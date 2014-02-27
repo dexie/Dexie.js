@@ -4,36 +4,23 @@ function StraightForwardDB(dbName, version) {
     var IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange;
     var IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction;
     var dbVersion = version || 1;
+    var dbTableSchema;
+    var dbPopulator;
+    /// <var type="Array" elementType="Version" />
+    var versions = [];
     var upgraders = [];
     var sfdb = this;
-    var tableSchema;
     var isReady = false;
     var readyEvent = event();
     ///<var type="IDBDatabase" />
     var db;
     var R = "readonly", RW = "readwrite";
 
-    this.version = function (ver, schema, upgradeFunc) {
-    	/// <summary>
-    	///   Defines the schema for a particular version
-    	/// </summary>
-        /// <param name="ver" type="Number"></param>
-        /// <param name="schema" type="Object">
-        /// Example: <br/>
-        ///   {users: "id++,first,last,!username,*email", <br/>
-        ///   passwords: "id++,!username"}<br/>
-        /// <br/>
-        /// Syntax: {Table: "[primaryKey][++],[!][*]index1,[!][*]index2,..."}<br/><br/>
-        /// Special characters:<br/>
-        ///  "!"  means unique key, <br/>
-        ///  "*"  means value is multiEntry, <br/>
-        ///  "++" means auto-increment and only applicable for primary key <br/>
-        /// </param>
-        /// <param name="upgradeFunc" optional="true">Function that performs upgrading actions.</param>
-        /// <returns type="StraightForwardDB"></returns>
+    this.version = function (versionNumber) {
+        /// <param name="versionNumber" type="Number"></param>
+        /// <returns type="Version"></returns>
         if (ver > dbVersion) {
             dbVersion = ver;
-            tableSchema = schema;
         }
         upgraders.sort(function(a,b){return a.version - b.version;});
         var lastSchema = upgraders.length > 0 ? upgraders[upgraders.length - 1].schema : null;
@@ -49,37 +36,152 @@ function StraightForwardDB(dbName, version) {
                 //      * multiEntry or unique changed: removeIndex, addIndex: throw()
             }
         });
-        return this;
+        var versionInstance = new Version(versionNumber);
+        versions.push(versionInstance);
+        return versionInstance;
     }
 
-    function getSchemaDiff(newSchema, oldSchema) {
+    function copyTable(oldStore, newStore, cb) {
+    	/// <param name="oldStore" type="IDBObjectStore"></param>
+        /// <param name="newStore" type="IDBObjectStore"></param>
+        iterate(oldStore.openCursor(), null, function (item) {
+            newStore.add(item);
+        }, null, cb, -1);
+    }
+
+    function createTable (trans, tableName, primKey, indexes) {
+        /// <param name="trans" type="IDBTransaction"></param>
+        var store = trans.db.createObjectStore(tableName, { keyPath: primKey.keyPath, autoIncrement: primKey.auto });
+        indexes.forEach(function(idx){
+            store.createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multi });
+        });
+        return store;
+    }
+
+    function recreateTable(trans, tableName, primKey, indexes, cb) {
+        /// <param name="trans" type="IDBTransaction"></param>
+        if (hasIEDeleteObjectStoreBug() && this.iewa && this.iewa[tableName]) {
+            trans.db.deleteObjectStore(tableName);
+            var store = createTable(trans, tableName, primKey, indexes);
+            this.iewa[tableName].forEach(function (item) {
+                store.add(item);
+            });
+            cb();
+        } else {
+            // Create temp table
+            var tmpStore = createTable(trans, "_temp-" + tableName, primKey, []);
+            // Copy old to temp
+            copyTable(trans.objectStore(tableName), tmpStore, function () {
+                // Delete old
+                trans.db.deleteObjectStore(tableName);
+                // Create new
+                var recreatedStore = createTable(trans, tableName, primKey, indexes);
+                // Copy temp to new
+                copyTable(tmpStore, recreatedStore, function () {
+                    // Delete temp
+                    trans.db.deleteObjectStore("_temp-" + tableName);
+                    cb();
+                });
+            });
+        }
+    }
+
+    function createUpgraderFactory(oldVersion) {
+        if (versions.length == 0) throw "SFDB: No versions specified. Need to call version(ver) method";
+        if (!versions.some(function(v){return v.cfg.tableSchema;})) throw "SFDB: No schema specified. Need to call dbInstance.version(ver).schema(schema)";
+        dbTableSchema = null;
+        versions.sort(function (a, b) { return a.cfg.version - b.cfg.version; });
+        if (oldVersion == 0) {
+            dbTableSchema = versions[versions.length - 1];
+            return function(trans) {
+                /// <param name="trans" type="IDBTransaction"></param>
+                // Create tables:
+                Object.keys(dbTableSchema).forEach(function (tableName){
+                    createTable(trans, tableName, dbTableSchema[tableName].primKey, dbTableSchema[tableName].indexes);
+                });
+                // Populate data
+                if (dbPopulator) dbPopulator(trans);
+            }
+        } else {
+            var queue = [];
+            versions.filter(function (v) { return v.cfg.version > oldVersion; }).forEach(function (version) {
+                /// <param name="version" type="Version"></param>
+                var oldSchema = dbTableSchema;
+                var newSchema = version.cfg.tableSchema;
+                dbTableSchema = newSchema;
+                if (!oldSchema) {
+                    queue.push(function (trans) {
+                        // Create tables:
+                        Object.keys(newSchema).forEach(function (tableName) {
+                            createTable(trans, tableName, newSchema[tableName].primKey, newSchema[tableName].indexes);
+                        });
+                    });
+                } else {
+                    var diff = getSchemaDiff(oldSchema, newSchema);
+                    queue.push(function (trans) {
+                        // Create new tables
+                        createTable(...)
+                        // Recreate changed tables
+                        recreateTable(...)
+                        // Delete old indexes
+                        
+                        // Create new indexes
+                    });
+                    if (newSchema.cfg.contentUpgrade) {
+                        queue.push(newSchema.cfg.contentUpgrade);
+                    }
+                    queue.push(function (trans) {
+                        // Delete old tables
+                    });
+                }
+            });
+        }
+    }
+
+    function getSchemaDiff(oldSchema, newSchema) {
         var diff = {
-            del: [],
-            add: [],
-            change: []
+            del: [], // Array of table names
+            add: [], // Array of [tableName, newDefinition]
+            change: [] // Array of {name: tableName, recreate: newDefinition, del: delIndexNames, add: newIndexDefs, change: changedIndexDefs}
         };
         for (var table in oldSchema) {
             if (!newSchema[table]) diff.del.push(table);
         }
         for (var table in newSchema) {
-            if (!oldSchema[table]) diff.add.push([table, newSchema[table]]);
-            else if (oldSchema[table].toLowerCase() != newSchema[table].toLowerCase()) {
-                // TODO: Get index diff. If something unchangeable is changed, throw!
-                var oldIndexes = parseIndexSyntax(oldSchema[table]);
-                var newIndexes = parseIndexSyntax(newSchema[table]);
-
-                //oldIndexes.reduce(
+            var oldDef = oldSchema[table],
+                newDef = newSchema[table];
+            if (!oldDef) diff.add.push([table, newDef]);
+            else {
+                var change = {
+                    name: table,
+                    def: newSchema[table],
+                    recreate: false,
+                    del: [],
+                    add: [],
+                    change: []
+                };
+                if (oldDef.primKey.src != newDef.primKey.src) {
+                    // Primary key has changed. Remove and re-add table.
+                    change.recreate = true;
+                } else {
+                    var oldIndexes = oldDef.indexes.reduce(function(prev,current){prev[current.name] = current; return prev;}, {});
+                    var newIndexes = newDef.indexes.reduce(function(prev,current){prev[current.name] = current; return prev;}, {});
+                    for (var idxName in oldIndexes) {
+                        if (!newIndexes[idxName]) change.del.push(idxName);
+                    }
+                    for (var idxName in newIndexes) {
+                        var oldIdx = oldIndexes[idxName],
+                            newIdx = newIndexes[idxName];
+                        if (!oldIdx) change.add.push(newIdx);
+                        else if (oldIdx.src != newIdx.src) change.change.push(newIdx);
+                    }
+                    if (change.recreate || change.del.length > 0 || change.add.length > 0 || change.change.length > 0) {
+                        diff.change.push(change);
+                    }
+                 }
             }
         }
-    }
-
-    function createTables(trans) {
-        /// <param name="trans" type="UpgradeTransaction"></param>
-        for (var tableName in tableSchema) {
-            if (tableSchema.hasOwnProperty(tableName)) {
-                trans.createTable(tableName, tableSchema[tableName]);
-            }
-        }
+        return diff;
     }
 
     this.upgradeTo = function (version, fn) {
@@ -107,13 +209,13 @@ function StraightForwardDB(dbName, version) {
         ///  "++" means auto-increment and only applicable for primary key <br/>
         /// </param>
         /// <returns type="StraightForwardDB"></returns>
-        tableSchema = schema;
+        dbTableSchema = schema;
         return this;
     }
 
     this.open = function () {
-        setApiOnPlace(this, defaultTransactionFactory, WriteableTable); //function () {throw "SFDB: Database not  to use yet."});
-        setApiOnPlace(UpgradeTransaction.prototype, function () { return IDBTransaction.prototype; }, UpgradeableTable); // For code completion only. Will be overridden by direct population later on.
+        setApiOnPlace(this, new OneshotTransactionFactory(), WriteableTable); //function () {throw "SFDB: Database not  to use yet."});
+        setApiOnPlace(UpgradeTransaction.prototype, new MultirequestTransactionFactory(IDBTransaction.prototype), UpgradeableTable); // For code completion only. Will be overridden by direct population later on.
 
         var req = idb.open(dbName, dbVersion);
         req.onerror = function (e) {
@@ -123,7 +225,7 @@ function StraightForwardDB(dbName, version) {
             // 1. Create object stores
             db = req.result;
             var upgradeTransaction = new UpgradeTransaction(req.transaction);
-            setApiOnPlace(upgradeTransaction, function () { return req.transaction; }, UpgradeableTable);
+            setApiOnPlace(upgradeTransaction, new MultirequestTransactionFactory(req.transaction), UpgradeableTable);
             if (e.oldVersion == 0) {
                 // Database first-time creation!
                 createTables(upgradeTransaction);
@@ -140,7 +242,7 @@ function StraightForwardDB(dbName, version) {
         }
         req.onsuccess = function (e) {
             db = req.result;
-            setApiOnPlace(sfdb, defaultTransactionFactory, WriteableTable);
+            setApiOnPlace(sfdb, new OneshotTransactionFactory(), WriteableTable);
             isReady = true;
             readyEvent.fire(e);
         }
@@ -192,40 +294,93 @@ function StraightForwardDB(dbName, version) {
         if (mode == "r") {
             var trans = db.transaction(storeNames, R);
             t = new Transaction(trans);
-            setApiOnPlace(t, function () { return trans; }, Table, storeNames);
+            setApiOnPlace(t, new MultirequestTransactionFactory(trans), Table, storeNames);
         } else if (mode == "rw") {
             var trans = db.transaction(storeNames, RW);
             t = new WriteableTransaction(trans);
-            setApiOnPlace(t, function () { return trans; }, WriteableTable, storeNames);
+            setApiOnPlace(t, new MultirequestTransactionFactory(trans), WriteableTable, storeNames);
         } else {
             throw "Invalid mode. Only 'r' or 'rw' are valid modes."
         }
         return t;
     }
 
-
-
-
-
+    this.table = function (tableName) {
+        if (!trans.db.objectStoreNames.contains(tableName)) throw "SFDB: Table does not exist";
+        return new WriteableTable(tableName, function () { return trans; });
+    }
 
 
 
     //
     //
     //
-    // ------------------------- class Table ---------------------------
+    // ------------------------- Version Object ---------------------------
+    //
+    //
+    //
+    function Version(versionNumber) {
+        this.cfg = {
+            version: versionNumber,
+            tableSchema: {},
+            schemaUpgrade: null,
+            contentUpgrade: null,
+        }
+        this.schema = function (schema) {
+            /// <summary>
+            ///   Defines the schema for a particular version
+            /// </summary>
+            /// <param name="schema" type="Object">
+            /// Example: <br/>
+            ///   {users: "id++,first,last,!username,*email", <br/>
+            ///   passwords: "id++,!username"}<br/>
+            /// <br/>
+            /// Syntax: {Table: "[primaryKey][++],[!][*]index1,[!][*]index2,..."}<br/><br/>
+            /// Special characters:<br/>
+            ///  "!"  means unique key, <br/>
+            ///  "*"  means value is multiEntry, <br/>
+            ///  "++" means auto-increment and only applicable for primary key <br/>
+            /// </param>
+            var tableSchema = this.cfg.tableSchema;
+            Object.keys(schema).forEach(function (tableName) {
+                var indexes = parseIndexSyntax(schema[tableName]);
+                var primKey = idxs.shift();
+                if (primKey.multi) throw "SFDB: Primary key cannot be multi-valued";
+                if (indexes.some(function (idx) { return idx.auto; })) {
+                    throw "SFDB: Only primary key can be marked as autoIncrement (++)";
+                }
+                tableSchema[tableName] = {
+                    primKey: primKey,
+                    indexes: indexes
+                };
+            });
+            return this;
+        }
+        this.upgrade = function (upgradeFunction) {
+            /// <param name="upgradeFunction" optional="true">Function that performs upgrading actions.</param>
+            this.cfg.contentUpgrade = upgradeFunction;
+            return this;
+        }
+    }
+
+
+
+    //
+    //
+    //
+    // ------------------------- Table Object ---------------------------
     //
     //
     //
     function Table(tableName, transactionFactory) {
     	/// <param name="tableName" type="String"></param>
-    	/// <param name="transactionFactory" value="function(){return IDBTransaction.prototype}"></param>
+        /// <param name="transactionFactory" type="OneshotTransactionFactory">OneshotTransactionFactory or MultirequestTransactionFactory</param>
         this.tableName = tableName;
         this.tf = transactionFactory;
     }
     Table.prototype.get = function (key) {
-        var d = Deferred();
-        var req = this.tf(this.tableName).objectStore(this.tableName).get(key);
+        var d = this.tf.deferred();
+        var req = this.tf.trans(this.tableName).objectStore(this.tableName).get(key);
         req.onerror = d.reject;
         req.onsuccess = function (e) {
             d.resolve(e.target.result);
@@ -239,16 +394,16 @@ function StraightForwardDB(dbName, version) {
         return new Collection(this.tf, this.tableName);
     }
     Table.prototype.each = function (fn) {
-        var d = Deferred();
-        var req = this.tf(this.tableName).objectStore(this.tableName).openCursor();
+        var d = this.tf.deferred();
+        var req = this.tf.trans(this.tableName).objectStore(this.tableName).openCursor();
         iterate(req, null, fn, d.reject, d.resolve, -1);
         return d;
     }
     Table.prototype.toArray = function (cb) {
-        var d = Deferred();
+        var d = this.tf.deferred();
         var a = [];
         if (cb) d.done(cb); // cb is just a shortcut for .toArray().done(cb);
-        var req = this.tf(this.tableName).objectStore(this.tableName).openCursor();
+        var req = this.tf.trans(this.tableName).objectStore(this.tableName).openCursor();
         iterate(req, null, function (item) { a.push(item); }, d.reject, function () { d.resolve(a); }, -1);
         return d;
     }
@@ -265,7 +420,7 @@ function StraightForwardDB(dbName, version) {
     //
     function WriteableTable(tableName, transactionFactory) {
         /// <param name="tableName" type="String"></param>
-        /// <param name="transactionFactory" value="function(){return IDBTransaction.prototype}"></param>
+        /// <param name="transactionFactory" type="OneshotTransactionFactory">OneshotTransactionFactory or MultirequestTransactionFactory</param>
         this.tableName = tableName;
         this.tf = transactionFactory;
     }
@@ -273,7 +428,7 @@ function StraightForwardDB(dbName, version) {
     WriteableTable.prototype = derive(Table);
 
     function createPromise(trans, req, tf, onReqSuccess) {
-        deferred = Deferred();
+        deferred = tf.deferred();
         req.onerror = deferred.reject;
         if (tf.oneshot) {
             // Transaction is a one-shot transaction and caller has not access to it. This is the case when calling
@@ -307,7 +462,7 @@ function StraightForwardDB(dbName, version) {
         ///     Note that the transaction may still not be completed and could still potentially fail even the request succeeded at this point.
         ///     Use the transaction() method to get more control over entire transation.
         /// </param>
-        var trans = this.tf(this.tableName, RW);
+        var trans = this.tf.trans(this.tableName, RW);
         var store = trans.objectStore(this.tableName);
         var req = store.put(obj);
         return createPromise(trans, req, this.tf);
@@ -323,7 +478,7 @@ function StraightForwardDB(dbName, version) {
         ///     Note that the transaction may still not be completed and could still potentially fail even the request succeeded at this point.
         ///     Use the transaction() method to get more control over entire transation.
         /// </param>
-        var trans = this.tf(this.tableName, RW);
+        var trans = this.tf.trans(this.tableName, RW);
         var store = trans.objectStore(this.tableName);
         var req = store.add(obj);
         return createPromise(trans, req, this.tf, function (e) {
@@ -338,13 +493,13 @@ function StraightForwardDB(dbName, version) {
 
     WriteableTable.prototype.delete = function (key) {
         /// <param name="key">Primary key of the object to delete</param>
-        var store = this.tf(this.tableName, RW).objectStore(this.tableName);
+        var store = this.tf.trans(this.tableName, RW).objectStore(this.tableName);
         var req = store.delete(key);
         return createPromise(trans, req, this.tf);
     }
 
     WriteableTable.prototype.clear = function (cb) {
-        var trans = this.tf(this.tableName, RW);
+        var trans = this.tf.trans(this.tableName, RW);
         var store = trans.objectStore(this.tableName);
         var req = store.clear();
         return createPromise(trans, req, this.tf);
@@ -366,7 +521,7 @@ function StraightForwardDB(dbName, version) {
     //
     //
     function UpgradeableTable(tableName, transactionFactory) {
-        /// <param name="transactionFactory" value="function(){return IDBTransaction.prototype;}"></param>
+        /// <param name="transactionFactory" type="OneshotTransactionFactory">OneshotTransactionFactory or MultirequestTransactionFactory</param>
         this.tableName = tableName;
         this.tf = transactionFactory;
     }
@@ -376,13 +531,13 @@ function StraightForwardDB(dbName, version) {
         parseIndexSyntax(index).forEach(function (idx) {
             if (!idx.keyPath) throw "SFDB: index must have a name and cannot be an empty string";
             if (idx.auto) throw "SFDB: Only the primary key can be auto incremented (++). Not indexes.";
-            this.tf().objectStore(this.tableName).createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multi });
+            this.tf.trans().objectStore(this.tableName).createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multi });
         });
     }
 
     UpgradeableTable.prototype.dropIndex = function (index) {
         parseIndexSyntax(index).forEach(function (idx) {
-            this.tf().objectStore(this.tableName).deleteIndex(idx.keyPath);
+            this.tf.trans().objectStore(this.tableName).deleteIndex(idx.keyPath);
         });
     }
 
@@ -401,22 +556,31 @@ function StraightForwardDB(dbName, version) {
         var thiz = this;
         var d = Deferred();
 
-        this.abort = function () {
-            trans.abort();
-        }
-
-        this.fail = d.fail;
-        this.done = d.done;
-        this.notify = d.notify;
+        thiz.fail = d.fail;
+        thiz.done = d.done;
 
         trans.onerror = d.reject;
         trans.onabort = d.reject;
         trans.oncomplete = d.resolve;
+
+        thiz.abort = function () {
+            trans.abort();
+        }
+        thiz.table = function (tableName) {
+            if (!trans.db.objectStoreNames.contains(tableName)) throw "SFDB: Table does not exist";
+            return new Table(tableName, function () { return trans; });
+        }
+
         return thiz;
     }
 
     function WriteableTransaction(trans) {
         var thiz = Transaction.call(this, trans);
+        thiz.table = function (tableName) {
+            if (!trans.db.objectStoreNames.contains(tableName)) throw "SFDB: Table does not exist";
+            return new WriteableTable(tableName, function () { return trans; });
+        }
+        return thiz;
     }
 
     function UpgradeTransaction(trans) {
@@ -435,7 +599,7 @@ function StraightForwardDB(dbName, version) {
             }
             return new UpgradeableTable(tableName, function () { return trans; });
         }
-        thiz.getTableByName = function (tableName) {
+        thiz.table = function (tableName) {
             if (!trans.db.objectStoreNames.contains(tableName)) throw "SFDB: Table does not exist";
             return new UpgradeableTable(tableName, function () { return trans; });
         }
@@ -515,7 +679,7 @@ function StraightForwardDB(dbName, version) {
     	/// <summary>
     	/// 
     	/// </summary>
-    	/// <param name="tf" value="function(){return IDBTransaction.prototype;}"></param>
+        /// <param name="tf" type="OneshotTransactionFactory">OneshotTransactionFactory or MultirequestTransactionFactory</param>
     	/// <param name="table" type="String"></param>
     	/// <param name="index" type="String" optional="true"></param>
         /// <param name="keyRange" type="IDBKeyRange" optional="true"></param>
@@ -547,13 +711,13 @@ function StraightForwardDB(dbName, version) {
         }
 
         this.each = function (fn) {
-            deferred = Deferred();
+            deferred = tf.deferred();
             iterate(openCursor(), filter, fn, deferred.reject, deferred.resolve, limit);
             return deferred;
         }
 
         this.count = function (cb) {
-            deferred = Deferred();
+            deferred = tf.deferred();
             // TODO: If limit, unique or filter, use iterate() instead!
             var trans = tf(table, R);
             var store = trans.objectStore(table);
@@ -569,7 +733,7 @@ function StraightForwardDB(dbName, version) {
         }
 
         this.toArray = function (cb) {
-            deferred = Deferred();
+            deferred = tf.deferred();
             var a = [];
             if (cb) deferred.done(cb); // cb is just a shortcut for .toArray().done(cb);
             iterate(openCursor(), filter, function (item) { a.push(item); }, deferred.reject, function () { deferred.resolve(a); }, limit);
@@ -577,14 +741,14 @@ function StraightForwardDB(dbName, version) {
         }
 
         this.first = function () {
-            deferred = Deferred();
+            deferred = tf.deferred();
             iterate(openCursor(), filter, function (item) { deferred.resolve(item); return false; }, deferred.reject, function () { }, limit);
             return deferred;
         }
 
         if (writeable) {
             this.modify = function (changes) {
-                deferred = CatchableDeferred(true);
+                deferred = tf.deferred(true);
                 mode = RW;
                 var keys = Object.keys(changes);
                 addFilter(function (cursor) {
@@ -607,7 +771,7 @@ function StraightForwardDB(dbName, version) {
                 return deferred;
             }
             this.delete = function () {
-                deferred = CatchableDeferred(true);
+                deferred = tf.deferred(true);
                 mode = RW;
                 addFilter(function (cursor) {
                     cursor.delete().onerror = function (e) { deferred.throw(e, cursor.value); };
@@ -661,8 +825,8 @@ function StraightForwardDB(dbName, version) {
     }
 
     function setApiOnPlace(obj, transactionFactory, tableClass, tableNames) {
-        for (var tableName in tableSchema) {
-            if (tableSchema.hasOwnProperty(tableName)) {
+        for (var tableName in dbTableSchema) {
+            if (dbTableSchema.hasOwnProperty(tableName)) {
                 if (!tableNames || tableNames.indexOf(tableName) != -1) {
                     //var memberName = obj[tableName] ? "tbl" + tableName[0].toUpperCase() + tableName.substr(1) : tableName;
                     obj[tableName] = new tableClass(tableName, transactionFactory);
@@ -672,8 +836,8 @@ function StraightForwardDB(dbName, version) {
     }
 
     function fake(fn) {
-        //var to = setTimeout(fn, 1000);
-        //clearTimeout(to);
+        var to = setTimeout(fn, 1000);
+        clearTimeout(to);
     }
 
     function onError(e) {
@@ -705,15 +869,53 @@ function StraightForwardDB(dbName, version) {
         indexes.split(',').forEach(function (index) {
             if (!index || index.indexOf('[') == 0) return;
             var keyPath = index.replace("!", "").replace("++", "").replace("*", "");
-            rv.push({
+            var idx = {
                 name: keyPath && keyPath.toLowerCase(),
                 keyPath: keyPath || null,
                 unique: index.indexOf('!') == 0,
                 multi: index.indexOf('*') == 0,
                 auto: index.indexOf("++") != -1
-            });
+            };
+            idx.src = (idx.unique ? '!' : '') + (idx.multi ? '*' : '') + (idx.auto ? "++" : "") + idx.keyPath;
+            rv.push(idx);
         });
         return rv;
+    }
+
+    function OneshotTransactionFactory() {
+        mode = mode || R;
+        this.trans = function(tableName, mode) {
+        	/// <returns type="IDBTransaction"></returns>
+            return db.transaction(tableName, mode);
+        }
+        this.oneshot = true;
+        this.deferred = function(catchable) {
+        	/// <returns type="CatchableDeferred"></returns>
+            return catchable ? CatchableDeferred(true) : Deferred();
+        }
+    }
+
+    function MultirequestTransactionFactory(trans) {
+        var thiz = this;
+        var uncompleteRequests = 0;
+        this.trans = function() { return trans; }
+        this.onbeforecomplete = null;
+        this.deferred = function(catchable) {
+            ++uncompleteRequests;
+            var d = (catchable ? CatchableDeferred(true) : Deferred());
+            function proxy (meth){
+                var origFunc = d[meth];
+                d[meth] = function() {
+                    origFunc.apply(this,arguments);
+                    if (--uncompleteRequests == 0 && thiz.onbeforecomplete) {
+                        thiz.onbeforecomplete();
+                    }
+                }
+            }
+            proxy("resolve");
+            proxy("reject");
+            return d;
+        }
     }
 
     function defaultTransactionFactory(tableName, mode) {
@@ -869,7 +1071,7 @@ function StraightForwardDB(dbName, version) {
         return deferred;
     }
 
-    function Callbacks(once) {
+    function Callbacks(once, stopOnFalse) {
         var state, list = [];
 
         function fire(context, args) {
