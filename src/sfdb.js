@@ -7,13 +7,18 @@
     var dbVersion = 0;
     /// <var type="Array" elementType="Version" />
     var versions = [];
-    var isReady = false;
-    var readyEvent = event();
     ///<var type="IDBDatabase" />
     var db = null;
     var R = "readonly", RW = "readwrite";
     var iewa; // IE WorkAound needed in IE10 & IE11 for http://connect.microsoft.com/IE/feedback/details/783672/indexeddb-getting-an-aborterror-exception-when-trying-to-delete-objectstore-inside-onupgradeneeded
     var database = this;
+    var mainTransactionFactory;
+    var pausedTransactionFactories = [];
+    
+    function init() {
+        mainTransactionFactory = new TransactionFactory().pause();
+        pausedTransactionFactories.push(mainTransactionFactory);
+    }
 
     function extend(obj, extended) {
         Object.keys(extended).forEach(function (key) {
@@ -42,6 +47,8 @@
     this.version = function (versionNumber) {
         /// <param name="versionNumber" type="Number"></param>
         /// <returns type="Version"></returns>
+        if (db) throw "SFDB: Cannot add version when database is open";
+        dbVersion = Math.max(dbVersion, versionNumber);
         var versionInstance = new Version(versionNumber);
         versions.push(versionInstance);
         return versionInstance;
@@ -50,7 +57,7 @@
     function Version(versionNumber) {
         this._cfg = {
             version: versionNumber,
-            tableSchema: {},
+            tableSchema: null,
             schemaUpgrade: null,
             contentUpgrade: null,
         }
@@ -72,7 +79,7 @@
             ///  "*"  means value is multiEntry, <br/>
             ///  "++" means auto-increment and only applicable for primary key <br/>
             /// </param>
-            var tableSchema = this._cfg.tableSchema;
+            var tableSchema = (this._cfg.tableSchema = this._cfg.tableSchema || {});
             Object.keys(schema).forEach(function (tableName) {
                 var indexes = parseIndexSyntax(schema[tableName]);
                 var primKey = indexes.shift();
@@ -86,13 +93,22 @@
                     indexes: indexes
                 };
             });
+            // Update the latest schema to this version
+            var latestSchema = getCurrentTableSchema();
+            if (dbTableSchema != latestSchema) {
+                // Update API
+                dbTableSchema = latestSchema;
+                removeTablesApi(database);
+                setApiOnPlace(database, mainTransactionFactory, WriteableTable, Object.keys(dbTableSchema));
+            }
+
             return this;
         },
         upgrade: function (upgradeFunction) {
             /// <param name="upgradeFunction" optional="true">Function that performs upgrading actions.</param>
-            var that = this;
+            var self = this;
             fake(function () {
-                upgradeFunction(new WriteableTransaction({}, {}, Object.keys(that._cfg.tableSchema))); // BUGBUG: No code completion for prev version's tables wont appear.
+                upgradeFunction(new WriteableTransaction({}, {}, Object.keys(self._cfg.tableSchema))); // BUGBUG: No code completion for prev version's tables wont appear.
             });
             this._cfg.contentUpgrade = upgradeFunction;
             return this;
@@ -101,13 +117,15 @@
 
     function runUpgraders(oldVersion, trans) {
         if (oldVersion == 0) {
-            dbTableSchema = versions[versions.length - 1]._cfg.tableSchema;
+            //dbTableSchema = versions[versions.length - 1]._cfg.tableSchema;
             // Create tables:
             Object.keys(dbTableSchema).forEach(function (tableName) {
                 createTable(trans, tableName, dbTableSchema[tableName].primKey, dbTableSchema[tableName].indexes);
             });
             // Populate data
-            var t = new WriteableTransaction(trans, new MultireqTransactionFactory(trans), trans.db.objectStoreNames);
+            var tf = new MultireqTransactionFactory(trans);
+            var t = new WriteableTransaction(trans, tf, trans.db.objectStoreNames);
+            tf.sfdbTrans = t;
             database.populate.fire(t);
         } else {
             // Upgrade version to version, step-by-step from oldest to newest version.
@@ -177,6 +195,7 @@
                         queue.push(function (trans, cb) {
                             var tf = new FinishableTransactionFactory(trans);
                             var t = new WriteableTransaction(trans, tf, trans.db.objectStoreNames);
+                            tf.sfdbTrans = t;
                             tf.onfinish = cb;
                             newSchema._cfg.contentUpgrade(t);
                             if (tf.uncompleteRequests == 0) cb();
@@ -319,20 +338,15 @@
         if (db) throw "SFDB: Database already open";
         // Make sure caller has specified at least one version
         if (versions.length == 0) throw "SFDB: No versions specified. Need to call version(ver) method";
-        // Sort versions by version number
-        versions.sort(function (a, b) { return a._cfg.version - b._cfg.version; });
         // Make sure at least the oldest version specifies a table schema
         if (!versions[0]._cfg.tableSchema) throw "SFDB: No schema specified. Need to call dbInstance.version(ver).schema(schema) on at least the lowest version.";
-        // Make all Version instances have a schema (its own or previous if not specified)
-        versions.forEach(function (ver) {
-            dbVersion = ver._cfg.version;
-            if (ver._cfg.tableSchema)
-                dbTableSchema = ver._cfg.tableSchema; // If a version specify schema, set this schema to dbTableSchema (at last we will have the last versions' schema there)
-            else
-                ver._cfg.tableSchema = dbTableSchema; // If a version doesnt specify schema, derive previous version's schema
+        // Sort versions and make all Version instances have a schema (its own or previous if not specified)
+        versions.sort(lowerVersionFirst).reduce(function (prev, ver) {
+            if (!ver._cfg.tableSchema) ver._cfg.tableSchema = prev._cfg.tableSchema;
+            return ver;
         });
 
-        setApiOnPlace(this, new TransactionFactory(), WriteableTable, Object.keys(dbTableSchema));
+        setApiOnPlace(this, mainTransactionFactory, WriteableTable, Object.keys(dbTableSchema));
         
         var req = idb.open(dbName, dbVersion * 10); // Multiply with 10 will be needed to workaround various bugs in different implementations of indexedDB.
         req.onerror = this.error.fire;
@@ -341,8 +355,12 @@
         }
         req.onsuccess = function (e) {
             db = req.result;
-            isReady = true;
-            readyEvent.fire(e);
+            database.ready.fire(e);
+            pausedTransactionFactories.forEach(function (tf) {
+                // If anyone has made operations on a table instance before the database was opened, the operations will start executing now.
+                tf.resume();
+            });
+            pausedTransactionFactories = [];
         }
         return this;
     }
@@ -350,6 +368,9 @@
     this.close = function () {
         if (db) {
             db.close();
+            pausedTransactionFactories.push(mainTransactionFactory.pause());
+            this.ready.reset();
+            this.error.reset();
             removeTablesApi(this);
             db = null;
         }
@@ -369,15 +390,13 @@
     //
 
     /// <field>Populate event</field>
-    this.populate = event(function () { return new WriteableTransaction(IDBTransaction.prototype, new TransactionFactory(), Object.keys(dbTableSchema)); });
+    this.populate = event(function () { return new WriteableTransaction(IDBTransaction.prototype, mainTransactionFactory, Object.keys(dbTableSchema)); });
 
     /// <field>Error event</field>
-    this.error = event(Event);
+    this.error = event(ErrorEvent, "stateful");
 
     /// <field>Ready event</field>
-    this.ready = function (fn) {
-        if (isReady) fn(); else readyEvent(fn);
-    }
+    this.ready = event(null, "stateful");
 
     this.transaction = function (mode, tableInstances) {
     	/// <summary>
@@ -385,36 +404,37 @@
     	/// </summary>
     	/// <param name="mode" type="String">"r" for readonly, or "rw" for readwrite</param>
         /// <param name="tableInstances" type="WriteableTable" parameterArray="true">Table instances to include in transaction, or strings representing the table names</param>
-        // Throw if no given table name doesnt exist.
-        var storeNames = [];
-        for (var i=1;i<arguments.length;++i) {
-            var tableInstance = arguments[i];
+       
+        var tables = tableInstances instanceof Array ? tableInstances : Array.prototype.slice.call(arguments, 1);
+        var storeNames = tables.map(function (tableInstance) {
             if (typeof (tableInstance) == "string") {
                 if (!dbTableSchema[tableInstance]) throw "SFDB: Invalid table name: " + tableInstance; return { INVALID_TABLE_NAME: 1 }; // Return statement is for IDE code completion.
-                storeNames.push(tableInstance);
+                return tableInstance;
             } else {
                 if (!(tableInstance instanceof WriteableTable)) throw "SFDB: Invalid parameter. Point out your table instances from your StraightForwardDB instance";
-                storeNames.push(tableInstance.tableName);
+                return tableInstance.name;
             }
-        }
-        var t;
-        if (mode == "r") {
-            var trans = db.transaction(storeNames, R);
-            var tf = new MultireqTransactionFactory(trans);
+        });
+        var tf, t;
+        if (mode == R || mode == "r") {
+            tf = new MultireqTransactionFactory(storeNames, R);
             t = new Transaction(trans, tf, storeNames);
-        } else if (mode == "rw") {
-            var trans = db.transaction(storeNames, RW);
-            var tf = new MultireqTransactionFactory(trans);
+        } else if (mode == RW || mode == "rw") {
+            tf = new MultireqTransactionFactory(storeNames, RW);
             t = new WriteableTransaction(trans, tf, storeNames);
         } else {
-            throw "Invalid mode. Only 'r' or 'rw' are valid modes."
+            throw "Invalid mode. Only 'readonly'/'r' or 'readwrite'/'rw' are valid modes."
+        }
+        tf.sfdbTrans = t;
+        if (!db) {
+            pausedTransactionFactories.push(tf.pause());
         }
         return t;
     }
 
     this.table = function (tableName) {
         if (Object.keys(dbTableSchema).indexOf(tableName) == -1) { throw "SFDB: Table does not exist"; return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
-        return new WriteableTable(tableName, new TransactionFactory());
+        return new WriteableTable(tableName, mainTransactionFactory);
     }
 
     //
@@ -424,10 +444,10 @@
     //
     //
     //
-    function Table(tableName, transactionFactory, collClass) {
-    	/// <param name="tableName" type="String"></param>
+    function Table(name, transactionFactory, collClass) {
+    	/// <param name="name" type="String"></param>
         /// <param name="transactionFactory" type="TransactionFactory">TransactionFactory or MultireqTransactionFactory</param>
-        this.tableName = tableName;
+        this.name = name;
         this._tf = transactionFactory;
         this._collClass = collClass || Collection;
     }
@@ -435,7 +455,7 @@
         get: function (key) {
             var self = this;
             return this._tf.createPromise(function (resolve, reject) {
-                var req = self._tf.create(self.tableName).objectStore(self.tableName).get(key);
+                var req = self._tf.create(self.name).objectStore(self.name).get(key);
                 req.onerror = function (e) { reject(req.error, e); }
                 req.onsuccess = function () {
                     resolve(req.result);
@@ -443,18 +463,18 @@
             });
         },
         where: function (indexName) {
-            return new WhereClause(this._tf, this.tableName, indexName);
+            return new WhereClause(this._tf, this.name, indexName);
         },
         count: function (cb) {
-            return new Collection(new WhereClause(this._tf, this.tableName)).count(cb);
+            return new Collection(new WhereClause(this._tf, this.name)).count(cb);
         },
         limit: function (numRows) {
-            return new this._collClass(new WhereClause(this._tf, this.tableName)).limit(numRows);
+            return new this._collClass(new WhereClause(this._tf, this.name)).limit(numRows);
         },
         each: function (fn) {
             var self = this;
             return this._tf.createPromise(function (resolve, reject) {
-                var req = self._tf.create(self.tableName).objectStore(self.tableName).openCursor();
+                var req = self._tf.create(self.name).objectStore(self.name).openCursor();
                 iterate(req, null, fn, resolve, reject); // TODO: Reject with error not event. Resolve with ???
             });
         },
@@ -462,12 +482,12 @@
             var self = this;
             return this._tf.createPromise(function (resolve, reject) {
                 var a = [];
-                var req = self._tf.create(self.tableName).objectStore(self.tableName).openCursor();
+                var req = self._tf.create(self.name).objectStore(self.name).openCursor();
                 iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject);
             }).then(cb);
         },
         orderBy: function (index) {
-            return new this._collClass(new WhereClause(this.tf, this.tableName, index));
+            return new this._collClass(new WhereClause(this.tf, this.name, index));
         }
     });
 
@@ -478,10 +498,10 @@
     //
     //
     //
-    function WriteableTable(tableName, transactionFactory) {
-        /// <param name="tableName" type="String"></param>
+    function WriteableTable(name, transactionFactory) {
+        /// <param name="name" type="String"></param>
         /// <param name="transactionFactory" type="TransactionFactory">TransactionFactory or MultireqTransactionFactory</param>
-        this.tableName = tableName;
+        this.name = name;
         this._tf = transactionFactory;
     }
 
@@ -495,8 +515,8 @@
                 tf = this._tf;
 
             return tf.createPromise(function (resolve, reject) {
-                var trans = tf.create(self.tableName, RW);
-                var store = trans.objectStore(self.tableName);
+                var trans = tf.create(self.name, RW);
+                var store = trans.objectStore(self.name);
                 var req = store[method].apply(store,args || []);
                 req.onerror = function (e) {
                     reject(req.error, e);
@@ -557,15 +577,15 @@
             return this._wrop("clear");
         },
         where: function (indexName) {
-            return new WhereClause(this._tf, this.tableName, indexName, true);
+            return new WhereClause(this._tf, this.name, indexName, true);
         },
         modify: function (changes) {
-            return new WriteableCollection(new WhereClause(this._tf, this.tableName, null, true)).modify(changes);
+            return new WriteableCollection(new WhereClause(this._tf, this.name, null, true)).modify(changes);
         }
     });
 
 
-    function Transaction(trans, tf, storeNames, tableClass) {
+    function Transaction(tf, storeNames, tableClass) {
     	/// <summary>
     	///    Transaction class
     	/// </summary>
@@ -574,22 +594,16 @@
         /// <param name="storeNames" type="Array">Array of table names to operate on</param>
         /// <param name="tableClass" optional="true" type="Function">Class to use for table instances</param>
 
-        var promise = new Promise(function (resolve, reject) {
-            trans.onerror = reject;
-            trans.onabort = reject;
-            trans.oncomplete = resolve;
-        });
-
         this._ctx = {
-            promise: promise,
-            trans: trans,
             tf: tf,
             storeNames: storeNames,
             tableClass: tableClass || Table
         };
         
-        this.fail = promise.catch;
-        this.done = promise.then;
+        this.fail = event(ErrorEvent, "stateful");
+        this.done = event(null, "stateful");
+
+        tf.sfdbTrans = this;
 
         setApiOnPlace(this, tf, tableClass || Table, storeNames);
     }
@@ -598,9 +612,9 @@
         abort: function () {
             this._ctx.trans.abort();
         },
-        table: function (tableName) {
-            if (this._ctx.storeNames.indexOf(tableName) == -1) throw "SFDB: Table does not exist";
-            return new this._ctx.tableClass(tableName, this._ctx.tf);
+        table: function (name) {
+            if (this._ctx.storeNames.indexOf(name) == -1) throw "SFDB: Table does not exist";
+            return new this._ctx.tableClass(name, this._ctx.tf);
         }
     });
 
@@ -611,7 +625,7 @@
         /// <param name="trans" type="IDBTransaction">The underlying transaction instance</param>
         /// <param name="tf">Transaction factory</param>
         /// <param name="storeNames" type="Array">Array of table names to operate on</param>
-        Transaction.call(this, trans, tf, storeNames, WriteableTable);
+        Transaction.call(this, tf, storeNames, WriteableTable);
     }
 
     derive (WriteableTransaction).from(Transaction);
@@ -865,6 +879,16 @@
     //
     //
 
+    function lowerVersionFirst(a, b) {
+        return a._cfg.version - b._cfg.version;
+    }
+
+    function getCurrentTableSchema() {
+        return versions.sort(lowerVersionFirst).reduce(function (prev, curr) {
+            return (curr._cfg.tableSchema ? curr : prev);
+        })._cfg.tableSchema;
+    }
+
     function setApiOnPlace(obj, transactionFactory, tableClass, tableNames) {
         for (var i=0,l=tableNames.length;i<l;++i) {
             var tableName = tableNames[i];
@@ -930,10 +954,11 @@
         return rv;
     }
 
-    function TransactionFactory() { }
+    function TransactionFactory() {}
 
     extend(TransactionFactory.prototype, {
         create: function (tableName, mode) {
+            if (!db) throw "SFDB: Database not open";
             return db.transaction(tableName, mode || R);
         },
         oneshot: true,
@@ -941,21 +966,56 @@
             return trappable ? new TrappablePromise(fn) : new Promise(fn);
         },
         createTrappablePromise: function (fn) {
-            return this.promise(fn, true);
+            return this.createPromise(fn, true);
+        },
+        pause: function () {
+            // Temporary set all requests into a pending queue if they are called before database is ready.
+            this.createPromise = function (fn) {
+                var proto = this.constructor.prototype;
+                var self = this;
+                arguments[0] = function () {
+                    var thiz = this, args = arguments;
+                    var waitingFns = (self.waitingFns = self.waitingFns || []);
+                    waitingFns.push(function () {
+                        fn.apply(thiz, args);
+                    });
+                };
+                return proto.createPromise.apply(this, arguments);
+            }
+            return this;
+        },
+        resume: function () {
+            delete this.createPromise; // Take back its prototype and original version of createPromise.
+            if (this.waitingFns) {
+                this.waitingFns.forEach(function (fn) { fn(); });
+                delete this.waitingFns;
+            }
+            return this;
         }
     });
 
-    function MultireqTransactionFactory(trans) {
-        this.trans = trans;
+    function MultireqTransactionFactory(storeNamesOrTrans, mode) {
+        this.sfdbTrans = null;
+        this.trans = (storeNamesOrTrans instanceof IDBTransaction ? storeNamesOrTrans : null);
+        this.storeNames = this.trans ? null : storeNamesOrTrans;
+        this.mode = mode || null;
     }
 
     derive(MultireqTransactionFactory).from(TransactionFactory).extend({
         oneshot: false,
-        create: function() { return this.trans; }
+        create: function () {
+            // Since this is a Multi-request transaction factory, we cache the transaction object once it has been created and continue using it.
+            if (this.trans) return this.trans;
+            this.trans = db.transaction(this.storeNames, this.mode);
+            trans.onerror = this.sfdbTrans.fail.fire;
+            trans.onabort = this.sfdbTrans.fail.fire;
+            trans.oncomplete = this.sfdbTrans.done.fire;
+            return trans;
+        }
     });
 
-    function FinishableTransactionFactory(trans) {
-        MultireqTransactionFactory.call(this, trans);
+    function FinishableTransactionFactory(storeNamesOrTrans, mode) {
+        MultireqTransactionFactory.call(this, storeNamesOrTrans, mode);
         this.uncompleteRequests = 0;
         this.onfinish = null;
     }
@@ -980,7 +1040,8 @@
                     if (--self.uncompleteRequests == 0 && self.onfinish) self.onfinish();
                 }
             }
-            return MultireqTransactionFactory.prototype.createPromise(function (resolve, reject, raise) {
+            var baseClass = MultireqTransactionFactory;
+            return baseClass.prototype.createPromise.call(this, function (resolve, reject, raise) {
                 arguments[0] = proxy(resolve);
                 arguments[1] = proxy(reject);
                 fn.apply(this, arguments);
@@ -992,16 +1053,28 @@
         if (!b) throw "Assertion failed";
     }
 
-    function event(constructor) {
-        var l = [];
+    function event(constructor, options) {
+        var l = [], args = null;
+        var split = options ? options.split(' ') : [];
+        var once = split.indexOf("stateful") != -1;
         var rv = function (cb) {
-            fake(function () { cb(constructor());}); // For code completion
-            if (l.indexOf(cb) == -1) l.push(cb);
+            fake(function () { if (constructor) cb(constructor()); }); // For code completion
+            if (args)
+                cb.apply(this, args);
+            else
+                if (l.indexOf(cb) == -1) l.push(cb);
             return this;
         };
         rv.fire = function (eventObj) {
             var a = arguments;
             l.forEach(function (cb) { cb.apply(window, a); });
+            if (once) {
+                args = a;
+                l = [];
+            }
+        }
+        rv.reset = function () {
+            args = null;
         }
         rv.off = function (cb) {
             var i = l.indexOf(cb);
@@ -1248,6 +1321,8 @@
         WriteableTable: WriteableTable,
         WriteableTransaction: WriteableTransaction,
     };
+
+    init();
 }
 
 StraightForwardDB.delete = function (databaseName) {
