@@ -1,5 +1,5 @@
-﻿/// <reference path="/js/common/jquery.js" />
-function StraightForwardDB(dbName) {
+﻿function StraightForwardDB(dbName) {
+    "use strict";
     var idb = window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB;
     var IDBKeyRange = window.IDBKeyRange || window.webkitIDBKeyRange;
     var IDBTransaction = window.IDBTransaction || window.webkitIDBTransaction;
@@ -7,16 +7,29 @@ function StraightForwardDB(dbName) {
     var dbVersion = 0;
     /// <var type="Array" elementType="Version" />
     var versions = [];
-    var upgraders = [];
-    var tables = derive(this);
-    var api = derive(tables);
     var isReady = false;
     var readyEvent = event();
     ///<var type="IDBDatabase" />
     var db = null;
     var R = "readonly", RW = "readwrite";
     var iewa; // IE WorkAound needed in IE10 & IE11 for http://connect.microsoft.com/IE/feedback/details/783672/indexeddb-getting-an-aborterror-exception-when-trying-to-delete-objectstore-inside-onupgradeneeded
+    var database = this;
 
+    function extend(obj, extended) {
+        Object.keys(extended).forEach(function (key) {
+            obj[key] = extended[key];
+        });
+    }
+
+    function derive (Child) {
+        return {from: function(Parent) {
+            Child.prototype = Object.create(Parent.prototype);
+            Child.prototype.constructor = Child;
+            return {extend: function(extension) {
+                extend (Child.prototype, extension);
+            }};
+        }}; 
+    }
 
     //
     //
@@ -26,7 +39,7 @@ function StraightForwardDB(dbName) {
     //
     //
 
-    api.version = function (versionNumber) {
+    this.version = function (versionNumber) {
         /// <param name="versionNumber" type="Number"></param>
         /// <returns type="Version"></returns>
         var versionInstance = new Version(versionNumber);
@@ -35,14 +48,16 @@ function StraightForwardDB(dbName) {
     }
 
     function Version(versionNumber) {
-        var thiz = this;
         this._cfg = {
             version: versionNumber,
             tableSchema: {},
             schemaUpgrade: null,
             contentUpgrade: null,
         }
-        this.schema = function (schema) {
+    }
+
+    extend(Version.prototype, {
+        schema: function (schema) {
             /// <summary>
             ///   Defines the schema for a particular version
             /// </summary>
@@ -72,16 +87,17 @@ function StraightForwardDB(dbName) {
                 };
             });
             return this;
-        }
-        this.upgrade = function (upgradeFunction) {
+        },
+        upgrade: function (upgradeFunction) {
             /// <param name="upgradeFunction" optional="true">Function that performs upgrading actions.</param>
+            var that = this;
             fake(function () {
-                upgradeFunction(new WriteableTransaction({}, {}, Object.keys(thiz._cfg.tableSchema))); // BUGBUG: No code completion for prev version's tables wont appear.
+                upgradeFunction(new WriteableTransaction({}, {}, Object.keys(that._cfg.tableSchema))); // BUGBUG: No code completion for prev version's tables wont appear.
             });
             this._cfg.contentUpgrade = upgradeFunction;
             return this;
         }
-    }
+    });
 
     function runUpgraders(oldVersion, trans) {
         if (oldVersion == 0) {
@@ -91,8 +107,8 @@ function StraightForwardDB(dbName) {
                 createTable(trans, tableName, dbTableSchema[tableName].primKey, dbTableSchema[tableName].indexes);
             });
             // Populate data
-            var t = new WriteableTransaction(trans, new MultirequestTransactionFactory(trans), trans.db.objectStoreNames);
-            api.populate.fire(t);
+            var t = new WriteableTransaction(trans, new MultireqTransactionFactory(trans), trans.db.objectStoreNames);
+            database.populate.fire(t);
         } else {
             // Upgrade version to version, step-by-step from oldest to newest version.
             // Each transaction object will contain the table set that was current in that version (but also not-yet-deleted tables from its previous version)
@@ -128,12 +144,12 @@ function StraightForwardDB(dbName) {
                                     iewa = iewa || { __num: 0 };
                                     ++iewa.__num;
                                     iewa[change.name] = [];
-                                    iterate(trans.objectStore(change.name).openCursor(), null, function (item) { iewa[change.name].push(item) }, null, function () {
+                                    iterate(trans.objectStore(change.name).openCursor(), null, function (item) { iewa[change.name].push(item) }, function () {
                                         if (--iewa.__num == 0) {
                                             trans.abort(); // Abort transaction and re-open database re-run the upgraders now that all tables are read to mem.
-                                            api.open();
+                                            database.open();
                                         }
-                                    }, -1);
+                                    });
                                 }
                             }
 
@@ -159,9 +175,9 @@ function StraightForwardDB(dbName) {
                     });
                     if (newSchema._cfg.contentUpgrade) {
                         queue.push(function (trans, cb) {
-                            var tf = new MultirequestTransactionFactory(trans);
+                            var tf = new FinishableTransactionFactory(trans);
                             var t = new WriteableTransaction(trans, tf, trans.db.objectStoreNames);
-                            tf.onbeforecomplete = cb;
+                            tf.onfinish = cb;
                             newSchema._cfg.contentUpgrade(t);
                             if (tf.uncompleteRequests == 0) cb();
                         });
@@ -245,7 +261,7 @@ function StraightForwardDB(dbName) {
         /// <param name="newStore" type="IDBObjectStore"></param>
         iterate(oldStore.openCursor(), null, function (item) {
             newStore.add(item);
-        }, null, cb, -1);
+        }, cb);
     }
 
     function createTable (trans, tableName, primKey, indexes) {
@@ -299,7 +315,7 @@ function StraightForwardDB(dbName) {
     //
     //
 
-    api.open = function () {
+    this.open = function () {
         if (db) throw "SFDB: Database already open";
         // Make sure caller has specified at least one version
         if (versions.length == 0) throw "SFDB: No versions specified. Need to call version(ver) method";
@@ -316,7 +332,7 @@ function StraightForwardDB(dbName) {
                 ver._cfg.tableSchema = dbTableSchema; // If a version doesnt specify schema, derive previous version's schema
         });
 
-        setApiOnPlace(tables, new OneshotTransactionFactory(), WriteableTable, Object.keys(dbTableSchema));
+        setApiOnPlace(this, new TransactionFactory(), WriteableTable, Object.keys(dbTableSchema));
         
         var req = idb.open(dbName, dbVersion * 10); // Multiply with 10 will be needed to workaround various bugs in different implementations of indexedDB.
         req.onerror = this.error.fire;
@@ -331,23 +347,21 @@ function StraightForwardDB(dbName) {
         return this;
     }
 
-    api.close = function () {
+    this.close = function () {
         if (db) {
             db.close();
-            Object.keys(tables).forEach(function (table) {
-                delete tables[table];
-            });
+            removeTablesApi(this);
             db = null;
         }
     }
 
-    api.delete = function () {
-        api.close();
-        var deferred = Deferred();
-        var req = idb.deleteDatabase(dbName);
-        req.onerror = deferred.reject;
-        req.onsuccess = deferred.resolve;
-        return deferred;
+    this.delete = function () {
+        this.close();
+        return Promise(function (resolve, reject) {
+            var req = idb.deleteDatabase(dbName);
+            req.onerror = resolve;
+            req.onsuccess = reject;
+        });
     }
 
     //
@@ -355,17 +369,17 @@ function StraightForwardDB(dbName) {
     //
 
     /// <field>Populate event</field>
-    api.populate = event(function () { return new WriteableTransaction(IDBTransaction.prototype, new OneshotTransactionFactory(), Object.keys(dbTableSchema)); });
+    this.populate = event(function () { return new WriteableTransaction(IDBTransaction.prototype, new TransactionFactory(), Object.keys(dbTableSchema)); });
 
     /// <field>Error event</field>
-    api.error = event(Event);
+    this.error = event(Event);
 
     /// <field>Ready event</field>
-    api.ready = function (fn) {
+    this.ready = function (fn) {
         if (isReady) fn(); else readyEvent(fn);
     }
 
-    api.transaction = function (mode, tableInstances) {
+    this.transaction = function (mode, tableInstances) {
     	/// <summary>
     	/// 
     	/// </summary>
@@ -386,11 +400,11 @@ function StraightForwardDB(dbName) {
         var t;
         if (mode == "r") {
             var trans = db.transaction(storeNames, R);
-            var tf = new MultirequestTransactionFactory(trans);
+            var tf = new MultireqTransactionFactory(trans);
             t = new Transaction(trans, tf, storeNames);
         } else if (mode == "rw") {
             var trans = db.transaction(storeNames, RW);
-            var tf = new MultirequestTransactionFactory(trans);
+            var tf = new MultireqTransactionFactory(trans);
             t = new WriteableTransaction(trans, tf, storeNames);
         } else {
             throw "Invalid mode. Only 'r' or 'rw' are valid modes."
@@ -398,12 +412,10 @@ function StraightForwardDB(dbName) {
         return t;
     }
 
-    api.table = function (tableName) {
+    this.table = function (tableName) {
         if (Object.keys(dbTableSchema).indexOf(tableName) == -1) { throw "SFDB: Table does not exist"; return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
-        return new WriteableTable(tableName, new OneshotTransactionFactory());
+        return new WriteableTable(tableName, new TransactionFactory());
     }
-
-
 
     //
     //
@@ -412,47 +424,52 @@ function StraightForwardDB(dbName) {
     //
     //
     //
-    function Table(tableName, transactionFactory) {
+    function Table(tableName, transactionFactory, collClass) {
     	/// <param name="tableName" type="String"></param>
-        /// <param name="transactionFactory" type="OneshotTransactionFactory">OneshotTransactionFactory or MultirequestTransactionFactory</param>
+        /// <param name="transactionFactory" type="TransactionFactory">TransactionFactory or MultireqTransactionFactory</param>
         this.tableName = tableName;
         this._tf = transactionFactory;
+        this._collClass = collClass || Collection;
     }
-    Table.prototype.get = function (key) {
-        var d = this._tf.deferred();
-        var req = this._tf.trans(this.tableName).objectStore(this.tableName).get(key);
-        req.onerror = d.reject;
-        req.onsuccess = function (e) {
-            d.resolve(e.target.result);
-        };
-        return d;
-    }
-    Table.prototype.where = function (indexName) {
-        return new WhereClause(this._tf, this.tableName, indexName, false);
-    }
-    Table.prototype.count = function (cb) {
-        return new Collection(this._tf, this.tableName).count(cb);
-    }
-    Table.prototype.limit = function (numRows) {
-        return new Collection(this._tf, this.tableName).limit(numRows);
-    }
-    Table.prototype.each = function (fn) {
-        var d = this._tf.deferred();
-        var req = this._tf.trans(this.tableName).objectStore(this.tableName).openCursor();
-        iterate(req, null, fn, d.reject, d.resolve, -1);
-        return d;
-    }
-    Table.prototype.toArray = function (cb) {
-        var d = this._tf.deferred();
-        var a = [];
-        if (cb) d.done(cb); // cb is just a shortcut for .toArray().done(cb);
-        var req = this._tf.trans(this.tableName).objectStore(this.tableName).openCursor();
-        iterate(req, null, function (item) { a.push(item); }, d.reject, function () { d.resolve(a); }, -1);
-        return d;
-    }
-    Table.prototype.orderBy = function (index) {
-        return new Collection(this.tf, this.tableName, index);
-    }
+    extend(Table.prototype, {
+        get: function (key) {
+            var self = this;
+            return this._tf.createPromise(function (resolve, reject) {
+                var req = self._tf.create(self.tableName).objectStore(self.tableName).get(key);
+                req.onerror = function (e) { reject(req.error, e); }
+                req.onsuccess = function () {
+                    resolve(req.result);
+                };
+            });
+        },
+        where: function (indexName) {
+            return new WhereClause(this._tf, this.tableName, indexName);
+        },
+        count: function (cb) {
+            return new Collection(new WhereClause(this._tf, this.tableName)).count(cb);
+        },
+        limit: function (numRows) {
+            return new this._collClass(new WhereClause(this._tf, this.tableName)).limit(numRows);
+        },
+        each: function (fn) {
+            var self = this;
+            return this._tf.createPromise(function (resolve, reject) {
+                var req = self._tf.create(self.tableName).objectStore(self.tableName).openCursor();
+                iterate(req, null, fn, resolve, reject); // TODO: Reject with error not event. Resolve with ???
+            });
+        },
+        toArray: function (cb) {
+            var self = this;
+            return this._tf.createPromise(function (resolve, reject) {
+                var a = [];
+                var req = self._tf.create(self.tableName).objectStore(self.tableName).openCursor();
+                iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject);
+            }).then(cb);
+        },
+        orderBy: function (index) {
+            return new this._collClass(new WhereClause(this.tf, this.tableName, index));
+        }
+    });
 
     //
     //
@@ -463,153 +480,141 @@ function StraightForwardDB(dbName) {
     //
     function WriteableTable(tableName, transactionFactory) {
         /// <param name="tableName" type="String"></param>
-        /// <param name="transactionFactory" type="OneshotTransactionFactory">OneshotTransactionFactory or MultirequestTransactionFactory</param>
+        /// <param name="transactionFactory" type="TransactionFactory">TransactionFactory or MultireqTransactionFactory</param>
         this.tableName = tableName;
         this._tf = transactionFactory;
     }
 
-    WriteableTable.prototype = derive(Table.prototype);
+    derive(WriteableTable).from(Table).extend({
 
-    function createPromise(trans, req, tf, onReqSuccess) {
-        deferred = tf.deferred();
-        req.onerror = deferred.reject;
-        if (tf.oneshot) {
-            // Transaction is a one-shot transaction and caller has not access to it. This is the case when calling
-            // put(),add() etc directy on db.table and not via db.transaction(). We must return a deferred object to 
-            // that user can act upon transaction completion. This is not needed when caller has the transaction
-            // object.
-            trans.oncomplete = deferred.resolve;
-            if (onReqSuccess) req.onsuccess = onReqSuccess;
-        } else {
-            // complete() must be called when request.onsuccess.
-            // If req.onsuccess already is bound to a function, use this poor-man's implementation of addEventListener() to onsuccess.
-            if (onReqSuccess) {
-                req.onsuccess = function () {
-                    onReqSuccess.apply(this, arguments);
-                    deferred.resolve.apply(this, arguments);
+        _wrop: function (method, args, onReqSuccess) {
+        	/// <summary>
+        	///  Perform a write operation on object store.
+        	/// </summary>
+            var self = this,
+                tf = this._tf;
+
+            return tf.createPromise(function (resolve, reject) {
+                var trans = tf.create(self.tableName, RW);
+                var store = trans.objectStore(self.tableName);
+                var req = store[method].apply(store,args || []);
+                req.onerror = function (e) {
+                    reject(req.error, e);
                 }
-            } else {
-                req.onsuccess = deferred.resolve;
-            }
+                if (tf.oneshot) {
+                    // Transaction is a one-shot transaction and caller has not access to it. This is the case when calling
+                    // put(),add() etc directy on db.table and not via db.transaction(). Let the promise.then() be called when transaction
+                    // completes and not just when request completes. Otherwise caller will continue before the data has been transmitted to the database.
+                    trans.oncomplete = function () {
+                        resolve(req.result);
+                    }
+                    if (onReqSuccess) req.onsuccess = onReqSuccess;
+                } else {
+                    // Caller has the transaction object. then() must be called when request.onsuccess.
+                    // This is because caller must be able to continue doing operations on the transaction that is already open.
+                    // Also, if caller will read from recently stored data within the same transaction, he or she will get it.
+                    // But if caller reads same data from another transaction, it may not be retrieved yet.
+                    if (onReqSuccess) {
+                        req.onsuccess = function () {
+                            onReqSuccess.apply(this, arguments);
+                            resolve(req.result);
+                        }
+                    } else {
+                        req.onsuccess = function () {
+                            resolve(req.result);
+                        }
+                    }
+                }
+            });
+        },
+
+
+        put: function (obj) {
+            /// <summary>
+            ///   Add an object to the database but in case an object with same primary key alread exists, the existing one will get updated.
+            /// </summary>
+            /// <param name="obj" type="Object">A javascript object to insert or update</param>
+            return this._wrop("put", [obj], function (e) {
+                var keyPath = req.source.keyPath;
+                if (keyPath) obj[keyPath] = req.result;
+            });
+        },
+        add: function (obj) {
+            /// <summary>
+            ///   Add an object to the database. In case an object with same primary key already exists, the object will not be added.
+            /// </summary>
+            /// <param name="obj" type="Object">A javascript object to insert</param>
+            return this._wrop("add", [obj], function (e) {
+                var keyPath = req.source.keyPath;
+                if (keyPath) obj[keyPath] = req.result;
+            });
+        },
+        'delete': function (key) {
+            /// <param name="key">Primary key of the object to delete</param>
+            return this._wrop("delete", [key]);
+        },
+        clear: function () {
+            return this._wrop("clear");
+        },
+        where: function (indexName) {
+            return new WhereClause(this._tf, this.tableName, indexName, true);
+        },
+        modify: function (changes) {
+            return new WriteableCollection(new WhereClause(this._tf, this.tableName, null, true)).modify(changes);
         }
-        return deferred;
-    }
+    });
 
-    WriteableTable.prototype.put = function (obj, cb) {
-        /// <summary>
-        ///   Add an object to the database but in case an object with same primary key alread exists, the existing one will get updated.
-        /// </summary>
-        /// <param name="obj" type="Object">A javascript object to insert or update</param>
-        /// <param name="cb" type="Function" optional="true">
-        ///     function (key, err) {} where key is the value of the objects manually or auto-generated primary key. If an error occurs, key will be null and err will contain the error.
-        ///     Note that the transaction may still not be completed and could still potentially fail even the request succeeded at this point.
-        ///     Use the transaction() method to get more control over entire transation.
-        /// </param>
-        var trans = this._tf.trans(this.tableName, RW);
-        var store = trans.objectStore(this.tableName);
-        var req = store.put(obj);
-        return createPromise(trans, req, this._tf);
-    }
 
-    WriteableTable.prototype.add = function (obj) {
-        /// <summary>
-        ///   Add an object to the database. In case an object with same primary key already exists, the object will not be added.
-        /// </summary>
-        /// <param name="obj" type="Object">A javascript object to insert</param>
-        /// <param name="cb" type="Function" optional="true">
-        ///     function (key, err) {} where key is the value of the objects manually or auto-generated primary key. If an error occurs, key will be null and err will contain the error.
-        ///     Note that the transaction may still not be completed and could still potentially fail even the request succeeded at this point.
-        ///     Use the transaction() method to get more control over entire transation.
-        /// </param>
-        var trans = this._tf.trans(this.tableName, RW);
-        var store = trans.objectStore(this.tableName);
-        var req = store.add(obj);
-        return createPromise(trans, req, this._tf, function (e) {
-            var target = e.target;
-            var keyPath = target.source.keyPath;
-            if (keyPath) {
-                obj[keyPath] = target.result;
-            }
-            deferred.notify(obj, target.result);
+    function Transaction(trans, tf, storeNames, tableClass) {
+    	/// <summary>
+    	///    Transaction class
+    	/// </summary>
+    	/// <param name="trans" type="IDBTransaction">The underlying transaction instance</param>
+        /// <param name="tf">Transaction factory</param>
+        /// <param name="storeNames" type="Array">Array of table names to operate on</param>
+        /// <param name="tableClass" optional="true" type="Function">Class to use for table instances</param>
+
+        var promise = new Promise(function (resolve, reject) {
+            trans.onerror = reject;
+            trans.onabort = reject;
+            trans.oncomplete = resolve;
         });
+
+        this._ctx = {
+            promise: promise,
+            trans: trans,
+            tf: tf,
+            storeNames: storeNames,
+            tableClass: tableClass || Table
+        };
+        
+        this.fail = promise.catch;
+        this.done = promise.then;
+
+        setApiOnPlace(this, tf, tableClass || Table, storeNames);
     }
 
-    WriteableTable.prototype.delete = function (key) {
-        /// <param name="key">Primary key of the object to delete</param>
-        var store = this._tf.trans(this.tableName, RW).objectStore(this.tableName);
-        var req = store.delete(key);
-        return createPromise(trans, req, this._tf);
-    }
-
-    WriteableTable.prototype.clear = function (cb) {
-        var trans = this._tf.trans(this.tableName, RW);
-        var store = trans.objectStore(this.tableName);
-        var req = store.clear();
-        return createPromise(trans, req, this._tf);
-    }
-
-    // TODO: compress code by generalise these calls.
-    WriteableTable.prototype.where = function (indexName) {
-        return new WhereClause(this._tf, this.tableName, indexName, true);
-    }
-    WriteableTable.prototype.limit = function (numRows) {
-        return new Collection(this._tf, this.tableName, null, null, true).limit(numRows);
-    }
-    WriteableTable.prototype.modify = function (changes) {
-        return new Collection(this._tf, this.tableName, null, null, true).modify(changes);
-    }
-
-
-    //
-    //
-    //
-    // ------------------------- class Transaction ---------------------------
-    //
-    //
-    //
-    function TransactionBase(trans, tf) {
-        var thiz = this;
-        var d = Deferred();
-
-        thiz.fail = d.fail;
-        thiz.done = d.done;
-
-        trans.onerror = d.reject;
-        trans.onabort = d.reject;
-        trans.oncomplete = d.resolve;
-
-        thiz.abort = function () {
-            trans.abort();
+    extend(Transaction.prototype, {
+        abort: function () {
+            this._ctx.trans.abort();
+        },
+        table: function (tableName) {
+            if (this._ctx.storeNames.indexOf(tableName) == -1) throw "SFDB: Table does not exist";
+            return new this._ctx.tableClass(tableName, this._ctx.tf);
         }
-        return thiz;
-    }
-    function Transaction(trans, tf, storeNames) {
-        var thiz = TransactionBase.call(this, trans, tf);
-        setApiOnPlace(thiz, tf, Table, storeNames);
-        thiz.table = function (tableName) {
-            if (!trans.db.objectStoreNames.contains(tableName)) throw "SFDB: Table does not exist";
-            return new Table(tableName, tf);
-        }
-
-        return thiz;
-    }
+    });
 
     function WriteableTransaction(trans, tf, storeNames) {
-        var thiz = TransactionBase.call(this, trans, tf);
-        setApiOnPlace(thiz, tf, WriteableTable, storeNames);
-        thiz.table = function (tableName) {
-            if (!trans.db.objectStoreNames.contains(tableName)) throw "SFDB: Table does not exist";
-            return new WriteableTable(tableName, tf);
-        }
-        return thiz;
+        /// <summary>
+        ///     Transaction class with WriteableTable instances instead of readonly Table instances.
+        /// </summary>
+        /// <param name="trans" type="IDBTransaction">The underlying transaction instance</param>
+        /// <param name="tf">Transaction factory</param>
+        /// <param name="storeNames" type="Array">Array of table names to operate on</param>
+        Transaction.call(this, trans, tf, storeNames, WriteableTable);
     }
 
-
-
-
-
-
-
+    derive (WriteableTransaction).from(Transaction);
 
 
 
@@ -622,37 +627,45 @@ function StraightForwardDB(dbName) {
     //
 
     function WhereClause(tf, table, index, writeable) {
-        /// <param name="tf" value="function(tableName, mode){return IDBTransaction.prototype;}"></param>
+        /// <param name="tf" type="TransactionFactory"></param>
         /// <param name="table" type="String"></param>
         /// <param name="index" type="String"></param>
-
-        this.between = function (lower, upper, includeLower, includeUpper) {
-        	/// <summary>
-        	///     Filter out records whose where-field lays between given lower and upper values. Applies to Strings, Numbers and Dates.
-        	/// </summary>
-        	/// <param name="lower"></param>
-        	/// <param name="upper"></param>
-        	/// <param name="includeLower" optional="true">Whether items that equals lower should be included. Default true.</param>
-        	/// <param name="includeUpper" optional="true">Whether items that equals upper should be included. Default false.</param>
-        	/// <returns type="Collection"></returns>
-            return new Collection(tf, table, index, IDBKeyRange.bound(lower, upper, includeLower == false ? false : true, !!includeUpper), writeable);
-        }
-        this.equals = function(value) {
-            return new Collection(tf, table, index, IDBKeyRange.only(value), writeable);
-        }
-        this.above = function(value) {
-            return new Collection(tf, table, index, IDBKeyRange.lowerBound(value), writeable);
-        }
-        this.aboveOrEqual = function(value) {
-            return new Collection(tf, table, index, IDBKeyRange.lowerBound(value, true), writeable);
-        }
-        this.below = function(value) {
-            return new Collection(tf, table, index, IDBKeyRange.upperBound(value), writeable);
-        }
-        this.belowOrEqual = function(value) {
-            return new Collection(tf, table, index, IDBKeyRange.upperBound(value, true), writeable);
+        this._ctx = {
+            tf: tf,
+            table: table,
+            index: index,
+            collClass: writeable ? WriteableCollection : Collection
         }
     }
+
+    extend(WhereClause.prototype, {
+        between: function (lower, upper, includeLower, includeUpper) {
+            /// <summary>
+            ///     Filter out records whose where-field lays between given lower and upper values. Applies to Strings, Numbers and Dates.
+            /// </summary>
+            /// <param name="lower"></param>
+            /// <param name="upper"></param>
+            /// <param name="includeLower" optional="true">Whether items that equals lower should be included. Default true.</param>
+            /// <param name="includeUpper" optional="true">Whether items that equals upper should be included. Default false.</param>
+            /// <returns type="Collection"></returns>
+            return new this.collClass(this, IDBKeyRange.bound(lower, upper, includeLower == false ? false : true, !!includeUpper));
+        },
+        equals: function (value) {
+            return new this.collClass(this, IDBKeyRange.only(value));
+        },
+        above: function (value) {
+            return new this.collClass(this, IDBKeyRange.lowerBound(value));
+        },
+        aboveOrEqual: function (value) {
+            return new this.collClass(this, IDBKeyRange.lowerBound(value, true));
+        },
+        below: function (value) {
+            return new this.collClass(this, IDBKeyRange.upperBound(value));
+        },
+        belowOrEqual: function (value) {
+            return new this.collClass(this, IDBKeyRange.upperBound(value, true));
+        }
+    });
 
 
 
@@ -669,137 +682,171 @@ function StraightForwardDB(dbName) {
     //
     //
 
-    function Collection(tf, table, index, keyRange, writeable) {
-    	/// <summary>
-    	/// 
-    	/// </summary>
-        /// <param name="tf" type="OneshotTransactionFactory">OneshotTransactionFactory or MultirequestTransactionFactory</param>
-    	/// <param name="table" type="String"></param>
-    	/// <param name="index" type="String" optional="true"></param>
+    function Collection(whereClause, keyRange) {
+        /// <summary>
+        /// 
+        /// </summary>
+        /// <param name="whereClause" type="WhereClause">Where clause instance</param>
         /// <param name="keyRange" type="IDBKeyRange" optional="true"></param>
-        /// <param name="writeable" optional="true"></param>
-        var limit = -1;
-        var dir = "next";
-        var unique = "";
-        var filter = null;
-        var mode = R;
-        /// <var type="CatchableDeferred">Deferred instance. Can be a CatchableDeferred.</var>
-        var deferred;
-        /// <var type="IDBTransaction" />
-        var trans;
-        var oneshot = tf.oneshot;
+        var whereCtx = whereClause._ctx;
+        this._ctx = {
+            tf: whereCtx.tf,
+            table: whereCtx.table,
+            index: whereCtx.index,
+            range: keyRange,
+            dir: "next",
+            unique: "",
+            filter: null,
+            /// <field type="IDBTransaction" />
+            trans: null,
+            oneshot: whereCtx.tf.oneshot
+        }
+    }
 
-        function addFilter(fn) {
-            if (!filter) filter = fn; else {
-                var prevFilter = filter;
-                filter = function(){return prevFilter.apply(this,arguments) && fn.apply(this,arguments);};
+    extend(Collection.prototype, {
+        _addFilter: function (fn) {
+            var ctx = this._ctx;
+            if (!ctx.filter) ctx.filter = fn; else {
+                var prevFilter = ctx.filter;
+                ctx.filter = function () { return prevFilter.apply(this, arguments) && fn.apply(this, arguments); };
             }
-        }
+        },
 
-        function openCursor() {
-            trans = tf.trans(table, mode);
-            var store = trans.objectStore(table);
-            var lowerIndex = index && index.toLowerCase();
-            var dbIndex = (index && store.keyPath && lowerIndex != store.keyPath.toLowerCase() ? store.index(index.toLowerCase()) : store);
-            return dbIndex.openCursor(keyRange, dir+unique);
-        }
+        _getIndexOrStore: function (mode) {
+            var ctx = this._ctx;
+            ctx.trans = ctx.tf.create(ctx.table, mode || R);
+            var store = ctx.trans.objectStore(ctx.table);
+            var lowerIndex = ctx.index && ctx.index.toLowerCase();
+            return (!lowerIndex || (store.keyPath && lowerIndex == store.keyPath.toLowerCase())) ? store : store.index(lowerIndex);
+        },
 
-        this.each = function (fn) {
-            deferred = tf.deferred();
-            iterate(openCursor(), filter, fn, deferred.reject, deferred.resolve, limit);
-            return deferred;
-        }
+        _openCursor: function (mode) {
+            var ctx = this._ctx;
+            return this._getIndexOrStore(mode).openCursor(ctx.range, ctx.dir + ctx.unique);
+        },
 
-        this.count = function (cb) {
-            deferred = tf.deferred();
-            // TODO: If limit, unique or filter, use iterate() instead!
-            var trans = tf(table, R);
-            var store = trans.objectStore(table);
-            var lowerIndex = index && index.toLowerCase();
-            var dbIndex = (index && store.keyPath && lowerIndex != store.keyPath.toLowerCase() ? store.index(index.toLowerCase()) : store);
-            var req = dbIndex.count(keyRange);
-            if (cb) deferred.done(cb);
-            req.onerror = deferred.reject;
-            req.onsuccess = function (e) {
-                deferred.resolve(e.target.result);
-            }
-            return deferred;
-        }
+        each: function (fn) {
+            var self = this,
+                ctx = this._ctx;
 
-        this.toArray = function (cb) {
-            deferred = tf.deferred();
-            var a = [];
-            if (cb) deferred.done(cb); // cb is just a shortcut for .toArray().done(cb);
-            iterate(openCursor(), filter, function (item) { a.push(item); }, deferred.reject, function () { deferred.resolve(a); }, limit);
-            return deferred;
-        }
+            return ctx.tf.createPromise(function (resolve, reject) {
+                iterate(self._openCursor(), ctx.filter, fn, resolve, reject);
+            });
+        },
 
-        this.first = function (cb) {
-            deferred = tf.deferred();
-            deferred.done(cb);
-            iterate(openCursor(), filter, function (item) { deferred.resolve(item); return false; }, deferred.reject, function () { }, limit);
-            return deferred;
-        }
+        count: function (cb) {
+            var self = this,
+                ctx = this._ctx;
 
-        if (writeable) {
-            this.modify = function (changes) {
-                deferred = tf.deferred(true);
-                mode = RW;
-                var keys = Object.keys(changes);
-                addFilter(function (cursor) {
-                    var item = cursor.value;
-                    for (var i = 0, l = keys.length; i < l; ++i) {
-                        var key = keys[i];
-                        var value = changes[key];
-                        item[key] = (value instanceof Function ? value(item) : value);
-                    }
-                    cursor.update(item).onerror = function (e) { deferred.throw(e, item); };
-                    // No need to listen to onsuccess! What different should it make?! Who to call? deferred.notify()? Not worth the cost in code exectution. Think of big queries of updating millions of records!
-                    return false; // Make sure fn() is never called because we set it to null!
-                });
-                if (oneshot) {
-                    iterate(openCursor(), filter, null, deferred.reject, function () { }, limit);
-                    trans.oncomplete = deferred.resolve;
-                } else {
-                    iterate(openCursor(), filter, null, deferred.reject, deferred.resolve, limit);
+            return ctx.tf.createPromise(function (resolve, reject) {
+                var req = self._getIndexOrStore().count(ctx.range);
+                req.onerror = function (e) { reject(req.error, e); }
+                req.onsuccess = function (e) {
+                    resolve(e.target.result);
                 }
-                return deferred;
-            }
-            this.delete = function () {
-                deferred = tf.deferred(true);
-                mode = RW;
-                addFilter(function (cursor) {
-                    cursor.delete().onerror = function (e) { deferred.throw(e, cursor.value); };
-                    return false;// Make sure fn() is never called because we set it to null!
-                });
-                if (oneshot) {
-                    iterate(openCursor(), filter, null, deferred.reject, function () { }, limit);
-                    trans.oncomplete = deferred.resolve;
-                } else {
-                    iterate(openCursor(), filter, null, deferred.reject, deferred.resolve, limit);
-                }
-                return deferred;
-            }
-        }
+            }).then(cb);
+        },
 
-        this.limit = function (numRows) {
-            limit = numRows;
+        toArray: function (cb) {
+            var self = this,
+                ctx = this._ctx;
+
+            return ctx.tf.createPromise(function (resolve, reject) {
+                var a = [];
+                iterate(self._openCursor(), ctx.filter, function (item) { a.push(item); }, function () { deferred.resolve(a); }, reject);
+            }).then(cb);
+        },
+
+        limit: function (numRows) {
+            this._addFilter(function (cursor, advance, resolve) {
+                if (--numRows < 0) advance(resolve);
+                return true;
+            });
             return this;
-        }
+        },
 
-        this.and = function(jsFunctionFilter) {
+        first: function (cb) {
+            return this.limit(1).toArray(function(a){ return a[0]}).then(cb);
+        },
+
+        last: function (cb) {
+            return this.desc().first(cb);
+        },
+
+        and: function(jsFunctionFilter) {
             /// <param name="jsFunctionFilter" type="Function">function(val){return true/false}</param>
-            addFilter(function(cursor){
+            this._addFilter(function(cursor){
                 return jsFunctionFilter (cursor.value);
             });
             return this;
+        },
+
+        desc: function () {
+            this._ctx.dir = (this._ctx.dir == "prev" ? "next" : "prev");
+            return this;
+        },
+
+        distinct: function () {
+            this._ctx.unique = "unique";
+            return this;
         }
-        this.desc = function () { dir = "prev"; return this;}
-        this.distinct = function () { unique = "unique"; return this;}
-    }
+    });
     
+    function WriteableCollection() {
+        Collection.apply(this, arguments);
+    }
 
+    derive(WriteableCollection).from(Collection).extend({
+        modify: function (changes) {
+            var self = this,
+                ctx = this._ctx;
 
+            return ctx.tf.createTrappablePromise(function (resolve, reject, raise) {
+                var keys = Object.keys(changes);
+                var getters = keys.map(function (key) {
+                    var value = changes[key];
+                    return (value instanceof Function ? value : function () { return value });
+                });
+                self._addFilter(function (cursor) {
+                    var item = cursor.value;
+                    for (var i = 0, l = keys.length; i < l; ++i) {
+                        item[keys[i]] = getters[i](item);
+                    }
+                    cursor.update(item).onerror = function (e) {
+                        if (raise(e.target.error, e, item)) ctx.trans.abort();
+                    };
+                    // No need to listen to onsuccess! What different should it make?! Who to call? notify? Not worth the cost in code exectution. Think of big queries of updating millions of records!
+                    return false; // Make sure fn() is never called because we set it to null!
+                });
+
+                if (ctx.oneshot) {
+                    iterate(self._openCursor(RW), ctx.filter, null, function () { }, reject);
+                    ctx.trans.oncomplete = resolve;
+                } else {
+                    iterate(self._openCursor(RW), ctx.filter, null, resolve, reject);
+                }
+            });
+        },
+        'delete': function () {
+            var self = this,
+                ctx = this._ctx;
+
+            return ctx.tf.createTrappablePromise(function (resolve, reject, raise) {
+                self._addFilter(function (cursor) {
+                    cursor.delete().onerror = function (e) {
+                        if (raise(e.target.error, e, cursor.value)) ctx.trans.abort();
+                    };
+                    return false;// Make sure fn() is never called because we set it to null!
+                });
+                if (ctx.oneshot) {
+                    iterate(self._openCursor(RW), ctx.filter, null, function () { }, reject);
+                    ctx.trans.oncomplete = deferred.resolve;
+                } else {
+                    iterate(self._openCursor(RW), ctx.filter, null, resolve, reject);
+                }
+            });
+        }
+    });
 
 
 
@@ -813,16 +860,18 @@ function StraightForwardDB(dbName) {
     //
     //
     //
-    function derive(obj) {
-        function F() { }
-        F.prototype = obj;
-        return new F();
-    }
 
     function setApiOnPlace(obj, transactionFactory, tableClass, tableNames) {
         for (var i=0,l=tableNames.length;i<l;++i) {
             var tableName = tableNames[i];
-            obj[tableName] = new tableClass(tableName, transactionFactory);
+            if (!obj[tableName]) {
+                obj[tableName] = new tableClass(tableName, transactionFactory);
+            }
+        }
+    }
+    function removeTablesApi(obj) {
+        for (var key in obj) {
+            if (obj[key] instanceof Table) delete obj[key];
         }
     }
 
@@ -831,20 +880,28 @@ function StraightForwardDB(dbName) {
         clearTimeout(to);
     }
 
-    function iterate(req, filter, fn, error, complete, limit) {
-        var countdown = limit + 1; // TODO: Lift out limit/countdown outside loop by adding a filter instead!
-        req.onerror = error;
-        req.onsuccess = function (e) {
-            var cursor = e.target.result;
-            if (cursor) {
-                var c = true;
-                if (!filter || filter(cursor)) {
-                    if (fn(cursor.value) == false) c = false;
-                    if (--countdown == 0) c = false;
+    function iterate(req, filter, fn, oncomplete, reject) {
+        req.onerror = function (e) { reject(req.error, e); }
+        if (filter) {
+            req.onsuccess = function (e) {
+                var cursor = e.target.result;
+                if (cursor) {
+                    var c = function(){cursor.continue();};
+                    if (filter(cursor, function (advancer) {c = advancer}, oncomplete, reject)) fn(cursor.value);
+                    c();
+                } else {
+                    oncomplete();
                 }
-                if (c) cursor.continue(); else complete();
-            } else {
-                complete();
+            }
+        } else {
+            req.onsuccess = function (e) {
+                var cursor = e.target.result;
+                if (cursor) {
+                    fn(cursor.value);
+                    cursor.continue();
+                } else {
+                    oncomplete();
+                }
             }
         }
     }
@@ -869,40 +926,63 @@ function StraightForwardDB(dbName) {
         return rv;
     }
 
-    function OneshotTransactionFactory() {
-        this.trans = function(tableName, mode) {
-        	/// <returns type="IDBTransaction"></returns>
+    function TransactionFactory() { }
+
+    extend(TransactionFactory.prototype, {
+        create: function (tableName, mode) {
             return db.transaction(tableName, mode || R);
+        },
+        oneshot: true,
+        createPromise: function (fn, trappable) {
+            return trappable ? new TrappablePromise(fn) : new Promise(fn);
+        },
+        createTrappablePromise: function (fn) {
+            return this.promise(fn, true);
         }
-        this.oneshot = true;
-        this.deferred = function(catchable) {
-        	/// <returns type="CatchableDeferred"></returns>
-            return catchable ? CatchableDeferred(true) : Deferred();
-        }
+    });
+
+    function MultireqTransactionFactory(trans) {
+        this.trans = trans;
     }
 
-    function MultirequestTransactionFactory(trans) {
-        var thiz = this;
+    derive(MultireqTransactionFactory).from(TransactionFactory).extend({
+        oneshot: false,
+        create: function() { return this.trans; }
+    });
+
+    function FinishableTransactionFactory(trans) {
+        MultireqTransactionFactory.call(this, trans);
         this.uncompleteRequests = 0;
-        this.trans = function() { return trans; }
-        this.onbeforecomplete = null;
-        this.deferred = function(catchable) {
-            ++thiz.uncompleteRequests;
-            var d = (catchable ? CatchableDeferred(true) : Deferred());
-            function proxy (meth){
-                var origFunc = d[meth];
-                d[meth] = function() {
-                    origFunc.apply(this,arguments);
-                    if (--thiz.uncompleteRequests == 0 && thiz.onbeforecomplete) {
-                        thiz.onbeforecomplete();
-                    }
+        this.onfinish = null;
+    }
+
+    derive(FinishableTransactionFactory).from(MultireqTransactionFactory).extend({
+        createPromise: function (fn, trappable) {
+        	/// <summary>
+            ///   This overriding of createPromise() will keep count of any pending request on the transaction and be able
+            ///   to notify when there are no more pending requests. This is important in the upgrading framework 
+            ///   because the underlying implementation of IndexedDB will automatically commit any transaction as soon as there are
+            ///   no pending requests left on it. We use this in order to run different version upgraders sequencially on the same transaction without
+            ///   requiring the API user to call a callback or return a promise from each upgrader. This makes the upgrader functions more easy
+            ///   to implement.
+        	/// </summary>
+        	/// <param name="fn"></param>
+        	/// <param name="trappable"></param>
+            var self = this;
+            ++self.uncompleteRequests;
+            function proxy(fn) {
+                return function () {
+                    fn.apply(this, arguments);
+                    if (--self.uncompleteRequests == 0 && self.onfinish) self.onfinish();
                 }
             }
-            proxy("resolve");
-            proxy("reject");
-            return d;
+            return MultireqTransactionFactory.prototype.createPromise(function (resolve, reject, raise) {
+                arguments[0] = proxy(resolve);
+                arguments[1] = proxy(reject);
+                fn.apply(this, arguments);
+            }, trappable);
         }
-    }
+    });
 
     function assert(b) {
         if (!b) throw "Assertion failed";
@@ -932,166 +1012,240 @@ function StraightForwardDB(dbName) {
     }
 
     //
+    // In case window.Promise is not present, define an A+ and ECMASCRIPT 6 compliant Promise using code from promise-light (https://github.com/taylorhakes/promise-light) by https://github.com/taylorhakes 
     //
-    //  Deferred promise. See http://wiki.commonjs.org/wiki/Promises/A
-    //
-    //
-    function Deferred(func) {
-        // In case jQuery is included. Use it's Deferred to enable compatibility with jQuery.when().
-        // BUG: Better approach would be to make sure this implementation is compatible.
-        //if (window.jQuery) return jQuery.Deferred(func);
+    var Promise = window.Promise || (function () {
 
-        var tuples = [
-                ['resolve', 'done', new Callbacks(true), 'resolved'],
-                ['reject', 'fail', new Callbacks(true), 'rejected'],
-                ['notify', 'progress', new Callbacks(false)],
-        ],
-            state = 'pending',
-            promise = {
-                state: function () {
-                    return state;
-                },
-                then: function ( /* doneHandler , failedHandler , progressHandler */) {
-                    var fns = arguments;
+        var asap = window.setImmediate || function (fn) { setTimeout(fn, 0) };
 
-                    return Deferred(function (newDefer) {
-                        tuples.forEach(function (tuple, i) {
-                            var fn = fns[i];
+        function Promise(fn) {
+            if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');
+            if (typeof fn !== 'function') throw new TypeError('not a function');
+            this._state = null;
+            this._value = null;
+            this._deferreds = [];
+            var self = this;
 
-                            deferred[tuple[1]](typeof fn === 'function' ?
-                                function () {
-                                    var returned = fn.apply(this, arguments);
+            doResolve(fn, function (data) {
+                resolve.call(self, data);
+            }, function (reason) {
+                reject.call(self, reason);
+            });
+        }
 
-                                    if (returned && typeof returned.promise === 'function') {
-                                        returned.promise()
-                                            .done(newDefer.resolve)
-                                            .fail(newDefer.reject)
-                                            .progress(newDefer.notify);
-                                    }
-                                } : newDefer[tuple[0]]
-                            );
+        function handle(deferred) {
+            var self = this;
+            if (this._state === null) {
+                this._deferreds.push(deferred);
+                return;
+            }
+            asap(function () {
+                var cb = self._state ? deferred.onFulfilled : deferred.onRejected;
+                if (cb === null) {
+                    (self._state ? deferred.resolve : deferred.reject)(self._value);
+                    return;
+                }
+                var ret;
+                try {
+                    ret = cb(self._value);
+                }
+                catch (e) {
+                    deferred.reject(e);
+                    return;
+                }
+                deferred.resolve(ret);
+            })
+        }
+
+        function resolve(newValue) {
+            var self = this;
+            try { //Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
+                if (newValue === self) throw new TypeError('A promise cannot be resolved with itself.');
+                if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
+                    if (typeof newValue.then === 'function') {
+                        doResolve(function (resolve, reject) {
+                            newValue.then(resolve, reject);
+                        }, function (data) {
+                            resolve.call(self, data);
+                        }, function (reason) {
+                            reject.call(self, reason);
                         });
-                    }).promise();
-                },
-                promise: function (obj) {
-                    if (obj) {
-                        Object.keys(promise)
-                            .forEach(function (key) {
-                                obj[key] = promise[key];
-                            });
-
-                        return obj;
+                        return;
                     }
-                    return promise;
                 }
-            },
-            deferred = {};
-
-        tuples.forEach(function (tuple, i) {
-            var list = tuple[2],
-                actionState = tuple[3];
-
-            promise[tuple[1]] = list.add;
-
-            if (actionState) {
-                list.add(function () {
-                    state = actionState;
-                });
-            }
-
-            deferred[tuple[0]] = list.fire;
-        });
-
-        promise.promise(deferred);
-
-        if (func) {
-            func.call(deferred, deferred);
+                this._state = true;
+                this._value = newValue;
+                finale.call(this);
+            } catch (e) { reject(e) }
         }
 
-        return deferred;
-    };
+        function reject(newValue) {
+            this._state = false;
+            this._value = newValue;
+            finale.call(this);
+        }
+
+        function finale() {
+            for (var i = 0, len = this._deferreds.length; i < len; i++) {
+                handle.call(this, this._deferreds[i]);
+            }
+            this._deferreds = null;
+        }
+
+        function Handler(onFulfilled, onRejected, resolve, reject) {
+            this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
+            this.onRejected = typeof onRejected === 'function' ? onRejected : null;
+            this.resolve = resolve;
+            this.reject = reject;
+        }
+
+        /**
+         * Take a potentially misbehaving resolver function and make sure
+         * onFulfilled and onRejected are only called once.
+         *
+         * Makes no guarantees about asynchrony.
+         */
+        function doResolve(fn, onFulfilled, onRejected) {
+            var done = false;
+            try {
+                fn(function (value) {
+                    if (done) return;
+                    done = true;
+                    onFulfilled(value);
+                }, function (reason) {
+                    if (done) return;
+                    done = true;
+                    onRejected(reason);
+                })
+            } catch (ex) {
+                if (done) return;
+                onRejected(ex);
+            }
+        }
+
+        Promise.all = function () {
+            var args = Array.prototype.slice.call(arguments.length === 1 && Array.isArray(arguments[0]) ? arguments[0] : arguments);
+
+            return new Promise(function (resolve, reject) {
+                if (args.length === 0) return resolve([]);
+                var remaining = args.length;
+                function res(i, val) {
+                    try {
+                        if (val && (typeof val === 'object' || typeof val === 'function')) {
+                            var then = val.then;
+                            if (typeof then === 'function') {
+                                then.call(val, function (val) { res(i, val) }, reject);
+                                return;
+                            }
+                        }
+                        args[i] = val;
+                        if (--remaining === 0) {
+                            resolve(args);
+                        }
+                    } catch (ex) {
+                        reject(ex);
+                    }
+                }
+                for (var i = 0; i < args.length; i++) {
+                    res(i, args[i]);
+                }
+            });
+        };
+
+        /* Prototype Methods */
+        Promise.prototype.then = function (onFulfilled, onRejected) {
+            var self = this;
+            return new Promise(function (resolve, reject) {
+                handle.call(self, new Handler(onFulfilled, onRejected, resolve, reject));
+            })
+        };
+
+        Promise.prototype['catch'] = function (onRejected) {
+            return this.then(null, onRejected);
+        };
+
+        Promise.resolve = function (value) {
+            return new Promise(function (resolve) {
+                resolve(value);
+            });
+        };
+
+        Promise.reject = function (value) {
+            return new Promise(function (resolve, reject) {
+                reject(value);
+            });
+        };
+
+        Promise.race = function (values) {
+            return new Promise(function (resolve, reject) {
+                values.map(function (value) {
+                    value.then(resolve, reject);
+                })
+            });
+        };
+
+        return Promise;
+    })();
+
+
 
     //
-    //  Extension to Deferred() with a catch() method to enable "ignore-and-continue" for asyncronic for loops.
+    //  Extension to Promise with a trap() method to enable "ignore-and-continue" for async "loops".
     //
-    function CatchableDeferred(handleEventCancellation) {
-        var deferred = Deferred();
+    function TrappablePromise(fn) {
+        var self = this;
         var catchers = [];
-        deferred.catch = function (fn) {
+        this.trap = function (fn) {
             catchers.push(fn || null);
-            return deferred;
+            return this;
         }
-        deferred.throw = function (e) {
-            var catched = false, numCatchers = catchers.length;
-            if (numCatchers > 0) {
-                for (var i = 0; i < numCatchers; ++i) {
-                    var catcher = catchers[i];
-                    if (catcher === null) {
-                        catched = true; // Caller use operation.catch();
-                        break;
+        Promise.call(this, function (resolve, reject) {
+            fn(resolve, reject, function (error, event, item) {
+                // Raise
+                var catched = false, numCatchers = catchers.length;
+                if (numCatchers > 0) {
+                    for (var i = 0; i < numCatchers; ++i) {
+                        var catcher = catchers[i];
+                        if (catcher === null) {
+                            catched = true; // Caller use operation.trap();
+                            break;
+                        }
+                        if (catcher(error, event, item) === false) {
+                            catched = true; // Caller use operation.trap(fn); and returns false from that function.
+                            break;
+                        }
                     }
-                    if (catcher.apply(this, arguments) === false) {
-                        catched = true; // Caller use operation.catch(fn); and returns false from that function.
-                        break;
-                    }
+                    // If come here, no catchers catched the error.
                 }
-                // If come here, no catchers catched the error.
-            }
-            if (catched) {
-                if (handleEventCancellation) {
-                    e.stopPropagation();
-                    e.preventDefault();
+                if (catched) {
+                    event.stopPropagation();
+                    event.preventDefault();
+                    return false;// Return false to caller, who may react accordingly.
+                } else {
+                    // Automatically apply the error into the reject() method, so that operation.catch() is triggered.
+                    reject(error, item, event);
+                    return true;
                 }
-                return false;// Return false to caller, who may react accordingly.
-            } else {
-                // Automatically apply the error into the reject() method, so that operation.fail() is triggered.
-                deferred.reject.apply(this, arguments);
-                return true;
-            }
-        }
-        return deferred;
+            });
+        });
     }
 
-    function Callbacks(once, stopOnFalse) {
-        var state, list = [];
+    derive(TrappablePromise).from(Promise);
 
-        function fire(context, args) {
-            if (list) {
-                args = args || [];
-                state = state || [context, args];
-
-                for (var i = 0, il = list.length ; i < il ; i++) {
-                    list[i].apply(state[0], state[1]);
-                }
-
-                if (once) {
-                    list = [];
-                }
-            }
-        }
-
-        this.add = function () {
-            for (var i = 0, l = arguments.length ; i < l ; i++) {
-                list.push(arguments[i]);
-            }
-
-            if (state) {
-                fire();
-            }
-
-            return this;
-        };
-
-        this.fire = function () {
-            fire(this, arguments);
-            return this;
-        };
+    this.classes = {
+        Collection: Collection,
+        Promise: Promise,
+        Table: Table,
+        Transaction: Transaction,
+        TrappablePromise: TrappablePromise,
+        Version: Version,
+        WhereClause: WhereClause,
+        WriteableCollection: WriteableCollection,
+        WriteableTable: WriteableTable,
+        WriteableTransaction: WriteableTransaction,
     };
-
-    return api;
 }
 
 StraightForwardDB.delete = function (databaseName) {
     return new StraightForwardDB(databaseName).delete();
 }
-
