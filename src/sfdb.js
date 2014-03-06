@@ -753,7 +753,7 @@
 
             return ctx.tf.createPromise(function (resolve, reject) {
                 var a = [];
-                iterate(self._openCursor(), ctx.filter, function (item) { a.push(item); }, function () { deferred.resolve(a); }, reject);
+                iterate(self._openCursor(), ctx.filter, function (item) { a.push(item); }, function () { resolve(a); }, reject);
             }).then(cb);
         },
 
@@ -807,7 +807,9 @@
                     var value = changes[key];
                     return (value instanceof Function ? value : function () { return value });
                 });
+                var count = 0;
                 self._addFilter(function (cursor) {
+                    ++count;
                     var item = cursor.value;
                     for (var i = 0, l = keys.length; i < l; ++i) {
                         item[keys[i]] = getters[i](item);
@@ -821,9 +823,9 @@
 
                 if (ctx.oneshot) {
                     iterate(self._openCursor(RW), ctx.filter, null, function () { }, reject);
-                    ctx.trans.oncomplete = resolve;
+                    ctx.trans.oncomplete = function () { resolve(count); };
                 } else {
-                    iterate(self._openCursor(RW), ctx.filter, null, resolve, reject);
+                    iterate(self._openCursor(RW), ctx.filter, null, function () { resolve(count); }, reject);
                 }
             });
         },
@@ -832,7 +834,9 @@
                 ctx = this._ctx;
 
             return ctx.tf.createTrappablePromise(function (resolve, reject, raise) {
+                var count = 0;
                 self._addFilter(function (cursor) {
+                    ++count;
                     cursor.delete().onerror = function (e) {
                         if (raise(e.target.error, e, cursor.value)) ctx.trans.abort();
                     };
@@ -840,9 +844,9 @@
                 });
                 if (ctx.oneshot) {
                     iterate(self._openCursor(RW), ctx.filter, null, function () { }, reject);
-                    ctx.trans.oncomplete = deferred.resolve;
+                    ctx.trans.oncomplete = function () { resolve(count); };
                 } else {
-                    iterate(self._openCursor(RW), ctx.filter, null, resolve, reject);
+                    iterate(self._openCursor(RW), ctx.filter, null, function () { resolve(count); }, reject);
                 }
             });
         }
