@@ -357,10 +357,10 @@
 
     this.delete = function () {
         this.close();
-        return Promise(function (resolve, reject) {
+        return new Promise(function (resolve, reject) {
             var req = idb.deleteDatabase(dbName);
-            req.onerror = resolve;
-            req.onsuccess = reject;
+            req.onsuccess = resolve;
+            req.onerror = reject;
         });
     }
 
@@ -535,8 +535,8 @@
             /// </summary>
             /// <param name="obj" type="Object">A javascript object to insert or update</param>
             return this._wrop("put", [obj], function (e) {
-                var keyPath = req.source.keyPath;
-                if (keyPath) obj[keyPath] = req.result;
+                var keyPath = e.target.source.keyPath;
+                if (keyPath) obj[keyPath] = e.target.result;
             });
         },
         add: function (obj) {
@@ -545,8 +545,8 @@
             /// </summary>
             /// <param name="obj" type="Object">A javascript object to insert</param>
             return this._wrop("add", [obj], function (e) {
-                var keyPath = req.source.keyPath;
-                if (keyPath) obj[keyPath] = req.result;
+                var keyPath = e.target.source.keyPath;
+                if (keyPath) obj[keyPath] = e.target.result;
             });
         },
         'delete': function (key) {
@@ -648,22 +648,22 @@
             /// <param name="includeLower" optional="true">Whether items that equals lower should be included. Default true.</param>
             /// <param name="includeUpper" optional="true">Whether items that equals upper should be included. Default false.</param>
             /// <returns type="Collection"></returns>
-            return new this.collClass(this, IDBKeyRange.bound(lower, upper, includeLower == false ? false : true, !!includeUpper));
+            return new this._ctx.collClass(this, IDBKeyRange.bound(lower, upper, includeLower == false ? false : true, !!includeUpper));
         },
         equals: function (value) {
-            return new this.collClass(this, IDBKeyRange.only(value));
+            return new this._ctx.collClass(this, IDBKeyRange.only(value));
         },
         above: function (value) {
-            return new this.collClass(this, IDBKeyRange.lowerBound(value));
+            return new this._ctx.collClass(this, IDBKeyRange.lowerBound(value));
         },
         aboveOrEqual: function (value) {
-            return new this.collClass(this, IDBKeyRange.lowerBound(value, true));
+            return new this._ctx.collClass(this, IDBKeyRange.lowerBound(value, true));
         },
         below: function (value) {
-            return new this.collClass(this, IDBKeyRange.upperBound(value));
+            return new this._ctx.collClass(this, IDBKeyRange.upperBound(value));
         },
         belowOrEqual: function (value) {
-            return new this.collClass(this, IDBKeyRange.upperBound(value, true));
+            return new this._ctx.collClass(this, IDBKeyRange.upperBound(value, true));
         }
     });
 

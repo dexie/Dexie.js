@@ -3,9 +3,9 @@
 module("open", {
     setup: function () {
         stop();
-        StraightForwardDB.delete("TestDB").done(function () {
+        StraightForwardDB.delete("TestDB").then(function () {
             start();
-        }).fail(function (e) {
+        }).catch(function (e) {
             ok(false, "Could not delete database");
         });
     },
@@ -20,7 +20,7 @@ asyncTest("open, add and query data", 7, function () {
     db.open();
     db.ready(function () {
         ok(true, "Database could be opened");
-        db.employees.add({ first: "David", last: "Fahlander" }).done(function () {
+        db.employees.add({ first: "David", last: "Fahlander" }).then(function () {
             ok(true, "Could add employee");
             db.employees.where("first").equals("David").toArray(function (a) {
                 ok(true, "Could retrieve employee based on where() clause");

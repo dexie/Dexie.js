@@ -8,7 +8,7 @@
     module("table", {
         setup: function () {
             stop();
-            StraightForwardDB.delete("TestDB").done(function () {
+            StraightForwardDB.delete("TestDB").then(function () {
                 db = new StraightForwardDB("TestDB");
                 db.version(1).schema({ employees: "++id,first,last,!username,!*email,*pets" });
                 db.populate(function(trans){
@@ -19,7 +19,7 @@
                 db.ready(function () {
                     start();
                 });
-            }).fail(function (e) {
+            }).catch(function (e) {
                 ok(false, "Could not delete database");
             });
         },
@@ -29,11 +29,11 @@
     });
 
     asyncTest("get", 4, function () {
-        db.table("employees").get(1).done(function (obj) {
+        db.table("employees").get(1).then(function (obj) {
             equal(obj.first, "David", "Got the first object");
-            db.employees.get(2).done(function (obj) {
+            db.employees.get(2).then(function (obj) {
                 equal(obj.first, "Karl", "Got the second object");
-                db.employees.get(100).done(function (obj) {
+                db.employees.get(100).then(function (obj) {
                     ok(true, "Got done() even when getting non-existing object");
                     equal(obj, undefined, "Result is 'undefined' when not existing");
                     start();
