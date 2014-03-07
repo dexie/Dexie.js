@@ -124,7 +124,7 @@
             });
             // Populate data
             var tf = new MultireqTransactionFactory(trans);
-            var t = new WriteableTransaction(trans, tf, trans.db.objectStoreNames);
+            var t = new WriteableTransaction(tf, trans.db.objectStoreNames);
             tf.sfdbTrans = t;
             database.populate.fire(t);
         } else {
@@ -412,16 +412,16 @@
                 return tableInstance;
             } else {
                 if (!(tableInstance instanceof WriteableTable)) throw "SFDB: Invalid parameter. Point out your table instances from your StraightForwardDB instance";
-                return tableInstance.name;
+                return tableInstance._name;
             }
         });
         var tf, t;
         if (mode == R || mode == "r") {
             tf = new MultireqTransactionFactory(storeNames, R);
-            t = new Transaction(trans, tf, storeNames);
+            t = new Transaction(tf, storeNames);
         } else if (mode == RW || mode == "rw") {
             tf = new MultireqTransactionFactory(storeNames, RW);
-            t = new WriteableTransaction(trans, tf, storeNames);
+            t = new WriteableTransaction(tf, storeNames);
         } else {
             throw "Invalid mode. Only 'readonly'/'r' or 'readwrite'/'rw' are valid modes."
         }
@@ -447,7 +447,7 @@
     function Table(name, transactionFactory, collClass) {
     	/// <param name="name" type="String"></param>
         /// <param name="transactionFactory" type="TransactionFactory">TransactionFactory or MultireqTransactionFactory</param>
-        this.name = name;
+        this._name = name;
         this._tf = transactionFactory;
         this._collClass = collClass || Collection;
     }
@@ -455,7 +455,7 @@
         get: function (key) {
             var self = this;
             return this._tf.createPromise(function (resolve, reject) {
-                var req = self._tf.create(self.name).objectStore(self.name).get(key);
+                var req = self._tf.create(self._name).objectStore(self._name).get(key);
                 req.onerror = function (e) { reject(req.error, e); }
                 req.onsuccess = function () {
                     resolve(req.result);
@@ -463,18 +463,18 @@
             });
         },
         where: function (indexName) {
-            return new WhereClause(this._tf, this.name, indexName);
+            return new WhereClause(this._tf, this._name, indexName);
         },
         count: function (cb) {
-            return new Collection(new WhereClause(this._tf, this.name)).count(cb);
+            return new Collection(new WhereClause(this._tf, this._name)).count(cb);
         },
         limit: function (numRows) {
-            return new this._collClass(new WhereClause(this._tf, this.name)).limit(numRows);
+            return new this._collClass(new WhereClause(this._tf, this._name)).limit(numRows);
         },
         each: function (fn) {
             var self = this;
             return this._tf.createPromise(function (resolve, reject) {
-                var req = self._tf.create(self.name).objectStore(self.name).openCursor();
+                var req = self._tf.create(self._name).objectStore(self._name).openCursor();
                 iterate(req, null, fn, resolve, reject); // TODO: Reject with error not event. Resolve with ???
             });
         },
@@ -482,12 +482,12 @@
             var self = this;
             return this._tf.createPromise(function (resolve, reject) {
                 var a = [];
-                var req = self._tf.create(self.name).objectStore(self.name).openCursor();
+                var req = self._tf.create(self._name).objectStore(self._name).openCursor();
                 iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject);
             }).then(cb);
         },
         orderBy: function (index) {
-            return new this._collClass(new WhereClause(this.tf, this.name, index));
+            return new this._collClass(new WhereClause(this._tf, this._name, index));
         }
     });
 
@@ -501,8 +501,7 @@
     function WriteableTable(name, transactionFactory) {
         /// <param name="name" type="String"></param>
         /// <param name="transactionFactory" type="TransactionFactory">TransactionFactory or MultireqTransactionFactory</param>
-        this.name = name;
-        this._tf = transactionFactory;
+        Table.call(this, name, transactionFactory, WriteableCollection);
     }
 
     derive(WriteableTable).from(Table).extend({
@@ -515,8 +514,8 @@
                 tf = this._tf;
 
             return tf.createPromise(function (resolve, reject) {
-                var trans = tf.create(self.name, RW);
-                var store = trans.objectStore(self.name);
+                var trans = tf.create(self._name, RW);
+                var store = trans.objectStore(self._name);
                 var req = store[method].apply(store,args || []);
                 req.onerror = function (e) {
                     reject(req.error, e);
@@ -577,10 +576,10 @@
             return this._wrop("clear");
         },
         where: function (indexName) {
-            return new WhereClause(this._tf, this.name, indexName, true);
+            return new WhereClause(this._tf, this._name, indexName, true);
         },
         modify: function (changes) {
-            return new WriteableCollection(new WhereClause(this._tf, this.name, null, true)).modify(changes);
+            return new WriteableCollection(new WhereClause(this._tf, this._name, null, true)).modify(changes);
         }
     });
 
@@ -600,8 +599,11 @@
             tableClass: tableClass || Table
         };
         
-        this.fail = event(ErrorEvent, "stateful");
-        this.done = event(null, "stateful");
+        this.on = {
+            error: event(ErrorEvent, "stateful"),
+            abort: event(ErrorEvent, "stateful"),
+            complete: event(null, "stateful")
+        };
 
         tf.sfdbTrans = this;
 
@@ -618,7 +620,7 @@
         }
     });
 
-    function WriteableTransaction(trans, tf, storeNames) {
+    function WriteableTransaction(tf, storeNames) {
         /// <summary>
         ///     Transaction class with WriteableTable instances instead of readonly Table instances.
         /// </summary>
@@ -662,22 +664,27 @@
             /// <param name="includeLower" optional="true">Whether items that equals lower should be included. Default true.</param>
             /// <param name="includeUpper" optional="true">Whether items that equals upper should be included. Default false.</param>
             /// <returns type="Collection"></returns>
-            return new this._ctx.collClass(this, IDBKeyRange.bound(lower, upper, includeLower == false ? false : true, !!includeUpper));
+            includeLower = includeLower != false;   // Default to true
+            includeUpper = includeUpper == true;    // Default to false
+            if ((lower > upper) ||
+                (lower == upper && (includeLower || includeUpper) && !(includeLower && includeUpper)))
+                return new Collection(this, IDBKeyRange.only(lower)).limit(0); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
+            return new this._ctx.collClass(this, IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper));
         },
         equals: function (value) {
             return new this._ctx.collClass(this, IDBKeyRange.only(value));
         },
         above: function (value) {
-            return new this._ctx.collClass(this, IDBKeyRange.lowerBound(value));
-        },
-        aboveOrEqual: function (value) {
             return new this._ctx.collClass(this, IDBKeyRange.lowerBound(value, true));
         },
+        aboveOrEqual: function (value) {
+            return new this._ctx.collClass(this, IDBKeyRange.lowerBound(value));
+        },
         below: function (value) {
-            return new this._ctx.collClass(this, IDBKeyRange.upperBound(value));
+            return new this._ctx.collClass(this, IDBKeyRange.upperBound(value, true));
         },
         belowOrEqual: function (value) {
-            return new this._ctx.collClass(this, IDBKeyRange.upperBound(value, true));
+            return new this._ctx.collClass(this, IDBKeyRange.upperBound(value));
         }
     });
 
@@ -711,6 +718,7 @@
             dir: "next",
             unique: "",
             filter: null,
+            limit: Infinity,
             /// <field type="IDBTransaction" />
             trans: null,
             oneshot: whereCtx.tf.oneshot
@@ -736,7 +744,7 @@
 
         _openCursor: function (mode) {
             var ctx = this._ctx;
-            return this._getIndexOrStore(mode).openCursor(ctx.range, ctx.dir + ctx.unique);
+            return this._getIndexOrStore(mode).openCursor(ctx.range || null, ctx.dir + ctx.unique);
         },
 
         each: function (fn) {
@@ -749,19 +757,22 @@
         },
 
         count: function (cb) {
+            fake(function () { cb(0); });
             var self = this,
                 ctx = this._ctx;
-
+            
             return ctx.tf.createPromise(function (resolve, reject) {
-                var req = self._getIndexOrStore().count(ctx.range);
+                var idx = self._getIndexOrStore();
+                var req = (ctx.range ? idx.count(ctx.range) : idx.count());
                 req.onerror = function (e) { reject(req.error, e); }
                 req.onsuccess = function (e) {
-                    resolve(e.target.result);
+                    resolve(Math.min(e.target.result, self._ctx.limit));
                 }
             }).then(cb);
         },
 
         toArray: function (cb) {
+            fake(function () { cb([]); });
             var self = this,
                 ctx = this._ctx;
 
@@ -772,9 +783,10 @@
         },
 
         limit: function (numRows) {
+            this._ctx.limit = Math.min(this._ctx.limit, numRows); // For count()
             this._addFilter(function (cursor, advance, resolve) {
-                if (--numRows < 0) advance(resolve);
-                return true;
+                if (--numRows <= 0) advance(resolve); // Stop after this item has been included
+                return numRows >= 0; // If numRows is already below 0, return false because then 0 was passed to numRows initially. Otherwise we wouldnt come here.
             });
             return this;
         },
@@ -1007,11 +1019,25 @@
             // Since this is a Multi-request transaction factory, we cache the transaction object once it has been created and continue using it.
             if (this.trans) return this.trans;
             this.trans = db.transaction(this.storeNames, this.mode);
-            trans.onerror = this.sfdbTrans.fail.fire;
-            trans.onabort = this.sfdbTrans.fail.fire;
-            trans.oncomplete = this.sfdbTrans.done.fire;
-            return trans;
-        }
+            this.trans.onerror = this.sfdbTrans.on.error.fire;
+            this.trans.onabort = this.sfdbTrans.on.abort.fire;
+            this.trans.oncomplete = this.sfdbTrans.on.complete.fire;
+            return this.trans;
+        },
+        createPromise: function (fn, trappable) {
+            var self = this;
+            var baseClass = TransactionFactory;
+            return baseClass.prototype.createPromise.call(this, function () {
+                try {
+                    fn.apply(this, arguments);
+                } catch (e) {
+                    try { self.trans.abort(); } catch (e2) { } // Make sure transaction is aborted if error occurs! Cannot rely on Promise.catch() because it is called on setImmediate, which is after transaction is committed.
+                    self.sfdbTrans.on.error.fire(e);
+                    throw e;
+                }
+            }, trappable);
+            return promise;
+        },
     });
 
     function FinishableTransactionFactory(storeNamesOrTrans, mode) {
@@ -1056,24 +1082,27 @@
     function event(constructor, options) {
         var l = [], args = null;
         var split = options ? options.split(' ') : [];
-        var once = split.indexOf("stateful") != -1;
+        var stateful = split.indexOf("stateful") != -1;
         var rv = function (cb) {
-            fake(function () { if (constructor) cb(constructor()); }); // For code completion
-            if (args)
+            fake(function () { if (constructor) cb(constructor.prototype); }); // For code completion
+            if (rv.isFired)
                 cb.apply(this, args);
             else
                 if (l.indexOf(cb) == -1) l.push(cb);
             return this;
         };
+        rv.isFired = false;
         rv.fire = function (eventObj) {
             var a = arguments;
             l.forEach(function (cb) { cb.apply(window, a); });
-            if (once) {
+            if (stateful) {
+                rv.isFired = true;
                 args = a;
                 l = [];
             }
         }
         rv.reset = function () {
+            rv.isFired = false;
             args = null;
         }
         rv.off = function (cb) {
