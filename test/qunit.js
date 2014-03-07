@@ -964,11 +964,12 @@ function extractStacktrace( e, offset ) {
 	}
 }
 function sourceFromStacktrace( offset ) {
-	try {
+	/*try {
 		throw new Error();
 	} catch ( e ) {
 		return extractStacktrace( e, offset );
-	}
+	}*/
+    return "";
 }
 
 /**

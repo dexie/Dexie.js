@@ -105,19 +105,29 @@
     });
     asyncTest("limit(),orderBy(),modify(), abort(), desc()", function () {
         var t = db.transaction("rw", db.users);
-        t.on.complete(function () {start();});
+        t.on.complete(function () {
+            start();
+        });
         t.on.error(function (e) {
             ok(false, "Error: " + e.message);
             start();
         });
-        t.users.orderBy("first").desc().limit(1).modify({ helloMessage: function (user) { return "Hello " + user.first; } }).then(function () {
-            t.users.orderBy("first").desc().toArray(function (a) {
-                equal(a[0].first, "Karl", "First item is Karl");
-                equal(a[0].helloMessage, "Hello Karl", "Karl got helloMessage 'Hello Karl'");
-                equal(a[1].first, "David", "Second item is David");
-                ok(!a[1].helloMessage, "David was not modified due to limit()");
+        t.users.orderBy("first").desc().limit(1).modify({ helloMessage: function (user) { return "Hello " + user.first; } })
+            .trap(function (e) {
+                ok(false, "Trap: " + e);
+                return false;
+            }).then(function () {
+                t.users.orderBy("first").desc().toArray(function (a) {
+                    equal(a[0].first, "Karl", "First item is Karl");
+                    equal(a[0].helloMessage, "Hello Karl", "Karl got helloMessage 'Hello Karl'");
+                    equal(a[1].first, "David", "Second item is David");
+                    ok(!a[1].helloMessage, "David was not modified due to limit()");
+                }).catch(function (e) {
+                    ok(false, "Inner catch: " + e.message);
+                });
+            }).catch(function (e) {
+                ok(false, "Outer catch: " + e.message);
             });
-        });
     });
     asyncTest("each", function () {
         ok(false, "Not implemented");
