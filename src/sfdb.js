@@ -14,8 +14,9 @@
         var deps = StraightForwardDB.dependencies;
         var indexedDB = deps.indexedDB,
             IDBKeyRange = deps.IDBKeyRange,
-            IDBTransaction = deps.IDBTransaction,
-            Promise = /*deps.Promise || */  PromiseLight; // Fallback to PromiseLight implementation in this file.
+            IDBTransaction = deps.IDBTransaction;
+
+        var Promise = DirectPromise;
 
         var ErrorEvent = window.ErrorEvent; // OK if not present. Just for code completion.
 
