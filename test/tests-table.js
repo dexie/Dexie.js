@@ -4,9 +4,19 @@
 (function(){
     var db = new StraightForwardDB("TestDB");
     db.version(1).schema({ users: "++id,first,last,!username,!*email,*pets" });
-    db.populate(function(trans){
+
+    var User = db.users.defineClass({
+        id:         Number,
+        first:      String,
+        last:       String,
+        username:   String,
+        email:      [String],
+        pets:       [String],
+    });
+
+    db.on("populate", function (trans) {
         trans.users.add({first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"]});
-        trans.users.add({first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: []});
+        trans.users.add({first: "Karl", last: "Faadersköld", username: "kceder", email: ["karl@ceder.what", "dadda@ceder.what"], pets: []});
     });
     var Promise = window.Promise || db.classes.Promise;
 
@@ -25,7 +35,7 @@
             });
         },
         teardown: function () {
-            db.close();
+            stop();db.delete().then(start);
         }
     });
 
@@ -83,10 +93,30 @@
         trans.users.where("id").between(1, 2, false, false).count(function (count) {
             ok(count == 0, "where().between(1, 2, false, false)");
         });
-        trans.on.complete(start)
-                .error(function (e) {
-                    ok(false, "Transaction failed: " + e.message);
-                });
+        trans.users.where("last").startsWith("Fah").toArray(function (a) {
+            equal(a.length, 1, "where().startsWith(existing) only matches Fahlander, not Faadersköld");
+            equal(a[0].first, "David");
+        });
+        trans.users.where("last").startsWith("Faa").toArray(function (a) {
+            equal(a.length, 1, "where().startsWith(existing) only matches Faadersköld, not Fahlander");
+            equal(a[0].first, "Karl");
+        });
+        trans.users.where("last").startsWith("Fa").toArray(function (a) {
+            equal(a.length, 2, "length = 2 on: where().startsWith(2 existing)");
+            equal(a[0].first, "Karl", "Karl found first on last 'Faadersköld'");
+            equal(a[1].first, "David", "David found second on last 'Fahlander'");
+        });
+        /*
+        trans.users.where("email").equals("david@awarica.com").toArray(function (a) { // Fails in IE with 0
+            equal(a.length, 1, "Finding items from array members. Expect to fail on IE10/IE11.");
+        });
+        trans.users.where("email").startsWith("da").distinct().toArray(function (a) { // Fails on IE with 0 and on Chrome with 3 even though we use "distinct" here. Maybe work around that?
+            equal(a.length, 2, "Found both because both have emails starting with 'da'");
+        });*/
+        trans.complete(start)
+             .error(function (e) {
+                ok(false, "Transaction failed: " + e.message);
+            });
     });
     asyncTest("count", function () {
         db.users.count(function (count) {
@@ -105,10 +135,10 @@
     });
     asyncTest("limit(),orderBy(),modify(), abort(), desc()", function () {
         var t = db.transaction("rw", db.users);
-        t.on.complete(function () {
+        t.complete(function () {
             start();
         });
-        t.on.error(function (e) {
+        t.error(function (e) {
             ok(false, "Error: " + e.message);
             start();
         });
@@ -130,10 +160,27 @@
             });
     });
     asyncTest("each", function () {
-        ok(false, "Not implemented");
-        start();
+        var users = [];
+        db.users.each(function (user) {
+            users.push(user);
+        }).then(function () {
+            equal(users.length, 2, "Got 2 users");
+            equal(users[0].first, "David", "Got David");
+            equal(users[1].first, "Karl", "Got Karl");
+            start();
+        });
     });
     asyncTest("put", function () {
+        var t = db.transaction("rw", db.users);
+        var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
+        t.users.put(newUser).then(function (id) {
+            equal(id, 3, "Got id 3 because we didnt supply an id");
+            equal(newUser.id, id, "The id property of the new user was set");
+            t.users.where("username").equals("aper").first(function (user) {
+                equal(user.last, "Persbrant", "The correct item was actually added");
+            });
+        });
+
         ok(false, "Not implemented");
         start();
     });

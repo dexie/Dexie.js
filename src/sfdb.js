@@ -31,6 +31,7 @@
         var database = this;
         var mainTransactionFactory;
         var pausedTransactionFactories = [];
+        var use_proto = (function(){function F(){}; var a = new F(); try {a.__proto__ = Object.prototype; return !(a instanceof F)} catch(e){return false;}})()
 
         function init() {
             mainTransactionFactory = new TransactionFactory().pause();
@@ -120,7 +121,7 @@
                     // Update API
                     dbTableSchema = latestSchema;
                     removeTablesApi(database);
-                    setApiOnPlace(database, mainTransactionFactory, WriteableTable, Object.keys(dbTableSchema));
+                    setApiOnPlace(database, mainTransactionFactory, ObjectMappableTable, Object.keys(dbTableSchema));
                 }
 
                 return this;
@@ -147,7 +148,7 @@
                 var tf = new MultireqTransactionFactory(trans);
                 var t = new WriteableTransaction(tf, trans.db.objectStoreNames);
                 tf.sfdbTrans = t;
-                database.populate.fire(t);
+                database.on("populate").fire(t);
             } else {
                 // Upgrade version to version, step-by-step from oldest to newest version.
                 // Each transaction object will contain the table set that was current in that version (but also not-yet-deleted tables from its previous version)
@@ -367,16 +368,16 @@
                 return ver;
             });
 
-            setApiOnPlace(this, mainTransactionFactory, WriteableTable, Object.keys(dbTableSchema));
+            //setApiOnPlace(this, mainTransactionFactory, WriteableTable, Object.keys(dbTableSchema));
 
             var req = indexedDB.open(dbName, dbVersion * 10); // Multiply with 10 will be needed to workaround various bugs in different implementations of indexedDB.
-            req.onerror = this.error.fire;
+            req.onerror = this.on("error").fire;
             req.onupgradeneeded = function (e) {
                 runUpgraders(e.oldVersion / 10, req.transaction);
             }
             req.onsuccess = function (e) {
                 db = req.result;
-                database.ready.fire(e);
+                database.on("ready").fire(e);
                 pausedTransactionFactories.forEach(function (tf) {
                     // If anyone has made operations on a table instance before the database was opened, the operations will start executing now.
                     tf.resume();
@@ -390,9 +391,7 @@
             if (db) {
                 db.close();
                 pausedTransactionFactories.push(mainTransactionFactory.pause());
-                this.ready.reset();
-                this.error.reset();
-                removeTablesApi(this);
+                this.on(["ready", "error"]).reset();
                 db = null;
             }
         }
@@ -407,17 +406,21 @@
         }
 
         //
-        // Events
+        // Events: populate, ready and error
         //
 
-        /// <field>Populate event</field>
-        this.populate = event(function () { return new WriteableTransaction(IDBTransaction.prototype, mainTransactionFactory, Object.keys(dbTableSchema)); });
+        this.on = events(this, "populate", ["ready", "error"]);
+        this.ready = function (callback) {
+            return this.on("ready", callback);
+        }
+        this.error = function (callback) {
+            return this.on("error", callback);
+        }
 
-        /// <field>Error event</field>
-        this.error = event(ErrorEvent, "stateful");
-
-        /// <field>Ready event</field>
-        this.ready = event(null, "stateful");
+        fake(function () {
+            database.on("populate").fire(new WriteableTransaction(IDBTransaction.prototype, mainTransactionFactory, Object.keys(dbTableSchema)));
+            database.on("error").fire(new ErrorEvent());
+        });
 
         this.transaction = function (mode, tableInstances) {
             /// <summary>
@@ -455,7 +458,7 @@
 
         this.table = function (tableName) {
             if (Object.keys(dbTableSchema).indexOf(tableName) == -1) { throw "SFDB: Table does not exist"; return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
-            return new WriteableTable(tableName, mainTransactionFactory);
+            return new ObjectMappableTable(tableName, mainTransactionFactory);
         }
 
         //
@@ -473,13 +476,36 @@
             this._collClass = collClass || Collection;
         }
         extend(Table.prototype, {
+            _createStructure: function (obj) {
+                var schema = dbTableSchema[this._name];
+                if (schema.primKey.keyPath) obj[schema.primKey.keyPath] = null;
+                schema.indexes.forEach(function (idx) {
+                    obj[idx.keyPath] = null;
+                });
+            },
             get: function (key) {
                 var self = this;
                 return this._tf.createPromise(function (resolve, reject) {
+                    fake(function () { resolve(createInstance(self._name)); });
                     var req = self._tf.create(self._name).objectStore(self._name).get(key);
                     req.onerror = function (e) { reject(req.error, e); }
                     req.onsuccess = function () {
-                        resolve(req.result);
+                        var mappedClass = database[self._name]._mappedClass;
+                        if (mappedClass) {
+                            var result = req.result;
+                            if (!result) {
+                                resolve(result);
+                            } else if (use_proto) {
+                                result.__proto__ = mappedClass.prototype;
+                                resolve(result);
+                            } else {
+                                var res = new mappedClass();
+                                for (var m in result) res[m] = result[m];
+                                result(res);
+                            }
+                        } else {
+                            resolve(req.result);
+                        }
                     };
                 });
             },
@@ -493,18 +519,20 @@
                 return new this._collClass(new WhereClause(this._tf, this._name)).limit(numRows);
             },
             each: function (fn) {
+                fake(function () { fn(createInstance(self._name)); });
                 var self = this;
                 return this._tf.createPromise(function (resolve, reject) {
                     var req = self._tf.create(self._name).objectStore(self._name).openCursor();
-                    iterate(req, null, fn, resolve, reject); // TODO: Reject with error not event. Resolve with ???
+                    iterate(req, null, fn, resolve, reject, self._mappedClass); // TODO: Reject with error not event. Resolve with ???
                 });
             },
             toArray: function (cb) {
                 var self = this;
                 return this._tf.createPromise(function (resolve, reject) {
+                    fake(function () { resolve([createInstance(self._name)]) });
                     var a = [];
                     var req = self._tf.create(self._name).objectStore(self._name).openCursor();
-                    iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject);
+                    iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject, self._mappedClass);
                 }).then(cb);
             },
             orderBy: function (index) {
@@ -604,6 +632,60 @@
             }
         });
 
+        function ObjectMappableTable(name, transactionFactory) {
+            WriteableTable.call(this, name, transactionFactory);
+        }
+
+        (function () {
+
+            function parseType(type) {
+                if (typeof (type) == 'function') {
+                    return new type();
+                } else if (Array.isArray(type)) {
+                    return [parseType(type[0])];
+                } else if (typeof (type) == 'object') {
+                    var rv = {};
+                    fillObject(rv, type);
+                    return rv;
+                } else {
+                    return type;
+                }
+            }
+
+            function fillObject(obj, structure) {
+                Object.keys(structure).forEach(function (member) {
+                    obj[member] = parseType(structure[member]);
+                });
+            }
+
+            derive(ObjectMappableTable).from(WriteableTable).extend({
+                mapToClass: function (constructor, structure) {
+                    /// <summary>
+                    ///     Map table to a javascript constructor function. Objects returned from the database will be instances of this class, making
+                    ///     it possible to the instanceOf operator as well as extending the class using constructor.prototype.method = function(){...}.
+                    /// </summary>
+                    /// <param name="constructor">Constructor function representing the class.</param>
+                    /// <param name="structure" optional="true">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
+                    /// know what type each member has. Example: {name: String, emailAddresses: [String], password}</param>
+                    var mappedClass = this._mappedClass = constructor;
+                    this._createStructure = structure ? function (obj) {
+                        fillObject(obj, structure);
+                    } : null;
+                    return constructor;
+                },
+                defineClass: function (structure) {
+                    /// <summary>
+                    ///     Define all members of the class that represents the table. This will help code completion of when objects are read from the database
+                    ///     as well as making it possible to extend the prototype of the returned constructor function.
+                    /// </summary>
+                    /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
+                    /// know what type each member has. Example: {name: String, emailAddresses: [String], password}</param>
+                    this._mappedClass = function () { }
+                    this._createStructure = function (obj) { fillObject(obj, structure); }
+                    return this._mappedClass;
+                }
+            });
+        })();
 
         function Transaction(tf, storeNames, tableClass) {
             /// <summary>
@@ -620,11 +702,9 @@
                 tableClass: tableClass || Table
             };
 
-            this.on = {
-                error: event(ErrorEvent, "stateful"),
-                abort: event(ErrorEvent, "stateful"),
-                complete: event(null, "stateful")
-            };
+            this.on = events(this, ["complete", "error"], "abort");
+            this.complete = function (cb) {return this.on("complete", cb);}
+            this.error = function (cb) { return this.on("error", cb);}
 
             tf.sfdbTrans = this;
 
@@ -706,6 +786,13 @@
             },
             belowOrEqual: function (value) {
                 return new this._ctx.collClass(this, IDBKeyRange.upperBound(value));
+            },
+            startsWith: function (str) {
+            	/// <param name="str" type="String"></param>
+                if (typeof (str) != 'string') throw "SFDB: startsWith only applicable on strings";
+                if (str === "") return new Collection(this); // All strings starts with an empty string - return all items.
+                var upper = str.substr(0, str.length - 1) + String.fromCharCode(str.charCodeAt(str.length - 1) + 1);
+                return this.between(str, upper, true, false);
             }
         });
 
@@ -772,8 +859,10 @@
                 var self = this,
                     ctx = this._ctx;
 
+                fake(function () { fn(createInstance(ctx.table));});
+
                 return ctx.tf.createPromise(function (resolve, reject) {
-                    iterate(self._openCursor(), ctx.filter, fn, resolve, reject);
+                    iterate(self._openCursor(), ctx.filter, fn, resolve, reject, database[ctx.table]._mappedClass);
                 });
             },
 
@@ -793,13 +882,14 @@
             },
 
             toArray: function (cb) {
-                fake(function () { cb([]); });
+                fake(function () { cb([createInstance(ctx.table)]); });
                 var self = this,
                     ctx = this._ctx;
 
                 return ctx.tf.createPromise(function (resolve, reject) {
+                    fake(function () { resolve([createInstance(ctx.table)]);});
                     var a = [];
-                    iterate(self._openCursor(), ctx.filter, function (item) { a.push(item); }, function () { resolve(a); }, reject);
+                    iterate(self._openCursor(), ctx.filter, function (item) { a.push(item); }, function () { resolve(a); }, reject, database[ctx.table]._mappedClass);
                 }).then(cb);
             },
 
@@ -849,6 +939,7 @@
                     ctx = this._ctx;
 
                 return ctx.tf.createTrappablePromise(function (resolve, reject, raise) {
+                    if (!ctx.oneshot) ctx.tf.pause(); // If in transaction (not oneshot), make next read operation in same transaction wait to execute until we are node modifying. Caller doenst need to wait for then(). Easier code!
                     var keys = Object.keys(changes);
                     var getters = keys.map(function (key) {
                         var value = changes[key];
@@ -879,16 +970,17 @@
                     });
 
                     if (ctx.oneshot) {
-                        iterate(self._openCursor(RW), ctx.filter, null, function () { }, reject);
+                        iterate(self._openCursor(RW), ctx.filter, null, function () {}, reject);
                         ctx.trans.oncomplete = function () { resolve(count); };
                     } else {
                         iterate(self._openCursor(RW), ctx.filter, null, function () {
                             //complete = true;
                             //if (successcount + failcount === count) resolve(successcount);
+                            ctx.tf.resume();
                             resolve(count);
                         }, function (e) {
                             reject(e);
-                        });
+                        }, database[ctx.table]._mappedClass);
                     }
                 });
             },
@@ -897,6 +989,7 @@
                     ctx = this._ctx;
 
                 return ctx.tf.createTrappablePromise(function (resolve, reject, raise) {
+                    if (!ctx.oneshot) ctx.tf.pause(); // If in transaction (not oneshot), make next read operation in same transaction wait to execute until we are node modifying. Caller doenst need to wait for then(). Easier code!
                     var count = 0;
                     self._addFilter(function (cursor) {
                         ++count;
@@ -909,7 +1002,10 @@
                         iterate(self._openCursor(RW), ctx.filter, null, function () { }, reject);
                         ctx.trans.oncomplete = function () { resolve(count); };
                     } else {
-                        iterate(self._openCursor(RW), ctx.filter, null, function () { resolve(count); }, reject);
+                        iterate(self._openCursor(RW), ctx.filter, null, function () {
+                            ctx.tf.resume();
+                            resolve(count);
+                        }, reject);
                     }
                 });
             }
@@ -957,8 +1053,30 @@
             clearTimeout(to);
         }
 
-        function iterate(req, filter, fn, oncomplete, reject) {
+        function createInstance(tableName) {
+            var mappedClass = database[tableName]._mappedClass;
+            var rv = mappedClass ? new mappedClass() : {};
+            database[tableName]._createStructure(rv);
+            return rv;
+        }
+
+        function iterate(req, filter, fn, oncomplete, reject, mappedClass) {
             req.onerror = function (e) { reject(req.error, e); }
+            if (mappedClass) {
+                var origFn = fn;
+                if (use_proto) {
+                    fn = function (val) {
+                        if (val) val.__proto__ = mappedClass.prototype;
+                        origFn(val);
+                    }
+                } else {
+                    fn = function (val) {
+                        var rv = new mappedClass();
+                        for (var m in val) rv[m] = val[m];
+                        origFn(rv);
+                    }
+                }
+            }
             if (filter) {
                 req.onsuccess = function (e) {
                     var cursor = e.target.result;
@@ -993,8 +1111,8 @@
                 var idx = {
                     name: keyPath && keyPath.toLowerCase(),
                     keyPath: keyPath || null,
-                    unique: index.indexOf('!') == 0,
-                    multi: index.indexOf('*') == 0,
+                    unique: index.indexOf('!') != -1,
+                    multi: index.indexOf('*') != -1,
                     auto: index.indexOf("++") != -1
                 };
                 idx.src = (idx.unique ? '!' : '') + (idx.multi ? '*' : '') + (idx.auto ? "++" : "") + idx.keyPath;
@@ -1056,9 +1174,9 @@
                 // Since this is a Multi-request transaction factory, we cache the transaction object once it has been created and continue using it.
                 if (this.trans) return this.trans;
                 this.trans = db.transaction(this.storeNames, this.mode);
-                this.trans.onerror = this.sfdbTrans.on.error.fire;
-                this.trans.onabort = this.sfdbTrans.on.abort.fire;
-                this.trans.oncomplete = this.sfdbTrans.on.complete.fire;
+                this.trans.onerror = this.sfdbTrans.on("error").fire;
+                this.trans.onabort = this.sfdbTrans.on("abort").fire;
+                this.trans.oncomplete = this.sfdbTrans.on("complete").fire;
                 return this.trans;
             },
             createPromise: function (fn, trappable) {
@@ -1069,7 +1187,7 @@
                         fn.apply(this, arguments);
                     } catch (e) {
                         try { self.trans.abort(); } catch (e2) { } // Make sure transaction is aborted if error occurs! Cannot rely on Promise.catch() because it is called on setImmediate, which is after transaction is committed.
-                        self.sfdbTrans.on.error.fire(e);
+                        self.sfdbTrans.on("error").fire(e);
                         throw e;
                     }
                 }, trappable);
@@ -1116,35 +1234,74 @@
             if (!b) throw "Assertion failed";
         }
 
-        function event(constructor, options, thisCtx) {
-            var l = [], args = null;
-            var split = options ? options.split(' ') : [];
-            var stateful = split.indexOf("stateful") != -1;
-            var rv = function (cb) {
-                fake(function () { if (constructor) cb(constructor.prototype); }); // For code completion
-                if (rv.isFired)
-                    cb.apply(this, args);
-                else
-                    if (l.indexOf(cb) == -1) l.push(cb);
-                return this;
-            };
-            rv.isFired = false;
-            rv.fire = function (eventObj) {
-                var a = arguments;
-                l.forEach(function (cb) { cb.apply(window, a); });
-                if (stateful) {
-                    rv.isFired = true;
-                    args = a;
-                    l = [];
+        function events(ctx, eventNames) {
+            var args = arguments;
+
+            var evs = {};
+            function add (eventName) {
+                function fire (val) {
+                    this.l.forEach(function(cb){
+                        cb(val);
+                    });
+                }                
+                evs[eventName] = {
+                    l: [],
+                    f: fire,
+                    s: function(cb) { this.l.push(cb);},
+                    u: function(cb) {
+                        this.l = this.l.filter(function(fn){ return fn !== cb; });
+                    }
+                }
+                return fire;
+            }
+
+            function promise(success, fail) {
+                var res = add(success);
+                var rej = add(fail);
+                var promise = new Promise(function (resolve, reject) {
+                    evs[success].f = resolve;
+                    evs[fail].f = reject;
+                });
+                evs[success].p = promise;
+                promise.then(function (val) {
+                    res.call(evs[success], val);
+                }, function (val) {
+                    rej.call(evs[fail], val);
+                });
+            }
+
+            for (var i = 1, l = args.length; i < l; ++i) {
+                var eventName = args[i];
+                if (typeof (eventName) == 'string') {
+                    // non-promise event
+                    add(eventName);
+                } else {
+                    // promise-based event pair (i.e. we promise to call one and only one of the events in the pair, and to only call it once (unless reset() is called))
+                    promise(eventName[0], eventName[1]);
                 }
             }
-            rv.reset = function () {
-                rv.isFired = false;
-                args = null;
-            }
-            rv.off = function (cb) {
-                var i = l.indexOf(cb);
-                if (i != -1) l.splice(i, 1);
+            var rv = function (eventName, subscriber) {
+                if (subscriber) {
+                    // Subscribe
+                    evs[eventName].s(subscriber);
+                    return ctx;
+                } else if (typeof (eventName) == 'string') {
+                    // Fire
+                    return {
+                        fire: function (val) {
+                            evs[eventName].f(val);
+                        },
+                        unsubscribe: function (fn) {
+                            evs[eventName].u(fn);
+                        },
+                    };
+                } else {
+                    var success = eventName[0], fail = eventName[1];
+                    return {
+                        getPromise: function () {return evs[success].p;},
+                        reset: function () { promise(success, fail);}
+                    };
+                }
             }
             return rv;
         }

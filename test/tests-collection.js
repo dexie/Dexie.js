@@ -4,10 +4,21 @@
 (function () {
     var db = new StraightForwardDB("TestDB");
     db.version(1).schema({ users: "++id,first,last,!username,!*email,*pets" });
-    db.populate(function (trans) {
+
+    var User = db.users.defineClass({
+        id:         Number,
+        first:      String,
+        last:       String,
+        username:   String,
+        email:      [String],
+        pets:       [String],
+    });
+
+    db.on("populate", function (trans) {
         trans.users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
         trans.users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
     });
+
     var Promise = window.Promise || db.classes.Promise;
 
     module("collection", {
@@ -25,7 +36,8 @@
             });
         },
         teardown: function () {
-            db.close();
+            stop();
+            db.delete().then(start);
         }
     });
 
@@ -67,8 +79,8 @@
     });
     asyncTest("modify", function () {
         var t = db.transaction("rw", db.users);
-        t.on.complete(function () { start(); });
-        t.on.error(function (e) {
+        t.complete(function () { start(); });
+        t.error(function (e) {
             ok(false, "Error: " + e.message);
             start();
         });
