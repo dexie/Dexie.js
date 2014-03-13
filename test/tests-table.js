@@ -3,8 +3,9 @@
 ///<var type="StraightForwardDB" />
 (function(){
     var db = new StraightForwardDB("TestDB");
-    db.version(1).schema({ users: "++id,first,last,!username,!*email,*pets" });
+    db.version(1).schema({ users: "++id,first,last,&username,*&email,*pets" });
 
+    //db.users.mapToClass(User);
     var User = db.users.defineClass({
         id:         Number,
         first:      String,
@@ -23,24 +24,23 @@
     module("table", {
         setup: function () {
             stop();
-            db.delete().then(function(){
-                db.open().ready(function () {
-                    start();
-                });
-                db.error(function (e) {
-                    ok(false, "Error: " + e);
-                });
-            }).catch(function (e) {
+            db.delete().catch(function (e) {
                 ok(false, "Could not delete database");
+            }).then(function () {
+                db.open().error(function (e) {
+                    ok(false, "Database Error: " + e);
+                });
+                start();
             });
         },
         teardown: function () {
-            stop();db.delete().then(start);
+            stop();
+            db.delete().then(start);
         }
     });
 
     asyncTest("get", 4, function () {
-        db.table("users").get(1).then(function (obj) {
+        db.table("users").get(1, function (obj) {
             equal(obj.first, "David", "Got the first object");
             db.users.get(2).then(function (obj) {
                 equal(obj.first, "Karl", "Got the second object");
@@ -106,13 +106,24 @@
             equal(a[0].first, "Karl", "Karl found first on last 'Faadersköld'");
             equal(a[1].first, "David", "David found second on last 'Fahlander'");
         });
-        /*
-        trans.users.where("email").equals("david@awarica.com").toArray(function (a) { // Fails in IE with 0
+        trans.users.where("last").equalsAnyOf("Fahlander", "Faadersköld").toArray(function (a) {
+            equal(a.length, 2, "equalsAnyOf() returned expected number of items");
+            equal(a[0].last, "Faadersköld", "Faadersköld is first");
+        });
+        trans.users.where("last").equalsAnyOf("Fahlander", "Faadersköld").desc().toArray(function (a) {
+            equal(a.length, 2, "equalsAnyOf().desc() returned expected number of items");
+            equal(a[0].last, "Fahlander", "Fahlander is first");
+        });
+        trans.users.where("last").equalsAnyOf("Faadersköld").toArray(function (a) {
+            equal(a.length, 1, "equalsAnyOf() returned expected number of items");
+        });
+
+        trans.users.where("email").equals("david@awarica.com").toArray(function (a) { // Fails in IE with 0 due to that IE is not implementing to index string arrays.
             equal(a.length, 1, "Finding items from array members. Expect to fail on IE10/IE11.");
         });
-        trans.users.where("email").startsWith("da").distinct().toArray(function (a) { // Fails on IE with 0 and on Chrome with 3 even though we use "distinct" here. Maybe work around that?
+        trans.users.where("email").startsWith("da").distinct().toArray(function (a) { // Fails on IE with 0
             equal(a.length, 2, "Found both because both have emails starting with 'da'");
-        });*/
+        });
         trans.complete(start)
              .error(function (e) {
                 ok(false, "Transaction failed: " + e.message);
@@ -172,28 +183,75 @@
     });
     asyncTest("put", function () {
         var t = db.transaction("rw", db.users);
+        /*db.users.get("a", function (a) {
+            
+        });
+        t.users.where("first").equals("a").first(function (ape) {
+            
+        });*/
+
         var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
         t.users.put(newUser).then(function (id) {
             equal(id, 3, "Got id 3 because we didnt supply an id");
             equal(newUser.id, id, "The id property of the new user was set");
-            t.users.where("username").equals("aper").first(function (user) {
-                equal(user.last, "Persbrant", "The correct item was actually added");
-            });
+        });
+        t.users.where("username").equals("aper").first(function (user) {
+            equal(user.last, "Persbrant", "The correct item was actually added");
         });
 
-        ok(false, "Not implemented");
-        start();
+        t.complete(start);
     });
     asyncTest("add", function () {
-        ok(false, "Not implemented");
-        start();
+        var t = db.transaction("rw", db.users);
+        var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
+
+        t.users.add(newUser).then(function (id) {
+            equal(id, 3, "Got id 3 because we didnt supply an id");
+            equal(newUser.id, id, "The id property of the new user was set");
+        });
+
+        t.users.where("username").equals("aper").first(function (user) {
+            equal(user.last, "Persbrant", "The correct item was actually added");
+        });
+
+        t.complete(start).error(function (e) {
+            ok(false, "Error: " + e);
+        });
     });
     asyncTest("delete", function () {
-        ok(false, "Not implemented");
-        start();
+        // Without transaction
+        db.users.get(1, function (user) {
+            notEqual(user, null, "User with id 1 exists");
+        }).then(function () {
+            db.users.delete(1).then(function () {
+                db.users.get(1, function (user) {
+                    equal(user, null, "User not found anymore");
+                    start();
+                });
+            });
+        });
+    });
+    asyncTest("delete(using transaction)", function() {
+        // With transaction
+        var trans = db.transaction("rw", db.users);
+        trans.users.get(1, function (user) {
+            notEqual(user, null, "User with id 1 exists");
+        });
+        trans.users.delete(1);
+        trans.users.get(1, function (user) {
+            equal(user, null, "User not found anymore");
+        });
+        trans.complete(start);
     });
     asyncTest("clear", function () {
-        ok(false, "Not implemented");
-        start();
+        var trans = db.transaction("rw", db.users);
+        trans.users.count(function (count) {
+            equal(count, 2, "There are 2 items in database before clearing it");
+        });
+        trans.users.clear();
+        trans.users.count(function (count) {
+            equal(count, 0, "There are 0 items in database after it has been cleared");
+        });
+        trans.complete(start);
     });
 })();

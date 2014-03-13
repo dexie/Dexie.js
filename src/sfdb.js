@@ -92,27 +92,31 @@
                 /// </summary>
                 /// <param name="schema" type="Object">
                 /// Example: <br/>
-                ///   {users: "id++,first,last,!username,*email", <br/>
-                ///   passwords: "id++,!username"}<br/>
+                ///   {users: "id++,first,last,&username,*email", <br/>
+                ///   passwords: "id++,&username"}<br/>
                 /// <br/>
-                /// Syntax: {Table: "[primaryKey][++],[!][*]index1,[!][*]index2,..."}<br/><br/>
+                /// Syntax: {Table: "[primaryKey][++],[&][*]index1,[&][*]index2,..."}<br/><br/>
                 /// Special characters:<br/>
-                ///  "!"  means unique key, <br/>
+                ///  "&"  means unique key, <br/>
                 ///  "*"  means value is multiEntry, <br/>
                 ///  "++" means auto-increment and only applicable for primary key <br/>
                 /// </param>
                 var tableSchema = (this._cfg.tableSchema = this._cfg.tableSchema || {});
                 Object.keys(schema).forEach(function (tableName) {
+                    var instanceTemplate = {};
                     var indexes = parseIndexSyntax(schema[tableName]);
                     var primKey = indexes.shift();
                     if (primKey.multi) throw "SFDB: Primary key cannot be multi-valued";
+                    if (primKey.keyPath) instanceTemplate[primKey.keyPath] = 0;
                     indexes.forEach(function (idx) {
                         if (idx.auto) throw "SFDB: Only primary key can be marked as autoIncrement (++)";
                         if (!idx.keyPath) throw "SFDB: index must have a name and cannot be an empty string";
+                        instanceTemplate[idx.keyPath] = "";
                     });
                     tableSchema[tableName] = {
                         primKey: primKey,
-                        indexes: indexes
+                        indexes: indexes,
+                        instanceTemplate: instanceTemplate
                     };
                 });
                 // Update the latest schema to this version
@@ -121,7 +125,7 @@
                     // Update API
                     dbTableSchema = latestSchema;
                     removeTablesApi(database);
-                    setApiOnPlace(database, mainTransactionFactory, ObjectMappableTable, Object.keys(dbTableSchema));
+                    setApiOnPlace(database, mainTransactionFactory, ObjectMappableTable, Object.keys(latestSchema), latestSchema);
                 }
 
                 return this;
@@ -148,6 +152,10 @@
                 var tf = new MultireqTransactionFactory(trans);
                 var t = new WriteableTransaction(tf, trans.db.objectStoreNames);
                 tf.sfdbTrans = t;
+                t.on("error", function (e) {
+                    // Forward descriptive error messages to database.error and not just the default errors from IDB (which are not so descriptive)
+                    database.on("error").fire("Failed to populate database: " + e);
+                }); 
                 database.on("populate").fire(t);
             } else {
                 // Upgrade version to version, step-by-step from oldest to newest version.
@@ -219,6 +227,10 @@
                                 var t = new WriteableTransaction(trans, tf, trans.db.objectStoreNames);
                                 tf.sfdbTrans = t;
                                 tf.onfinish = cb;
+                                t.on("error", function (e) {
+                                    // Forward descriptive error messages to database.error and not just the default errors from IDB (which are not so descriptive)
+                                    database.on("error").fire("Failed running upgrader function for version " + version._cfg.version + ": " + e);
+                                });
                                 newSchema._cfg.contentUpgrade(t);
                                 if (tf.uncompleteRequests == 0) cb();
                             });
@@ -371,8 +383,13 @@
             //setApiOnPlace(this, mainTransactionFactory, WriteableTable, Object.keys(dbTableSchema));
 
             var req = indexedDB.open(dbName, dbVersion * 10); // Multiply with 10 will be needed to workaround various bugs in different implementations of indexedDB.
-            req.onerror = this.on("error").fire;
+            req.onerror = function (e) {
+                database.on("error").fire(e.target.error);
+            }
             req.onupgradeneeded = function (e) {
+                req.transaction.onerror = function (e) {
+                    database.on("error").fire(e.target.error);
+                };
                 runUpgraders(e.oldVersion / 10, req.transaction);
             }
             req.onsuccess = function (e) {
@@ -476,17 +493,10 @@
             this._collClass = collClass || Collection;
         }
         extend(Table.prototype, {
-            _createStructure: function (obj) {
-                var schema = dbTableSchema[this._name];
-                if (schema.primKey.keyPath) obj[schema.primKey.keyPath] = null;
-                schema.indexes.forEach(function (idx) {
-                    obj[idx.keyPath] = null;
-                });
-            },
-            get: function (key) {
+            get: function (key, cb) {
                 var self = this;
+                fake(function () { cb(getInstanceTemplate(self._name)) });
                 return this._tf.createPromise(function (resolve, reject) {
-                    fake(function () { resolve(createInstance(self._name)); });
                     var req = self._tf.create(self._name).objectStore(self._name).get(key);
                     req.onerror = function (e) { reject(req.error, e); }
                     req.onsuccess = function () {
@@ -499,15 +509,15 @@
                                 result.__proto__ = mappedClass.prototype;
                                 resolve(result);
                             } else {
-                                var res = new mappedClass();
+                                var res = Object.create(mappedClass.prototype);
                                 for (var m in result) res[m] = result[m];
-                                result(res);
+                                resolve(res);
                             }
                         } else {
                             resolve(req.result);
                         }
                     };
-                });
+                }).then(cb);
             },
             where: function (indexName) {
                 return new WhereClause(this._tf, this._name, indexName);
@@ -519,8 +529,8 @@
                 return new this._collClass(new WhereClause(this._tf, this._name)).limit(numRows);
             },
             each: function (fn) {
-                fake(function () { fn(createInstance(self._name)); });
                 var self = this;
+                fake(function () { fn(getInstanceTemplate(self._name)) });
                 return this._tf.createPromise(function (resolve, reject) {
                     var req = self._tf.create(self._name).objectStore(self._name).openCursor();
                     iterate(req, null, fn, resolve, reject, self._mappedClass); // TODO: Reject with error not event. Resolve with ???
@@ -528,8 +538,8 @@
             },
             toArray: function (cb) {
                 var self = this;
+                fake(function () { cb([getInstanceTemplate(self._name)]) });
                 return this._tf.createPromise(function (resolve, reject) {
-                    fake(function () { resolve([createInstance(self._name)]) });
                     var a = [];
                     var req = self._tf.create(self._name).objectStore(self._name).openCursor();
                     iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject, self._mappedClass);
@@ -567,7 +577,15 @@
                     var store = trans.objectStore(self._name);
                     var req = store[method].apply(store, args || []);
                     req.onerror = function (e) {
-                        reject(req.error, e);
+                        var msg = e.target.error + " when ";
+                        switch(method) {
+                            case "add": msg += "adding object " + JSON.stringify(args[0]) + " into '" + self._name + "'"; break;
+                            case "put": msg += "putting object " + JSON.stringify(args[0]) + " into '" + self._name + "'"; break;
+                            case "delete": msg += "deleting object with key " + args[0] + " from '" + self._name + "'"; break;
+                            case "clear": msg += "clearing table '" + self._name + "'"; break;
+                        }
+                        reject(msg, e);
+                        tf.sfdbTrans.on("error").fire(msg); // Make sure this more descriptive error message is bubbled to the transaction
                     }
                     if (tf.oneshot) {
                         // Transaction is a one-shot transaction and caller has not access to it. This is the case when calling
@@ -668,9 +686,10 @@
                     /// <param name="structure" optional="true">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
                     /// know what type each member has. Example: {name: String, emailAddresses: [String], password}</param>
                     var mappedClass = this._mappedClass = constructor;
-                    this._createStructure = structure ? function (obj) {
-                        fillObject(obj, structure);
-                    } : null;
+                    this._instanceTemplate = Object.create(mappedClass.prototype);
+                    if (structure) {
+                        fillObject(this._instanceTemplate, structure);
+                    }
                     return constructor;
                 },
                 defineClass: function (structure) {
@@ -680,8 +699,9 @@
                     /// </summary>
                     /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
                     /// know what type each member has. Example: {name: String, emailAddresses: [String], password}</param>
-                    this._mappedClass = function () { }
-                    this._createStructure = function (obj) { fillObject(obj, structure); }
+                    this._mappedClass = function () {}
+                    fillObject(this._mappedClass.prototype, structure);
+                    this._instanceTemplate = new this._mappedClass();
                     return this._mappedClass;
                 }
             });
@@ -716,7 +736,7 @@
                 this._ctx.trans.abort();
             },
             table: function (name) {
-                if (this._ctx.storeNames.indexOf(name) == -1) throw "SFDB: Table does not exist";
+                if (Array.prototype.indexOf.call(this._ctx.storeNames, name) == -1) throw "SFDB: Table does not exist";
                 return new this._ctx.tableClass(name, this._ctx.tf);
             }
         });
@@ -755,50 +775,175 @@
             }
         }
 
-        extend(WhereClause.prototype, {
-            between: function (lower, upper, includeLower, includeUpper) {
-                /// <summary>
-                ///     Filter out records whose where-field lays between given lower and upper values. Applies to Strings, Numbers and Dates.
-                /// </summary>
-                /// <param name="lower"></param>
-                /// <param name="upper"></param>
-                /// <param name="includeLower" optional="true">Whether items that equals lower should be included. Default true.</param>
-                /// <param name="includeUpper" optional="true">Whether items that equals upper should be included. Default false.</param>
-                /// <returns type="Collection"></returns>
-                includeLower = includeLower != false;   // Default to true
-                includeUpper = includeUpper == true;    // Default to false
-                if ((lower > upper) ||
-                    (lower == upper && (includeLower || includeUpper) && !(includeLower && includeUpper)))
-                    return new Collection(this, IDBKeyRange.only(lower)).limit(0); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
-                return new this._ctx.collClass(this, IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper));
-            },
-            equals: function (value) {
-                return new this._ctx.collClass(this, IDBKeyRange.only(value));
-            },
-            above: function (value) {
-                return new this._ctx.collClass(this, IDBKeyRange.lowerBound(value, true));
-            },
-            aboveOrEqual: function (value) {
-                return new this._ctx.collClass(this, IDBKeyRange.lowerBound(value));
-            },
-            below: function (value) {
-                return new this._ctx.collClass(this, IDBKeyRange.upperBound(value, true));
-            },
-            belowOrEqual: function (value) {
-                return new this._ctx.collClass(this, IDBKeyRange.upperBound(value));
-            },
-            startsWith: function (str) {
-            	/// <param name="str" type="String"></param>
-                if (typeof (str) != 'string') throw "SFDB: startsWith only applicable on strings";
-                if (str === "") return new Collection(this); // All strings starts with an empty string - return all items.
-                var upper = str.substr(0, str.length - 1) + String.fromCharCode(str.charCodeAt(str.length - 1) + 1);
-                return this.between(str, upper, true, false);
+        (function () {
+            // WhereClause private methods
+
+            function getSortedSet(args) {
+                return Array.prototype.slice.call(Array.isArray(args[0]) ? args[0] : args, 0).sort();
             }
-        });
 
+            function upperFactory(dir) {
+                return dir === "next" ? function(s){return s.toUpperCase();} : function(s){return s.toLowerCase();}
+            }
+            function lowerFactory(dir) {
+                return dir === "next" ? function(s){return s.toLowerCase();} : function(s){return s.toUpperCase();}
+            }
+            function nextCasing(key, lowerKey, upperNeedle, lowerNeedle, cmp, dir) {
+                var length = Math.min(key.length, lowerNeedle.length);
+                var llp = -1;
+                for (var i = 0; i < length; ++i) {
+                    var lwrKeyChar = lowerKey[i];
+                    if (lwrKeyChar !== lowerNeedle[i]) {
+                        if (cmp(key[i], upperNeedle[i]) < 0) return key.substr(0, i) + upperNeedle[i] + upperNeedle.substr(i + 1);
+                        if (cmp(key[i], lowerNeedle[i]) < 0) return key.substr(0, i) + lowerNeedle[i] + upperNeedle.substr(i + 1);
+                        if (llp >= 0) return key.substr(0, llp) + lowerKey[llp] + upperNeedle.substr(llp + 1);
+                        return null;
+                    }
+                    if (cmp(key[i], lwrKeyChar) < 0) llp = i;
+                }
+                if (length < lowerNeedle.length && dir === "next") return key + upperNeedle.substr(key.length);
+                if (length < key.length && dir === "prev") return key.substr(0, upperNeedle.length);
+                return (llp < 0 ? null : key.substr(0, llp) + lowerNeedle[llp] + upperNeedle.substr(llp + 1));
+            }
 
+            function addIgnoreCaseFilter(c, match, needle) {
+                /// <param name="needle" type="String"></param>
+                var upper, lower, compare, upperNeedle, lowerNeedle, direction;
+                function initDirection(dir) {
+                    upper = upperFactory(dir);
+                    lower = lowerFactory(dir);
+                    compare = (dir === "next" ? ascending : descending);
+                    upperNeedle = upper(needle);
+                    lowerNeedle = lower(needle);
+                    direction = dir;
+                }
+                initDirection("next");
+                c._ondirectionchange = function (direction) {
+                    // This event onlys occur before filter is called the first time.
+                    initDirection(direction);
+                };
+                c._addFilter(function (cursor, advance, resolve) {
+                    /// <param name="cursor" type="IDBCursor"></param>
+                    /// <param name="advance" type="Function"></param>
+                    /// <param name="resolve" type="Function"></param>
+                    var key = cursor.key;
+                    if (typeof (key) !== 'string') return false;
+                    var lowerKey = lower(key);
+                    if (match(lowerKey, lowerNeedle)) {
+                        advance(function () { cursor.continue(); });
+                        return true;
+                    } else {
+                        var nextNeedle = nextCasing(key, lowerKey, upperNeedle, lowerNeedle, compare, direction);
+                        if (nextNeedle) {
+                            advance(function () { cursor.continue(nextNeedle); });
+                        } else {
+                            advance(resolve);
+                        }
+                        return false;
+                    }
+                });
+            }
 
-
+            // WhereClause public methods
+            extend(WhereClause.prototype, {
+                between: function (lower, upper, includeLower, includeUpper) {
+                    /// <summary>
+                    ///     Filter out records whose where-field lays between given lower and upper values. Applies to Strings, Numbers and Dates.
+                    /// </summary>
+                    /// <param name="lower"></param>
+                    /// <param name="upper"></param>
+                    /// <param name="includeLower" optional="true">Whether items that equals lower should be included. Default true.</param>
+                    /// <param name="includeUpper" optional="true">Whether items that equals upper should be included. Default false.</param>
+                    /// <returns type="Collection"></returns>
+                    includeLower = includeLower !== false;   // Default to true
+                    includeUpper = includeUpper === true;    // Default to false
+                    if ((lower > upper) ||
+                        (lower == upper && (includeLower || includeUpper) && !(includeLower && includeUpper)))
+                        return new Collection(this, IDBKeyRange.only(lower)).limit(0); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
+                    return new this._ctx.collClass(this, IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper));
+                },
+                equals: function (value) {
+                    return new this._ctx.collClass(this, IDBKeyRange.only(value));
+                },
+                above: function (value) {
+                    return new this._ctx.collClass(this, IDBKeyRange.lowerBound(value, true));
+                },
+                aboveOrEqual: function (value) {
+                    return new this._ctx.collClass(this, IDBKeyRange.lowerBound(value));
+                },
+                below: function (value) {
+                    return new this._ctx.collClass(this, IDBKeyRange.upperBound(value, true));
+                },
+                belowOrEqual: function (value) {
+                    return new this._ctx.collClass(this, IDBKeyRange.upperBound(value));
+                },
+                startsWith: function (str) {
+                    /// <param name="str" type="String"></param>
+                    if (typeof (str) != 'string') throw "SFDB: startsWith() only applicable on strings";
+                    if (str === "") return new Collection(this); // All strings starts with an empty string - return all items.
+                    var upper = str.substr(0, str.length - 1) + String.fromCharCode(str.charCodeAt(str.length - 1) + 1);
+                    return this.between(str, upper, true, false);
+                },
+                startsWithIgnoreCase: function (str) {
+                    /// <param name="str" type="String"></param>
+                    if (typeof (str) != 'string') throw "SFDB: startsWithIgnoreCase() only applicable on strings";
+                    var c = new this._ctx.collClass(this);
+                    addIgnoreCaseFilter(c, function (a, b) { return a.indexOf(b) === 0; }, str);
+                    c._ondirectionchange = function () { c._ctx.error = "SFDB: desc() not supported when querying table.startsWithIgnoreCase(str)"; };
+                    return c;
+                },
+                startsWithAnyOf: function (stringArray) {
+                    /// <param name="stringArray" type="Array" elementType="String"></param>
+                    var set = getSortedSet(arguments);
+                    var c = new this._ctx.collClass(this);
+                    var sorter = ascending;
+                    
+                    throw "Not implemented";
+                },
+                equalsAnyOf: function (valueArray) {
+                    var set = getSortedSet(arguments); 
+                    var c = new this._ctx.collClass(this);
+                    var sorter = ascending;
+                    c._ondirectionchange = function (direction) {
+                        sorter = (direction === "next" ? ascending : descending);
+                        set.sort(sorter);
+                    };
+                    var i = 0;
+                    c._addFilter(function (cursor, advance, resolve) {
+                        var key = cursor.key;
+                        while (sorter(key, set[i]) > 0) {
+                            // The cursor has passed beyond this key. Check next.
+                            ++i;
+                            if (i === set.length) {
+                                // There is no next. Stop searching.
+                                advance(resolve);
+                                return false;
+                            }
+                        }
+                        if (key === set[i]) {
+                            // The current cursor value should be included and we should continue a single step in case next item has the same key or possibly our next key in set.
+                            advance(function () { cursor.continue(); });
+                            return true;
+                        } else {
+                            // cursor.key not yet at set[i]. Forward cursor to the next key to hunt for.
+                            advance(function () { cursor.continue(set[i]); });
+                            return false;
+                        }
+                    });
+                    return c;
+                },
+                equalsIgnoreCase: function (str) {
+                    /// <param name="str" type="String"></param>
+                    if (typeof (str) != 'string') throw "SFDB: equalsIgnoreCase() only applicable on strings";
+                    var c = new this._ctx.collClass(this);
+                    addIgnoreCaseFilter(c, function (a, b) { return a === b; }, str);
+                    return c;
+                },
+                betweenAnyOf: function (ranges) {
+                    throw "Not implemented";
+                }
+            });
+        })();
 
 
 
@@ -823,13 +968,15 @@
                 table: whereCtx.table,
                 index: whereCtx.index,
                 range: keyRange,
+                op: "openCursor",
                 dir: "next",
                 unique: "",
                 filter: null,
                 limit: Infinity,
                 /// <field type="IDBTransaction" />
                 trans: null,
-                oneshot: whereCtx.tf.oneshot
+                oneshot: whereCtx.tf.oneshot,
+                error: null, // If set, any promise must be rejected with this error
             }
         }
 
@@ -852,18 +999,29 @@
 
             _openCursor: function (mode) {
                 var ctx = this._ctx;
-                return this._getIndexOrStore(mode).openCursor(ctx.range || null, ctx.dir + ctx.unique);
+                return this._getIndexOrStore(mode)[ctx.op](ctx.range || null, ctx.dir + ctx.unique);
+            },
+            
+            _promise: function (fn, cb, trappable) {
+                var ctx = this._ctx;
+                function rejector(resolve, reject) { asap(function(){reject (ctx.error);}) };
+                var p = ctx.tf.createPromise(ctx.error ? rejector : fn, trappable);
+                if (cb) p.then(cb);
+                return p;
+            },
+            _trappable: function (fn, cb) {
+                return this._promise(fn, cb, true);
             },
 
             each: function (fn) {
                 var self = this,
                     ctx = this._ctx;
 
-                fake(function () { fn(createInstance(ctx.table));});
+                fake(function () { fn(getInstanceTemplate(ctx.table,ctx));});
 
-                return ctx.tf.createPromise(function (resolve, reject) {
+                return this._promise(function (resolve, reject) {
                     iterate(self._openCursor(), ctx.filter, fn, resolve, reject, database[ctx.table]._mappedClass);
-                });
+                }, fn);
             },
 
             count: function (cb) {
@@ -871,26 +1029,39 @@
                 var self = this,
                     ctx = this._ctx;
 
-                return ctx.tf.createPromise(function (resolve, reject) {
-                    var idx = self._getIndexOrStore();
-                    var req = (ctx.range ? idx.count(ctx.range) : idx.count());
-                    req.onerror = function (e) { reject(req.error, e); }
-                    req.onsuccess = function (e) {
-                        resolve(Math.min(e.target.result, self._ctx.limit));
-                    }
-                }).then(cb);
+                if (this._ctx.filter) {
+                    // When filters are applied, we must count manually
+                    var count = 0;
+                    this._addFilter(function () { ++count; return false; });
+                    return this._promise(function (resolve, reject) {
+                        iterate(self._openCursor(), ctx.filter, null, function () {resolve(count);}, reject);
+                    }, cb);
+                } else {
+                    // Otherwise, we can use the count() method if the index.
+                    return this._promise(function (resolve, reject) {
+                        var idx = self._getIndexOrStore();
+                        var req = (ctx.range ? idx.count(ctx.range) : idx.count());
+                        req.onerror = function (e) { reject(req.error, e); }
+                        req.onsuccess = function (e) {
+                            resolve(Math.min(e.target.result, self._ctx.limit));
+                        }
+                    }, cb);
+                }
             },
 
             toArray: function (cb) {
-                fake(function () { cb([createInstance(ctx.table)]); });
                 var self = this,
                     ctx = this._ctx;
+                fake(function () { cb([getInstanceTemplate(ctx.table, ctx)]); });
 
-                return ctx.tf.createPromise(function (resolve, reject) {
-                    fake(function () { resolve([createInstance(ctx.table)]);});
-                    var a = [];
-                    iterate(self._openCursor(), ctx.filter, function (item) { a.push(item); }, function () { resolve(a); }, reject, database[ctx.table]._mappedClass);
-                }).then(cb);
+                return this._promise(function (resolve, reject) {
+                    if (ctx.error)
+                        reject(ctx.error);
+                    else {
+                        var a = [];
+                        iterate(self._openCursor(), ctx.filter, function (item) { a.push(item); }, function () { resolve(a); }, reject, database[ctx.table]._mappedClass);
+                    }
+                }, cb);
             },
 
             limit: function (numRows) {
@@ -903,6 +1074,8 @@
             },
 
             first: function (cb) {
+                var self = this;
+                fake(function () { cb(getInstanceTemplate(self._ctx.table,self._ctx)); });
                 return this.limit(1).toArray(function (a) { return a[0] }).then(cb);
             },
 
@@ -910,21 +1083,41 @@
                 return this.desc().first(cb);
             },
 
-            and: function (jsFunctionFilter) {
+            and: function (filterFunction) {
                 /// <param name="jsFunctionFilter" type="Function">function(val){return true/false}</param>
+                var self = this;
+                fake(function () { filterFunction(getInstanceTemplate(self._ctx.table, self._ctx)); });
                 this._addFilter(function (cursor) {
-                    return jsFunctionFilter(cursor.value);
+                    return filterFunction(cursor.value);
                 });
                 return this;
             },
 
             desc: function () {
                 this._ctx.dir = (this._ctx.dir == "prev" ? "next" : "prev");
+                if (this._ondirectionchange) this._ondirectionchange(this._ctx.dir);
+                return this;
+            },
+
+            keys: function() {
+                this._ctx.op = "openKeyCursor";
+                return this;
+            },
+
+            uniqueKeys: function () {
+                this._ctx.op = "openKeyCursor";
+                this._ctx.unique = "unique";
                 return this;
             },
 
             distinct: function () {
-                this._ctx.unique = "unique";
+                var set = {};
+                var primKey = dbTableSchema[this._ctx.table].primKey.keyPath;
+                this._addFilter(function (cursor) {
+                    var found = set[cursor.primaryKey];
+                    set[cursor.primaryKey] = true;
+                    return !found;
+                });
                 return this;
             }
         });
@@ -938,7 +1131,7 @@
                 var self = this,
                     ctx = this._ctx;
 
-                return ctx.tf.createTrappablePromise(function (resolve, reject, raise) {
+                return this._trappable(function (resolve, reject, raise) {
                     if (!ctx.oneshot) ctx.tf.pause(); // If in transaction (not oneshot), make next read operation in same transaction wait to execute until we are node modifying. Caller doenst need to wait for then(). Easier code!
                     var keys = Object.keys(changes);
                     var getters = keys.map(function (key) {
@@ -988,7 +1181,7 @@
                 var self = this,
                     ctx = this._ctx;
 
-                return ctx.tf.createTrappablePromise(function (resolve, reject, raise) {
+                return this._trappable(function (resolve, reject, raise) {
                     if (!ctx.oneshot) ctx.tf.pause(); // If in transaction (not oneshot), make next read operation in same transaction wait to execute until we are node modifying. Caller doenst need to wait for then(). Easier code!
                     var count = 0;
                     self._addFilter(function (cursor) {
@@ -1034,11 +1227,12 @@
             })._cfg.tableSchema;
         }
 
-        function setApiOnPlace(obj, transactionFactory, tableClass, tableNames) {
+        function setApiOnPlace(obj, transactionFactory, tableClass, tableNames, schema) {
             for (var i = 0, l = tableNames.length; i < l; ++i) {
                 var tableName = tableNames[i];
                 if (!obj[tableName]) {
                     obj[tableName] = new tableClass(tableName, transactionFactory);
+                    if (schema) obj[tableName]._instanceTemplate = schema[tableName].instanceTemplate;
                 }
             }
         }
@@ -1053,11 +1247,8 @@
             clearTimeout(to);
         }
 
-        function createInstance(tableName) {
-            var mappedClass = database[tableName]._mappedClass;
-            var rv = mappedClass ? new mappedClass() : {};
-            database[tableName]._createStructure(rv);
-            return rv;
+        function getInstanceTemplate(tableName, collCtx) {
+            return (collCtx && collCtx.op === "openKeyCursor" ? database[tableName]._instanceTemplate[collCtx.index] : database[tableName]._instanceTemplate);
         }
 
         function iterate(req, filter, fn, oncomplete, reject, mappedClass) {
@@ -1078,7 +1269,7 @@
                 }
             }
             if (filter) {
-                req.onsuccess = function (e) {
+                req.onsuccess = trycatch(function (e) {
                     var cursor = e.target.result;
                     if (cursor) {
                         var c = function () { cursor.continue(); };
@@ -1087,9 +1278,9 @@
                     } else {
                         oncomplete();
                     }
-                }
+                }, reject);
             } else {
-                req.onsuccess = function (e) {
+                req.onsuccess = trycatch(function (e) {
                     var cursor = e.target.result;
                     if (cursor) {
                         fn(cursor.value);
@@ -1097,7 +1288,7 @@
                     } else {
                         oncomplete();
                     }
-                }
+                }, reject);
             }
         }
 
@@ -1107,18 +1298,26 @@
             var rv = [];
             indexes.split(',').forEach(function (index) {
                 if (!index || index.indexOf('[') == 0) return;
-                var keyPath = index.replace("!", "").replace("++", "").replace("*", "");
+                var keyPath = index.replace("&", "").replace("++", "").replace("*", "");
                 var idx = {
                     name: keyPath && keyPath.toLowerCase(),
                     keyPath: keyPath || null,
-                    unique: index.indexOf('!') != -1,
+                    unique: index.indexOf('&') != -1,
                     multi: index.indexOf('*') != -1,
                     auto: index.indexOf("++") != -1
                 };
-                idx.src = (idx.unique ? '!' : '') + (idx.multi ? '*' : '') + (idx.auto ? "++" : "") + idx.keyPath;
+                idx.src = (idx.unique ? '&' : '') + (idx.multi ? '*' : '') + (idx.auto ? "++" : "") + idx.keyPath;
                 rv.push(idx);
             });
             return rv;
+        }
+
+        function ascending(a, b) {
+            return a < b ? -1 : a > b ? 1 : 0;
+        }
+
+        function descending(a, b) {
+            return a < b ? 1 : a > b ? -1 : 0;
         }
 
         function TransactionFactory() { }
@@ -1182,15 +1381,13 @@
             createPromise: function (fn, trappable) {
                 var self = this;
                 var baseClass = TransactionFactory;
-                return baseClass.prototype.createPromise.call(this, function () {
-                    try {
-                        fn.apply(this, arguments);
-                    } catch (e) {
-                        try { self.trans.abort(); } catch (e2) { } // Make sure transaction is aborted if error occurs! Cannot rely on Promise.catch() because it is called on setImmediate, which is after transaction is committed.
+                var p = baseClass.prototype.createPromise.call(this, fn, trappable);
+                asap(function(){
+                    p.catch(function (e) {
+                        // Bubble to transaction
                         self.sfdbTrans.on("error").fire(e);
-                        throw e;
-                    }
-                }, trappable);
+                    });
+                });
                 return promise;
             },
         });
@@ -1232,6 +1429,16 @@
 
         function assert(b) {
             if (!b) throw "Assertion failed";
+        }
+
+        function asap (fn) {
+            if (window.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
+        }
+
+        function trycatch(fn, reject) {
+            return function () {
+                try { fn.apply(this, arguments); } catch (e) { reject(e); };
+            };
         }
 
         function events(ctx, eventNames) {
@@ -1373,30 +1580,49 @@
     }
 
     //
-    // promise-light (https://github.com/taylorhakes/promise-light) by https://github.com/taylorhakes - an A+ and ECMASCRIPT 6 compliant Promise implementation.
-    // This one is slightly modified to call callbacks directly rather than calling them through setImmediate(). This is nescessary because with setImmediate() the indexedDB transaction
-    // may go auto-committed. This is a limitation when combining Promises/A+ with indexedDB and we work around it by not using setImmediate(). The change has no impact on the Promisa/A+ compatibility
-    // when using it the way we do in StraightForwardDB.
+    // A variant of promise-light (https://github.com/taylorhakes/promise-light) by https://github.com/taylorhakes - an A+ and ECMASCRIPT 6 compliant Promise implementation.
     //
-    // See this thread: https://github.com/promises-aplus/promises-spec/issues/45
+    // Modified by David Fahlander to be indexedDB compliant (See discussion: https://github.com/promises-aplus/promises-spec/issues/45) .
+    // This implementation will not use setTimeout or setImmediate when it's not needed. The behavior is 100% Promise/A+ compliant since
+    // the caller of new Promise() can be certain that the promise wont be triggered the lines after constructing the promise. We fix this by using the member variable this._constructing to check
+    // whether the object is being constructed when reject or resolve is called. If so, the use setTimeout/setImmediate to fulfill the promise, otherwise, we know that it's not needed.
+    //
+    // This topic was also discussed in the following thread: https://github.com/promises-aplus/promises-spec/issues/45 and this implementation solves that issue.
     //
     var DirectPromise = (function () {
 
-        var asap = function (fn) { fn(); }; // Original was asap = setImmediate. But we must NOT use setImmediate or setTimeout(fn,0) because it causes premature commit of indexedDB transactions - which is according to indexedDB specification.
+        // The use of asap in handle() is remarked because we must NOT use setTimeout(fn,0) because it causes premature commit of indexedDB transactions - which is according to indexedDB specification.
+        var asap = typeof (setImmediate) === 'undefined' ? function (fn,arg1,arg2,argN) {
+            setTimeout(function () { fn.call([].slice.call(arguments, 1)) }, 0);// If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
+        } : function (fn) {
+            setImmediate.apply(this, [fn].concat(arguments)); // IE10+ and node.
+        };
 
         function Promise(fn) {
             if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');
             if (typeof fn !== 'function') throw new TypeError('not a function');
-            this._state = null;
-            this._value = null;
+            this._constructing = true;
+            this._state = null; // null (=pending), false (=rejected) or true (=resolved)
+            this._value = null; // error or result
             this._deferreds = [];
+            this._catched = false; // for onuncatched
             var self = this;
 
-            doResolve(fn, function (data) {
-                resolve.call(self, data);
-            }, function (reason) {
-                reject.call(self, reason);
-            });
+            try {
+                doResolve(fn, function (data) {
+                    if (this._constructing)
+                        asap(resolve, self, data);
+                    else
+                        resolve(self, data);
+                }, function (reason) {
+                    if (this._constructing)
+                        asap(reject, self, reason);
+                    else
+                        reject(self, reason);
+                });
+            } finally {
+                this._constructing = false;
+            }
         }
 
         function handle(deferred) {
@@ -1405,60 +1631,69 @@
                 this._deferreds.push(deferred);
                 return;
             }
-            asap(function () {
-                var cb = self._state ? deferred.onFulfilled : deferred.onRejected;
-                if (cb === null) {
-                    (self._state ? deferred.resolve : deferred.reject)(self._value);
-                    return;
-                }
-                var ret;
-                try {
-                    ret = cb(self._value);
-                }
-                catch (e) {
-                    deferred.reject(e);
-                    return;
-                }
-                deferred.resolve(ret);
-            })
+
+            var cb = self._state ? deferred.onFulfilled : deferred.onRejected;
+            if (cb === null) {
+                // This Deferred doesnt have a listener for the event being triggered (onFulfilled or onReject) so lets forward the event to any eventual listeners on the Promise instance returned by then() or catch()
+                (self._state ? deferred.resolve : deferred.reject)(self._value);
+                return;
+            }
+            var ret;
+            try {
+                ret = cb(self._value);
+                setCatched(self);
+            }
+            catch (e) {
+                deferred.reject(e);
+                return;
+            }
+            deferred.resolve(ret);
         }
 
-        function resolve(newValue) {
-            var self = this;
+        function setCatched(promise) {
+            promise._catched = true;
+            if (promise._parent) setCatched(promise._parent);
+        }
+
+        function resolve(promise, newValue) {
             try { //Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
-                if (newValue === self) throw new TypeError('A promise cannot be resolved with itself.');
+                if (newValue === promise) throw new TypeError('A promise cannot be resolved with itself.');
                 if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
                     if (typeof newValue.then === 'function') {
                         doResolve(function (resolve, reject) {
                             newValue.then(resolve, reject);
                         }, function (data) {
-                            resolve.call(self, data);
+                            resolve.call(promise, data);
                         }, function (reason) {
-                            reject.call(self, reason);
+                            reject.call(promise, reason);
                         });
                         return;
                     }
                 }
-                this._state = true;
-                this._value = newValue;
-                finale.call(this);
+                promise._state = true;
+                promise._value = newValue;
+                finale.call(promise);
             } catch (e) { reject(e) }
         }
 
-        function reject(newValue) {
-            this._state = false;
-            this._value = newValue;
+        function reject(promise, newValue) {
+            promise._state = false;
+            promise._value = newValue;
+
             finale.call(this);
+            if (!promise._catched && promise.onuncatched) {
+                try { promise.onuncatched(promise)(); } catch (e) { }
+            }
         }
 
         function finale() {
             for (var i = 0, len = this._deferreds.length; i < len; i++) {
                 handle.call(this, this._deferreds[i]);
             }
-            this._deferreds = null;
+            this._deferreds = null; // ok because _deferreds can impossibly be accessed anymore (reject or resolve will never be called again, and handle() will not touch it since _state !== null.
         }
 
-        function Handler(onFulfilled, onRejected, resolve, reject) {
+        function Deferred (onFulfilled, onRejected, resolve, reject) {
             this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
             this.onRejected = typeof onRejected === 'function' ? onRejected : null;
             this.resolve = resolve;
@@ -1521,14 +1756,18 @@
         /* Prototype Methods */
         Promise.prototype.then = function (onFulfilled, onRejected) {
             var self = this;
-            return new Promise(function (resolve, reject) {
-                handle.call(self, new Handler(onFulfilled, onRejected, resolve, reject));
-            })
+            var p = new Promise(function (resolve, reject) {
+                handle.call(self, new Deferred(onFulfilled, onRejected, resolve, reject));
+            });
+            p._parent = this; // Used for recursively calling onuncatched event on self and all parents.
+            return p;
         };
 
         Promise.prototype['catch'] = function (onRejected) {
             return this.then(null, onRejected);
         };
+
+        Promise.prototype.onuncatched = null; // Optional event triggered if promise is rejected but no one listened.
 
         Promise.resolve = function (value) {
             return new Promise(function (resolve) {
@@ -1567,7 +1806,8 @@
         IDBKeyRange: window.IDBKeyRange || window.webkitIDBKeyRange,
         IDBTransaction: window.IDBTransaction || window.webkitIDBTransaction,
         // Optional:
-        Promise: window.Promise // If not present, it is polyfilled by PromiseLight in this JS-file.
+        Promise: window.Promise, // If not present, it is polyfilled by PromiseLight in this JS-file.
+        TypeError: window.TypeError || String
     }
 
     // Publish the StraightForwardDB to browser or NodeJS environment.
