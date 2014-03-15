@@ -16,8 +16,6 @@
             IDBKeyRange = deps.IDBKeyRange,
             IDBTransaction = deps.IDBTransaction;
 
-        var Promise = DirectPromise;
-
         var ErrorEvent = window.ErrorEvent; // OK if not present. Just for code completion.
 
         var dbTableSchema = null;
@@ -69,7 +67,7 @@
         this.version = function (versionNumber) {
             /// <param name="versionNumber" type="Number"></param>
             /// <returns type="Version"></returns>
-            if (db) throw "SFDB: Cannot add version when database is open";
+            if (db) throw new Error("Cannot add version when database is open");
             dbVersion = Math.max(dbVersion, versionNumber);
             var versionInstance = new Version(versionNumber);
             versions.push(versionInstance);
@@ -106,11 +104,11 @@
                     var instanceTemplate = {};
                     var indexes = parseIndexSyntax(schema[tableName]);
                     var primKey = indexes.shift();
-                    if (primKey.multi) throw "SFDB: Primary key cannot be multi-valued";
+                    if (primKey.multi) throw new Error("Primary key cannot be multi-valued");
                     if (primKey.keyPath) instanceTemplate[primKey.keyPath] = 0;
                     indexes.forEach(function (idx) {
-                        if (idx.auto) throw "SFDB: Only primary key can be marked as autoIncrement (++)";
-                        if (!idx.keyPath) throw "SFDB: index must have a name and cannot be an empty string";
+                        if (idx.auto) throw new Error ("Only primary key can be marked as autoIncrement (++)");
+                        if (!idx.keyPath) throw new Error ("Index must have a name and cannot be an empty string");
                         instanceTemplate[idx.keyPath] = "";
                     });
                     tableSchema[tableName] = {
@@ -369,11 +367,11 @@
         //
 
         this.open = function () {
-            if (db) throw "SFDB: Database already open";
+            if (db) throw new Error("Database already open");
             // Make sure caller has specified at least one version
-            if (versions.length == 0) throw "SFDB: No versions specified. Need to call version(ver) method";
+            if (versions.length == 0) throw new Error("No versions specified. Need to call version(ver) method");
             // Make sure at least the oldest version specifies a table schema
-            if (!versions[0]._cfg.tableSchema) throw "SFDB: No schema specified. Need to call dbInstance.version(ver).schema(schema) on at least the lowest version.";
+            if (!versions[0]._cfg.tableSchema) throw new Error("No schema specified. Need to call dbInstance.version(ver).schema(schema) on at least the lowest version.");
             // Sort versions and make all Version instances have a schema (its own or previous if not specified)
             versions.sort(lowerVersionFirst).reduce(function (prev, ver) {
                 if (!ver._cfg.tableSchema) ver._cfg.tableSchema = prev._cfg.tableSchema;
@@ -449,10 +447,10 @@
             var tables = tableInstances instanceof Array ? tableInstances : Array.prototype.slice.call(arguments, 1);
             var storeNames = tables.map(function (tableInstance) {
                 if (typeof (tableInstance) == "string") {
-                    if (!dbTableSchema[tableInstance]) throw "SFDB: Invalid table name: " + tableInstance; return { INVALID_TABLE_NAME: 1 }; // Return statement is for IDE code completion.
+                    if (!dbTableSchema[tableInstance]) throw new Error("Invalid table name: " + tableInstance); return { INVALID_TABLE_NAME: 1 }; // Return statement is for IDE code completion.
                     return tableInstance;
                 } else {
-                    if (!(tableInstance instanceof WriteableTable)) throw "SFDB: Invalid parameter. Point out your table instances from your StraightForwardDB instance";
+                    if (!(tableInstance instanceof Table)) throw new TypeError ("Invalid type. Arguments following mode must be instances of Table or String");
                     return tableInstance._name;
                 }
             });
@@ -464,7 +462,7 @@
                 tf = new MultireqTransactionFactory(storeNames, RW);
                 t = new WriteableTransaction(tf, storeNames);
             } else {
-                throw "Invalid mode. Only 'readonly'/'r' or 'readwrite'/'rw' are valid modes."
+                throw new RangeError("Invalid mode. Only 'readonly'/'r' or 'readwrite'/'rw' are valid modes.");
             }
             tf.sfdbTrans = t;
             if (!db) {
@@ -474,7 +472,7 @@
         }
 
         this.table = function (tableName) {
-            if (Object.keys(dbTableSchema).indexOf(tableName) == -1) { throw "SFDB: Table does not exist"; return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
+            if (Object.keys(dbTableSchema).indexOf(tableName) == -1) { throw new Error ("Table does not exist"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
             return new ObjectMappableTable(tableName, mainTransactionFactory);
         }
 
@@ -492,13 +490,14 @@
             this._tf = transactionFactory;
             this._collClass = collClass || Collection;
         }
-        extend(Table.prototype, {
+
+        derive(Table).from(StraightForwardDB.Table).extend({
             get: function (key, cb) {
                 var self = this;
                 fake(function () { cb(getInstanceTemplate(self._name)) });
                 return this._tf.createPromise(function (resolve, reject) {
                     var req = self._tf.create(self._name).objectStore(self._name).get(key);
-                    req.onerror = function (e) { reject(req.error, e); }
+                    req.onerror = eventRejectHandler(reject, ["getting", key, "from", self._name]);
                     req.onsuccess = function () {
                         var mappedClass = database[self._name]._mappedClass;
                         if (mappedClass) {
@@ -533,7 +532,8 @@
                 fake(function () { fn(getInstanceTemplate(self._name)) });
                 return this._tf.createPromise(function (resolve, reject) {
                     var req = self._tf.create(self._name).objectStore(self._name).openCursor();
-                    iterate(req, null, fn, resolve, reject, self._mappedClass); // TODO: Reject with error not event. Resolve with ???
+                    req.onerror = eventRejectHandler(reject, ["calling", "Table.each()", "on", self._name]);
+                    iterate(req, null, fn, resolve, reject, self._mappedClass && self._mappedClass.prototype);
                 });
             },
             toArray: function (cb) {
@@ -542,7 +542,8 @@
                 return this._tf.createPromise(function (resolve, reject) {
                     var a = [];
                     var req = self._tf.create(self._name).objectStore(self._name).openCursor();
-                    iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject, self._mappedClass);
+                    req.onerror = eventRejectHandler(reject, ["calling", "Table.toArray()", "on", self._name]);
+                    iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject, self._mappedClass && self._mappedClass.prototype);
                 }).then(cb);
             },
             orderBy: function (index) {
@@ -565,7 +566,7 @@
 
         derive(WriteableTable).from(Table).extend({
 
-            _wrop: function (method, args, onReqSuccess) {
+            _wrop: function (method, args, onReqSuccess, errsentance) {
                 /// <summary>
                 ///  Perform a write operation on object store.
                 /// </summary>
@@ -576,17 +577,7 @@
                     var trans = tf.create(self._name, RW);
                     var store = trans.objectStore(self._name);
                     var req = store[method].apply(store, args || []);
-                    req.onerror = function (e) {
-                        var msg = e.target.error + " when ";
-                        switch(method) {
-                            case "add": msg += "adding object " + JSON.stringify(args[0]) + " into '" + self._name + "'"; break;
-                            case "put": msg += "putting object " + JSON.stringify(args[0]) + " into '" + self._name + "'"; break;
-                            case "delete": msg += "deleting object with key " + args[0] + " from '" + self._name + "'"; break;
-                            case "clear": msg += "clearing table '" + self._name + "'"; break;
-                        }
-                        reject(msg, e);
-                        tf.sfdbTrans.on("error").fire(msg); // Make sure this more descriptive error message is bubbled to the transaction
-                    }
+                    req.onerror = eventRejectHandler(reject, errsentance);
                     if (tf.oneshot) {
                         // Transaction is a one-shot transaction and caller has not access to it. This is the case when calling
                         // put(),add() etc directy on db.table and not via db.transaction(). Let the promise.then() be called when transaction
@@ -623,7 +614,7 @@
                 return this._wrop("put", [obj], function (e) {
                     var keyPath = e.target.source.keyPath;
                     if (keyPath) obj[keyPath] = e.target.result;
-                });
+                }, ["putting", obj, "into", this._name]);
             },
             add: function (obj) {
                 /// <summary>
@@ -633,14 +624,14 @@
                 return this._wrop("add", [obj], function (e) {
                     var keyPath = e.target.source.keyPath;
                     if (keyPath) obj[keyPath] = e.target.result;
-                });
+                }, ["adding", obj, "into", this._name]);
             },
             'delete': function (key) {
                 /// <param name="key">Primary key of the object to delete</param>
-                return this._wrop("delete", [key]);
+                return this._wrop("delete", [key], null, ["deleting", key, "from", this._name]);
             },
             clear: function () {
-                return this._wrop("clear");
+                return this._wrop("clear", [], null, ["clearing", this._name]);
             },
             where: function (indexName) {
                 return new WhereClause(this._tf, this._name, indexName, true);
@@ -663,14 +654,14 @@
                     return [parseType(type[0])];
                 } else if (typeof (type) == 'object') {
                     var rv = {};
-                    fillObject(rv, type);
+                    applyStructure(rv, type);
                     return rv;
                 } else {
                     return type;
                 }
             }
 
-            function fillObject(obj, structure) {
+            function applyStructure(obj, structure) {
                 Object.keys(structure).forEach(function (member) {
                     obj[member] = parseType(structure[member]);
                 });
@@ -688,7 +679,7 @@
                     var mappedClass = this._mappedClass = constructor;
                     this._instanceTemplate = Object.create(mappedClass.prototype);
                     if (structure) {
-                        fillObject(this._instanceTemplate, structure);
+                        applyStructure(this._instanceTemplate, structure);
                     }
                     return constructor;
                 },
@@ -699,9 +690,13 @@
                     /// </summary>
                     /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
                     /// know what type each member has. Example: {name: String, emailAddresses: [String], password}</param>
-                    this._mappedClass = function () {}
-                    fillObject(this._mappedClass.prototype, structure);
-                    this._instanceTemplate = new this._mappedClass();
+                    var template = {};
+                    applyStructure(template, structure);
+                    var primKeyName = dbTableSchema[this._name].primKey.keyPath;
+                    this._mappedClass = function () {
+                        for (var m in template) if (m != primKeyName) this[m] = null || template[m];
+                    };
+                    this._instanceTemplate = template;
                     return this._mappedClass;
                 }
             });
@@ -715,7 +710,6 @@
             /// <param name="tf">Transaction factory</param>
             /// <param name="storeNames" type="Array">Array of table names to operate on</param>
             /// <param name="tableClass" optional="true" type="Function">Class to use for table instances</param>
-
             this._ctx = {
                 tf: tf,
                 storeNames: storeNames,
@@ -724,19 +718,22 @@
 
             this.on = events(this, ["complete", "error"], "abort");
             this.complete = function (cb) {return this.on("complete", cb);}
-            this.error = function (cb) { return this.on("error", cb);}
+            this.error = function (cb) { return this.on("error", cb); }
 
             tf.sfdbTrans = this;
 
             setApiOnPlace(this, tf, tableClass || Table, storeNames);
         }
 
-        extend(Transaction.prototype, {
+        derive(Transaction).from(StraightForwardDB.Transaction).extend({
             abort: function () {
-                this._ctx.trans.abort();
+                if (this._ctx.tf.trans && !this._ctx.tf.inactive) try {
+                    this._ctx.tf.inactive = true;
+                    this._ctx.tf.trans.abort();
+                } catch (e) { }
             },
             table: function (name) {
-                if (Array.prototype.indexOf.call(this._ctx.storeNames, name) == -1) throw "SFDB: Table does not exist";
+                if (Array.prototype.indexOf.call(this._ctx.storeNames, name) == -1) throw new Error ("Table does not exist");
                 return new this._ctx.tableClass(name, this._ctx.tf);
             }
         });
@@ -777,6 +774,13 @@
 
         (function () {
             // WhereClause private methods
+
+            function fail(collection, err) {
+                try { throw err; } catch (e) {
+                    collection._ctx.error = e;
+                }
+                return collection;
+            }
 
             function getSortedSet(args) {
                 return Array.prototype.slice.call(Array.isArray(args[0]) ? args[0] : args, 0).sort();
@@ -845,7 +849,7 @@
             }
 
             // WhereClause public methods
-            extend(WhereClause.prototype, {
+            derive(WhereClause).from(StraightForwardDB.WhereClause).extend ({
                 between: function (lower, upper, includeLower, includeUpper) {
                     /// <summary>
                     ///     Filter out records whose where-field lays between given lower and upper values. Applies to Strings, Numbers and Dates.
@@ -879,17 +883,17 @@
                 },
                 startsWith: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof (str) != 'string') throw "SFDB: startsWith() only applicable on strings";
+                    if (typeof (str) != 'string') return fail (new Collection(this), new TypeError("String expected"));
                     if (str === "") return new Collection(this); // All strings starts with an empty string - return all items.
                     var upper = str.substr(0, str.length - 1) + String.fromCharCode(str.charCodeAt(str.length - 1) + 1);
                     return this.between(str, upper, true, false);
                 },
                 startsWithIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof (str) != 'string') throw "SFDB: startsWithIgnoreCase() only applicable on strings";
+                    if (typeof (str) != 'string') return fail (new Collection(this), new TypeError("String expected"));
                     var c = new this._ctx.collClass(this);
                     addIgnoreCaseFilter(c, function (a, b) { return a.indexOf(b) === 0; }, str);
-                    c._ondirectionchange = function () { c._ctx.error = "SFDB: desc() not supported when querying table.startsWithIgnoreCase(str)"; };
+                    c._ondirectionchange = function () { fail(c, new Error("desc() not supported with WhereClause.startsWithIgnoreCase()")); };
                     return c;
                 },
                 startsWithAnyOf: function (stringArray) {
@@ -898,7 +902,7 @@
                     var c = new this._ctx.collClass(this);
                     var sorter = ascending;
                     
-                    throw "Not implemented";
+                    return fail(new Collection(this), new Error("Not implemented"));
                 },
                 equalsAnyOf: function (valueArray) {
                     var set = getSortedSet(arguments); 
@@ -934,13 +938,13 @@
                 },
                 equalsIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof (str) != 'string') throw "SFDB: equalsIgnoreCase() only applicable on strings";
+                    if (typeof (str) != 'string') return fail(new Collection(this), new TypeError("String expected"));
                     var c = new this._ctx.collClass(this);
                     addIgnoreCaseFilter(c, function (a, b) { return a === b; }, str);
                     return c;
                 },
                 betweenAnyOf: function (ranges) {
-                    throw "Not implemented";
+                    return fail(new Collection(this), "Not implemented");
                 }
             });
         })();
@@ -980,7 +984,7 @@
             }
         }
 
-        extend(Collection.prototype, {
+        derive(Collection).from(StraightForwardDB.Collection).extend ({
             _addFilter: function (fn) {
                 var ctx = this._ctx;
                 if (!ctx.filter) ctx.filter = fn; else {
@@ -1002,15 +1006,14 @@
                 return this._getIndexOrStore(mode)[ctx.op](ctx.range || null, ctx.dir + ctx.unique);
             },
             
-            _promise: function (fn, cb, trappable) {
+            _promise: function (fn, cb) {
                 var ctx = this._ctx;
-                function rejector(resolve, reject) { asap(function(){reject (ctx.error);}) };
-                var p = ctx.tf.createPromise(ctx.error ? rejector : fn, trappable);
-                if (cb) p.then(cb);
-                return p;
-            },
-            _trappable: function (fn, cb) {
-                return this._promise(fn, cb, true);
+                function rejector(resolve, reject) { asap(function () { reject(ctx.error); }) };
+                if (ctx.error) {
+                    return ctx.tf.createPromise(rejector);
+                } else {
+                    return ctx.tf.createPromise(fn).then(cb);
+                }
             },
 
             each: function (fn) {
@@ -1020,7 +1023,8 @@
                 fake(function () { fn(getInstanceTemplate(ctx.table,ctx));});
 
                 return this._promise(function (resolve, reject) {
-                    iterate(self._openCursor(), ctx.filter, fn, resolve, reject, database[ctx.table]._mappedClass);
+                    var mappedClass = database[ctx.table]._mappedClass;
+                    iterate(self._openCursor(), ctx.filter, fn, resolve, reject, mappedClass && mappedClass.prototype);
                 }, fn);
             },
 
@@ -1041,7 +1045,7 @@
                     return this._promise(function (resolve, reject) {
                         var idx = self._getIndexOrStore();
                         var req = (ctx.range ? idx.count(ctx.range) : idx.count());
-                        req.onerror = function (e) { reject(req.error, e); }
+                        req.onerror = eventRejectHandler(reject, ["calling", "count()", "on", self._name]);
                         req.onsuccess = function (e) {
                             resolve(Math.min(e.target.result, self._ctx.limit));
                         }
@@ -1059,7 +1063,8 @@
                         reject(ctx.error);
                     else {
                         var a = [];
-                        iterate(self._openCursor(), ctx.filter, function (item) { a.push(item); }, function () { resolve(a); }, reject, database[ctx.table]._mappedClass);
+                        var mappedClass = database[ctx.table]._mappedClass;
+                        iterate(self._openCursor(), ctx.filter, function (item) { a.push(item); }, function () { resolve(a); }, reject, mappedClass && mappedClass.prototype);
                     }
                 }, cb);
             },
@@ -1131,7 +1136,7 @@
                 var self = this,
                     ctx = this._ctx;
 
-                return this._trappable(function (resolve, reject, raise) {
+                return this._promise(function (resolve, reject) {
                     if (!ctx.oneshot) ctx.tf.pause(); // If in transaction (not oneshot), make next read operation in same transaction wait to execute until we are node modifying. Caller doenst need to wait for then(). Easier code!
                     var keys = Object.keys(changes);
                     var getters = keys.map(function (key) {
@@ -1139,25 +1144,20 @@
                         return (value instanceof Function ? value : function () { return value });
                     });
                     var count = 0;
-                        /*successcount = 0,
-                        failcount = 0,
-                        complete = false;*/
 
-                    self._addFilter(function (cursor) {
+                    self._addFilter(function (cursor, advance) {
                         ++count;
                         var item = cursor.value;
                         for (var i = 0, l = keys.length; i < l; ++i) {
                             item[keys[i]] = getters[i](item);
                         }
                         var req = cursor.update(item);
-                        req.onerror = function (e) {
-                            if (raise(e.target.error, e, item)) ctx.trans.abort();
-                        };
-                        /*req.onsuccess = function () {
-                            ++successcount;
-                            if (complete && successcount + failcount == count) resolve(successcount);
-                        }*/
-                        
+                        req.onerror = eventRejectHandler(function (e) {
+                            advance(function () { }); // Stop iterating
+                            var catched = reject(e);
+                            if (catched && ctx.oneshot) ctx.tf.resume();
+                            return catched;
+                        }, function () { return ["modifying", item, "on", ctx.table]; });
                         // No need to listen to onsuccess! What different should it make?! Who to call? notify? Not worth the cost in code exectution. Think of big queries of updating millions of records!
                         return false; // Make sure fn() is never called because we set it to null!
                     });
@@ -1167,13 +1167,11 @@
                         ctx.trans.oncomplete = function () { resolve(count); };
                     } else {
                         iterate(self._openCursor(RW), ctx.filter, null, function () {
-                            //complete = true;
-                            //if (successcount + failcount === count) resolve(successcount);
                             ctx.tf.resume();
                             resolve(count);
                         }, function (e) {
                             reject(e);
-                        }, database[ctx.table]._mappedClass);
+                        });
                     }
                 });
             },
@@ -1181,14 +1179,17 @@
                 var self = this,
                     ctx = this._ctx;
 
-                return this._trappable(function (resolve, reject, raise) {
+                return this._promise(function (resolve, reject) {
                     if (!ctx.oneshot) ctx.tf.pause(); // If in transaction (not oneshot), make next read operation in same transaction wait to execute until we are node modifying. Caller doenst need to wait for then(). Easier code!
                     var count = 0;
                     self._addFilter(function (cursor) {
                         ++count;
-                        cursor.delete().onerror = function (e) {
-                            if (raise(e.target.error, e, cursor.value)) ctx.trans.abort();
-                        };
+                        cursor.delete().onerror = eventRejectHandler(function (e) {
+                            advance(function () { }); // Stop iterating
+                            var catched = reject(e);
+                            if (catched && ctx.oneshot) ctx.tf.resume();
+                            return catched;
+                        }, function () { return ["modifying", item, "on", ctx.table]; });
                         return false;// Make sure fn() is never called because we set it to null!
                     });
                     if (ctx.oneshot) {
@@ -1251,20 +1252,22 @@
             return (collCtx && collCtx.op === "openKeyCursor" ? database[tableName]._instanceTemplate[collCtx.index] : database[tableName]._instanceTemplate);
         }
 
-        function iterate(req, filter, fn, oncomplete, reject, mappedClass) {
-            req.onerror = function (e) { reject(req.error, e); }
-            if (mappedClass) {
+        function iterate(req, filter, fn, oncomplete, reject, mappedProto) {
+            if (!req.onerror) req.onerror = eventRejectHandler(reject, ["calling openCursor() or openKeyCursor() on", self._name]);
+            if (mappedProto) {
                 var origFn = fn;
                 if (use_proto) {
                     fn = function (val) {
-                        if (val) val.__proto__ = mappedClass.prototype;
+                        if (val) val.__proto__ = mappedProto;
                         origFn(val);
                     }
                 } else {
                     fn = function (val) {
-                        var rv = new mappedClass();
-                        for (var m in val) rv[m] = val[m];
-                        origFn(rv);
+                        if (val) {
+                            var rv = Object.create(mappedProto);
+                            for (var m in val) rv[m] = val[m];
+                            origFn(rv);
+                        } else origFn(val);
                     }
                 }
             }
@@ -1320,51 +1323,56 @@
             return a < b ? 1 : a > b ? -1 : 0;
         }
 
-        function TransactionFactory() { }
+        function TransactionFactory() {
+            this.waitingFns = [];
+            this.paused = false;
+        }
 
         extend(TransactionFactory.prototype, {
             create: function (tableName, mode) {
-                if (!db) throw "SFDB: Database not open";
+                if (!db) throw new Error ("Database not open");
                 return db.transaction(tableName, mode || R);
             },
             oneshot: true,
-            createPromise: function (fn, trappable) {
-                return trappable ? new TrappablePromise(fn) : new Promise(fn);
-            },
-            createTrappablePromise: function (fn) {
-                return this.createPromise(fn, true);
+            createPromise: function (fn) {
+                return new Promise(fn);
             },
             pause: function () {
                 // Temporary set all requests into a pending queue if they are called before database is ready.
+                this.paused = true;
                 this.createPromise = function (fn) {
                     var proto = this.constructor.prototype;
-                    var self = this;
-                    arguments[0] = function () {
+                    var tf = this;
+                    var pausedFn = function (resolve, reject) {
                         var thiz = this, args = arguments;
-                        var waitingFns = (self.waitingFns = self.waitingFns || []);
-                        waitingFns.push(function () {
-                            fn.apply(thiz, args);
+                        tf.waitingFns.push(function () {
+                            try {
+                                fn.apply(thiz, args);
+                            } catch (e) { reject(e); }
                         });
                     };
-                    return proto.createPromise.apply(this, arguments);
+                    return proto.createPromise.call(this, pausedFn);
                 }
                 return this;
             },
             resume: function () {
+                this.paused = false;
                 delete this.createPromise; // Take back its prototype and original version of createPromise.
-                if (this.waitingFns) {
-                    this.waitingFns.forEach(function (fn) { fn(); });
-                    delete this.waitingFns;
+                while (this.waitingFns.length > 0 && !this.paused) {
+                    var fn = this.waitingFns.shift();
+                    try { fn(); } catch (e) { }
                 }
                 return this;
             }
         });
 
         function MultireqTransactionFactory(storeNamesOrTrans, mode) {
+            TransactionFactory.call(this);
             this.sfdbTrans = null;
             this.trans = (storeNamesOrTrans instanceof IDBTransaction ? storeNamesOrTrans : null);
             this.storeNames = this.trans ? null : storeNamesOrTrans;
             this.mode = mode || null;
+            this.inactive = false;
         }
 
         derive(MultireqTransactionFactory).from(TransactionFactory).extend({
@@ -1372,23 +1380,25 @@
             create: function () {
                 // Since this is a Multi-request transaction factory, we cache the transaction object once it has been created and continue using it.
                 if (this.trans) return this.trans;
+                var self = this;
                 this.trans = db.transaction(this.storeNames, this.mode);
                 this.trans.onerror = this.sfdbTrans.on("error").fire;
                 this.trans.onabort = this.sfdbTrans.on("abort").fire;
                 this.trans.oncomplete = this.sfdbTrans.on("complete").fire;
+                this.sfdbTrans.on("abort", function () { self.inactive = true; });
+                this.sfdbTrans.on("complete", function () { self.inactive = true; });
                 return this.trans;
             },
-            createPromise: function (fn, trappable) {
+            createPromise: function (fn) {
                 var self = this;
                 var baseClass = TransactionFactory;
-                var p = baseClass.prototype.createPromise.call(this, fn, trappable);
-                asap(function(){
-                    p.catch(function (e) {
-                        // Bubble to transaction
-                        self.sfdbTrans.on("error").fire(e);
-                    });
-                });
-                return promise;
+                var p = baseClass.prototype.createPromise.call(this, fn);
+                p.onuncatched = function (e) {
+                    // Bubble to transaction
+                    self.sfdbTrans.on("error").fire(e);
+                    self.sfdbTrans.abort();
+                }
+                return p;
             },
         });
 
@@ -1399,7 +1409,7 @@
         }
 
         derive(FinishableTransactionFactory).from(MultireqTransactionFactory).extend({
-            createPromise: function (fn, trappable) {
+            createPromise: function (fn) {
                 /// <summary>
                 ///   This overriding of createPromise() will keep count of any pending request on the transaction and be able
                 ///   to notify when there are no more pending requests. This is important in the upgrading framework 
@@ -1409,7 +1419,6 @@
                 ///   to implement.
                 /// </summary>
                 /// <param name="fn"></param>
-                /// <param name="trappable"></param>
                 var self = this;
                 ++self.uncompleteRequests;
                 function proxy(fn) {
@@ -1419,16 +1428,16 @@
                     }
                 }
                 var baseClass = MultireqTransactionFactory;
-                return baseClass.prototype.createPromise.call(this, function (resolve, reject, raise) {
+                return baseClass.prototype.createPromise.call(this, function (resolve, reject) {
                     arguments[0] = proxy(resolve);
                     arguments[1] = proxy(reject);
                     fn.apply(this, arguments);
-                }, trappable);
+                });
             }
         });
 
         function assert(b) {
-            if (!b) throw "Assertion failed";
+            if (!b) throw new Error("Assertion failed");
         }
 
         function asap (fn) {
@@ -1438,6 +1447,24 @@
         function trycatch(fn, reject) {
             return function () {
                 try { fn.apply(this, arguments); } catch (e) { reject(e); };
+            };
+        }
+
+        function eventRejectHandler(reject, sentance) {
+            return function (event) {
+                var origErrObj = event.target.error;
+                var errObj = Object.create(origErrObj);
+                errObj.toString = function () {
+                    return origErrObj.toString() + " occurred when " + sentance.map(function (word) {
+                        return typeof (word) === 'function' ? word() : JSON.stringify(word);
+                    }).join(" ");
+                };
+                if (reject(errObj)) {
+                    // Rejection was catched. Stop error from propagating to IDBTransaction.
+                    event.stopPropagation();
+                    event.preventDefault();
+                    return false;
+                }
             };
         }
 
@@ -1518,53 +1545,11 @@
             return navigator.userAgent.indexOf("Trident / 7.0; rv: 11.0") >= 0 || navigator.userAgent.indexOf("MSIE") >= 0;
         }
 
-        //
-        //  Extension to Promise with a trap() method to enable "ignore-and-continue" for async "loops".
-        //
-        function TrappablePromise(fn) {
-            var catchers = [];
-            var self = new Promise(function (resolve, reject) {
-                fn(resolve, reject, function (error, event, item) {
-                    // Raise
-                    var catched = false, numCatchers = catchers.length;
-                    if (numCatchers > 0) {
-                        for (var i = 0; i < numCatchers; ++i) {
-                            var catcher = catchers[i];
-                            if (catcher === null) {
-                                catched = true; // Caller use operation.trap();
-                                break;
-                            }
-                            if (catcher(error, event, item) === false) {
-                                catched = true; // Caller use operation.trap(fn); and returns false from that function.
-                                break;
-                            }
-                        }
-                        // If come here, no catchers catched the error.
-                    }
-                    if (catched) {
-                        event.stopPropagation();
-                        event.preventDefault();
-                        return false;// Return false to caller, who may react accordingly.
-                    } else {
-                        // Automatically apply the error into the reject() method, so that operation.catch() is triggered.
-                        reject(error, item, event);
-                        return true;
-                    }
-                });
-            });
-            self.trap = function (fn) {
-                catchers.push(fn || null);
-                return this;
-            }
-            return self;
-        }
-
-        this.classes = {
+        this._types = {
             Collection: Collection,
             Promise: Promise,
             Table: Table,
             Transaction: Transaction,
-            TrappablePromise: TrappablePromise,
             Version: Version,
             WhereClause: WhereClause,
             WriteableCollection: WriteableCollection,
@@ -1573,10 +1558,6 @@
         };
 
         init();
-    }
-
-    StraightForwardDB.delete = function (databaseName) {
-        return new StraightForwardDB(databaseName).delete();
     }
 
     //
@@ -1589,7 +1570,13 @@
     //
     // This topic was also discussed in the following thread: https://github.com/promises-aplus/promises-spec/issues/45 and this implementation solves that issue.
     //
-    var DirectPromise = (function () {
+    // Another feature with this Promise implementation is that reject will return false in case no one catched the reject call. This is used
+    // to stopPropagation() on the IDBRequest error event in case it was catched but not otherwise.
+    //
+    // Also, the event new Promise().onuncatched is called in case no one catches a reject call. This is used for us to manually bubble any request
+    // errors to the transaction. We must not rely on IndexedDB implementation to do this, because it only does so when the source of the rejection
+    // is an error event on a request, not in case an ordinary exception is thrown.
+    var Promise = (function () {
 
         // The use of asap in handle() is remarked because we must NOT use setTimeout(fn,0) because it causes premature commit of indexedDB transactions - which is according to indexedDB specification.
         var asap = typeof (setImmediate) === 'undefined' ? function (fn,arg1,arg2,argN) {
@@ -1615,10 +1602,12 @@
                     else
                         resolve(self, data);
                 }, function (reason) {
-                    if (this._constructing)
+                    if (this._constructing) {
                         asap(reject, self, reason);
-                    else
-                        reject(self, reason);
+                        return false;
+                    } else {
+                        return reject(self, reason);
+                    }
                 });
             } finally {
                 this._constructing = false;
@@ -1641,10 +1630,12 @@
             var ret;
             try {
                 ret = cb(self._value);
-                setCatched(self);
-            }
-            catch (e) {
-                deferred.reject(e);
+                if (!self._state) setCatched(self);
+            } catch (e) {
+                var catched = deferred.reject(e);
+                if (!catched && self.onuncatched) {
+                    try { self.onuncatched(e); } catch (e) { }
+                }
                 return;
             }
             deferred.resolve(ret);
@@ -1680,10 +1671,11 @@
             promise._state = false;
             promise._value = newValue;
 
-            finale.call(this);
+            finale.call(promise);
             if (!promise._catched && promise.onuncatched) {
-                try { promise.onuncatched(promise)(); } catch (e) { }
+                try { promise.onuncatched(promise._value); } catch (e) { }
             }
+            return promise._catched;
         }
 
         function finale() {
@@ -1793,6 +1785,16 @@
     })();
 
 
+    StraightForwardDB.delete = function (databaseName) {
+        return new StraightForwardDB(databaseName).delete();
+    }
+
+    // Define the very-base classes of the framework, in case any 3rd part library wants to extend the prototype of these classes
+    StraightForwardDB.Collection = function () { };
+    StraightForwardDB.Table = function () { };
+    StraightForwardDB.Transaction = function () { };
+    StraightForwardDB.WhereClause = function () { };
+
     //
     // Dependencies
     //
@@ -1807,7 +1809,9 @@
         IDBTransaction: window.IDBTransaction || window.webkitIDBTransaction,
         // Optional:
         Promise: window.Promise, // If not present, it is polyfilled by PromiseLight in this JS-file.
-        TypeError: window.TypeError || String
+        Error: window.Error || String,
+        TypeError: window.TypeError || String,
+        RangeError: window.RangeError || String
     }
 
     // Publish the StraightForwardDB to browser or NodeJS environment.

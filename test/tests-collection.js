@@ -19,8 +19,6 @@
         trans.users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
     });
 
-    var Promise = window.Promise || db.classes.Promise;
-
     module("collection", {
         setup: function () {
             stop();

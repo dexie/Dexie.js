@@ -19,7 +19,6 @@
         trans.users.add({first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"]});
         trans.users.add({first: "Karl", last: "Faadersköld", username: "kceder", email: ["karl@ceder.what", "dadda@ceder.what"], pets: []});
     });
-    var Promise = window.Promise || db.classes.Promise;
 
     module("table", {
         setup: function () {
@@ -126,7 +125,7 @@
         });
         trans.complete(start)
              .error(function (e) {
-                ok(false, "Transaction failed: " + e.message);
+                ok(false, "Transaction failed: " + e);
             });
     });
     asyncTest("count", function () {
@@ -150,25 +149,23 @@
             start();
         });
         t.error(function (e) {
-            ok(false, "Error: " + e.message);
+            ok(false, "Error: " + e);
             start();
         });
-        t.users.orderBy("first").desc().limit(1).modify({ helloMessage: function (user) { return "Hello " + user.first; } })
-            .trap(function (e) {
-                ok(false, "Trap: " + e);
-                return false;
-            }).then(function () {
-                t.users.orderBy("first").desc().toArray(function (a) {
-                    equal(a[0].first, "Karl", "First item is Karl");
-                    equal(a[0].helloMessage, "Hello Karl", "Karl got helloMessage 'Hello Karl'");
-                    equal(a[1].first, "David", "Second item is David");
-                    ok(!a[1].helloMessage, "David was not modified due to limit()");
-                }).catch(function (e) {
-                    ok(false, "Inner catch: " + e.message);
-                });
-            }).catch(function (e) {
-                ok(false, "Outer catch: " + e.message);
-            });
+
+        // Modify first found user with a helloMessage
+        t.users.orderBy("first").desc().limit(1).modify({
+            helloMessage: function (user) { return "Hello " + user.first; }
+        });
+
+        // Check that the modification went fine:
+        t.users.orderBy("first").desc().toArray(function (a) {
+            equal(a[0].first, "Karl", "First item is Karl");
+            equal(a[0].helloMessage, "Hello Karl", "Karl got helloMessage 'Hello Karl'");
+            equal(a[1].first, "David", "Second item is David");
+            ok(!a[1].helloMessage, "David was not modified due to limit()");
+        });
+
     });
     asyncTest("each", function () {
         var users = [];

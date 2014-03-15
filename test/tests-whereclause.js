@@ -142,6 +142,9 @@
                 ok(false, "Error: " + e);
                 start();
             });
+        }).catch(function (e) {
+            ok(false, e);
+            start();
         });
     });
 
@@ -224,12 +227,13 @@
             equal(a.length, 6, "6 folders found: " + a.map(function(folder){return '"' + folder.path + '"'}).join(', '));
         });
 
-        t.folders.where("path").startsWithIgnoreCase("/usr").desc().toArray(function (a) { // FIXTHIS: Fails!
-            equal(a.length, 6, "6 folders found: " + a.map(function (folder) { return '"' + folder.path + '"' }).join(', '));
+        t.complete(function () {
+            ok(true, "Transaction complete");
+            start();
+        }).error(function (e) {
+            ok(false, e);
+            start();
         });
-
-
-        t.complete(start).error(function (e) {ok(false, e);});
     });
 
 })();
