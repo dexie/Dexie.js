@@ -3,7 +3,7 @@
 module("open", {
     setup: function () {
         stop();
-        StraightForwardDB.delete("TestDB").then(function () {
+        Dexie.delete("TestDB").then(function () {
             start();
         }).catch(function (e) {
             ok(false, "Could not delete database");
@@ -14,7 +14,7 @@ module("open", {
 });
 
 asyncTest("open, add and query data without transaction", 7, function () {
-    var db = new StraightForwardDB("TestDB");
+    var db = new Dexie("TestDB");
     db.version(1).schema({ employees: "++id,first,last" });
     ok(true, "Simple version() and schema() passed");
     db.open().on("error", function () {
@@ -41,7 +41,7 @@ asyncTest("open, add and query data without transaction", 7, function () {
 });
 
 asyncTest("open, add and query data using transaction", function () {
-    var db = new StraightForwardDB("TestDB");
+    var db = new Dexie("TestDB");
     db.version(1).schema({ employees: "++id,first,last" });
     db.open().on("error", function () {
         ok(false, "Could not open database");

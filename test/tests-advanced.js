@@ -1,8 +1,7 @@
 ﻿///<reference path="run-unit-tests.html" />
 
-///<var type="StraightForwardDB" />
 (function () {
-    var db = new StraightForwardDB("TestDB");
+    var db = new Dexie("TestDB");
     db.version(1).schema({ users: "++id,first,last,&username,&*email,*pets" });
     db.populate(function (trans) {
         trans.users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });

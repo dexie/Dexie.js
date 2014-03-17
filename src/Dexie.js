@@ -7,11 +7,11 @@
 	/// </summary>
 	/// <param name="environment" value="{global: window, publish: function(name,module){}}">Browser / Nodejs compatible way of accessing global object (window in browsers) and publishing the module (putting it on the window object in browsers).</param>
 
-    function StraightForwardDB(dbName) {
+    function Dexie(dbName) {
         "use strict";
 
         // Resolve all external dependencies:
-        var deps = StraightForwardDB.dependencies;
+        var deps = Dexie.dependencies;
         var indexedDB = deps.indexedDB,
             IDBKeyRange = deps.IDBKeyRange,
             IDBTransaction = deps.IDBTransaction;
@@ -361,7 +361,7 @@
         //
         //
         //
-        //      StraightForwardDB API
+        //      Dexie API
         //
         //
         //
@@ -491,7 +491,7 @@
             this._collClass = collClass || Collection;
         }
 
-        derive(Table).from(StraightForwardDB.Table).extend({
+        derive(Table).from(Dexie.Table).extend({
             get: function (key, cb) {
                 var self = this;
                 fake(function () { cb(getInstanceTemplate(self._name)) });
@@ -725,7 +725,7 @@
             setApiOnPlace(this, tf, tableClass || Table, storeNames);
         }
 
-        derive(Transaction).from(StraightForwardDB.Transaction).extend({
+        derive(Transaction).from(Dexie.Transaction).extend({
             abort: function () {
                 if (this._ctx.tf.trans && !this._ctx.tf.inactive) try {
                     this._ctx.tf.inactive = true;
@@ -849,7 +849,7 @@
             }
 
             // WhereClause public methods
-            derive(WhereClause).from(StraightForwardDB.WhereClause).extend ({
+            derive(WhereClause).from(Dexie.WhereClause).extend ({
                 between: function (lower, upper, includeLower, includeUpper) {
                     /// <summary>
                     ///     Filter out records whose where-field lays between given lower and upper values. Applies to Strings, Numbers and Dates.
@@ -984,7 +984,7 @@
             }
         }
 
-        derive(Collection).from(StraightForwardDB.Collection).extend ({
+        derive(Collection).from(Dexie.Collection).extend ({
             _addFilter: function (fn) {
                 var ctx = this._ctx;
                 if (!ctx.filter) ctx.filter = fn; else {
@@ -1785,24 +1785,24 @@
     })();
 
 
-    StraightForwardDB.delete = function (databaseName) {
-        return new StraightForwardDB(databaseName).delete();
+    Dexie.delete = function (databaseName) {
+        return new Dexie(databaseName).delete();
     }
 
     // Define the very-base classes of the framework, in case any 3rd part library wants to extend the prototype of these classes
-    StraightForwardDB.Collection = function () { };
-    StraightForwardDB.Table = function () { };
-    StraightForwardDB.Transaction = function () { };
-    StraightForwardDB.WhereClause = function () { };
+    Dexie.Collection = function () { };
+    Dexie.Table = function () { };
+    Dexie.Transaction = function () { };
+    Dexie.WhereClause = function () { };
 
     //
     // Dependencies
     //
     // These will automatically work in browsers with indexedDB support, or where an indexedDB polyfill has been included.
     //
-    // In node.js, however, these properties must be set "manually" before instansiating a new StraightForwardDB(). For node.js, you need to require indexeddb-js or similar and then set these deps.
+    // In node.js, however, these properties must be set "manually" before instansiating a new Dexie(). For node.js, you need to require indexeddb-js or similar and then set these deps.
     //
-    StraightForwardDB.dependencies = {
+    Dexie.dependencies = {
         // Required:
         indexedDB: window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB,
         IDBKeyRange: window.IDBKeyRange || window.webkitIDBKeyRange,
@@ -1814,8 +1814,8 @@
         RangeError: window.RangeError || String
     }
 
-    // Publish the StraightForwardDB to browser or NodeJS environment.
-    publish("StraightForwardDB", StraightForwardDB);
+    // Publish the Dexie to browser or NodeJS environment.
+    publish("Dexie", Dexie);
 
 }).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this == window) 
     ? [window, function (name, value) { window[name] = value; } ]    // Adapt to browser environment

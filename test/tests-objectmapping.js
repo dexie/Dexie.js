@@ -1,10 +1,9 @@
 ﻿///<reference path="run-unit-tests.html" />
 
-///<var type="StraightForwardDB" />
 module("objectmapping");
 
 asyncTest("defineClass", function () {
-    var db = new StraightForwardDB("TestDB");
+    var db = new Dexie("TestDB");
 
     db.version(1).schema({
         user: "++id,first,last,&username,*&email,*pets"
@@ -23,7 +22,7 @@ asyncTest("defineClass", function () {
 });
 
 (function(){
-    var db = new StraightForwardDB("TestDB");
+    var db = new Dexie("TestDB");
     db.version(1).schema({
         tasks: "++id,first,last,!username,!*email,*pets"
     });

@@ -3,7 +3,7 @@
 
 (function () {
 
-    var db = new StraightForwardDB("TestDB-WhereClause");
+    var db = new Dexie("TestDB-WhereClause");
     db.version(1).schema({
         folders: "++id,&path",
         files: "++id,filename,extension,folderId"
