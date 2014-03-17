@@ -19,7 +19,7 @@ Dexie is a local database API for the browser based on indexedDB.
    * IOS Safari (with indexedDB shim)
  * Promise/A+ compliant
  * Code Completion friendly - Your IDE will guide you as you type!
- * Human readable queries such as: db.friends.where("phone").startsWith("+46").or("country").equals("SE").each(function(){})
+ * Human readable queries such as: db.friends.where("lastName").startsWithIgnoreCase("B").each(function(friend){...})
  * Simplified and robust error handling
  * Simplified upgrading framework
  * Transaction support
