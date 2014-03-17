@@ -84,11 +84,11 @@
         }
 
         extend(Version.prototype, {
-            schema: function (schema) {
+            stores: function (stores) {
                 /// <summary>
                 ///   Defines the schema for a particular version
                 /// </summary>
-                /// <param name="schema" type="Object">
+                /// <param name="stores" type="Object">
                 /// Example: <br/>
                 ///   {users: "id++,first,last,&username,*email", <br/>
                 ///   passwords: "id++,&username"}<br/>
@@ -100,9 +100,9 @@
                 ///  "++" means auto-increment and only applicable for primary key <br/>
                 /// </param>
                 var tableSchema = (this._cfg.tableSchema = this._cfg.tableSchema || {});
-                Object.keys(schema).forEach(function (tableName) {
+                Object.keys(stores).forEach(function (tableName) {
                     var instanceTemplate = {};
-                    var indexes = parseIndexSyntax(schema[tableName]);
+                    var indexes = parseIndexSyntax(stores[tableName]);
                     var primKey = indexes.shift();
                     if (primKey.multi) throw new Error("Primary key cannot be multi-valued");
                     if (primKey.keyPath) instanceTemplate[primKey.keyPath] = 0;
@@ -371,7 +371,7 @@
             // Make sure caller has specified at least one version
             if (versions.length == 0) throw new Error("No versions specified. Need to call version(ver) method");
             // Make sure at least the oldest version specifies a table schema
-            if (!versions[0]._cfg.tableSchema) throw new Error("No schema specified. Need to call dbInstance.version(ver).schema(schema) on at least the lowest version.");
+            if (!versions[0]._cfg.tableSchema) throw new Error("No schema specified. Need to call dbInstance.version(ver).stores(schema) on at least the lowest version.");
             // Sort versions and make all Version instances have a schema (its own or previous if not specified)
             versions.sort(lowerVersionFirst).reduce(function (prev, ver) {
                 if (!ver._cfg.tableSchema) ver._cfg.tableSchema = prev._cfg.tableSchema;

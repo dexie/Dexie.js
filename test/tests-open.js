@@ -15,8 +15,8 @@ module("open", {
 
 asyncTest("open, add and query data without transaction", 7, function () {
     var db = new Dexie("TestDB");
-    db.version(1).schema({ employees: "++id,first,last" });
-    ok(true, "Simple version() and schema() passed");
+    db.version(1).stores({ employees: "++id,first,last" });
+    ok(true, "Simple version() and stores() passed");
     db.open().on("error", function () {
         ok(false, "Could not open database");
         start();
@@ -42,7 +42,7 @@ asyncTest("open, add and query data without transaction", 7, function () {
 
 asyncTest("open, add and query data using transaction", function () {
     var db = new Dexie("TestDB");
-    db.version(1).schema({ employees: "++id,first,last" });
+    db.version(1).stores({ employees: "++id,first,last" });
     db.open().on("error", function () {
         ok(false, "Could not open database");
         start();

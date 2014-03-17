@@ -5,7 +5,7 @@ module("objectmapping");
 asyncTest("defineClass", function () {
     var db = new Dexie("TestDB");
 
-    db.version(1).schema({
+    db.version(1).stores({
         user: "++id,first,last,&username,*&email,*pets"
     });
 
@@ -23,7 +23,7 @@ asyncTest("defineClass", function () {
 
 (function(){
     var db = new Dexie("TestDB");
-    db.version(1).schema({
+    db.version(1).stores({
         tasks: "++id,first,last,!username,!*email,*pets"
     });
 

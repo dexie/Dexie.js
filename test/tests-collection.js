@@ -2,7 +2,7 @@
 
 (function () {
     var db = new Dexie("TestDB");
-    db.version(1).schema({ users: "++id,first,last,&username,*&email,*pets" });
+    db.version(1).stores({ users: "++id,first,last,&username,*&email,*pets" });
 
     var User = db.users.defineClass({
         id:         Number,

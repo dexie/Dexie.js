@@ -2,7 +2,7 @@
 
 /*
 var myDB = new Dexie("My-db");
-myDB.version(1).schema({ kalle: "bä" });
+myDB.version(1).stores({ kalle: "bä" });
 
 var Kalle = myDB.kalle.defineClass({
     jag: String

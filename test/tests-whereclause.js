@@ -4,7 +4,7 @@
 (function () {
 
     var db = new Dexie("TestDB-WhereClause");
-    db.version(1).schema({
+    db.version(1).stores({
         folders: "++id,&path",
         files: "++id,filename,extension,folderId"
     });

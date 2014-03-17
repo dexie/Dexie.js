@@ -2,7 +2,7 @@
 
 (function () {
     var db = new Dexie("TestDB");
-    db.version(1).schema({ users: "++id,first,last,&username,&*email,*pets" });
+    db.version(1).stores({ users: "++id,first,last,&username,&*email,*pets" });
     db.populate(function (trans) {
         trans.users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
         trans.users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
