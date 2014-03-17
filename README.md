@@ -29,3 +29,6 @@ Dexie is a local database API for the browser based on indexedDB.
  * Simplified upgrading framework
  * Transaction support
  * Thoroughly unit tested
+
+API Reference
+-------------
