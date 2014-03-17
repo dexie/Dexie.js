@@ -445,12 +445,13 @@
             /// <param name="tableInstances" type="WriteableTable" parameterArray="true">Table instances to include in transaction, or strings representing the table names</param>
 
             var tables = tableInstances instanceof Array ? tableInstances : Array.prototype.slice.call(arguments, 1);
+            var error = null;
             var storeNames = tables.map(function (tableInstance) {
                 if (typeof (tableInstance) == "string") {
-                    if (!dbTableSchema[tableInstance]) throw new Error("Invalid table name: " + tableInstance); return { INVALID_TABLE_NAME: 1 }; // Return statement is for IDE code completion.
+                    if (!dbTableSchema[tableInstance]) { error = new Error("Invalid table name: " + tableInstance); return { INVALID_TABLE_NAME: 1 } }; // Return statement is for IDE code completion.
                     return tableInstance;
                 } else {
-                    if (!(tableInstance instanceof Table)) throw new TypeError ("Invalid type. Arguments following mode must be instances of Table or String");
+                    if (!(tableInstance instanceof Table)) { error = new TypeError("Invalid type. Arguments following mode must be instances of Table or String"); return { IVALID_TYPE: 1 }; }
                     return tableInstance._name;
                 }
             });
@@ -462,9 +463,10 @@
                 tf = new MultireqTransactionFactory(storeNames, RW);
                 t = new WriteableTransaction(tf, storeNames);
             } else {
-                throw new RangeError("Invalid mode. Only 'readonly'/'r' or 'readwrite'/'rw' are valid modes.");
+                error = new RangeError("Invalid mode. Only 'readonly'/'r' or 'readwrite'/'rw' are valid modes.");
             }
             tf.sfdbTrans = t;
+            if (error) t._ctx.error = error; // Make try() fail with this error
             if (!db) {
                 pausedTransactionFactories.push(tf.pause());
             }
@@ -726,6 +728,22 @@
         }
 
         derive(Transaction).from(Dexie.Transaction).extend({
+            'try': function (fn) {
+                var self = this;
+                var args = self._ctx.storeNames.map(function (name) { return self[name]; });
+                return new Promise(function (resolve, reject) {
+                    if (self._ctx.error) reject(self._ctx.error);
+                    else {
+                        self.complete(resolve).error(reject);
+                        try {
+                            fn.apply(self, args);
+                        } catch (e) {
+                            self.abort();
+                            reject(e);
+                        }
+                    }
+                });
+            },
             abort: function () {
                 if (this._ctx.tf.trans && !this._ctx.tf.inactive) try {
                     this._ctx.tf.inactive = true;
@@ -1565,7 +1583,7 @@
     //
     // Modified by David Fahlander to be indexedDB compliant (See discussion: https://github.com/promises-aplus/promises-spec/issues/45) .
     // This implementation will not use setTimeout or setImmediate when it's not needed. The behavior is 100% Promise/A+ compliant since
-    // the caller of new Promise() can be certain that the promise wont be triggered the lines after constructing the promise. We fix this by using the member variable this._constructing to check
+    // the caller of new Promise() can be certain that the promise wont be triggered the lines after constructing the promise. We fix this by using the member variable constructing to check
     // whether the object is being constructed when reject or resolve is called. If so, the use setTimeout/setImmediate to fulfill the promise, otherwise, we know that it's not needed.
     //
     // This topic was also discussed in the following thread: https://github.com/promises-aplus/promises-spec/issues/45 and this implementation solves that issue.
@@ -1580,29 +1598,29 @@
 
         // The use of asap in handle() is remarked because we must NOT use setTimeout(fn,0) because it causes premature commit of indexedDB transactions - which is according to indexedDB specification.
         var asap = typeof (setImmediate) === 'undefined' ? function (fn,arg1,arg2,argN) {
-            setTimeout(function () { fn.call([].slice.call(arguments, 1)) }, 0);// If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
+            setTimeout(function () { fn.apply([].slice.call(arguments, 1)) }, 0);// If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
         } : function (fn) {
-            setImmediate.apply(this, [fn].concat(arguments)); // IE10+ and node.
+            setImmediate.apply(this, arguments); // IE10+ and node.
         };
 
         function Promise(fn) {
             if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');
             if (typeof fn !== 'function') throw new TypeError('not a function');
-            this._constructing = true;
             this._state = null; // null (=pending), false (=rejected) or true (=resolved)
             this._value = null; // error or result
             this._deferreds = [];
             this._catched = false; // for onuncatched
             var self = this;
+            var constructing = true;
 
             try {
                 doResolve(fn, function (data) {
-                    if (this._constructing)
+                    if (constructing)
                         asap(resolve, self, data);
                     else
                         resolve(self, data);
                 }, function (reason) {
-                    if (this._constructing) {
+                    if (constructing) {
                         asap(reject, self, reason);
                         return false;
                     } else {
@@ -1610,7 +1628,7 @@
                     }
                 });
             } finally {
-                this._constructing = false;
+                constructing = false;
             }
         }
 
@@ -1757,6 +1775,10 @@
 
         Promise.prototype['catch'] = function (onRejected) {
             return this.then(null, onRejected);
+        };
+
+        Promise.prototype['finally'] = function (onFinally) {
+            return this.then(onFinally, onFinally);
         };
 
         Promise.prototype.onuncatched = null; // Optional event triggered if promise is rejected but no one listened.

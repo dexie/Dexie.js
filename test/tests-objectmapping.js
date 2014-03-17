@@ -6,7 +6,8 @@ asyncTest("defineClass", function () {
     var db = new Dexie("TestDB");
 
     db.version(1).stores({
-        user: "++id,first,last,&username,*&email,*pets"
+        user: "++id,first,last,&username,*&email,*pets",
+        friends: "++id,name,age,isCloseFriend"
     });
 
     var User = db.users.defineClass({
@@ -18,6 +19,42 @@ asyncTest("defineClass", function () {
         pets: [String],
     });
 
+
+    db.friends.add({ name: "Ulla Bella", age: 87, isCloseFriend: false })
+        .then(function () {
+            db.friends.add({ name: "Elna", age: 99, isCloseFriend: true })
+                .then(function () {
+                    db.friends.where("age").above(65).each(function (friend) {
+                        console.log("Retired friend: " + friend.name);
+                    }).catch(function (error) {
+                        console.error(error);
+                    });
+                }).catch(function (error) {
+                    console.error(error);
+                });
+        }).catch(function (error) {
+            console.error(error);
+        });
+
+    db.transaction("rw", db.friends).try(function (friends) {
+        friends.add({ name: "Ulla Bella", age: 87, isCloseFriend: false });
+        friends.add({ name: "Elna", age: 99, isCloseFriend: true });
+        friends.where("age").above(65).each(function (friend) {
+            console.log("Retired friend: " + friend.name);
+        });
+    }).catch(function (e) {
+        console.error(e);
+    });
+
+    var transaction = db.transaction("rw", db.friends);
+    transaction.friends.add({ name: "Ulla Bella", age: 87, isCloseFriend: false });
+    transaction.friends.add({ name: "Elna", age: 99, isCloseFriend: true });
+    transaction.friends.where("age").above(65).each(function (friend) {
+        console.log("Retired friend: " + friend.name);
+    });
+    transaction.error(function (e) {
+        console.error(e);
+    });
 
 });
 

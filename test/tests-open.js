@@ -48,25 +48,24 @@ asyncTest("open, add and query data using transaction", function () {
         start();
     });
 
-    var transaction = db.transaction("rw", db.employees);
+    db.transaction("rw", db.employees).try(function (employees) {
 
-    // Add employee
-    transaction.employees.add({ first: "David", last: "Fahlander" });
+        // Add employee
+        employees.add({ first: "David", last: "Fahlander" });
 
-    // Query employee
-    transaction.employees.where("first").equals("David").toArray(function (a) {
-        equal(a.length, 1, "Could retrieve employee based on where() clause");
-        var first = a[0].first;
-        var last = a[0].last;
-        ok(first == "David" && last == "Fahlander", "Could get the same object");
-        equal(a.length, 1, "Length of returned answer is 1");
-        ok(a[0].id, "Got an autoincremented id value from the object");
-        db.close();
-    });
-
-    transaction.on("complete", function () {
+        // Query employee
+        employees.where("first").equals("David").toArray(function (a) {
+            equal(a.length, 1, "Could retrieve employee based on where() clause");
+            var first = a[0].first;
+            var last = a[0].last;
+            ok(first == "David" && last == "Fahlander", "Could get the same object");
+            equal(a.length, 1, "Length of returned answer is 1");
+            ok(a[0].id, "Got an autoincremented id value from the object");
+        });
+    }).catch(function (e) {
+        ok(false, e);
+    }).finally(function() {
         db.close();
         start();
     });
-
 });

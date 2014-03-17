@@ -56,44 +56,45 @@
             stop();
             db.delete().then(function () {
                 db.open().error(function (e) {
-                    throw "Error opening database: " + e;
+                    ok(false, "Error opening database: " + e);
+                    start();
                 }).ready(start);
-                
             }).catch(function (e) {
-                throw "Could not delete database: " + e;
+                ok(false, "Could not delete database: " + e);
+                start();
             });
         },
         teardown: function () {
-            db.delete();
+            stop();
+            db.delete().then(start);
         }
     });
 
 
     asyncTest("equalsAnyOf()", function () {
-        var trans = db.transaction("r", db.files, db.folders);
+        db.transaction("r", db.files, db.folders).try(function (files, folders) {
+            var transaction = this;
 
-        trans.files.where("filename").equalsAnyOf("hello", "hello-there", "README", "gösta").toArray(function (a) {
-            equal(a.length, 3, "Should find 3 files");
-            equal(a[0].filename, "README", "First match is README because capital R comes before lower 'h' in lexical sort");
-            equal(a[1].filename, "hello", "Second match is hello");
-            equal(a[2].filename, "hello-there", "Third match is hello-there");
+            files.where("filename").equalsAnyOf("hello", "hello-there", "README", "gösta").toArray(function (a) {
+                equal(a.length, 3, "Should find 3 files");
+                equal(a[0].filename, "README", "First match is README because capital R comes before lower 'h' in lexical sort");
+                equal(a[1].filename, "hello", "Second match is hello");
+                equal(a[2].filename, "hello-there", "Third match is hello-there");
 
-            a[0].getFullPath(trans).then(function (fullPath) {
-                equal(fullPath, "/usr/local/src/README.TXT", "Full path of README.TXT is: " + fullPath);
+                a[0].getFullPath(transaction).then(function (fullPath) {
+                    equal(fullPath, "/usr/local/src/README.TXT", "Full path of README.TXT is: " + fullPath);
+                });
+                a[1].getFullPath(transaction).then(function (fullPath) {
+                    equal(fullPath, "/usr/local/bin/hello.exe", "Full path of hello.exe is: " + fullPath);
+                });
+                a[2].getFullPath(transaction).then(function (fullPath) {
+                    equal("/var/bin/hello-there.exe", fullPath, "Full path of hello-there.exe is: " + fullPath);
+                });
             });
-            a[1].getFullPath(trans).then(function (fullPath) {
-                equal(fullPath, "/usr/local/bin/hello.exe", "Full path of hello.exe is: " + fullPath);
-            });
-            a[2].getFullPath(trans).then(function (fullPath) {
-                equal("/var/bin/hello-there.exe", fullPath, "Full path of hello-there.exe is: " + fullPath);
-            });
-        });
 
-        trans.complete(start);
-        trans.error(function(e){
+        }).catch(function (e) {
             ok(false, "Error: " + e);
-            start();
-        });
+        }).finally(start);
     });
 
     asyncTest("equalsIgnoreCase()", function () {
@@ -117,31 +118,28 @@
 					"apan JA", "apan JAPA", "apan JAPAA", "apan JAPANer",
 					"apan JAPAÖ", "apan japan", "apan japanER", "östen"];
 
-            var files = filenames.map(function (filename) {
+            var fileArray = filenames.map(function (filename) {
                 var file = new File();
                 file.filename = filename;
                 file.folderId = folderId;
                 return file;
             });
 
-            var trans = db.transaction("rw", db.files);
-            files.forEach(function (file) {
-                trans.files.add(file);
-            });
+            db.transaction("rw", db.files).try(function (files) {
+                fileArray.forEach(function (file) {
+                    files.add(file);
+                });
 
-            trans.files.where("filename").equalsIgnoreCase("apan japan").toArray(function (a) {
-                equal(a.length, 4, "There should be 4 files with that name");
-                equal(a[0].filename, "APAN JAPAN", "APAN JAPAN");
-                equal(a[1].filename, "Apan JapaN", "Apan JapaN");
-                equal(a[2].filename, "Apan Japan", "Apan Japan");
-                equal(a[3].filename, "apan japan", "apan japan");
-            });
-
-            trans.complete(start);
-            trans.error(function (e) {
+                files.where("filename").equalsIgnoreCase("apan japan").toArray(function (a) {
+                    equal(a.length, 4, "There should be 4 files with that name");
+                    equal(a[0].filename, "APAN JAPAN", "APAN JAPAN");
+                    equal(a[1].filename, "Apan JapaN", "Apan JapaN");
+                    equal(a[2].filename, "Apan Japan", "Apan Japan");
+                    equal(a[3].filename, "apan japan", "apan japan");
+                });
+            }).catch(function (e) {
                 ok(false, "Error: " + e);
-                start();
-            });
+            }).finally(start);
         }).catch(function (e) {
             ok(false, e);
             start();
@@ -158,35 +156,34 @@
 					"apan JA", "apan JAPA", "apan JAPAA", "apan JAPANer",
 					"apan JAPAÖ", "apan japan", "apan japanER", "östen"];
 
-            var files = filenames.map(function (filename) {
+            var fileArray = filenames.map(function (filename) {
                 var file = new File();
                 file.filename = filename;
                 file.folderId = folderId;
                 return file;
             });
 
-            var trans = db.transaction("rw", db.files);
-            files.forEach(function (file) {
-                trans.files.add(file);
-            });
+            db.transaction("rw", db.files).try(function (files) {
 
-            trans.files
-                .where("filename").equalsIgnoreCase("apan japan")
-                .and(function (f) { return f.folderId === folderId }) // Just for fun - only look in the newly created /etc folder.
-                .desc()
-                .toArray(function (a) {
-                    equal(a.length, 4, "There should be 4 files with that name in " + folder.path);
-                    equal(a[0].filename, "apan japan", "apan japan");
-                    equal(a[1].filename, "Apan Japan", "Apan Japan");
-                    equal(a[2].filename, "Apan JapaN", "Apan JapaN");
-                    equal(a[3].filename, "APAN JAPAN", "APAN JAPAN");
+                fileArray.forEach(function (file) {
+                    files.add(file);
                 });
 
-            trans.complete(start);
-            trans.error(function (e) {
+                files
+                    .where("filename").equalsIgnoreCase("apan japan")
+                    .and(function (f) { return f.folderId === folderId }) // Just for fun - only look in the newly created /etc folder.
+                    .desc()
+                    .toArray(function (a) {
+                        equal(a.length, 4, "There should be 4 files with that name in " + folder.path);
+                        equal(a[0].filename, "apan japan", "apan japan");
+                        equal(a[1].filename, "Apan Japan", "Apan Japan");
+                        equal(a[2].filename, "Apan JapaN", "Apan JapaN");
+                        equal(a[3].filename, "APAN JAPAN", "APAN JAPAN");
+                    });
+            }).catch(function (e) {
                 ok(false, "Error: " + e);
                 start();
-            });
+            }).finally(start);
         });
     });
 

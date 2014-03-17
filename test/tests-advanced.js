@@ -25,9 +25,11 @@
                 });
                 db.error(function (e) {
                     ok(false, "Error: " + e);
+                    start();
                 });
             }).catch(function (e) {
                 ok(false, "Could not delete database");
+                start();
             });
         },
         teardown: function () {
