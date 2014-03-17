@@ -20,12 +20,12 @@ Dexie is a local database API for the browser based on indexedDB.
  * Promise/A+ compliant
  * Code Completion friendly - Your IDE will guide you as you type!
  * Human readable queries such as: db.friends.where("lastName").startsWith("Bingo").each(function(friend){...})
- * Simplified and robust error handling
- * Simplified upgrading framework
- * Transaction support
  * Support for case insensitive matching
  * Support for prefix matching
  * Support for matching a set of keys in a single search
  * Support for OR between queries
  * Built to be easily extended by 3rd part libraries
+ * Simplified and robust error handling
+ * Simplified upgrading framework
+ * Transaction support
  * Thoroughly unit tested
