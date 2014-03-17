@@ -32,3 +32,5 @@ Dexie is a local database API for the browser based on indexedDB.
 
 API Reference
 -------------
+https://github.com/dfahlander/Dexie.js/wiki/API%20Reference
+
