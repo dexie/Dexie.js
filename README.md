@@ -34,3 +34,10 @@ API Reference
 -------------
 https://github.com/dfahlander/Dexie.js/wiki/API%20Reference
 
+Tutorial
+--------
+https://github.com/dfahlander/Dexie.js/wiki/Tutorial
+
+Wiki Home
+---------
+https://github.com/dfahlander/Dexie.js/wiki/Dexie.js
