@@ -1772,7 +1772,12 @@
         };
 
         Promise.prototype['catch'] = function (onRejected) {
-            return this.then(null, onRejected);
+            if (arguments.length === 1) return this.then(null, onRejected);
+            // First argument is the Error type to catch
+            var type = arguments[0], callback = arguments[1];
+            return this.then(null, function (e) {
+                if (e instanceof type) return callback(e); else throw e;
+            });
         };
 
         Promise.prototype['finally'] = function (onFinally) {
