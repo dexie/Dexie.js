@@ -19,7 +19,10 @@
             IDBKeyRange = deps.IDBKeyRange,
             IDBTransaction = deps.IDBTransaction;
 
-        var ErrorEvent = window.ErrorEvent; // OK if not present. Just for code completion.
+        var DOMError = deps.DOMError,
+            TypeError = deps.TypeError,
+            RangeError = deps.RangeError,
+            Error = deps.Error;
 
         var dbTableSchema = null;
         var dbVersion = 0;
@@ -457,7 +460,7 @@
 
         fake(function () {
             database.on("populate").fire(new WriteableTransaction(IDBTransaction.prototype, mainTransactionFactory, Object.keys(dbTableSchema)));
-            database.on("error").fire(new ErrorEvent());
+            database.on("error").fire(new DOMError());
         });
 
         this.transaction = function (mode, tableInstances, scopeFunc) {
@@ -1859,7 +1862,8 @@
         Promise: window.Promise, // If not present, it is polyfilled by PromiseLight in this JS-file.
         Error: window.Error || String,
         TypeError: window.TypeError || String,
-        RangeError: window.RangeError || String
+        RangeError: window.RangeError || String,
+        DOMError: window.DOMError || String
     }
 
     // Publish the Dexie to browser or NodeJS environment.
