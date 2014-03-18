@@ -8,8 +8,10 @@
     ///     By David Fahlander, david.fahlander@gmail.com
     /// 
     /// </summary>
+
+    "use strict";
+
     function Dexie(dbName) {
-        "use strict";
 
         // Resolve all external dependencies:
         var deps = Dexie.dependencies;
