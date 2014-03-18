@@ -4,9 +4,10 @@
     ///     Straight forward database API - working on top of indexedDB.
     ///     Indended environments: browsers, apps, nodejs.
     ///     Note that on Safari and Node.js, indexedDB shims are required. See indexeddb-js (for Node.js), https://github.com/facebook/IndexedDB-polyfill alternatively http://nparashuram.com/IndexedDBShim/ (indexedDB adapters for WebSQL).
+    /// 
+    ///     By David Fahlander, david.fahlander@gmail.com
+    /// 
     /// </summary>
-    /// <param name="environment" value="{global: window, publish: function(name,module){}}">Browser / Nodejs compatible way of accessing global object (window in browsers) and publishing the module (putting it on the window object in browsers).</param>
-
     function Dexie(dbName) {
         "use strict";
 
