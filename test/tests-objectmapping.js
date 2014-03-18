@@ -6,7 +6,7 @@ asyncTest("defineClass", function () {
     var db = new Dexie("TestDB");
 
     db.version(1).stores({
-        user: "++id,first,last,&username,*&email,*pets",
+        pets: "++id,first,last,&username,*&email,*pets",
         friends: "++id,name,age,isCloseFriend"
     });
 
@@ -18,6 +18,27 @@ asyncTest("defineClass", function () {
         email: [String],
         pets: [String],
     });
+
+    db.transaction("rw", "friends", function (friends, trans) {
+        friends.each(function(friend
+
+    });
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
     db.friends.add({ name: "Ulla Bella", age: 87, isCloseFriend: false })

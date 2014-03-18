@@ -1293,17 +1293,17 @@
             if (mappedProto) {
                 var origFn = fn;
                 if (use_proto) {
-                    fn = function (val) {
+                    fn = function (val, cursor) {
                         if (val) val.__proto__ = mappedProto;
-                        origFn(val);
+                        origFn(val, cursor);
                     }
                 } else {
-                    fn = function (val) {
+                    fn = function (val, cursor) {
                         if (val) {
                             var rv = Object.create(mappedProto);
                             for (var m in val) rv[m] = val[m];
-                            origFn(rv);
-                        } else origFn(val);
+                            origFn(rv, cursor);
+                        } else origFn(val, cursor);
                     }
                 }
             }
@@ -1312,7 +1312,7 @@
                     var cursor = e.target.result;
                     if (cursor) {
                         var c = function () { cursor.continue(); };
-                        if (filter(cursor, function (advancer) { c = advancer }, oncomplete, reject)) fn(cursor.value);
+                        if (filter(cursor, function (advancer) { c = advancer }, oncomplete, reject)) fn(cursor.value, cursor);
                         c();
                     } else {
                         oncomplete();
@@ -1322,7 +1322,7 @@
                 req.onsuccess = trycatch(function (e) {
                     var cursor = e.target.result;
                     if (cursor) {
-                        fn(cursor.value);
+                        fn(cursor.value, cursor);
                         cursor.continue();
                     } else {
                         oncomplete();
