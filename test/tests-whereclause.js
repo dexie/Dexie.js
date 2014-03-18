@@ -68,10 +68,10 @@
     });
 
 
-    asyncTest("equalsAnyOf()", function () {
+    asyncTest("anyOf()", function () {
         db.transaction("r", [db.files, db.folders], function (files, folders, transaction) {
 
-            files.where("filename").equalsAnyOf("hello", "hello-there", "README", "gösta").toArray(function (a) {
+            files.where("filename").anyOf("hello", "hello-there", "README", "gösta").toArray(function (a) {
                 equal(a.length, 3, "Should find 3 files");
                 equal(a[0].filename, "README", "First match is README because capital R comes before lower 'h' in lexical sort");
                 equal(a[1].filename, "hello", "Second match is hello");

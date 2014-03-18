@@ -487,7 +487,7 @@
                 error = new RangeError("Invalid mode. Only 'readonly'/'r' or 'readwrite'/'rw' are valid modes.");
             }
             tf.dexieTrans = trans;
-            if (!db) {
+            if (!db && !dbOpenError) {
                 pausedTransactionFactories.push(tf.pause());
             }
             var args = storeNames.map(function (name) { return trans[name]; });
@@ -940,7 +940,7 @@
                     
                     return fail(new Collection(this), new Error("Not implemented"));
                 },
-                equalsAnyOf: function (valueArray) {
+                anyOf: function (valueArray) {
                     var set = getSortedSet(arguments); 
                     var c = new this._ctx.collClass(this);
                     var sorter = ascending;
