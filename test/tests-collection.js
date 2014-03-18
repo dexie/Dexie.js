@@ -75,20 +75,8 @@
         start();
     });
     asyncTest("modify", function () {
-        var t = db.transaction("rw", db.users);
-        t.complete(function () { start(); });
-        t.error(function (e) {
-            ok(false, "Error: " + e.message);
-            start();
-        });
-        t.users.orderBy("first").desc().limit(1).modify({ helloMessage: function (user) { return "Hello " + user.first; } }).then(function () {
-            t.users.orderBy("first").desc().toArray(function (a) {
-                equal(a[0].first, "Karl", "First item is Karl");
-                equal(a[0].helloMessage, "Hello Karl", "Karl got helloMessage 'Hello Karl'");
-                equal(a[1].first, "David", "Second item is David");
-                ok(!a[1].helloMessage, "David was not modified due to limit()");
-            });
-        });
+        ok(false, "Not implemented");
+        start();
     });
     asyncTest("delete", function () {
         ok(false, "Not implemented");

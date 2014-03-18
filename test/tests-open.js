@@ -48,7 +48,7 @@ asyncTest("open, add and query data using transaction", function () {
         start();
     });
 
-    db.transaction("rw", db.employees).try(function (employees) {
+    db.transaction("rw", db.employees, function (employees) {
 
         // Add employee
         employees.add({ first: "David", last: "Fahlander" });

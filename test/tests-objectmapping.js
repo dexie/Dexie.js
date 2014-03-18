@@ -26,6 +26,7 @@ asyncTest("defineClass", function () {
                 .then(function () {
                     db.friends.where("age").above(65).each(function (friend) {
                         console.log("Retired friend: " + friend.name);
+                        console.info("All DONE!");
                     }).catch(function (error) {
                         console.error(error);
                     });
@@ -36,15 +37,32 @@ asyncTest("defineClass", function () {
             console.error(error);
         });
 
-    db.transaction("rw", db.friends).try(function (friends) {
+    db.transaction("rw", db.friends, function (friends) {
         friends.add({ name: "Ulla Bella", age: 87, isCloseFriend: false });
         friends.add({ name: "Elna", age: 99, isCloseFriend: true });
         friends.where("age").above(65).each(function (friend) {
             console.log("Retired friend: " + friend.name);
         });
-    }).catch(function (e) {
-        console.error(e);
+    }).catch(function (error) {
+        console.error(error);
     });
+
+    db.transaction("rw", [db.friends, db.family], function (friends, family) {
+
+    }).catch(function (e) {
+
+    });
+
+    db.transaction("rw", db.friends, function (friends) {
+        friends.add({ name: "Ulla Bella", age: 87, isCloseFriend: false });
+        friends.add({ name: "Elna", age: 99, isCloseFriend: true });
+        friends.where("age").above(65).each(function (friend) {
+            console.log("Retired friend: " + friend.name);
+        });
+    }).catch(function (error) {
+        console.error(error);
+    });
+
 
     var transaction = db.transaction("rw", db.friends);
     transaction.friends.add({ name: "Ulla Bella", age: 87, isCloseFriend: false });

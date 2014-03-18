@@ -72,8 +72,7 @@
 
 
     asyncTest("equalsAnyOf()", function () {
-        db.transaction("r", db.files, db.folders).try(function (files, folders) {
-            var transaction = this;
+        db.transaction("r", [db.files, db.folders], function (files, folders, transaction) {
 
             files.where("filename").equalsAnyOf("hello", "hello-there", "README", "gösta").toArray(function (a) {
                 equal(a.length, 3, "Should find 3 files");
@@ -125,7 +124,7 @@
                 return file;
             });
 
-            db.transaction("rw", db.files).try(function (files) {
+            db.transaction("rw", db.files, function (files) {
                 fileArray.forEach(function (file) {
                     files.add(file);
                 });
@@ -163,7 +162,7 @@
                 return file;
             });
 
-            db.transaction("rw", db.files).try(function (files) {
+            db.transaction("rw", db.files, function (files) {
 
                 fileArray.forEach(function (file) {
                     files.add(file);
@@ -188,48 +187,50 @@
     });
 
     asyncTest("equalsIgnoreCase() 3 (first key shorter than needle)", function () {
-        var t = db.transaction("rw", db.files);
-        t.files.clear();
-        t.files.add({ filename: "Hello-there-", folderId: 1 });
-        t.files.add({ filename: "hello-there-", folderId: 1 });
-        t.files.add({ filename: "hello-there-everyone", folderId: 1 });
-        t.files.add({ filename: "hello-there-everyone-of-you!", folderId: 1 });
-        // Ascending
-        t.files.where("filename").equalsIgnoreCase("hello-there-everyone").toArray(function (a) {
-            equal(a.length, 1, "Should find one file");
-            equal(a[0].filename, "hello-there-everyone", "First file is " + a[0].filename);
-        });
-        // Descending
-        t.files.where("filename").equalsIgnoreCase("hello-there-everyone").desc().toArray(function (a) {
-            equal(a.length, 1, "Should find one file");
-            equal(a[0].filename, "hello-there-everyone", "First file is " + a[0].filename);
-        });
-        t.on("complete", start);
-        t.on("error", function (e) {
-            ok(false, e);
+        db.transaction("rw", db.files, function (files, t) {
+            files.clear();
+            files.add({ filename: "Hello-there-", folderId: 1 });
+            files.add({ filename: "hello-there-", folderId: 1 });
+            files.add({ filename: "hello-there-everyone", folderId: 1 });
+            files.add({ filename: "hello-there-everyone-of-you!", folderId: 1 });
+            // Ascending
+            files.where("filename").equalsIgnoreCase("hello-there-everyone").toArray(function (a) {
+                equal(a.length, 1, "Should find one file");
+                equal(a[0].filename, "hello-there-everyone", "First file is " + a[0].filename);
+            });
+            // Descending
+            files.where("filename").equalsIgnoreCase("hello-there-everyone").desc().toArray(function (a) {
+                equal(a.length, 1, "Should find one file");
+                equal(a[0].filename, "hello-there-everyone", "First file is " + a[0].filename);
+            });
+            t.on("complete", start);
+            t.on("error", function (e) {
+                ok(false, e);
+            });
         });
     });
 
     asyncTest("startsWithIgnoreCase()", function () {
-        var t = db.transaction("r", db.folders);
+        db.transaction("r", db.folders, function (folders, t) {
 
-        t.folders.count(function (count) {
-            ok(true, "Number of folders in database: " + count);
-            t.folders.where("path").startsWithIgnoreCase("/").toArray(function (a) {
-                equal(a.length, count, "Got all folder objects because all of them starts with '/'");
+            folders.count(function (count) {
+                ok(true, "Number of folders in database: " + count);
+                folders.where("path").startsWithIgnoreCase("/").toArray(function (a) {
+                    equal(a.length, count, "Got all folder objects because all of them starts with '/'");
+                });
             });
-        });
 
-        t.folders.where("path").startsWithIgnoreCase("/usr").toArray(function (a) {
-            equal(a.length, 6, "6 folders found: " + a.map(function(folder){return '"' + folder.path + '"'}).join(', '));
-        });
+            folders.where("path").startsWithIgnoreCase("/usr").toArray(function (a) {
+                equal(a.length, 6, "6 folders found: " + a.map(function (folder) { return '"' + folder.path + '"' }).join(', '));
+            });
 
-        t.complete(function () {
-            ok(true, "Transaction complete");
-            start();
-        }).error(function (e) {
-            ok(false, e);
-            start();
+            t.complete(function () {
+                ok(true, "Transaction complete");
+                start();
+            }).error(function (e) {
+                ok(false, e);
+                start();
+            });
         });
     });
 

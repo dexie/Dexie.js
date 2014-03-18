@@ -149,7 +149,7 @@
                 // Populate data
                 var tf = new MultireqTransactionFactory(trans);
                 var t = new WriteableTransaction(tf, trans.db.objectStoreNames);
-                tf.sfdbTrans = t;
+                tf.dexieTrans = t;
                 t.on("error", function (e) {
                     // Forward descriptive error messages to database.error and not just the default errors from IDB (which are not so descriptive)
                     database.on("error").fire("Failed to populate database: " + e);
@@ -223,7 +223,7 @@
                             queue.push(function (trans, cb) {
                                 var tf = new FinishableTransactionFactory(trans);
                                 var t = new WriteableTransaction(trans, tf, trans.db.objectStoreNames);
-                                tf.sfdbTrans = t;
+                                tf.dexieTrans = t;
                                 tf.onfinish = cb;
                                 t.on("error", function (e) {
                                     // Forward descriptive error messages to database.error and not just the default errors from IDB (which are not so descriptive)
@@ -437,14 +437,15 @@
             database.on("error").fire(new ErrorEvent());
         });
 
-        this.transaction = function (mode, tableInstances) {
+        this.transaction = function (mode, tableInstances, scopeFunc) {
             /// <summary>
             /// 
             /// </summary>
             /// <param name="mode" type="String">"r" for readonly, or "rw" for readwrite</param>
-            /// <param name="tableInstances" type="WriteableTable" parameterArray="true">Table instances to include in transaction, or strings representing the table names</param>
+            /// <param name="tableInstances">Table instance, Array of Table instances, String or String Array of object stores to include in the transaction</param>
+            /// <param name="scopeFunc" type="Function">Function to execute with transaction</param>
 
-            var tables = tableInstances instanceof Array ? tableInstances : Array.prototype.slice.call(arguments, 1);
+            var tables = Array.isArray(tableInstances) ? tableInstances : [tableInstances];
             var error = null;
             var storeNames = tables.map(function (tableInstance) {
                 if (typeof (tableInstance) == "string") {
@@ -455,22 +456,35 @@
                     return tableInstance._name;
                 }
             });
-            var tf, t;
+            var tf, trans;
             if (mode == R || mode == "r") {
                 tf = new MultireqTransactionFactory(storeNames, R);
-                t = new Transaction(tf, storeNames);
+                trans = new Transaction(tf, storeNames);
             } else if (mode == RW || mode == "rw") {
                 tf = new MultireqTransactionFactory(storeNames, RW);
-                t = new WriteableTransaction(tf, storeNames);
+                trans = new WriteableTransaction(tf, storeNames);
             } else {
                 error = new RangeError("Invalid mode. Only 'readonly'/'r' or 'readwrite'/'rw' are valid modes.");
             }
-            tf.sfdbTrans = t;
-            if (error) t._ctx.error = error; // Make try() fail with this error
+            tf.dexieTrans = trans;
             if (!db) {
                 pausedTransactionFactories.push(tf.pause());
             }
-            return t;
+            var args = storeNames.map(function (name) { return trans[name]; });
+            args.push(trans);
+
+            return new Promise(function (resolve, reject) {
+                if (error) reject(error);
+                else {
+                    trans.complete(resolve).error(reject);
+                    try {
+                        scopeFunc.apply(null, args);
+                    } catch (e) {
+                        trans.abort();
+                        reject(e);
+                    }
+                }
+            });
         }
 
         this.table = function (tableName) {
@@ -722,28 +736,12 @@
             this.complete = function (cb) {return this.on("complete", cb);}
             this.error = function (cb) { return this.on("error", cb); }
 
-            tf.sfdbTrans = this;
+            tf.dexieTrans = this;
 
             setApiOnPlace(this, tf, tableClass || Table, storeNames);
         }
 
         derive(Transaction).from(Dexie.Transaction).extend({
-            'try': function (fn) {
-                var self = this;
-                var args = self._ctx.storeNames.map(function (name) { return self[name]; });
-                return new Promise(function (resolve, reject) {
-                    if (self._ctx.error) reject(self._ctx.error);
-                    else {
-                        self.complete(resolve).error(reject);
-                        try {
-                            fn.apply(self, args);
-                        } catch (e) {
-                            self.abort();
-                            reject(e);
-                        }
-                    }
-                });
-            },
             abort: function () {
                 if (this._ctx.tf.trans && !this._ctx.tf.inactive) try {
                     this._ctx.tf.inactive = true;
@@ -1386,7 +1384,7 @@
 
         function MultireqTransactionFactory(storeNamesOrTrans, mode) {
             TransactionFactory.call(this);
-            this.sfdbTrans = null;
+            this.dexieTrans = null;
             this.trans = (storeNamesOrTrans instanceof IDBTransaction ? storeNamesOrTrans : null);
             this.storeNames = this.trans ? null : storeNamesOrTrans;
             this.mode = mode || null;
@@ -1400,11 +1398,11 @@
                 if (this.trans) return this.trans;
                 var self = this;
                 this.trans = db.transaction(this.storeNames, this.mode);
-                this.trans.onerror = this.sfdbTrans.on("error").fire;
-                this.trans.onabort = this.sfdbTrans.on("abort").fire;
-                this.trans.oncomplete = this.sfdbTrans.on("complete").fire;
-                this.sfdbTrans.on("abort", function () { self.inactive = true; });
-                this.sfdbTrans.on("complete", function () { self.inactive = true; });
+                this.trans.onerror = this.dexieTrans.on("error").fire;
+                this.trans.onabort = this.dexieTrans.on("abort").fire;
+                this.trans.oncomplete = this.dexieTrans.on("complete").fire;
+                this.dexieTrans.on("abort", function () { self.inactive = true; });
+                this.dexieTrans.on("complete", function () { self.inactive = true; });
                 return this.trans;
             },
             createPromise: function (fn) {
@@ -1413,8 +1411,8 @@
                 var p = baseClass.prototype.createPromise.call(this, fn);
                 p.onuncatched = function (e) {
                     // Bubble to transaction
-                    self.sfdbTrans.on("error").fire(e);
-                    self.sfdbTrans.abort();
+                    self.dexieTrans.on("error").fire(e);
+                    self.dexieTrans.abort();
                 }
                 return p;
             },

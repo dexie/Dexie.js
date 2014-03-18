@@ -56,7 +56,7 @@
     });
 
     asyncTest("where", function () {
-        db.transaction("r", db.users).try(function (users) {
+        db.transaction("r", db.users, function (users) {
             users.where("username").equals("kceder").first(function (user) {
                 equal(user.first, "Karl", "where().equals()");
             }),
@@ -151,8 +151,7 @@
         }).finally(start);
     });
     asyncTest("limit(),orderBy(),modify(), abort(), desc()", function () {
-        db.transaction("rw", db.users)
-          .try(function (users) {
+        db.transaction("rw", db.users, function (users) {
               // Modify first found user with a helloMessage
               users.orderBy("first").desc().limit(1).modify({
                   helloMessage: function (user) { return "Hello " + user.first; }
@@ -186,7 +185,7 @@
     });
 
     asyncTest("put", function () {
-        db.transaction("rw", db.users).try(function (users) {
+        db.transaction("rw", db.users, function (users) {
             var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
             users.put(newUser).then(function (id) {
                 equal(id, 3, "Got id 3 because we didnt supply an id");
@@ -201,7 +200,7 @@
     });
 
     asyncTest("add", function () {
-        db.transaction("rw", db.users).try(function (users) {
+        db.transaction("rw", db.users, function (users) {
             var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
 
             users.add(newUser).then(function (id) {
@@ -232,7 +231,7 @@
     });
     asyncTest("delete(using transaction)", function() {
         // With transaction
-        db.transaction("rw", db.users).try(function (users) {
+        db.transaction("rw", db.users, function (users) {
             users.get(1, function (user) {
                 notEqual(user, null, "User with id 1 exists");
             });
@@ -245,7 +244,7 @@
         }).finally(start);
     });
     asyncTest("clear", function () {
-        db.transaction("rw", "users").try(function (users) {
+        db.transaction("rw", "users", function (users) {
             users.count(function (count) {
                 equal(count, 2, "There are 2 items in database before clearing it");
             });
