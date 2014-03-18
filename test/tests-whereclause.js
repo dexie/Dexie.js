@@ -55,18 +55,16 @@
         setup: function () {
             stop();
             db.delete().then(function () {
-                db.open().error(function (e) {
+                db.open().catch(function (e) {
                     ok(false, "Error opening database: " + e);
-                    start();
-                }).ready(start);
+                }).finally(start);
             }).catch(function (e) {
-                ok(false, "Could not delete database: " + e);
+                ok(false, "Error deleting database: " + e);
                 start();
             });
         },
         teardown: function () {
-            stop();
-            db.delete().then(start);
+            stop(); db.delete().finally(start);
         }
     });
 

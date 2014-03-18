@@ -399,7 +399,9 @@
                 });
                 pausedTransactionFactories = [];
             }
-            return this;
+            return new Promise(function (resolve, reject) {
+                database.ready(resolve).error(reject);
+            });
         }
 
         this.close = function () {

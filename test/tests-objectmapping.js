@@ -101,18 +101,16 @@ asyncTest("defineClass", function () {
         setup: function () {
             stop();
             db.delete().then(function () {
-                db.open().ready(function () {
-                    start();
-                });
-                db.error(function (e) {
-                    ok(false, "Error: " + e);
-                });
+                db.open().catch(function (e) {
+                    ok(false, "Error opening database: " + e);
+                }).finally(start);
             }).catch(function (e) {
-                ok(false, "Could not delete database");
+                ok(false, "Error deleting database: " + e);
+                start();
             });
         },
         teardown: function () {
-            stop(); db.delete().then(start);
+            stop(); db.delete().finally(start);
         }
     });
 

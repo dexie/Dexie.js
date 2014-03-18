@@ -20,20 +20,16 @@
         setup: function () {
             stop();
             db.delete().then(function () {
-                db.open().ready(function () {
-                    start();
-                });
-                db.error(function (e) {
-                    ok(false, "Error: " + e);
-                    start();
-                });
+                db.open().catch(function (e) {
+                    ok(false, "Error opening database: " + e);
+                }).finally(start);
             }).catch(function (e) {
-                ok(false, "Could not delete database");
+                ok(false, "Error deleting database: " + e);
                 start();
             });
         },
         teardown: function () {
-            db.delete();
+            stop(); db.delete().finally(start);
         }
     });
 });
