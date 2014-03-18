@@ -20,9 +20,8 @@
         setup: function () {
             stop();
             db.delete().then(function () {
-                db.open().catch(function (e) {
-                    ok(false, "Error opening database: " + e);
-                }).finally(start);
+                db.open();
+                start();
             }).catch(function (e) {
                 ok(false, "Error deleting database: " + e);
                 start();

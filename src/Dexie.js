@@ -24,12 +24,14 @@
         var versions = [];
         ///<var type="IDBDatabase" />
         var db = null;
+        var dbOpenError = null;
+        var isBeingOpened = false;
         var R = "readonly", RW = "readwrite";
         var iewa; // IE WorkAound needed in IE10 & IE11 for http://connect.microsoft.com/IE/feedback/details/783672/indexeddb-getting-an-aborterror-exception-when-trying-to-delete-objectstore-inside-onupgradeneeded
         var database = this;
         var mainTransactionFactory;
         var pausedTransactionFactories = [];
-        var use_proto = (function(){function F(){}; var a = new F(); try {a.__proto__ = Object.prototype; return !(a instanceof F)} catch(e){return false;}})()
+        var use_proto = (function () { function F() { }; var a = new F(); try { a.__proto__ = Object.prototype; return !(a instanceof F) } catch (e) { return false; } })()
 
         function init() {
             mainTransactionFactory = new TransactionFactory().pause();
@@ -377,12 +379,19 @@
                 if (!ver._cfg.tableSchema) ver._cfg.tableSchema = prev._cfg.tableSchema;
                 return ver;
             });
-
-            //setApiOnPlace(this, mainTransactionFactory, WriteableTable, Object.keys(dbTableSchema));
+            
+            dbOpenError = null;
+            isBeingOpened = true;
 
             var req = indexedDB.open(dbName, dbVersion * 10); // Multiply with 10 will be needed to workaround various bugs in different implementations of indexedDB.
             req.onerror = function (e) {
+                isBeingOpened = false;
+                dbOpenError = e.target.error;
                 database.on("error").fire(e.target.error);
+                pausedTransactionFactories.forEach(function (tf) {
+                    // Resume all stalled operations. They will fail once they wake up.
+                    tf.resume();
+                });
             }
             req.onupgradeneeded = function (e) {
                 req.transaction.onerror = function (e) {
@@ -391,6 +400,7 @@
                 runUpgraders(e.oldVersion / 10, req.transaction);
             }
             req.onsuccess = function (e) {
+                isBeingOpened = false;
                 db = req.result;
                 database.on("ready").fire(e);
                 pausedTransactionFactories.forEach(function (tf) {
@@ -410,15 +420,23 @@
                 pausedTransactionFactories.push(mainTransactionFactory.pause());
                 this.on(["ready", "error"]).reset();
                 db = null;
+                dbOpenError = null;
             }
         }
 
         this.delete = function () {
-            this.close();
             return new Promise(function (resolve, reject) {
-                var req = indexedDB.deleteDatabase(dbName);
-                req.onsuccess = resolve;
-                req.onerror = reject;
+                function doDelete() {
+                    database.close();
+                    var req = indexedDB.deleteDatabase(dbName);
+                    req.onsuccess = resolve;
+                    req.onerror = reject;
+                }
+                if (isBeingOpened) {
+                    database.ready(doDelete).error(doDelete);
+                } else {
+                    doDelete();
+                }
             });
         }
 
@@ -1348,7 +1366,7 @@
 
         extend(TransactionFactory.prototype, {
             create: function (tableName, mode) {
-                if (!db) throw new Error ("Database not open");
+                if (!db) throw dbOpenError;
                 return db.transaction(tableName, mode || R);
             },
             oneshot: true,
