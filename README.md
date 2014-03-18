@@ -38,6 +38,12 @@ Tutorial
 --------
 https://github.com/dfahlander/Dexie.js/wiki/Tutorial
 
+Hello World Example
+-------------------
+https://github.com/dfahlander/Dexie.js/wiki/Hello%20World
+
 Wiki Home
 ---------
 https://github.com/dfahlander/Dexie.js/wiki/Dexie.js
+
+
