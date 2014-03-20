@@ -200,11 +200,9 @@
                 equal(a.length, 1, "Should find one file");
                 equal(a[0].filename, "hello-there-everyone", "First file is " + a[0].filename);
             });
-            t.on("complete", start);
-            t.on("error", function (e) {
-                ok(false, e);
-            });
-        });
+        }).catch(function (e) {
+            ok(false, e);
+        }).finally(start);
     });
 
     asyncTest("startsWithIgnoreCase()", function () {
@@ -221,14 +219,46 @@
                 equal(a.length, 6, "6 folders found: " + a.map(function (folder) { return '"' + folder.path + '"' }).join(', '));
             });
 
-            t.complete(function () {
-                ok(true, "Transaction complete");
-                start();
-            }).error(function (e) {
-                ok(false, e);
-                start();
-            });
+        }).then(function(){
+            ok(true, "Transaction complete");
+        }).catch(function(e) {
+            ok(false, e);
+        }).finally(function () {
+            start();
         });
     });
+
+    asyncTest("queryingNonExistingObj", function () {
+        db.files.where("filename").equals("fdsojifdsjoisdf").toArray(function (a) {
+            equal(a.length, 0, "File fdsojifdsjoisdf was not found");
+        }).catch(function (e) {
+            ok(false, e);
+        }).finally(start);
+    });
+
+    /*asyncTest("empty", function () {
+        db.transaction("rw", [db.files, db.folders], function (files, folders) {
+            files.add({ filename: "readmeDotEmpty", extension: "", folderId: 1 });
+            files.add({ filename: "readmeDotNothing", folderId: 1 });
+            files.add({ filename: "readmeDotUndefined", extension: undefined, folderId: 1 });
+            files.add({ filename: "readmeDotNull", extension: null, folderId: 1 });
+            files.add({ filename: "readmeDotZero", extension: 0, folderId: 1 });
+            files.add({ filename: "readmeDotOne", extension: 1, folderId: 1 });
+            files.add({ filename: "readmeDotDate", extension: new Date(), folderId: 1 });
+            files.add({ filename: "readmeDotTxt", extension: ".txt", folderId: 1 });
+            files.where("extension").empty().toArray(function (a) {
+                ok(a.some(function (f) { return f.filename === "readmeDotEmpty"; }), "Found readmeDotEmpty");
+                ok(a.some(function (f) { return f.filename === "readmeDotNothing"; }), "Found readmeDotNothing");
+                ok(a.some(function (f) { return f.filename === "readmeDotUndefined"; }), "Found readmeDotUndefined");
+                ok(!a.some(function (f) { return f.filename === "readmeDotOne"; }), "Not found readmeDotOne");
+                ok(!a.some(function (f) { return f.filename === "readmeDotDate"; }), "Not found readmeDotDate");
+                ok(!a.some(function (f) { return f.filename === "readmeDotDate"; }), "Not found readmeDotDate");
+            });
+        }).catch(function(e) {
+            ok(false, e);
+        }).finally(function () {
+            start();
+        });
+    });*/
 
 })();

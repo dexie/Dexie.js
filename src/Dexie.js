@@ -420,6 +420,10 @@
             });
         }
 
+        this._backendDB = function () {
+            return db;
+        }
+
         this.close = function () {
             if (db) {
                 db.close();
@@ -653,9 +657,9 @@
                 ///   Add an object to the database but in case an object with same primary key alread exists, the existing one will get updated.
                 /// </summary>
                 /// <param name="obj" type="Object">A javascript object to insert or update</param>
-                return this._wrop("put", [obj], function (e) {
-                    var keyPath = e.target.source.keyPath;
-                    if (keyPath) obj[keyPath] = e.target.result;
+                return this._wrop("put", [obj], function (ev) {
+                    var keyPath = ev.target.source.keyPath;
+                    if (keyPath) obj[keyPath] = ev.target.result;
                 }, ["putting", obj, "into", this._name]);
             },
             add: function (obj) {
@@ -663,9 +667,9 @@
                 ///   Add an object to the database. In case an object with same primary key already exists, the object will not be added.
                 /// </summary>
                 /// <param name="obj" type="Object">A javascript object to insert</param>
-                return this._wrop("add", [obj], function (e) {
-                    var keyPath = e.target.source.keyPath;
-                    if (keyPath) obj[keyPath] = e.target.result;
+                return this._wrop("add", [obj], function (ev) {
+                    var keyPath = ev.target.source.keyPath;
+                    if (keyPath) obj[keyPath] = ev.target.result;
                 }, ["adding", obj, "into", this._name]);
             },
             'delete': function (key) {
@@ -676,10 +680,10 @@
                 return this._wrop("clear", [], null, ["clearing", this._name]);
             },
             where: function (indexName) {
-                return new WhereClause(this._tf, this._name, indexName, true);
+                return new WhereClause(this._tf, this._name, indexName, WriteableCollection);
             },
             modify: function (changes) {
-                return new WriteableCollection(new WhereClause(this._tf, this._name, null, true)).modify(changes);
+                return new WriteableCollection(new WhereClause(this._tf, this._name, null, WriteableCollection)).modify(changes);
             }
         });
 
@@ -802,7 +806,7 @@
         //
         //
 
-        function WhereClause(tf, table, index, writeable) {
+        function WhereClause(tf, table, index, collectionClass, orCollection) {
             /// <param name="tf" type="TransactionFactory"></param>
             /// <param name="table" type="String"></param>
             /// <param name="index" type="String"></param>
@@ -810,7 +814,8 @@
                 tf: tf,
                 table: table,
                 index: index,
-                collClass: writeable ? WriteableCollection : Collection
+                collClass: collectionClass || Collection,
+                or: orCollection
             }
         }
 
@@ -852,7 +857,7 @@
                 return (llp < 0 ? null : key.substr(0, llp) + lowerNeedle[llp] + upperNeedle.substr(llp + 1));
             }
 
-            function addIgnoreCaseFilter(c, match, needle) {
+            function addIgnoreCaseAlgorithm(c, match, needle) {
                 /// <param name="needle" type="String"></param>
                 var upper, lower, compare, upperNeedle, lowerNeedle, direction;
                 function initDirection(dir) {
@@ -868,7 +873,7 @@
                     // This event onlys occur before filter is called the first time.
                     initDirection(direction);
                 };
-                c._addFilter(function (cursor, advance, resolve) {
+                c._addAlgorithm(function (cursor, advance, resolve) {
                     /// <param name="cursor" type="IDBCursor"></param>
                     /// <param name="advance" type="Function"></param>
                     /// <param name="resolve" type="Function"></param>
@@ -930,21 +935,20 @@
                     var upper = str.substr(0, str.length - 1) + String.fromCharCode(str.charCodeAt(str.length - 1) + 1);
                     return this.between(str, upper, true, false);
                 },
+                equalsIgnoreCase: function (str) {
+                    /// <param name="str" type="String"></param>
+                    if (typeof (str) != 'string') return fail(new Collection(this), new TypeError("String expected"));
+                    var c = new this._ctx.collClass(this);
+                    addIgnoreCaseAlgorithm(c, function (a, b) { return a === b; }, str);
+                    return c;
+                },
                 startsWithIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
                     if (typeof (str) != 'string') return fail (new Collection(this), new TypeError("String expected"));
                     var c = new this._ctx.collClass(this);
-                    addIgnoreCaseFilter(c, function (a, b) { return a.indexOf(b) === 0; }, str);
+                    addIgnoreCaseAlgorithm(c, function (a, b) { return a.indexOf(b) === 0; }, str);
                     c._ondirectionchange = function () { fail(c, new Error("desc() not supported with WhereClause.startsWithIgnoreCase()")); };
                     return c;
-                },
-                startsWithAnyOf: function (stringArray) {
-                    /// <param name="stringArray" type="Array" elementType="String"></param>
-                    var set = getSortedSet(arguments);
-                    var c = new this._ctx.collClass(this);
-                    var sorter = ascending;
-                    
-                    return fail(new Collection(this), new Error("Not implemented"));
                 },
                 anyOf: function (valueArray) {
                     var set = getSortedSet(arguments); 
@@ -955,7 +959,7 @@
                         set.sort(sorter);
                     };
                     var i = 0;
-                    c._addFilter(function (cursor, advance, resolve) {
+                    c._addAlgorithm(function (cursor, advance, resolve) {
                         var key = cursor.key;
                         while (sorter(key, set[i]) > 0) {
                             // The cursor has passed beyond this key. Check next.
@@ -977,16 +981,6 @@
                         }
                     });
                     return c;
-                },
-                equalsIgnoreCase: function (str) {
-                    /// <param name="str" type="String"></param>
-                    if (typeof (str) != 'string') return fail(new Collection(this), new TypeError("String expected"));
-                    var c = new this._ctx.collClass(this);
-                    addIgnoreCaseFilter(c, function (a, b) { return a === b; }, str);
-                    return c;
-                },
-                betweenAnyOf: function (ranges) {
-                    return fail(new Collection(this), "Not implemented");
                 }
             });
         })();
@@ -1017,22 +1011,26 @@
                 op: "openCursor",
                 dir: "next",
                 unique: "",
+                algorithm: null,
                 filter: null,
                 limit: Infinity,
                 /// <field type="IDBTransaction" />
                 trans: null,
                 oneshot: whereCtx.tf.oneshot,
                 error: null, // If set, any promise must be rejected with this error
+                or: whereCtx.or
             }
         }
 
-        derive(Collection).from(Dexie.Collection).extend ({
+        derive(Collection).from(Dexie.Collection).extend({
             _addFilter: function (fn) {
                 var ctx = this._ctx;
-                if (!ctx.filter) ctx.filter = fn; else {
-                    var prevFilter = ctx.filter;
-                    ctx.filter = function () { return prevFilter.apply(this, arguments) && fn.apply(this, arguments); };
-                }
+                ctx.filter = combine(ctx.filter, fn);
+            },
+
+            _addAlgorithm: function (fn) {
+                var ctx = this._ctx;
+                ctx.algorithm = combine(ctx.algorithm, fn);
             },
 
             _getIndexOrStore: function (mode) {
@@ -1058,16 +1056,49 @@
                 }
             },
 
+            _iterate: function (fn, resolve, reject, mode) {
+                var self = this,
+                    ctx = this._ctx,
+                    mappedClass = database[ctx.table]._mappedClass;
+                
+                if (!ctx.or) {
+                    iterate(this._openCursor(mode), combine(ctx.algorithm, ctx.filter), fn, resolve, reject, mappedClass && mappedClass.prototype);
+                } else {
+                    (function () {
+                        var filter = ctx.filter;
+                        var set = {};
+                        var primKey = dbTableSchema[ctx.table].primKey.keyPath;
+                        var resolved = 0;
+
+                        function resolveboth() {
+                            if (++resolved === 2) resolve(); // Seems like we just support or btwn max 2 expressions, but there are no limit because we do recursion.
+                        }
+
+                        function union(item, cursor, advance) {
+                            if (!filter || filter(cursor, advance, resolveboth, reject)) {
+                                var key = JSON.stringify(item[primKey]);
+                                if (!set[key]) {
+                                    set[key] = true;
+                                    fn(item, cursor, advance);
+                                }
+                            }
+                        }
+
+                        ctx.or._iterate(union, resolveboth, reject, mode);
+                        iterate(self._openCursor(mode), ctx.algorithm, union, resolveboth, reject, mappedClass && mappedClass.prototype);
+                    })();
+                }
+            },
+
             each: function (fn) {
                 var self = this,
                     ctx = this._ctx;
 
-                fake(function () { fn(getInstanceTemplate(ctx.table,ctx));});
+                fake(function () { fn(getInstanceTemplate(ctx.table)); });
 
                 return this._promise(function (resolve, reject) {
-                    var mappedClass = database[ctx.table]._mappedClass;
-                    iterate(self._openCursor(), ctx.filter, fn, resolve, reject, mappedClass && mappedClass.prototype);
-                }, fn);
+                    self._iterate(fn, resolve, reject);
+                });
             },
 
             count: function (cb) {
@@ -1075,12 +1106,11 @@
                 var self = this,
                     ctx = this._ctx;
 
-                if (this._ctx.filter) {
-                    // When filters are applied, we must count manually
+                if (ctx.filter || ctx.or) {
+                    // When filters are applied or 'ored' collections are used, we must count manually
                     var count = 0;
-                    this._addFilter(function () { ++count; return false; });
                     return this._promise(function (resolve, reject) {
-                        iterate(self._openCursor(), ctx.filter, null, function () {resolve(count);}, reject);
+                        self._iterate(function () { ++count; return false; }, function () { resolve(count); }, reject);
                     }, cb);
                 } else {
                     // Otherwise, we can use the count() method if the index.
@@ -1095,19 +1125,39 @@
                 }
             },
 
+            sortBy: function (keyPath, cb) {
+                /// <param name="keyPath" type="String"></param>
+                var ctx = this._ctx;
+                fake(function () { cb([getInstanceTemplate(ctx.table)]); });
+                var parts = keyPath.split('.').reverse(),
+                    lastPart = parts[0],
+                    lastIndex = parts.length - 1;
+                function getval(obj, i) {
+                    if (i) return getval(obj[parts[i]], i - 1);
+                    return obj[lastPart];
+                }
+                var order = this._ctx.dir === "next" ? 1 : -1;
+                
+                function sorter (a, b) {
+                    var aVal = getval(a, lastIndex),
+                        bVal = getval(b, lastIndex);
+                    return aVal < bVal ? -order : aVal > bVal ? order : 0;
+                }
+                return this.toArray(function (a) {
+                    return a.sort(sorter);
+                }).then(cb);
+            },
+
             toArray: function (cb) {
                 var self = this,
                     ctx = this._ctx;
-                fake(function () { cb([getInstanceTemplate(ctx.table, ctx)]); });
+                fake(function () { cb([getInstanceTemplate(ctx.table)]); });
 
                 return this._promise(function (resolve, reject) {
-                    if (ctx.error)
-                        reject(ctx.error);
-                    else {
-                        var a = [];
-                        var mappedClass = database[ctx.table]._mappedClass;
-                        iterate(self._openCursor(), ctx.filter, function (item) { a.push(item); }, function () { resolve(a); }, reject, mappedClass && mappedClass.prototype);
-                    }
+                    var a = [];
+                    self._iterate(function (item) { a.push(item); }, function arrayComplete() {
+                        resolve(a);
+                    }, reject);
                 }, cb);
             },
 
@@ -1122,7 +1172,7 @@
 
             first: function (cb) {
                 var self = this;
-                fake(function () { cb(getInstanceTemplate(self._ctx.table,self._ctx)); });
+                fake(function () { cb(getInstanceTemplate(self._ctx.table)); });
                 return this.limit(1).toArray(function (a) { return a[0] }).then(cb);
             },
 
@@ -1133,11 +1183,15 @@
             and: function (filterFunction) {
                 /// <param name="jsFunctionFilter" type="Function">function(val){return true/false}</param>
                 var self = this;
-                fake(function () { filterFunction(getInstanceTemplate(self._ctx.table, self._ctx)); });
+                fake(function () { filterFunction(getInstanceTemplate(self._ctx.table)); });
                 this._addFilter(function (cursor) {
                     return filterFunction(cursor.value);
                 });
                 return this;
+            },
+
+            or: function (indexName) {
+                return new WhereClause(this._ctx.tf, this._ctx.table, indexName, this.constructor, this);
             },
 
             desc: function () {
@@ -1146,23 +1200,42 @@
                 return this;
             },
 
-            keys: function() {
+            eachKey: function (cb) {
+                var self = this;
+                fake(function () { cb(getInstanceTemplate(self._ctx.table)[self._ctx.index]); });
                 this._ctx.op = "openKeyCursor";
-                return this;
+                return this.each(function (val, cursor) { cb(cursor.key); });
             },
 
-            uniqueKeys: function () {
-                this._ctx.op = "openKeyCursor";
+            eachUniqueKey: function (cb) {
                 this._ctx.unique = "unique";
-                return this;
+                return this.eachKey(cb);
+            },
+
+            keys: function (cb) {
+                fake(function () { cb([getInstanceTemplate(ctx.table)[self._ctx.index]]); });
+                var self = this,
+                    ctx = this._ctx;
+                this._ctx.op = "openKeyCursor";
+                var a = [];
+                return this.each(function (item, cursor) {
+                    a.push(cursor.key);
+                }).then(function () {
+                    return a;
+                }).then(cb);
+            },
+
+            uniqueKeys: function (cb) {
+                this._ctx.unique = "unique";
+                return this.keys(cb);
             },
 
             distinct: function () {
                 var set = {};
-                var primKey = dbTableSchema[this._ctx.table].primKey.keyPath;
                 this._addFilter(function (cursor) {
-                    var found = set[cursor.primaryKey];
-                    set[cursor.primaryKey] = true;
+                    var strKey = JSON.stringify(cursor.primaryKey);
+                    var found = set[strKey];
+                    set[strKey] = true;
                     return !found;
                 });
                 return this;
@@ -1187,9 +1260,8 @@
                     });
                     var count = 0;
 
-                    self._addFilter(function (cursor, advance) {
+                    function modifyItem(item, cursor, advance) {
                         ++count;
-                        var item = cursor.value;
                         for (var i = 0, l = keys.length; i < l; ++i) {
                             item[keys[i]] = getters[i](item);
                         }
@@ -1200,20 +1272,16 @@
                             if (catched && ctx.oneshot) ctx.tf.resume();
                             return catched;
                         }, function () { return ["modifying", item, "on", ctx.table]; });
-                        // No need to listen to onsuccess! What different should it make?! Who to call? notify? Not worth the cost in code exectution. Think of big queries of updating millions of records!
-                        return false; // Make sure fn() is never called because we set it to null!
-                    });
+                    }
 
                     if (ctx.oneshot) {
-                        iterate(self._openCursor(RW), ctx.filter, null, function () {}, reject);
+                        self._iterate(modifyItem, function () { }, reject, RW);
                         ctx.trans.oncomplete = function () { resolve(count); };
                     } else {
-                        iterate(self._openCursor(RW), ctx.filter, null, function () {
+                        self._iterate(modifyItem, function () {
                             ctx.tf.resume();
                             resolve(count);
-                        }, function (e) {
-                            reject(e);
-                        });
+                        }, reject, RW);
                     }
                 });
             },
@@ -1224,24 +1292,25 @@
                 return this._promise(function (resolve, reject) {
                     if (!ctx.oneshot) ctx.tf.pause(); // If in transaction (not oneshot), make next read operation in same transaction wait to execute until we are node modifying. Caller doenst need to wait for then(). Easier code!
                     var count = 0;
-                    self._addFilter(function (cursor) {
+
+                    function deleteItem(item, cursor, advance) {
                         ++count;
                         cursor.delete().onerror = eventRejectHandler(function (e) {
                             advance(function () { }); // Stop iterating
                             var catched = reject(e);
                             if (catched && ctx.oneshot) ctx.tf.resume();
                             return catched;
-                        }, function () { return ["modifying", item, "on", ctx.table]; });
-                        return false;// Make sure fn() is never called because we set it to null!
-                    });
+                        }, function () { return ["deleting", item, "on", ctx.table]; });
+                    }
+
                     if (ctx.oneshot) {
-                        iterate(self._openCursor(RW), ctx.filter, null, function () { }, reject);
+                        self._iterate(deleteItem, function () { }, reject, RW);
                         ctx.trans.oncomplete = function () { resolve(count); };
                     } else {
-                        iterate(self._openCursor(RW), ctx.filter, null, function () {
+                        self._iterate(deleteItem, function () {
                             ctx.tf.resume();
                             resolve(count);
-                        }, reject);
+                        }, reject, RW);
                     }
                 });
             }
@@ -1290,48 +1359,49 @@
             clearTimeout(to);
         }
 
-        function getInstanceTemplate(tableName, collCtx) {
-            return (collCtx && collCtx.op === "openKeyCursor" ? database[tableName]._instanceTemplate[collCtx.index] : database[tableName]._instanceTemplate);
+        function getInstanceTemplate(tableName) {
+            return database[tableName]._instanceTemplate;
         }
 
-        function iterate(req, filter, fn, oncomplete, reject, mappedProto) {
+        function iterate(req, filter, fn, resolve, reject, mappedProto) {
             if (!req.onerror) req.onerror = eventRejectHandler(reject, ["calling openCursor() or openKeyCursor() on", self._name]);
             if (mappedProto) {
                 var origFn = fn;
                 if (use_proto) {
-                    fn = function (val, cursor) {
+                    fn = function (val, cursor, advance) {
                         if (val) val.__proto__ = mappedProto;
-                        origFn(val, cursor);
+                        origFn(val, cursor, advance);
                     }
                 } else {
-                    fn = function (val, cursor) {
+                    fn = function (val, cursor, advance) {
                         if (val) {
                             var rv = Object.create(mappedProto);
                             for (var m in val) rv[m] = val[m];
                             origFn(rv, cursor);
-                        } else origFn(val, cursor);
+                        } else origFn(val, cursor, advance);
                     }
                 }
             }
             if (filter) {
-                req.onsuccess = trycatch(function (e) {
+                req.onsuccess = trycatch(function filter_record (e) {
                     var cursor = e.target.result;
                     if (cursor) {
                         var c = function () { cursor.continue(); };
-                        if (filter(cursor, function (advancer) { c = advancer }, oncomplete, reject)) fn(cursor.value, cursor);
+                        if (filter(cursor, function (advancer) { c = advancer }, resolve, reject)) fn(cursor.value, cursor, function (advancer) { c = advancer });
                         c();
                     } else {
-                        oncomplete();
+                        resolve();
                     }
                 }, reject);
             } else {
-                req.onsuccess = trycatch(function (e) {
+                req.onsuccess = trycatch(function filter_record (e) {
                     var cursor = e.target.result;
                     if (cursor) {
-                        fn(cursor.value, cursor);
-                        cursor.continue();
+                        var c = function () { cursor.continue(); };
+                        fn(cursor.value, cursor, function (advancer) { c = advancer });
+                        c();
                     } else {
-                        oncomplete();
+                        resolve();
                     }
                 }, reject);
             }
@@ -1492,6 +1562,10 @@
             };
         }
 
+        function combine(filter1, filter2) {
+            return filter1 ? filter2 ? function () { return filter1.apply(this, arguments) && filter2.apply(this, arguments) } : filter1 : filter2;
+        }
+
         function eventRejectHandler(reject, sentance) {
             return function (event) {
                 var origErrObj = event.target.error;
@@ -1621,9 +1695,10 @@
     var Promise = (function () {
 
         // The use of asap in handle() is remarked because we must NOT use setTimeout(fn,0) because it causes premature commit of indexedDB transactions - which is according to indexedDB specification.
-        var asap = typeof (setImmediate) === 'undefined' ? function (fn,arg1,arg2,argN) {
-            setTimeout(function () { fn.apply([].slice.call(arguments, 1)) }, 0);// If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
-        } : function (fn) {
+        var asap = typeof (setImmediate) === 'undefined' ? function (fn, arg1, arg2, argN) {
+            var args = arguments;
+            setTimeout(function () { fn.apply(this, [].slice.call(args, 1)) }, 0);// If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
+        } : function (fn, arg1, arg2, argN) {
             setImmediate.apply(this, arguments); // IE10+ and node.
         };
 
@@ -1743,18 +1818,18 @@
         function doResolve(fn, onFulfilled, onRejected) {
             var done = false;
             try {
-                fn(function (value) {
+                fn(function Promise_resolve (value) {
                     if (done) return;
                     done = true;
                     onFulfilled(value);
-                }, function (reason) {
+                }, function Promise_reject (reason) {
                     if (done) return;
                     done = true;
-                    onRejected(reason);
+                    return onRejected(reason);
                 })
             } catch (ex) {
                 if (done) return;
-                onRejected(ex);
+                return onRejected(ex);
             }
         }
 
