@@ -1,5 +1,6 @@
 Dexie.js
 ========
+a bullet proof indexedDB wrapper.
 
 Dexie is a local database API for the browser based on indexedDB.
  * Straight forward API, easy to use.
