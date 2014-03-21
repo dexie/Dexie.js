@@ -8,12 +8,15 @@
         trans.users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
         trans.users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
     });
+    db.on("error", function (e) {
+        ok(false, "An error bubbled out to the db.on('error'). Should not happen because all tests should catch their errors themselves. " + e);
+    });
 
     module("exception-handling", {
         setup: function () {
             stop();
             db.delete().then(function () {
-                db.open();
+                db.open().catch(function (e) { ok(false, "Got bubbled!");});
                 start();
             }).catch(function (e) {
                 ok(false, "Error deleting database: " + e);
@@ -81,6 +84,47 @@
         }).catch(function (e) {
             ok(true, "Transaction got error: " + e);
         }).finally(start);
+    });
+
+    asyncTest("catch-all with db.on('error')", 3, function () {
+        var ourDB = new Dexie("TestDB2");
+        ourDB.version(1).stores({ users: "++id,first,last,&username,&*email,*pets" });
+        ourDB.on("populate", function (trans) {
+            trans.users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
+            trans.users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
+        });
+        var errorCount = 0;
+        ourDB.on("error", function (e) {
+            ok(errorCount < 3, "Uncatched error successfully bubbled to db.on('error'): " + e);
+            if (++errorCount == 3) {
+                ourDB.delete().then(start);
+            }
+        });
+
+        ourDB.open();
+
+        ourDB.transaction("rw", ourDB.users, function (users) {
+            users.add({ username: "dfahlander" }).then(function () {
+                ok(false, "Should not be able to add two users with same username");
+            });
+        }).then(function () {
+            ok(false, "Transaction should not complete since errors wasnt catched");
+        });
+        ourDB.transaction("rw", ourDB.users, function (users) {
+            users.add({ username: "dfahlander" }).then(function () {
+                ok(false, "Should not be able to add two users with same username");
+            });
+        }).then(function () {
+            ok(false, "Transaction should not complete since errors wasnt catched");
+        });
+        ourDB.transaction("rw", ourDB.users, function (users) {
+            users.add({ username: "dfahlander" }).then(function () {
+                ok(false, "Should not be able to add two users with same username");
+            });
+        }).then(function () {
+            ok(false, "Transaction should not complete since errors wasnt catched");
+        });
+
     });
 
 })();

@@ -1,5 +1,5 @@
 ﻿
-(function (window, publish, undefined) {
+(function (window, publish, isBrowser, undefined) {
     /// <summary>
     ///     Straight forward database API - working on top of indexedDB.
     ///     Indended environments: browsers, apps, nodejs.
@@ -26,8 +26,8 @@
 
         var dbTableSchema = null;
         var dbVersion = 0;
-        /// <var type="Array" elementType="Version" />
         var versions = [];
+        var dbStoreNames = [];
         ///<var type="IDBDatabase" />
         var db = null;
         var dbOpenError = null;
@@ -42,6 +42,20 @@
         function init() {
             mainTransactionFactory = new TransactionFactory().pause();
             pausedTransactionFactories.push(mainTransactionFactory);
+            // If browser (not node.js or other), subscribe to versionchange event and reload page
+            if (isBrowser) database.on("versionchange", function (ev) {
+                if (ev.newVersion && ev.newVersion > dbVersion) { // Only reload page if versionchange event isnt a deletion of database. Or if it's triggered with same verno as we already have due to delete/recreate calls.
+                    // Default behavior for versionchange event is to reload the page.
+                    // Caller can override this behavior by doing database.on("versionchange", function(){ return false; });
+                    window.location.reload(true);
+                    /* The logic behind this default handler is:
+                        1. Since this event means that the database is upgraded in another IDBDatabase instance (in tab or window that has a newer version of the code),
+                           it makes sense to reload our page and force reload from cache. When reloaded, we get the newest version of the code - making app in synch with db.
+                        2. There wont be an infinite loop here even if our page still get the old version, becuase the next time onerror will be triggered and not versionchange.
+                        3. If not solving this by default, the API user would be obligated to handle versionchange, and would have to be on place in every example of Dexie code.
+                    */
+                };
+            });
         }
 
         function extend(obj, extended) {
@@ -133,6 +147,7 @@
                     removeTablesApi(database);
                     setApiOnPlace(database, mainTransactionFactory, ObjectMappableTable, Object.keys(latestSchema), latestSchema);
                 }
+                dbStoreNames = Object.keys(latestSchema);
 
                 return this;
             },
@@ -140,14 +155,14 @@
                 /// <param name="upgradeFunction" optional="true">Function that performs upgrading actions.</param>
                 var self = this;
                 fake(function () {
-                    upgradeFunction(new WriteableTransaction({}, {}, Object.keys(self._cfg.tableSchema))); // BUGBUG: No code completion for prev version's tables wont appear.
+                    upgradeFunction(new WriteableTransaction(new TransactionFactory(), Object.keys(self._cfg.tableSchema))); // BUGBUG: No code completion for prev version's tables wont appear.
                 });
                 this._cfg.contentUpgrade = upgradeFunction;
                 return this;
             }
         });
 
-        function runUpgraders(oldVersion, trans) {
+        function runUpgraders(oldVersion, trans, reject) {
             if (oldVersion == 0) {
                 //dbTableSchema = versions[versions.length - 1]._cfg.tableSchema;
                 // Create tables:
@@ -159,8 +174,8 @@
                 var t = new WriteableTransaction(tf, trans.db.objectStoreNames);
                 tf.dexieTrans = t;
                 t.on("error", function (e) {
-                    // Forward descriptive error messages to database.error and not just the default errors from IDB (which are not so descriptive)
-                    database.on("error").fire("Failed to populate database: " + e);
+                    // Reject using descriptive error messages and not just the default errors from IDB (which are not so descriptive)
+                    reject("Failed to populate database: " + e);
                 }); 
                 database.on("populate").fire(t);
             } else {
@@ -234,8 +249,8 @@
                                 tf.dexieTrans = t;
                                 tf.onfinish = cb;
                                 t.on("error", function (e) {
-                                    // Forward descriptive error messages to database.error and not just the default errors from IDB (which are not so descriptive)
-                                    database.on("error").fire("Failed running upgrader function for version " + version._cfg.version + ": " + e);
+                                    // Forward descriptive error messages and not just the default errors from IDB (which are not so descriptive)
+                                    reject ("Failed running upgrader function for version " + version._cfg.version + ": " + e);
                                 });
                                 newSchema._cfg.contentUpgrade(t);
                                 if (tf.uncompleteRequests == 0) cb();
@@ -375,53 +390,52 @@
         //
 
         this.open = function () {
-            if (db) throw new Error("Database already open");
-            // Make sure caller has specified at least one version
-            if (versions.length == 0) throw new Error("No versions specified. Need to call version(ver) method");
-            // Make sure at least the oldest version specifies a table schema
-            if (!versions[0]._cfg.tableSchema) throw new Error("No schema specified. Need to call dbInstance.version(ver).stores(schema) on at least the lowest version.");
-            // Sort versions and make all Version instances have a schema (its own or previous if not specified)
-            versions.sort(lowerVersionFirst).reduce(function (prev, ver) {
-                if (!ver._cfg.tableSchema) ver._cfg.tableSchema = prev._cfg.tableSchema;
-                return ver;
-            });
-            
-            dbOpenError = null;
-            isBeingOpened = true;
-
-            // Multiply dbVersion with 10 will be needed to workaround upgrading bug in IE: 
-            // IE fails when deleting objectStore after reading from it.
-            // A future version of Dexie.js will stopover an intermediate version to workaround this.
-            // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
-            var req = indexedDB.open(dbName, dbVersion * 10); 
-            req.onerror = function (e) {
-                isBeingOpened = false;
-                dbOpenError = e.target.error;
-                database.on("error").fire(e.target.error);
-                pausedTransactionFactories.forEach(function (tf) {
-                    // Resume all stalled operations. They will fail once they wake up.
-                    tf.resume();
-                });
-            }
-            req.onblocked = database.on("blocked").fire;
-            req.onupgradeneeded = function (e) {
-                req.transaction.onerror = function (e) {
-                    database.on("error").fire(e.target.error);
-                };
-                runUpgraders(e.oldVersion / 10, req.transaction);
-            }
-            req.onsuccess = function (e) {
-                isBeingOpened = false;
-                db = req.result;
-                database.on("ready").fire(e);
-                pausedTransactionFactories.forEach(function (tf) {
-                    // If anyone has made operations on a table instance before the database was opened, the operations will start executing now.
-                    tf.resume();
-                });
-                pausedTransactionFactories = [];
-            }
             return new Promise(function (resolve, reject) {
-                database.ready(resolve).error(reject);
+                if (db) throw new Error("Database already open");
+                // Make sure caller has specified at least one version
+                if (versions.length == 0) throw new Error("No versions specified. Need to call version(ver) method");
+                // Make sure at least the oldest version specifies a table schema
+                if (!versions[0]._cfg.tableSchema) throw new Error("No schema specified. Need to call dbInstance.version(ver).stores(schema) on at least the lowest version.");
+                // Sort versions and make all Version instances have a schema (its own or previous if not specified)
+                versions.sort(lowerVersionFirst).reduce(function (prev, ver) {
+                    if (!ver._cfg.tableSchema) ver._cfg.tableSchema = prev._cfg.tableSchema;
+                    return ver;
+                });
+            
+                dbOpenError = null;
+                isBeingOpened = true;
+
+                // Multiply dbVersion with 10 will be needed to workaround upgrading bug in IE: 
+                // IE fails when deleting objectStore after reading from it.
+                // A future version of Dexie.js will stopover an intermediate version to workaround this.
+                // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
+                var req = indexedDB.open(dbName, dbVersion * 10); 
+                req.onerror = function (e) {
+                    isBeingOpened = false;
+                    dbOpenError = e.target.error;
+                    reject(dbOpenError);
+                    pausedTransactionFactories.forEach(function (tf) {
+                        // Resume all stalled operations. They will fail once they wake up.
+                        tf.resume();
+                    });
+                }
+                req.onblocked = database.on("blocked").fire;
+                req.onupgradeneeded = function (e) {
+                    req.transaction.onerror = function (e) {
+                        reject (e.target.error);
+                    };
+                    runUpgraders(e.oldVersion / 10, req.transaction, reject);
+                }
+                req.onsuccess = function (e) {
+                    isBeingOpened = false;
+                    db = req.result;
+                    db.onversionchange = database.on("versionchange").fire;
+                    pausedTransactionFactories.forEach(function (tf) {
+                        // If anyone has made operations on a table instance before the database was opened, the operations will start executing now.
+                        tf.resume();
+                    });
+                    pausedTransactionFactories = [];
+                }
             });
         }
 
@@ -433,7 +447,6 @@
             if (db) {
                 db.close();
                 pausedTransactionFactories.push(mainTransactionFactory.pause());
-                this.on(["ready", "error"]).reset();
                 db = null;
                 dbOpenError = null;
             }
@@ -446,6 +459,7 @@
                     var req = indexedDB.deleteDatabase(dbName);
                     req.onsuccess = resolve;
                     req.onerror = reject;
+                    req.onblocked = database.on("blocked").fire;
                 }
                 if (isBeingOpened) {
                     database.ready(doDelete).error(doDelete);
@@ -459,18 +473,11 @@
         // Events: populate, ready and error
         //
 
-        this.on = events(this, ["ready", "error"], "populate", "blocked");
-
-        this.ready = function (callback) {
-            return this.on("ready", callback);
-        }
-        this.error = function (callback) {
-            return this.on("error", callback);
-        }
+        this.on = events(this, "error", "populate", "blocked", "versionchange");
 
         fake(function () {
-            database.on("populate").fire(new WriteableTransaction(IDBTransaction.prototype, mainTransactionFactory, Object.keys(dbTableSchema)));
-            database.on("error").fire(new DOMError());
+            database.on("populate").fire(new WriteableTransaction(new TransactionFactory(), dbStoreNames));
+            database.on("error").fire(new Error());
         });
 
         this.transaction = function (mode, tableInstances, scopeFunc) {
@@ -480,45 +487,43 @@
             /// <param name="mode" type="String">"r" for readonly, or "rw" for readwrite</param>
             /// <param name="tableInstances">Table instance, Array of Table instances, String or String Array of object stores to include in the transaction</param>
             /// <param name="scopeFunc" type="Function">Function to execute with transaction</param>
-
-            var tables = Array.isArray(tableInstances) ? tableInstances : [tableInstances];
-            var error = null;
-            var storeNames = tables.map(function (tableInstance) {
-                if (typeof (tableInstance) == "string") {
-                    if (!dbTableSchema[tableInstance]) { error = new Error("Invalid table name: " + tableInstance); return { INVALID_TABLE_NAME: 1 } }; // Return statement is for IDE code completion.
-                    return tableInstance;
-                } else {
-                    if (!(tableInstance instanceof Table)) { error = new TypeError("Invalid type. Arguments following mode must be instances of Table or String"); return { IVALID_TYPE: 1 }; }
-                    return tableInstance._name;
-                }
-            });
-            var tf, trans;
-            if (mode == R || mode == "r") {
-                tf = new MultireqTransactionFactory(storeNames, R);
-                trans = new Transaction(tf, storeNames);
-            } else if (mode == RW || mode == "rw") {
-                tf = new MultireqTransactionFactory(storeNames, RW);
-                trans = new WriteableTransaction(tf, storeNames);
-            } else {
-                error = new RangeError("Invalid mode. Only 'readonly'/'r' or 'readwrite'/'rw' are valid modes.");
-            }
-            tf.dexieTrans = trans;
-            if (!db && !dbOpenError) {
-                pausedTransactionFactories.push(tf.pause());
-            }
-            var args = storeNames.map(function (name) { return trans[name]; });
-            args.push(trans);
-
             return new Promise(function (resolve, reject) {
-                if (error) reject(error);
-                else {
-                    trans.complete(resolve).error(reject);
-                    try {
-                        scopeFunc.apply(null, args);
-                    } catch (e) {
-                        trans.abort();
-                        reject(e);
+                var tables = Array.isArray(tableInstances) ? tableInstances : [tableInstances];
+                var storeNames = tables.map(function (tableInstance) {
+                    if (typeof (tableInstance) == "string") {
+                        if (!dbTableSchema[tableInstance]) { throw new Error("Invalid table name: " + tableInstance); return { INVALID_TABLE_NAME: 1 } }; // Return statement is for IDE code completion.
+                        return tableInstance;
+                    } else {
+                        if (!(tableInstance instanceof Table)) { throw new TypeError("Invalid type. Arguments following mode must be instances of Table or String"); return { IVALID_TYPE: 1 }; }
+                        return tableInstance._name;
                     }
+                });
+                var tf, trans;
+                if (mode == R || mode == "r") {
+                    tf = new MultireqTransactionFactory(storeNames, R);
+                    trans = new Transaction(tf, storeNames);
+                } else if (mode == RW || mode == "rw") {
+                    tf = new MultireqTransactionFactory(storeNames, RW);
+                    trans = new WriteableTransaction(tf, storeNames);
+                } else {
+                    throw new RangeError("Invalid mode. Only 'readonly'/'r' or 'readwrite'/'rw' are valid modes.");
+                }
+                tf.dexieTrans = trans;
+                if (!db && !dbOpenError) {
+                    pausedTransactionFactories.push(tf.pause());
+                }
+                var args = storeNames.map(function (name) { return trans[name]; });
+                args.push(trans);
+
+                trans.complete(resolve).error(function (e) {
+                    var catched = reject(e);
+                    if (!catched) database.on("error").fire(e); // If not catched, bubble error to database.on("error").
+                });
+                try {
+                    scopeFunc.apply(null, args);
+                } catch (e) {
+                    trans.abort();
+                    reject(e);
                 }
             });
         }
@@ -1500,7 +1505,11 @@
                 if (this.trans) return this.trans;
                 var self = this;
                 this.trans = db.transaction(this.storeNames, this.mode);
-                this.trans.onerror = this.dexieTrans.on("error").fire;
+                this.trans.onerror = function (e) {
+                    self.dexieTrans.on("error").fire(e.target.error);
+                    e.preventDefault(); // Prohibit default bubbling to window.error
+                    self.dexieTrans.abort(); // Make sure transaction is aborted since we preventDefault.
+                }
                 this.trans.onabort = this.dexieTrans.on("abort").fire;
                 this.trans.oncomplete = this.dexieTrans.on("complete").fire;
                 this.dexieTrans.on("abort", function () { self.inactive = true; });
@@ -1581,7 +1590,8 @@
                         return typeof (word) === 'function' ? word() : JSON.stringify(word);
                     }).join(" ");
                 };
-                if (reject(errObj)) {
+                var catched = reject(errObj);
+                if (catched) {
                     // Rejection was catched. Stop error from propagating to IDBTransaction.
                     event.stopPropagation();
                     event.preventDefault();
@@ -1596,10 +1606,10 @@
             var evs = {};
             function add (eventName) {
                 function fire (val) {
-                    this.l.forEach(function(cb){
-                        cb(val);
-                    });
-                }                
+                    for (var i=this.l.length -1; i>=0; --i) {
+                        if (this.l[i](val) === false) return false;
+                    }
+                }
                 evs[eventName] = {
                     l: [],
                     f: fire,
@@ -1641,8 +1651,8 @@
                     // Subscribe
                     evs[eventName].s(subscriber);
                     return ctx;
-                } else if (typeof (eventName) == 'string') {
-                    // Fire
+                } else if (typeof (eventName) === 'string') {
+                    // Return interface allowing to fire or unsubscribe from event
                     return {
                         fire: function (val) {
                             evs[eventName].f(val);
@@ -1652,10 +1662,11 @@
                         },
                     };
                 } else {
+                    // Return interface allowing access to backend Promise and resetting.
                     var success = eventName[0], fail = eventName[1];
                     return {
                         getPromise: function () {return evs[success].p;},
-                        reset: function () { promise(success, fail);}
+                        //reset: function () { promise(success, fail);} Reset not used anymore
                     };
                 }
             }
@@ -1918,7 +1929,13 @@
 
 
     Dexie.delete = function (databaseName) {
-        return new Dexie(databaseName).delete();
+        var db = new Dexie(databaseName),
+            promise = db.delete();
+        promise.onblocked = function (fn) {
+            db.on("blocked", fn);
+            return this;
+        };
+        return promise;
     }
 
     // Define the very-base classes of the framework, in case any 3rd part library wants to extend the prototype of these classes
@@ -1947,10 +1964,13 @@
         DOMError: window.DOMError || String
     }
 
+    // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
+    Dexie.version = 0.9;
+
     // Publish the Dexie to browser or NodeJS environment.
     publish("Dexie", Dexie);
 
 }).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this == window) 
-    ? [window, function (name, value) { window[name] = value; } ]    // Adapt to browser environment
-    : [global, function (name, value) { module.exports = value; }]); // Adapt to Node.js environment
+    ? [window, function (name, value) { window[name] = value; }, true ]    // Adapt to browser environment
+    : [global, function (name, value) { module.exports = value; }, false]); // Adapt to Node.js environment
 

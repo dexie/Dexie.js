@@ -6,15 +6,23 @@
         setup: function () {
         },
         teardown: function () {
-            stop(); Dexie.delete("PerformanceDB").then(start);
+            stop(); Dexie.delete("PerformanceDB").onblocked(function() {
+                alert("Please close other browsers and tabs! Another browser or tab is blocking the database from being deleted. ");
+            }).catch(function (e) {
+                ok(false, e);
+            }).finally(function () {
+                start();
+            });
         }
     });
 
     asyncTest("performance", function () {
         var db = new Dexie("PerformanceDB");
         db.version(1).stores({ emails: "++id,from,to,subject,message,shortStr" });
+        db.on("blocked", function() {
+            alert("Please close other browsers and tabs! Another browser or tab is blocking the database from being upgraded or deleted.");
+        });
         db.delete().then(function () {
-
             function randomString(count) {
                 return function () {
                     var ms = [];
@@ -75,6 +83,7 @@
                             ok(true, "Time taken: " + (tock - tick));
                             ok(true, "Num emails found: " + a.length);
                             ok(true, "Time taken per found item: " + (tock - tick) / a.length);
+                            db.close();
                             start();
                         });
 

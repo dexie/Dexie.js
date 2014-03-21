@@ -12,7 +12,6 @@
         email:      [String],
         pets:       [String],
     });
-
     db.on("populate", function (trans) {
         trans.users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
         trans.users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
