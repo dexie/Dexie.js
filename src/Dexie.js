@@ -389,7 +389,11 @@
             dbOpenError = null;
             isBeingOpened = true;
 
-            var req = indexedDB.open(dbName, dbVersion * 10); // Multiply with 10 will be needed to workaround various bugs in different implementations of indexedDB.
+            // Multiply dbVersion with 10 will be needed to workaround upgrading bug in IE: 
+            // IE fails when deleting objectStore after reading from it.
+            // A future version of Dexie.js will stopover an intermediate version to workaround this.
+            // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
+            var req = indexedDB.open(dbName, dbVersion * 10); 
             req.onerror = function (e) {
                 isBeingOpened = false;
                 dbOpenError = e.target.error;
@@ -399,6 +403,7 @@
                     tf.resume();
                 });
             }
+            req.onblocked = database.on("blocked").fire;
             req.onupgradeneeded = function (e) {
                 req.transaction.onerror = function (e) {
                     database.on("error").fire(e.target.error);
@@ -454,7 +459,8 @@
         // Events: populate, ready and error
         //
 
-        this.on = events(this, "populate", ["ready", "error"]);
+        this.on = events(this, ["ready", "error"], "populate", "blocked");
+
         this.ready = function (callback) {
             return this.on("ready", callback);
         }
