@@ -950,7 +950,7 @@
                     c._ondirectionchange = function () { fail(c, new Error("desc() not supported with WhereClause.startsWithIgnoreCase()")); };
                     return c;
                 },
-                anyOf: function (valueArray) {
+                'in': function (valueArray) {
                     var set = getSortedSet(arguments); 
                     var c = new this._ctx.collClass(this);
                     var sorter = ascending;

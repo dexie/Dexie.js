@@ -10,6 +10,7 @@ module("open", {
         });
     },
     teardown: function () {
+        stop(); Dexie.delete("TestDB").then(start);
     }
 });
 

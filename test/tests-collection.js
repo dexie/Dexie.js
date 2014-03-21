@@ -279,7 +279,7 @@
                 equal(a[2].first, "Apan", "Third is Apan");
             });
             var userArray = [];
-            users.where("id").anyOf(1, 2, 3, 4).or("username").anyOf("dfahlander", "kceder", "apanjapan").each(function (user) {
+            users.where("id").in(1, 2, 3, 4).or("username").in("dfahlander", "kceder", "apanjapan").each(function (user) {
                 ok(true, "Found: " + JSON.stringify(user));
                 userArray.push(user);
             }).then(function () {

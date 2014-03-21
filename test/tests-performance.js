@@ -2,7 +2,14 @@
 
 (function () {
     
-    module("performance");
+    module("performance", {
+        setup: function () {
+        },
+        teardown: function () {
+            stop(); Dexie.delete("PerformanceDB").then(start);
+        }
+    });
+
     asyncTest("performance", function () {
         var db = new Dexie("PerformanceDB");
         db.version(1).stores({ emails: "++id,from,to,subject,message,shortStr" });
