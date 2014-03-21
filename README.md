@@ -4,6 +4,7 @@ A bullet proof indexedDB wrapper.
 
  * The only indexedDB wrapper (so far) to support case insensitive search, set matching and logical OR operations.
  * Straight forward API, easy to use.
+ * Bullet proof error handling using transaction scopes
  * Does not hide backend indexedDB from the caller - always possible to reach the backend IDB objects.
  * Performance focused
  * Portable across all browsers:
