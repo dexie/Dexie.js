@@ -28,7 +28,6 @@ A bullet proof indexedDB wrapper.
  * Built to be easily extended by 3rd part libraries
  * Simplified and robust error handling
  * Simplified upgrading framework
- * Transaction support
  * Thoroughly unit tested
 
 API Reference
