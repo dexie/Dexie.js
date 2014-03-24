@@ -22,7 +22,10 @@
         db.on("blocked", function() {
             alert("Please close other browsers and tabs! Another browser or tab is blocking the database from being upgraded or deleted.");
         });
+
+        var tick;
         db.delete().then(function () {
+
             function randomString(count) {
                 return function () {
                     var ms = [];
@@ -35,11 +38,11 @@
 
             db.open();
 
-            var tick = Date.now();
+            tick = Date.now();
 
             // Create 10,000 emails
             ok(true, "Creating 10,000 emails");
-            db.transaction("rw", db.emails, function (emails) {
+            return db.transaction("rw", db.emails, function (emails) {
                 for (var i = 1; i <= 10000; ++i) {
                     emails.add({
                         from: "from" + i + "@test.com",
@@ -49,58 +52,57 @@
                         shortStr: randomString(2)()
                     });
                 }
-            }).then(function () {
-                ok(true, "Time taken: " + (Date.now() - tick));
+            })
 
-                // Speed of equals()
-                ok(true, "Speed of equals()");
-                tick = Date.now();
-                db.emails.where("shortStr").equals("yk").toArray(function (a) {
-                    var tock = Date.now();
-                    ok(true, "Time taken: " + (tock - tick));
-                    ok(true, "Num emails found: " + a.length);
-                    ok(true, "Time taken per found item: " + (tock - tick) / a.length);
+        }).then(function () {
+            ok(true, "Time taken: " + (Date.now() - tick));
 
-                    // Speed of equalsIgnoreCase()
-                    ok(true, "Speed of equalsIgnoreCase()");
-                    tick = Date.now();
-                    db.emails.where("shortStr").equalsIgnoreCase("yk").toArray(function (a) {
-                        var tock = Date.now();
-                        ok(true, "Time taken: " + (tock - tick));
-                        ok(true, "Num emails found: " + a.length);
-                        ok(true, "Time taken per found item: " + (tock - tick) / a.length);
+            // Speed of equals()
+            ok(true, "Speed of equals()");
+            tick = Date.now();
+            return db.emails.where("shortStr").equals("yk").toArray();
+
+        }).then(function (a) {
+            var tock = Date.now();
+            ok(true, "Time taken: " + (tock - tick));
+            ok(true, "Num emails found: " + a.length);
+            ok(true, "Time taken per found item: " + (tock - tick) / a.length);
+
+            // Speed of equalsIgnoreCase()
+            ok(true, "Speed of equalsIgnoreCase()");
+            tick = Date.now();
+            return db.emails.where("shortStr").equalsIgnoreCase("yk").toArray();
+
+        }).then (function (a) {
+            var tock = Date.now();
+            ok(true, "Time taken: " + (tock - tick));
+            ok(true, "Num emails found: " + a.length);
+            ok(true, "Time taken per found item: " + (tock - tick) / a.length);
                         
 
-                        // Speed of manual filter case insensitive search
-                        ok(true, "Speed of manual filter case insensitive search");
-                        tick = Date.now();
-                        var foundEmails = [];
-                        db.emails.each(function (email) {
-                            if (email.shortStr.toLowerCase() === "yk")
-                                foundEmails.push(email);
-                        }).then(function () {
-                            var tock = Date.now();
-                            ok(true, "Time taken: " + (tock - tick));
-                            ok(true, "Num emails found: " + a.length);
-                            ok(true, "Time taken per found item: " + (tock - tick) / a.length);
-                            db.close();
-                            start();
-                        });
+            // Speed of manual filter case insensitive search
+            ok(true, "Speed of manual filter case insensitive search");
+            tick = Date.now();
+            var foundEmails = [];
+            return db.emails.each(function (email) {
+                if (email.shortStr.toLowerCase() === "yk")
+                    foundEmails.push(email);
+            }).then(function () { return foundEmails; });
 
-                    }).catch(function (e) {
-                        ok(false, e);
-                        start();
-                    });
-                }).catch(function (e) {
-                    ok(false, e);
-                    start();
-                });
-            }).catch(function (e) {
-                ok(false, e);
-                start();
-            });
+        }).then (function (foundEmails) {
+            var tock = Date.now();
+            ok(true, "Time taken: " + (tock - tick));
+            ok(true, "Num emails found: " + foundEmails.length);
+            ok(true, "Time taken per found item: " + (tock - tick) / foundEmails.length);
+
+        }).catch(Error, function (e) {
+            ok(false, e.name + ":" + e.message + " " + e.stack);
+
         }).catch(function (e) {
-            ok(false, e);
+            ok(false, e.toString());
+
+        }).finally(function() {
+            db.close();
             start();
         });
     });

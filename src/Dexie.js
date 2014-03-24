@@ -1839,9 +1839,9 @@
                         doResolve(function (resolve, reject) {
                             newValue.then(resolve, reject);
                         }, function (data) {
-                            resolve.call(promise, data);
+                            resolve(promise, data);
                         }, function (reason) {
-                            reject.call(promise, reason);
+                            reject(promise, reason);
                         });
                         return;
                     }

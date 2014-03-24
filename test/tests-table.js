@@ -222,6 +222,9 @@
                     start();
                 });
             });
+        }).catch(function (e) {
+            ok(false, e);
+            start();
         });
     });
     asyncTest("delete(using transaction)", function() {
