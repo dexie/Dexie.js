@@ -36,17 +36,18 @@
         var iewa; // IE WorkAound needed in IE10 & IE11 for http://connect.microsoft.com/IE/feedback/details/783672/indexeddb-getting-an-aborterror-exception-when-trying-to-delete-objectstore-inside-onupgradeneeded
         var database = this;
         var mainTransactionFactory;
-        var pausedTransactionFactories = [];
+        var pausedResumeables = [];
         var use_proto = (function () { function F() { }; var a = new F(); try { a.__proto__ = Object.prototype; return !(a instanceof F) } catch (e) { return false; } })()
 
         function init() {
             mainTransactionFactory = new TransactionFactory().pause();
-            pausedTransactionFactories.push(mainTransactionFactory);
+            pausedResumeables.push(mainTransactionFactory);
             // If browser (not node.js or other), subscribe to versionchange event and reload page
             if (isBrowser) database.on("versionchange", function (ev) {
                 if (ev.newVersion && ev.newVersion > dbVersion) { // Only reload page if versionchange event isnt a deletion of database. Or if it's triggered with same verno as we already have due to delete/recreate calls.
                     // Default behavior for versionchange event is to reload the page.
                     // Caller can override this behavior by doing database.on("versionchange", function(){ return false; });
+                    database.close();
                     window.location.reload(true);
                     /* The logic behind this default handler is:
                         1. Since this event means that the database is upgraded in another IDBDatabase instance (in tab or window that has a newer version of the code),
@@ -127,11 +128,11 @@
                     var indexes = parseIndexSyntax(stores[tableName]);
                     var primKey = indexes.shift();
                     if (primKey.multi) throw new Error("Primary key cannot be multi-valued");
-                    if (primKey.keyPath) instanceTemplate[primKey.keyPath] = 0;
+                    if (primKey.keyPath && primKey.auto) setByKeyPath(instanceTemplate, primKey.keyPath, 0);
                     indexes.forEach(function (idx) {
                         if (idx.auto) throw new Error ("Only primary key can be marked as autoIncrement (++)");
-                        if (!idx.keyPath) throw new Error ("Index must have a name and cannot be an empty string");
-                        instanceTemplate[idx.keyPath] = "";
+                        if (!idx.keyPath) throw new Error("Index must have a name and cannot be an empty string");
+                        setByKeyPath(instanceTemplate, idx.keyPath, idx.compound ? idx.keyPath.map(function(){return ""}) : "");
                     });
                     tableSchema[tableName] = {
                         primKey: primKey,
@@ -171,7 +172,7 @@
                 });
                 // Populate data
                 var tf = new MultireqTransactionFactory(trans);
-                var t = new WriteableTransaction(tf, trans.db.objectStoreNames);
+                var t = new WriteableTransaction(tf, dbStoreNames);
                 tf.dexieTrans = t;
                 t.on("error", function (e) {
                     // Reject using descriptive error messages and not just the default errors from IDB (which are not so descriptive)
@@ -414,7 +415,7 @@
                     isBeingOpened = false;
                     dbOpenError = e.target.error;
                     reject(dbOpenError);
-                    pausedTransactionFactories.forEach(function (tf) {
+                    pausedResumeables.forEach(function (tf) {
                         // Resume all stalled operations. They will fail once they wake up.
                         tf.resume();
                     });
@@ -430,11 +431,11 @@
                     isBeingOpened = false;
                     db = req.result;
                     db.onversionchange = database.on("versionchange").fire;
-                    pausedTransactionFactories.forEach(function (tf) {
+                    pausedResumeables.forEach(function (tf) {
                         // If anyone has made operations on a table instance before the database was opened, the operations will start executing now.
                         tf.resume();
                     });
-                    pausedTransactionFactories = [];
+                    pausedResumeables = [];
                 }
             });
         }
@@ -446,7 +447,7 @@
         this.close = function () {
             if (db) {
                 db.close();
-                pausedTransactionFactories.push(mainTransactionFactory.pause());
+                pausedResumeables.push(mainTransactionFactory.pause());
                 db = null;
                 dbOpenError = null;
             }
@@ -462,7 +463,7 @@
                     req.onblocked = database.on("blocked").fire;
                 }
                 if (isBeingOpened) {
-                    database.ready(doDelete).error(doDelete);
+                    pausedResumeables.push({resume: doDelete});
                 } else {
                     doDelete();
                 }
@@ -473,7 +474,7 @@
         // Events: populate, ready and error
         //
 
-        this.on = events(this, "error", "populate", "blocked", "versionchange");
+        this.on = events(this, "error", "ready", "populate", "blocked", "versionchange");
 
         fake(function () {
             database.on("populate").fire(new WriteableTransaction(new TransactionFactory(), dbStoreNames));
@@ -487,8 +488,10 @@
             /// <param name="mode" type="String">"r" for readonly, or "rw" for readwrite</param>
             /// <param name="tableInstances">Table instance, Array of Table instances, String or String Array of object stores to include in the transaction</param>
             /// <param name="scopeFunc" type="Function">Function to execute with transaction</param>
+            tableInstances = [].slice.call(arguments, 1, arguments.length - 1);
+            scopeFunc = arguments[arguments.length - 1];
             return new Promise(function (resolve, reject) {
-                var tables = Array.isArray(tableInstances) ? tableInstances : [tableInstances];
+                var tables = Array.isArray(tableInstances[0]) ? tableInstances.reduce(function (a, b) { return a.concat(b) }) : tableInstances;
                 var storeNames = tables.map(function (tableInstance) {
                     if (typeof (tableInstance) == "string") {
                         if (!dbTableSchema[tableInstance]) { throw new Error("Invalid table name: " + tableInstance); return { INVALID_TABLE_NAME: 1 } }; // Return statement is for IDE code completion.
@@ -510,7 +513,7 @@
                 }
                 tf.dexieTrans = trans;
                 if (!db && !dbOpenError) {
-                    pausedTransactionFactories.push(tf.pause());
+                    pausedResumeables.push(tf.pause());
                 }
                 var args = storeNames.map(function (name) { return trans[name]; });
                 args.push(trans);
@@ -670,7 +673,7 @@
                 /// <param name="obj" type="Object">A javascript object to insert or update</param>
                 return this._wrop("put", [obj], function (ev) {
                     var keyPath = ev.target.source.keyPath;
-                    if (keyPath) obj[keyPath] = ev.target.result;
+                    if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
                 }, ["putting", obj, "into", this._name]);
             },
             add: function (obj) {
@@ -680,7 +683,7 @@
                 /// <param name="obj" type="Object">A javascript object to insert</param>
                 return this._wrop("add", [obj], function (ev) {
                     var keyPath = ev.target.source.keyPath;
-                    if (keyPath) obj[keyPath] = ev.target.result;
+                    if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
                 }, ["adding", obj, "into", this._name]);
             },
             'delete': function (key) {
@@ -751,7 +754,7 @@
                     applyStructure(template, structure);
                     var primKeyName = dbTableSchema[this._name].primKey.keyPath;
                     this._mappedClass = function () {
-                        for (var m in template) if (m != primKeyName) this[m] = null || template[m];
+                        for (var m in template) if (m != primKeyName) this[m] = template[m];
                     };
                     this._instanceTemplate = template;
                     return this._mappedClass;
@@ -941,10 +944,17 @@
                 },
                 startsWith: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof (str) != 'string') return fail (new Collection(this), new TypeError("String expected"));
-                    if (str === "") return new Collection(this); // All strings starts with an empty string - return all items.
-                    var upper = str.substr(0, str.length - 1) + String.fromCharCode(str.charCodeAt(str.length - 1) + 1);
-                    return this.between(str, upper, true, false);
+                    if (typeof (str) != 'string') return fail(new Collection(this), new TypeError("String expected"));
+                    return this.between(str, str + '\uffff', true, true);
+                },
+                startsWithIgnoreCase: function (str) {
+                    /// <param name="str" type="String"></param>
+                    if (typeof (str) != 'string') return fail(new Collection(this), new TypeError("String expected"));
+                    if (str === "") return this.startsWith(str);
+                    var c = new this._ctx.collClass(this);
+                    addIgnoreCaseAlgorithm(c, function (a, b) { return a.indexOf(b) === 0; }, str);
+                    c._ondirectionchange = function () { fail(c, new Error("desc() not supported with WhereClause.startsWithIgnoreCase()")); };
+                    return c;
                 },
                 equalsIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
@@ -953,15 +963,7 @@
                     addIgnoreCaseAlgorithm(c, function (a, b) { return a === b; }, str);
                     return c;
                 },
-                startsWithIgnoreCase: function (str) {
-                    /// <param name="str" type="String"></param>
-                    if (typeof (str) != 'string') return fail (new Collection(this), new TypeError("String expected"));
-                    var c = new this._ctx.collClass(this);
-                    addIgnoreCaseAlgorithm(c, function (a, b) { return a.indexOf(b) === 0; }, str);
-                    c._ondirectionchange = function () { fail(c, new Error("desc() not supported with WhereClause.startsWithIgnoreCase()")); };
-                    return c;
-                },
-                'in': function (valueArray) {
+                anyOf: function (valueArray) {
                     var set = getSortedSet(arguments); 
                     var c = new this._ctx.collClass(this);
                     var sorter = ascending;
@@ -1047,9 +1049,9 @@
             _getIndexOrStore: function (mode) {
                 var ctx = this._ctx;
                 ctx.trans = ctx.tf.create(ctx.table, mode || R);
-                var store = ctx.trans.objectStore(ctx.table);
-                var lowerIndex = ctx.index && ctx.index.toLowerCase();
-                return (!lowerIndex || (store.keyPath && lowerIndex == store.keyPath.toLowerCase())) ? store : store.index(lowerIndex);
+                var store = ctx.trans.objectStore(ctx.table),
+                    index = ctx.index;
+                return (!index || (store.keyPath && index === store.keyPath)) ? store : store.index(index);
             },
 
             _openCursor: function (mode) {
@@ -1087,8 +1089,8 @@
 
                         function union(item, cursor, advance) {
                             if (!filter || filter(cursor, advance, resolveboth, reject)) {
-                                var key = JSON.stringify(item[primKey]);
-                                if (!set[key]) {
+                                var key = JSON.stringify(getByKeyPath(item, primKey));
+                                if (!set.hasOwnProperty(key)) {
                                     set[key] = true;
                                     fn(item, cursor, advance);
                                 }
@@ -1245,7 +1247,7 @@
                 var set = {};
                 this._addFilter(function (cursor) {
                     var strKey = JSON.stringify(cursor.primaryKey);
-                    var found = set[strKey];
+                    var found = set.hasOwnProperty(strKey);
                     set[strKey] = true;
                     return !found;
                 });
@@ -1420,17 +1422,21 @@
 
         function parseIndexSyntax(indexes) {
             /// <param name="indexes" type="String"></param>
-            /// <returns value="[{name:'',keyPath:'',unique:false,multi:false,auto:false}]"></returns>
+            /// <returns value="[{name:'',keyPath:'',unique:false,multi:false,auto:false,compound:false}]"></returns>
             var rv = [];
             indexes.split(',').forEach(function (index) {
-                if (!index || index.indexOf('[') == 0) return;
-                var keyPath = index.replace("&", "").replace("++", "").replace("*", "");
+                if (!index) return;
+                var name = index.replace("&", "").replace("++", "").replace("*", "");
+                var keyPath = (name.indexOf('[') !== 0 ? name : index.substring(1, index.indexOf(']')).split('+'));
+
                 var idx = {
-                    name: keyPath && keyPath.toLowerCase(),
+                    name: name,
                     keyPath: keyPath || null,
                     unique: index.indexOf('&') != -1,
                     multi: index.indexOf('*') != -1,
-                    auto: index.indexOf("++") != -1
+                    auto: index.indexOf("++") != -1,
+                    compound: Array.isArray(keyPath),
+                    dotted: keyPath.indexOf('.') != -1
                 };
                 idx.src = (idx.unique ? '&' : '') + (idx.multi ? '*' : '') + (idx.auto ? "++" : "") + idx.keyPath;
                 rv.push(idx);
@@ -1579,6 +1585,51 @@
 
         function combine(filter1, filter2) {
             return filter1 ? filter2 ? function () { return filter1.apply(this, arguments) && filter2.apply(this, arguments) } : filter1 : filter2;
+        }
+
+        function getByKeyPath(obj, keyPath) {
+            // http://www.w3.org/TR/IndexedDB/#steps-for-extracting-a-key-from-a-value-using-a-key-path
+            if (!keyPath) return obj;
+            if (Array.isArray(keyPath)) {
+                var rv = [];
+                for (var i=0,l=keyPath.length;i<l;++i) {
+                    var val = getByKeyPath(obj, keyPath[i]);
+                    if (val === undefined) return;
+                    rv.push(val);
+                }
+                return val;
+            }
+            var period = keyPath.indexOf('.');
+            if (period != -1) {
+                var innerObj = obj[keyPath.substr(0, period)];
+                return innerObj === undefined ? undefined : getByKeyPath(innerObj, keyPath.substr(period + 1));
+            }
+            return obj[keyPath];
+        }
+
+        function setByKeyPath(obj, keyPath, value) {
+            if (!obj || keyPath === undefined) return;
+            if (Array.isArray(keyPath)) {
+                assert(Array.isArray(value));
+                for (var i = 0, l = keyPath.length; i < l; ++i) {
+                    setByKeyPath(obj, keyPath[i], value[i]);
+                }
+            } else {
+                var period = keyPath.indexOf('.');
+                if (period !== -1) {
+                    var currentKeyPath = keyPath.substr(0, period);
+                    var remainingKeyPath = keyPath.substr(period + 1);
+                    if (remainingKeyPath === "")
+                        obj[currentKeyPath] = value;
+                    else {
+                        var innerObj = obj[currentKeyPath];
+                        if (!innerObj) innerObj = (obj[currentKeyPath] = {});
+                        setByKeyPath(innerObj, remainingKeyPath, value);
+                    }
+                } else {
+                    obj[keyPath] = value;
+                }
+            }
         }
 
         function eventRejectHandler(reject, sentance) {

@@ -104,15 +104,15 @@
                 equal(a[0].first, "Karl", "Karl found first on last 'Faadersköld'");
                 equal(a[1].first, "David", "David found second on last 'Fahlander'");
             });
-            users.where("last").in("Fahlander", "Faadersköld").toArray(function (a) {
+            users.where("last").anyOf("Fahlander", "Faadersköld").toArray(function (a) {
                 equal(a.length, 2, "in() returned expected number of items");
                 equal(a[0].last, "Faadersköld", "Faadersköld is first");
             });
-            users.where("last").in("Fahlander", "Faadersköld").desc().toArray(function (a) {
+            users.where("last").anyOf("Fahlander", "Faadersköld").desc().toArray(function (a) {
                 equal(a.length, 2, "in().desc() returned expected number of items");
                 equal(a[0].last, "Fahlander", "Fahlander is first");
             });
-            users.where("last").in("Faadersköld").toArray(function (a) {
+            users.where("last").anyOf("Faadersköld").toArray(function (a) {
                 equal(a.length, 1, "in() returned expected number of items");
             });
 

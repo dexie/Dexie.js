@@ -13,6 +13,7 @@
         pets:       [String],
     });
     db.on("populate", function (trans) {
+        
         trans.users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
         trans.users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
     });
@@ -278,7 +279,7 @@
                 equal(a[2].first, "Apan", "Third is Apan");
             });
             var userArray = [];
-            users.where("id").in(1, 2, 3, 4).or("username").in("dfahlander", "kceder", "apanjapan").each(function (user) {
+            users.where("id").anyOf(1, 2, 3, 4).or("username").anyOf("dfahlander", "kceder", "apanjapan").each(function (user) {
                 ok(true, "Found: " + JSON.stringify(user));
                 userArray.push(user);
             }).then(function () {

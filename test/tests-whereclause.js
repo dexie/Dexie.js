@@ -6,7 +6,7 @@
     var db = new Dexie("TestDB-WhereClause");
     db.version(1).stores({
         folders: "++id,&path",
-        files: "++id,filename,extension,folderId"
+        files: "++id,filename,extension,[filename+extension],folderId"
     });
 
     var Folder = db.folders.defineClass({
@@ -68,10 +68,10 @@
     });
 
 
-    asyncTest("in()", function () {
+    asyncTest("anyOf()", function () {
         db.transaction("r", [db.files, db.folders], function (files, folders, transaction) {
 
-            files.where("filename").in("hello", "hello-there", "README", "gösta").toArray(function (a) {
+            files.where("filename").anyOf("hello", "hello-there", "README", "gösta").toArray(function (a) {
                 equal(a.length, 3, "Should find 3 files");
                 equal(a[0].filename, "README", "First match is README because capital R comes before lower 'h' in lexical sort");
                 equal(a[1].filename, "hello", "Second match is hello");
@@ -233,6 +233,17 @@
             equal(a.length, 0, "File fdsojifdsjoisdf was not found");
         }).catch(function (e) {
             ok(false, e);
+        }).finally(start);
+    });
+
+    asyncTest("compount-index", 2, function () {
+        db.transaction("r", db.files, function (files) {
+            files.where("[filename+extension]").equals(["README", ".TXT"]).toArray(function (a) {
+                equal(a.length, 1, "Found one file by compound index search");
+                equal(a[0].filename, "README", "The found file was README.TXT");
+            });
+        }).catch(function (e) {
+            ok(false, e + ". Expected to fail on IE10/IE11 - no support compound indexs.");
         }).finally(start);
     });
 
