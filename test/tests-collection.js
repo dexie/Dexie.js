@@ -79,17 +79,98 @@
             });
 
             users.orderBy("last").limit(-1).toArray(function (a) {
-                equal(a.length, 0, "Array length is -1");
+                equal(a.length, 0, "Array length is 0");
             });
 
             users.orderBy("id").limit(-1).toArray(function (a) {
-                equal(a.length, 0, "Array length is -1");
+                equal(a.length, 0, "Array length is 0");
             });
-
         }).catch(function (e) {
             ok(false, e);
         }).finally(start);
     });
+
+    asyncTest("offset().limit() with advanced combinations", 22, function () {
+        db.transaction("rw", db.users, function (users) {
+            for (var i = 0; i < 10; ++i) {
+                users.add({ first: "First" + i, last: "Last" + i, username: "user" + i, email: ["user" + i + "@abc.se"] });
+            }
+
+            // Using algorithm + count()
+            users.where("first").startsWithIgnoreCase("first").count(function (count) {
+                equal(count, 10, "Counting all 10");
+            });
+            users.where("first").startsWithIgnoreCase("first").limit(5).count(function (count) {
+                equal(count, 5, "algorithm + count(): limit(5).count()");
+            });
+            users.where("first").startsWithIgnoreCase("first").offset(7).count(function (count) {
+                equal(count, 3, "algorithm + count(): offset(7).count()");
+            });
+            users.where("first").startsWithIgnoreCase("first").offset(6).limit(4).count(function (count) {
+                equal(count, 4, "algorithm + count(): offset(6).limit(4)");
+            });
+            users.where("first").startsWithIgnoreCase("first").offset(7).limit(4).count(function (count) {
+                equal(count, 3, "algorithm + count(): offset(7).limit(4)");
+            });
+            users.where("first").startsWithIgnoreCase("first").offset(17).limit(4).count(function (count) {
+                equal(count, 0, "algorithm + count(): offset(17).limit(4)");
+            });
+            // Using algorithm + toArray()
+            users.where("first").startsWithIgnoreCase("first").limit(5).toArray(function (a) {
+                equal(a.length, 5, "algorithm + toArray(): limit(5)");
+            });
+            users.where("first").startsWithIgnoreCase("first").offset(7).toArray(function (a) {
+                equal(a.length, 3, "algorithm + toArray(): offset(7)");
+            });
+            users.where("first").startsWithIgnoreCase("first").offset(6).limit(4).toArray(function (a) {
+                equal(a.length, 4, "algorithm + toArray(): offset(6).limit(4)");
+            });
+            users.where("first").startsWithIgnoreCase("first").offset(7).limit(4).toArray(function (a) {
+                equal(a.length, 3, "algorithm + toArray(): offset(7).limit(4)");
+            });
+            users.where("first").startsWithIgnoreCase("first").offset(17).limit(4).toArray(function (a) {
+                equal(a.length, 0, "algorithm + toArray(): offset(17).limit(4)");
+            });
+            // Using IDBKeyRange + count()
+            users.where("first").startsWith("First").count(function (count) {
+                equal(count, 10, "IDBKeyRange + count() - count all 10");
+            });
+            users.where("first").startsWith("First").limit(5).count(function (count) {
+                equal(count, 5, "IDBKeyRange + count(): limit(5)");
+            });
+            users.where("first").startsWith("First").offset(7).count(function (count) {
+                equal(count, 3, "IDBKeyRange + count(): offset(7)");
+            });
+            users.where("first").startsWith("First").offset(6).limit(4).count(function (count) {
+                equal(count, 4, "IDBKeyRange + count(): offset(6)");
+            });
+            users.where("first").startsWith("First").offset(7).limit(4).count(function (count) {
+                equal(count, 3, "IDBKeyRange + count(): offset(7).limit(4)");
+            });
+            users.where("first").startsWith("First").offset(17).limit(4).count(function (count) {
+                equal(count, 0, "IDBKeyRange + count(): offset(17).limit(4)");
+            });
+            // Using IDBKeyRange + toArray()
+            users.where("first").startsWith("First").limit(5).toArray(function (a) {
+                equal(a.length, 5, "IDBKeyRange + toArray(): limit(5)");
+            });
+            users.where("first").startsWith("First").offset(7).toArray(function (a) {
+                equal(a.length, 3, "IDBKeyRange + toArray(): offset(7)");
+            });
+            users.where("first").startsWith("First").offset(6).limit(4).toArray(function (a) {
+                equal(a.length, 4, "IDBKeyRange + toArray(): offset(6).limit(4)");
+            });
+            users.where("first").startsWith("First").offset(7).limit(4).toArray(function (a) {
+                equal(a.length, 3, "IDBKeyRange + toArray(): offset(7).limit(4)");
+            });
+            users.where("first").startsWith("First").offset(17).limit(4).toArray(function (a) {
+                equal(a.length, 0, "IDBKeyRange + toArray(): offset(17).limit(4)");
+            });
+        }).catch(function (e) {
+            ok(false, e);
+        }).finally(start);
+    });
+
     asyncTest("first", 1, function () {
         db.users.orderBy("last").first(function (karlCeder) {
             equal(karlCeder.first, "Karl", "Got Karl");

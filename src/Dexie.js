@@ -410,6 +410,7 @@
                 // IE fails when deleting objectStore after reading from it.
                 // A future version of Dexie.js will stopover an intermediate version to workaround this.
                 // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
+                if (!indexedDB) throw new Error("indexedDB API not found. If using IE10+, make sure to run your code on a server URL (not locally). If using Safari, make sure to include indexedDB polyfill.");
                 var req = indexedDB.open(dbName, dbVersion * 10); 
                 req.onerror = function (e) {
                     isBeingOpened = false;
@@ -1026,6 +1027,7 @@
                 unique: "",
                 algorithm: null,
                 filter: null,
+                offset: 0,
                 limit: Infinity,
                 /// <field type="IDBTransaction" />
                 trans: null,
@@ -1119,7 +1121,7 @@
                 var self = this,
                     ctx = this._ctx;
 
-                if (ctx.filter || ctx.or) {
+                if (ctx.filter || ctx.algorithm || ctx.or) {
                     // When filters are applied or 'ored' collections are used, we must count manually
                     var count = 0;
                     return this._promise(function (resolve, reject) {
@@ -1132,7 +1134,7 @@
                         var req = (ctx.range ? idx.count(ctx.range) : idx.count());
                         req.onerror = eventRejectHandler(reject, ["calling", "count()", "on", self._name]);
                         req.onsuccess = function (e) {
-                            resolve(Math.min(e.target.result, self._ctx.limit));
+                            resolve(Math.min(e.target.result, Math.max(0, self._ctx.limit - self._ctx.offset)));
                         }
                     }, cb);
                 }
@@ -1172,6 +1174,25 @@
                         resolve(a);
                     }, reject);
                 }, cb);
+            },
+
+            offset: function (offset) {
+                var ctx = this._ctx;
+                if (offset <= 0) return this;
+                ctx.offset += offset; // For count()
+                if (!ctx.or && !ctx.algorithm && !ctx.filter) {
+                    this._addFilter(function offsetFilter(cursor, advance, resolve) {
+                        if (offset === 0) return true;
+                        if (offset === 1) { --offset; return false; }
+                        advance(function () { cursor.advance(offset); offset = 0; });
+                        return false;
+                    });
+                } else {
+                    this._addFilter(function offsetFilter(cursor, advance, resolve) {
+                        return (--offset < 0);
+                    });
+                }
+                return this;
             },
 
             limit: function (numRows) {
