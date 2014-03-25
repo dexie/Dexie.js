@@ -393,50 +393,57 @@
         this.open = function () {
             return new Promise(function (resolve, reject) {
                 if (db) throw new Error("Database already open");
-                // Make sure caller has specified at least one version
-                if (versions.length == 0) throw new Error("No versions specified. Need to call version(ver) method");
-                // Make sure at least the oldest version specifies a table schema
-                if (!versions[0]._cfg.tableSchema) throw new Error("No schema specified. Need to call dbInstance.version(ver).stores(schema) on at least the lowest version.");
-                // Sort versions and make all Version instances have a schema (its own or previous if not specified)
-                versions.sort(lowerVersionFirst).reduce(function (prev, ver) {
-                    if (!ver._cfg.tableSchema) ver._cfg.tableSchema = prev._cfg.tableSchema;
-                    return ver;
-                });
-            
-                dbOpenError = null;
-                isBeingOpened = true;
-
-                // Multiply dbVersion with 10 will be needed to workaround upgrading bug in IE: 
-                // IE fails when deleting objectStore after reading from it.
-                // A future version of Dexie.js will stopover an intermediate version to workaround this.
-                // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
-                if (!indexedDB) throw new Error("indexedDB API not found. If using IE10+, make sure to run your code on a server URL (not locally). If using Safari, make sure to include indexedDB polyfill.");
-                var req = indexedDB.open(dbName, dbVersion * 10); 
-                req.onerror = function (e) {
+                function openError(err) {
                     isBeingOpened = false;
-                    dbOpenError = e.target.error;
+                    dbOpenError = err;
                     reject(dbOpenError);
                     pausedResumeables.forEach(function (tf) {
                         // Resume all stalled operations. They will fail once they wake up.
                         tf.resume();
                     });
                 }
-                req.onblocked = database.on("blocked").fire;
-                req.onupgradeneeded = function (e) {
-                    req.transaction.onerror = function (e) {
-                        reject (e.target.error);
-                    };
-                    runUpgraders(e.oldVersion / 10, req.transaction, reject);
-                }
-                req.onsuccess = function (e) {
-                    isBeingOpened = false;
-                    db = req.result;
-                    db.onversionchange = database.on("versionchange").fire;
-                    pausedResumeables.forEach(function (tf) {
-                        // If anyone has made operations on a table instance before the database was opened, the operations will start executing now.
-                        tf.resume();
+                try {
+                    dbOpenError = null;
+                    isBeingOpened = true;
+
+                    // Make sure caller has specified at least one version
+                    if (versions.length == 0) throw new Error("No versions specified. Need to call version(ver) method");
+                    // Make sure at least the oldest version specifies a table schema
+                    if (!versions[0]._cfg.tableSchema) throw new Error("No schema specified. Need to call dbInstance.version(ver).stores(schema) on at least the lowest version.");
+                    // Sort versions and make all Version instances have a schema (its own or previous if not specified)
+                    versions.sort(lowerVersionFirst).reduce(function (prev, ver) {
+                        if (!ver._cfg.tableSchema) ver._cfg.tableSchema = prev._cfg.tableSchema;
+                        return ver;
                     });
-                    pausedResumeables = [];
+            
+                    // Multiply dbVersion with 10 will be needed to workaround upgrading bug in IE: 
+                    // IE fails when deleting objectStore after reading from it.
+                    // A future version of Dexie.js will stopover an intermediate version to workaround this.
+                    // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
+                    if (!indexedDB) throw new Error("indexedDB API not found. If using IE10+, make sure to run your code on a server URL (not locally). If using Safari, make sure to include indexedDB polyfill.");
+                    var req = indexedDB.open(dbName, dbVersion * 10); 
+                    req.onerror = function (e) {
+                        openError(e.target.error);
+                    };
+                    req.onblocked = database.on("blocked").fire;
+                    req.onupgradeneeded = function (e) {
+                        req.transaction.onerror = function (e) {
+                            reject(e.target.error);
+                        };
+                        runUpgraders(e.oldVersion / 10, req.transaction, reject);
+                    };
+                    req.onsuccess = function (e) {
+                        isBeingOpened = false;
+                        db = req.result;
+                        db.onversionchange = database.on("versionchange").fire;
+                        pausedResumeables.forEach(function (tf) {
+                            // If anyone has made operations on a table instance before the database was opened, the operations will start executing now.
+                            tf.resume();
+                        });
+                        pausedResumeables = [];
+                    };
+                } catch (err) {
+                    openError(err);
                 }
             });
         }
@@ -1530,6 +1537,7 @@
             create: function () {
                 // Since this is a Multi-request transaction factory, we cache the transaction object once it has been created and continue using it.
                 if (this.trans) return this.trans;
+                if (!db) throw dbOpenError;
                 var self = this;
                 this.trans = db.transaction(this.storeNames, this.mode);
                 this.trans.onerror = function (e) {
