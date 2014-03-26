@@ -3,7 +3,7 @@
 
    By David Fahlander, david.fahlander@gmail.com
 
-   Version 0.9.3a - March 25, 2014.
+   Version 0.9.4 - DATE, 2014.
 
    Tested successfully on Chrome, IE11, Firefox and Opera.
 
@@ -953,7 +953,7 @@
                 startsWith: function (str) {
                     /// <param name="str" type="String"></param>
                     if (typeof (str) != 'string') return fail(new Collection(this), new TypeError("String expected"));
-                    return this.between(str, str + '\uffff', true, true);
+                    return this.between(str, str + String.fromCharCode(65535), true, true);
                 },
                 startsWithIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
@@ -2051,7 +2051,7 @@
     }
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-    Dexie.version = 0.93;
+    Dexie.version = 0.94;
 
     // Publish the Dexie to browser or NodeJS environment.
     publish("Dexie", Dexie);
