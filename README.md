@@ -30,17 +30,13 @@ A bullet proof indexedDB wrapper.
  * Simplified upgrading framework
  * Thoroughly unit tested
 
-API Reference
+Documentation
 -------------
-https://github.com/dfahlander/Dexie.js/wiki/API%20Reference
+https://github.com/dfahlander/Dexie.js/wiki/Dexie.js
 
-Tutorial
+Download
 --------
-https://github.com/dfahlander/Dexie.js/wiki/Tutorial
-
-Hello World Example
--------------------
-https://github.com/dfahlander/Dexie.js/wiki/Hello%20World
-
+https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.js
+https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.min.js
 
 
