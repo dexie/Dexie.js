@@ -16,9 +16,7 @@
         db.version(1).stores({
             friends: "++id,name,shoeSize"
         });
-        db.open().catch(function (e) {
-            log("Error opening database: " + e, "error");
-        });
+        db.open();
 
         //
         // Populate some data
