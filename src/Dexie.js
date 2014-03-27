@@ -15,6 +15,26 @@
 
     "use strict";
 
+    function extend(obj, extended) {
+        Object.keys(extended).forEach(function (key) {
+            obj[key] = extended[key];
+        });
+    }
+
+    function derive(Child) {
+        return {
+            from: function (Parent) {
+                Child.prototype = Object.create(Parent.prototype);
+                Child.prototype.constructor = Child;
+                return {
+                    extend: function (extension) {
+                        extend(Child.prototype, typeof (extension) === 'function' ? extension() : extension);
+                    }
+                };
+            }
+        };
+    }
+
     function Dexie(dbName) {
 
         // Resolve all external dependencies:
@@ -61,26 +81,6 @@
                     */
                 };
             });
-        }
-
-        function extend(obj, extended) {
-            Object.keys(extended).forEach(function (key) {
-                obj[key] = extended[key];
-            });
-        }
-
-        function derive(Child) {
-            return {
-                from: function (Parent) {
-                    Child.prototype = Object.create(Parent.prototype);
-                    Child.prototype.constructor = Child;
-                    return {
-                        extend: function (extension) {
-                            extend(Child.prototype, extension);
-                        }
-                    };
-                }
-            };
         }
 
         //
@@ -479,10 +479,10 @@
         }
 
         //
-        // Events: populate, ready and error
+        // Events
         //
 
-        this.on = events(this, "error", "ready", "populate", "blocked", "versionchange");
+        this.on = events(this, "error", "populate", "blocked", "versionchange");
 
         fake(function () {
             database.on("populate").fire(new WriteableTransaction(new TransactionFactory(), dbStoreNames));
@@ -713,7 +713,10 @@
             WriteableTable.call(this, name, transactionFactory);
         }
 
-        (function () {
+        derive(ObjectMappableTable).from(WriteableTable).extend(function(){
+            //
+            // Private scope
+            //
 
             function parseType(type) {
                 if (typeof (type) == 'function') {
@@ -735,7 +738,10 @@
                 });
             }
 
-            derive(ObjectMappableTable).from(WriteableTable).extend({
+            //
+            // Return public API (extended via prototype)
+            // 
+            return {
                 mapToClass: function (constructor, structure) {
                     /// <summary>
                     ///     Map table to a javascript constructor function. Objects returned from the database will be instances of this class, making
@@ -767,8 +773,8 @@
                     this._instanceTemplate = template;
                     return this._mappedClass;
                 }
-            });
-        })();
+            };
+        });
 
         function Transaction(tf, storeNames, tableClass) {
             /// <summary>
@@ -841,7 +847,8 @@
             }
         }
 
-        (function () {
+        derive(WhereClause).from(Dexie.WhereClause).extend (function(){
+
             // WhereClause private methods
 
             function fail(collection, err) {
@@ -917,8 +924,10 @@
                 });
             }
 
+            //
             // WhereClause public methods
-            derive(WhereClause).from(Dexie.WhereClause).extend ({
+            //
+            return {
                 between: function (lower, upper, includeLower, includeUpper) {
                     /// <summary>
                     ///     Filter out records whose where-field lays between given lower and upper values. Applies to Strings, Numbers and Dates.
@@ -1003,8 +1012,8 @@
                     });
                     return c;
                 }
-            });
-        })();
+            };
+        });
 
 
 
@@ -1598,19 +1607,6 @@
             }
         });
 
-        function assert(b) {
-            if (!b) throw new Error("Assertion failed");
-        }
-
-        function asap (fn) {
-            if (window.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
-        }
-
-        function trycatch(fn, reject) {
-            return function () {
-                try { fn.apply(this, arguments); } catch (e) { reject(e); };
-            };
-        }
 
         function combine(filter1, filter2) {
             return filter1 ? filter2 ? function () { return filter1.apply(this, arguments) && filter2.apply(this, arguments) } : filter1 : filter2;
@@ -1684,79 +1680,6 @@
                     return false;
                 }
             };
-        }
-
-        function events(ctx, eventNames) {
-            var args = arguments;
-
-            var evs = {};
-            function add (eventName) {
-                function fire (val) {
-                    for (var i=this.l.length -1; i>=0; --i) {
-                        if (this.l[i](val) === false) return false;
-                    }
-                }
-                evs[eventName] = {
-                    l: [],
-                    f: fire,
-                    s: function(cb) { this.l.push(cb);},
-                    u: function(cb) {
-                        this.l = this.l.filter(function(fn){ return fn !== cb; });
-                    }
-                }
-                return fire;
-            }
-
-            function promise(success, fail) {
-                var res = add(success);
-                var rej = add(fail);
-                var promise = new Promise(function (resolve, reject) {
-                    evs[success].f = resolve;
-                    evs[fail].f = reject;
-                });
-                evs[success].p = promise;
-                promise.then(function (val) {
-                    res.call(evs[success], val);
-                }, function (val) {
-                    rej.call(evs[fail], val);
-                });
-            }
-
-            for (var i = 1, l = args.length; i < l; ++i) {
-                var eventName = args[i];
-                if (typeof (eventName) == 'string') {
-                    // non-promise event
-                    add(eventName);
-                } else {
-                    // promise-based event pair (i.e. we promise to call one and only one of the events in the pair, and to only call it once (unless reset() is called))
-                    promise(eventName[0], eventName[1]);
-                }
-            }
-            var rv = function (eventName, subscriber) {
-                if (subscriber) {
-                    // Subscribe
-                    evs[eventName].s(subscriber);
-                    return ctx;
-                } else if (typeof (eventName) === 'string') {
-                    // Return interface allowing to fire or unsubscribe from event
-                    return {
-                        fire: function (val) {
-                            evs[eventName].f(val);
-                        },
-                        unsubscribe: function (fn) {
-                            evs[eventName].u(fn);
-                        },
-                    };
-                } else {
-                    // Return interface allowing access to backend Promise and resetting.
-                    var success = eventName[0], fail = eventName[1];
-                    return {
-                        getPromise: function () {return evs[success].p;},
-                        //reset: function () { promise(success, fail);} Reset not used anymore
-                    };
-                }
-            }
-            return rv;
         }
 
         function hasIEDeleteObjectStoreBug() {
@@ -2014,6 +1937,95 @@
     })();
 
 
+    function events(ctx, eventNames) {
+        var args = arguments;
+
+        var evs = {};
+        function add(eventName) {
+            function fire(val) {
+                for (var i = this.l.length - 1; i >= 0; --i) {
+                    if (this.l[i](val) === false) return false;
+                }
+            }
+            evs[eventName] = {
+                l: [],
+                f: fire,
+                s: function (cb) { this.l.push(cb); },
+                u: function (cb) {
+                    this.l = this.l.filter(function (fn) { return fn !== cb; });
+                }
+            }
+            return fire;
+        }
+
+        function promise(success, fail) {
+            var res = add(success);
+            var rej = add(fail);
+            var promise = new Promise(function (resolve, reject) {
+                evs[success].f = resolve;
+                evs[fail].f = reject;
+            });
+            evs[success].p = promise;
+            promise.then(function (val) {
+                res.call(evs[success], val);
+            }, function (val) {
+                rej.call(evs[fail], val);
+            });
+        }
+
+        for (var i = 1, l = args.length; i < l; ++i) {
+            var eventName = args[i];
+            if (typeof (eventName) == 'string') {
+                // non-promise event
+                add(eventName);
+            } else {
+                // promise-based event pair (i.e. we promise to call one and only one of the events in the pair, and to only call it once (unless reset() is called))
+                promise(eventName[0], eventName[1]);
+            }
+        }
+        var rv = function (eventName, subscriber) {
+            if (subscriber) {
+                // Subscribe
+                evs[eventName].s(subscriber);
+                return ctx;
+            } else if (typeof (eventName) === 'string') {
+                // Return interface allowing to fire or unsubscribe from event
+                return {
+                    fire: function (val) {
+                        evs[eventName].f(val);
+                    },
+                    unsubscribe: function (fn) {
+                        evs[eventName].u(fn);
+                    },
+                };
+            } else {
+                // Return interface allowing access to backend Promise and resetting.
+                var success = eventName[0], fail = eventName[1];
+                return {
+                    getPromise: function () { return evs[success].p; },
+                    //reset: function () { promise(success, fail);} Reset not used anymore
+                };
+            }
+        }
+        return rv;
+    }
+
+    function assert(b) {
+        if (!b) throw new Error("Assertion failed");
+    }
+
+    function asap(fn) {
+        if (window.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
+    }
+
+    function trycatch(fn, reject) {
+        return function () {
+            try { fn.apply(this, arguments); } catch (e) { reject(e); };
+        };
+    }
+
+
+
     Dexie.delete = function (databaseName) {
         var db = new Dexie(databaseName),
             promise = db.delete();
@@ -2025,10 +2037,17 @@
     }
 
     // Define the very-base classes of the framework, in case any 3rd part library wants to extend the prototype of these classes
-    Dexie.Collection = function () { };
-    Dexie.Table = function () { };
-    Dexie.Transaction = function () { };
-    Dexie.WhereClause = function () { };
+    Dexie.Collection = function () { }; // Allows addons to extend Dexie.Collection.prototype
+    Dexie.Table = function () { };      // Allows addons to extend Dexie.Table.prototype
+    Dexie.Transaction = function () { };// Allows addons to extend Dexie.Transaction.prototype
+    Dexie.WhereClause = function () { };// Allows addons to extend Dexie.WhereClause.prototype
+    // Export our Promise implementation since it can be handy as a standalone Promise implementation
+    Dexie.Promise = Promise;
+    // Export our derive/extend methodology
+    Dexie.derive = derive;
+    Dexie.extend = extend;
+    // Export our events() function - can be handy as a toolkit
+    Dexie.events = events;
 
     //
     // Dependencies
@@ -2043,8 +2062,8 @@
         IDBKeyRange: window.IDBKeyRange || window.webkitIDBKeyRange,
         IDBTransaction: window.IDBTransaction || window.webkitIDBTransaction,
         // Optional:
-        Promise: window.Promise, // If not present, it is polyfilled by PromiseLight in this JS-file.
         Error: window.Error || String,
+        SyntaxError: window.SyntaxError || String,
         TypeError: window.TypeError || String,
         RangeError: window.RangeError || String,
         DOMError: window.DOMError || String
