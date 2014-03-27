@@ -1053,47 +1053,39 @@
             }
         }
 
-        derive(Collection).from(Dexie.Collection).extend({
-            _addFilter: function (fn) {
-                var ctx = this._ctx;
+        derive(Collection).from(Dexie.Collection).extend(function () {
+            //
+            // Private methods
+            //
+            function addFilter(ctx, fn) {
                 ctx.filter = combine(ctx.filter, fn);
-            },
+            }
 
-            _addAlgorithm: function (fn) {
-                var ctx = this._ctx;
-                ctx.algorithm = combine(ctx.algorithm, fn);
-            },
-
-            _getIndexOrStore: function (mode) {
-                var ctx = this._ctx;
+            function getIndexOrStore(ctx, mode) {
                 ctx.trans = ctx.tf.create(ctx.table, mode || R);
                 var store = ctx.trans.objectStore(ctx.table),
                     index = ctx.index;
                 return (!index || (store.keyPath && index === store.keyPath)) ? store : store.index(index);
-            },
+            }
 
-            _openCursor: function (mode) {
-                var ctx = this._ctx;
-                return this._getIndexOrStore(mode)[ctx.op](ctx.range || null, ctx.dir + ctx.unique);
-            },
-            
-            _promise: function (fn, cb) {
-                var ctx = this._ctx;
+            function openCursor(ctx, mode) {
+                return getIndexOrStore(ctx, mode)[ctx.op](ctx.range || null, ctx.dir + ctx.unique);
+            }
+
+            function promise(ctx, fn, cb) {
                 function rejector(resolve, reject) { asap(function () { reject(ctx.error); }) };
                 if (ctx.error) {
                     return ctx.tf.createPromise(rejector);
                 } else {
                     return ctx.tf.createPromise(fn).then(cb);
                 }
-            },
+            }
 
-            _iterate: function (fn, resolve, reject, mode) {
-                var self = this,
-                    ctx = this._ctx,
-                    mappedClass = database[ctx.table]._mappedClass;
-                
+            function iter (ctx, fn, resolve, reject, mode) {
+                var mappedClass = database[ctx.table]._mappedClass;
+
                 if (!ctx.or) {
-                    iterate(this._openCursor(mode), combine(ctx.algorithm, ctx.filter), fn, resolve, reject, mappedClass && mappedClass.prototype);
+                    iterate(openCursor(ctx, mode), combine(ctx.algorithm, ctx.filter), fn, resolve, reject, mappedClass && mappedClass.prototype);
                 } else {
                     (function () {
                         var filter = ctx.filter;
@@ -1107,7 +1099,7 @@
 
                         function union(item, cursor, advance) {
                             if (!filter || filter(cursor, advance, resolveboth, reject)) {
-                                var key = JSON.stringify(getByKeyPath(item, primKey));
+                                var key = JSON.stringify(cursor.primaryKey);
                                 if (!set.hasOwnProperty(key)) {
                                     set[key] = true;
                                     fn(item, cursor, advance);
@@ -1116,180 +1108,201 @@
                         }
 
                         ctx.or._iterate(union, resolveboth, reject, mode);
-                        iterate(self._openCursor(mode), ctx.algorithm, union, resolveboth, reject, mappedClass && mappedClass.prototype);
+                        iterate(openCursor(ctx, mode), ctx.algorithm, union, resolveboth, reject, mappedClass && mappedClass.prototype);
                     })();
                 }
-            },
-
-            each: function (fn) {
-                var self = this,
-                    ctx = this._ctx;
-
-                fake(function () { fn(getInstanceTemplate(ctx.table)); });
-
-                return this._promise(function (resolve, reject) {
-                    self._iterate(fn, resolve, reject);
-                });
-            },
-
-            count: function (cb) {
-                fake(function () { cb(0); });
-                var self = this,
-                    ctx = this._ctx;
-
-                if (ctx.filter || ctx.algorithm || ctx.or) {
-                    // When filters are applied or 'ored' collections are used, we must count manually
-                    var count = 0;
-                    return this._promise(function (resolve, reject) {
-                        self._iterate(function () { ++count; return false; }, function () { resolve(count); }, reject);
-                    }, cb);
-                } else {
-                    // Otherwise, we can use the count() method if the index.
-                    return this._promise(function (resolve, reject) {
-                        var idx = self._getIndexOrStore();
-                        var req = (ctx.range ? idx.count(ctx.range) : idx.count());
-                        req.onerror = eventRejectHandler(reject, ["calling", "count()", "on", self._name]);
-                        req.onsuccess = function (e) {
-                            resolve(Math.min(e.target.result, Math.max(0, self._ctx.limit - self._ctx.offset)));
-                        }
-                    }, cb);
-                }
-            },
-
-            sortBy: function (keyPath, cb) {
-                /// <param name="keyPath" type="String"></param>
-                var ctx = this._ctx;
-                fake(function () { cb([getInstanceTemplate(ctx.table)]); });
-                var parts = keyPath.split('.').reverse(),
-                    lastPart = parts[0],
-                    lastIndex = parts.length - 1;
-                function getval(obj, i) {
-                    if (i) return getval(obj[parts[i]], i - 1);
-                    return obj[lastPart];
-                }
-                var order = this._ctx.dir === "next" ? 1 : -1;
-                
-                function sorter (a, b) {
-                    var aVal = getval(a, lastIndex),
-                        bVal = getval(b, lastIndex);
-                    return aVal < bVal ? -order : aVal > bVal ? order : 0;
-                }
-                return this.toArray(function (a) {
-                    return a.sort(sorter);
-                }).then(cb);
-            },
-
-            toArray: function (cb) {
-                var self = this,
-                    ctx = this._ctx;
-                fake(function () { cb([getInstanceTemplate(ctx.table)]); });
-
-                return this._promise(function (resolve, reject) {
-                    var a = [];
-                    self._iterate(function (item) { a.push(item); }, function arrayComplete() {
-                        resolve(a);
-                    }, reject);
-                }, cb);
-            },
-
-            offset: function (offset) {
-                var ctx = this._ctx;
-                if (offset <= 0) return this;
-                ctx.offset += offset; // For count()
-                if (!ctx.or && !ctx.algorithm && !ctx.filter) {
-                    this._addFilter(function offsetFilter(cursor, advance, resolve) {
-                        if (offset === 0) return true;
-                        if (offset === 1) { --offset; return false; }
-                        advance(function () { cursor.advance(offset); offset = 0; });
-                        return false;
-                    });
-                } else {
-                    this._addFilter(function offsetFilter(cursor, advance, resolve) {
-                        return (--offset < 0);
-                    });
-                }
-                return this;
-            },
-
-            limit: function (numRows) {
-                this._ctx.limit = Math.min(this._ctx.limit, numRows); // For count()
-                this._addFilter(function (cursor, advance, resolve) {
-                    if (--numRows <= 0) advance(resolve); // Stop after this item has been included
-                    return numRows >= 0; // If numRows is already below 0, return false because then 0 was passed to numRows initially. Otherwise we wouldnt come here.
-                });
-                return this;
-            },
-
-            first: function (cb) {
-                var self = this;
-                fake(function () { cb(getInstanceTemplate(self._ctx.table)); });
-                return this.limit(1).toArray(function (a) { return a[0] }).then(cb);
-            },
-
-            last: function (cb) {
-                return this.desc().first(cb);
-            },
-
-            and: function (filterFunction) {
-                /// <param name="jsFunctionFilter" type="Function">function(val){return true/false}</param>
-                var self = this;
-                fake(function () { filterFunction(getInstanceTemplate(self._ctx.table)); });
-                this._addFilter(function (cursor) {
-                    return filterFunction(cursor.value);
-                });
-                return this;
-            },
-
-            or: function (indexName) {
-                return new WhereClause(this._ctx.tf, this._ctx.table, indexName, this.constructor, this);
-            },
-
-            desc: function () {
-                this._ctx.dir = (this._ctx.dir == "prev" ? "next" : "prev");
-                if (this._ondirectionchange) this._ondirectionchange(this._ctx.dir);
-                return this;
-            },
-
-            eachKey: function (cb) {
-                var self = this;
-                fake(function () { cb(getInstanceTemplate(self._ctx.table)[self._ctx.index]); });
-                this._ctx.op = "openKeyCursor";
-                return this.each(function (val, cursor) { cb(cursor.key); });
-            },
-
-            eachUniqueKey: function (cb) {
-                this._ctx.unique = "unique";
-                return this.eachKey(cb);
-            },
-
-            keys: function (cb) {
-                fake(function () { cb([getInstanceTemplate(ctx.table)[self._ctx.index]]); });
-                var self = this,
-                    ctx = this._ctx;
-                this._ctx.op = "openKeyCursor";
-                var a = [];
-                return this.each(function (item, cursor) {
-                    a.push(cursor.key);
-                }).then(function () {
-                    return a;
-                }).then(cb);
-            },
-
-            uniqueKeys: function (cb) {
-                this._ctx.unique = "unique";
-                return this.keys(cb);
-            },
-
-            distinct: function () {
-                var set = {};
-                this._addFilter(function (cursor) {
-                    var strKey = JSON.stringify(cursor.primaryKey);
-                    var found = set.hasOwnProperty(strKey);
-                    set[strKey] = true;
-                    return !found;
-                });
-                return this;
             }
+
+
+            return {
+                //
+                // Protected methods
+                //
+                _addAlgorithm: function (fn) {
+                    var ctx = this._ctx;
+                    ctx.algorithm = combine(ctx.algorithm, fn);
+                },
+
+                _promise: function (fn, cb) {
+                    return promise(this._ctx, fn, cb);
+                },
+
+                _iterate: function (fn, resolve, reject, mode) {
+                    return iter (this._ctx, fn, resolve, reject, mode);
+                },
+
+                //
+                // Public methods
+                //
+                each: function (fn) {
+                    var ctx = this._ctx;
+
+                    fake(function () { fn(getInstanceTemplate(ctx.table)); });
+
+                    return promise(ctx, function (resolve, reject) {
+                        iter(ctx, fn, resolve, reject);
+                    });
+                },
+
+                count: function (cb) {
+                    fake(function () { cb(0); });
+                    var self = this,
+                        ctx = this._ctx;
+
+                    if (ctx.filter || ctx.algorithm || ctx.or) {
+                        // When filters are applied or 'ored' collections are used, we must count manually
+                        var count = 0;
+                        return promise(ctx, function (resolve, reject) {
+                            iter(ctx, function () { ++count; return false; }, function () { resolve(count); }, reject);
+                        }, cb);
+                    } else {
+                        // Otherwise, we can use the count() method if the index.
+                        return promise(ctx, function (resolve, reject) {
+                            var idx = getIndexOrStore(ctx);
+                            var req = (ctx.range ? idx.count(ctx.range) : idx.count());
+                            req.onerror = eventRejectHandler(reject, ["calling", "count()", "on", self._name]);
+                            req.onsuccess = function (e) {
+                                resolve(Math.min(e.target.result, Math.max(0, ctx.limit - ctx.offset)));
+                            }
+                        }, cb);
+                    }
+                },
+
+                sortBy: function (keyPath, cb) {
+                    /// <param name="keyPath" type="String"></param>
+                    var ctx = this._ctx;
+                    fake(function () { cb([getInstanceTemplate(ctx.table)]); });
+                    var parts = keyPath.split('.').reverse(),
+                        lastPart = parts[0],
+                        lastIndex = parts.length - 1;
+                    function getval(obj, i) {
+                        if (i) return getval(obj[parts[i]], i - 1);
+                        return obj[lastPart];
+                    }
+                    var order = this._ctx.dir === "next" ? 1 : -1;
+
+                    function sorter(a, b) {
+                        var aVal = getval(a, lastIndex),
+                            bVal = getval(b, lastIndex);
+                        return aVal < bVal ? -order : aVal > bVal ? order : 0;
+                    }
+                    return this.toArray(function (a) {
+                        return a.sort(sorter);
+                    }).then(cb);
+                },
+
+                toArray: function (cb) {
+                    var ctx = this._ctx;
+
+                    fake(function () { cb([getInstanceTemplate(ctx.table)]); });
+
+                    return promise(ctx, function (resolve, reject) {
+                        var a = [];
+                        iter(ctx, function (item) { a.push(item); }, function arrayComplete() {
+                            resolve(a);
+                        }, reject);
+                    }, cb);
+                },
+
+                offset: function (offset) {
+                    var ctx = this._ctx;
+                    if (offset <= 0) return this;
+                    ctx.offset += offset; // For count()
+                    if (!ctx.or && !ctx.algorithm && !ctx.filter) {
+                        addFilter(ctx, function offsetFilter(cursor, advance, resolve) {
+                            if (offset === 0) return true;
+                            if (offset === 1) { --offset; return false; }
+                            advance(function () { cursor.advance(offset); offset = 0; });
+                            return false;
+                        });
+                    } else {
+                        addFilter(ctx, function offsetFilter(cursor, advance, resolve) {
+                            return (--offset < 0);
+                        });
+                    }
+                    return this;
+                },
+
+                limit: function (numRows) {
+                    this._ctx.limit = Math.min(this._ctx.limit, numRows); // For count()
+                    addFilter(this._ctx, function (cursor, advance, resolve) {
+                        if (--numRows <= 0) advance(resolve); // Stop after this item has been included
+                        return numRows >= 0; // If numRows is already below 0, return false because then 0 was passed to numRows initially. Otherwise we wouldnt come here.
+                    });
+                    return this;
+                },
+
+                first: function (cb) {
+                    var self = this;
+                    fake(function () { cb(getInstanceTemplate(self._ctx.table)); });
+                    return this.limit(1).toArray(function (a) { return a[0] }).then(cb);
+                },
+
+                last: function (cb) {
+                    return this.desc().first(cb);
+                },
+
+                and: function (filterFunction) {
+                    /// <param name="jsFunctionFilter" type="Function">function(val){return true/false}</param>
+                    var self = this;
+                    fake(function () { filterFunction(getInstanceTemplate(self._ctx.table)); });
+                    addFilter(this._ctx, function (cursor) {
+                        return filterFunction(cursor.value);
+                    });
+                    return this;
+                },
+
+                or: function (indexName) {
+                    return new WhereClause(this._ctx.tf, this._ctx.table, indexName, this.constructor, this);
+                },
+
+                desc: function () {
+                    this._ctx.dir = (this._ctx.dir == "prev" ? "next" : "prev");
+                    if (this._ondirectionchange) this._ondirectionchange(this._ctx.dir);
+                    return this;
+                },
+
+                eachKey: function (cb) {
+                    var self = this;
+                    fake(function () { cb(getInstanceTemplate(self._ctx.table)[self._ctx.index]); });
+                    this._ctx.op = "openKeyCursor";
+                    return this.each(function (val, cursor) { cb(cursor.key); });
+                },
+
+                eachUniqueKey: function (cb) {
+                    this._ctx.unique = "unique";
+                    return this.eachKey(cb);
+                },
+
+                keys: function (cb) {
+                    fake(function () { cb([getInstanceTemplate(ctx.table)[self._ctx.index]]); });
+                    var self = this,
+                        ctx = this._ctx;
+                    this._ctx.op = "openKeyCursor";
+                    var a = [];
+                    return this.each(function (item, cursor) {
+                        a.push(cursor.key);
+                    }).then(function () {
+                        return a;
+                    }).then(cb);
+                },
+
+                uniqueKeys: function (cb) {
+                    this._ctx.unique = "unique";
+                    return this.keys(cb);
+                },
+
+                distinct: function () {
+                    var set = {};
+                    addFilter(this._ctx, function (cursor) {
+                        var strKey = JSON.stringify(cursor.primaryKey);
+                        var found = set.hasOwnProperty(strKey);
+                        set[strKey] = true;
+                        return !found;
+                    });
+                    return this;
+                }
+            };
         });
 
         function WriteableCollection() {
