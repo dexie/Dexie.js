@@ -1266,7 +1266,7 @@
                     var self = this;
                     fake(function () { cb(getInstanceTemplate(self._ctx.table)[self._ctx.index]); });
                     this._ctx.op = "openKeyCursor";
-                    return this.each(function (val, cursor) { cb(cursor.key); });
+                    return this.each(function (val, cursor) { cb(cursor.key, cursor); });
                 },
 
                 eachUniqueKey: function (cb) {
