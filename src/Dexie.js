@@ -1316,34 +1316,59 @@
 
                 return this._promise(function (resolve, reject) {
                     if (!ctx.oneshot) ctx.tf.pause(); // If in transaction (not oneshot), make next read operation in same transaction wait to execute until we are node modifying. Caller doenst need to wait for then(). Easier code!
-                    var keys = Object.keys(changes);
-                    var getters = keys.map(function (key) {
-                        var value = changes[key];
-                        return (value instanceof Function ? value : function () { return value });
-                    });
+
+                    var keyPaths = Object.keys(changes);
+                    var numKeys = keyPaths.length;
+                    var modifyer;
+                    if (typeof (changes) === 'function') {
+                        modifyer = changes;
+                    } else {
+                        modifyer = function (item) {
+                            for (var i = 0; i < numKeys; ++i) {
+                                var keyPath = keyPaths[i];
+                                setByKeyPath(item, keyPath, changes[keyPath]);
+                            }
+                        }
+                    }
+
                     var count = 0;
+                    var successCount = 0;
+                    var iterationComplete = false;
+                    var stop = false;
 
                     function modifyItem(item, cursor, advance) {
                         ++count;
-                        for (var i = 0, l = keys.length; i < l; ++i) {
-                            item[keys[i]] = getters[i](item);
+                        if (stop) {
+                            advance(function () { });
+                            return;
                         }
+                        modifyer(item);
                         var req = cursor.update(item);
                         req.onerror = eventRejectHandler(function (e) {
-                            advance(function () { }); // Stop iterating
                             var catched = reject(e);
-                            if (catched && ctx.oneshot) ctx.tf.resume();
+                            if (!catched) stop = true;
+                            if (catched && !ctx.oneshot) ctx.tf.resume();
                             return catched;
                         }, function () { return ["modifying", item, "on", ctx.table]; });
+                        req.onsuccess = function () {
+                            ++successCount;
+                            if (iterationComplete && successCount === count) {
+                                ctx.tf.resume();
+                                resolve(successCount);
+                            }
+                        }
                     }
 
                     if (ctx.oneshot) {
                         self._iterate(modifyItem, function () { }, reject, RW);
-                        ctx.trans.oncomplete = function () { resolve(count); };
+                        ctx.trans.oncomplete = function () { resolve(successCount); };
                     } else {
                         self._iterate(modifyItem, function () {
-                            ctx.tf.resume();
-                            resolve(count);
+                            iterationComplete = true;
+                            if (successCount == count) {
+                                ctx.tf.resume();
+                                resolve(successCount);
+                            }
                         }, reject, RW);
                     }
                 });

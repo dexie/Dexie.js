@@ -238,8 +238,25 @@
         db.transaction("rw", db.users, function (users) {
             var currentTime = new Date();
             users.modify({
-                fullName: function (user) { return user.first + " " + user.last },
                 lastUpdated: currentTime
+            });
+            users.toArray(function (a) {
+                equal(a.length, 2, "Length ok");
+                equal(a[0].first, "David", "First is David");
+                equal(a[0].lastUpdated.getTime(), currentTime.getTime(), "Could set new member lastUpdated on David");
+                equal(a[1].lastUpdated.getTime(), currentTime.getTime(), "Could set new member lastUpdated on Karl");
+            });
+        }).catch(function (e) {
+            ok(false, e);
+        }).finally(start);
+    });
+
+    asyncTest("modify-using-function", function () {
+        db.transaction("rw", db.users, function (users) {
+            var currentTime = new Date();
+            users.modify(function(user) {
+                user.fullName = user.first + " " + user.last;
+                user.lastUpdated = currentTime;
             });
             users.toArray(function (a) {
                 equal(a.length, 2);
@@ -252,6 +269,23 @@
             ok(false, e);
         }).finally(start);
     });
+
+    asyncTest("modify-causing-error", function () {
+        db.transaction("rw", db.users, function (users) {
+            var currentTime = new Date();
+            users.modify(function (user) {
+                user.id = 1;
+                user.fullName = user.first + " " + user.last;
+                user.lastUpdated = currentTime;
+            });
+            users.toArray(function (a) {
+                ok(false, "Should not come here, beacuse we should get error when setting all primkey to 1");
+            });
+        }).catch(function (e) {
+            ok(true, "Got error: " + e);
+        }).finally(start);
+    });
+
 
     asyncTest("delete", 2, function () {
         db.users.orderBy("id").delete().then(function (numDeleted) {
