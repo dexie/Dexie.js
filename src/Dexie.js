@@ -3,7 +3,7 @@
 
    By David Fahlander, david.fahlander@gmail.com
 
-   Version 0.9.5 - DATE, YEAR.
+   Version 0.9.6 - DATE, YEAR.
 
    Tested successfully on Chrome, IE11, Firefox and Opera.
 
