@@ -159,7 +159,7 @@
             upgrade: function (upgradeFunction) {
                 /// <param name="upgradeFunction" optional="true">Function that performs upgrading actions.</param>
                 var self = this;
-                fake(function () {
+                fakeAutoComplete(function () {
                     upgradeFunction(new WriteableTransaction(new TransactionFactory(), Object.keys(self._cfg.tableSchema))); // BUGBUG: No code completion for prev version's tables wont appear.
                 });
                 this._cfg.contentUpgrade = upgradeFunction;
@@ -484,7 +484,7 @@
 
         this.on = events(this, "error", "populate", "blocked", "versionchange");
 
-        fake(function () {
+        fakeAutoComplete(function () {
             database.on("populate").fire(new WriteableTransaction(new TransactionFactory(), dbStoreNames));
             database.on("error").fire(new Error());
         });
@@ -562,7 +562,7 @@
         derive(Table).from(Dexie.Table).extend({
             get: function (key, cb) {
                 var self = this;
-                fake(function () { cb(getInstanceTemplate(self._name)) });
+                fakeAutoComplete(function () { cb(getInstanceTemplate(self._name)) });
                 return this._tf.createPromise(function (resolve, reject) {
                     var req = self._tf.create(self._name).objectStore(self._name).get(key);
                     req.onerror = eventRejectHandler(reject, ["getting", key, "from", self._name]);
@@ -597,7 +597,7 @@
             },
             each: function (fn) {
                 var self = this;
-                fake(function () { fn(getInstanceTemplate(self._name)) });
+                fakeAutoComplete(function () { fn(getInstanceTemplate(self._name)) });
                 return this._tf.createPromise(function (resolve, reject) {
                     var req = self._tf.create(self._name).objectStore(self._name).openCursor();
                     req.onerror = eventRejectHandler(reject, ["calling", "Table.each()", "on", self._name]);
@@ -606,7 +606,7 @@
             },
             toArray: function (cb) {
                 var self = this;
-                fake(function () { cb([getInstanceTemplate(self._name)]) });
+                fakeAutoComplete(function () { cb([getInstanceTemplate(self._name)]) });
                 return this._tf.createPromise(function (resolve, reject) {
                     var a = [];
                     var req = self._tf.create(self._name).objectStore(self._name).openCursor();
@@ -1137,7 +1137,7 @@
                 each: function (fn) {
                     var ctx = this._ctx;
 
-                    fake(function () { fn(getInstanceTemplate(ctx.table)); });
+                    fakeAutoComplete(function () { fn(getInstanceTemplate(ctx.table)); });
 
                     return promise(ctx, function (resolve, reject) {
                         iter(ctx, fn, resolve, reject);
@@ -1145,7 +1145,7 @@
                 },
 
                 count: function (cb) {
-                    fake(function () { cb(0); });
+                    fakeAutoComplete(function () { cb(0); });
                     var self = this,
                         ctx = this._ctx;
 
@@ -1171,7 +1171,7 @@
                 sortBy: function (keyPath, cb) {
                     /// <param name="keyPath" type="String"></param>
                     var ctx = this._ctx;
-                    fake(function () { cb([getInstanceTemplate(ctx.table)]); });
+                    fakeAutoComplete(function () { cb([getInstanceTemplate(ctx.table)]); });
                     var parts = keyPath.split('.').reverse(),
                         lastPart = parts[0],
                         lastIndex = parts.length - 1;
@@ -1194,7 +1194,7 @@
                 toArray: function (cb) {
                     var ctx = this._ctx;
 
-                    fake(function () { cb([getInstanceTemplate(ctx.table)]); });
+                    fakeAutoComplete(function () { cb([getInstanceTemplate(ctx.table)]); });
 
                     return promise(ctx, function (resolve, reject) {
                         var a = [];
@@ -1234,7 +1234,7 @@
 
                 first: function (cb) {
                     var self = this;
-                    fake(function () { cb(getInstanceTemplate(self._ctx.table)); });
+                    fakeAutoComplete(function () { cb(getInstanceTemplate(self._ctx.table)); });
                     return this.limit(1).toArray(function (a) { return a[0] }).then(cb);
                 },
 
@@ -1245,7 +1245,7 @@
                 and: function (filterFunction) {
                     /// <param name="jsFunctionFilter" type="Function">function(val){return true/false}</param>
                     var self = this;
-                    fake(function () { filterFunction(getInstanceTemplate(self._ctx.table)); });
+                    fakeAutoComplete(function () { filterFunction(getInstanceTemplate(self._ctx.table)); });
                     addFilter(this._ctx, function (cursor) {
                         return filterFunction(cursor.value);
                     });
@@ -1264,7 +1264,7 @@
 
                 eachKey: function (cb) {
                     var self = this;
-                    fake(function () { cb(getInstanceTemplate(self._ctx.table)[self._ctx.index]); });
+                    fakeAutoComplete(function () { cb(getInstanceTemplate(self._ctx.table)[self._ctx.index]); });
                     this._ctx.op = "openKeyCursor";
                     return this.each(function (val, cursor) { cb(cursor.key, cursor); });
                 },
@@ -1275,7 +1275,7 @@
                 },
 
                 keys: function (cb) {
-                    fake(function () { cb([getInstanceTemplate(ctx.table)[self._ctx.index]]); });
+                    fakeAutoComplete(function () { cb([getInstanceTemplate(ctx.table)[self._ctx.index]]); });
                     var self = this,
                         ctx = this._ctx;
                     this._ctx.op = "openKeyCursor";
@@ -1442,7 +1442,7 @@
             }
         }
 
-        function fake(fn) {
+        function fakeAutoComplete(fn) {
             var to = setTimeout(fn, 1000);
             clearTimeout(to);
         }
