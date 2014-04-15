@@ -24,7 +24,7 @@
 
     File.prototype.getFullPath = function (trans) {
         var file = this;
-        return (trans || db).folders.get(this.folderId, function (folder) {
+        return (trans || db).table("folders").get(this.folderId, function (folder) {
             return folder.path + "/" + file.filename + (file.extension || "");
         });
     }
@@ -89,7 +89,7 @@
             });
 
         }).catch(function (e) {
-            ok(false, "Error: " + e);
+            ok(false, "Error: " + e.stack || e);
         }).finally(start);
     });
 
@@ -134,10 +134,10 @@
                     equal(a[3].filename, "apan japan", "apan japan");
                 });
             }).catch(function (e) {
-                ok(false, "Error: " + e);
+                ok(false, "Error: " + e.stack || e);
             }).finally(start);
         }).catch(function (e) {
-            ok(false, e);
+            ok(false, e.stack || e);
             start();
         });
     });
@@ -177,7 +177,7 @@
                         equal(a[3].filename, "APAN JAPAN", "APAN JAPAN");
                     });
             }).catch(function (e) {
-                ok(false, "Error: " + e);
+                ok(false, "Error: " + e.stack || e);
                 start();
             }).finally(start);
         });
@@ -201,7 +201,7 @@
                 equal(a[0].filename, "hello-there-everyone", "First file is " + a[0].filename);
             });
         }).catch(function (e) {
-            ok(false, e);
+            ok(false, e.stack || e);
         }).finally(start);
     });
 
@@ -222,7 +222,7 @@
         }).then(function(){
             ok(true, "Transaction complete");
         }).catch(function(e) {
-            ok(false, e);
+            ok(false, e.stack || e);
         }).finally(function () {
             start();
         });
@@ -232,7 +232,7 @@
         db.files.where("filename").equals("fdsojifdsjoisdf").toArray(function (a) {
             equal(a.length, 0, "File fdsojifdsjoisdf was not found");
         }).catch(function (e) {
-            ok(false, e);
+            ok(false, e.stack || e);
         }).finally(start);
     });
 
