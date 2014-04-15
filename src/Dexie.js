@@ -182,7 +182,7 @@
                 // Populate data
                 var t = new Transaction(READWRITE, dbStoreNames, globalSchema);
                 t.idbtrans = trans;
-                t._active = true;
+                t.active = true;
                 t.idbtrans.onerror = eventRejectHandler(reject,  ["populating database"]);
                 db.on("populate").fire(t);
             } else {
@@ -253,7 +253,7 @@
                             queue.push(function (trans, cb) {
                                 var t = new Transaction(READWRITE, [].slice.call(trans.db.objectStoreNames, 0), newSchema);
                                 t.idbtrans = trans;
-                                t._active = true;
+                                t.active = true;
                                 var uncompletedRequests = 0;
                                 t._promise = override (function (mode, fn, writeLock) {
                                     ++uncompletedRequests;
@@ -416,9 +416,9 @@
         this._tableFactory = function createTable (mode, tableSchema, transactionPromiseFactory) {
         	/// <param name="tableSchema" type="TableSchema"></param>
             if (mode === READONLY)
-                return new Table(tableSchema.name, transactionPromiseFactory, Collection, tableSchema);
+                return new Table(tableSchema.name, transactionPromiseFactory, tableSchema, Collection);
             else
-                return new WriteableTable(tableSchema.name, transactionPromiseFactory, WriteableCollection, tableSchema);
+                return new WriteableTable(tableSchema.name, transactionPromiseFactory, tableSchema);
         }
 
         this._transPromiseFactory = function transactionPromiseFactory(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
@@ -598,7 +598,7 @@
                             return tableInstance;
                         } else {
                             if (!(tableInstance instanceof Table)) { throw new TypeError("Invalid type. Arguments following mode must be instances of Table or String"); return { IVALID_TYPE: 1 }; }
-                            return tableInstance._name;
+                            return tableInstance.name;
                         }
                     });
 
@@ -661,12 +661,12 @@
         //
         //
         //
-        function Table(name, transactionPromiseFactory, collClass, tableSchema) {
+        function Table(name, transactionPromiseFactory, tableSchema, collClass) {
             /// <param name="name" type="String"></param>
-            this._name = name;
+            this.name = name;
+            this.schema = tableSchema;
             this._tpf = transactionPromiseFactory;
             this._collClass = collClass || Collection;
-            this._schema = tableSchema;
         }
 
         extend(Table.prototype, function () {
@@ -701,12 +701,12 @@
                 //
 
                 _trans: function getTransaction(mode, fn, writeLocked) {
-                    return this._tpf(mode, [this._name], fn, writeLocked);
+                    return this._tpf(mode, [this.name], fn, writeLocked);
                 },
                 _idbstore: function getIDBObjectStore(mode, fn, writeLocked) {
                     var self = this;
-                    return this._tpf(mode, [this._name], function (resolve, reject, trans) {
-                        fn(resolve, reject, trans.idbtrans.objectStore(self._name));
+                    return this._tpf(mode, [this.name], function (resolve, reject, trans) {
+                        fn(resolve, reject, trans.idbtrans.objectStore(self.name));
                     }, writeLocked);
                 },
 
@@ -715,12 +715,12 @@
                 //
                 get: function (key, cb) {
                     var self = this;
-                    fakeAutoComplete(function () { cb(self._schema.instanceTemplate) });
+                    fakeAutoComplete(function () { cb(self.schema.instanceTemplate) });
                     return this._idbstore(READONLY, function (resolve, reject, idbstore) {
                         var req = idbstore.get(key);
-                        req.onerror = eventRejectHandler(reject, ["getting", key, "from", self._name]);
+                        req.onerror = eventRejectHandler(reject, ["getting", key, "from", self.name]);
                         req.onsuccess = function () {
-                            var mappedClass = self._schema.mappedClass;
+                            var mappedClass = self.schema.mappedClass;
                             if (mappedClass) {
                                 var result = req.result;
                                 if (!result) {
@@ -750,21 +750,21 @@
                 },
                 each: function (fn) {
                     var self = this;
-                    fakeAutoComplete(function () { fn(self._schema.instanceTemplate) });
+                    fakeAutoComplete(function () { fn(self.schema.instanceTemplate) });
                     return this._idbstore(READONLY, function (resolve, reject, idbstore) {
                         var req = idbstore.openCursor();
-                        req.onerror = eventRejectHandler(reject, ["calling", "Table.each()", "on", self._name]);
-                        iterate(req, null, fn, resolve, reject, self._schema.mappedClass);
+                        req.onerror = eventRejectHandler(reject, ["calling", "Table.each()", "on", self.name]);
+                        iterate(req, null, fn, resolve, reject, self.schema.mappedClass);
                     });
                 },
                 toArray: function (cb) {
                     var self = this;
-                    fakeAutoComplete(function () { cb([self._schema.instanceTemplate]) });
+                    fakeAutoComplete(function () { cb([self.schema.instanceTemplate]) });
                     return this._idbstore(READONLY, function (resolve, reject, idbstore) {
                         var a = [];
                         var req = idbstore.openCursor();
-                        req.onerror = eventRejectHandler(reject, ["calling", "Table.toArray()", "on", self._name]);
-                        iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject, self._schema.mappedClass);
+                        req.onerror = eventRejectHandler(reject, ["calling", "Table.toArray()", "on", self.name]);
+                        iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject, self.schema.mappedClass);
                     }).then(cb);
                 },
                 orderBy: function (index) {
@@ -779,12 +779,12 @@
                     /// <param name="constructor">Constructor function representing the class.</param>
                     /// <param name="structure" optional="true">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
                     /// know what type each member has. Example: {name: String, emailAddresses: [String], password}</param>
-                    var mappedClass = this._schema.mappedClass = constructor;
+                    var mappedClass = this.schema.mappedClass = constructor;
                     var instanceTemplate = Object.create(mappedClass.prototype);
                     if (structure) {
                         applyStructure(instanceTemplate, structure);
                     }
-                    this._schema.instanceTemplate = instanceTemplate;
+                    this.schema.instanceTemplate = instanceTemplate;
                     return constructor;
                 },
                 defineClass: function (structure) {
@@ -798,8 +798,8 @@
                     applyStructure(template, structure);
                     var prototype = {};
                     applyStructure(prototype, structure);
-                    if (this._schema.primKey.keyPath) delByKeyPath(prototype, this._schema.primKey.keyPath); // add() and put() fails on Chrome if primKey template lies on prototype due to a bug in its implementation of getByKeyPath(), that it accepts getting from prototype chain.
-                    var mappedClass = this._schema.mappedClass = function (properties) {
+                    if (this.schema.primKey.keyPath) delByKeyPath(prototype, this.schema.primKey.keyPath); // add() and put() fails on Chrome if primKey template lies on prototype due to a bug in its implementation of getByKeyPath(), that it accepts getting from prototype chain.
+                    var mappedClass = this.schema.mappedClass = function (properties) {
                         /// <param name="properties" type="Object" optional="true">Properties to initialize object with.
                         /// </param>
                         if (properties) {
@@ -811,7 +811,7 @@
                     });
 
                     mappedClass.prototype = prototype;
-                    this._schema.instanceTemplate = template;
+                    this.schema.instanceTemplate = template;
                     return mappedClass;
                 }
             };
@@ -824,8 +824,8 @@
         //
         //
         //
-        function WriteableTable(name, transactionPromiseFactory, collectionClass, tableSchema) {
-            Table.call(this, name, transactionPromiseFactory, collectionClass || WriteableCollection, tableSchema);
+        function WriteableTable(name, transactionPromiseFactory, tableSchema, collClass) {
+            Table.call(this, name, transactionPromiseFactory, tableSchema, collClass || WriteableCollection);
         }
 
         derive(WriteableTable).from(Table).extend(function () {
@@ -839,7 +839,7 @@
                     var self = this;
                     return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
                         var req = key ? idbstore.put(obj, key) : idbstore.put(obj);
-                        req.onerror = eventRejectHandler(reject, ["putting", obj, "into", self._name]);
+                        req.onerror = eventRejectHandler(reject, ["putting", obj, "into", self.name]);
                         req.onsuccess = function (ev) {
                             var keyPath = idbstore.keyPath;
                             if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
@@ -857,7 +857,7 @@
                     var self = this;
                     return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
                         var req = key ? idbstore.add(obj, key) : idbstore.add(obj);
-                        req.onerror = eventRejectHandler(reject, ["adding", obj, "into", self._name]);
+                        req.onerror = eventRejectHandler(reject, ["adding", obj, "into", self.name]);
                         req.onsuccess = function (ev) {
                             var keyPath = idbstore.keyPath;
                             if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
@@ -911,7 +911,7 @@
             this._reculock = 0;
             this._blockedFuncs = [];
             this._pls = null;
-            this._active = false;
+            this.active = false;
             this._dbschema = dbschema;
             this._tpf = function transactionPromiseFactory (mode, storeNames, fn, writeLocked) {
                 // Creates a Promise instance and calls fn (resolve, reject, trans) where trans is the instance of this transaction object.
@@ -968,18 +968,18 @@
                         if (!self.idbtrans && mode) {
                             if (!idbdb) throw dbOpenError;
                             var idbtrans = self.idbtrans = idbdb.transaction(self.storeNames, self.mode);
-                            self._active = true;
+                            self.active = true;
                             idbtrans.onerror = function (e) {
                                 self.on("error").fire(e && e.target.error);
                                 e.preventDefault(); // Prohibit default bubbling to window.error
                                 self.abort(); // Make sure transaction is aborted since we preventDefault.
                             }
                             idbtrans.onabort = function (e) {
-                                self._active = false;
+                                self.active = false;
                                 self.on("abort").fire(e);
                             }
                             idbtrans.oncomplete = function (e) {
-                                self._active = false;
+                                self.active = false;
                                 self.on("complete").fire(e);
                             }
                         }
@@ -1015,8 +1015,8 @@
                 return this.on("error", cb);
             },
             abort: function () {
-                if (this.idbtrans && this._active) try { // TODO: if !this.idbtrans, enqueue an abort() operation.
-                    this._active = false;
+                if (this.idbtrans && this.active) try { // TODO: if !this.idbtrans, enqueue an abort() operation.
+                    this.active = false;
                     this.idbtrans.abort();
                 } catch (e) { }
             },
@@ -1267,7 +1267,7 @@
             }
 
             function iter(ctx, fn, resolve, reject, idbstore) {
-                var mappedClass = ctx.table._schema.mappedClass;
+                var mappedClass = ctx.table.schema.mappedClass;
 
                 if (!ctx.or) {
                     iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, ctx.filter), fn, resolve, reject, mappedClass);
@@ -1275,7 +1275,7 @@
                     (function () {
                         var filter = ctx.filter;
                         var set = {};
-                        var primKey = ctx.table._schema.primKey.keyPath;
+                        var primKey = ctx.table.schema.primKey.keyPath;
                         var resolved = 0;
 
                         function resolveboth() {
@@ -1298,7 +1298,7 @@
                 }
             }
             function getInstanceTemplate(ctx) {
-                return ctx.table._schema.instanceTemplate;
+                return ctx.table.schema.instanceTemplate;
             }
 
 
@@ -1358,7 +1358,7 @@
                         return this._read(function (resolve, reject, idbstore) {
                             var idx = getIndexOrStore(ctx, idbstore);
                             var req = (ctx.range ? idx.count(ctx.range) : idx.count());
-                            req.onerror = eventRejectHandler(reject, ["calling", "count()", "on", self._name]);
+                            req.onerror = eventRejectHandler(reject, ["calling", "count()", "on", self.name]);
                             req.onsuccess = function (e) {
                                 resolve(Math.min(e.target.result, Math.max(0, ctx.limit - ctx.offset)));
                             }
@@ -1543,7 +1543,7 @@
                         req.onerror = eventRejectHandler(function (e) {
                             failures.push(e);
                             return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
-                        }, function () { return ["modifying", item, "on", ctx.table._name]; });
+                        }, function () { return ["modifying", item, "on", ctx.table.name]; });
                         req.onsuccess = function () {
                             ++successCount;
                             checkFinished();
@@ -1590,7 +1590,7 @@
                             failedRecords.push(record);
                             deletedObjs.splice(deletedObjs.indexOf(record), 1);
                             return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
-                        }, function () { return ["deleting", item, "on", ctx.table._name]; });
+                        }, function () { return ["deleting", item, "on", ctx.table.name]; });
                         req.onsuccess = function () {
                             ++successCount;
                             checkFinished();
