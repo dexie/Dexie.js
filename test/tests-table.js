@@ -16,8 +16,9 @@
     });
 
     db.on("populate", function (trans) {
-        trans.users.add({first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"]});
-        trans.users.add({first: "Karl", last: "Faadersköld", username: "kceder", email: ["karl@ceder.what", "dadda@ceder.what"], pets: []});
+        var users = trans.table("users");
+        users.add({first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"]});
+        users.add({first: "Karl", last: "Faadersköld", username: "kceder", email: ["karl@ceder.what", "dadda@ceder.what"], pets: []});
     });
 
     module("table", {
@@ -35,6 +36,11 @@
             stop(); db.delete().finally(start);
         }
     });
+
+    /*asyncTest("abba", 1, function () {
+        ok(true);
+        start();
+    });*/
 
     asyncTest("get", 4, function () {
         db.table("users").get(1, function (obj) {
@@ -188,11 +194,38 @@
             });
             users.where("username").equals("aper").first(function (user) {
                 equal(user.last, "Persbrant", "The correct item was actually added");
+                user.last = "ChangedLastName";
+                users.put(user).then(function (id) {
+                    equal(id, 3, "Still got id 3 because we update same object");
+                });
+                users.where("last").equals("ChangedLastName").first(function (user) {
+                    equal(user.last, "ChangedLastName", "LastName was successfully changed");
+                });
             });
         }).catch(function (e) {
             ok(false, e);
         }).finally(start);
     });
+
+    asyncTest("put-no-transaction", function () {
+        var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
+        db.users.put(newUser).then(function (id) {
+            equal(id, 3, "Got id 3 because we didnt supply an id");
+            equal(newUser.id, id, "The id property of the new user was set");
+            db.users.where("username").equals("aper").first(function (user) {
+                equal(user.last, "Persbrant", "The correct item was actually added");
+                user.last = "ChangedLastName";
+                db.users.put(user).then(function (id) {
+                    equal(id, 3, "Still got id 3 because we update same object");
+                    db.users.where("last").equals("ChangedLastName").first(function (user) {
+                        equal(user.last, "ChangedLastName", "LastName was successfully changed");
+                        start();
+                    });
+                });
+            });
+        });
+    });
+
 
     asyncTest("add", function () {
         db.transaction("rw", db.users, function (users) {

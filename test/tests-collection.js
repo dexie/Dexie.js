@@ -13,9 +13,9 @@
         pets:       [String],
     });
     db.on("populate", function (trans) {
-        
-        trans.users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
-        trans.users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
+        var users = trans.table("users");
+        users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
+        users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
     });
 
     module("collection", {
@@ -64,7 +64,6 @@
     });
     asyncTest("limit", 6, function () {
         db.transaction("r", db.users, function (users) {
-
             users.orderBy("last").limit(1).toArray(function (a) {
                 equal(a.length, 1, "Array length is 1");
                 equal(a[0].first, "Karl", "First is Karl");
@@ -239,6 +238,8 @@
             var currentTime = new Date();
             users.modify({
                 lastUpdated: currentTime
+            }).then(function (count) {
+                equal(count, 2, "Promise supplied the number of modifications made");
             });
             users.toArray(function (a) {
                 equal(a.length, 2, "Length ok");
@@ -270,7 +271,7 @@
         }).finally(start);
     });
 
-    asyncTest("modify-causing-error", function () {
+    asyncTest("modify-causing-error", 2, function () {
         db.transaction("rw", db.users, function (users) {
             var currentTime = new Date();
             users.modify(function (user) {
@@ -281,15 +282,18 @@
             users.toArray(function (a) {
                 ok(false, "Should not come here, beacuse we should get error when setting all primkey to 1");
             });
+        }).catch(Dexie.MultiModifyError, function (e) {
+            ok(true, "Got MultiModifyError: " + e);
+            equal(e.successCount, 1, "Succeeded with the first entry but not the second");
         }).catch(function (e) {
-            ok(true, "Got error: " + e);
+            ok(false, "Another error than the expected was thrown: " + e);
         }).finally(start);
     });
 
 
     asyncTest("delete", 2, function () {
-        db.users.orderBy("id").delete().then(function (numDeleted) {
-            equal(numDeleted, 2, "All two records deleted");
+        db.users.orderBy("id").delete().then(function (deletedObjs) {
+            equal(deletedObjs.length, 2, "All two records deleted");
             db.users.count(function (count) {
                 equal(count, 0, "No users in collection anymore");
             });
@@ -298,11 +302,16 @@
         }).finally(start);
     });
 
-    asyncTest("delete(2)", 3, function () {
+    asyncTest("delete(2)", 6, function () {
         db.transaction("rw", db.users, function (users) {
             users.add({ first: "dAvid", last: "Helenius", username: "dahel" });
-            users.where("first").equalsIgnoreCase("david").delete().then(function (numDeleted) {
-                equal(numDeleted, 2, "Two items deleted (Both davids)");
+            users.where("first").equalsIgnoreCase("david").delete().then(function (deletedRecords) {
+                equal(deletedRecords.length, 2, "Two items deleted (Both davids)");
+                ok(deletedRecords.every(function (record) {
+                    return Array.isArray(record) && record.length == 2 && !isNaN(record[0]) && record[1] instanceof Object;
+                }), "Each deleted record is an array of [primKey, obj]");
+                equal(deletedRecords[0][1].first, "David", "First deleted entry is David");
+                equal(deletedRecords[1][1].first, "dAvid", "Second deleted entry is dAvid");
             });
             users.toArray(function (a) {
                 equal(a.length, 1, "Deleted one user");
@@ -316,8 +325,8 @@
     asyncTest("delete(3, combine with OR)", 3, function () {
         db.transaction("rw", db.users, function (users) {
             users.add({ first: "dAvid", last: "Helenius", username: "dahel" });
-            users.where("first").equals("dAvid").or("username").equals("kceder").delete().then(function (numDeleted) {
-                equal(numDeleted, 2, "Two items deleted (Both dAvid Helenius and Karl Cedersköld)");
+            users.where("first").equals("dAvid").or("username").equals("kceder").delete().then(function (deletedRecords) {
+                equal(deletedRecords.length, 2, "Two items deleted (Both dAvid Helenius and Karl Cedersköld)");
             });
             users.toArray(function (a) {
                 equal(a.length, 1, "Only one item left since dAvid and Karl have been deleted");
