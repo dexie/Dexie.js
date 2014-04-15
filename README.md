@@ -3,10 +3,10 @@ Dexie.js
 A bullet proof indexedDB wrapper.
 
  * Minimalistic and straight forward API, easy to use.
+ * Code Completion friendly - Your IDE will guide you as you type!
+ * Human readable queries: db.friends.where("lastName").anyOf("Helenius", "Fahlander").each(function(friend){...})
  * Bullet proof error handling using transaction scopes
  * The only indexedDB wrapper (so far) to support case insensitive search, set matching and logical OR operations.
- * Human readable queries: db.friends.where("lastName").anyOf("Helenius", "Fahlander").each(function(friend){...})
- * Code Completion friendly - Your IDE will guide you as you type!
  * Promise/A+ compliant
  * Does not hide backend indexedDB from the caller - always possible to reach the backend IDB objects.
  * Performance focused
