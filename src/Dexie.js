@@ -3,7 +3,7 @@
 
    By David Fahlander, david.fahlander@gmail.com
 
-   Version 0.9.6 - DATE, YEAR.
+   Version 0.9.6.1 - DATE, YEAR.
 
    Tested successfully on Chrome, IE11, Firefox and Opera.
 
@@ -29,7 +29,7 @@
                 Child.prototype.constructor = Child;
                 return {
                     extend: function (extension) {
-                        extend(Child.prototype, typeof (extension) === 'function' ? extension(Parent.prototype) : extension);
+                        extend(Child.prototype, typeof extension !== 'object' ? extension(Parent.prototype) : extension);
                     }
                 };
             }
@@ -580,20 +580,20 @@
             // Let scopeFunc be the last argument
             scopeFunc = arguments[arguments.length - 1];
             return db._whenReady(function (resolve, reject) {
-                var outerPLS = Promise.pls(); // Need to make sure Promise.PLS.prohibitDB does not continue over to the then() callback of our returned Promise! Callers may use direct DB access after transaction completes!
+                var outerPSD = Promise.psd(); // Need to make sure Promise.PSD.prohibitDB does not continue over to the then() callback of our returned Promise! Callers may use direct DB access after transaction completes!
                 try {
                     // Prohibit direct table access on db instance. This is to help people resolve
                     // issues when changing non-transactional code into code encapsulated in a transaction block.
                     // It very easily happens that one forgets to change all db calls from db.friends.add() to just friends.add(). 
-                    // This "Promise Local Storage" member informs the table getter that we are in a transaction block. It will then throw an Error if trying to access db.friends.
-                    Promise.PLS.prohibitDB = true; 
+                    // This "Promise Specific Data" member informs the table getter that we are in a transaction block. It will then throw an Error if trying to access db.friends.
+                    Promise.PSD.prohibitDB = true; 
 
                     //
                     // Get storeNames from arguments. Either through given table instances, or through given table names.
                     //
                     var tables = Array.isArray(tableInstances[0]) ? tableInstances.reduce(function (a, b) { return a.concat(b) }) : tableInstances;
                     var storeNames = tables.map(function (tableInstance) {
-                        if (typeof (tableInstance) == "string") {
+                        if (typeof tableInstance == "string") {
                             if (!globalSchema[tableInstance]) { throw new Error("Invalid table name: " + tableInstance); return { INVALID_TABLE_NAME: 1 } }; // Return statement is for IDE code completion.
                             return tableInstance;
                         } else {
@@ -644,7 +644,7 @@
                         });
                     }
                 } finally {
-                    Promise.PLS = outerPLS;
+                    Promise.PSD = outerPSD;
                 }
             });
         }
@@ -675,11 +675,11 @@
             //
 
             function parseType(type) {
-                if (typeof (type) == 'function') {
+                if (typeof type == 'function') {
                     return new type();
                 } else if (Array.isArray(type)) {
                     return [parseType(type[0])];
-                } else if (typeof (type) == 'object') {
+                } else if (typeof type == 'object') {
                     var rv = {};
                     applyStructure(rv, type);
                     return rv;
@@ -910,7 +910,7 @@
             this.on = events(this, ["complete", "error"], "abort");
             this._reculock = 0;
             this._blockedFuncs = [];
-            this._pls = null;
+            this._psd = null;
             this.active = false;
             this._dbschema = dbschema;
             this._tpf = function transactionPromiseFactory (mode, storeNames, fn, writeLocked) {
@@ -934,13 +934,13 @@
             //
             _lock: function () {
                 // Temporary set all requests into a pending queue if they are called before database is ready.
-                ++this._reculock; // Recursive read/write lock pattern using PLS (Promise-local Storage) instead of TLS (Thread-local storage)
-                if (this._reculock === 1) this._pls = Promise.PLS && Promise.PLS.constructor;
+                ++this._reculock; // Recursive read/write lock pattern using PSD (Promise Specific Data) instead of TLS (Thread Local Storage)
+                if (this._reculock === 1) this._psd = Promise.PSD && Promise.PSD.constructor;
                 return this;
             },
             _unlock: function () {
                 if (--this._reculock === 0) {
-                    this._pls = null;
+                    this._psd = null;
                     while (this._blockedFuncs.length > 0 && !this._locked()) {
                         var fn = this._blockedFuncs.shift();
                         try { fn(); } catch (e) { }
@@ -951,14 +951,14 @@
             _locked: function () {
                 // Checks if any write-lock is applied on this transaction.
                 // To simplify the Dexie API for extension implementations, we support recursive locks.
-                // This is accomplished by using "Promise Local Storage" (PLS).
-                // PLS data is bound to a Promise and any child Promise emitted through then() or resolve( new Promise() ).
-                // Promise.PLS is local to code executing on top of the call stacks of any of any code executed by Promise():
+                // This is accomplished by using "Promise Specific Data" (PSD).
+                // PSD data is bound to a Promise and any child Promise emitted through then() or resolve( new Promise() ).
+                // Promise.PSD is local to code executing on top of the call stacks of any of any code executed by Promise():
                 //         * callback given to the Promise() constructor  (function (resolve, reject){...})
                 //         * callbacks given to then()/catch()/finally() methods (function (value){...})
-                // If creating a new independant Promise instance from within a Promise call stack, the new Promise will derive the PLS from the call stack of the parent Promise.
-                // Derivation is done so that the inner PLS __proto__ points to the outer PLS and the inner PLS is instanceof the constructor of the outer PLS.
-                return this._reculock && (!this._pls || !(Promise.PLS instanceof this._pls));
+                // If creating a new independant Promise instance from within a Promise call stack, the new Promise will derive the PSD from the call stack of the parent Promise.
+                // Derivation is done so that the inner PSD __proto__ points to the outer PSD and the inner PSD is instanceof the constructor of the outer PSD.
+                return this._reculock && (!this._psd || !(Promise.PSD instanceof this._psd));
             },
             _promise: function (mode, fn, bWriteLock) {
                 var self = this;
@@ -1107,7 +1107,7 @@
                     /// <param name="advance" type="Function"></param>
                     /// <param name="resolve" type="Function"></param>
                     var key = cursor.key;
-                    if (typeof (key) !== 'string') return false;
+                    if (typeof key !== 'string') return false;
                     var lowerKey = lower(key);
                     if (match(lowerKey, lowerNeedle)) {
                         advance(function () { cursor.continue(); });
@@ -1161,12 +1161,12 @@
                 },
                 startsWith: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof (str) != 'string') return fail(new Collection(this), new TypeError("String expected"));
+                    if (typeof str != 'string') return fail(new Collection(this), new TypeError("String expected"));
                     return this.between(str, str + String.fromCharCode(65535), true, true);
                 },
                 startsWithIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof (str) != 'string') return fail(new Collection(this), new TypeError("String expected"));
+                    if (typeof str != 'string') return fail(new Collection(this), new TypeError("String expected"));
                     if (str === "") return this.startsWith(str);
                     var c = new this._ctx.collClass(this);
                     addIgnoreCaseAlgorithm(c, function (a, b) { return a.indexOf(b) === 0; }, str);
@@ -1175,7 +1175,7 @@
                 },
                 equalsIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof (str) != 'string') return fail(new Collection(this), new TypeError("String expected"));
+                    if (typeof str != 'string') return fail(new Collection(this), new TypeError("String expected"));
                     var c = new this._ctx.collClass(this);
                     addIgnoreCaseAlgorithm(c, function (a, b) { return a === b; }, str);
                     return c;
@@ -1517,7 +1517,7 @@
 
                 return this._write(function (resolve, reject, idbstore) {
                     var modifyer;
-                    if (typeof (changes) === 'function') {
+                    if (typeof changes === 'function') {
                         modifyer = changes;
                     } else {
                         var keyPaths = Object.keys(changes);
@@ -1536,14 +1536,15 @@
                     var failures = [];
 
                     function modifyItem(item, cursor, advance) {
-                        var p = { value: item };
+                        var p = { primKey: cursor.primaryKey, value: item };
                         modifyer.call(p, item);
-                        var req = cursor.update(p.value);
+                        var bDelete = !p.hasOwnProperty("value");
+                        var req = (bDelete ? cursor.delete() : cursor.update(p.value));
                         ++count;
                         req.onerror = eventRejectHandler(function (e) {
                             failures.push(e);
                             return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
-                        }, function () { return ["modifying", item, "on", ctx.table.name]; });
+                        }, function () { return bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]; });
                         req.onsuccess = function () {
                             ++successCount;
                             checkFinished();
@@ -1571,53 +1572,7 @@
             },
 
             'delete': function () {
-                var self = this,
-                    ctx = this._ctx;
-
-                return this._write(function (resolve, reject, idbstore) {
-                    var deletedObjs = [];
-                    var successCount = 0;
-                    var iterationComplete = false;
-                    var failures = [];
-                    var failedRecords = [];
-
-                    function deleteItem(item, cursor, advance) {
-                        var record = [cursor.primaryKey, item];
-                        var req = cursor.delete();
-                        deletedObjs.push(record);
-                        req.onerror = eventRejectHandler(function (e) {
-                            failures.push(e);
-                            failedRecords.push(record);
-                            deletedObjs.splice(deletedObjs.indexOf(record), 1);
-                            return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
-                        }, function () { return ["deleting", item, "on", ctx.table.name]; });
-                        req.onsuccess = function () {
-                            ++successCount;
-                            checkFinished();
-                        }
-                    }
-
-                    function doReject(e) {
-                        if (e) failures.push(e);
-                        reject(new MultiDeleteError("Error deleting one or more objects", failures, deletedObjs));
-                    }
-
-                    function checkFinished() {
-                        if (iterationComplete && successCount + failures.length === deletedObjs.length) {
-                            if (failures.length > 0)
-                                doReject();
-                            else
-                                resolve(deletedObjs);
-                        }
-                    }
-
-                    self._iterate(deleteItem, function () {
-                        iterationComplete = true;
-                        if (successCount === deletedObjs.length) {
-                            resolve(deletedObjs);
-                        }
-                    }, doReject, idbstore);
-                });
+                return this.modify(function () { delete this.value; });
             }
         });
 
@@ -1653,8 +1608,8 @@
                             configurable: true,
                             enumerable: true,
                             get: function () {
-                                if (Promise.PLS && Promise.PLS.prohibitDB) {
-                                    throw new Error("Calling db." + tableName + " directly is not allowed in db.transaction() blocks.");
+                                if (Promise.PSD && Promise.PSD.prohibitDB) {
+                                    throw new Error("Dont call db." + tableName + " directly. Use tables from db.transaction() instead.");
                                     return { ALL_TABLES_PROHIBITED_IN_TRANSCATION_SCOPE: 1 }; // For code completion in IDE.
                                 }
                                 return tableInstance;
@@ -1851,8 +1806,8 @@
             this._catched = false; // for onuncatched
             var self = this;
             var constructing = true;
-            var outerPLS = Promise.pls();
-            this._PLS = Promise.PLS;
+            var outerPSD = Promise.psd();
+            this._PSD = Promise.PSD;
 
             try {
                 doResolve(this, fn, function (data) {
@@ -1870,7 +1825,7 @@
                 });
             } finally {
                 constructing = false;
-                Promise.PLS = outerPLS;
+                Promise.PSD = outerPSD;
             }
         }
 
@@ -1906,8 +1861,8 @@
         }
 
         function resolve(promise, newValue) {
-            var outerPLS = Promise.PLS;
-            Promise.PLS = promise._PLS;
+            var outerPSD = Promise.PSD;
+            Promise.PSD = promise._PSD;
             try { //Promise Resolution Procedure: https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
                 if (newValue === promise) throw new TypeError('A promise cannot be resolved with itself.');
                 if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
@@ -1926,13 +1881,13 @@
                 promise._value = newValue;
                 finale.call(promise);
             } catch (e) { reject(e) } finally {
-                Promise.PLS = outerPLS;
+                Promise.PSD = outerPSD;
             }
         }
 
         function reject(promise, newValue) {
-            var outerPLS = Promise.PLS;
-            Promise.PLS = promise._PLS;
+            var outerPSD = Promise.PSD;
+            Promise.PSD = promise._PSD;
             promise._state = false;
             promise._value = newValue;
 
@@ -1940,7 +1895,7 @@
             if (!promise._catched && promise.onuncatched) {
                 try { promise.onuncatched(promise._value); } catch (e) { }
             }
-            Promise.PLS = outerPLS;
+            Promise.PSD = outerPSD;
             return promise._catched;
         }
 
@@ -2017,7 +1972,7 @@
             var p = new Promise(function (resolve, reject) {
                 handle.call(self, new Deferred(onFulfilled, onRejected, resolve, reject));
             });
-            p._PLS = this._PLS;
+            p._PSD = this._PSD;
             p.onuncatched = this.onuncatched;
             p._parent = this; // Used for recursively calling onuncatched event on self and all parents.
             return p;
@@ -2064,15 +2019,15 @@
             });
         };
 
-        Promise.PLS = null; // Promise-Local Storage - a TLS Pattern (Thread-Local Storage) for Promises.
+        Promise.PSD = null; // Promise Specific Data - a TLS Pattern (Thread Local Storage) for Promises.
 
-        Promise.pls = function () {
-            // Create new Promise Local Storage (PLS) scope.
-            var outerScope = Promise.PLS;
+        Promise.psd = function () {
+            // Create new PSD scope (Promise Specific Data)
+            var outerScope = Promise.PSD;
             function F() { }
             if (outerScope) F.prototype = outerScope;
-            Promise.PLS = new F();
-            Promise.PLS.constructor = F;
+            Promise.PSD = new F();
+            Promise.PSD.constructor = F;
             return outerScope;
         }
 
@@ -2083,28 +2038,29 @@
         var args = arguments;
         var evs = {};
         function add(eventName) {
-            function fire() {
-                for (var i = this.l.length - 1; i >= 0; --i) {
-                    if (this.l[i].apply(this, arguments) === false) return false;
+            var context = {
+                subscribers: [],
+                fire: function fire() {
+                    var subscribers = context.subscribers;
+                    for (var i = subscribers.length - 1; i >= 0; --i) {
+                        if (subscribers[i].apply(this, arguments) === false) return false;
+                    }
+                },
+                subscribe: function (cb) { this.subscribers.push(cb); },
+                unsubscribe: function (cb) {
+                    context.subscribers = context.subscribers.filter(function (fn) { return fn !== cb; });
                 }
-            }
-            evs[eventName] = {
-                l: [],
-                f: fire,
-                s: function (cb) { this.l.push(cb); },
-                u: function (cb) {
-                    this.l = this.l.filter(function (fn) { return fn !== cb; });
-                }
-            }
-            return fire;
+            };
+            evs[eventName] = context;
+            return context.fire;
         }
 
         function promise(success, fail) {
             var res = add(success);
             var rej = add(fail);
             var promise = new Promise(function (resolve, reject) {
-                evs[success].f = resolve;
-                evs[fail].f = reject;
+                evs[success].fire = resolve;
+                evs[fail].fire = reject;
             });
             evs[success].p = promise;
             promise.then(function (val) {
@@ -2127,18 +2083,11 @@
         var rv = function (eventName, subscriber) {
             if (subscriber) {
                 // Subscribe
-                evs[eventName].s(subscriber);
+                evs[eventName].subscribe(subscriber);
                 return ctx;
             } else if (typeof (eventName) === 'string') {
                 // Return interface allowing to fire or unsubscribe from event
-                return {
-                    fire: function () {
-                        evs[eventName].f.apply(evs[eventName], arguments);
-                    },
-                    unsubscribe: function (fn) {
-                        evs[eventName].u(fn);
-                    },
-                };
+                return evs[eventName];
             } else {
                 // Return interface allowing access to backend Promise and resetting.
                 var success = eventName[0], fail = eventName[1];
@@ -2249,14 +2198,6 @@
         this.mappedClass = null;
     }
 
-    function MultiDeleteError(msg, failures, deletedRecords) {
-        Error.call(this, msg);
-        this.name = "MultiDeleteError";
-        this.failures = failures;
-        this.deletedRecords = deletedRecords;
-    }
-    derive(MultiDeleteError).from(Error);
-
     function MultiModifyError(msg, failures, successCount) {
         Error.call(this, msg);
         this.name = "MultiModifyError";
@@ -2277,7 +2218,6 @@
     }
 
     // Define the very-base classes of the framework, in case any 3rd part library wants to extend the prototype of these classes
-    Dexie.MultiDeleteError = MultiDeleteError;
     Dexie.MultiModifyError = MultiModifyError;
     Dexie.IndexSpec = IndexSpec;
     Dexie.TableSchema = TableSchema;
@@ -2316,7 +2256,7 @@
     }
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-    Dexie.version = 0.96;
+    Dexie.version = 0.961;
 
 
 

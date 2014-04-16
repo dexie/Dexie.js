@@ -292,8 +292,8 @@
 
 
     asyncTest("delete", 2, function () {
-        db.users.orderBy("id").delete().then(function (deletedObjs) {
-            equal(deletedObjs.length, 2, "All two records deleted");
+        db.users.orderBy("id").delete().then(function (count) {
+            equal(count, 2, "All two records deleted");
             db.users.count(function (count) {
                 equal(count, 0, "No users in collection anymore");
             });
@@ -302,16 +302,11 @@
         }).finally(start);
     });
 
-    asyncTest("delete(2)", 6, function () {
+    asyncTest("delete(2)", 3, function () {
         db.transaction("rw", db.users, function (users) {
             users.add({ first: "dAvid", last: "Helenius", username: "dahel" });
-            users.where("first").equalsIgnoreCase("david").delete().then(function (deletedRecords) {
-                equal(deletedRecords.length, 2, "Two items deleted (Both davids)");
-                ok(deletedRecords.every(function (record) {
-                    return Array.isArray(record) && record.length == 2 && !isNaN(record[0]) && record[1] instanceof Object;
-                }), "Each deleted record is an array of [primKey, obj]");
-                equal(deletedRecords[0][1].first, "David", "First deleted entry is David");
-                equal(deletedRecords[1][1].first, "dAvid", "Second deleted entry is dAvid");
+            users.where("first").equalsIgnoreCase("david").delete().then(function (deleteCount) {
+                equal(deleteCount, 2, "Two items deleted (Both davids)");
             });
             users.toArray(function (a) {
                 equal(a.length, 1, "Deleted one user");
@@ -325,8 +320,8 @@
     asyncTest("delete(3, combine with OR)", 3, function () {
         db.transaction("rw", db.users, function (users) {
             users.add({ first: "dAvid", last: "Helenius", username: "dahel" });
-            users.where("first").equals("dAvid").or("username").equals("kceder").delete().then(function (deletedRecords) {
-                equal(deletedRecords.length, 2, "Two items deleted (Both dAvid Helenius and Karl Cedersköld)");
+            users.where("first").equals("dAvid").or("username").equals("kceder").delete().then(function (deleteCount) {
+                equal(deleteCount, 2, "Two items deleted (Both dAvid Helenius and Karl Cedersköld)");
             });
             users.toArray(function (a) {
                 equal(a.length, 1, "Only one item left since dAvid and Karl have been deleted");

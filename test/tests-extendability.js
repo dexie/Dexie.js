@@ -33,14 +33,14 @@
 
         db.transaction("rw", db.activities, db.tasks, function (acts, tasks, trans) {
             //trans._ctx.tf.createPromise(function (resolve, reject) {
-            var outerPLS = Dexie.Promise.pls();
+            var outerPLS = Dexie.Promise.psd();
             try {
                 trans._lock();
                 acts.where("Type").equals(2).modify({ Flags: 2 }).finally(function () {
                     trans._unlock();
                 });
             } finally {
-                Dexie.Promise.PLS = outerPLS;
+                Dexie.Promise.PSD = outerPLS;
             }
             acts.where("Flags").equals(2).count(function (count) {
                 equal(count, 1, "Should have put one entry there now");
