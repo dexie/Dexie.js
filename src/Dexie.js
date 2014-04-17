@@ -665,7 +665,12 @@
             /// <param name="name" type="String"></param>
             this.name = name;
             this.schema = tableSchema;
-            this.when = allTables[name] ? allTables[name].when : events(this, "creating", "reading", "updating", "deleting");
+            this.when = allTables[name] ? allTables[name].when : events(this, {
+                "creating": [modifyableFunctionChain, nop],
+                "reading":  [pureFunctionChain, mirror],
+                "updating": [modifyableFunctionChain, nop],
+                "deleting": [nonStoppableEventChain, nop]
+            });
             this._tpf = transactionPromiseFactory;
             this._collClass = collClass || Collection;
         }
@@ -721,7 +726,7 @@
                         var req = idbstore.get(key);
                         req.onerror = eventRejectHandler(reject, ["getting", key, "from", self.name]);
                         req.onsuccess = function () {
-                            resolve(self.when("reading").chain(req.result));
+                            resolve(self.when.reading.fire(req.result));
                         };
                     }).then(cb);
                 },
@@ -740,7 +745,7 @@
                     return this._idbstore(READONLY, function (resolve, reject, idbstore) {
                         var req = idbstore.openCursor();
                         req.onerror = eventRejectHandler(reject, ["calling", "Table.each()", "on", self.name]);
-                        iterate(req, null, fn, resolve, reject, self.when("reading").chain);
+                        iterate(req, null, fn, resolve, reject, self.when.reading.fire);
                     });
                 },
                 toArray: function (cb) {
@@ -750,7 +755,7 @@
                         var a = [];
                         var req = idbstore.openCursor();
                         req.onerror = eventRejectHandler(reject, ["calling", "Table.toArray()", "on", self.name]);
-                        iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject, self.when("reading").chain);
+                        iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject, self.when.reading.fire);
                     }).then(cb);
                 },
                 orderBy: function (index) {
@@ -837,13 +842,16 @@
                     /// <param name="obj" type="Object">A javascript object to insert</param>
                     /// <param name="key" optional="true">Primary key</param>
                     var self = this,
-                        whenCreating = this.when.creating.chain;
+                        whenCreating = this.when.creating.fire;
                     return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
                         if (whenCreating !== nop) {
                             var effectiveKey = key || (idbstore.keyPath && getByKeyPath(obj, idbstore.keyPath));
                             var keyToUse = whenCreating(effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
-                            if (keyToUse !== effectiveKey) {
-                                if (idbstore.keyPath) setByKeyPath(obj, idbstore.keyPath, keyToUse); else key = keyToUse;
+                            if (effectiveKey === undefined && keyToUse !== undefined) {
+                                if (idbstore.keyPath)
+                                    setByKeyPath(obj, idbstore.keyPath, keyToUse);
+                                else
+                                    key = keyToUse;
                             }
                         }
                         var req = key ? idbstore.add(obj, key) : idbstore.add(obj);
@@ -1333,7 +1341,7 @@
 
             function iter(ctx, fn, resolve, reject, idbstore) {
                 if (!ctx.or) {
-                    iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, ctx.filter), fn, resolve, reject, ctx.table.when("reading").chain);
+                    iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, ctx.filter), fn, resolve, reject, ctx.table.when.reading.fire);
                 } else {
                     (function () {
                         var filter = ctx.filter;
@@ -1356,7 +1364,7 @@
                         }
 
                         ctx.or._iterate(union, resolveboth, reject, idbstore);
-                        iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, ctx.table.when("reading").chain);
+                        iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, ctx.table.when.reading.fire);
                     })();
                 }
             }
@@ -1588,8 +1596,8 @@
                 var self = this,
                     ctx = this._ctx,
                     when = ctx.table.when,
-                    whenCreating = when.creating.chain,
-                    whenUpdating = when.updating.chain,
+                    whenCreating = when.creating.fire,
+                    whenUpdating = when.updating.fire,
                     whenDeleting = when.deleting.fire;
 
                 return this._write(function (resolve, reject, idbstore, trans) {
@@ -1602,6 +1610,7 @@
                                 whenDeleting(this.primKey, item, trans);
                                 changes.call(this, item);
                                 if (this.hasOwnProperty("value")) {
+                                    // Not deleted, just replaced. Fire when('creating') event.
                                     whenCreating(this.primKey, this.value, trans);
                                 }
                             }
@@ -1729,14 +1738,15 @@
         }
 
         function iterate(req, filter, fn, resolve, reject, whenReading) {
-            if (!whenReading) whenReading = function (val) { return val; };
+            whenReading = whenReading || mirror;
             if (!req.onerror) req.onerror = eventRejectHandler(reject);
             if (filter) {
                 req.onsuccess = trycatch(function filter_record(e) {
                     var cursor = req.result;
                     if (cursor) {
                         var c = function () { cursor.continue(); };
-                        if (filter(cursor, function (advancer) { c = advancer }, resolve, reject)) fn(whenReading(cursor.value), cursor, function (advancer) { c = advancer });
+                        if (filter(cursor, function (advancer) { c = advancer }, resolve, reject))
+                            fn(whenReading(cursor.value), cursor, function (advancer) { c = advancer });
                         c();
                     } else {
                         resolve();
@@ -2124,9 +2134,21 @@
     //
     //
 
-    function nop(val) { return val; }
+    function nop() {}
+    function mirror(val) { return val; }
 
-    function functionChain(f1, f2) {
+    function pureFunctionChain(f1, f2) {
+        // Enables chained events that takes ONE argument and returns it to the next function in chain.
+        // This pattern is used in the when("reading") event.
+        if (f1 === mirror) return f2;
+        return function (val) {
+            return f2(f1(val));
+        }
+    }
+
+    function modifyableFunctionChain(f1, f2) {
+        // Enables chained events that takes several arguments and may modify first argument by making a modification and then returning the same instance.
+        // This pattern is used in the when("creating") and when("updating") events.
         if (f1 === nop) return f2;
         return function () {
             var res = f1.apply(this, arguments);
@@ -2136,7 +2158,8 @@
         }
     }
 
-    function fireChain(f1, f2) {
+    function stoppableEventChain(f1, f2) {
+        // Enables chained events that may return false to stop the event chain.
         if (f1 === nop) return f2;
         return function () {
             if (f1.apply(this, arguments) === false) return false;
@@ -2144,28 +2167,44 @@
         }
     }
 
+    function nonStoppableEventChain(f1, f2) {
+        if (f1 === nop) return f2;
+        return function () {
+            f2.apply(this, arguments);
+            f1.apply(this, arguments);
+        }
+    }
+
     function events(ctx, eventNames) {
         var args = arguments;
         var evs = {};
-        function add(eventName) {
+        function add(eventName, chainFunction, defaultFunction) {
             if (Array.isArray(eventName)) return addEventGroup(eventName);
+            if (typeof eventName === 'object') return addConfiguredEvents(eventName);
+            if (!chainFunction) chainFunction = stoppableEventChain;
+            if (!defaultFunction) defaultFunction = nop;
+            
             var context = {
                 subscribers: [],
-                fire: nop,
-                chain: nop,
+                fire: defaultFunction,
                 subscribe: function (cb) {
                     context.subscribers.push(cb);
-                    context.fire = fireChain(context.fire, cb);
-                    context.chain = functionChain(context.chain, cb);
+                    context.fire = chainFunction(context.fire, cb);
                 },
                 unsubscribe: function (cb) {
                     context.subscribers = context.subscribers.filter(function (fn) { return fn !== cb; });
-                    context.fire = context.subscribers.reduce(fireChain, nop);
-                    context.chain = context.subscribers.reduce(chain, nop);
+                    context.fire = context.subscribers.reduce(chainFunction, defaultFunction);
                 }
             };
             evs[eventName] = context;
             return context;
+        }
+
+        function addConfiguredEvents(cfg) {
+            // events(this, {reading: [functionChain, nop]});
+            Object.keys(cfg).forEach(function(eventName) {
+                add(eventName, cfg[eventName][0], cfg[eventName][1]);
+            });
         }
 
         function addEventGroup(eventGroup) {
