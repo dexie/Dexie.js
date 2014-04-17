@@ -36,8 +36,8 @@
         };
     }
 
-    function override(fn, override) {
-        return function () { override.apply(fn, arguments); };
+    function override(origFunction, overridedFunction) {
+        return function () { overridedFunction.apply(origFunction, arguments); };
     }
 
     function Dexie(dbName) {
@@ -150,7 +150,7 @@
                 /// <param name="upgradeFunction" optional="true">Function that performs upgrading actions.</param>
                 var self = this;
                 fakeAutoComplete(function () {
-                    upgradeFunction(new Transaction(READWRITE, Object.keys(self._cfg.dbschema), self._cfg.dbschema));// BUGBUG: No code completion for prev version's tables wont appear.
+                    upgradeFunction(db._createTransaction (READWRITE, Object.keys(self._cfg.dbschema), self._cfg.dbschema));// BUGBUG: No code completion for prev version's tables wont appear.
                 });
                 this._cfg.contentUpgrade = upgradeFunction;
                 return this;
@@ -180,7 +180,7 @@
                     createTable(trans, tableName, globalSchema[tableName].primKey, globalSchema[tableName].indexes);
                 });
                 // Populate data
-                var t = new Transaction(READWRITE, dbStoreNames, globalSchema);
+                var t = db._createTransaction(READWRITE, dbStoreNames, globalSchema);
                 t.idbtrans = trans;
                 t.active = true;
                 t.idbtrans.onerror = eventRejectHandler(reject,  ["populating database"]);
@@ -251,7 +251,7 @@
                         });
                         if (newSchema._cfg.contentUpgrade) {
                             queue.push(function (trans, cb) {
-                                var t = new Transaction(READWRITE, [].slice.call(trans.db.objectStoreNames, 0), newSchema);
+                                var t = db._createTransaction(READWRITE, [].slice.call(trans.db.objectStoreNames, 0), newSchema);
                                 t.idbtrans = trans;
                                 t.active = true;
                                 var uncompletedRequests = 0;
@@ -421,6 +421,10 @@
                 return new WriteableTable(tableSchema.name, transactionPromiseFactory, tableSchema);
         }
 
+        this._createTransaction = function (mode, storeNames, dbschema) {
+            return new Transaction(mode, storeNames, dbschema);
+        }
+
         this._transPromiseFactory = function transactionPromiseFactory(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
             if (!idbdb && !dbOpenError) {
                 // Database is paused. Wait til resumed.
@@ -432,7 +436,7 @@
                     });
                 });
             } else {
-                var trans = new Transaction(mode, storeNames, globalSchema);
+                var trans = db._createTransaction(mode, storeNames, globalSchema);
                 return trans._promise(mode, function (resolve, reject) {
                     fn(function (value) {
                         // Instead of resolving value directly, wait with resolving it until transaction has completed.
@@ -563,7 +567,7 @@
         this.on = events(this, "error", "populate", "blocked", "versionchange");
 
         fakeAutoComplete(function () {
-            db.on("populate").fire(new Transaction(READWRITE, dbStoreNames, globalSchema));
+            db.on("populate").fire(db._createTransaction(READWRITE, dbStoreNames, globalSchema));
             db.on("error").fire(new Error());
         });
 
@@ -615,7 +619,7 @@
                     //
                     // Create Transaction instance
                     //
-                    var trans = new Transaction(mode, storeNames, globalSchema);
+                    var trans = db._createTransaction(mode, storeNames, globalSchema);
 
                     //
                     // Supply table instances bound to the new Transaction and provide them as callback arguments
@@ -665,7 +669,7 @@
             /// <param name="name" type="String"></param>
             this.name = name;
             this.schema = tableSchema;
-            this.when = allTables[name] ? allTables[name].when : events(this, {
+            this.hook = allTables[name] ? allTables[name].hook : events(null, {
                 "creating": [modifyableFunctionChain, nop],
                 "reading":  [pureFunctionChain, mirror],
                 "updating": [modifyableFunctionChain, nop],
@@ -726,7 +730,7 @@
                         var req = idbstore.get(key);
                         req.onerror = eventRejectHandler(reject, ["getting", key, "from", self.name]);
                         req.onsuccess = function () {
-                            resolve(self.when.reading.fire(req.result));
+                            resolve(self.hook.reading.fire(req.result));
                         };
                     }).then(cb);
                 },
@@ -745,7 +749,7 @@
                     return this._idbstore(READONLY, function (resolve, reject, idbstore) {
                         var req = idbstore.openCursor();
                         req.onerror = eventRejectHandler(reject, ["calling", "Table.each()", "on", self.name]);
-                        iterate(req, null, fn, resolve, reject, self.when.reading.fire);
+                        iterate(req, null, fn, resolve, reject, self.hook.reading.fire);
                     });
                 },
                 toArray: function (cb) {
@@ -755,7 +759,7 @@
                         var a = [];
                         var req = idbstore.openCursor();
                         req.onerror = eventRejectHandler(reject, ["calling", "Table.toArray()", "on", self.name]);
-                        iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject, self.when.reading.fire);
+                        iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject, self.hook.reading.fire);
                     }).then(cb);
                 },
                 orderBy: function (index) {
@@ -785,7 +789,7 @@
 
                     // Now, subscribe to the when("reading") event to make all objects that come out from this table inherit from given class
                     // no matter which method to use for reading (Table.get() or Table.where(...)... )
-                    this.when("reading", use_proto ?
+                    this.hook("reading", use_proto ?
                         function makeInherited (obj) {
                             if (!obj) return obj; // No valid object. (Value is null). Return as is.
                             // The JS engine supports __proto__. Just change that pointer on the existing object. A little more efficient way.
@@ -842,11 +846,11 @@
                     /// <param name="obj" type="Object">A javascript object to insert</param>
                     /// <param name="key" optional="true">Primary key</param>
                     var self = this,
-                        whenCreating = this.when.creating.fire;
+                        creatingHook = this.hook.creating.fire;
                     return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
-                        if (whenCreating !== nop) {
+                        if (creatingHook !== nop) {
                             var effectiveKey = key || (idbstore.keyPath && getByKeyPath(obj, idbstore.keyPath));
-                            var keyToUse = whenCreating(effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
+                            var keyToUse = creatingHook(effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
                             if (effectiveKey === undefined && keyToUse !== undefined) {
                                 if (idbstore.keyPath)
                                     setByKeyPath(obj, idbstore.keyPath, keyToUse);
@@ -871,7 +875,7 @@
                     /// <param name="obj" type="Object">A javascript object to insert or update</param>
                     /// <param name="key" optional="true">Primary key</param>
                     var self = this;
-                    if (this.when.creating.subscribers.length || this.when.deleting.subscribers.length) {
+                    if (this.hook.creating.subscribers.length || this.hook.deleting.subscribers.length) {
                         //
                         // People listens to when("creating") or when("deleting") events!
                         // We must implement put() using WriteableCollection.modify() and WriteableTable.add() in order to call the correct events!
@@ -918,7 +922,7 @@
 
                 'delete': function (key) {
                     /// <param name="key">Primary key of the object to delete</param>
-                    if (this.when.deleting.subscribers.length) {
+                    if (this.hook.deleting.subscribers.length) {
                         // People listens to when("deleting") event. Must implement delete using WriteableCollection.delete() that will
                         // call the CRUD event. Only WriteableCollection.delete() will know whether an object was actually deleted.
                         return this.where(":id").equals(key).delete();
@@ -935,7 +939,7 @@
                 },
 
                 clear: function () {
-                    if (this.when.deleting.subscribers.length) {
+                    if (this.hook.deleting.subscribers.length) {
                         // People listens to when("deleting") event. Must implement delete using WriteableCollection.delete() that will
                         // call the CRUD event. Only WriteableCollection.delete() will knows which objects that are actually deleted.
                         this.toCollection().delete();
@@ -1341,7 +1345,7 @@
 
             function iter(ctx, fn, resolve, reject, idbstore) {
                 if (!ctx.or) {
-                    iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, ctx.filter), fn, resolve, reject, ctx.table.when.reading.fire);
+                    iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, ctx.filter), fn, resolve, reject, ctx.table.hook.reading.fire);
                 } else {
                     (function () {
                         var filter = ctx.filter;
@@ -1364,7 +1368,7 @@
                         }
 
                         ctx.or._iterate(union, resolveboth, reject, idbstore);
-                        iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, ctx.table.when.reading.fire);
+                        iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, ctx.table.hook.reading.fire);
                     })();
                 }
             }
@@ -1595,27 +1599,27 @@
             modify: function (changes) {
                 var self = this,
                     ctx = this._ctx,
-                    when = ctx.table.when,
-                    whenCreating = when.creating.fire,
-                    whenUpdating = when.updating.fire,
-                    whenDeleting = when.deleting.fire;
+                    hook = ctx.table.hook,
+                    creatingHook = hook.creating.fire,
+                    updatingHook = hook.updating.fire,
+                    deletingHook = hook.deleting.fire;
 
                 return this._write(function (resolve, reject, idbstore, trans) {
                     var modifyer;
                     if (typeof changes === 'function') {
-                        if (whenCreating === nop && whenDeleting === nop) {
+                        if (creatingHook === nop && deletingHook === nop) {
                             modifyer = changes;
                         } else {
                             modifyer = function (item) {
-                                whenDeleting(this.primKey, item, trans);
+                                deletingHook(this.primKey, item, trans);
                                 changes.call(this, item);
                                 if (this.hasOwnProperty("value")) {
                                     // Not deleted, just replaced. Fire when('creating') event.
-                                    whenCreating(this.primKey, this.value, trans);
+                                    creatingHook(this.primKey, this.value, trans);
                                 }
                             }
                         }
-                    } else if (whenUpdating === nop) {
+                    } else if (updatingHook === nop) {
                         var keyPaths = Object.keys(changes);
                         var numKeys = keyPaths.length;
                         modifyer = function (item) {
@@ -1628,7 +1632,7 @@
                         var origChanges = changes;
                         changes = clone(origChanges);
                         modifyer = function (item) {
-                            var changed = whenUpdating(changes, this.primKey, item, trans);
+                            var changed = updatingHook(changes, this.primKey, item, trans);
                             Object.keys(changes).forEach(function (keyPath) {
                                 setByKeyPath(item, keyPath, changes[keyPath]);
                             });
@@ -1737,8 +1741,8 @@
             clearTimeout(to);
         }
 
-        function iterate(req, filter, fn, resolve, reject, whenReading) {
-            whenReading = whenReading || mirror;
+        function iterate(req, filter, fn, resolve, reject, readingHook) {
+            readingHook = readingHook || mirror;
             if (!req.onerror) req.onerror = eventRejectHandler(reject);
             if (filter) {
                 req.onsuccess = trycatch(function filter_record(e) {
@@ -1746,7 +1750,7 @@
                     if (cursor) {
                         var c = function () { cursor.continue(); };
                         if (filter(cursor, function (advancer) { c = advancer }, resolve, reject))
-                            fn(whenReading(cursor.value), cursor, function (advancer) { c = advancer });
+                            fn(readingHook(cursor.value), cursor, function (advancer) { c = advancer });
                         c();
                     } else {
                         resolve();
@@ -1757,7 +1761,7 @@
                     var cursor = req.result;
                     if (cursor) {
                         var c = function () { cursor.continue(); };
-                        fn(whenReading(cursor.value), cursor, function (advancer) { c = advancer });
+                        fn(readingHook(cursor.value), cursor, function (advancer) { c = advancer });
                         c();
                     } else {
                         resolve();
