@@ -20,6 +20,7 @@
         Object.keys(extension).forEach(function (key) {
             obj[key] = extension[key];
         });
+        return obj;
     }
 
     function derive(Child) {
@@ -36,8 +37,8 @@
         };
     }
 
-    function override(origFunction, overridedFunction) {
-        return function () { overridedFunction.apply(origFunction, arguments); };
+    function override(origFunc, overridedFactory) {
+        return overridedFactory(origFunc);
     }
 
     function Dexie(dbName) {
@@ -255,24 +256,22 @@
                                 t.idbtrans = trans;
                                 t.active = true;
                                 var uncompletedRequests = 0;
-                                t._promise = override (function (mode, fn, writeLock) {
-                                    ++uncompletedRequests;
-                                    function proxy(fn) {
-                                        return function () {
-                                            fn.apply(this, arguments);
-                                            if (--uncompletedRequests == 0) cb(); // A called db operation has completed without starting a new operation. The flow is finished, now run next upgrader.
+                                t._promise = override (t._promise, function(orig_promise) {
+                                    return function (mode, fn, writeLock) {
+                                        ++uncompletedRequests;
+                                        function proxy(fn) {
+                                            return function () {
+                                                fn.apply(this, arguments);
+                                                if (--uncompletedRequests == 0) cb(); // A called db operation has completed without starting a new operation. The flow is finished, now run next upgrader.
+                                            }
                                         }
+                                        return orig_promise.call(this, mode, function (resolve, reject, trans) {
+                                            arguments[0] = proxy(resolve);
+                                            arguments[1] = proxy(reject);
+                                            fn.apply(this, arguments);
+                                        }, writeLock);
                                     }
-                                    return this.call(t, function (resolve, reject, trans) {
-                                        arguments[0] = proxy(resolve);
-                                        arguments[1] = proxy(reject);
-                                        fn.apply(this, arguments);
-                                    });
-
-                                    return this.apply(t, arguments).finally(function () {
-                                        if (--uncompletedRequests === 0) cb();
-                                    });
-                                }, t._promise);
+                                });
                                 trans.onerror = eventRejectHandler(reject, ["running upgrader function for version", version._cfg.version]);
                                 newSchema._cfg.contentUpgrade(t);
                                 if (uncompletedRequests === 0) cb(); // contentUpgrade() didnt call any db operations at all.
@@ -458,7 +457,7 @@
         }
 
         this._whenReady = function (fn) {
-            if (!idbdb && !dbOpenError) {
+            if (!idbdb && !dbOpenError || (Promise.PSD && Promise.PSD.onready_firing)) {
                 return new Promise(function (resolve, reject) {
                     fakeAutoComplete(function () { new Promise(function () { fn(resolve, reject); }); });
                     pausedResumeables.push({
@@ -517,18 +516,39 @@
                     req.onerror = eventToError(openError);
                     req.onblocked = db.on("blocked").fire;
                     req.onupgradeneeded = function (e) {
-                        req.transaction.onerror = eventToError(reject);
-                        runUpgraders(e.oldVersion / 10, req.transaction, reject);
+                        req.transaction.onerror = eventToError(openError);
+                        runUpgraders(e.oldVersion / 10, req.transaction, openError);
                     };
                     req.onsuccess = function (e) {
                         isBeingOpened = false;
                         idbdb = req.result;
                         idbdb.onversionchange = db.on("versionchange").fire;
-                        pausedResumeables.forEach(function (resumable) {
-                            // If anyone has made operations on a table instance before the db was opened, the operations will start executing now.
-                            resumable.resume();
-                        });
-                        pausedResumeables = [];
+
+                        // Now, let any subscribers to the on("ready") fire BEFORE any other db operations resume!
+                        // If an the on("ready") subscriber returns a Promise, we will wait til promise completes or rejects before 
+                        var outerScope = Promise.psd();
+                        Promise.PSD.onready_firing = true; // Set a Promise-Specific Data property informing that onready is firing. This will make db._whenReady() let the subscribers use the DB but block all others (!). Quite cool ha?
+                        try {
+                            var res = db.on.ready.fire();
+                            if (res && typeof res.then == 'function') {
+                                // If on('ready') returns a promise, wait for it to complete and then resume any pending operations.
+                                res.then(resume, openError);
+                            } else {
+                                asap(resume); // Cannot call resume directly because then the pauseResumables would inherit from our PSD scope.
+                            }
+                        } catch (e) {
+                            openError(e);
+                        } finally {
+                            Promise.PSD = outerScope; // Always end a PSD scope in a finally scope. Otherwise we may mess it up totally.
+                        }
+                        function resume() {
+                            pausedResumeables.forEach(function (resumable) {
+                                // If anyone has made operations on a table instance before the db was opened, the operations will start executing now.
+                                resumable.resume();
+                            });
+                            pausedResumeables = [];
+                            resolve();
+                        }
                     };
                 } catch (err) {
                     openError(err);
@@ -564,7 +584,7 @@
         //
         // Events
         //
-        this.on = events(this, "error", "populate", "blocked", "versionchange");
+        this.on = events(this, "error", "populate", "blocked", "versionchange", {"ready": [promisableChain, nop]});
 
         fakeAutoComplete(function () {
             db.on("populate").fire(db._createTransaction(READWRITE, dbStoreNames, globalSchema));
@@ -670,9 +690,9 @@
             this.name = name;
             this.schema = tableSchema;
             this.hook = allTables[name] ? allTables[name].hook : events(null, {
-                "creating": [modifyableFunctionChain, nop],
+                "creating": [hookCreatingChain, nop],
                 "reading":  [pureFunctionChain, mirror],
-                "updating": [modifyableFunctionChain, nop],
+                "updating": [hookUpdatingChain, nop],
                 "deleting": [nonStoppableEventChain, nop]
             });
             this._tpf = transactionPromiseFactory;
@@ -848,9 +868,10 @@
                     var self = this,
                         creatingHook = this.hook.creating.fire;
                     return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
+                        var thisCtx = {};
                         if (creatingHook !== nop) {
                             var effectiveKey = key || (idbstore.keyPath && getByKeyPath(obj, idbstore.keyPath));
-                            var keyToUse = creatingHook(effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
+                            var keyToUse = creatingHook.call(thisCtx, effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
                             if (effectiveKey === undefined && keyToUse !== undefined) {
                                 if (idbstore.keyPath)
                                     setByKeyPath(obj, idbstore.keyPath, keyToUse);
@@ -859,10 +880,14 @@
                             }
                         }
                         var req = key ? idbstore.add(obj, key) : idbstore.add(obj);
-                        req.onerror = eventRejectHandler(reject, ["adding", obj, "into", self.name]);
+                        req.onerror = eventRejectHandler(function (e) {
+                            if (thisCtx.onerror) thisCtx.onerror(e);
+                            reject(e);
+                        }, ["adding", obj, "into", self.name]);
                         req.onsuccess = function (ev) {
                             var keyPath = idbstore.keyPath;
                             if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
+                            if (thisCtx.onsuccess) thisCtx.onsuccess(ev.target.result);
                             resolve(req.result);
                         };
                     });
@@ -888,7 +913,7 @@
                                 self.add(obj).then(resolve, reject);
                             } else {
                                 // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
-                                trans._lock();
+                                trans._lock(); // Needed because operation is splitted into modify() and add().
                                 self.where(":id").equals(key).modify(function (value) {
                                     // Replace extisting value with our object
                                     // CRUD event firing handled in WriteableCollection.modify()
@@ -905,7 +930,7 @@
                                     trans._unlock();
                                 }).then(resolve, reject);
                             }
-                        });// true = Pause transaction factory during the entire operation. Needed because operation is splitted into modify() and add().
+                        });
                     } else {
                         // Use the standard IDB put() method.
                         return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
@@ -1600,43 +1625,71 @@
                 var self = this,
                     ctx = this._ctx,
                     hook = ctx.table.hook,
-                    creatingHook = hook.creating.fire,
                     updatingHook = hook.updating.fire,
                     deletingHook = hook.deleting.fire;
 
                 return this._write(function (resolve, reject, idbstore, trans) {
                     var modifyer;
                     if (typeof changes === 'function') {
-                        if (creatingHook === nop && deletingHook === nop) {
+                        // Changes is a function that may update, add or delete propterties or even require a deletion the object itself (delete this.item)
+                        if (updatingHook === nop && deletingHook === nop) {
+                            // Noone cares about what is being changed. Just let the modifier function be the given argument as is.
                             modifyer = changes;
                         } else {
+                            // People want to know exactly what is being modified or deleted.
+                            // Let modifyer be a proxy function that finds out what changes the caller is actually doing
+                            // and call the hooks accordingly!
                             modifyer = function (item) {
-                                deletingHook(this.primKey, item, trans);
-                                changes.call(this, item);
-                                if (this.hasOwnProperty("value")) {
-                                    // Not deleted, just replaced. Fire when('creating') event.
-                                    creatingHook(this.primKey, this.value, trans);
+                                var origItem = deepClone(item); // Clone the item first so we can compare laters.
+                                changes.call(this, item); // Call the real modifyer function.
+                                if (!this.hasOwnProperty("value")) {
+                                    // The real modifyer function requests a deletion of the object. Inform the deletingHook that a deletion is taking place.
+                                    deletingHook.call(this, this.primKey, item, trans);
+                                } else {
+                                    // No deletion. Check what was changed
+                                    var objectDiff = getObjectDiff(origItem, this.item);
+                                    var additionalChanges = updatingHook.call(this, objectDiff, this.primKey, origItem, trans);
+                                    if (additionalChanges) {
+                                        // Hook want to apply additional modifications. Make sure to fullfill the will of the hook.
+                                        item = this.item;
+                                        Object.keys(additionalChanges).forEach(function (keyPath) {
+                                            if (additionalChanges[keyPath] === undefined)
+                                                delByKeyPath(item, keyPath);
+                                            else
+                                                setByKeyPath(item, keyPath, additionalChanges[keyPath]);
+                                        });
+                                    }
                                 }
                             }
                         }
                     } else if (updatingHook === nop) {
+                        // changes is a set of {keyPath: value} and no one is listening to the updating hook.
                         var keyPaths = Object.keys(changes);
                         var numKeys = keyPaths.length;
                         modifyer = function (item) {
                             for (var i = 0; i < numKeys; ++i) {
-                                var keyPath = keyPaths[i];
-                                setByKeyPath(item, keyPath, changes[keyPath]);
+                                var keyPath = keyPaths[i], val = changes[keyPath];
+                                if (val === undefined)
+                                    delByKeyPath(item, keyPath); // Adding {keyPath: undefined} means that the keyPath should be deleted.
+                                else
+                                    setByKeyPath(item, keyPath, val);
                             }
                         }
                     } else {
+                        // changes is a set of {keyPath: value} and people are listening to the updating hook so we need to call it and
+                        // allow it to add additional modifications to make.
                         var origChanges = changes;
-                        changes = clone(origChanges);
+                        changes = shallowClone(origChanges); // Let's work with a clone of the changes keyPath/value set so that we can restore it in case a hook extends it.
                         modifyer = function (item) {
-                            var changed = updatingHook(changes, this.primKey, item, trans);
+                            var additionalChanges = updatingHook.call(this, changes, this.primKey, item, trans);
+                            if (additionalChanges) extend(changes, additionalChanges);
                             Object.keys(changes).forEach(function (keyPath) {
-                                setByKeyPath(item, keyPath, changes[keyPath]);
+                                if (changes[keyPath] === undefined)
+                                    delByKeyPath(item, keyPath, changes[keyPath]);
+                                else
+                                    setByKeyPath(item, keyPath, changes[keyPath]);
                             });
-                            if (changed) changes = clone(origChanges);
+                            if (additionalChanges) changes = shallowClone(origChanges); // Restore original changes.
                         }
                     }
 
@@ -1646,16 +1699,18 @@
                     var failures = [];
 
                     function modifyItem(item, cursor, advance) {
-                        var p = { primKey: cursor.primaryKey, value: item };
-                        modifyer.call(p, item);
-                        var bDelete = !p.hasOwnProperty("value");
-                        var req = (bDelete ? cursor.delete() : cursor.update(p.value));
+                        var thisContext = { primKey: cursor.primaryKey, value: item };
+                        modifyer.call(thisContext, item);
+                        var bDelete = !thisContext.hasOwnProperty("value");
+                        var req = (bDelete ? cursor.delete() : cursor.update(thisContext.value));
                         ++count;
                         req.onerror = eventRejectHandler(function (e) {
                             failures.push(e);
+                            if (thisContext.onerror) thisContext.onerror(e);
                             return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
                         }, function () { return bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]; });
-                        req.onsuccess = function () {
+                        req.onsuccess = function (ev) {
+                            if (thisContext.onsuccess) thisContext.onsuccess(ev.target.result);
                             ++successCount;
                             checkFinished();
                         }
@@ -1736,11 +1791,6 @@
             });
         }
 
-        function fakeAutoComplete(fn) {
-            var to = setTimeout(fn, 1000);
-            clearTimeout(to);
-        }
-
         function iterate(req, filter, fn, resolve, reject, readingHook) {
             readingHook = readingHook || mirror;
             if (!req.onerror) req.onerror = eventRejectHandler(reject);
@@ -1802,14 +1852,6 @@
 
         function combine(filter1, filter2) {
             return filter1 ? filter2 ? function () { return filter1.apply(this, arguments) && filter2.apply(this, arguments) } : filter1 : filter2;
-        }
-
-        function clone(obj) {
-            var rv = {};
-            for (var m in obj) {
-                if (obj.hasOwnProperty(m)) rv[m] = obj[m];
-            }
-            return rv;
         }
 
         function eventToError(fn) {
@@ -2143,22 +2185,51 @@
 
     function pureFunctionChain(f1, f2) {
         // Enables chained events that takes ONE argument and returns it to the next function in chain.
-        // This pattern is used in the when("reading") event.
+        // This pattern is used in the hook("reading") event.
         if (f1 === mirror) return f2;
         return function (val) {
             return f2(f1(val));
         }
     }
 
-    function modifyableFunctionChain(f1, f2) {
+    function callBoth(on1, on2) {
+        return function () {
+            on1.apply(this, arguments);
+            on2.apply(this, arguments);
+        }
+    }
+
+    function hookCreatingChain(f1, f2) {
         // Enables chained events that takes several arguments and may modify first argument by making a modification and then returning the same instance.
-        // This pattern is used in the when("creating") and when("updating") events.
+        // This pattern is used in the hook("creating") event.
         if (f1 === nop) return f2;
         return function () {
             var res = f1.apply(this, arguments);
             if (res !== undefined) arguments[0] = res;
+            var onsuccess = this.onsuccess, // In case event listener has set this.onsuccess
+                onerror = this.onerror;     // In case event listener has set this.onerror
+            delete this.onsuccess;
+            delete this.onerror;
             var res2 = f2.apply(this, arguments);
+            if (onsuccess) this.onsuccess = this.onsuccess ? callBoth(onsuccess, this.onsuccess) : onsuccess;
+            if (onerror) this.onerror = this.onerror ? callBoth(onerror, this.onerror) : onerror;
             return res2 !== undefined ? res2 : res;
+        }
+    }
+
+    function hookUpdatingChain(f1, f2) {
+        if (f1 === nop) return f2;
+        return function () {
+            var res = f1.apply(this, arguments);
+            if (res !== undefined) extend(arguments[0], res); // If f1 returns new modifications, extend caller's modifications with the result before calling next in chain.
+            var onsuccess = this.onsuccess, // In case event listener has set this.onsuccess
+                onerror = this.onerror;     // In case event listener has set this.onerror
+            delete this.onsuccess;
+            delete this.onerror;
+            var res2 = f2.apply(this, arguments);
+            if (onsuccess) this.onsuccess = this.onsuccess ? callBoth(onsuccess, this.onsuccess) : onsuccess;
+            if (onerror) this.onerror = this.onerror ? callBoth(onerror, this.onerror) : onerror;
+            return res === undefined ? res2 === undefined ? undefined : res2 : res.extend(res2);
         }
     }
 
@@ -2174,8 +2245,22 @@
     function nonStoppableEventChain(f1, f2) {
         if (f1 === nop) return f2;
         return function () {
-            f2.apply(this, arguments);
             f1.apply(this, arguments);
+            f2.apply(this, arguments);
+        }
+    }
+
+    function promisableChain(f1, f2) {
+        if (f1 === nop) return f2;
+        return function () {
+            var res = f1.apply(this, arguments);
+            if (res && typeof res.then == 'function') {
+                var thiz = this, args = arguments;
+                return res.then(function () {
+                    return f2.apply(thiz, args);
+                });
+            }
+            return f2.apply(this, arguments);
         }
     }
 
@@ -2250,6 +2335,11 @@
         if (window.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
     }
 
+    function fakeAutoComplete(fn) {
+        var to = setTimeout(fn, 1000);
+        clearTimeout(to);
+    }
+
     function trycatch(fn, reject) {
         return function () {
             try {
@@ -2312,6 +2402,55 @@
     function delByKeyPath(obj, keyPath) {
         setByKeyPath(obj, keyPath, null, true);
     }
+
+    function shallowClone(obj) {
+        var rv = {};
+        for (var m in obj) {
+            if (obj.hasOwnProperty(m)) rv[m] = obj[m];
+        }
+        return rv;
+    }
+
+    function deepClone(any) {
+        if (!any || typeof any !== 'object') return any;
+        var rv;
+        if (Array.isArray(any)) {
+            rv = [];
+            for (var i=0, l=any.length; i<l; ++i) {
+                rv.push(deepClone(any[i]));
+            }
+        } else if (any instanceof Date) {
+            rv = new Date();
+            rv.setTime(any.getTime());
+        } else {
+            rv = any.constructor ? Object.create(any.constructor.prototype) : {};
+            for (var prop in any) {
+                if (any.hasOwnProperty(prop)) {
+                    rv[prop] = deepClone(any[prop]);
+                }
+            }
+        }
+        return rv;
+    }
+
+    function getObjectDiff(a, b) {
+        // This is a simplified version that will always return keypaths on the root level.
+        // If for example a and b differs by: (a.somePropsObject.x != b.somePropsObject.x), we will return that "somePropsObject" is changed
+        // and not "somePropsObject.x". This is acceptable and true but could be optimized to support nestled changes if that would give a
+        // big optimization benefit.
+        var rv = {};
+        for (var prop in a) if (a.hasOwnProperty(prop)) {
+            if (!b.hasOwnProperty(prop))
+                rv[prop] = undefined; // Property removed
+            else if (a[prop] !== b[prop])
+                rv[prop] = b[prop]; // Property changed
+        }
+        for (var prop in b) if (b.hasOwnProperty(prop) && !a.hasOwnProperty(prop)) {
+            rv[prop] = b[prop]; // Property added
+        }
+        return rv;
+    }
+
 
     //
     // IndexSpec struct
@@ -2385,7 +2524,10 @@
     Dexie.getByKeyPath = getByKeyPath;
     Dexie.setByKeyPath = setByKeyPath;
     Dexie.delByKeyPath = delByKeyPath;
+    Dexie.shallowClone = shallowClone;
+    Dexie.deepClone = deepClone;
     Dexie.addons = [];
+    Dexie.fakeAutoComplete = fakeAutoComplete;
 	// Export our static classes
     Dexie.MultiModifyError = MultiModifyError;
     Dexie.IndexSpec = IndexSpec;
