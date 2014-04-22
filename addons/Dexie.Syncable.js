@@ -217,7 +217,13 @@
                     // Only add change if the operation succeeds.
                     var modifiedObj = Dexie.deepClone(obj);
                     Object.keys(mods).forEach(function (keyPath) {
-                        Dexie.setByKeyPath(modifiedObj, mods[keyPath]);
+                        var value = mods[keyPath];
+                        if (typeof value === 'undefined') {
+                            Dexie.delByKeyPath(modifiedObj);
+                            mods[keyPath] = null; // Database items and JSON cannot contain undefined. Consumer may check if Dexie.getByKeyPath(newObj, keyPath]) for undefined to know if a deletion was made.
+                        } else {
+                            Dexie.setByKeyPath(modifiedObj, mods[keyPath]);
+                        }
                     });
                     trans._changesTable.add({
                         tstmp: trans._timestamp,
