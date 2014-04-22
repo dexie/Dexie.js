@@ -40,7 +40,7 @@
             ok(true, "Got transaction error: " + (e.stack || e));
         }).finally(start);
     });
-
+    
     asyncTest("eventError-request-catch", function () {
         db.transaction("rw", db.users, function (users) {
             users.add({ username: "dfahlander" }).then(function () {
@@ -54,7 +54,7 @@
         }).then(function () {
             ok(true, "Transaction should complete since the only error that occurred was catched");
         }).catch(function (e) {
-            ok(false, "Got transaction error: " + (e.stack || e));
+            ok(false, "Should not get transaction error since we have catched the error. Got Transaction error: " + (e.stack || e));
         }).finally(start);
     });
 

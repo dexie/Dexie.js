@@ -23,7 +23,7 @@
         return db;
     }
 
-    asyncTest("test1", function () {
+    asyncTest("test1", 4, function () {
         var db1 = createDB();
         var db2 = createDB();
 

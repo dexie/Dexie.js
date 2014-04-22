@@ -889,7 +889,7 @@
                         var req = key ? idbstore.add(obj, key) : idbstore.add(obj);
                         req.onerror = eventRejectHandler(function (e) {
                             if (thisCtx.onerror) thisCtx.onerror(e);
-                            reject(e);
+                            return reject(e);
                         }, ["adding", obj, "into", self.name]);
                         req.onsuccess = function (ev) {
                             var keyPath = idbstore.keyPath;

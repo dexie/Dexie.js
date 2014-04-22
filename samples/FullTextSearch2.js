@@ -17,9 +17,10 @@ db._createTransaction = Dexie.override(db._createTransaction, function (createTr
     // If not doing this, error will occur in the hooks unless the application code has included emailWords in the transaction when modifying emails table.
     return function(mode, storeNames, dbSchema) {
         if (mode === "readwrite" && storeNames.indexOf("emailWords") == -1) {
+            storeNames = storeNames.slice(0); // Clone storeNames before mippling with it.
             storeNames.push("emailWords");
         }
-        return createTransaction.apply(this, arguments);
+        return createTransaction.call(this, mode, storeNames, dbSchema);
     }
 });
 

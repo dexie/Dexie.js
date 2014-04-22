@@ -57,7 +57,13 @@
                         newStoresSpec[tableName] = tableDef.substr(pColon + 1);
                         createChangesTable = true;
                     } else {
-                        newStoresSpec = tableDef;
+                        newStoresSpec[tableName] = tableDef;
+                    }
+                    if (Dexie.Syncable.syncAll) {
+                        // Static property telling Dexie.Syncable to work on all tables, even those not marked as syncable.
+                        // This property can be useful reusing the unit tests for Dexie with Dexie.Syncable applied.
+                        createChangesTable = true;
+                        syncedTables[tableName] = true;
                     }
                 });
                 if (createChangesTable) {
@@ -116,6 +122,7 @@
                 if (mode === 'readwrite' && storenames.some(function (storeName) { return dbschema[storeName] && dbschema[storeName].synced; })) {
                     // At least one included store is a synced store. Make sure to also include the _changes store.
                     addChanges = true;
+                    storenames = storenames.slice(0); // Clone
                     storenames.push("_changes");
                 }
                 // Call original db._createTransaction()
@@ -219,10 +226,10 @@
                     Object.keys(mods).forEach(function (keyPath) {
                         var value = mods[keyPath];
                         if (typeof value === 'undefined') {
-                            Dexie.delByKeyPath(modifiedObj);
+                            Dexie.delByKeyPath(modifiedObj, keyPath);
                             mods[keyPath] = null; // Database items and JSON cannot contain undefined. Consumer may check if Dexie.getByKeyPath(newObj, keyPath]) for undefined to know if a deletion was made.
                         } else {
-                            Dexie.setByKeyPath(modifiedObj, mods[keyPath]);
+                            Dexie.setByKeyPath(modifiedObj, keyPath, mods[keyPath]);
                         }
                     });
                     trans._changesTable.add({
@@ -275,7 +282,7 @@
                 nodeInfo.myRevision = lastChange && lastChange.rev || 0;
                 return db.table("_syncNodes").add(nodeInfo).then(function () {
                     Dexie.Syncable.onLatestRevisionIncremented.subscribe(onLatestRevisionIncremented); // Call readChanges whenever a new revision is in place.
-                    //pollHandle = setTimeout(poll, POLL_INTERVAL);
+                    pollHandle = setTimeout(poll, POLL_INTERVAL);
                 });
             });
         });
@@ -429,6 +436,8 @@
     Dexie.Syncable = Syncable;
     Dexie.Syncable.latestRevision = 0;
     Dexie.Syncable.onLatestRevisionIncremented = Dexie.events(null, "latestRevisionIncremented").latestRevisionIncremented;
+    Dexie.Syncable.syncAll = false;
+
     window.addEventListener("storage", function(event) {
         // We use the onstorage event to trigger onLatestRevisionIncremented since we will wake up when other windows modify the DB as well!
         if (event.key === 'Dexie.Syncable.latestRevision') {
