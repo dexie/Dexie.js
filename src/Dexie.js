@@ -917,11 +917,11 @@
                             key = key || (self.schema.primKey.keyPath && getByKeyPath(obj, self.schema.primKey.keyPath));
                             if (key === undefined) {
                                 // No primary key. Must use add().
-                                trans.table(self.name).add(obj).then(resolve, reject);
+                                trans.tables[self.name].add(obj).then(resolve, reject);
                             } else {
                                 // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
                                 trans._lock(); // Needed because operation is splitted into modify() and add().
-                                trans.table(self.name).where(":id").equals(key).modify(function (value) {
+                                trans.tables[self.name].where(":id").equals(key).modify(function (value) {
                                     // Replace extisting value with our object
                                     // CRUD event firing handled in WriteableCollection.modify()
                                     this.value = obj;
@@ -929,7 +929,7 @@
                                     if (count === 0) {
                                         // Object's key was not found. Add the object instead.
                                         // CRUD event firing will be done in add()
-                                        return trans.table(self.name).add(obj, key); // Resolving with another Promise. Returned Promise will then resolve with the new key.
+                                        return trans.tables[self.name].add(obj, key); // Resolving with another Promise. Returned Promise will then resolve with the new key.
                                     } else {
                                         return key; // Resolve with the provided key.
                                     }
@@ -1019,7 +1019,10 @@
             this._psd = null;
             this.active = false;
             this._dbschema = dbschema;
-            this._tpf = function transactionPromiseFactory (mode, storeNames, fn, writeLocked) {
+            this._tpf = transactionPromiseFactory;
+            this.tables = {};
+
+            function transactionPromiseFactory (mode, storeNames, fn, writeLocked) {
                 // Creates a Promise instance and calls fn (resolve, reject, trans) where trans is the instance of this transaction object.
                 // Support for write-locking the transaction during the promise life time from creation to success/failure.
                 // This is actually not needed when just using single operations on IDB, since IDB implements this internally.
@@ -1030,8 +1033,12 @@
                 return self._promise(mode, fn, writeLocked);
             }
 
-            //setApiOnPlace([this, this.tables], transactionPromiseFactory, storeNames, mode, dbschema); // Removed the auto-table population on Transactions in Dexie version 0.95 since the performance cost
-            //is not worth the syntactic sugar of it. db.transaction() yet provides the table instances as arguments. Only on("populate") and upgrade() functions will be affected.
+            for (var i = storeNames.length - 1; i !== -1; --i) {
+                var name = storeNames[i];
+                var table = db._tableFactory(mode, dbschema[name], transactionPromiseFactory);
+                this.tables[name] = table;
+                if (!this[name]) this[name] = table;
+            }
         }
 
         extend(Transaction.prototype, {
@@ -1130,8 +1137,8 @@
                 } catch (e) { }
             },
             table: function (name) {
-                if (!this._dbschema.hasOwnProperty(name)) { throw new Error("Table does not exist"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
-                return db._tableFactory(this.mode, this._dbschema[name], this._tpf);
+                if (!this.tables.hasOwnProperty(name)) { throw new Error("Table does not exist"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
+                return this.tables[name];
             }
         });
 

@@ -129,7 +129,6 @@
                 var trans = origFunc.call(this, mode, storenames, dbschema);
                 // If this transaction 
                 if (addChanges) {
-                    trans._changesTable = trans.table("_changes"); // Cache the changes table on the transaction for performance optimization.
                     trans._timestamp = Date.now(); // Cache the time stamp of when transaction was created for performance optimization.
                     trans._lastWrittenRevision = 0;
                     trans.on('complete', function () {
@@ -206,7 +205,7 @@
                 // Also, only add the change if operation succeeds. Caller might catch the error to prohibit transaction
                 // from being aborted. If not waiting for onsuccess we would add the change to _changes even thought it wouldnt succeed.
                 this.onsuccess = function (primKey) {
-                    trans._changesTable.add({
+                    trans.tables._changes.add({
                         tstmp: trans._timestamp,
                         table: tableName,
                         key: primKey,
@@ -232,7 +231,7 @@
                             Dexie.setByKeyPath(modifiedObj, keyPath, mods[keyPath]);
                         }
                     });
-                    trans._changesTable.add({
+                    trans.tables._changes.add({
                         tstmp: trans._timestamp,
                         table: tableName,
                         key: primKey,
@@ -248,7 +247,7 @@
             table.hook('deleting', function (primKey, obj, trans) {
                 /// <param name="trans" type="db.Transaction"></param>
                 this.onsuccess = function () {
-                    trans._changesTable.add({
+                    trans.tables._changes.add({
                         tstmp: trans._timestamp,
                         table: tableName,
                         key: primKey,
