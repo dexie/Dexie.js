@@ -48,7 +48,7 @@ db.emails.hook("updating", function (mods, primKey, obj, trans) {
         var emailWords = trans.table("emailWords");
         emailWords.where("emailId").equals(primKey).delete();
         // Add new mappings.
-        if (mods.message) {
+        if (typeof mods.message == 'string') {
             getAllWords(mods.message).forEach(function (word) {
                 emailWords.add({ word: word, emailId: primKey });
             });
