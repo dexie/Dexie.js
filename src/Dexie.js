@@ -144,7 +144,6 @@
                     setApiOnPlace(db, db._transPromiseFactory, Object.keys(latestSchema), READWRITE, latestSchema, true);
                 }
                 dbStoreNames = Object.keys(latestSchema);
-
                 return this;
             },
             upgrade: function (upgradeFunction) {
@@ -408,10 +407,6 @@
 
         this._allTables = allTables;
 
-        this._backendDB = function () {
-            return idbdb;
-        }
-
         this._tableFactory = function createTable (mode, tableSchema, transactionPromiseFactory) {
         	/// <param name="tableSchema" type="TableSchema"></param>
             if (mode === READONLY)
@@ -580,6 +575,18 @@
                 }
             });
         }
+
+        this.backendDB = function () {
+            return idbdb;
+        }
+
+        this.isOpen = function () {
+            return idbdb !== null;
+        }
+        this.hasFailed = function () {
+            return dbOpenError !== null;
+        }
+
 
         //
         // Events
@@ -907,14 +914,14 @@
                         //
                         return this._trans(READWRITE, function (resolve, reject, trans) {
                             // Since key is optional, make sure we get it from obj if not provided
-                            key = key || (idbstore.keyPath && getByKeyPath(obj, idbstore.keyPath));
+                            key = key || (self.schema.primKey.keyPath && getByKeyPath(obj, self.schema.primKey.keyPath));
                             if (key === undefined) {
                                 // No primary key. Must use add().
-                                self.add(obj).then(resolve, reject);
+                                trans.table(self.name).add(obj).then(resolve, reject);
                             } else {
                                 // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
                                 trans._lock(); // Needed because operation is splitted into modify() and add().
-                                self.where(":id").equals(key).modify(function (value) {
+                                trans.table(self.name).where(":id").equals(key).modify(function (value) {
                                     // Replace extisting value with our object
                                     // CRUD event firing handled in WriteableCollection.modify()
                                     this.value = obj;
@@ -922,7 +929,7 @@
                                     if (count === 0) {
                                         // Object's key was not found. Add the object instead.
                                         // CRUD event firing will be done in add()
-                                        return self.add(obj, key); // Resolving with another Promise. Returned Promise will then resolve with the new key.
+                                        return trans.table(self.name).add(obj, key); // Resolving with another Promise. Returned Promise will then resolve with the new key.
                                     } else {
                                         return key; // Resolve with the provided key.
                                     }
@@ -1628,6 +1635,12 @@
                     updatingHook = hook.updating.fire,
                     deletingHook = hook.deleting.fire;
 
+                fakeAutoComplete(function () {
+                    if (typeof changes === 'function') {
+                        changes.call({ value: ctx.table.schema.instanceTemplate }, ctx.table.schema.instanceTemplate);
+                    }
+                });
+
                 return this._write(function (resolve, reject, idbstore, trans) {
                     var modifyer;
                     if (typeof changes === 'function') {
@@ -1647,11 +1660,11 @@
                                     deletingHook.call(this, this.primKey, item, trans);
                                 } else {
                                     // No deletion. Check what was changed
-                                    var objectDiff = getObjectDiff(origItem, this.item);
+                                    var objectDiff = getObjectDiff(origItem, this.value);
                                     var additionalChanges = updatingHook.call(this, objectDiff, this.primKey, origItem, trans);
                                     if (additionalChanges) {
                                         // Hook want to apply additional modifications. Make sure to fullfill the will of the hook.
-                                        item = this.item;
+                                        item = this.value;
                                         Object.keys(additionalChanges).forEach(function (keyPath) {
                                             if (additionalChanges[keyPath] === undefined)
                                                 delByKeyPath(item, keyPath);
@@ -2127,12 +2140,12 @@
         };
 
         Promise.prototype['finally'] = function (onFinally) {
-            this.then(function (value) {
+            return this.then(function (value) {
                 onFinally();
+                return value;
             }, function (err) {
                 return Promise.reject(err);
             });
-            return this;
         };
 
         Promise.prototype.onuncatched = null; // Optional event triggered if promise is rejected but no one listened.
