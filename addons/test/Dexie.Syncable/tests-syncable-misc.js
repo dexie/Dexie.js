@@ -30,7 +30,7 @@
         db2.friends.on("created", function (key, obj) {
             ok(true, "obj created: " + JSON.stringify(obj));
         });
-        db2.friends.on("updated", function (key, oldObj, mods, newObj) {
+        db2.friends.on("updated", function (key, mods, oldObj, newObj) {
             ok(true, "obj updated: " + JSON.stringify(mods));
             equal(JSON.stringify(mods), JSON.stringify({ name: "David" }), "Only modifying the name property");
         });

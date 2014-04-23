@@ -1,27 +1,69 @@
 ﻿/// <reference path="../src/Dexie.js" />
+/// <reference path="Dexie.Syncable.SyncProviderAPI.js" />
 (function (window, publish, isBrowser, undefined) {
 
     "use strict"
 
+    /** class DatabaseChange
+     *
+     *  Object contained by the _changes table.
+     */
+    var DatabaseChange = Dexie.defineClass({
+        tstmp: Number,  // Time stamp of change
+        table: String,  // Table name
+        key: Object,    // Primary key. Any type.
+        type: Number,   // 1 = CREATE, 2 = UPDATE, 3 = DELETE
+        mods: Object,   // CREATE: mods contains the object. UPDATE: mods contains the modifications made to the object.
+        oldObj: Object, // UPDATE: oldObj contains the old object before updates applied. DELETE: oldObj contains the object that was deleted.
+        newObj: Object  // UPDATE: newObj contains the new object after modifications were applied.
+    });
+
+    /** class SyncNode
+     *
+     * Object contained in the _syncNodes table.
+     */
+    var SyncNode = Dexie.defineClass({
+        id: Number,
+        myRevision: Number,
+        type: String,               // "local" or "remote"
+        lastHeartBeat: Number,
+        deleteTimeStamp: Number,    // In case lastHeartBeat is too old, a value of now + HIBERNATE_GRACE_PERIOD will be set here. If reached before node wakes up, node will be deleted.
+
+        // Below properties apply to remote nodes only (type == "remote"):
+        syncProvider: String, // Tells which implementation of ISyncProvider to use for remote syncing. 
+        syncContext: null
+    });
+
     // Import some usable helper functions
     var override = Dexie.override;
 
-    function Syncable (db) {
+    Dexie.Syncable = function (db) {
     	/// <summary>
     	///   Extension to Dexie providing Syncronization capabilities to Dexie.
     	/// </summary>
         /// <param name="db" type="Dexie"></param>
 
-        var NODE_TIMEOUT = 30000, // 30 seconds
+        var NODE_TIMEOUT = 30000, // 30 seconds before local db instances are timed out. This is so that old changes can be deleted when not needed and to garbage collect old _syncNodes objects.
             HIBERNATE_GRACE_PERIOD = 30000, // 30 seconds
             POLL_INTERVAL = 1000; // 1 second. In real-world there will be this value + the time it takes to poll().
 
-        var nodeInfo = {
+        //
+        // ProviderContext : IPersistedContext
+        //
+        function ProviderContext(nodeID) {
+            this.nodeID = nodeID;
+        }
+        ProviderContext.prototype.save = function () {
+            // Store this instance in the syncContext property of the node it belongs to.
+            return db._changes.where("id").equals(this.nodeID).modify({ syncContext: this });
+        }
+
+        var mySyncNode = new SyncNode({
             myRevision: 0,
             type: "local",
             lastHeartBeat: Date.now(),
             deleteTimeStamp: null
-        };
+        });
 
         var anySyncedTable = 0;
         var pollHandle = null;
@@ -31,14 +73,11 @@
                 _syncNodes: "++id,myRevision,lastHeartBeat",
                 _changes: "++rev,tstmp"
             });
-            db._syncNodes.defineClass({
-                id: Number,
-                myRevision: Number,
-                type: String,
-                lastHeartBeat: Number,
-                deleteTimeStamp: Number
-            });
+            //db._changes.mapToClass(DatabaseChange);
+            //db._syncNodes.mapToClass(SyncNode);
         });
+
+
 
         //
         // Override parsing the stores to allow "sync:" prefix on any object store.
@@ -93,11 +132,22 @@
             };
         });
 
-        db._tableFactory = override(db._tableFactory, function (origFunc) {
+        // Override Version.stores() in order to map our classes.
+        db.Version.prototype.stores = override(db.Version.prototype.stores, function (origFunc) {
             return function () {
+                var rv = origFunc.apply(this, arguments);
+                db._changes.mapToClass(DatabaseChange);
+                db._syncNodes.mapToClass(SyncNode);
+                return rv;
+            };
+        });
+
+        db._tableFactory = override(db._tableFactory, function (origFunc) {
+            return function (mode, tableSchema, transactionPromiseFactory) {
                 var table = origFunc.apply(this, arguments);
-                //table.kalle = "hej";
-                addObserveEvents(table);
+                if (tableSchema.synced) {
+                    addObserveEvents(table);
+                }
                 return table;
             }
         });
@@ -210,35 +260,31 @@
                         table: tableName,
                         key: primKey,
                         type: 1,
-                        obj: obj
+                        mods: obj
                     }).then(function (rev) {
                         trans._lastWrittenRevision = rev;
                     });
                 };
                 return rv;
             });
-            table.hook('updating', function (mods, primKey, obj, trans) {
+            table.hook('updating', function (mods, primKey, oldObj, trans) {
                 /// <param name="trans" type="db.Transaction"></param>
-                this.onsuccess = function () {
+                this.onsuccess = function (newObj) {
                     // Only add change if the operation succeeds.
-                    var modifiedObj = Dexie.deepClone(obj);
-                    Object.keys(mods).forEach(function (keyPath) {
-                        var value = mods[keyPath];
-                        if (typeof value === 'undefined') {
-                            Dexie.delByKeyPath(modifiedObj, keyPath);
-                            mods[keyPath] = null; // Database items and JSON cannot contain undefined. Consumer may check if Dexie.getByKeyPath(newObj, keyPath]) for undefined to know if a deletion was made.
-                        } else {
-                            Dexie.setByKeyPath(modifiedObj, keyPath, mods[keyPath]);
+                    var modsWithoutUndefined = Dexie.deepClone(mods);
+                    for (var prop in modsWithoutUndefined) {
+                        if (typeof modsWithoutUndefined[prop] === 'undefined') {
+                            modsWithoutUndefined[prop] = null; // Null is as close we could come to deleting a property when not allowing undefined.
                         }
-                    });
+                    }
                     trans.tables._changes.add({
                         tstmp: trans._timestamp,
                         table: tableName,
                         key: primKey,
                         type: 2,
-                        oldObj: obj,
-                        mods: mods,
-                        newObj: modifiedObj
+                        mods: modsWithoutUndefined,
+                        oldObj: oldObj,
+                        newObj: newObj
                     }).then(function (rev) {
                         trans._lastWrittenRevision = rev;
                     });
@@ -252,7 +298,7 @@
                         table: tableName,
                         key: primKey,
                         type: 3,
-                        obj: obj
+                        oldObj: obj
                     }).then(function (rev) {
                         trans._lastWrittenRevision = rev;
                     });
@@ -278,8 +324,8 @@
             return db.table("_changes").orderBy("rev").last(function (lastChange) {
                 // Since startObserving() is called before database open() method, this will be the first database operation enqueued to db.
                 // Therefore we know that the retrieved value will be This query will 
-                nodeInfo.myRevision = lastChange && lastChange.rev || 0;
-                return db.table("_syncNodes").add(nodeInfo).then(function () {
+                mySyncNode.myRevision = lastChange && lastChange.rev || 0;
+                return db.table("_syncNodes").add(mySyncNode).then(function () {
                     Dexie.Syncable.onLatestRevisionIncremented.subscribe(onLatestRevisionIncremented); // Call readChanges whenever a new revision is in place.
                     pollHandle = setTimeout(poll, POLL_INTERVAL);
                 });
@@ -306,31 +352,31 @@
                 return Dexie.Promise.reject(); // Inform caller not to continue.
             }
             readChanges.isReadingChanges = true;
-            var expectedRevision = nodeInfo.myRevision + 1;
+            var expectedRevision = mySyncNode.myRevision + 1;
 
-            return db._changes.where("rev").between(nodeInfo.myRevision, latestRevision, false, true).each(function (change) {
+            return db._changes.where("rev").between(mySyncNode.myRevision, latestRevision, false, true).each(function (change) {
 
                 if (change.rev !== expectedRevision) throw new NotInSyncError("Not in sync! Need to reload page");
                 var on = db._allTables[change.table].on;
                 switch (change.type) {
                     case 1:
-                        on.created.fire(change.key, change.obj);
+                        on.created.fire(change.key, change.mods);
                         break;
                     case 2:
-                        on.updated.fire(change.key, change.oldObj, change.mods, change.newObj);
+                        on.updated.fire(change.key, change.mods, change.oldObj, change.newObj);
                         break;
                     case 3:
-                        on.deleted.fire(change.key, change.obj);
+                        on.deleted.fire(change.key, change.oldObj);
                         break;
                 }
-                nodeInfo.myRevision = change.rev;
-                expectedRevision = nodeInfo.myRevision + 1;
+                mySyncNode.myRevision = change.rev;
+                expectedRevision = mySyncNode.myRevision + 1;
 
             }).then(function () {
 
-                nodeInfo.lastHeartBeat = Date.now();
-                nodeInfo.deleteTimeStamp = null; // Reset "deleteTimeStamp" flag if it was there.
-                db.table("_syncNodes").put(nodeInfo);
+                mySyncNode.lastHeartBeat = Date.now();
+                mySyncNode.deleteTimeStamp = null; // Reset "deleteTimeStamp" flag if it was there.
+                db.table("_syncNodes").put(mySyncNode);
 
             }).catch(NotInSyncError, function (e) {
 
@@ -341,9 +387,9 @@
                     // User doesnt want to reload page. We must silently ignore all lost changes and recreate our node:
                     db.transaction("rw", db._changes, db._syncNodes, function (changes, syncNodes) {
                         changes.orderBy("rev").last(function (lastRev) {
-                            nodeInfo.myRevision = lastRev;
+                            mySyncNode.myRevision = lastRev;
                             // Put back our sync node that has probably been deleted by other node.
-                            syncNodes.put(nodeInfo);
+                            syncNodes.put(mySyncNode);
                         });
                     });
                 }
@@ -431,8 +477,6 @@
         return f1;
     }
 
-
-    Dexie.Syncable = Syncable;
     Dexie.Syncable.latestRevision = 0;
     Dexie.Syncable.onLatestRevisionIncremented = Dexie.events(null, "latestRevisionIncremented").latestRevisionIncremented;
     Dexie.Syncable.syncAll = false;
