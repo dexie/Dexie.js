@@ -707,31 +707,6 @@
         }
 
         extend(Table.prototype, function () {
-            //
-            // Table Private Functions
-            //
-
-            function parseType(type) {
-                if (typeof type == 'function') {
-                    return new type();
-                } else if (Array.isArray(type)) {
-                    return [parseType(type[0])];
-                } else if (typeof type == 'object') {
-                    var rv = {};
-                    applyStructure(rv, type);
-                    return rv;
-                } else {
-                    return type;
-                }
-            }
-
-            function applyStructure(obj, structure) {
-                Object.keys(structure).forEach(function (member) {
-                    var value = parseType(structure[member]);
-                    obj[member] = value;
-                });
-            }
-
             return {
                 //
                 // Table Protected Methods
@@ -806,6 +781,9 @@
                     /// <param name="structure" optional="true">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
                     /// know what type each member has. Example: {name: String, emailAddresses: [String], password}</param>
                     if (this.schema.mappedClass) throw new Error("Table already mapped");
+                    // Make sure primary key is not part of prototype because add() and put() fails on Chrome if primKey template lies on prototype due to a bug in its implementation
+                    // of getByKeyPath(), that it accepts getting from prototype chain.
+                    if (this.schema.primKey.keyPath) delByKeyPath(constructor.prototype, this.schema.primKey.keyPath); 
                     this.schema.mappedClass = constructor;
                     var instanceTemplate = Object.create(constructor.prototype);
                     if (structure) {
@@ -838,17 +816,7 @@
                     /// </summary>
                     /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
                     /// know what type each member has. Example: {name: String, emailAddresses: [String], properties: {shoeSize: Number}}</param>
-
-                    // The defined class has a constructor taking an optional argument with all properties to set.
-                    function Class(properties) {
-                        /// <param name="properties" type="Object" optional="true">Properties to initialize object with.
-                        /// </param>
-                        if (properties) extend(this, properties);
-                    }
-                    Class.name = this.name; // Set the name of the class to the table name by default. This is an EcmaScript 6 feature. Not supported by IE11 yet.
-                    applyStructure(Class.prototype, structure);
-                    if (this.schema.primKey.keyPath) delByKeyPath(Class.prototype, this.schema.primKey.keyPath); // add() and put() fails on Chrome if primKey template lies on prototype due to a bug in its implementation of getByKeyPath(), that it accepts getting from prototype chain.
-                    return this.mapToClass(Class, structure);
+                    return this.mapToClass(Dexie.defineClass(structure, this.name), structure);
                 }
             };
         });
@@ -1701,7 +1669,7 @@
                         var origChanges = changes;
                         changes = shallowClone(origChanges); // Let's work with a clone of the changes keyPath/value set so that we can restore it in case a hook extends it.
                         modifyer = function (item) {
-                            var additionalChanges = updatingHook.call(this, changes, this.primKey, item, trans);
+                            var additionalChanges = updatingHook.call(this, changes, this.primKey, deepClone(item), trans);
                             if (additionalChanges) extend(changes, additionalChanges);
                             Object.keys(changes).forEach(function (keyPath) {
                                 if (changes[keyPath] === undefined)
@@ -1730,7 +1698,7 @@
                             return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
                         }, function () { return bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]; });
                         req.onsuccess = function (ev) {
-                            if (thisContext.onsuccess) thisContext.onsuccess(ev.target.result);
+                            if (thisContext.onsuccess) thisContext.onsuccess(thisContext.value);
                             ++successCount;
                             checkFinished();
                         }
@@ -2471,6 +2439,27 @@
         return rv;
     }
 
+    function parseType(type) {
+        if (typeof type == 'function') {
+            return new type();
+        } else if (Array.isArray(type)) {
+            return [parseType(type[0])];
+        } else if (type && typeof type == 'object') {
+            var rv = {};
+            applyStructure(rv, type);
+            return rv;
+        } else {
+            return type;
+        }
+    }
+
+    function applyStructure(obj, structure) {
+        Object.keys(structure).forEach(function (member) {
+            var value = parseType(structure[member]);
+            obj[member] = value;
+        });
+    }
+
 
     //
     // IndexSpec struct
@@ -2519,7 +2508,6 @@
     }
     derive(MultiModifyError).from(Error);
 
-
     //
     // Static delete() method.
     //
@@ -2531,6 +2519,26 @@
             return this;
         };
         return promise;
+    }
+
+    Dexie.defineClass = function (structure, name) {
+        /// <summary>
+        ///     Create a javascript constructor based on given template for which properties to expect in the class.
+        ///     Any property that is a constructor function will act as a type. So {name: String} will be equal to {name: new String()}.
+        /// </summary>
+        /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
+        /// know what type each member has. Example: {name: String, emailAddresses: [String], properties: {shoeSize: Number}}</param>
+        /// <param name="name" optional="true">Name of the class</param>
+
+        // Default constructor able to copy given properties into this object.
+        function Class(properties) {
+            /// <param name="properties" type="Object" optional="true">Properties to initialize object with.
+            /// </param>
+            if (properties) extend(this, properties);
+        }
+        if (name) Class.name = name; // Set the name of the class. This is an EcmaScript 6 feature. Not supported by IE11 yet.
+        applyStructure(Class.prototype, structure);
+        return Class;
     }
     
     // Export our Promise implementation since it can be handy as a standalone Promise implementation
