@@ -760,6 +760,9 @@
                 count: function (cb) {
                     return new this._collClass(new WhereClause(this)).count(cb);
                 },
+                offset: function (offset) {
+                    return new this._collClass(new WhereClause(this)).offset(offset);
+                },
                 limit: function (numRows) {
                     return new this._collClass(new WhereClause(this)).limit(numRows);
                 },
