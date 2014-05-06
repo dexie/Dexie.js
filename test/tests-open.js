@@ -19,7 +19,7 @@ asyncTest("open, add and query data without transaction", 6, function () {
     db.version(1).stores({ employees: "++id,first,last" });
     ok(true, "Simple version() and stores() passed");
     db.open().catch(function (e) {
-        ok(false, "Could not open database: " + e);
+        ok(false, "Could not open database: " + (e.stack || e));
         start();
     });
 

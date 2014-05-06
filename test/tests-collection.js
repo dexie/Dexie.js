@@ -236,7 +236,7 @@
     asyncTest("modify", function () {
         db.transaction("rw", db.users, function (users) {
             var currentTime = new Date();
-            users.modify({
+            users.toCollection().modify({
                 lastUpdated: currentTime
             }).then(function (count) {
                 equal(count, 2, "Promise supplied the number of modifications made");
@@ -255,7 +255,7 @@
     asyncTest("modify-using-function", function () {
         db.transaction("rw", db.users, function (users) {
             var currentTime = new Date();
-            users.modify(function(user) {
+            users.toCollection().modify(function(user) {
                 user.fullName = user.first + " " + user.last;
                 user.lastUpdated = currentTime;
             });
@@ -274,7 +274,7 @@
     asyncTest("modify-causing-error", 2, function () {
         db.transaction("rw", db.users, function (users) {
             var currentTime = new Date();
-            users.modify(function (user) {
+            users.toCollection().modify(function (user) {
                 user.id = 1;
                 user.fullName = user.first + " " + user.last;
                 user.lastUpdated = currentTime;

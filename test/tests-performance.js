@@ -7,7 +7,7 @@
         },
         teardown: function () {
             stop(); Dexie.delete("PerformanceDB").onblocked(function() {
-                alert("Please close other browsers and tabs! Another browser or tab is blocking the database from being deleted. ");
+                //alert("Please close other browsers and tabs! Another browser or tab is blocking the database from being deleted. ");
             }).catch(function (e) {
                 ok(false, e);
             }).finally(function () {

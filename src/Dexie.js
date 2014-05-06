@@ -54,13 +54,14 @@
             RangeError = deps.RangeError,
             Error = deps.Error;
 
-        var globalSchema = null;
+        var globalSchema = this._dbSchema = null;
         var dbVersion = 0;
         var versions = [];
         var dbStoreNames = [];
         var allTables = {};
         ///<var type="IDBDatabase" />
         var idbdb = null; // Instance of IDBDatabase
+        var db_is_blocked = true;
         var dbOpenError = null;
         var isBeingOpened = false;
         var READONLY = "readonly", READWRITE = "readwrite";
@@ -138,7 +139,7 @@
                 var latestSchema = getCurrentDBSchema();
                 if (globalSchema != latestSchema) {
                     // Update API
-                    globalSchema = latestSchema;
+                    globalSchema = db._dbSchema = latestSchema;
                     removeTablesApi([allTables, db]);
                     setApiOnPlace(allTables, db._transPromiseFactory, Object.keys(latestSchema), READWRITE, latestSchema);
                     setApiOnPlace(db, db._transPromiseFactory, Object.keys(latestSchema), READWRITE, latestSchema, true);
@@ -189,19 +190,16 @@
                 // Upgrade version to version, step-by-step from oldest to newest version.
                 // Each transaction object will contain the table set that was current in that version (but also not-yet-deleted tables from its previous version)
                 var queue = [];
-                globalSchema = null;
+                globalSchema = db._dbSchema = null;
                 var versToRun = versions.filter(function (v) { return v._cfg.version > oldVersion; });
                 versToRun.forEach(function (version) {
                     /// <param name="version" type="Version"></param>
                     var oldSchema = globalSchema;
                     var newSchema = version._cfg.dbschema;
-                    globalSchema = newSchema;
+                    globalSchema = db._dbSchema = newSchema;
                     if (!oldSchema) {
                         queue.push(function (trans, cb) {
-                            // Create tables:
-                            Object.keys(newSchema).forEach(function (tableName) {
-                                createTable(trans, tableName, newSchema[tableName].primKey, newSchema[tableName].indexes);
-                            });
+                            createMissingTables(newSchema, trans);
                             cb();
                         });
                     } else {
@@ -294,6 +292,8 @@
                 var runNextQueuedFunction = function () {
                     if (queue.length)
                         queue.shift()(trans, runNextQueuedFunction);
+                    else
+                        createMissingTables(globalSchema, trans); // At last, make sure to create any missing tables.
                 };
 
                 if (iewa && iewa.__num > 0) return; // MSIE 10 & 11 workaround. Halt this run - we are in progress of copying tables into memory. When that is done, we will abort transaction and re-open db again.
@@ -365,6 +365,15 @@
             return store;
         }
 
+        function createMissingTables(newSchema, trans) {
+            Object.keys(newSchema).forEach(function (tableName) {
+                if (!trans.db.objectStoreNames.contains(tableName)) {
+                    createTable(trans, tableName, newSchema[tableName].primKey, newSchema[tableName].indexes);
+                }
+            });
+        }
+
+
         function addIndex(store, idx) {
             store.createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multi });
         }
@@ -420,7 +429,7 @@
         }
 
         this._transPromiseFactory = function transactionPromiseFactory(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
-            if (!idbdb && !dbOpenError) {
+            if (db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
                 // Database is paused. Wait til resumed.
                 return new Promise(function (resolve, reject) {
                     pausedResumeables.push({
@@ -452,7 +461,7 @@
         }
 
         this._whenReady = function (fn) {
-            if (!idbdb && !dbOpenError || (Promise.PSD && Promise.PSD.onready_firing)) {
+            if (db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
                 return new Promise(function (resolve, reject) {
                     fakeAutoComplete(function () { new Promise(function () { fn(resolve, reject); }); });
                     pausedResumeables.push({
@@ -478,10 +487,11 @@
 
         this.open = function () {
             return new Promise(function (resolve, reject) {
-                if (idbdb) throw new Error("Database already open");
+                if (idbdb || isBeingOpened) throw new Error("Database already opened or being opened");
                 function openError(err) {
                     isBeingOpened = false;
                     dbOpenError = err;
+                    db_is_blocked = false;
                     reject(dbOpenError);
                     pausedResumeables.forEach(function (resumable) {
                         // Resume all stalled operations. They will fail once they wake up.
@@ -522,7 +532,7 @@
                         // Now, let any subscribers to the on("ready") fire BEFORE any other db operations resume!
                         // If an the on("ready") subscriber returns a Promise, we will wait til promise completes or rejects before 
                         var outerScope = Promise.psd();
-                        Promise.PSD.onready_firing = true; // Set a Promise-Specific Data property informing that onready is firing. This will make db._whenReady() let the subscribers use the DB but block all others (!). Quite cool ha?
+                        Promise.PSD.letThrough = true; // Set a Promise-Specific Data property informing that onready is firing. This will make db._whenReady() let the subscribers use the DB but block all others (!). Quite cool ha?
                         try {
                             var res = db.on.ready.fire();
                             if (res && typeof res.then == 'function') {
@@ -537,6 +547,7 @@
                             Promise.PSD = outerScope; // Always end a PSD scope in a finally scope. Otherwise we may mess it up totally.
                         }
                         function resume() {
+                            db_is_blocked = false;
                             pausedResumeables.forEach(function (resumable) {
                                 // If anyone has made operations on a table instance before the db was opened, the operations will start executing now.
                                 resumable.resume();
@@ -555,6 +566,7 @@
             if (idbdb) {
                 idbdb.close();
                 idbdb = null;
+                db_is_blocked = true;
                 dbOpenError = null;
             }
         }
@@ -566,7 +578,9 @@
                     var req = indexedDB.deleteDatabase(dbName);
                     req.onsuccess = resolve;
                     req.onerror = eventRejectHandler(reject, ["deleting", dbName]);
-                    req.onblocked = db.on("blocked").fire;
+                    req.onblocked = function () {
+                        db.on("blocked").fire();
+                    }
                 }
                 if (isBeingOpened) {
                     pausedResumeables.push({ resume: doDelete });
@@ -587,6 +601,10 @@
             return dbOpenError !== null;
         }
 
+        //
+        // Properties
+        //
+        this.name = dbName;
 
         //
         // Events
@@ -783,6 +801,7 @@
                     if (this.schema.mappedClass) throw new Error("Table already mapped");
                     // Make sure primary key is not part of prototype because add() and put() fails on Chrome if primKey template lies on prototype due to a bug in its implementation
                     // of getByKeyPath(), that it accepts getting from prototype chain.
+                    structure = structure || shallowClone(constructor.prototype);
                     if (this.schema.primKey.keyPath) delByKeyPath(constructor.prototype, this.schema.primKey.keyPath); 
                     this.schema.mappedClass = constructor;
                     var instanceTemplate = Object.create(constructor.prototype);
@@ -816,7 +835,7 @@
                     /// </summary>
                     /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
                     /// know what type each member has. Example: {name: String, emailAddresses: [String], properties: {shoeSize: Number}}</param>
-                    return this.mapToClass(Dexie.defineClass(structure, this.name), structure);
+                    return this.mapToClass(Dexie.defineClass(structure), structure);
                 }
             };
         });
@@ -889,6 +908,8 @@
                             } else {
                                 // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
                                 trans._lock(); // Needed because operation is splitted into modify() and add().
+                                // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
+                                obj = deepClone(obj);
                                 trans.tables[self.name].where(":id").equals(key).modify(function (value) {
                                     // Replace extisting value with our object
                                     // CRUD event firing handled in WriteableCollection.modify()
@@ -952,10 +973,6 @@
                             };
                         });
                     }
-                },
-
-                modify: function (changes) {
-                    return new this._collClass(new WhereClause(this)).modify(changes);
                 },
 
                 update: function (key, changes) {
@@ -1324,6 +1341,7 @@
                 unique: "",
                 algorithm: null,
                 filter: null,
+                isMatch: null,
                 offset: 0,
                 limit: Infinity,
                 error: null, // If set, any promise must be rejected with this error
@@ -1339,6 +1357,10 @@
 
             function addFilter(ctx, fn) {
                 ctx.filter = combine(ctx.filter, fn);
+            }
+
+            function addMatchFilter(ctx, fn) {
+                ctx.isMatch = combine(ctx.isMatch, fn);
             }
 
             function getIndexOrStore(ctx, store) {
@@ -1532,6 +1554,7 @@
                     addFilter(this._ctx, function (cursor) {
                         return filterFunction(cursor.value);
                     });
+                    addMatchFilter(this._ctx, filterFunction); // match filters not used in Dexie.js but can be used by 3rd part libraries to test a collection for a match without querying DB. Used by Dexie.Observable.
                     return this;
                 },
 
@@ -2158,6 +2181,19 @@
             return outerScope;
         }
 
+        /*Promise.psdScope = function (fn, promise) {
+            var outerScope = Promise.PSD;
+            if (promise)
+                Promise.PSD = promise._PSD;
+            else
+                Promise.psd();
+            try {
+                return fn();
+            } finally {
+                Promise.PSD = outerScope;
+            }
+        }*/
+
         return Promise;
     })();
 
@@ -2521,14 +2557,13 @@
         return promise;
     }
 
-    Dexie.defineClass = function (structure, name) {
+    Dexie.defineClass = function (structure) {
         /// <summary>
         ///     Create a javascript constructor based on given template for which properties to expect in the class.
         ///     Any property that is a constructor function will act as a type. So {name: String} will be equal to {name: new String()}.
         /// </summary>
         /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
         /// know what type each member has. Example: {name: String, emailAddresses: [String], properties: {shoeSize: Number}}</param>
-        /// <param name="name" optional="true">Name of the class</param>
 
         // Default constructor able to copy given properties into this object.
         function Class(properties) {
@@ -2536,7 +2571,6 @@
             /// </param>
             if (properties) extend(this, properties);
         }
-        if (name) Class.name = name; // Set the name of the class. This is an EcmaScript 6 feature. Not supported by IE11 yet.
         applyStructure(Class.prototype, structure);
         return Class;
     }
