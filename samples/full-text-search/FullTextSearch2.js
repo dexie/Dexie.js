@@ -9,16 +9,16 @@ var db = new Dexie("FullTextSample");
 
 db.version(1).stores({
     emails: "++id,subject,from,to,cc,bcc,message",
-    emailWords: "++,word,emailId" // This object store is a "view". It will contain mappings between all words to corresponding emails.
+    _emailWords: "++,word,emailId" // This object store is a "view". It will contain mappings between all words to corresponding emails.
 });
 
 db._createTransaction = Dexie.override(db._createTransaction, function (createTransaction) {
-    // Override db._createTransaction() to make sure to add emailWords table to any transaction being modified
-    // If not doing this, error will occur in the hooks unless the application code has included emailWords in the transaction when modifying emails table.
+    // Override db._createTransaction() to make sure to add _emailWords table to any transaction being modified
+    // If not doing this, error will occur in the hooks unless the application code has included _emailWords in the transaction when modifying emails table.
     return function(mode, storeNames, dbSchema) {
-        if (mode === "readwrite" && storeNames.indexOf("emailWords") == -1) {
+        if (mode === "readwrite" && storeNames.indexOf("_emailWords") == -1) {
             storeNames = storeNames.slice(0); // Clone storeNames before mippling with it.
-            storeNames.push("emailWords");
+            storeNames.push("_emailWords");
         }
         return createTransaction.call(this, mode, storeNames, dbSchema);
     }
@@ -26,13 +26,13 @@ db._createTransaction = Dexie.override(db._createTransaction, function (createTr
 
 db.emails.hook("creating", function (primKey, obj, trans) {
     // Must wait till we have the auto-incremented key.
-    trans._lock(); // Lock transaction until we got primary key and added all mappings. App code trying to read from emailWords the line after having added an email must then wait until we are done writing the mappings.
+    trans._lock(); // Lock transaction until we got primary key and added all mappings. App code trying to read from _emailWords the line after having added an email must then wait until we are done writing the mappings.
     this.onsuccess = function (primKey) {
         /// <param name="trans" type="db.Transaction"></param>
-        var emailWords = trans.table("emailWords");
+        var _emailWords = trans.table("_emailWords");
         // Add mappings for all words.
         getAllWords(obj.message).forEach(function (word) {
-            emailWords.add({ word: word, emailId: primKey });
+            _emailWords.add({ word: word, emailId: primKey });
         });
         trans._unlock();
     }
@@ -46,12 +46,12 @@ db.emails.hook("updating", function (mods, primKey, obj, trans) {
     if (mods.hasOwnProperty("message")) {
         // message property is about to be changed.
         // Delete existing mappings
-        var emailWords = trans.table("emailWords");
-        emailWords.where("emailId").equals(primKey).delete();
+        var _emailWords = trans.table("_emailWords");
+        _emailWords.where("emailId").equals(primKey).delete();
         // Add new mappings.
         if (typeof mods.message == 'string') {
             getAllWords(mods.message).forEach(function (word) {
-                emailWords.add({ word: word, emailId: primKey });
+                _emailWords.add({ word: word, emailId: primKey });
             });
         }
     }
@@ -62,7 +62,7 @@ db.emails.hook("deleting", function (primKey, obj, trans) {
     if (obj.message) {
         // Email is about to be deleted.
         // Delete existing mappings
-        trans.table("emailWords").where("emailId").equals(primKey).delete();
+        trans.table("_emailWords").where("emailId").equals(primKey).delete();
     }
 });
 
@@ -86,7 +86,7 @@ db.open();
 // Application code:
 //
 
-db.transaction('rw', db.emails, db.emailWords, function (emails, emailWords) {
+db.transaction('rw', db.emails, db._emailWords, function (emails, emailWords) {
     // Add an email:
     emails.add({
         subject: "Testing full-text search",
