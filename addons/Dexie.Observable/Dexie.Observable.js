@@ -349,7 +349,7 @@
             }
         }
         
-        function readChanges(latestRevision, recursion) {
+        function readChanges(latestRevision, recursion, wasPartial) {
             // Whenever changes are read, fire db.on("changes") with the array of changes. Eventually, limit the array to 1000 entries or so (an entire database is
             // downloaded from server AFTER we are initiated. For example, if first sync call fails, then after a while we get reconnected. However, that scenario
             // should be handled in case database is totally empty we should fail if sync is not available)
@@ -368,6 +368,10 @@
                     partial = (changes.length == 1000); // Same as limit.
                     db.on('changes').fire(changes, partial);
                     mySyncNode.myRevision = lastChange.rev;
+                } else if (wasPartial) {
+                    // No more changes, BUT since we have triggered on('changes') with partial = true,
+                    // we HAVE TO trigger changes again with empty list and partial = false
+                    db.on('changes').fire([], false);
                 }
 
                 mySyncNode.lastHeartBeat = Date.now();
@@ -379,7 +383,7 @@
                 if (partial || Dexie.Observable.latestRevision[db.name] > mySyncNode.myRevision) {
                     // Either there were more than 1000 changes or additional changes where added while we were reading these changes,
                     // In either case, call readChanges() again until we're done.
-                    return readChanges(Dexie.Observable.latestRevision[db.name], true);
+                    return readChanges(Dexie.Observable.latestRevision[db.name], true, partial);
                 }
 
             }).catch(function (e) { // TODO: Remove this catch() clause. This is temporary while debugging.
