@@ -1271,7 +1271,7 @@
                     /// <param name="str" type="String"></param>
                     if (typeof str != 'string') return fail(new Collection(this), new TypeError("String expected"));
                     if (str === "") return this.startsWith(str);
-                    var c = new this._ctx.collClass(this);
+                    var c = new this._ctx.collClass(this, IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase() + String.fromCharCode(65535)));
                     addIgnoreCaseAlgorithm(c, function (a, b) { return a.indexOf(b) === 0; }, str);
                     c._ondirectionchange = function () { fail(c, new Error("desc() not supported with WhereClause.startsWithIgnoreCase()")); };
                     return c;
@@ -1279,13 +1279,14 @@
                 equalsIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
                     if (typeof str != 'string') return fail(new Collection(this), new TypeError("String expected"));
-                    var c = new this._ctx.collClass(this);
+                    var c = new this._ctx.collClass(this, IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase()));
                     addIgnoreCaseAlgorithm(c, function (a, b) { return a === b; }, str);
                     return c;
                 },
                 anyOf: function (valueArray) {
                     var set = getSortedSet(arguments);
-                    var c = new this._ctx.collClass(this);
+                    if (set.length === 0) return new this._ctx.collClass(this, IDBKeyRange.only("")).limit(0); // Return an empty collection.
+                    var c = new this._ctx.collClass(this, IDBKeyRange.bound(set[0], set[set.length-1]));
                     var sorter = ascending;
                     c._ondirectionchange = function (direction) {
                         sorter = (direction === "next" ? ascending : descending);
