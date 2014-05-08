@@ -393,7 +393,18 @@
 
                 mySyncNode.lastHeartBeat = Date.now();
                 mySyncNode.deleteTimeStamp = null; // Reset "deleteTimeStamp" flag if it was there.
-                db.table("_syncNodes").put(mySyncNode);
+                return db.table("_syncNodes").update(mySyncNode.id, {
+                    lastHeartBeat: mySyncNode.lastHeartBeat,
+                    deleteTimeStamp: mySyncNode.deleteTimeStamp
+                });
+            }).then (function (nodeWasUpdated) {
+                if (!nodeWasUpdated) {
+                    // My node has been deleted. We must have been lazy and got removed by another node.
+                    db.close();
+                    alert("Out of sync"); // TODO: What to do? Reload the page?
+                    window.location.reload(true);
+                    throw new Error("Out of sync"); // Will make current promise reject
+                }
 
                 // Check if more changes have come since we started reading changes in the first place. If so, relaunch readChanges and let the ongoing promise not
                 // resolve until all changes have been read.
