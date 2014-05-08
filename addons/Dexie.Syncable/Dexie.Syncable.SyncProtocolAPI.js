@@ -50,17 +50,19 @@ function ISyncProtocol() {
 		///		Local changes to sync to remote node. This array will contain changes that has occured locally since last sync.
 		///		If this is the initial sync, framework will want to upload the entire local database to the server.
 		///     If having been offline for a while, local database might contain much changes to send.
-		///		It is not guaranteed that ALL client changes are delivered in the first call to sync(). If number of changes are enormous,
-		///     the framework may choose to only apply a first bunch of changes and when onSuccess() is called, framework may call sync()
+		///		Of those reasons, it is not guaranteed that ALL client changes are delivered in this first call to sync(). If number of changes are 'enormous',
+		///     the framework may choose to only apply a first bunch of changes and when onSuccess() is called by your implementation, framework may call sync()
         ///     again (or continuation.react depending on the continuation method given in the call to onSuccess()).
         ///     The argument 'partial' will tell whether all changes are sent or if it is only a partial change set. See parameter 'partial'
 		/// </param>
 		/// <param name="baseRevision">
-		///		Server revision that the changes are based on. This will be the same value that were sent to an
-		///		earlier call to applyRemoteChanges(). Server revision can be of any type - it is implementation dependant.
+        ///		Server revision that the changes are based on. On initial sync, this value will be null. If having synced before, this will be the same value
+        ///     that were previously sent by the sync implementor to applyRemoteChanges(). baseRevision is persisted so even after a reboot, the last value
+        ///     will be remembered. Server revision can be of any type - it is implementation dependant.
 		///		Server should use this value to know if there are conflicts. If changes on the remote node was made after this revision,
 		///		and any of those changes modified the same properties on the same objects, it must be considered a conflict and
-		///		the remote node should resolve that conflict by choosing the remote node's version of the conflicting properties.
+        ///		the remote node should resolve that conflict by choosing the remote node's version of the conflicting properties unless it is a conflict
+        ///     where client has deleted an object that server has updated - then the client change must be the winner.
         /// </param>
         /// <param name="partial" type="Boolean">
         ///     If true, the changes only contains a part of the changes. The part might be cut in the middle of a transaction so the changes must
@@ -82,12 +84,22 @@ function ISyncProtocol() {
 		/// </param>
 		/// <param name="onChangesAccepted">
         ///		Call this function when you get an ack from the server that the changes has been recieved. Must be called no
-        ///     matter if changes were partial or complete.
+        ///     matter if changes were partial or complete. This will mark the changes as handled so that they need not to be sent again
+        ///     to the particular remote node being synced.
 		/// </param>
 		/// <param name="onSuccess" value="function (continuation) {}">
-		///		Call this function when all changes you got from the server has been sent to applyRemoteChanges(). Normally, you
-		///		would also have called onclientchangesaccepted, but this is not required. In case the server did not return
-		///		any changes, you may not even have called applyserverchanges.
+        ///		Call this function when all changes you got from the server has been sent to applyRemoteChanges().
+        /// 
+        ///     Sample when using a poll strategy: onSuccess({again: 1000});
+        ///     Sample when using an immediate reaction strategy: onSuccess({
+        ///         react: function onLocalChanges (changes, baseRevision, partial, onChangesAccepted) {
+        ///             // Send changes, baseRevisoin and partial to server
+        ///             // When server acks, call onChangesAccepted();
+        ///         },
+        ///         disconnect: function () {
+        ///             // Disconnect from server!
+        ///         }
+        ///     });
 		///		
 		///		The given continuation object tells the framework how to continue syncing. Possible values are:
 		///		{ again: milliseconds } - tells the framework to call sync() again in given milliseconds.
@@ -108,7 +120,7 @@ function ISyncProtocol() {
 		///		should be number of milliseconds until trying to call sync() again.
 		/// 
 		///		Use this callback also if server requires authentication. You may provide an instance of a custom
-		///		AuthenticationNeededException class that may be catched by the caller of db.sync() in application code.
+		///		Exception class that may be catched by the caller of db.sync() in application code.
 		///		Application code may then react and redirect or in other way handle the authentication process.
 		///		It is a contract outside this API between the application code and the ISyncProtocol implementation about
 		///		how authentication and sessions should be handled. There are many possible ways to implement this, including
