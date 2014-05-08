@@ -32,9 +32,35 @@
         isMaster: Number,           // 1 if true. Not using Boolean because it's not possible to index Booleans in IE implementation of IDB.
 
         // Below properties should be extended in Dexie.Syncable. Not here. They apply to remote nodes only (type == "remote"):
-        syncProvider: String, // Tells which implementation of ISyncProvider to use for remote syncing. 
-        syncContext: null
+        syncProtocol: String,       // Tells which implementation of ISyncProtocol to use for remote syncing. 
+        syncContext: null,
+        remoteRevision: null
     });
+
+    function addFireAndForgetEvent(eventSet, eventName) {
+        var event = (eventSet[eventName] = eventSet.addEventType(eventName));
+        event.fire = function () {
+            // Change the way how fire() works by doing a simple forEach rather than a functional recursion. More suitable when there might be many dynamically added/removed subscribers.
+            // We call the subscribers using asap() (setImmediate/setTimeout) so that 1) One subscriber failing does not hinder next subscriber. 2) An exception will break into debugger and not just catch, 3) The read-transaction will not be locked while subscribers update HTML.
+            var args = arguments;
+            event.subscribers.forEach(function (fn) {
+                asap(function fireEvent (){
+                    fn.apply(window, arguments);
+                });
+            });
+        }
+        event.subscribe = function (fn) {
+            // Change how subscribe works for the same reason as above.
+            if (event.subscribers.indexOf(fn) === -1) {
+                event.subscribers.push(fn);
+            }
+        }
+        event.unsubscribe = function (fn) {
+            // Change how unsubscribe works for the same reason as above.
+            var idxOfFn = event.subscribers.indexOf(fn);
+            if (idxOfFn !== -1) event.subscribers.splice(idxOfFn, 1);
+        }
+    }
 
     // Import some usable helper functions
     var override = Dexie.override;
@@ -68,6 +94,7 @@
             db.version(1).stores({
                 _syncNodes: "++id,myRevision,lastHeartBeat",
                 _changes: "++rev",
+                _intercomm: "++id,destinationNode",
                 _uncommittedChanges: "++id"
             });
             db._syncNodes.mapToClass(SyncNode);
@@ -89,6 +116,7 @@
                 // Create the _changes and _syncNodes tables
                 stores["_changes"] = "++rev";
                 stores["_syncNodes"] = "++id,myRevision,lastHeartBeat,url,isMaster";
+                stores["_intercomm"] = "++id,destinationNode";
                 stores["_uncommittedChanges"] = "++id"; // For remote syncing when server returns a partial result.
                 // Call default implementation. Will populate the dbSchema structures.
                 origFunc.call(this, stores, dbSchema);
@@ -126,26 +154,13 @@
         });
 
         // changes event on db:
-        db.on.changes = db.on.addEventType('changes');
-        db.on.changes.fire = function (changes, partial) {
-            // Change the way how fire() works by doing a simple forEach rather than a functional recursion. More suitable when there might be many dynamically added/removed subscribers.
-            // We call the subscribers using asap() (setImmediate/setTimeout) so that 1) One subscriber failing does not hinder next subscriber. 2) An exception will break into debugger and not just catch, 3) The read-transaction will not be locked while subscribers update HTML.
-            db.on.changes.subscribers.forEach(function (fn) { asap (fn, changes, partial);});
-        }
-        db.on.changes.subscribe = function (fn) {
-            // Change how subscribe works for the same reason as above.
-            if (db.on.changes.subscribers.indexOf(fn) === -1) {
-                db.on.changes.subscribers.push(fn);
-            }
-        }
-        db.on.changes.unsubscribe = function (fn) {
-            // Change how unsubscribe works for the same reason as above.
-            var idxOfFn = db.on.changes.subscribers.indexOf(fn);
-            if (idxOfFn !== -1) db.on.changes.subscribers.splice(idxOfFn, 1);
-        }
+        addFireAndForgetEvent(db.on, 'changes');
 
         // cleanup hook for derived classes to do additional cleanup.
         db.on.cleanup = db.on.addEventType('cleanup', promisableChain, nop); // fire (nodesTable, changesTable, trans). Hook called when cleaning up nodes. Subscribers may return a Promise to to more stuff. May do additional stuff if local sync node is master.
+
+        // Message event for intercomm messages between nodes
+        addFireAndForgetEvent(db.on, 'message');
 
         //
         // Overide transaction creation to always include the "_changes" store when any observable store is involved.
@@ -210,6 +225,7 @@
                 }
                 Dexie.Observable.on('latestRevisionIncremented').unsubscribe(onLatestRevisionIncremented);
                 Dexie.Observable.on('suicideNurseCall').unsubscribe(onSuicide);
+                Dexie.Observable.on('intercomm').unsubscribe(onIntercomm);
                 window.removeEventListener('beforeunload', onBeforeUnload);
                 // Inform other db instances in same window that we are dying:
                 if (mySyncNode) {
@@ -331,6 +347,7 @@
                     Dexie.Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
                     window.addEventListener('beforeunload', onBeforeUnload);
                     Dexie.Observable.on.suicideNurseCall.subscribe(onSuicide);
+                    Dexie.Observable.on.intercomm.subscribe(onIntercomm);
                     // Cleanup will delete dead nodes and check if we should be the master.
                     return cleanup().then(function () {
                         pollHandle = setTimeout(poll, LOCAL_POLL);
@@ -410,7 +427,7 @@
                 if (db.isOpen()) {
                     alert("Error in poll(): " + e.stack || e);
                 }
-            }).finally(function () {
+            }).then(consumeIntercommMessages).finally(function () {
                 // Poll again in given interval:
                 if (db.isOpen()) {
                     pollHandle = setTimeout(poll, LOCAL_POLL);
@@ -419,7 +436,7 @@
         }
 
         function cleanup() {
-            return db.transaction('rw', db._syncNodes, db._changes, function (nodes, changes, trans) {
+            return db.transaction('rw', db._syncNodes, db._changes, db._intercomm, function (nodes, changes, intercomm, trans) {
                 // Cleanup dead local nodes that has no heartbeat for over a minute
                 // Dont do the following:
                 //nodes.where("lastHeartBeat").below(Date.now() - NODE_TIMEOUT).and(function (node) { return node.type == "local"; }).delete();
@@ -431,6 +448,14 @@
                         delete this.value;
                         // Cleanup localStorage "deadnode:" entry for this node (localStorage API was used to wakeup other windows (onstorage event) - an event type missing in indexedDB.)
                         localStorage.removeItem('Dexie.Observable/deadnode:' + node.id + '/' + db.name);
+                        // Cleanup intercomm messages
+                        intercomm.where("destinationNode").equals(node.id).modify(function (msg) {
+                            if (msg.delegatable) {
+                                // Message was delegatable, meaning someone must take over its messages when it dies. Let us be that one!
+                                db.on.message.fire(msg);
+                            }
+                            delete this.value;
+                        });
                     } else if (!node.deleteTimeStamp) {
                         // Mark the node for deletion
                         node.deleteTimeStamp = Date.now() + HIBERNATE_GRACE_PERIOD;
@@ -475,6 +500,45 @@
             }
         }
 
+        //
+        // Intercommunication between nodes
+        //
+        // Enable inter-process communication between browser windows
+        db.sendMessage = function (type, message, destinationNode) {
+        	/// <param name="type" type="String">Type of message</param>
+        	/// <param name="message">Message to send</param>
+            /// <param name="destinationNode" type="Number">ID of destination node</param>
+            var msg = { message: message, destinationNode: destinationNode, sender: mySyncNode.id, type: type };
+            db._intercomm.add(msg).then(function (messageId) {
+                localStorage.setItem("Dexie.Observable/intercomm/" + db.name, messageId.toString());
+                Dexie.Observable.on.intercomm.fire(db.name);
+            });
+        }
+
+        db.broadcastMessage = function (type, message, bIncludeSelf) {
+            db._syncNodes.each(function (node) {
+                if (bIncludeSelf || node.id !== mySyncNode.id) {
+                    db.sendMessage(message, node.id);
+                }
+            });
+        }
+
+        function consumeIntercommMessages() {
+            // Check if we got messages:
+            return db._intercomm.where("destinationNode").equals(mySyncNode.id).modify(function (msg) {
+                // For each message, fire the event and remove message.
+                db.on.message.fire(msg);
+                delete this.value;
+            });
+        }
+
+        function onIntercomm(dbname) {
+            // When storage event trigger us to check
+            if (dbname === db.name) {
+                consumeIntercommMessages();
+            }
+        }
+
     } // End of "Dexie.Observable = function (db) { ... }."
 
 
@@ -509,7 +573,7 @@
     // 
 
     Dexie.Observable.latestRevision = {}; // Latest revision PER DATABASE. Example: Dexie.Observable.latestRevision.FriendsDB = 37;
-    Dexie.Observable.on = Dexie.events(null, "latestRevisionIncremented", "suicideNurseCall"); // fire(dbname, value);
+    Dexie.Observable.on = Dexie.events(null, "latestRevisionIncremented", "suicideNurseCall", "intercomm"); // fire(dbname, value);
     Dexie.createUUID = function () {
         // Decent solution from http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript
         var d = Date.now();
@@ -537,6 +601,10 @@
                 var nodeID = parseInt(prop.split(':')[1], 10);
                 if (event.newValue) {
                     Dexie.Observable.on.suicideNurseCall.fire(dbname, nodeID);
+                }
+            } else if (prop === 'intercomm') {
+                if (event.newValue) {
+                    Dexie.Observable.on.intercomm.fire(dbname);
                 }
             }
         }
