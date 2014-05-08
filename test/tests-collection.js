@@ -411,4 +411,41 @@
         }).finally(start);
     });
 
+    asyncTest("until", function () {
+        db.transaction("rw", db.users, function (users) {
+            users.add({ first: "Apa1", username: "apa1" });
+            users.add({ first: "Apa2", username: "apa2" });
+            users.add({ first: "Apa3", username: "apa3" });
+
+            // Checking that it stops immediately when first item is the stop item:
+            users.orderBy(":id").until(function (user) { return user.first == "David" }).toArray(function (a) {
+                equal(0, a.length, "Stopped immediately because David has ID 1");
+            });
+
+            // Checking that specifying includeStopEntry = true will include the stop entry.
+            users.orderBy(":id").until(function (user) { return user.first == "David" }, true).toArray(function (a) {
+                equal(1, a.length, "Got the stop entry when specifying includeStopEntry = true");
+                equal("David", a[0].first, "Name is David");
+            });
+
+            // Checking that when sorting on first name and stopping on David, we'll get the apes.
+            users.orderBy("first").until(function (user) { return user.first == "David" }).toArray(function (a) {
+                equal(3, a.length, "Got 3 users only (3 apes) because the Apes comes before David and Karl when ordering by first name");
+                equal("apa1", a[0].username, "First is apa1");
+                equal("apa2", a[1].username, "Second is apa2");
+                equal("apa3", a[2].username, "Third is apa3");
+            });
+
+            // Checking that reverse() affects the until() method as expected:
+            users.orderBy("first").reverse().until(function (user) { return user.username == "apa2" }).toArray(function (a) {
+                equal(3, a.length, "Got 3 users only (David, Karl and Apa3)");
+                equal("Karl", a[0].first, "When reverse(), First is Karl.");
+                equal("David", a[1].first, "When reverse(), Second is David");
+                equal("Apa3", a[2].first, "When reverse(), Third is Apa3");
+            });
+        }).catch(function (e) {
+            ok(false, e.stack || e);
+        }).finally(start);
+    });
+
 })();

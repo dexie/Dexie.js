@@ -1,6 +1,5 @@
-﻿///<reference path="run-unit-tests.html" />
+﻿///<reference path="../src/Dexie.js" />
 
-///<var type="Dexie" />
 (function(){
     var db = new Dexie("TestDB");
     db.version(1).stores({ users: "++id,first,last,&username,*&email,*pets" });

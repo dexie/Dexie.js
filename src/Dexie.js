@@ -628,12 +628,6 @@
             tableInstances = [].slice.call(arguments, 1, arguments.length - 1);
             // Let scopeFunc be the last argument
             scopeFunc = arguments[arguments.length - 1];
-            fakeAutoComplete(function () {
-                // Repair autocomplete for VS2012. Since version 0.9.7 autoComplete failed some times in VS2012 for db.transaction(). This piece of code repaired it.
-                scopeFunc.apply(null, tableInstances.map(function(tbl){ return (mode == 'rw' || mode == 'readwrite' ?
-                    new WriteableTable(tbl.name || tbl, db._transPromiseFactory, globalSchema, new WriteableCollection()) :
-                    new Table(tbl.name || tbl, db._transPromiseFactory, globalSchema, new Collection()))}));
-            });
             return db._whenReady(function (resolve, reject) {
                 var outerPSD = Promise.psd(); // Need to make sure Promise.PSD.prohibitDB does not continue over to the then() callback of our returned Promise! Callers may use direct DB access after transaction completes!
                 try {
@@ -771,6 +765,9 @@
                 },
                 limit: function (numRows) {
                     return this.toCollection().limit(numRows);
+                },
+                reverse: function () {
+                    return this.toCollection().reverse();
                 },
                 filter: function (filterFunction) {
                     return this.toCollection().and(filterFunction);
@@ -1546,6 +1543,20 @@
                     addFilter(this._ctx, function (cursor, advance, resolve) {
                         if (--numRows <= 0) advance(resolve); // Stop after this item has been included
                         return numRows >= 0; // If numRows is already below 0, return false because then 0 was passed to numRows initially. Otherwise we wouldnt come here.
+                    });
+                    return this;
+                },
+
+                until: function (filterFunction, bIncludeStopEntry) {
+                    var ctx = this._ctx;
+                    fakeAutoComplete(function () { filterFunction(getInstanceTemplate(ctx)); });
+                    addFilter(this._ctx, function (cursor, advance, resolve) {
+                        if (filterFunction(cursor.value)) {
+                            advance(resolve);
+                            return bIncludeStopEntry;
+                        } else {
+                            return true;
+                        }
                     });
                     return this;
                 },
