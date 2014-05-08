@@ -168,7 +168,7 @@
                 files
                     .where("filename").equalsIgnoreCase("apan japan")
                     .and(function (f) { return f.folderId === folderId }) // Just for fun - only look in the newly created /etc folder.
-                    .desc()
+                    .reverse()
                     .toArray(function (a) {
                         equal(a.length, 4, "There should be 4 files with that name in " + folder.path);
                         equal(a[0].filename, "apan japan", "apan japan");
@@ -196,7 +196,7 @@
                 equal(a[0].filename, "hello-there-everyone", "First file is " + a[0].filename);
             });
             // Descending
-            files.where("filename").equalsIgnoreCase("hello-there-everyone").desc().toArray(function (a) {
+            files.where("filename").equalsIgnoreCase("hello-there-everyone").reverse().toArray(function (a) {
                 equal(a.length, 1, "Should find one file");
                 equal(a[0].filename, "hello-there-everyone", "First file is " + a[0].filename);
             });

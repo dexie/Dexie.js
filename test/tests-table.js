@@ -37,11 +37,6 @@
         }
     });
 
-    /*asyncTest("abba", 1, function () {
-        ok(true);
-        start();
-    });*/
-
     asyncTest("get", 4, function () {
         db.table("users").get(1, function (obj) {
             equal(obj.first, "David", "Got the first object");
@@ -114,8 +109,8 @@
                 equal(a.length, 2, "in() returned expected number of items");
                 equal(a[0].last, "Faadersköld", "Faadersköld is first");
             });
-            users.where("last").anyOf("Fahlander", "Faadersköld").desc().toArray(function (a) {
-                equal(a.length, 2, "in().desc() returned expected number of items");
+            users.where("last").anyOf("Fahlander", "Faadersköld").reverse().toArray(function (a) {
+                equal(a.length, 2, "in().reverse() returned expected number of items");
                 equal(a[0].last, "Fahlander", "Fahlander is first");
             });
             users.where("last").anyOf("Faadersköld").toArray(function (a) {
@@ -151,15 +146,15 @@
             ok(false, e);
         }).finally(start);
     });
-    asyncTest("limit(),orderBy(),modify(), abort(), desc()", function () {
-        db.transaction("rw", db.users, function (users) {
+    asyncTest("limit(),orderBy(),modify(), abort(), reverse()", function () {
+        db.transaction("rw", db.users, db.users, function (users) {
             // Modify first found user with a helloMessage
-            users.orderBy("first").desc().limit(1).modify(function (user) {
+            users.orderBy("first").reverse().limit(1).modify(function (user) {
                 user.helloMessage = "Hello " + user.first;
             });
 
             // Check that the modification went fine:
-            users.orderBy("first").desc().toArray(function (a) {
+            users.orderBy("first").reverse().toArray(function (a) {
                 equal(a[0].first, "Karl", "First item is Karl");
                 equal(a[0].helloMessage, "Hello Karl", "Karl got helloMessage 'Hello Karl'");
                 equal(a[1].first, "David", "Second item is David");
@@ -170,6 +165,15 @@
         }).finally(function () {
             start();
         });
+    });
+
+    asyncTest("filter", function () {
+        db.users.filter(function (user) { return user.email.indexOf("david@awarica.com") != -1 }).toArray(function (davids) {
+            equal(1, davids.length, "Got one David");
+            equal("David", davids[0].first, "The name of the David is David");
+        }).catch(function (e) {
+            ok(false, e.stack || e);
+        }).finally(start);
     });
 
     asyncTest("each", function () {

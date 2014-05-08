@@ -206,10 +206,9 @@
         }).finally(start);
     });
 
-    asyncTest("desc", function () {
+    asyncTest("reverse", function () {
         db.transaction("r", db.users, function (users) {
-
-            users.orderBy("first").desc().first(function (user) {
+            users.orderBy("first").reverse().first(function (user) {
                 equal(user.first, "Karl", "Got Karl");
             });
 

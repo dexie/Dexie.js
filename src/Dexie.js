@@ -628,6 +628,12 @@
             tableInstances = [].slice.call(arguments, 1, arguments.length - 1);
             // Let scopeFunc be the last argument
             scopeFunc = arguments[arguments.length - 1];
+            fakeAutoComplete(function () {
+                // Repair autocomplete for VS2012. Since version 0.9.7 autoComplete failed some times in VS2012 for db.transaction(). This piece of code repaired it.
+                scopeFunc.apply(null, tableInstances.map(function(tbl){ return (mode == 'rw' || mode == 'readwrite' ?
+                    new WriteableTable(tbl.name || tbl, db._transPromiseFactory, globalSchema, new WriteableCollection()) :
+                    new Table(tbl.name || tbl, db._transPromiseFactory, globalSchema, new Collection()))}));
+            });
             return db._whenReady(function (resolve, reject) {
                 var outerPSD = Promise.psd(); // Need to make sure Promise.PSD.prohibitDB does not continue over to the then() callback of our returned Promise! Callers may use direct DB access after transaction completes!
                 try {
@@ -669,7 +675,7 @@
                     //
                     // Supply table instances bound to the new Transaction and provide them as callback arguments
                     //
-                    var tableArgs = storeNames.map(function (name) { return trans.table(name); });
+                    var tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
                     // Let last argument be the Transaction instance itself
                     tableArgs.push(trans);
 
@@ -758,13 +764,16 @@
                     return new WhereClause(this, indexName);
                 },
                 count: function (cb) {
-                    return new this._collClass(new WhereClause(this)).count(cb);
+                    return this.toCollection().count(cb);
                 },
                 offset: function (offset) {
-                    return new this._collClass(new WhereClause(this)).offset(offset);
+                    return this.toCollection().offset(offset);
                 },
                 limit: function (numRows) {
-                    return new this._collClass(new WhereClause(this)).limit(numRows);
+                    return this.toCollection().limit(numRows);
+                },
+                filter: function (filterFunction) {
+                    return this.toCollection().and(filterFunction);
                 },
                 each: function (fn) {
                     var self = this;
@@ -1273,7 +1282,7 @@
                     if (str === "") return this.startsWith(str);
                     var c = new this._ctx.collClass(this, IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase() + String.fromCharCode(65535)));
                     addIgnoreCaseAlgorithm(c, function (a, b) { return a.indexOf(b) === 0; }, str);
-                    c._ondirectionchange = function () { fail(c, new Error("desc() not supported with WhereClause.startsWithIgnoreCase()")); };
+                    c._ondirectionchange = function () { fail(c, new Error("reverse() not supported with WhereClause.startsWithIgnoreCase()")); };
                     return c;
                 },
                 equalsIgnoreCase: function (str) {
@@ -1548,7 +1557,7 @@
                 },
 
                 last: function (cb) {
-                    return this.desc().first(cb);
+                    return this.reverse().first(cb);
                 },
 
                 and: function (filterFunction) {
@@ -1566,10 +1575,14 @@
                     return new WhereClause(this._ctx.table, indexName, this);
                 },
 
-                desc: function () {
+                reverse: function () {
                     this._ctx.dir = (this._ctx.dir == "prev" ? "next" : "prev");
                     if (this._ondirectionchange) this._ondirectionchange(this._ctx.dir);
                     return this;
+                },
+
+                desc: function () {
+                    return this.reverse();
                 },
 
                 eachKey: function (cb) {
