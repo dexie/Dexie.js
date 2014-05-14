@@ -606,6 +606,14 @@
         //
         this.name = dbName;
 
+        // db.tables - an array of all Table instances.
+        // TODO: Change so that tables is a simple member and make sure to update it whenever allTables changes.
+        Object.defineProperty(this, "tables", {
+            get: function () {
+                return Object.keys(allTables).map(function (name) { return allTables[name]; });
+            }
+        });
+
         //
         // Events
         //
@@ -683,7 +691,7 @@
 
                     // Finally, call the scope function with our table and transaction arguments.
                     try {
-                        scopeFunc.apply(null, tableArgs);
+                        scopeFunc.apply(trans, tableArgs);
                     } catch (e) {
                         // If exception occur, abort the transaction and reject Promise.
                         trans.abort();
@@ -984,8 +992,20 @@
                     }
                 },
 
-                update: function (key, changes) {
-                    return this.where(":id").equals(key).modify(changes);
+                update: function (keyOrObject, modifications) {
+                    if (typeof modifications !== 'object' || Array.isArray(modifications)) throw new Error("db.update(keyOrObject, modifications). modifications must be an object.");
+                    if (typeof keyOrObject === 'object' && !Array.isArray(keyOrObject)) {
+                        // object to modify. Also modify given object with the modifications:
+                        Object.keys(modifications).forEach(function (keyPath) {
+                            setByKeyPath(keyOrObject, keyPath, modifications[keyPath]);
+                        });
+                        var key = getByKeyPath(keyOrObject, this.schema.primKey.keyPath);
+                        if (key === undefined) Promise.reject(new Error("Object does not contain its primary key"));
+                        return this.where(":id").equals(key).modify(modifications);
+                    } else {
+                        // key to modify
+                        return this.where(":id").equals(keyOrObject).modify(modifications);
+                    }
                 },
             }
         });
@@ -1625,6 +1645,18 @@
                     this._ctx.unique = "unique";
                     return this.keys(cb);
                 },
+
+                firstKey: function (cb) {
+                    var self = this;
+                    //fakeAutoComplete(function () { cb(getInstanceTemplate(self._ctx)[self._ctx.index]); });
+                    //debugger;
+                    return this.limit(1).keys(function (a) { return a[0]; }).then(cb);
+                },
+
+                lastKey: function (cb) {
+                    return this.reverse().firstKey(cb);
+                },
+
 
                 distinct: function () {
                     var set = {};
@@ -2494,7 +2526,7 @@
         for (var prop in a) if (a.hasOwnProperty(prop)) {
             if (!b.hasOwnProperty(prop))
                 rv[prop] = undefined; // Property removed
-            else if (a[prop] !== b[prop])
+            else if (a[prop] !== b[prop]) // Optimization possibility: With current code, Array-, Object- and Date members will always be considered changed no matter if really changed. Could do a recursive inspection here to really know if it was changed (such as comparing JSON.stringify(), catching exception for Date- and other objects).
                 rv[prop] = b[prop]; // Property changed
         }
         for (var prop in b) if (b.hasOwnProperty(prop) && !a.hasOwnProperty(prop)) {

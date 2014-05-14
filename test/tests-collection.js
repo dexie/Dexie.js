@@ -448,4 +448,24 @@
         }).finally(start);
     });
 
+    asyncTest("firstKey", function () {
+        db.users.orderBy('last').firstKey(function (key) {
+            equal("Cedersköld", key, "First lastName is Cedersköld");
+        }).catch(function (e) {
+            ok(false, e.stack || e);
+        }).finally(function () {
+            start();
+        });
+    });
+
+    asyncTest("lastKey", function () {
+        db.users.orderBy('last').lastKey(function (key) {
+            equal("Fahlander", key, "Last lastName is Fahlander");
+        }).catch(function (e) {
+            ok(false, e.stack || e);
+        }).finally(function () {
+            start();
+        });
+    });
+
 })();
