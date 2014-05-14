@@ -1,14 +1,14 @@
 ﻿/** WebSocketSyncServer.
 
-    A template for how to implement a sync server that interchange changes between a Dexie.Syncable client and a database of any kind.
+    Functional WebSocket server that can be used as a template for how to implement a sync server that interchange changes between a
+    Dexie.Syncable client and a database of any kind.
 
-    This code is an independant functional example but it uses a non-persistent RAM database for simplicity reasons. It handles conflicts according to
-    the Dexie.Syncable specification. The rules of thumb for conflict handling is that
+    The code is only dependant on nodejs-websocket. For simplicity reasons, it uses a non-persistent RAM database. It handles conflicts according to
+    the Dexie.Syncable specification; The rules of thumb for conflict handling is that:
         1. Client- and server state must be exact the same after a sync operation.
         2. Server changes are applied after client changes - thereby winning over the latter except when client already has deleted an object - then the server update wont affect any object since it doesnt exist on client
-    The resolveConflicts() function handles changes on the server AS IF the server changes where applied after client changes.
 
-    This code may be used as a template for implementing your own sync with the database of your preference.
+    In this code, the resolveConflicts() function handles changes on the server AS IF the server changes where applied after client changes.
 
     The code relies heavily in closures, so translating the code to other languages is easiest if the other language also support closures
     (such as C#, Python, Perl, Go, Dart or Smalltalk).
