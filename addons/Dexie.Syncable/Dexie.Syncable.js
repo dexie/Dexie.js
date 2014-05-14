@@ -555,6 +555,7 @@
                         return db.transaction('rw', db.tables, function () {
                             var trans = this;
                             var localRevisionBeforeChanges = 0;
+                            var lastModificationPromise = null;
                             trans._changes.orderBy('rev').last(function (lastChange) {
                                 // Store what revision we were at before committing the changes
                                 localRevisionBeforeChanges = (lastChange && lastChange.rev) || 0;
@@ -563,12 +564,16 @@
                                 trans.source = node.id;
                                 // 2. Apply uncommitted changes and delete each uncommitted change
                                 return trans._uncommittedChanges.where('node').equals(node.id).modify(function (change) {
-                                    applyChange(change);
+                                    lastModificationPromise = applyChange(change);
                                     delete this.value;
                                 });
                             }).then(function () {
                                 // 3. Apply last chunk of changes
-                                changes.forEach(applyChange);
+                                changes.forEach(function (change) {
+                                    lastModificationPromise = applyChange(change);
+                                });
+                                if (lastModificationPromise) return lastModificationPromise; // Wait until last modification is done, so that it's revision is created!
+                            }).then(function () {
                                 // Get what revision we are at now:
                                 return trans._changes.orderBy('rev').last();
                             }).then(function (lastChange) {
@@ -579,7 +584,7 @@
                                     var remoteRevisions = dbNode.remoteRevisions || [];
                                     remoteRevisions.push({ remote: remoteRevision, local: currentLocalRevision });
                                     if (dbNode.myRevision === localRevisionBeforeChanges) {
-                                        // In server was up-to-date before we added new changes from the server, update myRevision to last change
+                                        // If server was up-to-date before we added new changes from the server, update myRevision to last change
                                         // because server is still up-to-date! This is also important in order to prohibit getLocalChangesForNode() from
                                         // ever sending an empty change list to server, which would otherwise be done every second time it would send changes.
                                         dbNode.myRevision = lastChange.rev;
@@ -603,15 +608,10 @@
                             function applyChange(change) {
                                 var table = trans.tables[change.table];
                                 switch (change.type) {
-                                    case CREATE:
-                                        table.put(change.obj, change.key);
-                                        break;
-                                    case UPDATE:
-                                        table.update(change.key, change.mods);
-                                        break;
-                                    case DELETE:
-                                        table.delete(change.key);
-                                        break;
+                                    case CREATE: return table.put(change.obj, change.key);
+                                    case UPDATE: return table.update(change.key, change.mods);
+                                    case DELETE: return table.delete(change.key);
+                                    default: throw new Error("Change type unsupported");
                                 }
                             }
                         });
