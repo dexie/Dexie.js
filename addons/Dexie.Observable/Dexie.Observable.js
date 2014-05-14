@@ -34,6 +34,8 @@
         // Below properties should be extended in Dexie.Syncable. Not here. They apply to remote nodes only (type == "remote"):
         syncProtocol: String,       // Tells which implementation of ISyncProtocol to use for remote syncing. 
         syncContext: null,
+        syncOptions: Object,
+        connected: false,
         remoteRevisions: [{local: Number, remote: null}],
         dbUploadState: {
             tablesToUpload: [String],
@@ -42,31 +44,6 @@
             baseRevision: Number
         }
     });
-
-    function addFireAndForgetEvent(eventSet, eventName) {
-        var event = (eventSet[eventName] = eventSet.addEventType(eventName));
-        event.fire = function () {
-            // Change the way how fire() works by doing a simple forEach rather than a functional recursion. More suitable when there might be many dynamically added/removed subscribers.
-            // We call the subscribers using asap() (setImmediate/setTimeout) so that 1) One subscriber failing does not hinder next subscriber. 2) An exception will break into debugger and not just catch, 3) The read-transaction will not be locked while subscribers update HTML.
-            var args = arguments;
-            event.subscribers.forEach(function (fn) {
-                asap(function fireEvent (){
-                    fn.apply(window, args);
-                });
-            });
-        }
-        event.subscribe = function (fn) {
-            // Change how subscribe works for the same reason as above.
-            if (event.subscribers.indexOf(fn) === -1) {
-                event.subscribers.push(fn);
-            }
-        }
-        event.unsubscribe = function (fn) {
-            // Change how unsubscribe works for the same reason as above.
-            var idxOfFn = event.subscribers.indexOf(fn);
-            if (idxOfFn !== -1) event.subscribers.splice(idxOfFn, 1);
-        }
-    }
 
     // Import some usable helper functions
     var override = Dexie.override;
@@ -160,13 +137,11 @@
         });
 
         // changes event on db:
-        addFireAndForgetEvent(db.on, 'changes');
-
-        // cleanup hook for derived classes to do additional cleanup.
-        db.on.cleanup = db.on.addEventType('cleanup', promisableChain, nop); // fire (nodesTable, changesTable, trans). Hook called when cleaning up nodes. Subscribers may return a Promise to to more stuff. May do additional stuff if local sync node is master.
-
-        // Message event for intercomm messages between nodes
-        addFireAndForgetEvent(db.on, 'message');
+        db.on.addEventType({
+            changes: 'asap',
+            cleanup: [promisableChain, nop], // fire (nodesTable, changesTable, trans). Hook called when cleaning up nodes. Subscribers may return a Promise to to more stuff. May do additional stuff if local sync node is master.
+            message: 'asap'
+        });
 
         //
         // Overide transaction creation to always include the "_changes" store when any observable store is involved.
@@ -495,7 +470,7 @@
                         return changes.where("rev").below(oldestNode.myRevision).delete();
                     });
                 }).then(function () {
-                    return db.on("cleanup").fire(nodes, changes, trans);
+                    return db.on("cleanup").fire(nodes, changes, intercomm, trans);
                 });
             });
         }
@@ -548,7 +523,7 @@
 
         db.broadcastMessage = function (type, message, bIncludeSelf) {
             db._syncNodes.each(function (node) {
-                if (bIncludeSelf || node.id !== mySyncNode.id) {
+                if (node.type == 'local' && (bIncludeSelf || node.id !== mySyncNode.id)) {
                     db.sendMessage(type, message, node.id);
                 }
             });
