@@ -34,7 +34,13 @@
         // Below properties should be extended in Dexie.Syncable. Not here. They apply to remote nodes only (type == "remote"):
         syncProtocol: String,       // Tells which implementation of ISyncProtocol to use for remote syncing. 
         syncContext: null,
-        remoteRevision: null
+        remoteRevisions: [{local: Number, remote: null}],
+        dbUploadState: {
+            tablesToUpload: [String],
+            currentTable: String,
+            currentKey: null,
+            baseRevision: Number
+        }
     });
 
     function addFireAndForgetEvent(eventSet, eventName) {
@@ -45,7 +51,7 @@
             var args = arguments;
             event.subscribers.forEach(function (fn) {
                 asap(function fireEvent (){
-                    fn.apply(window, arguments);
+                    fn.apply(window, args);
                 });
             });
         }
@@ -95,7 +101,7 @@
                 _syncNodes: "++id,myRevision,lastHeartBeat",
                 _changes: "++rev",
                 _intercomm: "++id,destinationNode",
-                _uncommittedChanges: "++id"
+                _uncommittedChanges: "++id,node"
             });
             db._syncNodes.mapToClass(SyncNode);
             db._changes.mapToClass(DatabaseChange);
@@ -117,7 +123,7 @@
                 stores["_changes"] = "++rev";
                 stores["_syncNodes"] = "++id,myRevision,lastHeartBeat,url,isMaster";
                 stores["_intercomm"] = "++id,destinationNode";
-                stores["_uncommittedChanges"] = "++id"; // For remote syncing when server returns a partial result.
+                stores["_uncommittedChanges"] = "++id,node"; // For remote syncing when server returns a partial result.
                 // Call default implementation. Will populate the dbSchema structures.
                 origFunc.call(this, stores, dbSchema);
                 // Allow UUID primary keys using $$ prefix on primary key or indexes
@@ -343,14 +349,21 @@
                     Dexie.Observable.on.latestRevisionIncremented.fire(latestRevision);
                 }
                 // Add new sync node or if this is a reopening of the database after a close() call, update it.
-                return db.table("_syncNodes").add(mySyncNode).then(function () {
-                    Dexie.Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
-                    window.addEventListener('beforeunload', onBeforeUnload);
-                    Dexie.Observable.on.suicideNurseCall.subscribe(onSuicide);
-                    Dexie.Observable.on.intercomm.subscribe(onIntercomm);
-                    // Cleanup will delete dead nodes and check if we should be the master.
-                    return cleanup().then(function () {
-                        pollHandle = setTimeout(poll, LOCAL_POLL);
+                return db.transaction('rw', db._syncNodes, function (syncNodes) {
+                    syncNodes.where('isMaster').equals(1).count(function (anyMasterNode) {
+                        if (!anyMasterNode) {
+                            // There's no master node. Let's take that role then.
+                            mySyncNode.isMaster = 1;
+                        }
+                        // Add our node to DB and start subscribing to events
+                        return syncNodes.add(mySyncNode).then(function () {
+                            Dexie.Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
+                            window.addEventListener('beforeunload', onBeforeUnload);
+                            Dexie.Observable.on.suicideNurseCall.subscribe(onSuicide);
+                            Dexie.Observable.on.intercomm.subscribe(onIntercomm);
+                            // Start polling for changes and do cleanups:
+                            pollHandle = setTimeout(poll, LOCAL_POLL);
+                        });
                     });
                 });
             });
@@ -377,9 +390,9 @@
                 return readChanges.ongoingOperation;
             }
 
+            var partial = false;
             var promise = db._changes.where("rev").above(mySyncNode.myRevision).limit(1000).toArray(function (changes) {
                 if (mySyncNode == null) return Promise.reject(new Error("Database closed")); // In case database got closed.
-                var partial = false;
                 if (changes.length > 0) {
                     var lastChange = changes[changes.length - 1];
                     partial = (changes.length == 1000); // Same as limit.
@@ -391,11 +404,9 @@
                     db.on('changes').fire([], false);
                 }
 
-                mySyncNode.lastHeartBeat = Date.now();
-                mySyncNode.deleteTimeStamp = null; // Reset "deleteTimeStamp" flag if it was there.
-                return db.table("_syncNodes").update(mySyncNode.id, {
-                    lastHeartBeat: mySyncNode.lastHeartBeat,
-                    deleteTimeStamp: mySyncNode.deleteTimeStamp
+                return db.table("_syncNodes").update(mySyncNode, {
+                    lastHeartBeat: Date.now(),
+                    deleteTimeStamp: null // Reset "deleteTimeStamp" flag if it was there.
                 });
             }).then (function (nodeWasUpdated) {
                 if (!nodeWasUpdated) {
@@ -431,6 +442,7 @@
             return promise;
         }
 
+
         function poll() {
             pollHandle = null;
             if (!db.isOpen()) return;
@@ -459,28 +471,25 @@
                         delete this.value;
                         // Cleanup localStorage "deadnode:" entry for this node (localStorage API was used to wakeup other windows (onstorage event) - an event type missing in indexedDB.)
                         localStorage.removeItem('Dexie.Observable/deadnode:' + node.id + '/' + db.name);
-                        // Cleanup intercomm messages
+                        // Check if we are deleting a master node
+                        if (node.isMaster) {
+                            // The node we are deleting is master. We must take over that role.
+                            nodes.update(mySyncNode, { isMaster: 1 });
+                        }
+                        // Cleanup intercomm messages destinated to the node being deleted:
                         intercomm.where("destinationNode").equals(node.id).modify(function (msg) {
-                            if (msg.delegatable) {
-                                // Message was delegatable, meaning someone must take over its messages when it dies. Let us be that one!
+                            // Delete the message from DB and if someone is waiting for reply, let ourselved answer the request.
+                            delete this.value;
+                            if (msg.wantReply) {
+                                // Message wants a reply, meaning someone must take over its messages when it dies. Let us be that one!
                                 db.on.message.fire(msg);
                             }
-                            delete this.value;
                         });
                     } else if (!node.deleteTimeStamp) {
                         // Mark the node for deletion
                         node.deleteTimeStamp = Date.now() + HIBERNATE_GRACE_PERIOD;
                     }
                 }).then(function () {
-                    // Now after eventually deleting a master. Check if there is any master or not:
-                    return nodes.where("isMaster").above(0).count();
-                }).then(function (anyMaster) {
-                    if (!anyMaster) {
-                        // There's no master. Take that role!
-                        mySyncNode.isMaster = 1;
-                        nodes.update(mySyncNode.id, { isMaster: 1 });
-                    }
-
                     // Cleanup old revisions that no node is interested of.
                     return nodes.orderBy("myRevision").first(function (oldestNode) {
                         return changes.where("rev").below(oldestNode.myRevision).delete();
@@ -515,21 +524,32 @@
         // Intercommunication between nodes
         //
         // Enable inter-process communication between browser windows
-        db.sendMessage = function (type, message, destinationNode) {
+
+        var requestsWaitingForReply = {};
+
+        db.sendMessage = function (type, message, destinationNode, wantReply, isFailure) {
         	/// <param name="type" type="String">Type of message</param>
         	/// <param name="message">Message to send</param>
             /// <param name="destinationNode" type="Number">ID of destination node</param>
-            var msg = { message: message, destinationNode: destinationNode, sender: mySyncNode.id, type: type };
-            db._intercomm.add(msg).then(function (messageId) {
-                localStorage.setItem("Dexie.Observable/intercomm/" + db.name, messageId.toString());
-                Dexie.Observable.on.intercomm.fire(db.name);
+            /// <param name="wantReply" type="Boolean">If true, the returned promise will complete with the reply from remote. Otherwise it will complete when message has been successfully sent.</param>
+            var msg = { message: message, destinationNode: destinationNode, sender: mySyncNode.id, type: type, wantReply: wantReply, success: !isFailure };
+            return db.transaction('rw', db._intercomm, function (intercomm) {
+                intercomm.add(msg).then(function (messageId) {
+                    localStorage.setItem("Dexie.Observable/intercomm/" + db.name, messageId.toString());
+                    Dexie.Observable.on.intercomm.fire(db.name);
+                    if (wantReply) {
+                        return new Promise(function (resolve, reject) {
+                            requestsWaitingForReply[messageId.toString()] = { resolve: resolve, reject: reject };
+                        });
+                    }
+                });
             });
         }
 
         db.broadcastMessage = function (type, message, bIncludeSelf) {
             db._syncNodes.each(function (node) {
                 if (bIncludeSelf || node.id !== mySyncNode.id) {
-                    db.sendMessage(message, node.id);
+                    db.sendMessage(type, message, node.id);
                 }
             });
         }
@@ -538,8 +558,28 @@
             // Check if we got messages:
             return db._intercomm.where("destinationNode").equals(mySyncNode.id).modify(function (msg) {
                 // For each message, fire the event and remove message.
-                db.on.message.fire(msg);
                 delete this.value;
+                if (msg.type === 'response') {
+                    // This is a response. Lookup pending request and fulfill it's promise.
+                    var request = requestsWaitingForReply[msg.requestID.toString()];
+                    if (request) {
+                        if (msg.success) {
+                            request.resolve(msg.message);
+                        } else {
+                            request.reject(msg.message);
+                        }
+                        delete requestsWaitingForReply[msg.requestID.toString()];
+                    }
+                } else {
+                    // This is a message or request. Fire the event and add an API for the subscriber to use if reply is requested
+                    msg.resolve = function (result) {
+                        db.sendMessage('response', result, msg.sender);
+                    }
+                    msg.reject = function (error) {
+                        db.sendMessage('response', error, msg.sender, false, true);
+                    }
+                    db.on.message.fire(msg);
+                }
             });
         }
 

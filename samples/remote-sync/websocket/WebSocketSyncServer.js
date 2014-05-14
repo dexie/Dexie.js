@@ -1,9 +1,14 @@
 ﻿/** WebSocketSyncServer.
 
-    A template for how to implement a sync gateway that interchange changes between a Dexie.Syncable client and a database of any kind.
+    A template for how to implement a sync server that interchange changes between a Dexie.Syncable client and a database of any kind.
 
-    This code is a functional example but it uses a non-persistent RAM database for simplicity reasons. It handles conflicts in the prefered way.
-    The code may be used as a template for implementing your own sync with the database of your preference.
+    This code is an independant functional example but it uses a non-persistent RAM database for simplicity reasons. It handles conflicts according to
+    the Dexie.Syncable specification. The rules of thumb for conflict handling is that
+        1. Client- and server state must be exact the same after a sync operation.
+        2. Server changes are applied after client changes - thereby winning over the latter except when client already has deleted an object - then the server update wont affect any object since it doesnt exist on client
+    The resolveConflicts() function handles changes on the server AS IF the server changes where applied after client changes.
+
+    This code may be used as a template for implementing your own sync with the database of your preference.
 
     The code relies heavily in closures, so translating the code to other languages is easiest if the other language also support closures
     (such as C#, Python, Perl, Go, Dart or Smalltalk).
@@ -220,15 +225,15 @@
                                 //
                                 // HERE COMES THE QUITE IMPORTANT SYNC ALGORITHM!
                                 //
-                                // 1. Reduce all changes that have occurred after given
-                                //    baseRevision (our changes) to a key/value object.
+                                // 1. Reduce all server changes (not client changes) that have occurred after given
+                                //    baseRevision (our changes) to a set (key/value object where key is the combination of table/primaryKey)
                                 // 2. Check all client changes against reduced server
                                 //    changes to detect conflict. Resolve conflicts:
-                                //      server creates object with same key as client creates, updates or deletes: Always discard client change.
-                                //      server deletes object with same key as client creates, updates or deletes: Always discard client change.
-                                //      server updates object with same key as client updates: Apply all properties the client updates unless they conflict with server updates
-                                //      server updates object with same key as client creates: Apply the client create but apply the server update on top
-                                //      server updates object with same key as client deletes: Let client win. Deletes always wins over Updates.
+                                //      If server created an object with same key as client creates, updates or deletes: Always discard client change.
+                                //      If server deleted an object with same key as client creates, updates or deletes: Always discard client change.
+                                //      If server updated an object with same key as client updates: Apply all properties the client updates unless they conflict with server updates
+                                //      If server updated an object with same key as client creates: Apply the client create but apply the server update on top
+                                //      If server updated an object with same key as client deletes: Let client win. Deletes always wins over Updates.
                                 //
                                 // 3. After resolving conflicts, apply client changes into server database.
                                 // 4. Send an ack to the client that we have persisted its changes
@@ -256,7 +261,8 @@
                                 });
                             }
 
-                            // Now ack client that we have recieved his changes
+                            // Now ack client that we have recieved his changes. This should be done no matter if the're buffered into uncommittedChanges
+                            // or if the're actually committed to db.
                             conn.sendText(JSON.stringify({
                                 type: "ack",
                                 requestId: requestId,
@@ -298,7 +304,7 @@
                             switch (nextChange.type) {
                                 case CREATE: return nextChange; // Another CREATE replaces previous CREATE.
                                 case UPDATE: return applyModifications(deepClone(prevChange.obj), nextChange.mods); // deep clone object before modifying since the earlier change in db.changes[] would otherwise be altered.
-                                case DELETE: return null;  // Object created and then deleted. The entire change should be forgotten.
+                                case DELETE: return nextChange;  // Object created and then deleted. If it wasnt for that we MUST handle resent changes, we would skip entire change here. But what if the CREATE was sent earlier, and then CREATE/DELETE at later stage? It would become a ghost object in DB. Therefore, we MUST keep the delete change! If object doesnt exist, it wont harm!
                             }
                             break;
                         case UPDATE:
@@ -317,11 +323,11 @@
                             break;
                     }
                 })();
-                if (mergedChange) {
+                //if (mergedChange) {
                     set[id] = mergedChange;
-                } else {
-                    delete set[id];
-                }
+                //} else {
+                //    delete set[id];
+                //}
             }
             return set;
         }, {});
@@ -366,9 +372,7 @@
                         resolved.push(clientChange);
                         break;
                 }
-            } /*else if (serverChange.type == CREATE || serverChange.type == DELETE) {
-                // Always discard client change if a later server change would delete or recreate the object with that key.
-            }*/
+            }
         });
         return resolved;
     }
@@ -434,7 +438,7 @@
         setByKeyPath(obj, keyPath, null, true);
     }
 
-    publish("SyncServer", SyncServer); // Will do module.exports = SyncServer for node but window.SyncServer = SyncServer for browser.
+    publish("SyncServer", SyncServer); // Will do module.exports = SyncServer for Node.js but window.SyncServer = SyncServer for browser.
 
 }).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this == window)
 ? [window, function (name, value) { window[name] = value; }, true]    // Adapt to browser environment
