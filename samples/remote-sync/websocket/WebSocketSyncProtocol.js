@@ -64,7 +64,7 @@
                 sendChanges(changes, baseRevision, partial, onChangesAccepted);
 
                 // Subscribe to server changes:
-                we.send(JSON.stringify({
+                ws.send(JSON.stringify({
                     type: "subscribe",
                     syncedRevision: syncedRevision
                 }));
@@ -104,7 +104,7 @@
                     // }
                     var requestFromServer = JSON.parse(event.data);
                     if (requestFromServer.type == "changes") {
-                        applyRemoteChanges(requestFromServer.changes, requestFromServer.lastRevision, requestFromServer.partial);
+                        applyRemoteChanges(requestFromServer.changes, requestFromServer.currentRevision, requestFromServer.partial);
                         if (isFirstRound && !requestFromServer.partial) {
                             // Since this is the first sync round and server sais we've got all changes - now is the time to call onsuccess()
                             onSuccess({

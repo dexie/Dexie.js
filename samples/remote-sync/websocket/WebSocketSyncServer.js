@@ -137,7 +137,7 @@
         this.start = function () {
             ws.createServer(function (conn) {
 
-                var syncedRevision = 0; // Used when sending changes to client. Only send changes above baseRevision since client is already in sync with baseRevision.
+                var syncedRevision = 0; // Used when sending changes to client. Only send changes above syncedRevision since client is already in sync with syncedRevision.
 
                 function sendAnyChanges() {
                     // Get all changes after syncedRevision that was not performed by the client we're talkin' to.
@@ -184,7 +184,7 @@
                         }
                     } else if (type == "subscribe") {
                         // Client wants to subscribe to server changes happened or happening after given syncedRevision
-                        syncedRevision = request.syncedRevision;
+                        syncedRevision = request.syncedRevision || 0;
                         // Send any changes we have currently:
                         sendAnyChanges();
                         // Start subscribing for additional changes:
@@ -240,8 +240,8 @@
                                 //
                                 //
                                 // ----------------------------------------------
-
-                                var serverChanges = db.changes.filter(function (change) { return change.rev > baseRevision; });
+                                var baseRevision = request.baseRevision || 0;
+                                var serverChanges = db.changes.filter(function (change) { return change.rev > baseRevision });
                                 var reducedServerChangeSet = reduceChanges(serverChanges);
                                 var resolved = resolveConflicts(request.changes, reducedServerChangeSet);
 

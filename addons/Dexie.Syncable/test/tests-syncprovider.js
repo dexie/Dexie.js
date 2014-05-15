@@ -25,7 +25,7 @@
     module("tests-syncprovider", {
         setup: function () {
             stop();
-            Dexie.delete("SyncProviderTest").then(function () {
+            Dexie.Promise.all(Dexie.delete("SyncProviderTest"), Dexie.delete("OtherClientDB")).then(function () {
                 start();
             }).catch(function (e) {
                 ok(false, "Could not delete database");
@@ -33,92 +33,85 @@
             });
         },
         teardown: function () {
-            stop(); Dexie.delete("SyncProviderTest").then(start);
+            stop(); Dexie.Promise.all(Dexie.delete("SyncProviderTest"), Dexie.delete("OtherClientDB")).then(start);
         }
     });
 
-    asyncTest("testSyncServer", function () {
-        /*var db = new Dexie("SyncProviderTest");
+    asyncTest("testSyncProvider", function () {
+        var CREATE = 1,
+            UPDATE = 2,
+            DELETE = 3;
+
+        var db = new Dexie("SyncProviderTest");
         db.version(1).stores({
-            friends: "sync:$$id,name",
-            pets: "sync:$$id,kind,name"
-        });*/
+            friends: "$$id,name",
+            pets: "$$id,kind,name"
+        });
 
-        var server = new SyncServer(1234);
+        // Setup the sync server
+        var server = new SyncServer(5000);
         server.start();
-        
-        var ws = new WebSocket("http://dummy:1234");
-        ws.onopen = function () {
-            ok(true, "WebSocket opened");
-            ws.send(JSON.stringify({
-                type: "clientIdentity",
-                clientIdentity: null
-            }));
-            ws.send(JSON.stringify({
-                type: "subscribe",
-                syncedRevision: null
-            }));
-        }
-        ws.onclose = function (reason) {
-            ok(true, "WebSocket closed. Reason: " + reason);
-            start();
-        }
-        ws.onerror = function (event) {
-            ok(false, "Error: " + event.reason);
-            start();
-        }
 
-        ws.onmessage = function (event) {
-            var requestFromServer = JSON.parse(event.data);
-            if (requestFromServer.type === "clientIdentity") {
-                ok(true, "Got client identity: " + requestFromServer.clientIdentity);
-                // Now send changes to server
-                ws.send(JSON.stringify({
-                    type: "changes",
-                    changes: [],
-                    partial: false,
-                    baseRevision: null,
-                    requestId: 1
-                }));
-            } else if (requestFromServer.type == "ack") {
-                ok(true, "Got ack from server: " + requestFromServer.requestId);
-                equal(requestFromServer.requestId, 1, "The request ID 1 was acked");
+        // Connect our db client to it
+        var syncer = db.sync("websocket", "http://dummy:5000");
+        console.log("Sync called. Current status: " + Dexie.Syncable.StatusTexts[syncer.status]);
+        syncer.statusChanged(function (newStatus) {
+            console.log("Sync State Changed: " + Dexie.Syncable.StatusTexts[newStatus]);
+        });
 
-                // Now connect another WebSocket and send its changes to server so that server will react and send us the changes:
-                var ws2 = new WebSocket("http://dummy:1234");
-                ws2.onopen = function () {
-                    ws2.send(JSON.stringify({
-                        type: "clientIdentity",
-                        clientIdentity: null
-                    }));
-                    ws2.send(JSON.stringify({
-                        type: "changes",
-                        changes: [{ type: 1, table: "UllaBella", key: "apa", obj: {name: "Apansson"}}],
-                        partial: false,
-                        baseRevision: null,
-                        requestId: 1
-                    }));
+        // Open database
+        db.open();
+
+        // Create another database to sync with:
+        var db2 = new Dexie("OtherClientDB");
+        db2.version(1).stores({
+            friends: "$$id",
+            pets: "$$id"
+        });
+
+        db2.sync("websocket", "http://dummy:5000");
+        db2.open().then(function () {
+            console.log("db2 opened");
+        });
+        db2.on.error.subscribe(function (error) {
+            console.error("db2 error: " + error);
+        });
+
+        db2.on('changes', function (changes, partial) {
+            console.log("db2.on('changes'): changes.length: " + changes.length + "\tpartial: " + (partial ? "true" : "false"));
+            changes.forEach(function (change) {
+                console.log(JSON.stringify(change));
+                db2.checkChange(change);
+            });
+        });
+
+        function waitFor(db, params) {
+            return new Dexie.Promise(function (resolve, reject) {
+                db.checkChange = function (change) {
+                    var checker = {};
+                    Dexie.extend(checker, change);
+                    if (change.type == CREATE) Dexie.extend(checker, change.obj);
+                    if (change.type == UPDATE) Dexie.extend(checker, change.mods);
+                    var found = true;
+                    Object.keys(params).forEach(function (param) {
+                        if (!(param in checker)) found = false;
+                        if (params[param] != checker[param]) found = false;
+                    });
+                    if (found) resolve();
                 }
-            } else if (requestFromServer.type == "changes") {
-                if (requestFromServer.currentRevision == 0) {
-                    ok(true, "Got initial changes sent to us with current revision 0");
-                } else {
-                    ok(true, "Got changes from server: " + JSON.stringify(requestFromServer.changes));
-                    equal(JSON.stringify(requestFromServer.changes), JSON.stringify([
-                        {
-                            rev: 1,
-                            source: 2, // WebSocket2 was the source of the changes.
-                            type: 1,
-                            table: "UllaBella",
-                            key: "apa",
-                            obj: { name: "Apansson" }
-                        }
-                    ]), "Changes where the same as the ones sent by WebSocket2");
-                    start();
-                }
-            }
+            });
         }
 
+        db.friends.add({ name: "David" });
+
+        waitFor(db2, { type: CREATE, name: "David" }).then(function () {
+            ok(true, "Got David");
+        }).finally(function () {
+            console.log("Closing down");
+            db.close();
+            db2.close();
+            start();
+        });
     });
 
 })();
