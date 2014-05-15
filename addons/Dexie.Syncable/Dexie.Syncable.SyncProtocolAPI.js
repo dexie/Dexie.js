@@ -32,38 +32,38 @@
 */
 function ISyncProtocol() {
     this.sync = function (context, url, options, changes, baseRevision, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
-		/// <summary>
+        /// <summary>
         ///		Syncronize changes between local and remote.
         /// </summary>
-		/// <param name="context" type="IPersistedContext">
-		///		A context that the implementation may use for storing persistent state bound to the local database. See IPersistedContext.
-		///		The same context instance will be given for all calls to sync() as long as the URL is the same. If calling context.save(),
-		///		all properties stored on the context will be persisted in an internal table contained by the same database that is being
-		///		synced. Context instance is also cached in memory and will not be reloaded from database during the application session.
-		/// </param>
-		/// <param name="url" type="String">
-		///		URL of the remote node to establish a continous sync with.
-		/// </param>
-		/// <param name="options" type="Object">
-		///		Information needed in order to interact with server. Example of options are timeout settings, poll intervals,
-		///     authentication credentials, etc. The options are implementation specific.
-		/// </param>
-		/// <param name="changes" type="Array" elementType="IDatabaseChange">
-		///		Local changes to sync to remote node. This array will contain changes that has occured locally since last sync.
-		///		If this is the initial sync, framework will want to upload the entire local database to the server.
-		///     If initial sync or if having been offline for a while, local database might contain much changes to send.
-		///		Of those reasons, it is not guaranteed that ALL client changes are delivered in this first call to sync(). If number of changes are 'enormous',
+        /// <param name="context" type="IPersistedContext">
+        ///		A context that the implementation may use for storing persistent state bound to the local database. See IPersistedContext.
+        ///		The same context instance will be given for all calls to sync() as long as the URL is the same. If calling context.save(),
+        ///		all properties stored on the context will be persisted in an internal table contained by the same database that is being
+        ///		synced. Context instance is also cached in memory and will not be reloaded from database during the application session.
+        /// </param>
+        /// <param name="url" type="String">
+        ///		URL of the remote node to establish a continous sync with.
+        /// </param>
+        /// <param name="options" type="Object">
+        ///		Information needed in order to interact with server. Example of options are timeout settings, poll intervals,
+        ///     authentication credentials, etc. The options are implementation specific.
+        /// </param>
+        /// <param name="changes" type="Array" elementType="IDatabaseChange">
+        ///		Local changes to sync to remote node. This array will contain changes that has occured locally since last sync.
+        ///		If this is the initial sync, framework will want to upload the entire local database to the server.
+        ///     If initial sync or if having been offline for a while, local database might contain much changes to send.
+        ///		Of those reasons, it is not guaranteed that ALL client changes are delivered in this first call to sync(). If number of changes are 'enormous',
         ///     the framework may choose to only apply a first chunk of changes and when onSuccess() is called by your implementation, framework will send
         ///     the remaining changes by calling sync() again, or continuation.react depending on the continuation method given in the call to onSuccess().
         ///     The argument 'partial' will tell whether all changes are sent or if it is only a partial change set. See parameter 'partial'. Note that if
         ///     partial = true, your server should queue the changes and not commit them yet but wait until all changes have been sent (partial = false).
-		/// </param>
-		/// <param name="baseRevision">
+        /// </param>
+        /// <param name="baseRevision">
         ///		Server revision that the changes are based on. On initial sync, this value will be null. If having synced before, this will be the same value
         ///     that were previously sent by the sync implementor to applyRemoteChanges(). baseRevision is persisted so even after a reboot, the last value
         ///     will be remembered. Server revision can be of any JS type (such as Number, String, Array, Date or Object).
-		///		Server should use this value to know if there are conflicts. If changes on the remote node was made after this revision,
-		///		and any of those changes modified the same properties on the same objects, it must be considered a conflict and
+        ///		Server should use this value to know if there are conflicts. If changes on the remote node was made after this revision,
+        ///		and any of those changes modified the same properties on the same objects, it must be considered a conflict and
         ///		the remote node should resolve that conflict by choosing the remote node's version of the conflicting properties unless it is a conflict
         ///     where client has deleted an object that server has updated - then the deletion should win over the update. An implementation of this
         ///     rule is defined in WebSocketSyncServer.js: function resolveConflicts().
@@ -74,8 +74,8 @@ function ISyncProtocol() {
         ///     A sync server should store partial changes into a temporary storage until the same client sends a new
         ///     request with partial = false. For an example of how to hande this, see WebSocketSyncServer.js under samples/remote-sync/websocket.
         /// </param>
-		/// <param name="applyRemoteChanges" value="function (changes, lastRevision, partial, clear) {}">
-		///		Call this function whenever the response stream from the remote node contains new changes to apply.
+        /// <param name="applyRemoteChanges" value="function (changes, lastRevision, partial, clear) {}">
+        ///		Call this function whenever the response stream from the remote node contains new changes to apply.
         ///		Provide the array of IDatabaseChange objects as well as the revision of the last change in the change set.
         ///     If there are enormous amount of changes (would take too much RAM memory to put in a single array), you may call
         ///     this function several times with 'partial' set to true until the last set of changes arrive. The framework will
@@ -85,13 +85,13 @@ function ISyncProtocol() {
         ///     old revisions to save space and if clients come in with a baseRevision older than the earliest revision known by server,
         ///     server may set this flag and provide a changes array of CREATEs only for all objects in the database. Again, if the amount
         ///     of data is very big, server may send the changes in chunks setting partial to true for all chunks but the last one.
-		/// </param>
-		/// <param name="onChangesAccepted">
+        /// </param>
+        /// <param name="onChangesAccepted">
         ///		Call this function when you get an ack from the server that the changes has been recieved. Must be called no
         ///     matter if changes were partial or not partial. This will mark the changes as handled so that they need not to be sent again
         ///     to the particular remote node being synced.
-		/// </param>
-		/// <param name="onSuccess" value="function (continuation) {}">
+        /// </param>
+        /// <param name="onSuccess" value="function (continuation) {}">
         ///		Call this function when all changes you got from the server has been sent to applyRemoteChanges(). Note that
         ///     not all changes from client has to be sent or acked yet (nescessarily).
         /// 
@@ -105,38 +105,39 @@ function ISyncProtocol() {
         ///             // Disconnect from server!
         ///         }
         ///     });
-		///		
-		///		The given continuation object tells the framework how to continue syncing. Possible values are:
-		///		{ again: milliseconds } - tells the framework to call sync() again in given milliseconds.
-		///		{ react: onLocalChanges, disconnect: disconnectFunction } - tells the framework that you will continue
-		///	    listening on both client- and server changes simultanously. When you get changes from server, you will
-		///		once again call	applyRemoteChanges() and when client changes arrive, you will get notified in your
-		///     'react' function: function onLocalChanges(changes, baseRevision, partial, onChangesAccepted).
-		///		When the framework want to close down your provider, it will call your provided disconnect function.
-		///		Note that the disconnect function is only required when using the 'react' pattern. This is because
-		///		the 'again' pattern is always initiated by the framework.
-		/// 
-		///		Note that onSuccess() must only be called once. If continuing using the 'react' pattern, you will
+        ///		
+        ///		The given continuation object tells the framework how to continue syncing. Possible values are:
+        ///		{ again: milliseconds } - tells the framework to call sync() again in given milliseconds.
+        ///		{ react: onLocalChanges, disconnect: disconnectFunction } - tells the framework that you will continue
+        ///	    listening on both client- and server changes simultanously. When you get changes from server, you will
+        ///		once again call	applyRemoteChanges() and when client changes arrive, you will get notified in your
+        ///     'react' function: function onLocalChanges(changes, baseRevision, partial, onChangesAccepted).
+        ///		When the framework want to close down your provider, it will call your provided disconnect function.
+        ///		Note that the disconnect function is only required when using the 'react' pattern. This is because
+        ///		the 'again' pattern is always initiated by the framework.
+        /// 
+        ///		Note that onSuccess() must only be called once. If continuing using the 'react' pattern, you will
         ///		no more call onSuccess(). (If using the 'again' pattern, the next call will be to sync() again and
         ///     thus the same implementation as initial sync and therefore you must call onSuccess() again).
-		/// </param>
-		/// <param name="onError" value="function (error, again) {}">
-		///		Call this function if an error occur. Provide the error object
-		///		(exception or other toStringable object such as a String instance) as well as the again value that
+        /// </param>
+        /// <param name="onError" value="function (error, again) {}">
+        ///		Call this function if an error occur. Provide the error object
+        ///		(exception or other toStringable object such as a String instance) as well as the again value that
         ///		should be number of milliseconds until trying to call sync() again.
         /// 
         ///     For repairable errors, such as network down, provide a value for again so that the framework may
         ///     try again later. If the error is non-repairable (wouldnt be fixed if trying again later), you
         ///     should provide Infinity, null or undefined as value for the again parameter.
-		/// 
-		///		If an error occur while listening for server changes after having gone over to the 'react' pattern,
-		///		you may also call onError() to inform the framework that the remote node has gone down. If doing so,
-		///		your sync call will be terminated and you will no longer recieve any local changes to your 'react'
-		///		callback. Instead you inform the framework about the number of milliseconds until it should call
-		///		sync() again to reestablish the connection. 
-		/// </param>
-	}
+        /// 
+        ///		If an error occur while listening for server changes after having gone over to the 'react' pattern,
+        ///		you may also call onError() to inform the framework that the remote node has gone down. If doing so,
+        ///		your sync call will be terminated and you will no longer recieve any local changes to your 'react'
+        ///		callback. Instead you inform the framework about the number of milliseconds until it should call
+        ///		sync() again to reestablish the connection. 
+        /// </param>
+    }
 }
+
 
 /** Interface of a change object.
   * 
@@ -192,15 +193,15 @@ var DatabaseChangeType = {
     * 
     */
 function IPersistedContext() {
-	this.save = function () {
-		/// <summary>
-		///	  Persist your context object to local database. When done, the returned promise will resolve.
-		///	  You may only store primitive types, objects and arrays in this context. You may not store functions
-		///	  or DomNodes.
-		/// </summary>
-		/// <returns type="Promise">Returns Promise with methods then() and catch() to call if in need to wait
-		///  for the result of the save() operation.
-		/// </returns>
-	}
+    this.save = function () {
+        /// <summary>
+        ///	  Persist your context object to local database. When done, the returned promise will resolve.
+        ///	  You may only store primitive types, objects and arrays in this context. You may not store functions
+        ///	  or DomNodes.
+        /// </summary>
+        /// <returns type="Promise">Returns Promise with methods then() and catch() to call if in need to wait
+        ///  for the result of the save() operation.
+        /// </returns>
+    }
 }
 
