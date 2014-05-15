@@ -114,7 +114,7 @@ function ISyncProtocol() {
         /// 
         ///     Sample when using a poll strategy: onSuccess({again: 1000});
         ///     Sample when using an immediate reaction strategy: onSuccess({
-        ///         react: function onLocalChanges (changes, baseRevision, partial, onChangesAccepted) {
+        ///         react: function (changes, baseRevision, partial, onChangesAccepted) {
         ///             // Send changes, baseRevisoin and partial to server
         ///             // When server acks, call onChangesAccepted();
         ///         },
