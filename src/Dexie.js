@@ -918,8 +918,8 @@
                         //
                         return this._trans(READWRITE, function (resolve, reject, trans) {
                             // Since key is optional, make sure we get it from obj if not provided
-                            key = key || (self.schema.primKey.keyPath && getByKeyPath(obj, self.schema.primKey.keyPath));
-                            if (key === undefined) {
+                            var effectiveKey = key || (self.schema.primKey.keyPath && getByKeyPath(obj, self.schema.primKey.keyPath));
+                            if (effectiveKey === undefined) {
                                 // No primary key. Must use add().
                                 trans.tables[self.name].add(obj).then(resolve, reject);
                             } else {
@@ -927,7 +927,7 @@
                                 trans._lock(); // Needed because operation is splitted into modify() and add().
                                 // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
                                 obj = deepClone(obj);
-                                trans.tables[self.name].where(":id").equals(key).modify(function (value) {
+                                trans.tables[self.name].where(":id").equals(effectiveKey).modify(function (value) {
                                     // Replace extisting value with our object
                                     // CRUD event firing handled in WriteableCollection.modify()
                                     this.value = obj;
@@ -937,7 +937,7 @@
                                         // CRUD event firing will be done in add()
                                         return trans.tables[self.name].add(obj, key); // Resolving with another Promise. Returned Promise will then resolve with the new key.
                                     } else {
-                                        return key; // Resolve with the provided key.
+                                        return effectiveKey; // Resolve with the provided key.
                                     }
                                 }).finally(function () {
                                     trans._unlock();
@@ -2202,6 +2202,7 @@
                 onFinally();
                 return value;
             }, function (err) {
+                onFinally();
                 return Promise.reject(err);
             });
         };
