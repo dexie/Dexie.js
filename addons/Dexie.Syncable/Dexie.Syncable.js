@@ -3,7 +3,9 @@
 /// <reference path="Dexie.Syncable.SyncProtocolAPI.js" />
 (function (window, publish, isBrowser, undefined) {
 
-    var override = Dexie.override;
+    var override = Dexie.override,
+        Promise = Dexie.Promise,
+        setByKeyPath = Dexie.setByKeyPath;
 
     Dexie.Syncable = function (db) {
     	/// <param name="db" type="Dexie"></param>
@@ -14,7 +16,9 @@
         var CREATE = 1,
             UPDATE = 2,
             DELETE = 3;
+
         var MAX_CHANGES_PER_CHUNK = 1000;
+
         //
         // PersistedContext : IPersistedContext
         //
@@ -51,7 +55,7 @@
                 /// <param name="changes" type="db.WriteableTable"></param>
                 /// <param name="intercomm" type="db.WriteableTable"></param>
                 /// <param name="trans" type="db.Transaction"></param>
-                if (!weAreMaster && db._localSyncNode.isMaster) {
+                if (db._localSyncNode && !weAreMaster && db._localSyncNode.isMaster) {
                     // We took over the master role in Observable's cleanup method
                     weAreMaster = true;
                     nodes.filter(function (node) { return node.type == 'remote' && node.connected }).each(function (connectedRemoteNode) {
@@ -76,13 +80,11 @@
             var protocolInstance = Dexie.Syncable.registeredProtocols[protocolName];
 
             var promise = null;
-            // Add a 'status' event to the returned promise.
-            var onStatusChanged = Dexie.events(finalSyncPromise, { status: 'asap' }).status;
 
             if (protocolInstance) {
-                if (db.isOpen()) {
+                if (db.isOpen() && db._localSyncNode) {
                     if (db._localSyncNode.isMaster) {
-                        promise = sync(protocolInstance, url, options, onStatusChanged);
+                        promise = sync(protocolInstance, protocolName, url, options, db._localSyncNode.id);
                     } else {
                         // Request master node to do the sync:
                         promise = db._syncNodes.where('isMaster').above(0).first(function (masterNode) {
@@ -91,7 +93,6 @@
                         });
                         promise.protocolName = protocolName;
                         promise.url = url;
-                        promise._onStatusChanged = onStatusChanged;
                         remoteProviders.push(promise);
                         promise.catch(function (err) {
                             remoteProviders.splice(remoteProviders.indexOf(promise), 1);
@@ -101,25 +102,32 @@
                     promise = new Promise(function (resolve, reject) {
                         db.on("ready", function syncWhenReady() {
                             db.on.ready.unsubscribe(syncWhenReady);
-                            return db.sync(protocolName, url, options, onStatusChanged).then(function (result) {
+                            var thePromise = db.sync(protocolName, url, options);
+                            thePromise.statusChanged(promise._onStatusChanged.fire);
+                            thePromise.then(function (result) {
                                 resolve (result);
                             }).catch(function (error) {
                                 // Reject the promise returned to the caller of sync():
                                 reject(error);
                                 // but resolve the promise that db.on("ready") waits for, because database should succeed to open even if the sync operation fails!
                             });
+                            thePromise.statusChanged(promise._onStatusChanged.fire);
                         });
                     });
                 }
             } else {
                 throw new Error("ISyncProviderFactory " + protocolName + " is not registered in Dexie.Syncable.registerSyncProtocol()");
             }
+            // Add a 'status' event to the returned promise.
+            var onStatusChanged = Dexie.events(null, { status: 'asap' }).status;
+            promise._onStatusChanged = onStatusChanged;
             promise.status = Dexie.Syncable.Statuses.OFFLINE;
             promise.statusChanged = onStatusChanged.subscribe;
             promise.statusChanged(function (newStatus) {
+                if (!db.isOpen()) return; // In case db has closed we should not do any broadcasting because it wouldnt work.
                 promise.status = newStatus;
                 // Also broadcast message to other nodes about the status
-                db.broadcastMessage("syncStatusChanged", { newStatus: newStatus, url: msg.url, protocolName: msg.protocolName }, false);
+                db.broadcastMessage("syncStatusChanged", { newStatus: newStatus, url: url, protocolName: protocolName }, false);
             });
 
             return promise;
@@ -127,7 +135,7 @@
 
         //Dexie.Observable.SyncNode.prototype.get
 
-        function sync (protocolInstance, url, options, onStatusChanged) {
+        function sync (protocolInstance, protocolName, url, options, dbAliveID) {
             /// <param name="protocolInstance" type="ISyncProtocol"></param>
             var syncPromise = getOrCreateSyncNode().then(function (node) {
                 return connectProtocol(node);
@@ -139,10 +147,16 @@
                 // If syncPromise fails, remove the promise from syncPromises so that another call to sync() tries to sync again.
                 // But if promise is resolved, leave it in syncPromises so that another db.sync() call will resolve immediately when promise is online.
                 syncPromises.splice(syncPromises.indexOf(syncPromise), 1);
-                return Dexie.Promise.reject(e);
+                return Promise.reject(e);
             });
 
             return syncPromise;
+
+            function stillAlive() {
+                // A better method than doing db.isOpen() because the same db instance may have been reopened, but then this sync call should be dead
+                // because the new instance should be considered a fresh instance and will have another local node.
+                return db._localSyncNode && db._localSyncNode.id === dbAliveID;
+            }
 
             function getOrCreateSyncNode() {
                 return db._syncNodes.where("url").equalsIgnoreCase(url).and(function (node) { return node.syncProtocol === protocolName; }).first(function (node) {
@@ -173,6 +187,7 @@
                 /// <param name="node" type="Dexie.Observable.SyncNode"></param>
 
                 var connectedContinuation, providerHandle;
+                var onStatusChanged = syncPromise._onStatusChanged; // _onStatusChanged has been set by db.sync() immediately after calling sync() above.
                 onStatusChanged.fire(Dexie.Syncable.Statuses.CONNECTING);
                 return doSync();
 
@@ -183,7 +198,7 @@
                         return getLocalChangesForNode(node, function sendChangesToProvider(changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
                             // Create a final Promise for the entire sync() operation that will resolve when provider calls onSuccess().
                             // By creating finalPromise before calling protocolInstance.sync() it is possible for provider to call onError() immediately if it wants.
-                            var finalSyncPromise = new Dexie.Promise(function (resolve, reject) {
+                            var finalSyncPromise = new Promise(function (resolve, reject) {
 
                                 protocolInstance.sync(
                                     node.syncContext,
@@ -256,6 +271,12 @@
                 }
 
                 function continueSendingChanges(continuation) {
+                    if (!stillAlive()) {
+                        if (continuation.disconnect)
+                            continuation.disconnect();
+                        return;
+                    }
+
                     connectedContinuation = continuation;
                     providerHandle = {
                         disconnect: function () {
@@ -291,9 +312,11 @@
                     });
 
                     function reactToChanges() {
+                        if (!connectedContinuation) return;
                         changesWaiting = false;
                         isWaitingForServer = true;
                         getLocalChangesForNode(node, function (changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
+                            if (!connectedContinuation) return;
                             if (changes.length > 0) {
                                 continuation.react(changes, remoteBaseRevision, partial, function onChangesAccepted() {
                                     db._syncNodes.update(node, nodeModificationsOnAck);
@@ -390,13 +413,14 @@
                         // Check if we're in the middle of already doing that:
                         if (node.dbUploadState == null) {
                             // Initiatalize dbUploadState
+                            var tablesToUpload = db.tables.filter(function (table) { return table.schema.observable; }).map(function (table) { return table.name; });
                             var dbUploadState = {
-                                tablesToUpload: Object.keys(db._dbSchema).filter(function (name) { return db._dbSchema[name].observable; }),
+                                tablesToUpload: tablesToUpload,
                                 currentTable: tablesToUpload.shift(),
                                 currentKey: null
                             };
-                            return db._changes.orderBy('rev').last(function (baseRevision) {
-                                db._syncNodes.update(node, {"dbUploadState.baseRevision": baseRevision});
+                            return db._changes.orderBy('rev').last(function (lastChange) {
+                                dbUploadState.localBaseRevision = (lastChange && lastChange.rev) || 0;
                                 var collection = db.table(dbUploadState.currentTable).orderBy(':id');
                                 return getTableObjectsAsChanges(dbUploadState, [], collection);
                             });
@@ -410,7 +434,7 @@
                     }
 
                     function getTableObjectsAsChanges(state, changes, collection) {
-                        /// <param name="state" value="{tablesToUpload:[''],currentTable:'_changes',currentKey:null,baseRevision:0}"></param>
+                        /// <param name="state" value="{tablesToUpload:[''],currentTable:'_changes',currentKey:null,localBaseRevision:0}"></param>
                         /// <param name="changes" type="Array" elementType="IDatabaseChange"></param>
                         /// <param name="collection" type="db.Collection"></param>
                         var limitReached = false;
@@ -437,7 +461,7 @@
                                     // Done iterating all tables
                                     // Now append changes occurred during our dbUpload:
                                     var brmcr = getBaseRevisionAndMaxClientRevision(node);
-                                    return getChangesSinceRevision(state.baseRevision, MAX_CHANGES_PER_CHUNK - changes.length, brmcr.maxClientRevision, function (additionalChanges, partial, nodeModificationsOnAck) {
+                                    return getChangesSinceRevision(state.localBaseRevision, MAX_CHANGES_PER_CHUNK - changes.length, brmcr.maxClientRevision, function (additionalChanges, partial, nodeModificationsOnAck) {
                                         changes = changes.concat(additionalChanges);
                                         nodeModificationsOnAck.dbUploadState = null;
                                         return cb(changes, brmcr.remoteBaseRevision, partial, nodeModificationsOnAck);
@@ -495,14 +519,14 @@
                                             case CREATE:
                                                 switch (nextChange.type) {
                                                     case CREATE: return nextChange; // Another CREATE replaces previous CREATE.
-                                                    case UPDATE: return applyModifications(deepClone(prevChange.obj), nextChange.mods); // deep clone object before modifying since the earlier change in db.changes[] would otherwise be altered.
+                                                    case UPDATE: return combineCreateAndUpdate(prevChange, nextChange); // Apply nextChange.mods into prevChange.obj
                                                     case DELETE: return nextChange;  // Object created and then deleted. If it wasnt for that we MUST handle resent changes, we would skip entire change here. But what if the CREATE was sent earlier, and then CREATE/DELETE at later stage? It would become a ghost object in DB. Therefore, we MUST keep the delete change! If object doesnt exist, it wont harm!
                                                 }
                                                 break;
                                             case UPDATE:
                                                 switch (nextChange.type) {
                                                     case CREATE: return nextChange; // Another CREATE replaces previous update.
-                                                    case UPDATE: return mergeModificationSets(prevChange.mods, nextChange.mods); // Add the additional modifications to existing modification set.
+                                                    case UPDATE: return combineUpdateAndUpdate(prevChange, nextChange); // Add the additional modifications to existing modification set.
                                                     case DELETE: return nextChange;  // Only send the delete change. What was updated earlier is no longer of interest.
                                                 }
                                                 break;
@@ -527,13 +551,16 @@
                             
 
                 function applyRemoteChanges(remoteChanges, remoteRevision, partial, clear) {
-                    enque(applyRemoteChanges, letThrough(function () {
-                        // FIXTHIS: Check what to do if clear() is true!
-                        return (partial ? saveToUncommitedChanges(remoteChanges) : finallyCommitAllChanges(remoteChanges, remoteRevision))
-                            .catch(function (error) {
-                                onError(error, Infinity);
-                            });
-                    }));
+                    enque(applyRemoteChanges, function() {
+                        return letThrough(function () {
+                            // FIXTHIS: Check what to do if clear() is true!
+                            return (partial ? saveToUncommitedChanges(remoteChanges) : finallyCommitAllChanges(remoteChanges, remoteRevision))
+                                .catch(function (error) {
+                                    onError(error, Infinity);
+                                });
+                        });
+                    });
+
 
                     function saveToUncommitedChanges (changes) {
                         return db.transaction('rw', db._uncommittedChanges, function (uncommittedChanges) {
@@ -636,7 +663,7 @@
                     try {
                         Promise.PSD.letThrough = true; // Make sure we are let through if still blocking db due to onready is firing.
                         // When setting this variable we will be let through even if database is not open so we need to check that first.
-                        if (!db.isOpen())
+                        if (!stillAlive())
                             return Promise.reject("Database not open");
                         else
                             return fn();
@@ -649,13 +676,15 @@
         }
 
         db.close = override(db.close, function (origClose) {
-            syncProviders.forEach(function (provider) {
-                provider.disconnect();
-            });
-            syncProviders.splice(0, syncProviders.length);
-            syncPromises = [];
-            remoteProviders = [];
-            return origClose.apply(this, arguments);
+            return function () {
+                syncProviders.forEach(function (provider) {
+                    provider.disconnect();
+                });
+                syncProviders.splice(0, syncProviders.length);
+                syncPromises = [];
+                remoteProviders = [];
+                return origClose.apply(this, arguments);
+            }
         });
 
     }
@@ -669,6 +698,28 @@
                 return enque(context, fn);
             });
         }
+    }
+
+    function combineCreateAndUpdate(prevChange, nextChange) {
+        var clonedChange = Dexie.deepClone(prevChange);// Clone object before modifying since the earlier change in db.changes[] would otherwise be altered.
+        Object.keys(nextChange.mods).forEach(function (keyPath) {
+            setByKeyPath(clonedChange.obj, keyPath, nextChange.mods[keyPath]);
+        });
+        return clonedChange;
+    }
+
+    function combineUpdateAndUpdate(prevChange, nextChange) {
+        var clonedChange = Dexie.deepClone(prevChange); // Clone object before modifying since the earlier change in db.changes[] would otherwise be altered.
+        Object.keys(nextChange.mods).forEach(function (keyPath) {
+            // Add or replace this keyPath and its new value
+            clonedChange.mods[keyPath] = nextChange.mods[keyPath];
+            // In case prevChange contained sub-paths to the new keyPath, we must make sure that those sub-paths are removed since
+            // we must mimic what would happen if applying the two changes after each other:
+            Object.keys(prevChange.mods).filter(function (subPath) { return subPath.indexOf(keyPath + '.') === 0 }).forEach(function (subPath) {
+                delete clonedChange[subPath];
+            });
+        });
+        return clonedChange;
     }
 
     Dexie.Syncable.Statuses = {

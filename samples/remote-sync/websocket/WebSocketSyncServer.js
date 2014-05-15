@@ -298,19 +298,19 @@
                 set[id] = nextChange;
             } else {
                 // Merge the oldchange with the new change
-                var mergedChange = (function () {
+                set[id] = (function () {
                     switch (prevChange.type) {
                         case CREATE:
                             switch (nextChange.type) {
                                 case CREATE: return nextChange; // Another CREATE replaces previous CREATE.
-                                case UPDATE: return applyModifications(deepClone(prevChange.obj), nextChange.mods); // deep clone object before modifying since the earlier change in db.changes[] would otherwise be altered.
+                                case UPDATE: return combineCreateAndUpdate(prevChange, nextChange); // Apply nextChange.mods into prevChange.obj
                                 case DELETE: return nextChange;  // Object created and then deleted. If it wasnt for that we MUST handle resent changes, we would skip entire change here. But what if the CREATE was sent earlier, and then CREATE/DELETE at later stage? It would become a ghost object in DB. Therefore, we MUST keep the delete change! If object doesnt exist, it wont harm!
                             }
                             break;
                         case UPDATE:
                             switch (nextChange.type) {
                                 case CREATE: return nextChange; // Another CREATE replaces previous update.
-                                case UPDATE: return mergeModificationSets(prevChange.mods, nextChange.mods); // Add the additional modifications to existing modification set.
+                                case UPDATE: return combineUpdateAndUpdate(prevChange, nextChange); // Add the additional modifications to existing modification set.
                                 case DELETE: return nextChange;  // Only send the delete change. What was updated earlier is no longer of interest.
                             }
                             break;
@@ -323,11 +323,6 @@
                             break;
                     }
                 })();
-                //if (mergedChange) {
-                    set[id] = mergedChange;
-                //} else {
-                //    delete set[id];
-                //}
             }
             return set;
         }, {});
@@ -382,31 +377,30 @@
     }
 
     function applyModifications(obj, modifications) {
-        Object.keys(modifications).sort(function (a, b) { return a.length - b.length }).forEach(function (keyPath) {
-            // The reason we sort by length is to make direct keyPath applied first and nestled second.
-            // Consider the following modifications set:
-            //  {
-            //      "address.city": "Stockholm",
-            //      "address": {
-            //          "city": "Haparanda",
-            //          "country": "Sweden"
-            //      }
-            //  }
-            // Since "address" would overwrite "address.city" it's better to first apply "address" and then "address.city".
+        Object.keys(modifications).forEach(function (keyPath) {
             setByKeyPath(obj, keyPath, modifications[keyPath]);
         });
         return obj;
     }
 
-    function mergeModificationSets(obj1, obj2) {
-        var merged = {};
-        Object.keys(obj1).forEach(function (keyPath) {
-            merged[keyPath] = obj1[keyPath];
+    function combineCreateAndUpdate(prevChange, nextChange) {
+        var clonedChange = deepClone(prevChange);// Clone object before modifying since the earlier change in db.changes[] would otherwise be altered.
+        applyModifications(clonedChange.obj, nextChange.mods); // Apply modifications to existing object.
+        return clonedChange;
+    }
+
+    function combineUpdateAndUpdate(prevChange, nextChange) {
+        var clonedChange = deepClone(prevChange); // Clone object before modifying since the earlier change in db.changes[] would otherwise be altered.
+        Object.keys(nextChange.mods).forEach(function (keyPath) {
+            // Add or replace this keyPath and its new value
+            clonedChange.mods[keyPath] = nextChange.mods[keyPath];
+            // In case prevChange contained sub-paths to the new keyPath, we must make sure that those sub-paths are removed since
+            // we must mimic what would happen if applying the two changes after each other:
+            Object.keys(prevChange.mods).filter(function (subPath) { return subPath.indexOf(keyPath + '.') === 0 }).forEach(function (subPath) {
+                delete clonedChange[subPath];
+            });
         });
-        Object.keys(obj2).forEach(function (keyPath) {
-            merged[keyPath] = obj2[keyPath];
-        });
-        return merged;
+        return clonedChange;
     }
 
     function setByKeyPath(obj, keyPath, value, bDelete) {

@@ -42,7 +42,7 @@
             tablesToUpload: [String],
             currentTable: String,
             currentKey: null,
-            baseRevision: Number
+            localBaseRevision: Number
         }
     });
 
@@ -367,24 +367,24 @@
             }
 
             var partial = false;
-            var promise = db._changes.where("rev").above(mySyncNode.myRevision).limit(1000).toArray(function (changes) {
-                if (mySyncNode == null) return Promise.reject(new Error("Database closed")); // In case database got closed.
+            var outSyncNode = mySyncNode; // Because mySyncNode can suddenly be set to null on database close, and worse, can be set to a new value if database is reopened.
+            var promise = db._changes.where("rev").above(outSyncNode.myRevision).limit(1000).toArray(function (changes) {
                 if (changes.length > 0) {
                     var lastChange = changes[changes.length - 1];
                     partial = (changes.length == 1000); // Same as limit.
                     db.on('changes').fire(changes, partial);
-                    mySyncNode.myRevision = lastChange.rev;
+                    outSyncNode.myRevision = lastChange.rev;
                 } else if (wasPartial) {
                     // No more changes, BUT since we have triggered on('changes') with partial = true,
                     // we HAVE TO trigger changes again with empty list and partial = false
                     db.on('changes').fire([], false);
                 }
 
-                return db.table("_syncNodes").update(mySyncNode, {
+                return db.table("_syncNodes").update(outSyncNode, {
                     lastHeartBeat: Date.now(),
                     deleteTimeStamp: null // Reset "deleteTimeStamp" flag if it was there.
                 });
-            }).then (function (nodeWasUpdated) {
+            }).then(function (nodeWasUpdated) {
                 if (!nodeWasUpdated) {
                     // My node has been deleted. We must have been lazy and got removed by another node.
                     db.close();
@@ -395,7 +395,7 @@
 
                 // Check if more changes have come since we started reading changes in the first place. If so, relaunch readChanges and let the ongoing promise not
                 // resolve until all changes have been read.
-                if (partial || Dexie.Observable.latestRevision[db.name] > mySyncNode.myRevision) {
+                if (partial || Dexie.Observable.latestRevision[db.name] > outSyncNode.myRevision) {
                     // Either there were more than 1000 changes or additional changes where added while we were reading these changes,
                     // In either case, call readChanges() again until we're done.
                     return readChanges(Dexie.Observable.latestRevision[db.name], true, partial);
@@ -435,6 +435,8 @@
         }
 
         function cleanup() {
+            var ourSyncNode = mySyncNode;
+            if (!ourSyncNode) return Promise.reject("Database closed");
             return db.transaction('rw', db._syncNodes, db._changes, db._intercomm, function (nodes, changes, intercomm, trans) {
                 // Cleanup dead local nodes that has no heartbeat for over a minute
                 // Dont do the following:
@@ -450,7 +452,7 @@
                         // Check if we are deleting a master node
                         if (node.isMaster) {
                             // The node we are deleting is master. We must take over that role.
-                            nodes.update(mySyncNode, { isMaster: 1 });
+                            nodes.update(ourSyncNode, { isMaster: 1 });
                         }
                         // Cleanup intercomm messages destinated to the node being deleted:
                         intercomm.where("destinationNode").equals(node.id).modify(function (msg) {
@@ -479,6 +481,7 @@
 
         function onBeforeUnload(event) {
             // Mark our own sync node for deletion.
+            if (!mySyncNode) return;
             mySyncNode.deleteTimeStamp = 1; // One millisecond after 1970. Makes it occur in the past but still keeps it truthy.
             mySyncNode.lastHeartBeat = 0;
             db._syncNodes.put(mySyncNode); // This async operation may be cancelled since the browser is closing down now.
@@ -508,6 +511,7 @@
         	/// <param name="message">Message to send</param>
             /// <param name="destinationNode" type="Number">ID of destination node</param>
             /// <param name="wantReply" type="Boolean">If true, the returned promise will complete with the reply from remote. Otherwise it will complete when message has been successfully sent.</param>
+            if (!mySyncNode) return Promise.reject("Database closed");
             var msg = { message: message, destinationNode: destinationNode, sender: mySyncNode.id, type: type, wantReply: wantReply, success: !isFailure };
             return db.transaction('rw', db._intercomm, function (intercomm) {
                 intercomm.add(msg).then(function (messageId) {
@@ -523,8 +527,10 @@
         }
 
         db.broadcastMessage = function (type, message, bIncludeSelf) {
+            if (!mySyncNode) return Promise.reject("Database closed");
+            var mySyncNodeId = mySyncNode.id;
             db._syncNodes.each(function (node) {
-                if (node.type == 'local' && (bIncludeSelf || node.id !== mySyncNode.id)) {
+                if (node.type == 'local' && (bIncludeSelf || node.id !== mySyncNodeId)) {
                     db.sendMessage(type, message, node.id);
                 }
             });
@@ -532,6 +538,7 @@
 
         function consumeIntercommMessages() {
             // Check if we got messages:
+            if (!mySyncNode) return Promise.reject("Database closed");
             return db._intercomm.where("destinationNode").equals(mySyncNode.id).modify(function (msg) {
                 // For each message, fire the event and remove message.
                 delete this.value;

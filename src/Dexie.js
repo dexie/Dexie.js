@@ -2550,7 +2550,7 @@
         for (var prop in a) if (a.hasOwnProperty(prop)) {
             if (!b.hasOwnProperty(prop))
                 rv[prop] = undefined; // Property removed
-            else if (a[prop] !== b[prop]) // Optimization possibility: With current code, Array-, Object- and Date members will always be considered changed no matter if really changed. Could do a recursive inspection here to really know if it was changed (such as comparing JSON.stringify(), catching exception for Date- and other objects).
+            else if (a[prop] !== b[prop] && JSON.stringify(a[prop]) != JSON.stringify(b[prop])) 
                 rv[prop] = b[prop]; // Property changed
         }
         for (var prop in b) if (b.hasOwnProperty(prop) && !a.hasOwnProperty(prop)) {
