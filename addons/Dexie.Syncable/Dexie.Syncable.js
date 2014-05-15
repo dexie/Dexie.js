@@ -154,7 +154,8 @@
                         // Create new node and sync everything
                         node = new Dexie.Observable.SyncNode();
                         node.myRevision = -1;
-                        node.remoteRevisions = [];
+                        node.appliedRemoteRevision = null;
+                        node.remoteBaseRevisions = [];
                         node.type = "remote";
                         node.syncProtocol = protocolName;
                         node.syncOptions = options;
@@ -179,7 +180,7 @@
                     // Use enque() to ensure only a single promise execution at a time.
                     return enque(doSync, function () {
                         // By returning the Promise returned by getLocalChangesForNode() a final catch() on the sync() method will also catch error occurring in entire sequence.
-                        return getLocalChangesForNode(node, function sendChangesToProvider(changes, remoteRevision, partial, nodeModificationsOnAck) {
+                        return getLocalChangesForNode(node, function sendChangesToProvider(changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
                             // Create a final Promise for the entire sync() operation that will resolve when provider calls onSuccess().
                             // By creating finalPromise before calling protocolInstance.sync() it is possible for provider to call onError() immediately if it wants.
                             var finalSyncPromise = new Dexie.Promise(function (resolve, reject) {
@@ -189,8 +190,9 @@
                                     url,
                                     options,
                                     changes,
-                                    remoteRevision,
+                                    remoteBaseRevision,
                                     partial,
+                                    node.appliedRemoteRevision,
                                     applyRemoteChanges,
                                     onChangesAccepted,
                                     resolve,
@@ -291,9 +293,9 @@
                     function reactToChanges() {
                         changesWaiting = false;
                         isWaitingForServer = true;
-                        getLocalChangesForNode(node, function (changes, remoteRevision, partial, nodeModificationsOnAck) {
+                        getLocalChangesForNode(node, function (changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
                             if (changes.length > 0) {
-                                continuation.react(changes, remoteRevision, partial, function onChangesAccepted() {
+                                continuation.react(changes, remoteBaseRevision, partial, function onChangesAccepted() {
                                     db._syncNodes.update(node, nodeModificationsOnAck);
                                     // More changes may be waiting:
                                     reactToChanges();
@@ -317,9 +319,9 @@
                 function continueUsingPollPattern(continuation) {
 
                     function syncAgain () {
-                        getLocalChangesForNode(node, function (changes, remoteRevision, partial, nodeModificationsOnAck) {
+                        getLocalChangesForNode(node, function (changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
 
-                            protocolInstance.sync(node.syncContext, url, options, changes, remoteRevision, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError);
+                            protocolInstance.sync(node.syncContext, url, options, changes, remoteBaseRevision, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError);
 
                             function onChangesAccepted() {
                                 db._syncNodes.update(node, nodeModificationsOnAck);
@@ -346,26 +348,26 @@
                     syncAgain();
                 }
 
-                function getRemoteRevisionAndMaxClientRevision(node) {
+                function getBaseRevisionAndMaxClientRevision(node) {
                     /// <param name="node" type="Dexie.Observable.SyncNode"></param>
-                    if (node.remoteRevisions.length === 0) return {
-                        // No remoteRevisions have arrived yet. No limit on clientRevision and provide null as remoteRevision:
+                    if (node.remoteBaseRevisions.length === 0) return {
+                        // No remoteBaseRevisions have arrived yet. No limit on clientRevision and provide null as remoteBaseRevision:
                         maxClientRevision: Infinity,
-                        remoteRevision: null
+                        remoteBaseRevision: null
                     };
-                    for (var i = node.remoteRevisions.length - 1; i >= 0; --i) {
-                        if (node.myRevision >= node.remoteRevisions[i].local) {
-                            // Found a remoteRevision that fits node.myRevision. Return remoteRevision and eventually a roof maxClientRevision pointing out where next remoteRevision bases its changes on.
+                    for (var i = node.remoteBaseRevisions.length - 1; i >= 0; --i) {
+                        if (node.myRevision >= node.remoteBaseRevisions[i].local) {
+                            // Found a remoteBaseRevision that fits node.myRevision. Return remoteBaseRevision and eventually a roof maxClientRevision pointing out where next remoteBaseRevision bases its changes on.
                             return {
-                                maxClientRevision: i === node.remoteRevisions.length - 1 ? Infinity : node.remoteRevisions[i + 1].local,
-                                remoteRevision: node.remoteRevisions[i].remote
+                                maxClientRevision: i === node.remoteBaseRevisions.length - 1 ? Infinity : node.remoteBaseRevisions[i + 1].local,
+                                remoteBaseRevision: node.remoteBaseRevisions[i].remote
                             }
                         }
                     }
                     // There are at least one item in the list but the server hasnt yet become up-to-date with the 0 revision from client. 
                     return {
-                        maxClientRevision: node.remoteRevisions[0].local,
-                        remoteRevision: null
+                        maxClientRevision: node.remoteBaseRevisions[0].local,
+                        remoteBaseRevision: null
                     };
                 }
 
@@ -375,13 +377,13 @@
                     ///     for that node.
                 	/// </summary>
                 	/// <param name="node"></param>
-                    /// <param name="cb" value="function(changes, remoteRevision, partial, nodeModificationsOnAck) {}">Callback that will retrieve next chunk of changes and a boolean telling if it's a partial result or not. If truthy, result is partial and there are more changes to come. If falsy, these changes are the final result.</param>
+                    /// <param name="cb" value="function(changes, remoteBaseRevision, partial, nodeModificationsOnAck) {}">Callback that will retrieve next chunk of changes and a boolean telling if it's a partial result or not. If truthy, result is partial and there are more changes to come. If falsy, these changes are the final result.</param>
 
                     if (node.myRevision >= 0) {
                         // Node is based on a revision in our local database and will just need to get the changes that has occurred since that revision.
-                        var rrmc = getRemoteRevisionAndMaxClientRevision(node);
-                        return getChangesSinceRevision(node.myRevision, MAX_CHANGES_PER_CHUNK, rrmc.maxClientRevision, function (changes, partial, nodeModificationsOnAck) {
-                            return cb(changes, rrmc.remoteRevision, partial, nodeModificationsOnAck);
+                        var brmcr = getBaseRevisionAndMaxClientRevision(node);
+                        return getChangesSinceRevision(node.myRevision, MAX_CHANGES_PER_CHUNK, brmcr.maxClientRevision, function (changes, partial, nodeModificationsOnAck) {
+                            return cb(changes, brmcr.remoteBaseRevision, partial, nodeModificationsOnAck);
                         });
                     } else {
                         // Node hasn't got anything from our local database yet. We will need to upload entire DB to the node in the form of CREATE changes.
@@ -434,11 +436,11 @@
                                 if (state.tablesToUpload.length == 0) {
                                     // Done iterating all tables
                                     // Now append changes occurred during our dbUpload:
-                                    var rrmc = getRemoteRevisionAndMaxClientRevision(node);
-                                    return getChangesSinceRevision(state.baseRevision, MAX_CHANGES_PER_CHUNK - changes.length, rrmc.maxClientRevision, function (additionalChanges, partial, nodeModificationsOnAck) {
+                                    var brmcr = getBaseRevisionAndMaxClientRevision(node);
+                                    return getChangesSinceRevision(state.baseRevision, MAX_CHANGES_PER_CHUNK - changes.length, brmcr.maxClientRevision, function (additionalChanges, partial, nodeModificationsOnAck) {
                                         changes = changes.concat(additionalChanges);
                                         nodeModificationsOnAck.dbUploadState = null;
-                                        return cb(changes, rrmc.remoteRevision, partial, nodeModificationsOnAck);
+                                        return cb(changes, brmcr.remoteBaseRevision, partial, nodeModificationsOnAck);
                                     });
                                 } else {
                                     // Not done iterating all tables. Continue on next table:
@@ -546,7 +548,9 @@
                                 if (change.mods) changeToAdd.mods = change.mods;
                                 uncommittedChanges.add(changeToAdd);
                             });
-                        })
+                        }).then(function () {
+                            db._syncNodes.update(node, {appliedRemoteRevision: remoteRevision});
+                        });
                     }
 
                     function finallyCommitAllChanges(changes, remoteRevision) {
@@ -578,30 +582,33 @@
                                 return trans._changes.orderBy('rev').last();
                             }).then(function (lastChange) {
                                 var currentLocalRevision = (lastChange && lastChange.rev) || 0;
-                                // 4. Update node states (remoteRevisions array and eventually myRevision)
+                                // 4. Update node states (appliedRemoteRevision, remoteBaseRevisions and eventually myRevision)
                                 return trans._syncNodes.where('id').equals(node.id).modify(function (dbNode) {
-                                    // Make an atomic Array.push() into node.remoteRevisions:
-                                    var remoteRevisions = dbNode.remoteRevisions || [];
-                                    remoteRevisions.push({ remote: remoteRevision, local: currentLocalRevision });
+                                    // Update appliedRemoteRevision:
+                                    dbNode.appliedRemoteRevision = remoteRevision;
+                                    node.appliedRemoteRevision = remoteRevision;
+                                    // Make an atomic Array.push() into node.remoteBaseRevisions:
+                                    var remoteBaseRevisions = dbNode.remoteBaseRevisions || [];
+                                    remoteBaseRevisions.push({ remote: remoteRevision, local: currentLocalRevision });
                                     if (dbNode.myRevision === localRevisionBeforeChanges) {
                                         // If server was up-to-date before we added new changes from the server, update myRevision to last change
                                         // because server is still up-to-date! This is also important in order to prohibit getLocalChangesForNode() from
                                         // ever sending an empty change list to server, which would otherwise be done every second time it would send changes.
-                                        dbNode.myRevision = lastChange.rev;
+                                        dbNode.myRevision = currentLocalRevision;
                                     }
-                                    // Garbage collect remoteRevisions not in use anymore:
-                                    if (remoteRevisions.length > 1) {
-                                        for (var i = remoteRevisions.length - 1; i > 0; --i) {
-                                            if (dbNode.myRevision >= remoteRevisions[i].local) {
-                                                remoteRevisions.splice(0, i);
+                                    // Garbage collect remoteBaseRevisions not in use anymore:
+                                    if (remoteBaseRevisions.length > 1) {
+                                        for (var i = remoteBaseRevisions.length - 1; i > 0; --i) {
+                                            if (dbNode.myRevision >= remoteBaseRevisions[i].local) {
+                                                remoteBaseRevisions.splice(0, i);
                                                 break;
                                             }
                                         }
                                     }
-                                    dbNode.remoteRevisions = remoteRevisions;
+                                    dbNode.remoteBaseRevisions = remoteBaseRevisions;
                                     // Also store the changes into the memory-cached node instance:
                                     node.myRevision = dbNode.myRevision;
-                                    node.remoteRevisions = remoteRevisions;
+                                    node.remoteBaseRevisions = remoteBaseRevisions;
                                 });
                             });
 

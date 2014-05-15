@@ -137,11 +137,11 @@
         this.start = function () {
             ws.createServer(function (conn) {
 
-                var baseRevision = 0; // Used when sending changes to client. Only send changes above baseRevision since client is already in sync with baseRevision.
+                var syncedRevision = 0; // Used when sending changes to client. Only send changes above baseRevision since client is already in sync with baseRevision.
 
                 function sendAnyChanges() {
-                    // Get all changes after baseRevision that was not performed by the client we're talkin' to.
-                    var changes = db.changes.filter(function (change) { return change.rev > baseRevision && change.source !== clientIdentity; });
+                    // Get all changes after syncedRevision that was not performed by the client we're talkin' to.
+                    var changes = db.changes.filter(function (change) { return change.rev > syncedRevision && change.source !== clientIdentity; });
                     // Compact changes so that multiple changes on same object is merged into a single change.
                     var reducedSet = reduceChanges(changes, clientIdentity);
                     // Convert the reduced set into an array again.
@@ -156,7 +156,7 @@
                         partial: false // Tell client that these are the only changes we are aware of. Since our mem DB is syncronous, we got all changes in one chunk.
                     }));
 
-                    baseRevision = currentRevision; // Make sure we only send revisions coming after this revision next time and not resend the above changes over and over.
+                    syncedRevision = currentRevision; // Make sure we only send revisions coming after this revision next time and not resend the above changes over and over.
                 }
 
                 conn.on("text", function (message) {
@@ -183,8 +183,8 @@
                             }));
                         }
                     } else if (type == "subscribe") {
-                        // Client wants to subscribe to server changes happened or happening after given baseRevision
-                        baseRevision = request.baseRevision;
+                        // Client wants to subscribe to server changes happened or happening after given syncedRevision
+                        syncedRevision = request.syncedRevision;
                         // Send any changes we have currently:
                         sendAnyChanges();
                         // Start subscribing for additional changes:

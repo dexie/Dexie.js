@@ -15,7 +15,7 @@
 
     Dexie.Syncable.Remote.registerSyncProtocol("websocket", {
 
-        sync: function (context, url, options, changes, baseRevision, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
+        sync: function (context, url, options, changes, baseRevision, partial, syncedRevision, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
 
 
             // The following vars are needed because we must know which callback to ack when server sends it's ack to us.
@@ -66,7 +66,7 @@
                 // Subscribe to server changes:
                 we.send(JSON.stringify({
                     type: "subscribe",
-                    baseRevision: baseRevision
+                    syncedRevision: syncedRevision
                 }));
             }
 
@@ -109,7 +109,7 @@
                             // Since this is the first sync round and server sais we've got all changes - now is the time to call onsuccess()
                             onSuccess({
                                 // Specify a react function that will react on additional client changes
-                                react: function onLocalChanges(changes, baseRevision, partial, onChangesAccepted) {
+                                react: function (changes, baseRevision, partial, onChangesAccepted) {
                                     sendChanges(changes, baseRevision, partial, onChangesAccepted);
                                 },
                                 // Specify a disconnect function that will close our socket so that we dont continue to monitor changes.

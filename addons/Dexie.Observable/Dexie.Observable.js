@@ -36,7 +36,8 @@
         syncContext: null,
         syncOptions: Object,
         connected: false,
-        remoteRevisions: [{local: Number, remote: null}],
+        appliedRemoteRevision: null,
+        remoteBaseRevisions: [{ local: Number, remote: null }],
         dbUploadState: {
             tablesToUpload: [String],
             currentTable: String,

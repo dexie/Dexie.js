@@ -6,11 +6,11 @@
 
 Dexie.Syncable.Remote.registerSyncProtocol("sample_protocol", {
 
-    sync: function (context, url, options, changes, baseRevision, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
+    sync: function (context, url, options, changes, baseRevision, partial, syncedRevision, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
         /// <param name="context" type="IPersistedContext"></param>
         /// <param name="url" type="String"></param>
         /// <param name="changes" type="Array" elementType="IDatabaseChange"></param>
-        /// <param name="applyRemoteChanges" value="function (changes, lastRevision) {}"></param>
+        /// <param name="applyRemoteChanges" value="function (changes, lastRevision, partial, clear) {}"></param>
         /// <param name="onSuccess" value="function (continuation) {}"></param>
         /// <param name="onError" value="function (error, again) {}"></param>
 
@@ -21,7 +21,8 @@ Dexie.Syncable.Remote.registerSyncProtocol("sample_protocol", {
         //      [clientIdentity: unique value representing the client identity. If omitted, server will return a new client identity in its response that we should apply in next sync call.]
         //      baseRevision: baseRevision,
         //      partial: partial,
-        //      changes: changes
+        //      changes: changes,
+        //      syncedRevision: syncedRevision
         //  }
         //  To make the sample simplified, we assume the server has the exact same specification of how changes are structured.
         //  In real world, you would have to pre-process the changes array to fit the server specification.
@@ -30,7 +31,8 @@ Dexie.Syncable.Remote.registerSyncProtocol("sample_protocol", {
             clientIdentity: context.clientIdentity || null,
             baseRevision: baseRevision,
             partial: partial,
-            changes: changes
+            changes: changes,
+            syncedRevision: syncedRevision
         };
 
         // Send the request:
@@ -48,7 +50,8 @@ Dexie.Syncable.Remote.registerSyncProtocol("sample_protocol", {
                 //    success: true / false,
                 //    errorMessage: "",
                 //    changes: changes,
-                //    currentRevision: revisionOfLastChange
+                //    currentRevision: revisionOfLastChange,
+                //    needsResync: false, // Flag telling that server doesnt have given syncedRevision or of other reason wants client to resync.
                 //    [clientIdentity: unique value representing the client identity. Only provided if we did not supply a valid clientIdentity in the request.]
                 //}
                 if (!data.success) {
@@ -57,7 +60,7 @@ Dexie.Syncable.Remote.registerSyncProtocol("sample_protocol", {
                     // Since we got success, we also know that server accepted our changes:
                     onChangesAccepted();
                     // Convert the response format to the Dexie.Syncable.Remote.SyncProtocolAPI specification:
-                    applyRemoteChanges (data.changes, data.currentRevision);
+                    applyRemoteChanges (data.changes, data.currentRevision, false, data.needsResync);
                     onSuccess({ again: POLL_INTERVAL });
                     if ('clientIdentity' in data) {
                         context.clientIdentity = data.clientIdentity;

@@ -31,7 +31,7 @@
 
 */
 function ISyncProtocol() {
-    this.sync = function (context, url, options, changes, baseRevision, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
+    this.sync = function (context, url, options, changes, baseRevision, partial, syncedRevision, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
         /// <summary>
         ///		Syncronize changes between local and remote.
         /// </summary>
@@ -59,20 +59,37 @@ function ISyncProtocol() {
         ///     partial = true, your server should queue the changes and not commit them yet but wait until all changes have been sent (partial = false).
         /// </param>
         /// <param name="baseRevision">
-        ///		Server revision that the changes are based on. On initial sync, this value will be null. If having synced before, this will be the same value
-        ///     that were previously sent by the sync implementor to applyRemoteChanges(). baseRevision is persisted so even after a reboot, the last value
-        ///     will be remembered. Server revision can be of any JS type (such as Number, String, Array, Date or Object).
-        ///		Server should use this value to know if there are conflicts. If changes on the remote node was made after this revision,
+        ///		Server revision that the changes are based on. Should be used when resolving conflicts.
+        ///     On initial sync, this value will be null. If having synced before, this will one of the values that has been sent
+        ///     previously to applyRemoteChanges(), but not nescessarily the last value. baseRevision is persisted so it will survive a reboot.
+        /// 
+        ///     A revision can be of any JS type (such as Number, String, Array, Date or Object).
+        ///		Remote node should use this value to know if there are conflicts. If changes on the remote node was made after this revision,
         ///		and any of those changes modified the same properties on the same objects, it must be considered a conflict and
         ///		the remote node should resolve that conflict by choosing the remote node's version of the conflicting properties unless it is a conflict
         ///     where client has deleted an object that server has updated - then the deletion should win over the update. An implementation of this
         ///     rule is defined in WebSocketSyncServer.js: function resolveConflicts().
+        /// 
+        ///     The difference between baseRevision and syncedRevision is:
+        ///         * baseRevision: revision that given 'changes' array are based upon. Should be used by remote node when resolving conflicts.
+        ///         * syncedRevision: revision that local node has already applied. Should be used by remote node when filtering which changes to send to local node.
         /// </param>
         /// <param name="partial" type="Boolean">
         ///     If true, the changes only contains a part of the changes. The part might be cut in the middle of a transaction so the changes must
         ///     not be applied until another request comes in from same client with partial = false.
         ///     A sync server should store partial changes into a temporary storage until the same client sends a new
         ///     request with partial = false. For an example of how to hande this, see WebSocketSyncServer.js under samples/remote-sync/websocket.
+        /// </param>
+        /// <param name="syncedRevision">
+        ///		Server revision that local database is in sync with already. On initial sync, this value will be null. If having synced before, this will be the same value
+        ///     that were previously sent by the sync implementor to applyRemoteChanges(). syncedRevision is persisted so even after a reboot, the last value
+        ///     will be remembered. A revision can be of any JS type (such as Number, String, Array, Date or Object).
+        ///		Server should use this value to know which changes to send to client. Server should only send changes occurring after given syncedRevision.
+        ///     If changes on the remote node was made after this revision.
+        /// 
+        ///     The difference between baseRevision and syncedRevision is:
+        ///         * baseRevision: revision that given 'changes' array are based upon. Should be used by remote node when resolving conflicts.
+        ///         * syncedRevision: revision that local node has already applied. Should be used by remote node when filtering which changes to send to local node.
         /// </param>
         /// <param name="applyRemoteChanges" value="function (changes, lastRevision, partial, clear) {}">
         ///		Call this function whenever the response stream from the remote node contains new changes to apply.
