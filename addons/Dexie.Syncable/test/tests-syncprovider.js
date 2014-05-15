@@ -80,8 +80,15 @@
         db2.on('changes', function (changes, partial) {
             console.log("db2.on('changes'): changes.length: " + changes.length + "\tpartial: " + (partial ? "true" : "false"));
             changes.forEach(function (change) {
-                console.log(JSON.stringify(change));
+                //console.log(JSON.stringify(change));
                 db2.checkChange(change);
+            });
+        });
+
+        db.on('changes', function (changes, partial) {
+            console.log("db.on('changes'): changes.length: " + changes.length + "\tpartial: " + (partial ? "true" : "false"));
+            changes.forEach(function (change) {
+                if (db.checkChange) db.checkChange(change);
             });
         });
 
@@ -105,7 +112,47 @@
         db.friends.add({ name: "David" });
 
         waitFor(db2, { type: CREATE, name: "David" }).then(function () {
-            ok(true, "Got David");
+            ok(true, "The CREATE of friend 'David' was sent all the way to server and then back again to db2.");
+            db.friends.where('name').equals('David').modify({ name: "Ylva" });
+            return waitFor(db2, { type: UPDATE, name: "Ylva" });
+        }).then(function () {
+            ok(true, "The UPDATE of friend 'David' to 'Ylva' was sent all the way around as well");
+            return db.friends.where('name').equals('Ylva').first(function (friend) {
+                return friend.id;
+            })
+        }).then(function (id) {
+            db.friends.delete(id);
+            return waitFor(db2, { type: DELETE, key: id });
+        }).then(function () {
+            ok(true, "The DELETE of friend 'Ylva' was sent all the way around as well");
+            // Now send 1100 create requests
+            db2.transaction('rw', db2.pets, function (pets) {
+                for (var i = 0; i < 1100; ++i) {
+                    pets.add({name: "Josephina" + (i + 1), kind: "Dog"});
+                }
+            });
+            return waitFor(db, { type: CREATE, name: "Josephina1100" });
+        }).then(function () {
+            ok(true, "All 1100 dogs where sent all the way around (db2-->db this time)");
+            // Now check that db2 contains all dogs and that its _uncommittedChanges is emptied
+            return db.pets.count(function (count) {
+                equal(count, 1100, "DB2 has 1100 pets now");
+            });
+        }).then(function () {
+            return db._uncommittedChanges.count(function (count) {
+                equal(count, 0, "DB2 has no uncommitted changes anymore");
+            });
+        }).then(function () {
+            // Now send 1000 create this time (exact number of max changes per chunk)
+            db.transaction('rw', db.pets, function (pets) {
+                for (var i = 0; i < 1000; ++i) {
+                    pets.add({ name: "Tito" + (i + 1), kind: "Cat" });
+                }
+            });
+            return waitFor(db, { type: CREATE, name: "Tito1000" });
+        }).then(function () {
+            ok(true, "All 1000 cats where sent all the way around (db-->db2 this time)");
+
         }).finally(function () {
             console.log("Closing down");
             db.close();

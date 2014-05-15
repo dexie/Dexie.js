@@ -367,20 +367,21 @@
             }
 
             var partial = false;
-            var outSyncNode = mySyncNode; // Because mySyncNode can suddenly be set to null on database close, and worse, can be set to a new value if database is reopened.
-            var promise = db._changes.where("rev").above(outSyncNode.myRevision).limit(1000).toArray(function (changes) {
+            var ourSyncNode = mySyncNode; // Because mySyncNode can suddenly be set to null on database close, and worse, can be set to a new value if database is reopened.
+            if (!ourSyncNode) return Promise.reject("Database closed");
+            var promise = db._changes.where("rev").above(ourSyncNode.myRevision).limit(1000).toArray(function (changes) {
                 if (changes.length > 0) {
                     var lastChange = changes[changes.length - 1];
                     partial = (changes.length == 1000); // Same as limit.
                     db.on('changes').fire(changes, partial);
-                    outSyncNode.myRevision = lastChange.rev;
+                    ourSyncNode.myRevision = lastChange.rev;
                 } else if (wasPartial) {
                     // No more changes, BUT since we have triggered on('changes') with partial = true,
                     // we HAVE TO trigger changes again with empty list and partial = false
                     db.on('changes').fire([], false);
                 }
 
-                return db.table("_syncNodes").update(outSyncNode, {
+                return db.table("_syncNodes").update(ourSyncNode, {
                     lastHeartBeat: Date.now(),
                     deleteTimeStamp: null // Reset "deleteTimeStamp" flag if it was there.
                 });
@@ -395,7 +396,7 @@
 
                 // Check if more changes have come since we started reading changes in the first place. If so, relaunch readChanges and let the ongoing promise not
                 // resolve until all changes have been read.
-                if (partial || Dexie.Observable.latestRevision[db.name] > outSyncNode.myRevision) {
+                if (partial || Dexie.Observable.latestRevision[db.name] > ourSyncNode.myRevision) {
                     // Either there were more than 1000 changes or additional changes where added while we were reading these changes,
                     // In either case, call readChanges() again until we're done.
                     return readChanges(Dexie.Observable.latestRevision[db.name], true, partial);
