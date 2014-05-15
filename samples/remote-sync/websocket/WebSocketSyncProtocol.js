@@ -13,7 +13,7 @@
     // Constants:
     var RECONNECT_DELAY = 5000; // Reconnect delay in case of errors such as network down.
 
-    Dexie.Syncable.Remote.registerSyncProtocol("websocket", {
+    Dexie.Syncable.registerSyncProtocol ("websocket", {
 
         sync: function (context, url, options, changes, baseRevision, partial, syncedRevision, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
 

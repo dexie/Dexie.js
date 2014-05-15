@@ -87,12 +87,12 @@
         setTimeout(function () {
             try {
                 if (EmulatedWebSocketServerFactory.listeners[uri.port]) {
-                    var server = EmulatedWebSocketServerFactory[uri.port];
+                    var server = EmulatedWebSocketServerFactory.listeners[uri.port];
                     var conn = server._connect(self);
+                    self.conn = conn;
                     if (self.onopen) {
                         self.onopen({ target: self });
                     }
-                    self.conn = conn;
                 } else {
                     throw "Could not connect";
                 }

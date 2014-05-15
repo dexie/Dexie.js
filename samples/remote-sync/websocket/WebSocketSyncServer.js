@@ -53,7 +53,7 @@
                     type: CREATE,
                     table: table,
                     key: key,
-                    obj: value
+                    obj: obj
                 });
                 db.trigger();
             },
@@ -141,9 +141,9 @@
 
                 function sendAnyChanges() {
                     // Get all changes after syncedRevision that was not performed by the client we're talkin' to.
-                    var changes = db.changes.filter(function (change) { return change.rev > syncedRevision && change.source !== clientIdentity; });
+                    var changes = db.changes.filter(function (change) { return change.rev > syncedRevision && change.source !== conn.clientIdentity; });
                     // Compact changes so that multiple changes on same object is merged into a single change.
-                    var reducedSet = reduceChanges(changes, clientIdentity);
+                    var reducedSet = reduceChanges(changes, conn.clientIdentity);
                     // Convert the reduced set into an array again.
                     var reducedArray = Object.keys(reducedSet).map(function (key) { return reducedSet[key]; });
                     // Notice the current revision of the database. We want to send it to client so it knows what to ask for next time.
