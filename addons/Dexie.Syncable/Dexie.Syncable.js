@@ -257,6 +257,7 @@
 
                 function disconnectProvider() {
                     if (connectedContinuation) {
+
                         if (connectedContinuation.react) {
                             try {
                                 // react pattern must provide a disconnect function.
@@ -303,7 +304,8 @@
                     var changesWaiting, // Boolean
                         isWaitingForServer; // Boolean
 
-                    db.on('changes', function () {
+
+                    function onChanges() {
                         if (connectedContinuation) {
                             onStatusChanged.fire(Dexie.Syncable.Statuses.SYNCING);
                             if (isWaitingForServer)
@@ -311,6 +313,16 @@
                             else {
                                 reactToChanges();
                             }
+                        }
+                    }
+
+                    db.on('changes', onChanges);
+
+                    // Override disconnectProvider to also unsubscribe to onChanges.
+                    disconnectProvider = override(disconnectProvider, function (origFunc) {
+                        return function () {
+                            db.on.changes.unsubscribe(onChanges);
+                            return origFunc.apply(this, arguments);
                         }
                     });
 
