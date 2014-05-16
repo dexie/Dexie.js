@@ -6,7 +6,6 @@
     asyncTest("testWebSocketSyncServer", function () {
         var server = new SyncServer(1234);
         server.start();
-        server.stop();
         
         var ws = new WebSocket("http://dummy:1234");
         ws.onopen = function () {
