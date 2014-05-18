@@ -205,10 +205,10 @@
                                     node.syncContext,
                                     url,
                                     options,
-                                    changes,
                                     remoteBaseRevision,
-                                    partial,
                                     node.appliedRemoteRevision,
+                                    changes,
+                                    partial,
                                     applyRemoteChanges,
                                     onChangesAccepted,
                                     resolve,
@@ -359,7 +359,7 @@
                     function syncAgain () {
                         getLocalChangesForNode(node, function (changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
 
-                            protocolInstance.sync(node.syncContext, url, options, changes, remoteBaseRevision, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError);
+                            protocolInstance.sync(node.syncContext, url, options, remoteBaseRevision, node.appliedRemoteRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError);
 
                             function onChangesAccepted() {
                                 db._syncNodes.update(node, nodeModificationsOnAck);

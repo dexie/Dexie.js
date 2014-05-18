@@ -15,7 +15,7 @@
 
     Dexie.Syncable.registerSyncProtocol ("websocket", {
 
-        sync: function (context, url, options, changes, baseRevision, partial, syncedRevision, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
+        sync: function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
 
 
             // The following vars are needed because we must know which callback to ack when server sends it's ack to us.

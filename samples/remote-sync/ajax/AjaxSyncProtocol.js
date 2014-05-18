@@ -6,7 +6,7 @@
 
 Dexie.Syncable.Remote.registerSyncProtocol("sample_protocol", {
 
-    sync: function (context, url, options, changes, baseRevision, partial, syncedRevision, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
+    sync: function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
         /// <param name="context" type="IPersistedContext"></param>
         /// <param name="url" type="String"></param>
         /// <param name="changes" type="Array" elementType="IDatabaseChange"></param>

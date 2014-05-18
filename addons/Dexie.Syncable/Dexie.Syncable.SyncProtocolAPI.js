@@ -27,11 +27,11 @@
    WebSocket gateway between the client and the backend database. The gateway can act as a controller and make sure any changes
    are registered in the 'changes' table and that the API provides a sync() method to interchange changes between client and server.
 
-   An example of an ISyncProtocol instance is found in https://github.com/dfahlander/Dexie.js/tree/master/samples/remote-sync/Dexie.Syncbl
+   An example of an ISyncProtocol instance is found in https://github.com/dfahlander/Dexie.js/tree/master/samples/remote-sync/Dexie.Syncable.js
 
 */
 function ISyncProtocol() {
-    this.sync = function (context, url, options, changes, baseRevision, partial, syncedRevision, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
+    this.sync = function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
         /// <summary>
         ///		Syncronize changes between local and remote.
         /// </summary>
@@ -47,16 +47,6 @@ function ISyncProtocol() {
         /// <param name="options" type="Object">
         ///		Information needed in order to interact with server. Example of options are timeout settings, poll intervals,
         ///     authentication credentials, etc. The options are implementation specific.
-        /// </param>
-        /// <param name="changes" type="Array" elementType="IDatabaseChange">
-        ///		Local changes to sync to remote node. This array will contain changes that has occured locally since last sync.
-        ///		If this is the initial sync, framework will want to upload the entire local database to the server.
-        ///     If initial sync or if having been offline for a while, local database might contain much changes to send.
-        ///		Of those reasons, it is not guaranteed that ALL client changes are delivered in this first call to sync(). If number of changes are 'enormous',
-        ///     the framework may choose to only apply a first chunk of changes and when onSuccess() is called by your implementation, framework will send
-        ///     the remaining changes by calling sync() again, or continuation.react depending on the continuation method given in the call to onSuccess().
-        ///     The argument 'partial' will tell whether all changes are sent or if it is only a partial change set. See parameter 'partial'. Note that if
-        ///     partial = true, your server should queue the changes and not commit them yet but wait until all changes have been sent (partial = false).
         /// </param>
         /// <param name="baseRevision">
         ///		Server revision that the changes are based on. Should be used when resolving conflicts.
@@ -74,12 +64,6 @@ function ISyncProtocol() {
         ///         * baseRevision: revision that given 'changes' array are based upon. Should be used by remote node when resolving conflicts.
         ///         * syncedRevision: revision that local node has already applied. Should be used by remote node when filtering which changes to send to local node.
         /// </param>
-        /// <param name="partial" type="Boolean">
-        ///     If true, the changes only contains a part of the changes. The part might be cut in the middle of a transaction so the changes must
-        ///     not be applied until another request comes in from same client with partial = false.
-        ///     A sync server should store partial changes into a temporary storage until the same client sends a new
-        ///     request with partial = false. For an example of how to hande this, see WebSocketSyncServer.js under samples/remote-sync/websocket.
-        /// </param>
         /// <param name="syncedRevision">
         ///		Server revision that local database is in sync with already. On initial sync, this value will be null. If having synced before, this will be the same value
         ///     that were previously sent by the sync implementor to applyRemoteChanges(). syncedRevision is persisted so even after a reboot, the last value
@@ -90,6 +74,22 @@ function ISyncProtocol() {
         ///     The difference between baseRevision and syncedRevision is:
         ///         * baseRevision: revision that given 'changes' array are based upon. Should be used by remote node when resolving conflicts.
         ///         * syncedRevision: revision that local node has already applied. Should be used by remote node when filtering which changes to send to local node.
+        /// </param>
+        /// <param name="changes" type="Array" elementType="IDatabaseChange">
+        ///		Local changes to sync to remote node. This array will contain changes that has occured locally since last sync.
+        ///		If this is the initial sync, framework will want to upload the entire local database to the server.
+        ///     If initial sync or if having been offline for a while, local database might contain much changes to send.
+        ///		Of those reasons, it is not guaranteed that ALL client changes are delivered in this first call to sync(). If number of changes are 'enormous',
+        ///     the framework may choose to only apply a first chunk of changes and when onSuccess() is called by your implementation, framework will send
+        ///     the remaining changes by calling sync() again, or continuation.react depending on the continuation method given in the call to onSuccess().
+        ///     The argument 'partial' will tell whether all changes are sent or if it is only a partial change set. See parameter 'partial'. Note that if
+        ///     partial = true, your server should queue the changes and not commit them yet but wait until all changes have been sent (partial = false).
+        /// </param>
+        /// <param name="partial" type="Boolean">
+        ///     If true, the changes only contains a part of the changes. The part might be cut in the middle of a transaction so the changes must
+        ///     not be applied until another request comes in from same client with partial = false.
+        ///     A sync server should store partial changes into a temporary storage until the same client sends a new
+        ///     request with partial = false. For an example of how to hande this, see WebSocketSyncServer.js under samples/remote-sync/websocket.
         /// </param>
         /// <param name="applyRemoteChanges" value="function (changes, lastRevision, partial, clear) {}">
         ///		Call this function whenever the response stream from the remote node contains new changes to apply.
