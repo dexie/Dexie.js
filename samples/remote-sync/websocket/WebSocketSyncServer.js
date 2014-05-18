@@ -367,7 +367,7 @@
                         resolved.push(clientChange);
                         break;
                 }
-            }
+            } // else if serverChange.type is CREATE or DELETE, dont push anything to resolved, because the client change is not of any interest (CREATE or DELETE would eliminate any client change with same key!)
         });
         return resolved;
     }
