@@ -27,7 +27,9 @@
    WebSocket gateway between the client and the backend database. The gateway can act as a controller and make sure any changes
    are registered in the 'changes' table and that the API provides a sync() method to interchange changes between client and server.
 
-   An example of an ISyncProtocol instance is found in https://github.com/dfahlander/Dexie.js/tree/master/samples/remote-sync/Dexie.Syncable.js
+   Two examples of a ISyncProtocol instances are found in:
+       https://github.com/dfahlander/Dexie.js/tree/master/samples/remote-sync/ajax/AjaxSyncProtocol.js
+       https://github.com/dfahlander/Dexie.js/tree/master/samples/remote-sync/websocket/WebSocketSyncProtocol.js
 
 */
 function ISyncProtocol() {
