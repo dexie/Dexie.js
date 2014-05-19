@@ -1188,7 +1188,7 @@
             }
 
             function getSortedSet(args) {
-                return Array.prototype.slice.call(Array.isArray(args[0]) ? args[0] : args, 0).sort();
+                return Array.prototype.slice.call(Array.isArray(args[0]) ? args[0] : args, 0).sort(ascending);
             }
 
             function upperFactory(dir) {

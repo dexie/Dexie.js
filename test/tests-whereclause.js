@@ -93,6 +93,14 @@
         }).finally(start);
     });
 
+    asyncTest("anyOf(integerArray)", function () {
+        // Testing bug #11 Integer Indexes in anyOf handled incorrectly
+        db.files.where('id').anyOf([2, 11]).toArray(function (a) {
+            equal(a.length, 1, "Should be only one found entry");
+            equal(a[0].id, 2, "Item no 2 should be found");
+        }).finally(start);
+    });
+
     asyncTest("equalsIgnoreCase()", function () {
 
         db.files.where("filename").equalsIgnoreCase("hello").toArray(function (a) {
