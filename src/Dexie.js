@@ -72,10 +72,11 @@
         function init() {
             // If browser (not node.js or other), subscribe to versionchange event and reload page
             if (isBrowser) db.on("versionchange", function (ev) {
-                if (ev.newVersion && ev.newVersion > dbVersion) { // Only reload page if versionchange event isnt a deletion of db. Or if it's triggered with same verno as we already have due to delete/recreate calls.
+                // Let's not block the other window from making it's delete() or open() call.
+                db.close();
+                if (ev.newVersion) { // Only reload page if versionchange event isnt a deletion of db.
                     // Default behavior for versionchange event is to reload the page.
                     // Caller can override this behavior by doing db.on("versionchange", function(){ return false; });
-                    db.close();
                     window.location.reload(true);
                     /* The logic behind this default handler is:
                         1. Since this event means that the db is upgraded in another IDBDatabase instance (in tab or window that has a newer version of the code),
@@ -620,7 +621,7 @@
         //
         // Events
         //
-        this.on = events(this, "error", "populate", "blocked", "versionchange", {"ready": [promisableChain, nop]});
+        this.on = events(this, "error", "populate", "blocked", { "ready": [promisableChain, nop], "versionchange": [reverseStoppableEventChain, nop] });
 
         fakeAutoComplete(function () {
             db.on("populate").fire(db._createTransaction(READWRITE, dbStoreNames, globalSchema));
@@ -2339,6 +2340,14 @@
         return function () {
             if (f1.apply(this, arguments) === false) return false;
             return f2.apply(this, arguments);
+        }
+    }
+
+    function reverseStoppableEventChain(f1, f2) {
+        if (f1 === nop) return f2;
+        return function () {
+            if (f2.apply(this, arguments) === false) return false;
+            return f1.apply(this, arguments);
         }
     }
 
