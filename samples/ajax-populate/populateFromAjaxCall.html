@@ -17,79 +17,75 @@
     </script>
     <script>
 
-    var db = new Dexie('someDB');
-    db.version(1).stores({ someTable: "++id,someIndex" });
+        var db = new Dexie('someDB');
+        db.version(3).stores({
+            someTable: "++id,someIndex"
+        });
 
-    db.on('populate', function (transaction) {
-        console.log("First time initialization");
-
-        // Instead of using given transaction, let's subscribe
-        // to the on('ready') event where it's legal to call other asynchronic API:s
-        // and still let the framework wait for those calls to complete.
-
-        db.on('ready', function onReady() {
+        // Populate from AJAX:
+        db.on('ready', function () {
             // on('ready') event will fire when database is open but before any
             // other queued operations start executing.
-            // By returning a Promise in this event,
+            // By returning a Promise from this event,
             // the framework will wait until promise completes before
             // resuming any queued database operations.
-            return new Dexie.Promise(function (resolve, reject) {
-                $.ajax(url, {
-                    type: 'get',
-                    dataType: 'json',
-                    error: function (xhr, textStatus) {
-                        reject(textStatus);
-                    },
-                    success: resolve
-                });
-
-                // Make sure to remove us in case db fails and same instance
-                // is being used again to open DB.
-                db.on('ready').unsubscribe(onReady);
-
-            }).then(function (data) {
-                // When ajax request resolves, start populating data and return
-                // the Transaction promise so that db.open() will resolve after this
-                // transaction has committed.
-                return db.transaction('rw', db.someTable, function (someTable) {
-                    data.someInitArrayOfObjects.forEach(function (item) {
-                        someTable.add(item);
+            // Let's start by counting the number of objects in our table.
+            return db.someTable.count(function (count) {
+                if (count > 0) {
+                    console.log("Already populated");
+                } else {
+                    console.log("Database is empty. Populating from ajax call...");
+                    // We want framework to continue waiting, so we encapsulate the ajax call
+                    // in a Dexie.Promise that we return here.
+                    return new Dexie.Promise(function (resolve, reject) {
+                        $.ajax(url, {
+                            type: 'get',
+                            dataType: 'json',
+                            error: function (xhr, textStatus) {
+                                reject(textStatus); // Rejecting promise to make db.open() fail.
+                            },
+                            success: function (data) {
+                                resolve(data); // Resolving Promise will launch then() below.
+                            }
+                        });
+                    }).then(function (data) {
+                        console.log("Got ajax response. We'll now add the objects.");
+                        // By returning the db.transaction() promise, framework will keep
+                        // waiting for this transaction to commit before resuming other
+                        // db-operations.
+                        return db.transaction('rw', db.someTable, function (someTable) {
+                            data.someInitArrayOfObjects.forEach(function (item) {
+                                console.log("Adding object: " + JSON.stringify(item));
+                                someTable.add(item);
+                            });
+                        });
+                    }).then(function () {
+                        console.log ("Transaction committed");
                     });
-                });
-            }).catch(function (err) {
-                // Ajax error or other error. Reject our promise! This will make db.open() 
-                // fail as well as any queued db operation.
-
-                // Also delete the database since it would otherwise
-                // just contain an empty database with no populated data.
-                // If not deleting DB here, on('populate') would never fire again.
-
-                db.delete();
-                return Dexie.Promise.reject(err);
+                }
             });
         });
-    });
 
-    db.open(); // Will resolve when data is fully populated (or fail if error)
+        db.open(); // Will resolve when data is fully populated (or fail if error)
 
-    // Following operation will be queued until we're finished populating data:
-    db.someTable.each(function (obj) {
-        // When we come here, data is fully populated and we can log all objects.
-        console.log(JSON.stringify(obj));
-    }).then(function () {
-        console.log("Finished");
-        //db.delete();
-    }).catch(function (error) {
-        // In our each() callback above fails, OR db.open() fails due to any reason,
-        // including our ajax call failed, this operation will fail and we will get
-        // the error here!
-        console.error(error.stack || error);
-        // Note that we could also have catched it on db.open() but in this sample,
-        // we show it here.
-    });
+        // Following operation will be queued until we're finished populating data:
+        db.someTable.each(function (obj) {
+            // When we come here, data is fully populated and we can log all objects.
+            console.log("Found object: " + JSON.stringify(obj));
+        }).then(function () {
+            console.log("Finished.");
+        }).catch(function (error) {
+            // In our each() callback above fails, OR db.open() fails due to any reason,
+            // including our ajax call failed, this operation will fail and we will get
+            // the error here!
+            console.error(error.stack || error);
+            // Note that we could also have catched it on db.open() but in this sample,
+            // we show it here.
+        });
     </script>
 </head>
 <body>
-    To see what happens, please open your console log (F12 --> Console in IE/Chrome/Firefox). Opera: Open Web Inspector --> Console.
+    To see what happens, please open your console log (F12 --> Console in IE/Chrome/Firefox). Opera: Open Web Inspector --> Console.<br />
+    <button onclick="db.delete().then(function(){window.location.reload()});">Delete Database and reload page</button>
 </body>
 </html>

@@ -536,7 +536,11 @@
                             var res = db.on.ready.fire();
                             if (res && typeof res.then == 'function') {
                                 // If on('ready') returns a promise, wait for it to complete and then resume any pending operations.
-                                res.then(resume, openError);
+                                res.then(resume, function (err) {
+                                    idbdb.close();
+                                    idbdb = null;
+                                    openError(err);
+                                });
                             } else {
                                 asap(resume); // Cannot call resume directly because then the pauseResumables would inherit from our PSD scope.
                             }
