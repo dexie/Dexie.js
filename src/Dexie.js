@@ -51,7 +51,6 @@
 
         var DOMError = deps.DOMError,
             TypeError = deps.TypeError,
-            RangeError = deps.RangeError,
             Error = deps.Error;
 
         var globalSchema = this._dbSchema = null;
@@ -658,6 +657,18 @@
                             return tableInstance.name;
                         }
                     });
+                    // Check that caller doesnt specify same table twice!
+                    // Important because of a Mozilla Firefox bug:
+                    //   If same storeName occurs twice in a call to IDBDatabase.transaction(),
+                    //   the database will turn into a stalled state forever, or until browser is restarted:
+                    if (storeNames.length > 1) for (var i = 0, l = storeNames.length; i < l; ++i) {
+                        var storeName = storeNames[i];
+                        for (var j = 0; j < storeNames.length; ++j) {
+                            if (j !== i && storeNames[j] == storeName) {
+                                throw new Error("Duplicate Store Name " + storeName + " in call to transaction()");
+                            }
+                        }
+                    }
 
                     //
                     // Resolve mode. Allow shortcuts "r" and "rw".
@@ -667,7 +678,7 @@
                     else if (mode == "rw" || mode == READWRITE)
                         mode = READWRITE;
                     else
-                        throw new RangeError("Invalid transaction mode");
+                        throw new Error("Invalid transaction mode");
 
                     //
                     // Create Transaction instance
@@ -2113,7 +2124,7 @@
             for (var i = 0, len = this._deferreds.length; i < len; i++) {
                 handle.call(this, this._deferreds[i]);
             }
-            this._deferreds = null; // ok because _deferreds can impossibly be accessed anymore (reject or resolve will never be called again, and handle() will not touch it since _state !== null.
+            this._deferreds = [];
         }
 
         function Deferred(onFulfilled, onRejected, resolve, reject) {
@@ -2695,7 +2706,6 @@
         Error: window.Error || String,
         SyntaxError: window.SyntaxError || String,
         TypeError: window.TypeError || String,
-        RangeError: window.RangeError || String,
         DOMError: window.DOMError || String
     }
 

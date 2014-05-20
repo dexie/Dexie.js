@@ -146,7 +146,7 @@
         }).finally(start);
     });
     asyncTest("limit(),orderBy(),modify(), abort(), reverse()", function () {
-        db.transaction("rw", db.users, db.users, function (users) {
+        db.transaction("rw", db.users, function (users) {
             // Modify first found user with a helloMessage
             users.orderBy("first").reverse().limit(1).modify(function (user) {
                 user.helloMessage = "Hello " + user.first;
