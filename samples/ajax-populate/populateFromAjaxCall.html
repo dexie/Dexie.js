@@ -8,8 +8,8 @@
         var $ = {
             ajax: function (url, params) {
                 setTimeout(function () {
-                    params.error({}, "Oj vad fel det blev");
-                    //params.success({ someInitArrayOfObjects: [{ someIndex: "item1" }, { someIndex: "item2" }] });
+                    //params.error({}, "Oj vad fel det blev");
+                    params.success({ someInitArrayOfObjects: [{ someIndex: "item1" }, { someIndex: "item2" }] });
                 }, 1);
             }
         };
@@ -78,6 +78,7 @@
         console.log(JSON.stringify(obj));
     }).then(function () {
         console.log("Finished");
+        //db.delete();
     }).catch(function (error) {
         // In our each() callback above fails, OR db.open() fails due to any reason,
         // including our ajax call failed, this operation will fail and we will get
