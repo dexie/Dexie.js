@@ -39,7 +39,7 @@
                         close: function (code, reason) {
                             setTimeout(function () {
                                 conn._client._disconnect(code, reason);
-                            });
+                            }, 0);
                         },
                         _disconnect: function (code, reason) {
                             conn._fire("close", [code, reason]);

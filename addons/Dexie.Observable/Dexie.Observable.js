@@ -35,7 +35,8 @@
         syncProtocol: String,       // Tells which implementation of ISyncProtocol to use for remote syncing. 
         syncContext: null,
         syncOptions: Object,
-        connected: false,
+        connected: false, // FIXTHIS: Remove! Replace with status.
+        status: Number,
         appliedRemoteRevision: null,
         remoteBaseRevisions: [{ local: Number, remote: null }],
         dbUploadState: {
@@ -99,7 +100,7 @@
             return function (stores, dbSchema) {
                 // Create the _changes and _syncNodes tables
                 stores["_changes"] = "++rev";
-                stores["_syncNodes"] = "++id,myRevision,lastHeartBeat,url,isMaster";
+                stores["_syncNodes"] = "++id,myRevision,lastHeartBeat,url,isMaster,type,status";
                 stores["_intercomm"] = "++id,destinationNode";
                 stores["_uncommittedChanges"] = "++id,node"; // For remote syncing when server returns a partial result.
                 // Call default implementation. Will populate the dbSchema structures.

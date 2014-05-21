@@ -53,9 +53,9 @@
         server.start();
 
         // Connect our db client to it
-        var syncer = db.sync("websocket", "http://dummy:5000");
+        var syncer = db.syncable.connect("websocket", "http://dummy:5000");
         console.log("Sync called. Current status: " + Dexie.Syncable.StatusTexts[syncer.status]);
-        syncer.statusChanged(function (newStatus) {
+        db.syncable.on('statusChanged', function (newStatus, url) {
             console.log("Sync State Changed: " + Dexie.Syncable.StatusTexts[newStatus]);
         });
 
@@ -69,7 +69,7 @@
             pets: "$$id"
         });
 
-        db2.sync("websocket", "http://dummy:5000");
+        db2.syncable.connect("websocket", "http://dummy:5000");
         db2.open().then(function () {
             console.log("db2 opened");
         });

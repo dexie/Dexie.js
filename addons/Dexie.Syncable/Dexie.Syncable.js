@@ -9,13 +9,16 @@
 
     Dexie.Syncable = function (db) {
     	/// <param name="db" type="Dexie"></param>
-        var syncPromises = [];
-        var syncProviders = [];
-        var remoteProviders = [];
+        var activePeers = [];
+        var weAreMaster = false;
 
+        // Change Types
         var CREATE = 1,
             UPDATE = 2,
             DELETE = 3;
+
+        // Statuses
+        var Statuses = Dexie.Syncable.Statuses;
 
         var MAX_CHANGES_PER_CHUNK = 1000;
 
@@ -30,128 +33,152 @@
             return db._syncNodes.update(this.nodeID, { syncContext: this });
         }
 
-        var weAreMaster = false;
+        db.on('message', function onMessage(msg) {
+            // Message from other local node arrives...
+            if (msg.type == 'connect') {
+                // We are master node and another non-master node wants us to do the connect.
+                db.syncable.connect(msg.protocolName, msg.url, msg.options).then(msg.resolve, msg.reject);
+            } else if (msg.type == 'syncStatusChanged') {
+                // We are client and a master node informs us about syncStatus change.
+                // Lookup the connectedProvider and call its event
+                db.syncable.on.statusChanged.fire(msg.newStatus, msg.url);
+            }
+        });
 
-        db.on('ready', function () {
-            db.on('message', function (msg) {
-                if (msg.type == 'sync') {
-                    // We are master node and another non-master node wants us to do the sync.
-                    var promise = db.sync(msg.protocolName, msg.url, msg.options);
-                    promise.then(msg.resolve, msg.reject);
-                } else if (msg.type == 'syncStatusChanged') {
-                    // We are client and a master node informs us about syncStatus change.
-                    // Lookup the connectedProvider and call its event
-                    var remoteProvider = remoteProviders.filter(function (providerHandle) { return providerHandle.url === msg.url && providerHandle.protocolName === msg.protocolName })[0];
-                    if (remoteProvider) {
-                        remoteProvider._onStatusChanged.fire(msg.newStatus);
-                    }
-                }
-            });
+        db.on('ready', function onReady() {
+            // Store whether we are master or not.
+            // Need to have it stored on order to detect if we become master in on('cleanup');
+            weAreMaster = db._localSyncNode.isMaster;
+        });
 
-            weAreMaster = db._localSyncNode.isMaster; // Store this value to be able to detect if we become master
+        db.on('cleanup', function (nodes, changes, intercomm, trans) {
+            /// <param name="nodes" type="db.WriteableTable"></param>
+            /// <param name="changes" type="db.WriteableTable"></param>
+            /// <param name="intercomm" type="db.WriteableTable"></param>
+            /// <param name="trans" type="db.Transaction"></param>
 
-            db.on('cleanup', function (nodes, changes, intercomm, trans) {
-                /// <param name="nodes" type="db.WriteableTable"></param>
-                /// <param name="changes" type="db.WriteableTable"></param>
-                /// <param name="intercomm" type="db.WriteableTable"></param>
-                /// <param name="trans" type="db.Transaction"></param>
-                if (db._localSyncNode && !weAreMaster && db._localSyncNode.isMaster) {
-                    // We took over the master role in Observable's cleanup method
-                    weAreMaster = true;
-                    nodes.filter(function (node) { return node.type == 'remote' && node.connected }).each(function (connectedRemoteNode) {
+            // A cleanup (done in Dexie.Observable) may result in that a master node is removed and we become master.
+            if (db._localSyncNode && !weAreMaster && db._localSyncNode.isMaster) {
+                // We took over the master role in Observable's cleanup method
+                weAreMaster = true;
+                nodes.where('type').equals('remote')
+                    .and(function (node) { return node.status !== Statuses.OFFLINE && node.status !== Statuses.ERROR; })
+                    .each(function (connectedRemoteNode) {
                         // There are connected remote nodes that we must take over
                         setTimeout(function () {
-                            db.sync(connectedRemoteNode.syncProtocol, connectedRemoteNode.url, connectedRemoteNode.syncOptions);
+                            db.syncable.connect(connectedRemoteNode.syncProtocol, connectedRemoteNode.url, connectedRemoteNode.syncOptions);
                         }, 0);
                     });
-                }
-            });
+            }
+        });
+
+        db.on('ready', function onReady() {
+            // Again, in onReady: If we ARE master, make sure to connect to remote servers that is in a connected state.
+            if (weAreMaster) {
+                // Make sure to connect to remote servers that is in a connected state (NOT OFFLINE or ERROR!)
+                return db._syncNodes.where('type').equals('remote')
+                    .and(function (node) { return node.status !== Statuses.OFFLINE && node.status !== Statuses.ERROR; })
+                    .toArray(function (connectedRemoteNodes) {
+                        // There are connected remote nodes that we must take over
+                        if (connectedRemoteNodes.length > 0) {
+                            return Promise.all(connectedRemoteNodes.map(function (node) {
+                                return db.syncable.connect(node.syncProtocol, node.url, node.syncOptions)
+                                    .catch(function () { }); // If a node fails to connect, don't make db.open() reject. Accept it!
+                            }));
+                        }
+                    });
+            }
         });
 
 
-        db.sync = function (protocolName, url, options) {
-            var existingPromise = syncPromises.filter(function (syncPromise) { return syncPromise.protocolName == protocolName && syncPromise.url == url; });
-            if (existingPromise.length > 0) {
-                // Never create multiple syncNodes with same protocolName and url. Instead, let the next call to sync() return the same promise that
-                // have already been started and eventually also resolved. If promise has already resolved (node connected), calling existing promise.then() will give a callback directly.
-                return existingPromise[0];
-            }
+        db.syncable = {};
 
+        db.syncable.getStatus = function (url, cb) {
+            return db._syncNodes.where('url').equals(url).first(function (node) {
+                return node.status;
+            }).then(cb);
+        }
+
+        db.syncable.list = function () {
+            return db._syncNodes.where('type').equals('remote').toArray(function (a) {
+                return a.map(function (node) { return node.url; });
+            });
+        }
+
+        db.syncable.on = Dexie.events(db, { statusChanged: "asap" });
+
+
+        db.syncable.connect = function (protocolName, url, options) {
+            options = options || {}; // Make sure options is always an object because 1) Provider expects it to be. 2) We'll be persisting it and you cannot persist undefined.
             var protocolInstance = Dexie.Syncable.registeredProtocols[protocolName];
-
-            var promise = null;
 
             if (protocolInstance) {
                 if (db.isOpen() && db._localSyncNode) {
+                    // Database is open
                     if (db._localSyncNode.isMaster) {
-                        promise = sync(protocolInstance, protocolName, url, options, db._localSyncNode.id);
+                        // We are master node
+                        return connect(protocolInstance, protocolName, url, options, db._localSyncNode.id);
                     } else {
-                        // Request master node to do the sync:
-                        promise = db._syncNodes.where('isMaster').above(0).first(function (masterNode) {
+                        // We are not master node
+                        // Request master node to do the connect:
+                        return db._syncNodes.where('isMaster').above(0).first(function (masterNode) {
                             // There will always be a master node. In theory we may self have become master node when we come here. But that's ok. We'll request ourselves.
-                            return db.sendMessage('sync', { protocolName: protocolName, url: url, options: options }, masterNode.id, true);
-                        });
-                        promise.protocolName = protocolName;
-                        promise.url = url;
-                        remoteProviders.push(promise);
-                        promise.catch(function (err) {
-                            remoteProviders.splice(remoteProviders.indexOf(promise), 1);
+                            return db.sendMessage('connect', { protocolName: protocolName, url: url, options: options }, masterNode.id, true);
                         });
                     }
                 } else {
-                    promise = new Promise(function (resolve, reject) {
+                    // Database not yet open
+                    // Wait for it to open
+                    return new Promise(function (resolve, reject) {
                         db.on("ready", function syncWhenReady() {
                             db.on.ready.unsubscribe(syncWhenReady);
-                            var thePromise = db.sync(protocolName, url, options);
-                            thePromise.statusChanged(promise._onStatusChanged.fire);
-                            thePromise.then(function (result) {
-                                resolve (result);
-                            }).catch(function (error) {
-                                // Reject the promise returned to the caller of sync():
-                                reject(error);
-                                // but resolve the promise that db.on("ready") waits for, because database should succeed to open even if the sync operation fails!
+                            return db.syncable.connect(protocolName, url, options).catch(function (err) {
+                                // Reject the promise returned to the caller of db.syncable.connect():
+                                reject(err);
+                                // but resolve the promise that db.on("ready") waits for, because database should succeed to open even if the connect operation fails!
                             });
-                            thePromise.statusChanged(promise._onStatusChanged.fire);
                         });
                     });
                 }
             } else {
                 throw new Error("ISyncProviderFactory " + protocolName + " is not registered in Dexie.Syncable.registerSyncProtocol()");
+                return new Promise(); // For code completion
             }
-            // Add a 'status' event to the returned promise.
-            var onStatusChanged = Dexie.events(null, { status: 'asap' }).status;
-            promise._onStatusChanged = onStatusChanged;
-            promise.status = Dexie.Syncable.Statuses.OFFLINE;
-            promise.statusChanged = onStatusChanged.subscribe;
-            promise.statusChanged(function (newStatus) {
-                if (!db.isOpen()) return; // In case db has closed we should not do any broadcasting because it wouldnt work.
-                promise.status = newStatus;
-                // Also broadcast message to other nodes about the status
-                db.broadcastMessage("syncStatusChanged", { newStatus: newStatus, url: url, protocolName: protocolName }, false);
-            });
-
-            return promise;
         }
 
-        //Dexie.Observable.SyncNode.prototype.get
-
-        function sync (protocolInstance, protocolName, url, options, dbAliveID) {
+        function connect (protocolInstance, protocolName, url, options, dbAliveID) {
             /// <param name="protocolInstance" type="ISyncProtocol"></param>
-            var syncPromise = getOrCreateSyncNode().then(function (node) {
+            var existingPeer = activePeers.filter(function (peer) { return peer.url == url; });
+            if (existingPeer.length > 0) {
+                // Never create multiple syncNodes with same protocolName and url. Instead, let the next call to connect() return the same promise that
+                // have already been started and eventually also resolved. If promise has already resolved (node connected), calling existing promise.then() will give a callback directly.
+                return existingPeer[0].connectPromise;
+            }
+
+            var connectPromise = getOrCreateSyncNode().then(function (node) {
                 return connectProtocol(node);
             });
-            var rejectSyncPromise = null;
-            syncPromise.protocolName = protocolName;
-            syncPromise.url = url;
-            syncPromises.push(syncPromise);
-            syncPromise.catch(function (e) {
-                // If syncPromise fails, remove the promise from syncPromises so that another call to sync() tries to sync again.
-                // But if promise is resolved, leave it in syncPromises so that another db.sync() call will resolve immediately when promise is online.
-                syncPromises.splice(syncPromises.indexOf(syncPromise), 1);
-                return Promise.reject(e);
-            });
 
-            return syncPromise;
+            var rejectConnectPromise = null;
+            var disconnected = false;
+            var activePeer = {
+                url: url,
+                status: Dexie.Syncable.Statuses.OFFLINE,
+                connectPromise: connectPromise,
+                on: Dexie.events(null, "disconnect"),
+                disconnect: function (newStatus, error) {
+                    if (!disconnected) {
+                        activePeer.on.disconnect.fire(newStatus, error);
+                        var pos = activePeers.indexOf(activePeer);
+                        if (pos >= 0) activePeers.splice(pos, 1);
+                        if (error && rejectConnectPromise) rejectConnectPromise(error);
+                    }
+                    disconnected = true;
+                }
+            };
+            activePeers.push(activePeer);
+
+            return connectPromise;
 
             function stillAlive() {
                 // A better method than doing db.isOpen() because the same db instance may have been reopened, but then this sync call should be dead
@@ -160,36 +187,56 @@
             }
 
             function getOrCreateSyncNode() {
-                return db._syncNodes.where("url").equalsIgnoreCase(url).and(function (node) { return node.syncProtocol === protocolName; }).first(function (node) {
-                    if (node) {
-                        // Node already there. Make syncContext become an instance of PersistedContext:
-                        node.syncContext = Dexie.extend(new PersistedContext(node.id), node.syncContext);
-                        return node;
-                    } else {
-                        // Create new node and sync everything
-                        node = new Dexie.Observable.SyncNode();
-                        node.myRevision = -1;
-                        node.appliedRemoteRevision = null;
-                        node.remoteBaseRevisions = [];
-                        node.type = "remote";
-                        node.syncProtocol = protocolName;
-                        node.syncOptions = options;
-                        node.lastHeartBeat = Date.now();
-                        node.dbUploadState = null;
-                        return db._syncNodes.put(node).then(function (nodeId) {
-                            node.syncContext = new PersistedContext(nodeId);
-                            return node;
-                        });
-                    }
+                return db.transaction('rw', db._syncNodes, function (syncNodes) {
+                    // Returning a promise from transaction scope will make the transaction promise resolve with the value of that promise.
+                    return syncNodes.where("url").equalsIgnoreCase(url).first(function (node) {
+                        if (node) {
+                            // Node already there. Make syncContext become an instance of PersistedContext:
+                            node.syncContext = Dexie.extend(new PersistedContext(node.id), node.syncContext);
+                            syncNodes.update(node, {
+                                syncProtocol: protocolName, // In case it was changed (would be very strange but...) could happen...
+                                syncOptions: options
+                            });
+                        } else {
+                            // Create new node and sync everything
+                            node = new Dexie.Observable.SyncNode();
+                            node.myRevision = -1;
+                            node.appliedRemoteRevision = null;
+                            node.remoteBaseRevisions = [];
+                            node.type = "remote";
+                            node.syncProtocol = protocolName;
+                            node.syncOptions = options;
+                            node.lastHeartBeat = Date.now();
+                            node.dbUploadState = null;
+                            syncNodes.put(node).then(function (nodeId) {
+                                node.syncContext = new PersistedContext(nodeId);
+                                syncNodes.put(node); // Put node again to update syncContext with correct nodeId.
+                            });
+                        }
+                        return node; // returning node will make the db.transaction()-promise resolve with this value.
+                    });
                 });
             }
 
             function connectProtocol(node) {
                 /// <param name="node" type="Dexie.Observable.SyncNode"></param>
 
-                var connectedContinuation, providerHandle;
-                var onStatusChanged = syncPromise._onStatusChanged; // _onStatusChanged has been set by db.sync() immediately after calling sync() above.
-                onStatusChanged.fire(Dexie.Syncable.Statuses.CONNECTING);
+                function changeStatusTo(newStatus) {
+                    return db._syncNodes.update(node, { status: newStatus }).then(function (modified) {
+                        if (modified) {
+                            db.syncable.on.statusChanged.fire(newStatus, url);
+                            // Also broadcast message to other nodes about the status
+                            db.broadcastMessage("syncStatusChanged", { newStatus: newStatus, url: url }, false);
+                        }
+                    });
+                }
+
+                activePeer.on('disconnect', function (newStatus) {
+                    if (!isNaN(newStatus)) changeStatusTo(newStatus);
+                });
+
+                var connectedContinuation;
+                changeStatusTo(Dexie.Syncable.Statuses.CONNECTING);
                 return doSync();
 
                 function doSync() {
@@ -200,7 +247,7 @@
                             // Create a final Promise for the entire sync() operation that will resolve when provider calls onSuccess().
                             // By creating finalPromise before calling protocolInstance.sync() it is possible for provider to call onError() immediately if it wants.
                             var finalSyncPromise = new Promise(function (resolve, reject) {
-                                rejectSyncPromise = reject;
+                                rejectConnectPromise = reject;
                                 protocolInstance.sync(
                                     node.syncContext,
                                     url,
@@ -216,19 +263,20 @@
 
                                 function onError(error, again) {
                                     reject(error);
-                                    if (!isNaN(again) && again < Infinity) {
-                                        setTimeout(function () {
-                                            if (connectedContinuation) {
-                                                onStatusChanged.fire(Dexie.Syncable.Statuses.SYNCING);
-                                                doSync();
-                                            }
-                                        }, again);
-                                        if (connectedContinuation) {
-                                            onStatusChanged.fire(Dexie.Syncable.Statuses.ERROR_WILL_RETRY, error);
-                                            disconnectProvider();
+                                    if (stillAlive()) {
+                                        if (!isNaN(again) && again < Infinity) {
+                                            setTimeout(function () {
+                                                if (stillAlive()) {
+                                                    changeStatusTo(Dexie.Syncable.Statuses.SYNCING);
+                                                    doSync();
+                                                }
+                                            }, again);
+                                            changeStatusTo(Dexie.Syncable.Statuses.ERROR_WILL_RETRY, error);
+                                            if (connectedContinuation.disconnect) connectedContinuation.disconnect();
+                                            connectedContinuation = null;
+                                        } else {
+                                            abortTheProvider(error); // Will fire ERROR on statusChanged event.
                                         }
-                                    } else {
-                                        abortTheProvider(error); // Will fire ERROR on onStatusChanged.
                                     }
                                 }
                             });
@@ -246,52 +294,29 @@
                     });
                 }
 
-
                 function abortTheProvider(error) {
-                    if (connectedContinuation) {
-                        onStatusChanged.fire(Dexie.Syncable.Statuses.ERROR, error);
-                        db._syncNodes.update(node, { connected: false });
-                        disconnectProvider();
-                    }
-                }
-
-                function disconnectProvider() {
-                    if (connectedContinuation) {
-
-                        if (connectedContinuation.react) {
-                            try {
-                                // react pattern must provide a disconnect function.
-                                connectedContinuation.disconnect();
-                            } catch (e) { }
-                        }
-                        connectedContinuation = null;// Stop poll() pattern from polling again and abortTheProvider() from being called twice.
-                    }
-                    if (providerHandle) {
-                        syncProviders.splice(syncProviders.indexOf(providerHandle), 1);
-                        providerHandle = null;
-                    }
+                    activePeer.disconnect(Dexie.Syncable.Statuses.ERROR, error);
                 }
 
                 function continueSendingChanges(continuation) {
-                    if (!stillAlive()) {
+                    if (!stillAlive()) { // Database was closed.
                         if (continuation.disconnect)
                             continuation.disconnect();
                         return;
                     }
 
                     connectedContinuation = continuation;
-                    providerHandle = {
-                        disconnect: function () {
-                            if (connectedContinuation) {
-                                onStatusChanged.fire(Dexie.Syncable.Statuses.OFFLINE);
-                                db._syncNodes.update(node, { connected: false });
-                                disconnectProvider();
+                    activePeer.on('disconnect', function () {
+                        if (connectedContinuation) {
+                            if (connectedContinuation.react) {
+                                try {
+                                    // react pattern must provide a disconnect function.
+                                    connectedContinuation.disconnect();
+                                } catch (e) { }
                             }
+                            connectedContinuation = null;// Stop poll() pattern from polling again and abortTheProvider() from being called twice.
                         }
-                    };
-                    syncProviders.push(providerHandle);
-
-                    db._syncNodes.update(node, { connected: true });
+                    });
 
                     if (continuation.react) {
                         continueUsingReactPattern(continuation);
@@ -307,7 +332,7 @@
 
                     function onChanges() {
                         if (connectedContinuation) {
-                            onStatusChanged.fire(Dexie.Syncable.Statuses.SYNCING);
+                            changeStatusTo(Dexie.Syncable.Statuses.SYNCING);
                             if (isWaitingForServer)
                                 changesWaiting = true;
                             else {
@@ -318,12 +343,9 @@
 
                     db.on('changes', onChanges);
 
-                    // Override disconnectProvider to also unsubscribe to onChanges.
-                    disconnectProvider = override(disconnectProvider, function (origFunc) {
-                        return function () {
-                            db.on.changes.unsubscribe(onChanges);
-                            return origFunc.apply(this, arguments);
-                        }
+                    // Override disconnect() to also unsubscribe to onChanges.
+                    activePeer.on('disconnect', function () {
+                        db.on.changes.unsubscribe(onChanges);
                     });
 
                     function reactToChanges() {
@@ -345,7 +367,7 @@
                                     // This is an expreemely rare scenario, and eventually impossible. But need to be here because it could happen in theory.
                                     reactToChanges();
                                 } else {
-                                    onStatusChanged.fire(Dexie.Syncable.Statuses.ONLINE);
+                                    changeStatusTo(Dexie.Syncable.Statuses.ONLINE);
                                 }
                             }
                         }).catch(abortTheProvider);
@@ -354,7 +376,7 @@
                     reactToChanges();
                 }
 
-                function continueUsingPollPattern(continuation) {
+                function continueUsingPollPattern() {
 
                     function syncAgain () {
                         getLocalChangesForNode(node, function (changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
@@ -365,36 +387,45 @@
                                 db._syncNodes.update(node, nodeModificationsOnAck);
                             }
 
-                            function onSuccess() {
-                                if (partial && connectedContinuation) {
+                            function onSuccess(continuation) {
+                                if (!connectedContinuation) {
+                                    // Got disconnected before succeeding. Quit.
+                                    return;
+                                }
+                                connectedContinuation = continuation;
+                                if (partial) {
+                                    // We only sent partial changes. Need to do another round asap.
                                     syncAgain();
                                 } else {
-                                    if (connectedContinuation && !isNaN(continuation.again) && continuation.again < Infinity) {
-                                        onStatusChanged.fire(Dexie.Syncable.Statuses.ONLINE);
+                                    // We've sent all changes now (in sync!)
+                                    if (!isNaN(continuation.again) && continuation.again < Infinity) {
+                                        // Provider wants to keep polling. Set Status to ONLINE.
+                                        changeStatusTo(Dexie.Syncable.Statuses.ONLINE);
                                         setTimeout(function () {
                                             if (connectedContinuation) {
-                                                onStatusChanged.fire(Dexie.Syncable.Statuses.SYNCING);
+                                                changeStatusTo(Dexie.Syncable.Statuses.SYNCING);
                                                 syncAgain();
                                             }
                                         }, continuation.again);
-                                    } else if (isNaN(continuation.again) || continuation.again == Infinity) {
-                                        disconnectProvider();
+                                    } else {
+                                        // Provider seems finished polling. Since we are never going to poll again,
+                                        // disconnect provider and set status to OFFLINE until another call to db.syncable.connect().
+                                        activePeer.disconnect(Dexie.Syncable.Statuses.OFFLINE);
                                     }
                                 }
                             }
 
                             function onError(error, again) {
                                 if (!isNaN(again) && again < Infinity) {
-                                    setTimeout(function () {
-                                        if (connectedContinuation) {
-                                            onStatusChanged.fire(Dexie.Syncable.Statuses.SYNCING);
-                                            doSync();
-                                        }
-                                    }, again);
                                     if (connectedContinuation) {
-                                        onStatusChanged.fire(Dexie.Syncable.Statuses.ERROR_WILL_RETRY, error);
-                                        disconnectProvider();
-                                    }
+                                            setTimeout(function () {
+                                            if (connectedContinuation) {
+                                                changeStatusTo(Dexie.Syncable.Statuses.SYNCING);
+                                                syncAgain();
+                                            }
+                                        }, again);
+                                        changeStatusTo(Dexie.Syncable.Statuses.ERROR_WILL_RETRY);
+                                    } // else status is already changed since we got disconnected.
                                 } else {
                                     abortTheProvider(error); // Will fire ERROR on onStatusChanged.
                                 }
@@ -402,7 +433,7 @@
                         }).catch(abortTheProvider);
                     }
 
-                    syncAgain();
+                    syncAgain(); // Since we may have more changes to send, we do another sync asap and then we get into the new syncAgain() flow.
                 }
 
                 function getBaseRevisionAndMaxClientRevision(node) {
@@ -590,7 +621,6 @@
                             // FIXTHIS: Check what to do if clear() is true!
                             return (partial ? saveToUncommitedChanges(remoteChanges) : finallyCommitAllChanges(remoteChanges, remoteRevision))
                                 .catch(function (error) {
-                                    if (rejectSyncPromise) rejectSyncPromise(error);
                                     abortTheProvider(error);
                                     return Promise.reject(error);
                                 });
@@ -617,7 +647,6 @@
                     }
 
                     function finallyCommitAllChanges(changes, remoteRevision) {
-
                         // 1. Open a write transaction on all tables in DB
                         return db.transaction('rw', db.tables, function () {
                             var trans = this;
@@ -714,12 +743,9 @@
 
         db.close = override(db.close, function (origClose) {
             return function () {
-                syncProviders.forEach(function (provider) {
-                    provider.disconnect();
+                activePeers.forEach(function (peer) {
+                    peer.disconnect();
                 });
-                syncProviders.splice(0, syncProviders.length);
-                syncPromises = [];
-                remoteProviders = [];
                 return origClose.apply(this, arguments);
             }
         });
@@ -760,21 +786,21 @@
     }
 
     Dexie.Syncable.Statuses = {
-        ERROR_WILL_RETRY:   -2, // An error occured such as net down but the sync provider will retry to connect.
         ERROR:              -1, // An irrepairable error occurred and the sync provider is dead.
         OFFLINE:            0,  // The sync provider hasnt yet become online, or it has been disconnected.
         CONNECTING:         1,  // Trying to connect to server
         ONLINE:             2,  // Connected to server and currently in sync with server
-        SYNCING:            3   // Syncing with server. For poll pattern, this is every poll call. For react pattern, this is when local changes are being sent to server.
+        SYNCING:            3,  // Syncing with server. For poll pattern, this is every poll call. For react pattern, this is when local changes are being sent to server.
+        ERROR_WILL_RETRY:   4,  // An error occured such as net down but the sync provider will retry to connect.
     };
 
     Dexie.Syncable.StatusTexts = {
-        "-2": "ERROR_WILL_RETRY",
         "-1": "ERROR",
         "0": "OFFLINE",
         "1": "CONNECTING",
         "2": "ONLINE",
-        "3": "SYNCING"
+        "3": "SYNCING",
+        "4": "ERROR_WILL_RETRY"
     }
 
     Dexie.Syncable.registeredProtocols = {}; // Map<String,ISyncProviderFactory> when key is the provider name.
