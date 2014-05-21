@@ -697,8 +697,11 @@
                     // Let last argument be the Transaction instance itself
                     tableArgs.push(trans);
 
-                    // If transaction completes, resolve the Promise
-                    trans.complete(resolve);
+                    // If transaction completes, resolve the Promise with the return value of scopeFunc.
+                    var returnValue;
+                    trans.complete(function () {
+                        resolve(returnValue);
+                    });
                     // If transaction fails, reject the Promise and bubble to db if noone catched this rejection.
                     trans.error(function (e) {
                         var catched = reject(e);
@@ -707,7 +710,7 @@
 
                     // Finally, call the scope function with our table and transaction arguments.
                     try {
-                        scopeFunc.apply(trans, tableArgs);
+                        returnValue = scopeFunc.apply(trans, tableArgs);
                     } catch (e) {
                         // If exception occur, abort the transaction and reject Promise.
                         trans.abort();
@@ -1306,12 +1309,12 @@
                 },
                 startsWith: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof str != 'string') return fail(new Collection(this), new TypeError("String expected"));
+                    if (typeof str != 'string') return fail(new this._ctx.collClass(this), new TypeError("String expected"));
                     return this.between(str, str + String.fromCharCode(65535), true, true);
                 },
                 startsWithIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof str != 'string') return fail(new Collection(this), new TypeError("String expected"));
+                    if (typeof str != 'string') return fail(new this._ctx.collClass(this), new TypeError("String expected"));
                     if (str === "") return this.startsWith(str);
                     var c = new this._ctx.collClass(this, IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase() + String.fromCharCode(65535)));
                     addIgnoreCaseAlgorithm(c, function (a, b) { return a.indexOf(b) === 0; }, str);
@@ -1320,7 +1323,7 @@
                 },
                 equalsIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof str != 'string') return fail(new Collection(this), new TypeError("String expected"));
+                    if (typeof str != 'string') return fail(new this._ctx.collClass(this), new TypeError("String expected"));
                     var c = new this._ctx.collClass(this, IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase()));
                     addIgnoreCaseAlgorithm(c, function (a, b) { return a === b; }, str);
                     return c;
@@ -1728,7 +1731,7 @@
                             // and call the hooks accordingly!
                             modifyer = function (item) {
                                 var origItem = deepClone(item); // Clone the item first so we can compare laters.
-                                changes.call(this, item); // Call the real modifyer function.
+                                if (changes.call(this, item) === false) return false; // Call the real modifyer function (If it returns false explicitely, it means it dont want to modify anyting on this object)
                                 if (!this.hasOwnProperty("value")) {
                                     // The real modifyer function requests a deletion of the object. Inform the deletingHook that a deletion is taking place.
                                     deletingHook.call(this, this.primKey, item, trans);
@@ -1754,13 +1757,18 @@
                         var keyPaths = Object.keys(changes);
                         var numKeys = keyPaths.length;
                         modifyer = function (item) {
+                            var anythingModified = false;
                             for (var i = 0; i < numKeys; ++i) {
                                 var keyPath = keyPaths[i], val = changes[keyPath];
-                                if (val === undefined)
+                                if (val === undefined && getByKeyPath(item, keyPath) !== undefined) {
                                     delByKeyPath(item, keyPath); // Adding {keyPath: undefined} means that the keyPath should be deleted.
-                                else
+                                    anythingModified = true;
+                                } else if (getByKeyPath(item, keyPath) !== val) {
                                     setByKeyPath(item, keyPath, val);
+                                    anythingModified = true;
+                                }
                             }
+                            return anythingModified;
                         }
                     } else {
                         // changes is a set of {keyPath: value} and people are listening to the updating hook so we need to call it and
@@ -1768,15 +1776,21 @@
                         var origChanges = changes;
                         changes = shallowClone(origChanges); // Let's work with a clone of the changes keyPath/value set so that we can restore it in case a hook extends it.
                         modifyer = function (item) {
+                            var anythingModified = false;
                             var additionalChanges = updatingHook.call(this, changes, this.primKey, deepClone(item), trans);
                             if (additionalChanges) extend(changes, additionalChanges);
                             Object.keys(changes).forEach(function (keyPath) {
-                                if (changes[keyPath] === undefined)
+                                var val = changes[keyPath];
+                                if (val === undefined && getByKeyPath(item, keyPath) !== undefined) {
                                     delByKeyPath(item, keyPath, changes[keyPath]);
-                                else
+                                    anythingModified = true;
+                                } else if (getByKeyPath(item, keyPath) !== val) {
                                     setByKeyPath(item, keyPath, changes[keyPath]);
+                                    anythingModified = true;
+                                }
                             });
                             if (additionalChanges) changes = shallowClone(origChanges); // Restore original changes.
+                            return anythingModified;
                         }
                     }
 
@@ -1787,19 +1801,20 @@
 
                     function modifyItem(item, cursor, advance) {
                         var thisContext = { primKey: cursor.primaryKey, value: item };
-                        modifyer.call(thisContext, item);
-                        var bDelete = !thisContext.hasOwnProperty("value");
-                        var req = (bDelete ? cursor.delete() : cursor.update(thisContext.value));
-                        ++count;
-                        req.onerror = eventRejectHandler(function (e) {
-                            failures.push(e);
-                            if (thisContext.onerror) thisContext.onerror(e);
-                            return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
-                        }, function () { return bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]; });
-                        req.onsuccess = function (ev) {
-                            if (thisContext.onsuccess) thisContext.onsuccess(thisContext.value);
-                            ++successCount;
-                            checkFinished();
+                        if (modifyer.call(thisContext, item) !== false) { // If a callback explicitely returns false, do not perform the update!
+                            var bDelete = !thisContext.hasOwnProperty("value");
+                            var req = (bDelete ? cursor.delete() : cursor.update(thisContext.value));
+                            ++count;
+                            req.onerror = eventRejectHandler(function (e) {
+                                failures.push(e);
+                                if (thisContext.onerror) thisContext.onerror(e);
+                                return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
+                            }, function () { return bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]; });
+                            req.onsuccess = function (ev) {
+                                if (thisContext.onsuccess) thisContext.onsuccess(thisContext.value);
+                                ++successCount;
+                                checkFinished();
+                            }
                         }
                     }
 
