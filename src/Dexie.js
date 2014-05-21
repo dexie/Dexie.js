@@ -360,7 +360,7 @@
 
         function createTable(trans, tableName, primKey, indexes) {
             /// <param name="trans" type="IDBTransaction"></param>
-            var store = trans.db.createObjectStore(tableName, { keyPath: primKey.keyPath, autoIncrement: primKey.auto });
+            var store = trans.db.createObjectStore(tableName, primKey.keyPath ? { keyPath: primKey.keyPath, autoIncrement: primKey.auto } : { autoIncrement: primKey.auto });
             indexes.forEach(function (idx) { addIndex(store, idx); });
             return store;
         }
@@ -900,7 +900,7 @@
                     return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
                         var thisCtx = {};
                         if (creatingHook !== nop) {
-                            var effectiveKey = key || (idbstore.keyPath && getByKeyPath(obj, idbstore.keyPath));
+                            var effectiveKey = key || (idbstore.keyPath ? getByKeyPath(obj, idbstore.keyPath) : undefined);
                             var keyToUse = creatingHook.call(thisCtx, effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
                             if (effectiveKey === undefined && keyToUse !== undefined) {
                                 if (idbstore.keyPath)
