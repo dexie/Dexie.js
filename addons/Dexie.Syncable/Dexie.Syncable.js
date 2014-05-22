@@ -10,7 +10,6 @@
     Dexie.Syncable = function (db) {
     	/// <param name="db" type="Dexie"></param>
         var activePeers = [];
-        var weAreMaster = false;
 
         // Change Types
         var CREATE = 1,
@@ -22,22 +21,13 @@
 
         var MAX_CHANGES_PER_CHUNK = 1000;
 
-        //
-        // PersistedContext : IPersistedContext
-        //
-        function PersistedContext(nodeID) {
-            this.nodeID = nodeID;
-        }
-        PersistedContext.prototype.save = function () {
-            // Store this instance in the syncContext property of the node it belongs to.
-            return db._syncNodes.update(this.nodeID, { syncContext: this });
-        }
-
         db.on('message', function onMessage(msg) {
             // Message from other local node arrives...
             if (msg.type == 'connect') {
                 // We are master node and another non-master node wants us to do the connect.
                 db.syncable.connect(msg.protocolName, msg.url, msg.options).then(msg.resolve, msg.reject);
+            } else if (msg.type == 'disconnect') {
+                db.syncable.disconnect(msg.url);
             } else if (msg.type == 'syncStatusChanged') {
                 // We are client and a master node informs us about syncStatus change.
                 // Lookup the connectedProvider and call its event
@@ -45,36 +35,30 @@
             }
         });
 
-        db.on('ready', function onReady() {
-            // Store whether we are master or not.
-            // Need to have it stored on order to detect if we become master in on('cleanup');
-            weAreMaster = db._localSyncNode.isMaster;
-        });
-
-        db.on('cleanup', function (nodes, changes, intercomm, trans) {
+        db.on('cleanup', function (nodes, changes, intercomm, trans, weBecameMaster) {
             /// <param name="nodes" type="db.WriteableTable"></param>
             /// <param name="changes" type="db.WriteableTable"></param>
             /// <param name="intercomm" type="db.WriteableTable"></param>
             /// <param name="trans" type="db.Transaction"></param>
 
             // A cleanup (done in Dexie.Observable) may result in that a master node is removed and we become master.
-            if (db._localSyncNode && !weAreMaster && db._localSyncNode.isMaster) {
+            if (weBecameMaster) {
                 // We took over the master role in Observable's cleanup method
-                weAreMaster = true;
                 nodes.where('type').equals('remote')
                     .and(function (node) { return node.status !== Statuses.OFFLINE && node.status !== Statuses.ERROR; })
                     .each(function (connectedRemoteNode) {
                         // There are connected remote nodes that we must take over
-                        setTimeout(function () {
+                        // Since we may be in the on(ready) event, we must get VIPed to continue - Promise.PSD is not derived in Collection.each() since it is a callback called outside a Promise.
+                        letThrough(function () {
                             db.syncable.connect(connectedRemoteNode.syncProtocol, connectedRemoteNode.url, connectedRemoteNode.syncOptions);
-                        }, 0);
+                        });
                     });
             }
         });
 
         db.on('ready', function onReady() {
             // Again, in onReady: If we ARE master, make sure to connect to remote servers that is in a connected state.
-            if (weAreMaster) {
+            if (db._localSyncNode && db._localSyncNode.isMaster) {
                 // Make sure to connect to remote servers that is in a connected state (NOT OFFLINE or ERROR!)
                 return db._syncNodes.where('type').equals('remote')
                     .and(function (node) { return node.status !== Statuses.OFFLINE && node.status !== Statuses.ERROR; })
@@ -94,8 +78,10 @@
         db.syncable = {};
 
         db.syncable.getStatus = function (url, cb) {
-            return db._syncNodes.where('url').equals(url).first(function (node) {
-                return node.status;
+            return letThrough(function () {
+                return db._syncNodes.where('url').equals(url).first(function (node) {
+                    return node ? node.status : Statuses.OFFLINE;
+                });
             }).then(cb);
         }
 
@@ -107,6 +93,17 @@
 
         db.syncable.on = Dexie.events(db, { statusChanged: "asap" });
 
+        db.syncable.disconnect = function (url) {
+            if (db._localSyncNode && db._localSyncNode.isMaster) {
+                activePeers.filter(function (peer) { return peer.url === url }).forEach(function (peer) {
+                    peer.disconnect(Statuses.OFFLINE);
+                });
+            } else {
+                db._syncNodes.where('isMaster').above(0).first(function (masterNode) {
+                    db.sendMessage('disconnect', { url: url }, masterNode.id);
+                });
+            }
+        }
 
         db.syncable.connect = function (protocolName, url, options) {
             options = options || {}; // Make sure options is always an object because 1) Provider expects it to be. 2) We'll be persisting it and you cannot persist undefined.
@@ -123,7 +120,7 @@
                         // Request master node to do the connect:
                         return db._syncNodes.where('isMaster').above(0).first(function (masterNode) {
                             // There will always be a master node. In theory we may self have become master node when we come here. But that's ok. We'll request ourselves.
-                            return db.sendMessage('connect', { protocolName: protocolName, url: url, options: options }, masterNode.id, true);
+                            return db.sendMessage('connect', { protocolName: protocolName, url: url, options: options }, masterNode.id, { wantReply: true });
                         });
                     }
                 } else {
@@ -132,7 +129,7 @@
                     return new Promise(function (resolve, reject) {
                         db.on("ready", function syncWhenReady() {
                             db.on.ready.unsubscribe(syncWhenReady);
-                            return db.syncable.connect(protocolName, url, options).catch(function (err) {
+                            return db.syncable.connect(protocolName, url, options).then(resolve).catch(function (err) {
                                 // Reject the promise returned to the caller of db.syncable.connect():
                                 reject(err);
                                 // but resolve the promise that db.on("ready") waits for, because database should succeed to open even if the connect operation fails!
@@ -141,7 +138,7 @@
                     });
                 }
             } else {
-                throw new Error("ISyncProviderFactory " + protocolName + " is not registered in Dexie.Syncable.registerSyncProtocol()");
+                throw new Error("ISyncProtocol '" + protocolName + "' is not registered in Dexie.Syncable.registerSyncProtocol()");
                 return new Promise(); // For code completion
             }
         }
@@ -161,9 +158,10 @@
 
             var rejectConnectPromise = null;
             var disconnected = false;
+            var hasMoreToGive = true;
             var activePeer = {
                 url: url,
-                status: Dexie.Syncable.Statuses.OFFLINE,
+                status: Statuses.OFFLINE,
                 connectPromise: connectPromise,
                 on: Dexie.events(null, "disconnect"),
                 disconnect: function (newStatus, error) {
@@ -193,42 +191,54 @@
                         if (node) {
                             // Node already there. Make syncContext become an instance of PersistedContext:
                             node.syncContext = Dexie.extend(new PersistedContext(node.id), node.syncContext);
-                            syncNodes.update(node, {
-                                syncProtocol: protocolName, // In case it was changed (would be very strange but...) could happen...
-                                syncOptions: options
-                            });
+                            node.syncProtocol = protocolName; // In case it was changed (would be very strange but...) could happen...
+                            node.save();
                         } else {
                             // Create new node and sync everything
-                            node = new Dexie.Observable.SyncNode();
+                            node = new db.observable.SyncNode();
                             node.myRevision = -1;
                             node.appliedRemoteRevision = null;
                             node.remoteBaseRevisions = [];
                             node.type = "remote";
                             node.syncProtocol = protocolName;
+                            node.url = url;
                             node.syncOptions = options;
                             node.lastHeartBeat = Date.now();
                             node.dbUploadState = null;
                             syncNodes.put(node).then(function (nodeId) {
-                                node.syncContext = new PersistedContext(nodeId);
-                                syncNodes.put(node); // Put node again to update syncContext with correct nodeId.
+                                node.syncContext = new PersistedContext(nodeId);// Update syncContext in db with correct nodeId.
+                                node.save();
                             });
                         }
+
+                        //
+                        // PersistedContext : IPersistedContext
+                        //
+                        function PersistedContext(nodeID) {
+                            this.nodeID = nodeID;
+                        }
+                        PersistedContext.prototype.save = function () {
+                            // Store this instance in the syncContext property of the node it belongs to.
+                            node.save();
+                            //return db._syncNodes.update(this.nodeID, { syncContext: this });
+                        }
+
                         return node; // returning node will make the db.transaction()-promise resolve with this value.
                     });
                 });
             }
 
             function connectProtocol(node) {
-                /// <param name="node" type="Dexie.Observable.SyncNode"></param>
+                /// <param name="node" type="db.observable.SyncNode"></param>
 
                 function changeStatusTo(newStatus) {
-                    return db._syncNodes.update(node, { status: newStatus }).then(function (modified) {
-                        if (modified) {
-                            db.syncable.on.statusChanged.fire(newStatus, url);
-                            // Also broadcast message to other nodes about the status
-                            db.broadcastMessage("syncStatusChanged", { newStatus: newStatus, url: url }, false);
-                        }
-                    });
+                    if (node.status != newStatus) {
+                        node.status = newStatus;
+                        node.save();
+                        db.syncable.on.statusChanged.fire(newStatus, url);
+                        // Also broadcast message to other nodes about the status
+                        db.broadcastMessage("syncStatusChanged", { newStatus: newStatus, url: url }, false);
+                    }
                 }
 
                 activePeer.on('disconnect', function (newStatus) {
@@ -236,208 +246,78 @@
                 });
 
                 var connectedContinuation;
-                changeStatusTo(Dexie.Syncable.Statuses.CONNECTING);
+                changeStatusTo(Statuses.CONNECTING);
                 return doSync();
 
                 function doSync() {
                     // Use enque() to ensure only a single promise execution at a time.
                     return enque(doSync, function () {
                         // By returning the Promise returned by getLocalChangesForNode() a final catch() on the sync() method will also catch error occurring in entire sequence.
-                        return getLocalChangesForNode(node, function sendChangesToProvider(changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
+                        return getLocalChangesForNode_autoAckIfEmpty(node, function sendChangesToProvider(changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
                             // Create a final Promise for the entire sync() operation that will resolve when provider calls onSuccess().
                             // By creating finalPromise before calling protocolInstance.sync() it is possible for provider to call onError() immediately if it wants.
                             var finalSyncPromise = new Promise(function (resolve, reject) {
-                                rejectConnectPromise = reject;
-                                protocolInstance.sync(
-                                    node.syncContext,
-                                    url,
-                                    options,
-                                    remoteBaseRevision,
-                                    node.appliedRemoteRevision,
-                                    changes,
-                                    partial,
-                                    applyRemoteChanges,
-                                    onChangesAccepted,
-                                    resolve,
-                                    onError);
+                                rejectConnectPromise = function (err) {
+                                    reject(err);
+                                }
+                                Dexie.asap(function () {
+                                    protocolInstance.sync(
+                                        node.syncContext,
+                                        url,
+                                        options,
+                                        remoteBaseRevision,
+                                        node.appliedRemoteRevision,
+                                        changes,
+                                        partial,
+                                        applyRemoteChanges,
+                                        onChangesAccepted,
+                                        resolve,
+                                        onError);
 
-                                function onError(error, again) {
-                                    reject(error);
-                                    if (stillAlive()) {
-                                        if (!isNaN(again) && again < Infinity) {
-                                            setTimeout(function () {
-                                                if (stillAlive()) {
-                                                    changeStatusTo(Dexie.Syncable.Statuses.SYNCING);
-                                                    doSync();
-                                                }
-                                            }, again);
-                                            changeStatusTo(Dexie.Syncable.Statuses.ERROR_WILL_RETRY, error);
-                                            if (connectedContinuation.disconnect) connectedContinuation.disconnect();
-                                            connectedContinuation = null;
-                                        } else {
-                                            abortTheProvider(error); // Will fire ERROR on statusChanged event.
+                                    function onError(error, again) {
+                                        reject(error);
+                                        if (stillAlive()) {
+                                            if (!isNaN(again) && again < Infinity) {
+                                                setTimeout(function () {
+                                                    if (stillAlive()) {
+                                                        changeStatusTo(Statuses.SYNCING);
+                                                        doSync();
+                                                    }
+                                                }, again);
+                                                changeStatusTo(Statuses.ERROR_WILL_RETRY, error);
+                                                if (connectedContinuation.disconnect) connectedContinuation.disconnect();
+                                                connectedContinuation = null;
+                                            } else {
+                                                abortTheProvider(error); // Will fire ERROR on statusChanged event.
+                                            }
                                         }
                                     }
-                                }
+                                });
                             });
 
-                            return finalSyncPromise;
+                            return finalSyncPromise.then(function () {
+                                // Resolve caller of db.syncable.connect() with undefined. Not with continuation!
+                            });
 
                             function onChangesAccepted() {
-                                db._syncNodes.update(node, nodeModificationsOnAck);
+                                Object.keys(nodeModificationsOnAck).forEach(function (keyPath) {
+                                    Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
+                                });
+                                node.save();
                                 // We dont know if onSuccess() was called by provider yet. If it's already called, finalPromise.then() will execute immediately,
                                 // otherwise it will execute when finalSyncPromise resolves.
                                 finalSyncPromise.then(continueSendingChanges);
                             }
-
                         });
                     });
                 }
 
                 function abortTheProvider(error) {
-                    activePeer.disconnect(Dexie.Syncable.Statuses.ERROR, error);
-                }
-
-                function continueSendingChanges(continuation) {
-                    if (!stillAlive()) { // Database was closed.
-                        if (continuation.disconnect)
-                            continuation.disconnect();
-                        return;
-                    }
-
-                    connectedContinuation = continuation;
-                    activePeer.on('disconnect', function () {
-                        if (connectedContinuation) {
-                            if (connectedContinuation.react) {
-                                try {
-                                    // react pattern must provide a disconnect function.
-                                    connectedContinuation.disconnect();
-                                } catch (e) { }
-                            }
-                            connectedContinuation = null;// Stop poll() pattern from polling again and abortTheProvider() from being called twice.
-                        }
-                    });
-
-                    if (continuation.react) {
-                        continueUsingReactPattern(continuation);
-                    } else {
-                        continueUsingPollPattern(continuation);
-                    }
-                }
-
-                function continueUsingReactPattern(continuation) {
-                    var changesWaiting, // Boolean
-                        isWaitingForServer; // Boolean
-
-
-                    function onChanges() {
-                        if (connectedContinuation) {
-                            changeStatusTo(Dexie.Syncable.Statuses.SYNCING);
-                            if (isWaitingForServer)
-                                changesWaiting = true;
-                            else {
-                                reactToChanges();
-                            }
-                        }
-                    }
-
-                    db.on('changes', onChanges);
-
-                    // Override disconnect() to also unsubscribe to onChanges.
-                    activePeer.on('disconnect', function () {
-                        db.on.changes.unsubscribe(onChanges);
-                    });
-
-                    function reactToChanges() {
-                        if (!connectedContinuation) return;
-                        changesWaiting = false;
-                        isWaitingForServer = true;
-                        getLocalChangesForNode(node, function (changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
-                            if (!connectedContinuation) return;
-                            if (changes.length > 0) {
-                                continuation.react(changes, remoteBaseRevision, partial, function onChangesAccepted() {
-                                    db._syncNodes.update(node, nodeModificationsOnAck);
-                                    // More changes may be waiting:
-                                    reactToChanges();
-                                });
-                            } else {
-                                isWaitingForServer = false;
-                                if (changesWaiting) {
-                                    // A change jumped in between the time-spot of quering _changes and getting called back with zero changes.
-                                    // This is an expreemely rare scenario, and eventually impossible. But need to be here because it could happen in theory.
-                                    reactToChanges();
-                                } else {
-                                    changeStatusTo(Dexie.Syncable.Statuses.ONLINE);
-                                }
-                            }
-                        }).catch(abortTheProvider);
-                    }
-
-                    reactToChanges();
-                }
-
-                function continueUsingPollPattern() {
-
-                    function syncAgain () {
-                        getLocalChangesForNode(node, function (changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
-
-                            protocolInstance.sync(node.syncContext, url, options, remoteBaseRevision, node.appliedRemoteRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError);
-
-                            function onChangesAccepted() {
-                                db._syncNodes.update(node, nodeModificationsOnAck);
-                            }
-
-                            function onSuccess(continuation) {
-                                if (!connectedContinuation) {
-                                    // Got disconnected before succeeding. Quit.
-                                    return;
-                                }
-                                connectedContinuation = continuation;
-                                if (partial) {
-                                    // We only sent partial changes. Need to do another round asap.
-                                    syncAgain();
-                                } else {
-                                    // We've sent all changes now (in sync!)
-                                    if (!isNaN(continuation.again) && continuation.again < Infinity) {
-                                        // Provider wants to keep polling. Set Status to ONLINE.
-                                        changeStatusTo(Dexie.Syncable.Statuses.ONLINE);
-                                        setTimeout(function () {
-                                            if (connectedContinuation) {
-                                                changeStatusTo(Dexie.Syncable.Statuses.SYNCING);
-                                                syncAgain();
-                                            }
-                                        }, continuation.again);
-                                    } else {
-                                        // Provider seems finished polling. Since we are never going to poll again,
-                                        // disconnect provider and set status to OFFLINE until another call to db.syncable.connect().
-                                        activePeer.disconnect(Dexie.Syncable.Statuses.OFFLINE);
-                                    }
-                                }
-                            }
-
-                            function onError(error, again) {
-                                if (!isNaN(again) && again < Infinity) {
-                                    if (connectedContinuation) {
-                                            setTimeout(function () {
-                                            if (connectedContinuation) {
-                                                changeStatusTo(Dexie.Syncable.Statuses.SYNCING);
-                                                syncAgain();
-                                            }
-                                        }, again);
-                                        changeStatusTo(Dexie.Syncable.Statuses.ERROR_WILL_RETRY);
-                                    } // else status is already changed since we got disconnected.
-                                } else {
-                                    abortTheProvider(error); // Will fire ERROR on onStatusChanged.
-                                }
-                            }
-                        }).catch(abortTheProvider);
-                    }
-
-                    syncAgain(); // Since we may have more changes to send, we do another sync asap and then we get into the new syncAgain() flow.
+                    activePeer.disconnect(Statuses.ERROR, error);
                 }
 
                 function getBaseRevisionAndMaxClientRevision(node) {
-                    /// <param name="node" type="Dexie.Observable.SyncNode"></param>
+                    /// <param name="node" type="db.observable.SyncNode"></param>
                     if (node.remoteBaseRevisions.length === 0) return {
                         // No remoteBaseRevisions have arrived yet. No limit on clientRevision and provide null as remoteBaseRevision:
                         maxClientRevision: Infinity,
@@ -457,6 +337,20 @@
                         maxClientRevision: node.remoteBaseRevisions[0].local,
                         remoteBaseRevision: null
                     };
+                }
+
+                function getLocalChangesForNode_autoAckIfEmpty(node, cb) {
+                    return getLocalChangesForNode(node, function autoAck (changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
+                        if (changes.length === 0 && nodeModificationsOnAck.myRevision != node.myRevision) {
+                            Object.keys(nodeModificationsOnAck).forEach(function (keyPath) {
+                                Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
+                            });
+                            node.save();
+                            return getLocalChangesForNode(node, autoAck);
+                        } else {
+                            return cb(changes, remoteBaseRevision, partial, nodeModificationsOnAck);
+                        }
+                    });
                 }
 
                 function getLocalChangesForNode(node, cb) {
@@ -519,6 +413,7 @@
                         }).then(function () {
                             if (limitReached) {
                                 // Limit reached. Send partial result.
+                                hasMoreToGive = true;
                                 return cb(changes, null, true, {dbUploadState: state});
                             } else {
                                 // Done iterating this table. Check if there are more tables to go through:
@@ -551,7 +446,7 @@
                             var query = (maxRevision == Infinity ?
                                 _changes.where('rev').above(revision) :
                                 _changes.where('rev').between(revision, maxRevision, false, true));
-                            query.and(function (change) { return change.source !== ignoreSource }).until(function () {
+                            query.until(function () {
                                 if (numChanges === maxChanges) {
                                     partial = true;
                                     return true;
@@ -559,6 +454,7 @@
                             }).each(function (change) {
                                 // Note the revision in nextRevision:
                                 nextRevision = change.rev;
+                                if (change.source === ignoreSource) return;
                                 // Our _changes table contains more info than required (old objs, source etc). Just make sure to include the nescessary info:
                                 var changeToSend = {
                                     type: change.type,
@@ -609,6 +505,7 @@
                             });
                         }).then(function () {
                             var changes = Object.keys(changeSet).map(function (key) { return changeSet[key]; });
+                            hasMoreToGive = partial;
                             return cb(changes, partial, { myRevision: nextRevision });
                         });
                     }
@@ -616,7 +513,7 @@
                             
 
                 function applyRemoteChanges(remoteChanges, remoteRevision, partial, clear) {
-                    enque(applyRemoteChanges, function() {
+                    return enque(applyRemoteChanges, function() {
                         return letThrough(function () {
                             // FIXTHIS: Check what to do if clear() is true!
                             return (partial ? saveToUncommitedChanges(remoteChanges) : finallyCommitAllChanges(remoteChanges, remoteRevision))
@@ -642,13 +539,14 @@
                                 uncommittedChanges.add(changeToAdd);
                             });
                         }).then(function () {
-                            db._syncNodes.update(node, {appliedRemoteRevision: remoteRevision});
+                            node.appliedRemoteRevision = remoteRevision;
+                            node.save();
                         });
                     }
 
                     function finallyCommitAllChanges(changes, remoteRevision) {
                         // 1. Open a write transaction on all tables in DB
-                        return db.transaction('rw', db.tables, function () {
+                        return db.transaction('rw', db.tables.filter(function (table) { return table.name == '_changes' || table.name == '_uncommittedChanges' || table.schema.observable }), function () {
                             var trans = this;
                             var localRevisionBeforeChanges = 0;
                             var lastModificationPromise = null;
@@ -675,33 +573,24 @@
                             }).then(function (lastChange) {
                                 var currentLocalRevision = (lastChange && lastChange.rev) || 0;
                                 // 4. Update node states (appliedRemoteRevision, remoteBaseRevisions and eventually myRevision)
-                                return trans._syncNodes.where('id').equals(node.id).modify(function (dbNode) {
-                                    // Update appliedRemoteRevision:
-                                    dbNode.appliedRemoteRevision = remoteRevision;
-                                    node.appliedRemoteRevision = remoteRevision;
-                                    // Make an atomic Array.push() into node.remoteBaseRevisions:
-                                    var remoteBaseRevisions = dbNode.remoteBaseRevisions || [];
-                                    remoteBaseRevisions.push({ remote: remoteRevision, local: currentLocalRevision });
-                                    if (dbNode.myRevision === localRevisionBeforeChanges) {
-                                        // If server was up-to-date before we added new changes from the server, update myRevision to last change
-                                        // because server is still up-to-date! This is also important in order to prohibit getLocalChangesForNode() from
-                                        // ever sending an empty change list to server, which would otherwise be done every second time it would send changes.
-                                        dbNode.myRevision = currentLocalRevision;
-                                    }
-                                    // Garbage collect remoteBaseRevisions not in use anymore:
-                                    if (remoteBaseRevisions.length > 1) {
-                                        for (var i = remoteBaseRevisions.length - 1; i > 0; --i) {
-                                            if (dbNode.myRevision >= remoteBaseRevisions[i].local) {
-                                                remoteBaseRevisions.splice(0, i);
-                                                break;
-                                            }
+                                node.appliedRemoteRevision = remoteRevision;
+                                node.remoteBaseRevisions.push({ remote: remoteRevision, local: currentLocalRevision });
+                                if (node.myRevision === localRevisionBeforeChanges) {
+                                    // If server was up-to-date before we added new changes from the server, update myRevision to last change
+                                    // because server is still up-to-date! This is also important in order to prohibit getLocalChangesForNode() from
+                                    // ever sending an empty change list to server, which would otherwise be done every second time it would send changes.
+                                    node.myRevision = currentLocalRevision;
+                                }
+                                // Garbage collect remoteBaseRevisions not in use anymore:
+                                if (node.remoteBaseRevisions.length > 1) {
+                                    for (var i = node.remoteBaseRevisions.length - 1; i > 0; --i) {
+                                        if (node.myRevision >= node.remoteBaseRevisions[i].local) {
+                                            node.remoteBaseRevisions.splice(0, i);
+                                            break;
                                         }
                                     }
-                                    dbNode.remoteBaseRevisions = remoteBaseRevisions;
-                                    // Also store the changes into the memory-cached node instance:
-                                    node.myRevision = dbNode.myRevision;
-                                    node.remoteBaseRevisions = remoteBaseRevisions;
-                                });
+                                }
+                                node.save();
                             });
 
                             function applyChange(change) {
@@ -738,6 +627,168 @@
                     }
                 }
 
+
+                //
+                //
+                //  Continuation Patterns Follows
+                //
+                //
+
+                function continueSendingChanges(continuation) {
+                    if (!stillAlive()) { // Database was closed.
+                        if (continuation.disconnect)
+                            continuation.disconnect();
+                        return;
+                    }
+
+                    connectedContinuation = continuation;
+                    activePeer.on('disconnect', function () {
+                        if (connectedContinuation) {
+                            if (connectedContinuation.react) {
+                                try {
+                                    // react pattern must provide a disconnect function.
+                                    connectedContinuation.disconnect();
+                                } catch (e) { }
+                            }
+                            connectedContinuation = null;// Stop poll() pattern from polling again and abortTheProvider() from being called twice.
+                        }
+                    });
+
+                    if (continuation.react) {
+                        continueUsingReactPattern(continuation);
+                    } else {
+                        continueUsingPollPattern(continuation);
+                    }
+                }
+
+                //  React Pattern (eager)
+                function continueUsingReactPattern(continuation) {
+                    var changesWaiting, // Boolean
+                        isWaitingForServer; // Boolean
+
+
+                    function onChanges() {
+                        if (connectedContinuation) {
+                            changeStatusTo(Statuses.SYNCING);
+                            if (isWaitingForServer)
+                                changesWaiting = true;
+                            else {
+                                reactToChanges();
+                            }
+                        }
+                    }
+
+                    db.on('changes', onChanges);
+
+                    // Override disconnect() to also unsubscribe to onChanges.
+                    activePeer.on('disconnect', function () {
+                        db.on.changes.unsubscribe(onChanges);
+                    });
+
+                    function reactToChanges() {
+                        if (!connectedContinuation) return;
+                        changesWaiting = false;
+                        isWaitingForServer = true;
+                        getLocalChangesForNode_autoAckIfEmpty(node, function (changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
+                            if (!connectedContinuation) return;
+                            if (changes.length > 0) {
+                                continuation.react(changes, remoteBaseRevision, partial, function onChangesAccepted() {
+                                    Object.keys(nodeModificationsOnAck).forEach(function (keyPath) {
+                                        Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
+                                    });
+                                    node.save();
+                                    // More changes may be waiting:
+                                    reactToChanges();
+                                });
+                            } else {
+                                isWaitingForServer = false;
+                                if (changesWaiting) {
+                                    // A change jumped in between the time-spot of quering _changes and getting called back with zero changes.
+                                    // This is an expreemely rare scenario, and eventually impossible. But need to be here because it could happen in theory.
+                                    reactToChanges();
+                                } else {
+                                    changeStatusTo(Statuses.ONLINE);
+                                }
+                            }
+                        }).catch(abortTheProvider);
+                    }
+
+                    reactToChanges();
+                }
+
+                //  Poll Pattern
+                function continueUsingPollPattern() {
+
+                    function syncAgain() {
+                        getLocalChangesForNode_autoAckIfEmpty(node, function (changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
+
+                            protocolInstance.sync(node.syncContext, url, options, remoteBaseRevision, node.appliedRemoteRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError);
+
+                            function onChangesAccepted() {
+                                Object.keys(nodeModificationsOnAck).forEach(function (keyPath) {
+                                    Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
+                                });
+                                node.save();
+                            }
+
+                            function onSuccess(continuation) {
+                                if (!connectedContinuation) {
+                                    // Got disconnected before succeeding. Quit.
+                                    return;
+                                }
+                                connectedContinuation = continuation;
+                                if (partial) {
+                                    // We only sent partial changes. Need to do another round asap.
+                                    syncAgain();
+                                } else {
+                                    // We've sent all changes now (in sync!)
+                                    if (!isNaN(continuation.again) && continuation.again < Infinity) {
+                                        // Provider wants to keep polling. Set Status to ONLINE.
+                                        changeStatusTo(Statuses.ONLINE);
+                                        setTimeout(function () {
+                                            if (connectedContinuation) {
+                                                changeStatusTo(Statuses.SYNCING);
+                                                syncAgain();
+                                            }
+                                        }, continuation.again);
+                                    } else {
+                                        // Provider seems finished polling. Since we are never going to poll again,
+                                        // disconnect provider and set status to OFFLINE until another call to db.syncable.connect().
+                                        activePeer.disconnect(Statuses.OFFLINE);
+                                    }
+                                }
+                            }
+
+                            function onError(error, again) {
+                                if (!isNaN(again) && again < Infinity) {
+                                    if (connectedContinuation) {
+                                        setTimeout(function () {
+                                            if (connectedContinuation) {
+                                                changeStatusTo(Statuses.SYNCING);
+                                                syncAgain();
+                                            }
+                                        }, again);
+                                        changeStatusTo(Statuses.ERROR_WILL_RETRY);
+                                    } // else status is already changed since we got disconnected.
+                                } else {
+                                    abortTheProvider(error); // Will fire ERROR on onStatusChanged.
+                                }
+                            }
+                        }).catch(abortTheProvider);
+                    }
+
+                    if (hasMoreToGive) {
+                        syncAgain();
+                    } else if (connectedContinuation && !isNaN(connectedContinuation.again) && connectedContinuation.again < Infinity) {
+                        changeStatusTo(Statuses.ONLINE);
+                        setTimeout(function () {
+                            if (connectedContinuation) {
+                                changeStatusTo(Statuses.SYNCING);
+                                syncAgain();
+                            }
+                        }, connectedContinuation.again);
+                    }
+                }
             }
         }
 
@@ -750,7 +801,16 @@
             }
         });
 
+        var syncNodeSaveQueContexts = {};
+        db.observable.SyncNode.prototype.save = function () {
+            var node = this;
+            syncNodeSaveQueContexts[node.id] = syncNodeSaveQueContexts[node.id] || {};
+            return enque(syncNodeSaveQueContexts[node.id], function () {
+                return db.table('_syncNodes').put(node);
+            });
+        }
     }
+
 
     function enque(context, fn) {
         if (!context.ongoingOperation) {
@@ -783,6 +843,23 @@
             });
         });
         return clonedChange;
+    }
+
+    function letThrough(fn) {
+        // Make ourselves VIP by setting the PSD variable letThrough = true.
+        // This will let us through to access DB even when it is blocked while the db.ready() subscribers are firing.
+        // This would have worked automatically if we were certain that the Provider was using Dexie.Promise for all asyncronic operations. The promise PSD
+        // from the provider.connect() call would then be derived all the way to when provider would call localDatabase.applyChanges(). But since
+        // the provider more likely is using non-promise async APIs or other thenable implementations, we cannot assume that. Therefore, we need
+        // to fix this manually here as well.
+        var outerScope = Promise.psd();
+        try {
+            Promise.PSD.letThrough = true; // Make sure we are let through if still blocking db due to onready is firing.
+            // When setting this variable we will be let through even if database is not open so we need to check that first.
+            return fn();
+        } finally {
+            Promise.PSD = outerScope;
+        }
     }
 
     Dexie.Syncable.Statuses = {
