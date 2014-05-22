@@ -835,12 +835,14 @@
                     /// <param name="structure" optional="true">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
                     /// know what type each member has. Example: {name: String, emailAddresses: [String], password}</param>
                     if (this.schema.mappedClass) throw new Error("Table already mapped");
-                    // Make sure primary key is not part of prototype because add() and put() fails on Chrome if primKey template lies on prototype due to a bug in its implementation
-                    // of getByKeyPath(), that it accepts getting from prototype chain.
-                    structure = structure || shallowClone(constructor.prototype);
-                    if (this.schema.primKey.keyPath) delByKeyPath(constructor.prototype, this.schema.primKey.keyPath); 
                     this.schema.mappedClass = constructor;
                     var instanceTemplate = Object.create(constructor.prototype);
+                    if (this.schema.primKey.keyPath) {
+                        // Make sure primary key is not part of prototype because add() and put() fails on Chrome if primKey template lies on prototype due to a bug in its implementation
+                        // of getByKeyPath(), that it accepts getting from prototype chain.
+                        setByKeyPath(instanceTemplate, this.schema.primKey.keyPath, this.schema.primKey.auto ? 0 : "");
+                        delByKeyPath(constructor.prototype, this.schema.primKey.keyPath); 
+                    }
                     if (structure) {
                         // structure and instanceTemplate is for IDE code competion only while constructor.prototype is for actual inheritance.
                         applyStructure(instanceTemplate, structure); 
@@ -1863,8 +1865,8 @@
                             enumerable: true,
                             get: function () {
                                 if (Promise.PSD && Promise.PSD.prohibitDB) {
-                                    throw new Error("Dont call db." + tableName + " directly. Use tables from db.transaction() instead.");
-                                    return { ALL_TABLES_PROHIBITED_IN_TRANSCATION_SCOPE: 1 }; // For code completion in IDE.
+                                    throw new Error("Dont call db." + tableName + " directly. Use tables from your db.transaction() callback instead, or use db.table(tableName) to explicitely show you know what you're doing.");
+                                    return { A_NON_TRANSACTIONAL_TABLE_ACCESS_IN_TRANSCATION_SCOPE: 1 }; // For code completion in IDE.
                                 }
                                 return tableInstance;
                             }
