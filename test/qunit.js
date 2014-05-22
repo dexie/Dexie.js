@@ -426,7 +426,12 @@ extend( QUnit, {
 		return undefined;
 	},
 
-	push: function( result, actual, expected, message ) {
+	push: function (result, actual, expected, message) {
+	    if (result)
+	        console.info("equal: " + actual + " " + message);
+	    else
+	        console.error("expected: " + expected + " actual: " + expected + " " + message);
+
 		if ( !config.current ) {
 			throw new Error( "assertion outside test context, was " + sourceFromStacktrace() );
 		}
@@ -477,6 +482,7 @@ extend( QUnit, {
 		if ( !config.current ) {
 			throw new Error( "pushFailure() assertion outside test context, was " + sourceFromStacktrace(2) );
 		}
+		console.error("failure: " + message);
 
 		var output,
 			details = {
@@ -1500,6 +1506,11 @@ assert = QUnit.assert = {
 		if ( !config.current ) {
 			throw new Error( "ok() assertion outside test context, was " + sourceFromStacktrace(2) );
 		}
+		if (result)
+		    console.info("ok: " + msg);
+		else
+		    console.error("fail: " + msg);
+
 		result = !!result;
 		msg = msg || ( result ? "okay" : "failed" );
 
