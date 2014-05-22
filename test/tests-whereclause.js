@@ -32,21 +32,21 @@
     db.on("populate", function(trans) {
         var folders = trans.table("folders");
         var files = trans.table("files");
-        folders.add({path: "/", description: "Root folder"});
-        folders.add({path: "/usr"});
-        folders.add({path: "/usr/local"});
-        folders.add({ path: "/usr/local/bin" }).then(function (id) {
+        folders.add({path: "/", description: "Root folder"}); // 1
+        folders.add({path: "/usr"}); // 2
+        folders.add({path: "/usr/local"}); // 3
+        folders.add({ path: "/usr/local/bin" }).then(function (id) { // 4
             files.add({filename: "Hello", folderId: id});
             files.add({filename: "hello", extension: ".exe", folderId: id});
         });
-        folders.add({ path: "/usr/local/src" }).then(function (id) {
+        folders.add({ path: "/usr/local/src" }).then(function (id) { // 5
             files.add({filename: "world", extension: ".js", folderId: id});
             files.add({filename: "README", extension: ".TXT", folderId: id});
         });
-        folders.add({ path: "/usr/local/var" });
-        folders.add({ path: "/USR/local/VAR" });
-        folders.add({path: "/var"});
-        folders.add({ path: "/var/bin" }).then(function (id) {
+        folders.add({ path: "/usr/local/var" }); // 6
+        folders.add({ path: "/USR/local/VAR" }); // 7
+        folders.add({path: "/var"}); // 8
+        folders.add({ path: "/var/bin" }).then(function (id) { // 9
             files.add({filename: "hello-there", extension: ".exe", folderId: id});
         });
     });
@@ -252,6 +252,69 @@
             });
         }).catch(function (e) {
             ok(false, e + ". Expected to fail on IE10/IE11 - no support compound indexs.");
+        }).finally(start);
+    });
+
+    asyncTest("above, aboveOrEqual, below, belowOrEqual, between", 32, function () {
+        db.folders.where('id').above(5).toArray(function (a) {
+            equal(a.length, 4, "Four folders have id above 5");
+            equal(a[0].path, "/usr/local/var");
+            equal(a[1].path, "/USR/local/VAR");
+            equal(a[2].path, "/var");
+            equal(a[3].path, "/var/bin");
+        }).then(function () {
+            return db.folders.where('id').aboveOrEqual(5).toArray(function (a) {
+                equal(a.length, 5, "Five folders have id above or equal 5");
+                equal(a[0].path, "/usr/local/src");
+                equal(a[1].path, "/usr/local/var");
+                equal(a[2].path, "/USR/local/VAR");
+                equal(a[3].path, "/var");
+                equal(a[4].path, "/var/bin");
+            });
+        }).then(function () {
+            return db.folders.where('id').below(5).toArray(function (a) {
+                equal(a.length, 4, "Four folders have id below 5");
+                equal(a[0].path, "/");
+                equal(a[1].path, "/usr");
+                equal(a[2].path, "/usr/local");
+                equal(a[3].path, "/usr/local/bin");
+            });
+        }).then(function () {
+            return db.folders.where('id').belowOrEqual(5).toArray(function (a) {
+                equal(a.length, 5, "Five folders have id below or equal to 5");
+                equal(a[0].path, "/");
+                equal(a[1].path, "/usr");
+                equal(a[2].path, "/usr/local");
+                equal(a[3].path, "/usr/local/bin");
+                equal(a[4].path, "/usr/local/src");
+            });
+        }).then(function () {
+            return db.folders.where('id').between(1, 2).toArray(function (a) {
+                equal(a.length, 1, "One folder between 1 and 2");
+                equal(a[0].id, 1, "Found item is number 1");
+            });
+        }).then(function () {
+            return db.folders.where('id').between(1, 2, true, false).toArray(function (a) {
+                equal(a.length, 1, "One folder between 1 and 2 (including lower but not upper)");
+                equal(a[0].id, 1, "Found item is number 1");
+            });
+        }).then(function () {
+            return db.folders.where('id').between(1, 2, false, true).toArray(function (a) {
+                equal(a.length, 1, "One folder between 1 and 2 (including upper but not lower)");
+                equal(a[0].id, 2, "Found item is number 2");
+            });
+        }).then(function () {
+            return db.folders.where('id').between(1, 2, false, false).toArray(function (a) {
+                equal(a.length, 0, "Zarro folders between 1 and 2 (neither including lower nor upper)");
+            });
+        }).then(function () {
+            return db.folders.where('id').between(1, 2, true, true).toArray(function (a) {
+                equal(a.length, 2, "Two folder between 1 and 2 (including both lower and upper)");
+                equal(a[0].id, 1, "Number 1 among found items");
+                equal(a[1].id, 2, "Number 2 among found items");
+            });
+        }).catch(function (err) {
+            ok(false, err.stack || err);
         }).finally(start);
     });
 
