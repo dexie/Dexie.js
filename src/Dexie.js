@@ -1743,10 +1743,7 @@
                                         // Hook want to apply additional modifications. Make sure to fullfill the will of the hook.
                                         item = this.value;
                                         Object.keys(additionalChanges).forEach(function (keyPath) {
-                                            if (additionalChanges[keyPath] === undefined)
-                                                delByKeyPath(item, keyPath);
-                                            else
-                                                setByKeyPath(item, keyPath, additionalChanges[keyPath]);
+                                            setByKeyPath(item, keyPath, additionalChanges[keyPath]);  // Adding {keyPath: undefined} means that the keyPath should be deleted. Handled by setByKeyPath
                                         });
                                     }
                                 }
@@ -1760,11 +1757,8 @@
                             var anythingModified = false;
                             for (var i = 0; i < numKeys; ++i) {
                                 var keyPath = keyPaths[i], val = changes[keyPath];
-                                if (val === undefined && getByKeyPath(item, keyPath) !== undefined) {
-                                    delByKeyPath(item, keyPath); // Adding {keyPath: undefined} means that the keyPath should be deleted.
-                                    anythingModified = true;
-                                } else if (getByKeyPath(item, keyPath) !== val) {
-                                    setByKeyPath(item, keyPath, val);
+                                if (getByKeyPath(item, keyPath) !== val) {
+                                    setByKeyPath(item, keyPath, val); // Adding {keyPath: undefined} means that the keyPath should be deleted. Handled by setByKeyPath
                                     anythingModified = true;
                                 }
                             }
@@ -1781,10 +1775,7 @@
                             if (additionalChanges) extend(changes, additionalChanges);
                             Object.keys(changes).forEach(function (keyPath) {
                                 var val = changes[keyPath];
-                                if (val === undefined && getByKeyPath(item, keyPath) !== undefined) {
-                                    delByKeyPath(item, keyPath, changes[keyPath]);
-                                    anythingModified = true;
-                                } else if (getByKeyPath(item, keyPath) !== val) {
+                                if (getByKeyPath(item, keyPath) !== val) {
                                     setByKeyPath(item, keyPath, changes[keyPath]);
                                     anythingModified = true;
                                 }
@@ -2523,7 +2514,6 @@
 
     function setByKeyPath(obj, keyPath, value) {
         if (!obj || keyPath === undefined) return;
-        var bDelete = arguments[3];
         if (Array.isArray(keyPath)) {
             assert(Array.isArray(value));
             for (var i = 0, l = keyPath.length; i < l; ++i) {
@@ -2535,20 +2525,20 @@
                 var currentKeyPath = keyPath.substr(0, period);
                 var remainingKeyPath = keyPath.substr(period + 1);
                 if (remainingKeyPath === "")
-                    if (bDelete) delete obj[currentKeyPath]; else obj[currentKeyPath] = value;
+                    if (value === undefined) delete obj[currentKeyPath]; else obj[currentKeyPath] = value;
                 else {
                     var innerObj = obj[currentKeyPath];
                     if (!innerObj) innerObj = (obj[currentKeyPath] = {});
-                    setByKeyPath(innerObj, remainingKeyPath, value, bDelete);
+                    setByKeyPath(innerObj, remainingKeyPath, value);
                 }
             } else {
-                if (bDelete) delete obj[keyPath]; else obj[keyPath] = value;
+                if (value === undefined) delete obj[keyPath]; else obj[keyPath] = value;
             }
         }
     }
 
     function delByKeyPath(obj, keyPath) {
-        setByKeyPath(obj, keyPath, null, true);
+        setByKeyPath(obj, keyPath, undefined);
     }
 
     function shallowClone(obj) {
@@ -2714,6 +2704,7 @@
     Dexie.deepClone = deepClone;
     Dexie.addons = [];
     Dexie.fakeAutoComplete = fakeAutoComplete;
+    Dexie.asap = asap;
 	// Export our static classes
     Dexie.MultiModifyError = MultiModifyError;
     Dexie.IndexSpec = IndexSpec;
