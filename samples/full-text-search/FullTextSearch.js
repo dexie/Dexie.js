@@ -33,7 +33,7 @@
             prev[current] = true;
             return prev;
         }, {});
-        return Object.keys(set);
+        return Object.keys(wordSet);
     }
 
     // Open database to allow application code using it.
