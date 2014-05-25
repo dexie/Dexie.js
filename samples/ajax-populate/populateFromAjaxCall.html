@@ -4,6 +4,10 @@
     <title>Dexie Sample - populate from ajax call</title>
     <script src="../../src/Dexie.js"></script>
     <script>
+        //
+        // PREPARATION
+        //
+
         // Fake jquery ajax
         var $ = {
             ajax: function (url, params) {
@@ -14,8 +18,34 @@
             }
         };
         var url = "http://dummy";
+
+        // To make the sample more visible - replace window.console with one that shows the content on page
+        function Console() {
+            this.table = document.createElement('table');
+            this.log = function (txt, type) {
+                var tr = document.createElement('tr');
+                var td = document.createElement('td');
+                td.textContent = type || "";
+                tr.appendChild(td);
+                td = document.createElement('td');
+                td.textContent = txt;
+                tr.appendChild(td);
+                this.table.appendChild(tr);
+            }
+            this.error = function (txt) {
+                this.log(txt, "ERROR!");
+            }
+        }
+        window.console = new Console();
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('consoleArea').appendChild(console.table);
+        });
+
     </script>
     <script>
+        //
+        // SAMPLE CODE
+        //
 
         var db = new Dexie('someDB');
         db.version(3).stores({
@@ -60,7 +90,7 @@
                             });
                         });
                     }).then(function () {
-                        console.log ("Transaction committed");
+                        console.log("Transaction committed");
                     });
                 }
             });
@@ -84,8 +114,9 @@
         });
     </script>
 </head>
-<body>
-    To see what happens, please open your console log (F12 --> Console in IE/Chrome/Firefox). Opera: Open Web Inspector --> Console.<br />
+<body>    
+    <div id="consoleArea"></div>
+    <button onclick="window.location.reload();">Reload page</button>
     <button onclick="db.delete().then(function(){window.location.reload()});">Delete Database and reload page</button>
 </body>
 </html>
