@@ -21,7 +21,7 @@
 
         var MAX_CHANGES_PER_CHUNK = 1000;
 
-        db.on('message', function onMessage(msg) {
+        db.on('message', function (msg) {
             // Message from other local node arrives...
             if (msg.type == 'connect') {
                 // We are master node and another non-master node wants us to do the connect.
