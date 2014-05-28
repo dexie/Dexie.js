@@ -2701,7 +2701,7 @@
     //
     // Static method for retrieving a list of all existing databases at current host.
     //
-    Dexie.getDatabaseNames = function () {
+    Dexie.getDatabaseNames = function (cb) {
         return new Promise(function (resolve, reject) {
             if ('webkitGetDatabaseNames' in indexedDB) {
                 var req = indexedDB.webkitGetDatabaseNames();
@@ -2717,7 +2717,7 @@
                     resolve(databaseNames);
                 });
             }
-        });
+        }).then(cb);
     }
 
     Dexie.defineClass = function (structure) {
