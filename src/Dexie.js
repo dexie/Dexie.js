@@ -517,18 +517,24 @@
                     // A future version of Dexie.js will stopover an intermediate version to workaround this.
                     // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
                     if (!indexedDB) throw new Error("indexedDB API not found. If using IE10+, make sure to run your code on a server URL (not locally). If using Safari, make sure to include indexedDB polyfill.");
+                    var dbWasCreated = false;
                     var req = indexedDB.open(dbName, dbVersion * 10);
                     req.onerror = eventToError(openError);
                     req.onblocked = db.on("blocked").fire;
                     req.onupgradeneeded = function (e) {
+                        if (e.oldVersion == 0) dbWasCreated = true;
                         req.transaction.onerror = eventToError(openError);
                         runUpgraders(e.oldVersion / 10, req.transaction, openError);
                     };
                     req.onsuccess = function (e) {
                         isBeingOpened = false;
                         idbdb = req.result;
-                        idbdb.onversionchange = db.on("versionchange").fire;
-
+                        idbdb.onversionchange = db.on("versionchange").fire; // Not firing it here, just setting the function callback to any registered subscriber.
+                        if (dbWasCreated) {
+                            globalDatabaseList(function (databaseNames) {
+                                return databaseNames.push(dbName);
+                            });
+                        }
                         // Now, let any subscribers to the on("ready") fire BEFORE any other db operations resume!
                         // If an the on("ready") subscriber returns a Promise, we will wait til promise completes or rejects before 
                         var outerScope = Promise.psd();
@@ -580,7 +586,13 @@
                 function doDelete() {
                     db.close();
                     var req = indexedDB.deleteDatabase(dbName);
-                    req.onsuccess = resolve;
+                    req.onsuccess = function () {
+                        globalDatabaseList(function (databaseNames) {
+                            var pos = databaseNames.indexOf(dbName);
+                            if (pos >= 0) return databaseNames.splice(pos, 1);
+                        });
+                        resolve();
+                    };
                     req.onerror = eventRejectHandler(reject, ["deleting", dbName]);
                     req.onblocked = function () {
                         db.on("blocked").fire();
@@ -860,7 +872,7 @@
                         } : function makeInherited (obj) {
                             if (!obj) return obj; // No valid object. (Value is null). Return as is.
                             // __proto__ not supported - do it by the standard: return a new object and clone the members from the old one.
-                            var res = Object.create(proto);
+                            var res = Object.create(constructor.prototype);
                             for (var m in obj) if (obj.hasOwnProperty(m)) res[m] = obj[m];
                             return res;
                         });
@@ -931,11 +943,13 @@
                     /// </summary>
                     /// <param name="obj" type="Object">A javascript object to insert or update</param>
                     /// <param name="key" optional="true">Primary key</param>
-                    var self = this;
-                    if (this.hook.creating.subscribers.length || this.hook.deleting.subscribers.length) {
+                    var self = this,
+                        creatingHook = this.hook.creating.fire,
+                        updatingHook = this.hook.updating.fire;
+                    if (creatingHook !== nop || updatingHook !== nop) {
                         //
-                        // People listens to when("creating") or when("deleting") events!
-                        // We must implement put() using WriteableCollection.modify() and WriteableTable.add() in order to call the correct events!
+                        // People listens to when("creating") or when("updating") events!
+                        // We must know whether the put operation results in an CREATE or UPDATE.
                         //
                         return this._trans(READWRITE, function (resolve, reject, trans) {
                             // Since key is optional, make sure we get it from obj if not provided
@@ -1949,38 +1963,6 @@
             return filter1 ? filter2 ? function () { return filter1.apply(this, arguments) && filter2.apply(this, arguments) } : filter1 : filter2;
         }
 
-        function eventToError(fn) {
-            return function (e) {
-                return fn(e && e.target && e.target.error);
-            }
-        }
-
-        function eventRejectHandler(reject, sentance) {
-            return function (event) {
-                var origErrObj = (event && event.target.error) || { toString: "" },
-                    errObj = origErrObj;                
-                if (sentance) {
-                    errObj = Object.create(origErrObj);
-                    errObj.toString = function () {
-                        return origErrObj.toString() + " occurred when " + sentance.map(function (word) {
-                            switch (typeof (word)) {
-                                case 'function': return word();
-                                case 'string': return word;
-                                default: return JSON.stringify(word);
-                            }
-                        }).join(" ");
-                    };
-                }
-                var catched = reject(errObj);
-                if (catched) {
-                    // Rejection was catched. Stop error from propagating to IDBTransaction.
-                    event.stopPropagation();
-                    event.preventDefault();
-                    return false;
-                }
-            };
-        }
-
         function hasIEDeleteObjectStoreBug() {
             // Assume bug is present in IE10 and IE11 but dont expect it in next version of IE (IE12)
             return navigator.userAgent.indexOf("Trident / 7.0; rv: 11.0") >= 0 || navigator.userAgent.indexOf("MSIE") >= 0;
@@ -2612,6 +2594,49 @@
         });
     }
 
+    function eventToError(fn) {
+        return function (e) {
+            return fn(e && e.target && e.target.error);
+        }
+    }
+
+    function eventRejectHandler(reject, sentance) {
+        return function (event) {
+            var origErrObj = (event && event.target.error) || { toString: "" },
+                errObj = origErrObj;
+            if (sentance) {
+                errObj = Object.create(origErrObj);
+                errObj.toString = function () {
+                    return origErrObj.toString() + " occurred when " + sentance.map(function (word) {
+                        switch (typeof (word)) {
+                            case 'function': return word();
+                            case 'string': return word;
+                            default: return JSON.stringify(word);
+                        }
+                    }).join(" ");
+                };
+            }
+            var catched = reject(errObj);
+            if (catched) {
+                // Rejection was catched. Stop error from propagating to IDBTransaction.
+                event.stopPropagation();
+                event.preventDefault();
+                return false;
+            }
+        };
+    }
+
+    function globalDatabaseList(cb) {
+        var val;
+        try {
+            val = JSON.parse(localStorage.getItem('Dexie.DatabaseNames') || "[]");
+        } catch (e) {
+            val = [];
+        }
+        if (cb(val)) {
+            localStorage.setItem('Dexie.DatabaseNames', JSON.stringify(val));
+        }
+    }
 
     //
     // IndexSpec struct
@@ -2671,6 +2696,28 @@
             return this;
         };
         return promise;
+    }
+
+    //
+    // Static method for retrieving a list of all existing databases at current host.
+    //
+    Dexie.getDatabaseNames = function () {
+        return new Promise(function (resolve, reject) {
+            if ('webkitGetDatabaseNames' in indexedDB) {
+                var req = indexedDB.webkitGetDatabaseNames();
+                req.onsuccess = function (event) {
+                    resolve(event.target.result);
+                }
+                req.onerror = eventRejectHandler(reject);
+            } else {
+                globalDatabaseList(function (databaseNames) {
+                    databaseNames.contains = function (name) {
+                        return this.indexOf(name) !== -1;
+                    }
+                    resolve(databaseNames);
+                });
+            }
+        });
     }
 
     Dexie.defineClass = function (structure) {
