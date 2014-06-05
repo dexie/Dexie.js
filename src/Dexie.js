@@ -53,8 +53,7 @@
             TypeError = deps.TypeError,
             Error = deps.Error;
 
-        var globalSchema = this._dbSchema = null;
-        var dbVersion = 0;
+        var globalSchema = this._dbSchema = {};
         var versions = [];
         var dbStoreNames = [];
         var allTables = {};
@@ -68,6 +67,7 @@
         var db = this;
         var pausedResumeables = [];
         var use_proto = (function () { function F() { }; var a = new F(); try { a.__proto__ = Object.prototype; return !(a instanceof F) } catch (e) { return false; } })()
+        var autoSchema = false;
 
         function init() {
             // If browser (not node.js or other), subscribe to versionchange event and reload page
@@ -100,7 +100,7 @@
             /// <param name="versionNumber" type="Number"></param>
             /// <returns type="Version"></returns>
             if (idbdb) throw new Error("Cannot add version when database is open");
-            dbVersion = Math.max(dbVersion, versionNumber);
+            this.verno = Math.max(this.verno, versionNumber);
             var versionInstance = versions.filter(function (v) { return v._cfg.version == versionNumber; })[0];
             if (versionInstance) return versionInstance;
             versionInstance = new Version(versionNumber);
@@ -485,6 +485,8 @@
         //
         //
 
+        this.verno = 0;
+
         this.open = function () {
             return new Promise(function (resolve, reject) {
                 if (idbdb || isBeingOpened) throw new Error("Database already opened or being opened");
@@ -497,38 +499,57 @@
                         // Resume all stalled operations. They will fail once they wake up.
                         resumable.resume();
                     });
+                    pausedResumeables = [];
                 }
                 try {
                     dbOpenError = null;
                     isBeingOpened = true;
 
                     // Make sure caller has specified at least one version
-                    if (versions.length == 0) throw new Error("No versions specified. Need to call version(ver) method");
-                    // Make sure at least the oldest version specifies a table schema
-                    if (!versions[0]._cfg.dbschema) throw new Error("No schema specified. Need to call dbInstance.version(ver).stores(schema) on at least the lowest version.");
-                    // Sort versions and make all Version instances have a schema (its own or previous if not specified)
-                    versions.sort(lowerVersionFirst).reduce(function (prev, ver) {
-                        if (!ver._cfg.dbschema) ver._cfg.dbschema = prev._cfg.dbschema;
-                        return ver;
-                    });
+                    if (versions.length == 0) {
+                        autoSchema = true;
+                    } else {
+                        // Make sure at least the oldest version specifies a table schema
+                        if (!versions[0]._cfg.dbschema) throw new Error("No schema specified. Need to call dbInstance.version(ver).stores(schema) on at least the lowest version.");
+                        // Sort versions and make all Version instances have a schema (its own or previous if not specified)
+                        versions.sort(lowerVersionFirst).reduce(function (prev, ver) {
+                            if (!ver._cfg.dbschema) ver._cfg.dbschema = prev._cfg.dbschema;
+                            return ver;
+                        });
+                    }
 
-                    // Multiply dbVersion with 10 will be needed to workaround upgrading bug in IE: 
+                    // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE: 
                     // IE fails when deleting objectStore after reading from it.
                     // A future version of Dexie.js will stopover an intermediate version to workaround this.
                     // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
                     if (!indexedDB) throw new Error("indexedDB API not found. If using IE10+, make sure to run your code on a server URL (not locally). If using Safari, make sure to include indexedDB polyfill.");
                     var dbWasCreated = false;
-                    var req = indexedDB.open(dbName, dbVersion * 10);
+                    var req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, db.verno * 10);
                     req.onerror = eventToError(openError);
                     req.onblocked = db.on("blocked").fire;
                     req.onupgradeneeded = function (e) {
-                        if (e.oldVersion == 0) dbWasCreated = true;
-                        req.transaction.onerror = eventToError(openError);
-                        runUpgraders(e.oldVersion / 10, req.transaction, openError);
+                        if (autoSchema && !db._allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
+                            // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
+                            // If onupgradeneeded is called it means database did not exist. Reject the open() promise and make sure that we 
+                            // do not create a new database by accident here.
+                            req.onerror = function (event) { event.preventDefault();}; // Prohibit onabort error from firing before we're done!
+                            req.transaction.abort(); // Abort transaction (would hope that this would make DB disappear but it doesnt.)
+                            // Close database and delete it.
+                            req.result.close();
+                            var delreq = indexedDB.deleteDatabase(dbName); // The upgrade transaction is atomic, and javascript is single threaded - meaning that there is no risk that we delete someone elses database here!
+                            delreq.onsuccess = delreq.onerror = function () {
+                                openError(new Error("Database '" + dbName + "' doesnt exist"));
+                            }
+                        } else {
+                            if (e.oldVersion == 0) dbWasCreated = true;
+                            req.transaction.onerror = eventToError(openError);
+                            runUpgraders(e.oldVersion / 10, req.transaction, openError);
+                        }
                     };
                     req.onsuccess = function (e) {
                         isBeingOpened = false;
                         idbdb = req.result;
+                        if (autoSchema) readGlobalSchema();
                         idbdb.onversionchange = db.on("versionchange").fire; // Not firing it here, just setting the function callback to any registered subscriber.
                         if (dbWasCreated) {
                             globalDatabaseList(function (databaseNames) {
@@ -626,6 +647,7 @@
         // TODO: Change so that tables is a simple member and make sure to update it whenever allTables changes.
         Object.defineProperty(this, "tables", {
             get: function () {
+            	/// <returns type="Array" elementType="WriteableTable" />
                 return Object.keys(allTables).map(function (name) { return allTables[name]; });
             }
         });
@@ -674,18 +696,6 @@
                             return tableInstance.name;
                         }
                     });
-                    // Check that caller doesnt specify same table twice!
-                    // Important because of a Mozilla Firefox bug:
-                    //   If same storeName occurs twice in a call to IDBDatabase.transaction(),
-                    //   the database will turn into a stalled state forever, or until browser is restarted:
-                    if (storeNames.length > 1) for (var i = 0, l = storeNames.length; i < l; ++i) {
-                        var storeName = storeNames[i];
-                        for (var j = 0; j < storeNames.length; ++j) {
-                            if (j !== i && storeNames[j] == storeName) {
-                                throw new Error("Duplicate Store Name " + storeName + " in call to transaction()");
-                            }
-                        }
-                    }
 
                     //
                     // Resolve mode. Allow shortcuts "r" and "rw".
@@ -738,7 +748,8 @@
         }
 
         this.table = function (tableName) {
-            if (!allTables.hasOwnProperty(tableName)) { throw new Error("Table does not exist"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
+        	/// <returns type="WriteableTable"></returns>
+            if (!autoSchema && !allTables.hasOwnProperty(tableName)) { throw new Error("Table does not exist"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
             return allTables[tableName];
         }
 
@@ -1934,7 +1945,7 @@
             /// <returns type="Array" elementType="IndexSpec"></returns>
             var rv = [];
             indexes.split(',').forEach(function (index) {
-                if (!index) return;
+                index = index.trim();
                 var name = index.replace("&", "").replace("++", "").replace("*", "");
                 var keyPath = (name.indexOf('[') !== 0 ? name : index.substring(1, index.indexOf(']')).split('+'));
 
@@ -1966,6 +1977,26 @@
         function hasIEDeleteObjectStoreBug() {
             // Assume bug is present in IE10 and IE11 but dont expect it in next version of IE (IE12)
             return navigator.userAgent.indexOf("Trident / 7.0; rv: 11.0") >= 0 || navigator.userAgent.indexOf("MSIE") >= 0;
+        }
+
+        function readGlobalSchema() {
+            db.verno = idbdb.version / 10;
+            db._dbSchema = globalSchema = {};
+            dbStoreNames = [].slice.call(idbdb.objectStoreNames, 0);
+            if (dbStoreNames.length == 0) return; // Database contains no stores.
+            var trans = idbdb.transaction(dbStoreNames, 'readonly');
+            dbStoreNames.forEach(function (storeName) {
+                var store = trans.objectStore(storeName);
+                var primKey = new IndexSpec(store.keyPath, store.keyPath || "", false, false, !!store.autoIncrement, false, store.keyPath && store.keyPath.indexOf('.') != -1);
+                var indexes = [];
+                for (var j = 0; j < store.indexNames.length; ++j) {
+                    var idbindex = store.index(store.indexNames[j]);
+                    var index = new IndexSpec(idbindex.name, idbindex.keyPath, !!idbindex.unique, !!idbindex.multiEntry, false, typeof idbindex.keyPath !== 'string', idbindex.keyPath.indexOf('.') != -1);
+                    indexes.push(index);
+                }
+                globalSchema[storeName] = new TableSchema(storeName, primKey, indexes, {});
+            });
+            setApiOnPlace(allTables, db._transPromiseFactory, Object.keys(globalSchema), READWRITE, globalSchema);
         }
 
         extend(this, {
@@ -2678,10 +2709,10 @@
     // MultiModifyError Class (extends Error)
     //
     function MultiModifyError(msg, failures, successCount) {
-        Error.call(this, msg);
         this.name = "MultiModifyError";
         this.failures = failures;
         this.successCount = successCount;
+        this.message = failures.join('\n');
     }
     derive(MultiModifyError).from(Error);
 
@@ -2703,8 +2734,8 @@
     //
     Dexie.getDatabaseNames = function (cb) {
         return new Promise(function (resolve, reject) {
-            if ('webkitGetDatabaseNames' in indexedDB) {
-                var req = indexedDB.webkitGetDatabaseNames();
+            if ('webkitGetDatabaseNames' in indexedDB || 'getDatabaseNames' in indexedDB) { // In case getDatabaseNames() becomes standard, let's prepare to support it:
+                var req = ('getDatabaseNames' in indexedDB ? indexedDB.getDatabaseNames() : indexedDB.webkitGetDatabaseNames());
                 req.onsuccess = function (event) {
                     resolve(event.target.result);
                 }
