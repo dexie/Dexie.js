@@ -2633,20 +2633,18 @@
 
     function eventRejectHandler(reject, sentance) {
         return function (event) {
-            var origErrObj = (event && event.target.error) || { toString: "" },
-                errObj = origErrObj;
+            var errObj = (event && event.target.error) || new Error();
             if (sentance) {
-                errObj = Object.create(origErrObj);
-                errObj.toString = function () {
-                    return origErrObj.toString() + " occurred when " + sentance.map(function (word) {
-                        switch (typeof (word)) {
-                            case 'function': return word();
-                            case 'string': return word;
-                            default: return JSON.stringify(word);
-                        }
-                    }).join(" ");
-                };
-            }
+                var occurredWhen = " occured when " + sentance.map(function (word) {
+                    switch (typeof (word)) {
+                        case 'function': return word();
+                        case 'string': return word;
+                        default: return JSON.stringify(word);
+                    }
+                }).join(" ");
+                if (errObj.message) errObj.message += occurredWhen;
+                else errObj = errObj + occurredWhen;
+            };
             var catched = reject(errObj);
             if (catched) {
                 // Rejection was catched. Stop error from propagating to IDBTransaction.
