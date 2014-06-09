@@ -2093,7 +2093,7 @@
             var ret;
             try {
                 ret = cb(self._value);
-                if (!self._state && (!ret || typeof ret.then !== 'function')) setCatched(self);
+                if (!self._state && (!ret || typeof ret.then !== 'function' || ret._state !== false)) setCatched(self); // Caller did 'return Promise.reject(err);' - don't regard it as catched!
             } catch (e) {
                 var catched = deferred.reject(e);
                 if (!catched && self.onuncatched) {
