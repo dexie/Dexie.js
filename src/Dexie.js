@@ -1816,6 +1816,7 @@
                     var successCount = 0;
                     var iterationComplete = false;
                     var failures = [];
+                    var failKeys = [];
 
                     function modifyItem(item, cursor, advance) {
                         var thisContext = { primKey: cursor.primaryKey, value: item };
@@ -1825,6 +1826,7 @@
                             ++count;
                             req.onerror = eventRejectHandler(function (e) {
                                 failures.push(e);
+                                failKeys.push(thisContext.primKey);
                                 if (thisContext.onerror) thisContext.onerror(e);
                                 return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
                             }, function () { return bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]; });
@@ -1838,7 +1840,7 @@
 
                     function doReject(e) {
                         if (e) failures.push(e);
-                        return reject(new MultiModifyError("Error modifying one or more objects", failures, successCount));
+                        return reject(new MultiModifyError("Error modifying one or more objects", failures, successCount, failKeys));
                     }
 
                     function checkFinished() {
@@ -2706,9 +2708,10 @@
     //
     // MultiModifyError Class (extends Error)
     //
-    function MultiModifyError(msg, failures, successCount) {
+    function MultiModifyError(msg, failures, successCount, failedKeys) {
         this.name = "MultiModifyError";
         this.failures = failures;
+        this.failedKeys = failedKeys;
         this.successCount = successCount;
         this.message = failures.join('\n');
     }
