@@ -23,16 +23,18 @@
 
         db.on('message', function (msg) {
             // Message from other local node arrives...
-            if (msg.type == 'connect') {
-                // We are master node and another non-master node wants us to do the connect.
-                db.syncable.connect(msg.protocolName, msg.url, msg.options).then(msg.resolve, msg.reject);
-            } else if (msg.type == 'disconnect') {
-                db.syncable.disconnect(msg.url);
-            } else if (msg.type == 'syncStatusChanged') {
-                // We are client and a master node informs us about syncStatus change.
-                // Lookup the connectedProvider and call its event
-                db.syncable.on.statusChanged.fire(msg.newStatus, msg.url);
-            }
+            db.vip(function () {
+                if (msg.type == 'connect') {
+                    // We are master node and another non-master node wants us to do the connect.
+                    db.syncable.connect(msg.protocolName, msg.url, msg.options).then(msg.resolve, msg.reject);
+                } else if (msg.type == 'disconnect') {
+                    db.syncable.disconnect(msg.url);
+                } else if (msg.type == 'syncStatusChanged') {
+                    // We are client and a master node informs us about syncStatus change.
+                    // Lookup the connectedProvider and call its event
+                    db.syncable.on.statusChanged.fire(msg.newStatus, msg.url);
+                }
+            });
         });
 
         db.on('cleanup', function (nodes, changes, intercomm, trans, weBecameMaster) {
@@ -49,7 +51,7 @@
                     .each(function (connectedRemoteNode) {
                         // There are connected remote nodes that we must take over
                         // Since we may be in the on(ready) event, we must get VIPed to continue - Promise.PSD is not derived in Collection.each() since it is a callback called outside a Promise.
-                        letThrough(function () {
+                        db.vip(function () {
                             db.syncable.connect(connectedRemoteNode.syncProtocol, connectedRemoteNode.url, connectedRemoteNode.syncOptions);
                         });
                     });
@@ -67,7 +69,9 @@
                         if (connectedRemoteNodes.length > 0) {
                             return Promise.all(connectedRemoteNodes.map(function (node) {
                                 return db.syncable.connect(node.syncProtocol, node.url, node.syncOptions)
-                                    .catch(function () { }); // If a node fails to connect, don't make db.open() reject. Accept it!
+                                    .catch(function () {
+                                        return undefined;// If a node fails to connect, don't make db.open() reject. Accept it!
+                                    }); 
                             }));
                         }
                     });
@@ -78,7 +82,7 @@
         db.syncable = {};
 
         db.syncable.getStatus = function (url, cb) {
-            return letThrough(function () {
+            return db.vip(function(){
                 return db._syncNodes.where('url').equals(url).first(function (node) {
                     return node ? node.status : Statuses.OFFLINE;
                 });
@@ -129,10 +133,12 @@
                     return new Promise(function (resolve, reject) {
                         db.on("ready", function syncWhenReady() {
                             db.on.ready.unsubscribe(syncWhenReady);
-                            return db.syncable.connect(protocolName, url, options).then(resolve).catch(function (err) {
-                                // Reject the promise returned to the caller of db.syncable.connect():
-                                reject(err);
-                                // but resolve the promise that db.on("ready") waits for, because database should succeed to open even if the connect operation fails!
+                            return db.vip(function(){
+                                return db.syncable.connect(protocolName, url, options).then(resolve).catch(function (err) {
+                                    // Reject the promise returned to the caller of db.syncable.connect():
+                                    reject(err);
+                                    // but resolve the promise that db.on("ready") waits for, because database should succeed to open even if the connect operation fails!
+                                });
                             });
                         });
                     });
@@ -261,18 +267,24 @@
                                     reject(err);
                                 }
                                 Dexie.asap(function () {
-                                    protocolInstance.sync(
-                                        node.syncContext,
-                                        url,
-                                        options,
-                                        remoteBaseRevision,
-                                        node.appliedRemoteRevision,
-                                        changes,
-                                        partial,
-                                        applyRemoteChanges,
-                                        onChangesAccepted,
-                                        resolve,
-                                        onError);
+                                    try {
+                                        protocolInstance.sync(
+                                            node.syncContext,
+                                            url,
+                                            options,
+                                            remoteBaseRevision,
+                                            node.appliedRemoteRevision,
+                                            changes,
+                                            partial,
+                                            applyRemoteChanges,
+                                            onChangesAccepted,
+                                            function (continuation) {
+                                                resolve(continuation);
+                                            },
+                                            onError);
+                                    } catch (ex) {
+                                        onError(ex, Infinity);
+                                    }
 
                                     function onError(error, again) {
                                         reject(error);
@@ -514,7 +526,8 @@
 
                 function applyRemoteChanges(remoteChanges, remoteRevision, partial, clear) {
                     return enque(applyRemoteChanges, function() {
-                        return letThrough(function () {
+                        return db.vip(function () {
+                            if (!stillAlive()) return Promise.reject("Database not open");
                             // FIXTHIS: Check what to do if clear() is true!
                             return (partial ? saveToUncommitedChanges(remoteChanges) : finallyCommitAllChanges(remoteChanges, remoteRevision))
                                 .catch(function (error) {
@@ -545,11 +558,13 @@
                     }
 
                     function finallyCommitAllChanges(changes, remoteRevision) {
+                        //alert("finallyCommitAllChanges() will now start its job.");
+                        //var tick = Date.now();
+
                         // 1. Open a write transaction on all tables in DB
                         return db.transaction('rw', db.tables.filter(function (table) { return table.name == '_changes' || table.name == '_uncommittedChanges' || table.schema.observable }), function () {
                             var trans = this;
                             var localRevisionBeforeChanges = 0;
-                            var lastModificationPromise = null;
                             trans._changes.orderBy('rev').last(function (lastChange) {
                                 // Store what revision we were at before committing the changes
                                 localRevisionBeforeChanges = (lastChange && lastChange.rev) || 0;
@@ -557,16 +572,14 @@
                                 // Specify the source. Important for the change consumer to ignore changes originated from self!
                                 trans.source = node.id;
                                 // 2. Apply uncommitted changes and delete each uncommitted change
-                                return trans._uncommittedChanges.where('node').equals(node.id).modify(function (change) {
-                                    lastModificationPromise = applyChange(change);
-                                    delete this.value;
-                                });
+                                return trans._uncommittedChanges.where('node').equals(node.id).toArray();
+                            }).then(function (uncommittedChanges) {
+                                return applyChanges(uncommittedChanges, 0);
+                            }).then(function () {
+                                return trans._uncommittedChanges.where('node').equals(node.id).delete();
                             }).then(function () {
                                 // 3. Apply last chunk of changes
-                                changes.forEach(function (change) {
-                                    lastModificationPromise = applyChange(change);
-                                });
-                                if (lastModificationPromise) return lastModificationPromise; // Wait until last modification is done, so that it's revision is created!
+                                return applyChanges(changes, 0);
                             }).then(function () {
                                 // Get what revision we are at now:
                                 return trans._changes.orderBy('rev').last();
@@ -591,13 +604,74 @@
                                     }
                                 }
                                 node.save();
+                                //var tock = Date.now();
+                                //alert("finallyCommitAllChanges() has done its job. " + changes.length + " changes applied in " + ((tock - tick) / 1000) + "seconds");
                             });
+
+                            function applyChanges(changes, offset) {
+                            	/// <param name="changes" type="Array" elementType="IDatabaseChange"></param>
+                            	/// <param name="offset" type="Number"></param>
+                                var lastChangeType = 0;
+                                var lastCreatePromise = null;
+                                for (var i=offset, len = changes.length; i<len; ++i) {
+                                    var change = changes[i];
+                                    var table = trans.tables[change.table];
+                                    if (change.type === CREATE) {
+                                        // Optimize CREATE changes because on initial sync with server, the entire DB will be downloaded in forms of CREATE changes.
+                                        // Instead of waiting for each change to resolve, do all CREATE changes in bulks until another type of change is stepped upon.
+                                        // This case is the only case that allows i to increment and the for-loop to continue since it does not return anything.
+                                        var specifyKey = !table.schema.primKey.keyPath;
+                                        lastCreatePromise = (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).catch(DOMException, function (e) {
+                                            return (specifyKey ? table.put(change.obj, change.key) : table.put(change.obj));
+                                        });
+                                    } else if (lastCreatePromise) {
+                                        // We did some CREATE changes but now stumbled upon another type of change.
+                                        // Let's wait for the last CREATE change to resolve and then call applyChanges again at current position. Next time, lastCreatePromise will be null and a case below will happen.
+                                        return lastCreatePromise.then(function () {
+                                            applyChanges(changes, i);
+                                        });
+                                    } else if (change.type === UPDATE) {
+                                        return table.update(change.key, change.mods).then(function () {
+                                            // Wait for update to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
+                                            applyChanges(changes, i + 1);
+                                        });
+                                    } else if (change.type === DELETE) {
+                                        return table.delete(change.key).then(function () {
+                                            // Wait for delete to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
+                                            applyChanges(changes, i + 1);
+                                        });
+                                    }
+                                }
+                                return lastCreatePromise || Promise.resolve(null); // Will return null or a Promise and make the entire applyChanges promise finally resolve.
+                            }
 
                             function applyChange(change) {
                                 var table = trans.tables[change.table];
                                 var specifyKey = !table.schema.primKey.keyPath;
                                 switch (change.type) {
-                                    case CREATE: return specifyKey ? table.put(change.obj, change.key) : table.put(change.obj);
+                                    case CREATE: 
+                                        /*return (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).then(function () {
+                                            return true; 
+                                        }).catch(function (e) {
+                                            return false; // Would be more straight-forward to return a new Promise here, but there is a limitation in Dexie that makes the error bubble to transaction despite being catched in case the catch clause returns another Promise.
+                                        }).then(function (added) {
+                                            if (!added) {
+                                                return specifyKey ? table.put(change.obj, change.key) : table.put(change.obj);
+                                            }
+                                        });*/
+                                        /*return trans._promise('readwrite', function (resolve, reject) {
+                                            (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).then(function(val){
+                                                resolve (val);
+                                            }).catch(function (e) {
+                                                (specifyKey ? table.put(change.obj, change.key) : table.put(change.obj)).then(resolve, reject);
+                                            });
+                                        }, "writelock");*/
+                                        /*trans._lock();
+                                        return (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).catch(function (e) {
+                                            return specifyKey ? table.put(change.obj, change.key) : table.put(change.obj);
+                                        }).finally(function () {
+                                            trans._unlock();
+                                        });;*/
                                     case UPDATE: return table.update(change.key, change.mods);
                                     case DELETE: return table.delete(change.key);
                                     default: throw new Error("Change type unsupported");
@@ -606,27 +680,6 @@
                         });
                     }
                 }
-
-                function letThrough(fn) {
-                    // Make ourselves VIP by setting the PSD variable letThrough = true.
-                    // This will let us through to access DB even when it is blocked while the db.ready() subscribers are firing.
-                    // This would have worked automatically if we were certain that the Provider was using Dexie.Promise for all asyncronic operations. The promise PSD
-                    // from the provider.connect() call would then be derived all the way to when provider would call localDatabase.applyChanges(). But since
-                    // the provider more likely is using non-promise async APIs or other thenable implementations, we cannot assume that. Therefore, we need
-                    // to fix this manually here as well.
-                    var outerScope = Promise.psd();
-                    try {
-                        Promise.PSD.letThrough = true; // Make sure we are let through if still blocking db due to onready is firing.
-                        // When setting this variable we will be let through even if database is not open so we need to check that first.
-                        if (!stillAlive())
-                            return Promise.reject("Database not open");
-                        else
-                            return fn();
-                    } finally {
-                        Promise.PSD = outerScope;
-                    }
-                }
-
 
                 //
                 //
@@ -809,19 +862,22 @@
                 return db.table('_syncNodes').put(node);
             });
         }
-    }
 
-
-    function enque(context, fn) {
-        if (!context.ongoingOperation) {
-            context.ongoingOperation = fn().then(function (res) { delete context.ongoingOperation; return res; });
-            return context.ongoingOperation;
-        } else {
-            context.ongoingOperation = context.ongoingOperation.then(function () {
-                return enque(context, fn);
+        function enque(context, fn) {
+            return db.vip(function () {
+                if (!context.ongoingOperation) {
+                    context.ongoingOperation = fn().then(function (res) { delete context.ongoingOperation; return res; });
+                } else {
+                    context.ongoingOperation = context.ongoingOperation.then(function () {
+                        return enque(context, fn);
+                    });
+                }
+                return context.ongoingOperation;
             });
         }
     }
+
+
 
     function combineCreateAndUpdate(prevChange, nextChange) {
         var clonedChange = Dexie.deepClone(prevChange);// Clone object before modifying since the earlier change in db.changes[] would otherwise be altered.
@@ -843,23 +899,6 @@
             });
         });
         return clonedChange;
-    }
-
-    function letThrough(fn) {
-        // Make ourselves VIP by setting the PSD variable letThrough = true.
-        // This will let us through to access DB even when it is blocked while the db.ready() subscribers are firing.
-        // This would have worked automatically if we were certain that the Provider was using Dexie.Promise for all asyncronic operations. The promise PSD
-        // from the provider.connect() call would then be derived all the way to when provider would call localDatabase.applyChanges(). But since
-        // the provider more likely is using non-promise async APIs or other thenable implementations, we cannot assume that. Therefore, we need
-        // to fix this manually here as well.
-        var outerScope = Promise.psd();
-        try {
-            Promise.PSD.letThrough = true; // Make sure we are let through if still blocking db due to onready is firing.
-            // When setting this variable we will be let through even if database is not open so we need to check that first.
-            return fn();
-        } finally {
-            Promise.PSD = outerScope;
-        }
     }
 
     Dexie.Syncable.Statuses = {
