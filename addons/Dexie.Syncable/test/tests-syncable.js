@@ -1,30 +1,20 @@
 ﻿///<reference path="test-syncable.html" />
-
 (function () {
 
-	/*var apa = new Dexie("apa");
-	apa.version(1).stores({ objects: "$$" });
-	apa.open().then(function(){
-		apa.close();
-		var apa2 = new Dexie("apa");
-		apa2.version(1).stores({ objects: "$$" });
-		apa2.open().then(function () {
-			apa2.close();
-			apa2 = new Dexie("apa");
-			apa2.version(1).stores({ objects: "$$" });
-			apa2.open();
-		});
-	});
-	return;*/
+    /* The following is being tested:
 
+        1. A dummy implementation of ISyncProtocol is registered so that the unit test can interact with the database correctly.
+    */
 	var db1 = new Dexie("db1");
-	var db2 = new Dexie("db2");
+	var db2 = new Dexie("db1");
 	//var syncServer = new SyncServer(12936);
 	//syncServer.start();
-	var deletePromise = Dexie.Promise.all([db1.delete(), db2.delete()]);
+	var deletePromise = Dexie.delete("db1");
 
 	module("tests-syncable", {
-		setup: function () {
+	    setup: function () {
+	        db1.close();
+	        db2.close();
 			stop();
 			deletePromise.then(start);
 		},

@@ -321,7 +321,7 @@
                                 finalSyncPromise.then(continueSendingChanges);
                             }
                         });
-                    });
+                    }, dbAliveID);
                 }
 
                 function abortTheProvider(error) {
@@ -535,7 +535,7 @@
                                     return Promise.reject(error);
                                 });
                         });
-                    });
+                    }, dbAliveID);
 
 
                     function saveToUncommitedChanges (changes) {
@@ -863,17 +863,31 @@
             });
         }
 
-        function enque(context, fn) {
-            return db.vip(function () {
+        function enque(context, fn, instanceID) {
+            function _enque () {
                 if (!context.ongoingOperation) {
                     context.ongoingOperation = fn().then(function (res) { delete context.ongoingOperation; return res; });
                 } else {
                     context.ongoingOperation = context.ongoingOperation.then(function () {
-                        return enque(context, fn);
+                        return enque(context, fn, instanceID);
                     });
                 }
                 return context.ongoingOperation;
-            });
+            }
+
+            if (!instanceID) {
+                // Caller wants to enque it until database becomes open.
+                if (db.isOpen()) {
+                    return db.vip(_enque);
+                } else {
+                    return Promise.reject(new Error ("Database was closed"));
+                }
+            } else if (db._localSyncNode && instanceID === db._localSyncNode.id) {
+                // DB is already open but queuer doesnt want it to be queued if database has been closed (request bound to current instance of DB)
+                return db.vip(_enque);
+            } else {
+                return Promise.reject(new Error("Database was closed"));
+            }
         }
     }
 
