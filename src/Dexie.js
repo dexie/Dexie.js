@@ -2261,8 +2261,16 @@
             if (arguments.length === 1) return this.then(null, onRejected);
             // First argument is the Error type to catch
             var type = arguments[0], callback = arguments[1];
-            return this.then(null, function (e) {
+            if (typeof type === 'function') return this.then(null, function (e) {
+                // Catching errors by its constructor type (similar to java / c++ / c#)
+                // Sample: promise.catch(TypeError, function (e) { ... });
                 if (e instanceof type) return callback(e); else return Promise.reject(e);
+            });
+            else return this.then(null, function (e) {
+                // Catching errors by the error.name property. Makes sense for indexedDB where error type
+                // is always DOMError but where e.name tells the actual error type.
+                // Sample: promise.catch('ConstraintError', function (e) { ... });
+                if (e && e.name === type) return callback(e); else return Promise.reject(e);
             });
         };
 
