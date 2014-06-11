@@ -122,7 +122,7 @@
                     } else {
                         // We are not master node
                         // Request master node to do the connect:
-                        return db._syncNodes.where('isMaster').above(0).first(function (masterNode) {
+                        return db.table('_syncNodes').where('isMaster').above(0).first(function (masterNode) {
                             // There will always be a master node. In theory we may self have become master node when we come here. But that's ok. We'll request ourselves.
                             return db.sendMessage('connect', { protocolName: protocolName, url: url, options: options }, masterNode.id, { wantReply: true });
                         });
@@ -385,6 +385,7 @@
                         if (node.dbUploadState == null) {
                             // Initiatalize dbUploadState
                             var tablesToUpload = db.tables.filter(function (table) { return table.schema.observable; }).map(function (table) { return table.name; });
+                            if (tablesToUpload.length === 0) return cb([], null, false, {}); // There are no synched tables at all.
                             var dbUploadState = {
                                 tablesToUpload: tablesToUpload,
                                 currentTable: tablesToUpload.shift(),

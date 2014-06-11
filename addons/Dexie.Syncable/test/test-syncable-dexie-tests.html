@@ -14,7 +14,7 @@
   <script src="../Dexie.Syncable.js"></script>
     <script>
         Dexie.Syncable.registerSyncProtocol("logger", {
-            sync: function (context, url, options, changes, baseRevision, partial, syncedRevision, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
+            sync: function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
                 /// <param name="changes" type="Array" elementType="IDatabaseChange"></param>
                 /// <param name="applyRemoteChanges" value="function (changes, lastRevision, partial, clear) {}"></param>
                 /// <param name="onSuccess" value="function (continuation) {}"></param>
@@ -61,10 +61,10 @@
             db.open = Dexie.override(db.open, function (origFunc) {
                 return function () {
                     console.log("Calling db.sync()");
-                    db.sync("logger", "").then(function () {
-                        console.log("Sync promise was resolved");
+                    db.syncable.connect("logger", "").then(function () {
+                        console.log("connect() promise was resolved");
                     }).catch(function (err) {
-                        console.error("Error from syncPromise: " + err.stack || err);
+                        console.error("Error from connect(): " + err.stack || err);
                     });
                     return origFunc.apply(this, arguments);
                 }

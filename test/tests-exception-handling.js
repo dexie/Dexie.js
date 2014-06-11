@@ -37,7 +37,7 @@
         }).then(function () {
             ok(false, "Transaction should not complete since an error should have occurred");
         }).catch(function (e) {
-            ok(true, "Got transaction error: " + (e.stack || e));
+            ok(true, "Got transaction error: " + e);
         }).finally(start);
     });
     
@@ -46,7 +46,7 @@
             users.add({ username: "dfahlander" }).then(function () {
                 ok(false, "Should not be able to add two users with same username");
             }).catch(function (e) {
-                ok(true, "Got request error: " + (e.stack || e));
+                ok(true, "Got request error: " + e);
             });
             users.add({ first: "Trazan", last: "Apansson", username: "tapan", email: ["trazan@apansson.barnarne"], pets: ["monkey"] }).then(function (id) {
                 ok(id > 2, "Could continue transaction and add Trazan since last error event was catched");
@@ -54,7 +54,7 @@
         }).then(function () {
             ok(true, "Transaction should complete since the only error that occurred was catched");
         }).catch(function (e) {
-            ok(false, "Should not get transaction error since we have catched the error. Got Transaction error: " + (e.stack || e));
+            ok(false, "Should not get transaction error since we have catched the error. Got Transaction error: " + e);
         }).finally(start);
     });
 
@@ -67,7 +67,7 @@
         }).catch(TypeError, function (e) {
             ok(false, "Should not happen. The thrown error was not a TypeError");
         }).catch(SyntaxError, function (e) {
-            ok(true, "Transaction got SyntaxError: " + (e.stack || e));
+            ok(true, "Transaction got SyntaxError: " + e);
         }).catch(function (e) {
             ok(false, "Should not come here! The error should already have been catched above()");
         }).finally(start);
@@ -83,7 +83,7 @@
         }).then(function () {
             ok(false, "Transaction should not complete since an error should have occurred");
         }).catch(function (e) {
-            ok(true, "Transaction got error: " + (e.stack || e));
+            ok(true, "Transaction got error: " + e);
         }).finally(start);
     });
 
@@ -97,7 +97,7 @@
         });
         var errorCount = 0;
         ourDB.on("error", function (e) {
-            ok(errorCount < 3, "Uncatched error successfully bubbled to db.on('error'): " + (e.stack || e));
+            ok(errorCount < 3, "Uncatched error successfully bubbled to db.on('error'): " + e);
             if (++errorCount == 3) {
                 ourDB.delete().then(start);
             }
@@ -155,7 +155,7 @@
         }));
 
         Dexie.Promise.all(promises).catch(function (e) {
-            ok(false, "Unknown error occurred: " + e.stack || e);
+            ok(false, "Unknown error occurred: " + e);
         }).finally(start);
     });
 

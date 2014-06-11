@@ -2662,7 +2662,6 @@
             return fn(e && e.target && e.target.error);
         }
     }
-
     function eventRejectHandler(reject, sentance) {
         return function (event) {
             var errObj = (event && event.target.error) || new Error();
@@ -2674,8 +2673,18 @@
                         default: return JSON.stringify(word);
                     }
                 }).join(" ");
-                if (errObj.message) errObj.message += occurredWhen;
-                else errObj = errObj + occurredWhen;
+                if (errObj.name) {
+                    errObj.toString = function toString() {
+                        return errObj.name + occurredWhen + (errObj.message ? ". " + errObj.message : "");
+                        // Code below works for stacked exceptions, BUT! stack is never present in event errors (not in any of the browsers). So it's no use to include it!
+                        /*delete this.toString; // Prohibiting endless recursiveness in IE.
+                        if (errObj.stack) rv += (errObj.stack ? ". Stack: " + errObj.stack : "");
+                        this.toString = toString;
+                        return rv;*/
+                    }
+                } else {
+                    errObj = errObj + occurredWhen;
+                }
             };
             var catched = reject(errObj);
             if (catched) {

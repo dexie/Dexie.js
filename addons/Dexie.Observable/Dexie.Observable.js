@@ -222,13 +222,13 @@
                 Dexie.Observable.on('intercomm').unsubscribe(onIntercomm);
                 Dexie.Observable.on('beforeunload').unsubscribe(onBeforeUnload);
                 // Inform other db instances in same window that we are dying:
-                if (mySyncNode) {
+                if (mySyncNode && mySyncNode.id) {
                     Dexie.Observable.on.suicideNurseCall.fire(db.name, mySyncNode.id);
                     // Inform other windows as well:
                     localStorage.setItem('Dexie.Observable/deadnode:' + mySyncNode.id.toString() + '/' + db.name, "dead"); // In IE, this will also wakeup our own window. cleanup() may trigger twice per other db instance. But that doesnt to anything.
                     mySyncNode.deleteTimeStamp = 1; // One millisecond after 1970. Makes it occur in the past but still keeps it truthy.
                     mySyncNode.lastHeartBeat = 0;
-                    db._syncNodes.put(mySyncNode); // This async operation may be cancelled since the browser is closing down now.
+                    db.table('_syncNodes').put(mySyncNode); // This async operation may be cancelled since the browser is closing down now.
                     mySyncNode = null;
                 }
 
@@ -342,7 +342,7 @@
                     Dexie.Observable.on.latestRevisionIncremented.fire(latestRevision);
                 }
                 // Add new sync node or if this is a reopening of the database after a close() call, update it.
-                return db.transaction('rw', db._syncNodes, function (syncNodes) {
+                return db.transaction('rw', '_syncNodes', function (syncNodes) {
                     syncNodes.where('isMaster').equals(1).count(function (anyMasterNode) {
                         if (!anyMasterNode) {
                             // There's no master node. Let's take that role then.
@@ -457,7 +457,7 @@
         function cleanup() {
             var ourSyncNode = mySyncNode;
             if (!ourSyncNode) return Promise.reject("Database closed");
-            return db.transaction('rw', db._syncNodes, db._changes, db._intercomm, function (nodes, changes, intercomm, trans) {
+            return db.transaction('rw', '_syncNodes', '_changes', '_intercomm', function (nodes, changes, intercomm, trans) {
                 // Cleanup dead local nodes that has no heartbeat for over a minute
                 // Dont do the following:
                 //nodes.where("lastHeartBeat").below(Date.now() - NODE_TIMEOUT).and(function (node) { return node.type == "local"; }).delete();
