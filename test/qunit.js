@@ -430,7 +430,7 @@ extend( QUnit, {
 	    if (result)
 	        console.info("equal: " + actual + " " + message);
 	    else
-	        console.error("expected: " + expected + " actual: " + expected + " " + message);
+	        console.error("expected: " + expected + " actual: " + actual + " " + message);
 
 		if ( !config.current ) {
 			throw new Error( "assertion outside test context, was " + sourceFromStacktrace() );
