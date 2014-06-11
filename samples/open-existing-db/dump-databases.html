@@ -36,7 +36,7 @@
         // SAMPLE CODE
         //
 
-        Dexie.getDatabaseNames(function dump (databases) {
+        function dump(databases) {
             if (databases.length > 0) {
                 var db = new Dexie(databases[0]);
                 // Now, open database without specifying any version. This will make the database open any existing database and read its schema automatically.
@@ -49,8 +49,16 @@
                     });
                     console.log("}");
                 }).finally(function () {
-                    dump ([].slice.call(databases, 1));
+                    dump([].slice.call(databases, 1));
                 });;
+            }
+        }
+
+        Dexie.getDatabaseNames(function (databases) {
+            if (databases.length === 0) {
+                console.log("There are no databases at current origin");
+            } else {
+                dump(databases);
             }
         });
 
