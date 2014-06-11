@@ -38,7 +38,7 @@
 
         Dexie.getDatabaseNames(function (databases) {
             if (databases.length === 0) {
-                console.log("There are no databases at current origin");
+                console.log("There are no databases at current origin. Try loading another sample and then go back to this page.");
             } else {
                 dump(databases);
             }
