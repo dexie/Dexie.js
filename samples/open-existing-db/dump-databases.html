@@ -1,0 +1,62 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Database Dump Sample</title>
+    <script src="../../src/Dexie.js"></script>
+    <script>
+        //
+        // PREPARATION
+        //
+
+        // To make the sample more visible - replace window.console with one that shows the content on page
+        function Console() {
+            this.table = document.createElement('table');
+            this.log = function (txt, type) {
+                var tr = document.createElement('tr');
+                var td = document.createElement('td');
+                td.textContent = type || "";
+                tr.appendChild(td);
+                td = document.createElement('td');
+                td.textContent = txt;
+                tr.appendChild(td);
+                this.table.appendChild(tr);
+            }
+            this.error = function (txt) {
+                this.log(txt, "ERROR!");
+            }
+        }
+        window.console = new Console();
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('consoleArea').appendChild(console.table);
+        });
+
+    </script>
+    <script>
+        //
+        // SAMPLE CODE
+        //
+
+        Dexie.getDatabaseNames(function dump (databases) {
+            if (databases.length > 0) {
+                var db = new Dexie(databases[0]);
+                // Now, open database without specifying any version. This will make the database open any existing database and read its schema automatically.
+                db.open().then(function () {
+                    console.log("Database name: " + db.name);
+                    console.log("Database version: " + db.verno);
+                    console.log("Database tables: {");
+                    db.tables.forEach(function (table) {
+                        console.log(table.name + ": " + '"' + table.schema.primKey.src + "," + table.schema.indexes.map(function (index) { return index.src; }).join(',') + '"');
+                    });
+                    console.log("}");
+                }).finally(function () {
+                    dump ([].slice.call(databases, 1));
+                });;
+            }
+        });
+
+    </script>
+</head>
+<body>
+    <div id="consoleArea"></div>
+</body>
+</html>
