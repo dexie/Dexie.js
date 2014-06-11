@@ -622,7 +622,7 @@
                                         // Instead of waiting for each change to resolve, do all CREATE changes in bulks until another type of change is stepped upon.
                                         // This case is the only case that allows i to increment and the for-loop to continue since it does not return anything.
                                         var specifyKey = !table.schema.primKey.keyPath;
-                                        lastCreatePromise = (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).catch(DOMException, function (e) {
+                                        lastCreatePromise = (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).catch("ConstraintError", function (e) {
                                             return (specifyKey ? table.put(change.obj, change.key) : table.put(change.obj));
                                         });
                                     } else if (lastCreatePromise) {

@@ -465,33 +465,32 @@
                 // Instead, we should mark any old nodes for deletion in a minute or so. If they still dont wakeup after that minute we could consider them dead.
                 var weBecameMaster = false;
                 nodes.where("lastHeartBeat").below(Date.now() - NODE_TIMEOUT).and(function (node) { return node.type === 'local' }).modify(function (node) {
-                    var thiz = this;
-                    db.vip(function () {
-                        if (node.deleteTimeStamp && node.deleteTimeStamp < Date.now()) {
-                            // Delete the node.
-                            delete thiz.value;
-                            // Cleanup localStorage "deadnode:" entry for this node (localStorage API was used to wakeup other windows (onstorage event) - an event type missing in indexedDB.)
-                            localStorage.removeItem('Dexie.Observable/deadnode:' + node.id + '/' + db.name);
-                            // Check if we are deleting a master node
-                            if (node.isMaster) {
-                                // The node we are deleting is master. We must take over that role.
-                                nodes.update(ourSyncNode, { isMaster: 1 });
-                                weBecameMaster = true;
-                            }
-                            // Cleanup intercomm messages destinated to the node being deleted:
-                            intercomm.where("destinationNode").equals(node.id).modify(function (msg) {
-                                // Delete the message from DB and if someone is waiting for reply, let ourselved answer the request.
-                                delete this.value;
-                                if (msg.wantReply) {
-                                    // Message wants a reply, meaning someone must take over its messages when it dies. Let us be that one!
-                                    consumeMessage(msg);
-                                }
-                            });
-                        } else if (!node.deleteTimeStamp) {
-                            // Mark the node for deletion
-                            node.deleteTimeStamp = Date.now() + HIBERNATE_GRACE_PERIOD;
+                    if (node.deleteTimeStamp && node.deleteTimeStamp < Date.now()) {
+                        // Delete the node.
+                        delete this.value;
+                        // Cleanup localStorage "deadnode:" entry for this node (localStorage API was used to wakeup other windows (onstorage event) - an event type missing in indexedDB.)
+                        localStorage.removeItem('Dexie.Observable/deadnode:' + node.id + '/' + db.name);
+                        // Check if we are deleting a master node
+                        if (node.isMaster) {
+                            // The node we are deleting is master. We must take over that role.
+                            // OK to call nodes.update(). No need to call db.vip() because nodes is opened in existing transaction!
+                            nodes.update(ourSyncNode, { isMaster: 1 });
+                            weBecameMaster = true;
                         }
-                    });
+                        // Cleanup intercomm messages destinated to the node being deleted:
+                        intercomm.where("destinationNode").equals(node.id).modify(function (msg) {
+                            // OK to call intercomm. No need to call db.vip() because intercomm is opened in existing transaction!
+                            // Delete the message from DB and if someone is waiting for reply, let ourselved answer the request.
+                            delete this.value;
+                            if (msg.wantReply) {
+                                // Message wants a reply, meaning someone must take over its messages when it dies. Let us be that one!
+                                consumeMessage(msg);
+                            }
+                        });
+                    } else if (!node.deleteTimeStamp) {
+                        // Mark the node for deletion
+                        node.deleteTimeStamp = Date.now() + HIBERNATE_GRACE_PERIOD;
+                    }
                 }).then(function () {
                     // Cleanup old revisions that no node is interested of.
                     return nodes.orderBy("myRevision").first(function (oldestNode) {
