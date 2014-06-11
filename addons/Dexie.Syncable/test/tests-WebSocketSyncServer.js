@@ -1,7 +1,7 @@
 ﻿///<reference path="test-syncable.html" />
 
 (function () {
-    module("tests-syncprovider");
+    module("tests-WebSocketSyncServer");
 
     asyncTest("testWebSocketSyncServer", function () {
         var server = new SyncServer(1234);

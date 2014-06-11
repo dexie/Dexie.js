@@ -18,12 +18,12 @@
 	return;*/
 
 	var db1 = new Dexie("db1");
-	var db2 = new Dexie("db1");
+	var db2 = new Dexie("db2");
 	//var syncServer = new SyncServer(12936);
 	//syncServer.start();
-	var deletePromise = Dexie.Promise.all(db1.delete());//, db2.delete());
+	var deletePromise = Dexie.Promise.all([db1.delete(), db2.delete()]);
 
-	module("tests-syncprovider", {
+	module("tests-syncable", {
 		setup: function () {
 			stop();
 			deletePromise.then(start);
