@@ -155,7 +155,7 @@ asyncTest("Dexie.getDatabaseNames", 11, function () {
         return Dexie.getDatabaseNames();
     }).then(function (names) {
         equal(names.length, defaultDatabases.length + 1, "Another DB has been created");
-        ok(names.contains("TestDB1"), "Database names now contains TestDB1");
+        ok(names.indexOf("TestDB1") !== -1, "Database names now contains TestDB1");
         db2 = new Dexie("TestDB2");
         db2.version(1).stores({});
         return db2.open();
@@ -164,19 +164,19 @@ asyncTest("Dexie.getDatabaseNames", 11, function () {
         return Dexie.getDatabaseNames();
     }).then(function (names) {
         equal(names.length, defaultDatabases.length + 2, "Yet another DB has been created");
-        ok(names.contains("TestDB2"), "Database names now contains TestDB2");
+        ok(names.indexOf("TestDB2") !== -1, "Database names now contains TestDB2");
         return db1.delete();
     }).then(function () {
         return Dexie.getDatabaseNames();
     }).then(function(names){
         equal(names.length, defaultDatabases.length + 1, "A database has been deleted");
-        ok(!names.contains("TestDB1"), "TestDB1 not in database list anymore");
+        ok(!names.indexOf("TestDB1") !== -1, "TestDB1 not in database list anymore");
         return db2.delete();
     }).then(function () {
         return Dexie.getDatabaseNames();
     }).then(function (names) {
         equal(names.length, defaultDatabases.length, "All of our databases have been deleted");
-        ok(!names.contains("TestDB2"), "TestDB2 not in database list anymore");
+        ok(!names.indexOf("TestDB2") !== -1, "TestDB2 not in database list anymore");
     }).catch(function (err) {
         ok(false, err.stack || err);
     }).finally(function () {

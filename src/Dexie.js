@@ -551,11 +551,9 @@
                         idbdb = req.result;
                         if (autoSchema) readGlobalSchema();
                         idbdb.onversionchange = db.on("versionchange").fire; // Not firing it here, just setting the function callback to any registered subscriber.
-                        if (dbWasCreated) {
-                            globalDatabaseList(function (databaseNames) {
-                                return databaseNames.push(dbName);
-                            });
-                        }
+                        globalDatabaseList(function (databaseNames) {
+                            if (databaseNames.indexOf(dbName) === -1) return databaseNames.push(dbName);
+                        });
                         // Now, let any subscribers to the on("ready") fire BEFORE any other db operations resume!
                         // If an the on("ready") subscriber returns a Promise, we will wait til promise completes or rejects before 
                         var outerScope = Promise.psd();
@@ -2290,6 +2288,7 @@
             var p = new Promise(function () { });
             p._state = true;
             p._value = value;
+            return p;
         };
 
         Promise.reject = function (value) {
@@ -2785,16 +2784,11 @@
             if ('webkitGetDatabaseNames' in indexedDB || 'getDatabaseNames' in indexedDB) { // In case getDatabaseNames() becomes standard, let's prepare to support it:
                 var req = ('getDatabaseNames' in indexedDB ? indexedDB.getDatabaseNames() : indexedDB.webkitGetDatabaseNames());
                 req.onsuccess = function (event) {
-                    resolve(event.target.result);
+                    resolve([].slice.call(event.target.result, 0)); // Converst DOMStringList to Array<String>
                 }
                 req.onerror = eventRejectHandler(reject);
             } else {
-                globalDatabaseList(function (databaseNames) {
-                    databaseNames.contains = function (name) {
-                        return this.indexOf(name) !== -1;
-                    }
-                    resolve(databaseNames);
-                });
+                globalDatabaseList(resolve);
             }
         }).then(cb);
     }
