@@ -63,7 +63,6 @@
         var dbOpenError = null;
         var isBeingOpened = false;
         var READONLY = "readonly", READWRITE = "readwrite";
-        var iewa; // IE WorkAound needed in IE10 & IE11 for http://connect.microsoft.com/IE/feedback/details/783672/indexeddb-getting-an-aborterror-exception-when-trying-to-delete-objectstore-inside-onupgradeneeded
         var db = this;
         var pausedResumeables = [];
         var use_proto = (function () { function F() { }; var a = new F(); try { a.__proto__ = Object.prototype; return !(a instanceof F) } catch (e) { return false; } })()
@@ -105,17 +104,26 @@
             if (versionInstance) return versionInstance;
             versionInstance = new Version(versionNumber);
             versions.push(versionInstance);
+            versions.sort(lowerVersionFirst);
             return versionInstance;
         }
 
         function Version(versionNumber) {
             this._cfg = {
                 version: versionNumber,
-                dbschema: null,
-                schemaUpgrade: null,
+                storesSource: null,
+                dbschema: {},
+                tables: {},
                 contentUpgrade: null,
             }
         }
+
+        /*function compileSchema() {
+            var stores = {};
+                this._parseStoresSpec(version.storesSource, dbschema);
+            });
+        }*/
+
 
         extend(Version.prototype, {
             stores: function (stores) {
@@ -133,18 +141,23 @@
                 ///  "*"  means value is multiEntry, <br/>
                 ///  "++" means auto-increment and only applicable for primary key <br/>
                 /// </param>
-                var dbschema = (this._cfg.dbschema = this._cfg.dbschema || {});
-                this._parseStoresSpec(stores, dbschema);
+                this._cfg.storesSource = this._cfg.storesSource ? extend(this._cfg.storesSource, stores) : stores;
+                // Derive stores from earlier versions if they are not explicitely specified as null or a new syntax.
+                var storesSpec = {};
+                versions.forEach(function (version) { // 'versions' is always sorted by lowest version first.
+                    extend(storesSpec, version._cfg.storesSource);
+                });
+
+                var dbschema = (this._cfg.dbschema = {});
+                this._parseStoresSpec(storesSpec, dbschema);
                 // Update the latest schema to this version
-                var latestSchema = getCurrentDBSchema();
-                if (globalSchema != latestSchema) {
-                    // Update API
-                    globalSchema = db._dbSchema = latestSchema;
-                    removeTablesApi([allTables, db]);
-                    setApiOnPlace(allTables, db._transPromiseFactory, Object.keys(latestSchema), READWRITE, latestSchema);
-                    setApiOnPlace(db, db._transPromiseFactory, Object.keys(latestSchema), READWRITE, latestSchema, true);
-                }
-                dbStoreNames = Object.keys(latestSchema);
+                // Update API
+                globalSchema = db._dbSchema = dbschema;
+                removeTablesApi([allTables, db]);
+                setApiOnPlace(allTables, db._transPromiseFactory, Object.keys(dbschema), READWRITE, dbschema);
+                setApiOnPlace(db, db._transPromiseFactory, Object.keys(dbschema), READWRITE, dbschema, true);
+                setApiOnPlace(this._cfg.tables, db._transPromiseFactory, Object.keys(dbschema), READWRITE, dbschema, true);
+                dbStoreNames = Object.keys(dbschema);
                 return this;
             },
             upgrade: function (upgradeFunction) {
@@ -156,19 +169,21 @@
                 this._cfg.contentUpgrade = upgradeFunction;
                 return this;
             },
-            _parseStoresSpec: function (stores, inOutSchema) {
+            _parseStoresSpec: function (stores, outSchema) {
                 Object.keys(stores).forEach(function (tableName) {
-                    var instanceTemplate = {};
-                    var indexes = parseIndexSyntax(stores[tableName]);
-                    var primKey = indexes.shift();
-                    if (primKey.multi) throw new Error("Primary key cannot be multi-valued");
-                    if (primKey.keyPath && primKey.auto) setByKeyPath(instanceTemplate, primKey.keyPath, 0);
-                    indexes.forEach(function (idx) {
-                        if (idx.auto) throw new Error("Only primary key can be marked as autoIncrement (++)");
-                        if (!idx.keyPath) throw new Error("Index must have a name and cannot be an empty string");
-                        setByKeyPath(instanceTemplate, idx.keyPath, idx.compound ? idx.keyPath.map(function () { return "" }) : "");
-                    });
-                    inOutSchema[tableName] = new TableSchema(tableName, primKey, indexes, instanceTemplate);
+                    if (stores[tableName] !== null) {
+                        var instanceTemplate = {};
+                        var indexes = parseIndexSyntax(stores[tableName]);
+                        var primKey = indexes.shift();
+                        if (primKey.multi) throw new Error("Primary key cannot be multi-valued");
+                        if (primKey.keyPath && primKey.auto) setByKeyPath(instanceTemplate, primKey.keyPath, 0);
+                        indexes.forEach(function (idx) {
+                            if (idx.auto) throw new Error("Only primary key can be marked as autoIncrement (++)");
+                            if (!idx.keyPath) throw new Error("Index must have a name and cannot be an empty string");
+                            setByKeyPath(instanceTemplate, idx.keyPath, idx.compound ? idx.keyPath.map(function () { return "" }) : "");
+                        });
+                        outSchema[tableName] = new TableSchema(tableName, primKey, indexes, instanceTemplate);
+                    }
                 });
             }
         });
@@ -190,46 +205,28 @@
                 // Upgrade version to version, step-by-step from oldest to newest version.
                 // Each transaction object will contain the table set that was current in that version (but also not-yet-deleted tables from its previous version)
                 var queue = [];
-                globalSchema = db._dbSchema = null;
+                var oldVersionStruct = versions.filter(function (version) { return version._cfg.version === oldVersion })[0];
+                if (!oldVersionStruct) throw new Error("Dexie specification of currently installed DB version is missing");
+                globalSchema = db._dbSchema = oldVersionStruct._cfg.dbschema;
+                var anyContentUpgraderHasRun = false;
+                
                 var versToRun = versions.filter(function (v) { return v._cfg.version > oldVersion; });
                 versToRun.forEach(function (version) {
                     /// <param name="version" type="Version"></param>
                     var oldSchema = globalSchema;
                     var newSchema = version._cfg.dbschema;
                     globalSchema = db._dbSchema = newSchema;
-                    if (!oldSchema) {
-                        queue.push(function (trans, cb) {
-                            createMissingTables(newSchema, trans);
-                            cb();
-                        });
-                    } else {
+                    {
                         var diff = getSchemaDiff(oldSchema, newSchema);
                         diff.add.forEach(function (tuple) {
                             queue.push(function (trans, cb) {
                                 createTable(trans, tuple[0], tuple[1].primKey, tuple[1].indexes);
+                                cb();
                             });
-                            cb();
                         });
                         diff.change.forEach(function (change) {
                             if (change.recreate) {
-                                // Recreate tables
-                                if (hasIEDeleteObjectStoreBug()) {
-                                    if (!iewa || !iewa[change.name]) {
-                                        iewa = iewa || { __num: 0 };
-                                        ++iewa.__num;
-                                        iewa[change.name] = [];
-                                        iterate(trans.objectStore(change.name).openCursor(), null, function (item) { iewa[change.name].push(item) }, function () {
-                                            if (--iewa.__num == 0) {
-                                                trans.abort(); // Abort transaction and re-open db re-run the upgraders now that all tables are read to mem.
-                                                db.open();
-                                            }
-                                        });
-                                    }
-                                }
-
-                                queue.push(function (trans, cb) {
-                                    recreateTable(trans, change.name, change.def.primKey, change.def.indexes, cb);
-                                });
+                                throw new Error("Not yet support for changing primary key");
                             } else {
                                 queue.push(function (trans, cb) {
                                     var store = trans.objectStore(change.name);
@@ -247,8 +244,9 @@
                                 });
                             }
                         });
-                        if (newSchema._cfg.contentUpgrade) {
+                        if (version._cfg.contentUpgrade) {
                             queue.push(function (trans, cb) {
+                                anyContentUpgraderHasRun = true;
                                 var t = db._createTransaction(READWRITE, [].slice.call(trans.db.objectStoreNames, 0), newSchema);
                                 t.idbtrans = trans;
                                 t.active = true;
@@ -270,20 +268,16 @@
                                     }
                                 });
                                 trans.onerror = eventRejectHandler(reject, ["running upgrader function for version", version._cfg.version]);
-                                newSchema._cfg.contentUpgrade(t);
+                                version._cfg.contentUpgrade(t);
                                 if (uncompletedRequests === 0) cb(); // contentUpgrade() didnt call any db operations at all.
                             });
                         }
-                        if (diff.del.length) {
-                            if (!hasIEDeleteObjectStoreBug()) { // Dont delete old tables if ieBug is present. Let tables be left in DB so far. This needs to be taken care of.
-                                queue.push(function (trans, cb) {
-                                    // Delete old tables
-                                    diff.del.forEach(function (tableName) {
-                                        trans.db.deleteObjectStore(tableName);
-                                    });
-                                    cb();
-                                });
-                            }
+                        if (!anyContentUpgraderHasRun || !hasIEDeleteObjectStoreBug()) { // Dont delete old tables if ieBug is present and a content upgrader has run. Let tables be left in DB so far. This needs to be taken care of.
+                            queue.push(function (trans, cb) {
+                                // Delete old tables
+                                deleteRemovedTables(newSchema, trans);
+                                cb();
+                            });
                         }
                     }
                 });
@@ -293,10 +287,8 @@
                     if (queue.length)
                         queue.shift()(trans, runNextQueuedFunction);
                     else
-                        createMissingTables(globalSchema, trans); // At last, make sure to create any missing tables.
+                        createMissingTables(globalSchema, trans); // At last, make sure to create any missing tables. (Needed by addons that add stores to DB without specifying version)
                 };
-
-                if (iewa && iewa.__num > 0) return; // MSIE 10 & 11 workaround. Halt this run - we are in progress of copying tables into memory. When that is done, we will abort transaction and re-open db again.
 
                 runNextQueuedFunction();
             }
@@ -349,15 +341,6 @@
             return diff;
         }
 
-
-        function copyTable(oldStore, newStore, cb) {
-            /// <param name="oldStore" type="IDBObjectStore"></param>
-            /// <param name="newStore" type="IDBObjectStore"></param>
-            iterate(oldStore.openCursor(), null, function (item) {
-                newStore.add(item);
-            }, cb);
-        }
-
         function createTable(trans, tableName, primKey, indexes) {
             /// <param name="trans" type="IDBTransaction"></param>
             var store = trans.db.createObjectStore(tableName, primKey.keyPath ? { keyPath: primKey.keyPath, autoIncrement: primKey.auto } : { autoIncrement: primKey.auto });
@@ -373,39 +356,17 @@
             });
         }
 
+        function deleteRemovedTables(newSchema, trans) {
+            for (var i = 0; i < trans.db.objectStoreNames.length; ++i) {
+                var storeName = trans.db.objectStoreNames[i];
+                if (newSchema[storeName] === null || newSchema[storeName] === undefined) {
+                    trans.db.deleteObjectStore(storeName);
+                }
+            }
+        }
 
         function addIndex(store, idx) {
             store.createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multi });
-        }
-
-        function recreateTable(trans, tableName, primKey, indexes, cb) {
-            /// <param name="trans" type="IDBTransaction"></param>
-            if (iewa) {
-                //trans.db.deleteObjectStore(tableName);
-                var store = createTable(trans, tableName, primKey, indexes);
-                iewa[tableName].forEach(function (item) {
-                    store.add(item);
-                });
-                delete iewa[tableName];
-                if (Object.keys(iewa).length == 0) iewa = null;
-                cb();
-            } else {
-                // Create temp table
-                var tmpStore = createTable(trans, "_temp-" + tableName, primKey, []);
-                // Copy old to temp
-                copyTable(trans.objectStore(tableName), tmpStore, function () {
-                    // Delete old
-                    trans.db.deleteObjectStore(tableName);
-                    // Create new
-                    var recreatedStore = createTable(trans, tableName, primKey, indexes);
-                    // Copy temp to new
-                    copyTable(tmpStore, recreatedStore, function () {
-                        // Delete temp
-                        trans.db.deleteObjectStore("_temp-" + tableName);
-                        cb();
-                    });
-                });
-            }
         }
 
         //
@@ -508,14 +469,6 @@
                     // Make sure caller has specified at least one version
                     if (versions.length == 0) {
                         autoSchema = true;
-                    } else {
-                        // Make sure at least the oldest version specifies a table schema
-                        if (!versions[0]._cfg.dbschema) throw new Error("No schema specified. Need to call dbInstance.version(ver).stores(schema) on at least the lowest version.");
-                        // Sort versions and make all Version instances have a schema (its own or previous if not specified)
-                        versions.sort(lowerVersionFirst).reduce(function (prev, ver) {
-                            if (!ver._cfg.dbschema) ver._cfg.dbschema = prev._cfg.dbschema;
-                            return ver;
-                        });
                     }
 
                     // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE: 
@@ -1903,12 +1856,6 @@
             return a._cfg.version - b._cfg.version;
         }
 
-        function getCurrentDBSchema() {
-            return versions.sort(lowerVersionFirst).reduce(function (prev, curr) {
-                return (curr._cfg.dbschema ? curr : prev);
-            })._cfg.dbschema;
-        }
-
         function setApiOnPlace(obj, transactionPromiseFactory, tableNames, mode, dbschema, enableProhibitedDB) {
             tableNames.forEach(function (tableName) {
                 if (!obj[tableName]) {
@@ -2005,7 +1952,7 @@
 
         function hasIEDeleteObjectStoreBug() {
             // Assume bug is present in IE10 and IE11 but dont expect it in next version of IE (IE12)
-            return navigator.userAgent.indexOf("Trident / 7.0; rv: 11.0") >= 0 || navigator.userAgent.indexOf("MSIE") >= 0;
+            return navigator.userAgent.indexOf("Trident") >= 0 || navigator.userAgent.indexOf("MSIE") >= 0;
         }
 
         function readGlobalSchema() {
