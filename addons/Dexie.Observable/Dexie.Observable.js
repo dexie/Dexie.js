@@ -131,7 +131,6 @@
         //
         // Make sure to subscribe to "creating", "updating" and "deleting" hooks for all observable tables that were created in the stores() method.
         //
-        var classMapped = false;
         db.Version.prototype.stores = override(db.Version.prototype.stores, function (origFunc) {
             return function (stores) {
                 var rv = origFunc.apply(this, arguments);
@@ -140,10 +139,7 @@
                         crudMonitor(table);
                     }
                 });
-                if (!classMapped) {
-                    db._syncNodes.mapToClass(SyncNode);
-                    classMapped = true;
-                }
+                db._syncNodes.mapToClass(SyncNode);
                 return rv;
             };
         });

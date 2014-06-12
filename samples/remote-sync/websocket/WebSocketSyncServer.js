@@ -411,33 +411,22 @@
         return clonedChange;
     }
 
-    function setByKeyPath(obj, keyPath, value, bDelete) {
-        if (!obj || keyPath === undefined) return;
-        if (Array.isArray(keyPath)) {
-            assert(Array.isArray(value));
-            for (var i = 0, l = keyPath.length; i < l; ++i) {
-                setByKeyPath(obj, keyPath[i], value[i]);
+    function setByKeyPath(obj, keyPath, value) {
+        if (!obj || typeof keyPath !== 'string') return;
+        var period = keyPath.indexOf('.');
+        if (period !== -1) {
+            var currentKeyPath = keyPath.substr(0, period);
+            var remainingKeyPath = keyPath.substr(period + 1);
+            if (remainingKeyPath === "")
+                obj[currentKeyPath] = value;
+            else {
+                var innerObj = obj[currentKeyPath];
+                if (!innerObj) innerObj = (obj[currentKeyPath] = {});
+                setByKeyPath(innerObj, remainingKeyPath, value);
             }
         } else {
-            var period = keyPath.indexOf('.');
-            if (period !== -1) {
-                var currentKeyPath = keyPath.substr(0, period);
-                var remainingKeyPath = keyPath.substr(period + 1);
-                if (remainingKeyPath === "")
-                    if (bDelete) delete obj[currentKeyPath]; else obj[currentKeyPath] = value;
-                else {
-                    var innerObj = obj[currentKeyPath];
-                    if (!innerObj) innerObj = (obj[currentKeyPath] = {});
-                    setByKeyPath(innerObj, remainingKeyPath, value, bDelete);
-                }
-            } else {
-                if (bDelete) delete obj[keyPath]; else obj[keyPath] = value;
-            }
+            obj[keyPath] = value;
         }
-    }
-
-    function deleteByKeyPath(obj, keyPath) {
-        setByKeyPath(obj, keyPath, null, true);
     }
 
     publish("SyncServer", SyncServer); // Will do module.exports = SyncServer for Node.js but window.SyncServer = SyncServer for browser.

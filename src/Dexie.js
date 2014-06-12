@@ -885,7 +885,6 @@
                     /// <param name="constructor">Constructor function representing the class.</param>
                     /// <param name="structure" optional="true">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
                     /// know what type each member has. Example: {name: String, emailAddresses: [String], password}</param>
-                    if (this.schema.mappedClass) throw new Error("Table already mapped");
                     this.schema.mappedClass = constructor;
                     var instanceTemplate = Object.create(constructor.prototype);
                     if (this.schema.primKey.keyPath) {
@@ -1857,7 +1856,7 @@
                                 failKeys.push(thisContext.primKey);
                                 if (thisContext.onerror) thisContext.onerror(e);
                                 return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
-                            }, function () { return bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]; });
+                            }, bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]);
                             req.onsuccess = function (ev) {
                                 if (thisContext.onsuccess) thisContext.onsuccess(thisContext.value);
                                 ++successCount;
