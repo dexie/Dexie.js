@@ -1492,7 +1492,7 @@
 
                         function union(item, cursor, advance) {
                             if (!filter || filter(cursor, advance, resolveboth, reject)) {
-                                var key = JSON.stringify(cursor.primaryKey);
+                                var key = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
                                 if (!set.hasOwnProperty(key)) {
                                     set[key] = true;
                                     fn(item, cursor, advance);
@@ -1735,7 +1735,7 @@
                 distinct: function () {
                     var set = {};
                     addFilter(this._ctx, function (cursor) {
-                        var strKey = JSON.stringify(cursor.primaryKey);
+                        var strKey = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
                         var found = set.hasOwnProperty(strKey);
                         set[strKey] = true;
                         return !found;
