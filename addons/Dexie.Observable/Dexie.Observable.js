@@ -131,17 +131,17 @@
         //
         // Make sure to subscribe to "creating", "updating" and "deleting" hooks for all observable tables that were created in the stores() method.
         //
-        db.Version.prototype.stores = override(db.Version.prototype.stores, function (origFunc) {
-            return function (stores) {
-                var rv = origFunc.apply(this, arguments);
-                Object.keys(stores).map(function (tableName) { return db._allTables[tableName]; }).forEach(function (table) {
-                    if (table.schema.observable) {
-                        crudMonitor(table);
-                    }
-                });
-                db._syncNodes.mapToClass(SyncNode);
-                return rv;
-            };
+        db._tableFactory = override(db._tableFactory, function (origCreateTable) {
+            return function createTable(mode, tableSchema, transactionPromiseFactory) {
+                var table = origCreateTable.apply(this, arguments);
+                if (table.schema.observable && transactionPromiseFactory === db._transPromiseFactory) { // Only crudMonitor when creating 
+                    crudMonitor(table);
+                }
+                if (table.name === "_syncNodes" && transactionPromiseFactory === db._transPromiseFactory) {
+                    table.mapToClass(SyncNode);
+                }
+                return table;
+            }
         });
 
         // changes event on db:
@@ -224,7 +224,7 @@
                     localStorage.setItem('Dexie.Observable/deadnode:' + mySyncNode.id.toString() + '/' + db.name, "dead"); // In IE, this will also wakeup our own window. cleanup() may trigger twice per other db instance. But that doesnt to anything.
                     mySyncNode.deleteTimeStamp = 1; // One millisecond after 1970. Makes it occur in the past but still keeps it truthy.
                     mySyncNode.lastHeartBeat = 0;
-                    db.table('_syncNodes').put(mySyncNode); // This async operation may be cancelled since the browser is closing down now.
+                    db._syncNodes.put(mySyncNode); // This async operation may be cancelled since the browser is closing down now.
                     mySyncNode = null;
                 }
 
@@ -335,17 +335,19 @@
                     // Side track . For correctness whenever setting Dexie.Observable.latestRevision[db.name] we must make sure the event is fired if increased:
                     // There are other db instances in same window that hasnt yet been informed about a new revision
                     Dexie.Observable.latestRevision[db.name] = latestRevision;
-                    Dexie.Observable.on.latestRevisionIncremented.fire(latestRevision);
+                    Dexie.spawn(function () {
+                        Dexie.Observable.on.latestRevisionIncremented.fire(latestRevision);
+                    });
                 }
                 // Add new sync node or if this is a reopening of the database after a close() call, update it.
-                return db.transaction('rw', '_syncNodes', function (syncNodes) {
-                    syncNodes.where('isMaster').equals(1).count(function (anyMasterNode) {
+                return db.transaction('rw', '_syncNodes', function () {
+                    db._syncNodes.where('isMaster').equals(1).count(function (anyMasterNode) {
                         if (!anyMasterNode) {
                             // There's no master node. Let's take that role then.
                             mySyncNode.isMaster = 1;
                         }
                         // Add our node to DB and start subscribing to events
-                        syncNodes.add(mySyncNode).then(function () {
+                        db._syncNodes.add(mySyncNode).then(function () {
                             Dexie.Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
                             Dexie.Observable.on('beforeunload', onBeforeUnload);
                             Dexie.Observable.on('suicideNurseCall', onSuicide);
@@ -365,7 +367,7 @@
             if (dbname === db.name) {
                 if (handledRevision >= latestRevision) return; // Make sure to only run once per revision. (Workaround for IE triggering storage event on same window)
                 handledRevision = latestRevision;
-                db.vip(function () {
+                Dexie.vip(function () {
                     readChanges(latestRevision);
                 });
             }
@@ -416,7 +418,7 @@
                 if (partial || Dexie.Observable.latestRevision[db.name] > ourSyncNode.myRevision) {
                     // Either there were more than 1000 changes or additional changes where added while we were reading these changes,
                     // In either case, call readChanges() again until we're done.
-                    return readChanges(Dexie.Observable.latestRevision[db.name], true, partial);
+                    return readChanges(Dexie.Observable.latestRevision[db.name], (recursion || 0) + 1, partial);
                 }
 
             }).catch(function (e) { // TODO: Remove this catch() clause. This is temporary while debugging.
@@ -440,7 +442,7 @@
         function poll() {
             pollHandle = null;
             var currentInstance = mySyncNode.id;
-            db.vip(function () { // VIP ourselves. Otherwise we might not be able to consume intercomm messages from master node before database has finished opening. This would make DB stall forever. Cannot rely on storage-event since it may not always work in some browsers of different processes.
+            Dexie.vip(function () { // VIP ourselves. Otherwise we might not be able to consume intercomm messages from master node before database has finished opening. This would make DB stall forever. Cannot rely on storage-event since it may not always work in some browsers of different processes.
                 readChanges(Dexie.Observable.latestRevision[db.name]).then(cleanup).then(consumeIntercommMessages).finally(function () {
                     // Poll again in given interval:
                     if (mySyncNode && mySyncNode.id === currentInstance) {
@@ -453,14 +455,14 @@
         function cleanup() {
             var ourSyncNode = mySyncNode;
             if (!ourSyncNode) return Promise.reject("Database closed");
-            return db.transaction('rw', '_syncNodes', '_changes', '_intercomm', function (nodes, changes, intercomm, trans) {
+            return db.transaction('rw', '_syncNodes', '_changes', '_intercomm', function () {
                 // Cleanup dead local nodes that has no heartbeat for over a minute
                 // Dont do the following:
                 //nodes.where("lastHeartBeat").below(Date.now() - NODE_TIMEOUT).and(function (node) { return node.type == "local"; }).delete();
                 // Because client may have been in hybernate mode and recently woken up. That would lead to deletion of all nodes.
                 // Instead, we should mark any old nodes for deletion in a minute or so. If they still dont wakeup after that minute we could consider them dead.
                 var weBecameMaster = false;
-                nodes.where("lastHeartBeat").below(Date.now() - NODE_TIMEOUT).and(function (node) { return node.type === 'local' }).modify(function (node) {
+                db._syncNodes.where("lastHeartBeat").below(Date.now() - NODE_TIMEOUT).and(function (node) { return node.type === 'local' }).modify(function (node) {
                     if (node.deleteTimeStamp && node.deleteTimeStamp < Date.now()) {
                         // Delete the node.
                         delete this.value;
@@ -469,18 +471,20 @@
                         // Check if we are deleting a master node
                         if (node.isMaster) {
                             // The node we are deleting is master. We must take over that role.
-                            // OK to call nodes.update(). No need to call db.vip() because nodes is opened in existing transaction!
-                            nodes.update(ourSyncNode, { isMaster: 1 });
+                            // OK to call nodes.update(). No need to call Dexie.vip() because nodes is opened in existing transaction!
+                            db._syncNodes.update(ourSyncNode, { isMaster: 1 });
                             weBecameMaster = true;
                         }
                         // Cleanup intercomm messages destinated to the node being deleted:
-                        intercomm.where("destinationNode").equals(node.id).modify(function (msg) {
-                            // OK to call intercomm. No need to call db.vip() because intercomm is opened in existing transaction!
+                        db._intercomm.where("destinationNode").equals(node.id).modify(function (msg) {
+                            // OK to call intercomm. No need to call Dexie.vip() because intercomm is opened in existing transaction!
                             // Delete the message from DB and if someone is waiting for reply, let ourselved answer the request.
                             delete this.value;
                             if (msg.wantReply) {
                                 // Message wants a reply, meaning someone must take over its messages when it dies. Let us be that one!
-                                consumeMessage(msg);
+                                Dexie.spawn(function () {
+                                    consumeMessage(msg);
+                                });
                             }
                         });
                     } else if (!node.deleteTimeStamp) {
@@ -489,11 +493,11 @@
                     }
                 }).then(function () {
                     // Cleanup old revisions that no node is interested of.
-                    return nodes.orderBy("myRevision").first(function (oldestNode) {
-                        return changes.where("rev").below(oldestNode.myRevision).delete();
+                    return db._syncNodes.orderBy("myRevision").first(function (oldestNode) {
+                        return db._changes.where("rev").below(oldestNode.myRevision).delete();
                     });
                 }).then(function () {
-                    return db.on("cleanup").fire(nodes, changes, intercomm, trans, weBecameMaster);
+                    return db.on("cleanup").fire(weBecameMaster);
                 });
             });
         }
@@ -515,7 +519,7 @@
                 // Make sure it's dead indeed. Second bullet. Why? Because it has marked itself for deletion in the onbeforeunload event, which is fired just before window dies.
                 // It's own call to put() may have been cancelled.
                 // Note also that in IE, this event may be called twice, but that doesnt harm!
-                db.vip(function () {
+                Dexie.vip(function () {
                     db._syncNodes.update(nodeID, { deleteTimeStamp: 1, lastHeartBeat: 0 }).then(cleanup);
                 });
             }
@@ -540,14 +544,13 @@
             var tables = ["_intercomm"];
             if (options.wantReply) tables.push("_syncNodes"); // If caller wants a reply, include "_syncNodes" in transaction to check that there's a reciever there. Otherwise, new master will get it.
             return db.transaction('rw', tables, function () {
-                var trans = this;
                 if (options.wantReply) {
                     // Check that there is a reciever there to take the request.
-                    return trans._syncNodes.where('id').equals(destinationNode).count(function (recieverAlive) {
+                    return db._syncNodes.where('id').equals(destinationNode).count(function (recieverAlive) {
                         if (recieverAlive)
                             return addMessage(msg);
                         else
-                            return trans._syncNodes.where('isMaster').above(0).first(function (masterNode) {
+                            return db._syncNodes.where('isMaster').above(0).first(function (masterNode) {
                                 msg.destinationNode = masterNode.id;
                                 return addMessage(msg);
                             });
@@ -557,9 +560,11 @@
                 }
 
                 function addMessage(msg) {
-                    return trans._intercomm.add(msg).then(function (messageId) {
+                    return db._intercomm.add(msg).then(function (messageId) {
                         localStorage.setItem("Dexie.Observable/intercomm/" + db.name, messageId.toString());
-                        Dexie.Observable.on.intercomm.fire(db.name);
+                        Dexie.spawn(function () {
+                            Dexie.Observable.on.intercomm.fire(db.name);
+                        });
                         if (options.wantReply) {
                             return new Promise(function (resolve, reject) {
                                 requestsWaitingForReply[messageId.toString()] = { resolve: resolve, reject: reject };
@@ -589,7 +594,9 @@
             return db.table('_intercomm').where("destinationNode").equals(mySyncNode.id).modify(function (msg) {
                 // For each message, fire the event and remove message.
                 delete this.value;
-                consumeMessage(msg);
+                Dexie.spawn(function () {
+                    consumeMessage(msg);
+                });
             });
         }
 

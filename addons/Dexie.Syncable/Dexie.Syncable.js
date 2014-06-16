@@ -23,7 +23,7 @@
 
         db.on('message', function (msg) {
             // Message from other local node arrives...
-            db.vip(function () {
+            Dexie.vip(function () {
                 if (msg.type == 'connect') {
                     // We are master node and another non-master node wants us to do the connect.
                     db.syncable.connect(msg.protocolName, msg.url, msg.options).then(msg.resolve, msg.reject);
@@ -51,8 +51,10 @@
                     .each(function (connectedRemoteNode) {
                         // There are connected remote nodes that we must take over
                         // Since we may be in the on(ready) event, we must get VIPed to continue - Promise.PSD is not derived in Collection.each() since it is a callback called outside a Promise.
-                        db.vip(function () {
-                            db.syncable.connect(connectedRemoteNode.syncProtocol, connectedRemoteNode.url, connectedRemoteNode.syncOptions);
+                        Dexie.spawn(function () {
+                            Dexie.vip(function () {
+                                db.syncable.connect(connectedRemoteNode.syncProtocol, connectedRemoteNode.url, connectedRemoteNode.syncOptions);
+                            });
                         });
                     });
             }
@@ -82,7 +84,7 @@
         db.syncable = {};
 
         db.syncable.getStatus = function (url, cb) {
-            return db.vip(function(){
+            return Dexie.vip(function(){
                 return db._syncNodes.where('url').equals(url).first(function (node) {
                     return node ? node.status : Statuses.OFFLINE;
                 });
@@ -133,7 +135,7 @@
                     return new Promise(function (resolve, reject) {
                         db.on("ready", function syncWhenReady() {
                             db.on.ready.unsubscribe(syncWhenReady);
-                            return db.vip(function(){
+                            return Dexie.vip(function(){
                                 return db.syncable.connect(protocolName, url, options).then(resolve).catch(function (err) {
                                     // Reject the promise returned to the caller of db.syncable.connect():
                                     reject(err);
@@ -191,14 +193,14 @@
             }
 
             function getOrCreateSyncNode() {
-                return db.transaction('rw', db._syncNodes, function (syncNodes) {
+                return db.transaction('rw', db._syncNodes, function () {
                     // Returning a promise from transaction scope will make the transaction promise resolve with the value of that promise.
-                    return syncNodes.where("url").equalsIgnoreCase(url).first(function (node) {
+                    return db._syncNodes.where("url").equalsIgnoreCase(url).first(function (node) {
                         if (node) {
                             // Node already there. Make syncContext become an instance of PersistedContext:
                             node.syncContext = Dexie.extend(new PersistedContext(node.id), node.syncContext);
                             node.syncProtocol = protocolName; // In case it was changed (would be very strange but...) could happen...
-                            node.save();
+                            db._syncNodes.put(node);
                         } else {
                             // Create new node and sync everything
                             node = new db.observable.SyncNode();
@@ -211,9 +213,9 @@
                             node.syncOptions = options;
                             node.lastHeartBeat = Date.now();
                             node.dbUploadState = null;
-                            syncNodes.put(node).then(function (nodeId) {
+                            db._syncNodes.put(node).then(function (nodeId) {
                                 node.syncContext = new PersistedContext(nodeId);// Update syncContext in db with correct nodeId.
-                                node.save();
+                                db._syncNodes.put(node);
                             });
                         }
 
@@ -225,7 +227,12 @@
                         }
                         PersistedContext.prototype.save = function () {
                             // Store this instance in the syncContext property of the node it belongs to.
-                            node.save();
+                            return Dexie.spawn(function () {
+                                return Dexie.vip(function () {
+                                    return node.save();
+                                });
+                            });
+                            
                             //return db._syncNodes.update(this.nodeID, { syncContext: this });
                         }
 
@@ -353,7 +360,7 @@
 
                 function getLocalChangesForNode_autoAckIfEmpty(node, cb) {
                     return getLocalChangesForNode(node, function autoAck (changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
-                        if (changes.length === 0 && nodeModificationsOnAck.myRevision != node.myRevision) {
+                        if (changes.length === 0 && 'myRevision' in nodeModificationsOnAck && nodeModificationsOnAck.myRevision != node.myRevision) {
                             Object.keys(nodeModificationsOnAck).forEach(function (keyPath) {
                                 Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
                             });
@@ -385,7 +392,7 @@
                         if (node.dbUploadState == null) {
                             // Initiatalize dbUploadState
                             var tablesToUpload = db.tables.filter(function (table) { return table.schema.observable; }).map(function (table) { return table.name; });
-                            if (tablesToUpload.length === 0) return cb([], null, false, {}); // There are no synched tables at all.
+                            if (tablesToUpload.length === 0) return Promise.resolve(cb([], null, false, {})); // There are no synched tables at all.
                             var dbUploadState = {
                                 tablesToUpload: tablesToUpload,
                                 currentTable: tablesToUpload.shift(),
@@ -455,10 +462,10 @@
                         var partial = false;
                         var ignoreSource = node.id;
                         var nextRevision = revision;
-                        return db.transaction('r', db._changes, function (_changes) {
+                        return db.transaction('r', db._changes, function () {
                             var query = (maxRevision == Infinity ?
-                                _changes.where('rev').above(revision) :
-                                _changes.where('rev').between(revision, maxRevision, false, true));
+                                db._changes.where('rev').above(revision) :
+                                db._changes.where('rev').between(revision, maxRevision, false, true));
                             query.until(function () {
                                 if (numChanges === maxChanges) {
                                     partial = true;
@@ -527,20 +534,18 @@
 
                 function applyRemoteChanges(remoteChanges, remoteRevision, partial, clear) {
                     return enque(applyRemoteChanges, function() {
-                        return db.vip(function () {
-                            if (!stillAlive()) return Promise.reject("Database not open");
-                            // FIXTHIS: Check what to do if clear() is true!
-                            return (partial ? saveToUncommitedChanges(remoteChanges) : finallyCommitAllChanges(remoteChanges, remoteRevision))
-                                .catch(function (error) {
-                                    abortTheProvider(error);
-                                    return Promise.reject(error);
-                                });
-                        });
+                        if (!stillAlive()) return Promise.reject("Database not open");
+                        // FIXTHIS: Check what to do if clear() is true!
+                        return (partial ? saveToUncommitedChanges(remoteChanges) : finallyCommitAllChanges(remoteChanges, remoteRevision))
+                            .catch(function (error) {
+                                abortTheProvider(error);
+                                return Promise.reject(error);
+                            });
                     }, dbAliveID);
 
 
                     function saveToUncommitedChanges (changes) {
-                        return db.transaction('rw', db._uncommittedChanges, function (uncommittedChanges) {
+                        return db.transaction('rw', db._uncommittedChanges, function () {
                             changes.forEach(function (change) {
                                 var changeToAdd = {
                                     node: node.id,
@@ -550,7 +555,7 @@
                                 };
                                 if (change.obj) changeToAdd.obj = change.obj;
                                 if (change.mods) changeToAdd.mods = change.mods;
-                                uncommittedChanges.add(changeToAdd);
+                                db._uncommittedChanges.add(changeToAdd);
                             });
                         }).then(function () {
                             node.appliedRemoteRevision = remoteRevision;
@@ -564,26 +569,26 @@
 
                         // 1. Open a write transaction on all tables in DB
                         return db.transaction('rw', db.tables.filter(function (table) { return table.name == '_changes' || table.name == '_uncommittedChanges' || table.schema.observable }), function () {
-                            var trans = this;
+                            var trans = Dexie.currentTransaction;
                             var localRevisionBeforeChanges = 0;
-                            trans._changes.orderBy('rev').last(function (lastChange) {
+                            db._changes.orderBy('rev').last(function (lastChange) {
                                 // Store what revision we were at before committing the changes
                                 localRevisionBeforeChanges = (lastChange && lastChange.rev) || 0;
                             }).then(function () {
                                 // Specify the source. Important for the change consumer to ignore changes originated from self!
                                 trans.source = node.id;
                                 // 2. Apply uncommitted changes and delete each uncommitted change
-                                return trans._uncommittedChanges.where('node').equals(node.id).toArray();
+                                return db._uncommittedChanges.where('node').equals(node.id).toArray();
                             }).then(function (uncommittedChanges) {
                                 return applyChanges(uncommittedChanges, 0);
                             }).then(function () {
-                                return trans._uncommittedChanges.where('node').equals(node.id).delete();
+                                return db._uncommittedChanges.where('node').equals(node.id).delete();
                             }).then(function () {
                                 // 3. Apply last chunk of changes
                                 return applyChanges(changes, 0);
                             }).then(function () {
                                 // Get what revision we are at now:
-                                return trans._changes.orderBy('rev').last();
+                                return db._changes.orderBy('rev').last();
                             }).then(function (lastChange) {
                                 var currentLocalRevision = (lastChange && lastChange.rev) || 0;
                                 // 4. Update node states (appliedRemoteRevision, remoteBaseRevisions and eventually myRevision)
@@ -616,67 +621,36 @@
                                 var lastCreatePromise = null;
                                 for (var i=offset, len = changes.length; i<len; ++i) {
                                     var change = changes[i];
-                                    var table = trans.tables[change.table];
-                                    if (change.type === CREATE) {
-                                        // Optimize CREATE changes because on initial sync with server, the entire DB will be downloaded in forms of CREATE changes.
-                                        // Instead of waiting for each change to resolve, do all CREATE changes in bulks until another type of change is stepped upon.
-                                        // This case is the only case that allows i to increment and the for-loop to continue since it does not return anything.
-                                        var specifyKey = !table.schema.primKey.keyPath;
-                                        lastCreatePromise = (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).catch("ConstraintError", function (e) {
-                                            return (specifyKey ? table.put(change.obj, change.key) : table.put(change.obj));
-                                        });
-                                    } else if (lastCreatePromise) {
-                                        // We did some CREATE changes but now stumbled upon another type of change.
-                                        // Let's wait for the last CREATE change to resolve and then call applyChanges again at current position. Next time, lastCreatePromise will be null and a case below will happen.
-                                        return lastCreatePromise.then(function () {
-                                            applyChanges(changes, i);
-                                        });
-                                    } else if (change.type === UPDATE) {
-                                        return table.update(change.key, change.mods).then(function () {
-                                            // Wait for update to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
-                                            applyChanges(changes, i + 1);
-                                        });
-                                    } else if (change.type === DELETE) {
-                                        return table.delete(change.key).then(function () {
-                                            // Wait for delete to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
-                                            applyChanges(changes, i + 1);
-                                        });
-                                    }
+                                    (function (change) {
+                                        var table = trans.tables[change.table];
+                                        if (change.type === CREATE) {
+                                            // Optimize CREATE changes because on initial sync with server, the entire DB will be downloaded in forms of CREATE changes.
+                                            // Instead of waiting for each change to resolve, do all CREATE changes in bulks until another type of change is stepped upon.
+                                            // This case is the only case that allows i to increment and the for-loop to continue since it does not return anything.
+                                            var specifyKey = !table.schema.primKey.keyPath;
+                                            lastCreatePromise = (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).catch("ConstraintError", function (e) {
+                                                return (specifyKey ? table.put(change.obj, change.key) : table.put(change.obj));
+                                            });
+                                        } else if (lastCreatePromise) {
+                                            // We did some CREATE changes but now stumbled upon another type of change.
+                                            // Let's wait for the last CREATE change to resolve and then call applyChanges again at current position. Next time, lastCreatePromise will be null and a case below will happen.
+                                            return lastCreatePromise.then(function () {
+                                                applyChanges(changes, i);
+                                            });
+                                        } else if (change.type === UPDATE) {
+                                            return table.update(change.key, change.mods).then(function () {
+                                                // Wait for update to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
+                                                applyChanges(changes, i + 1);
+                                            });
+                                        } else if (change.type === DELETE) {
+                                            return table.delete(change.key).then(function () {
+                                                // Wait for delete to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
+                                                applyChanges(changes, i + 1);
+                                            });
+                                        }
+                                    })(change);
                                 }
                                 return lastCreatePromise || Promise.resolve(null); // Will return null or a Promise and make the entire applyChanges promise finally resolve.
-                            }
-
-                            function applyChange(change) {
-                                var table = trans.tables[change.table];
-                                var specifyKey = !table.schema.primKey.keyPath;
-                                switch (change.type) {
-                                    case CREATE: 
-                                        /*return (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).then(function () {
-                                            return true; 
-                                        }).catch(function (e) {
-                                            return false; // Would be more straight-forward to return a new Promise here, but there is a limitation in Dexie that makes the error bubble to transaction despite being catched in case the catch clause returns another Promise.
-                                        }).then(function (added) {
-                                            if (!added) {
-                                                return specifyKey ? table.put(change.obj, change.key) : table.put(change.obj);
-                                            }
-                                        });*/
-                                        /*return trans._promise('readwrite', function (resolve, reject) {
-                                            (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).then(function(val){
-                                                resolve (val);
-                                            }).catch(function (e) {
-                                                (specifyKey ? table.put(change.obj, change.key) : table.put(change.obj)).then(resolve, reject);
-                                            });
-                                        }, "writelock");*/
-                                        /*trans._lock();
-                                        return (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).catch(function (e) {
-                                            return specifyKey ? table.put(change.obj, change.key) : table.put(change.obj);
-                                        }).finally(function () {
-                                            trans._unlock();
-                                        });;*/
-                                    case UPDATE: return table.update(change.key, change.mods);
-                                    case DELETE: return table.delete(change.key);
-                                    default: throw new Error("Change type unsupported");
-                                }
                             }
                         });
                     }
@@ -857,17 +831,19 @@
 
         var syncNodeSaveQueContexts = {};
         db.observable.SyncNode.prototype.save = function () {
-            var node = this;
-            syncNodeSaveQueContexts[node.id] = syncNodeSaveQueContexts[node.id] || {};
-            return enque(syncNodeSaveQueContexts[node.id], function () {
-                return db.table('_syncNodes').put(node);
-            });
+            return db._syncNodes.put(this);
         }
 
         function enque(context, fn, instanceID) {
             function _enque () {
                 if (!context.ongoingOperation) {
-                    context.ongoingOperation = fn().then(function (res) { delete context.ongoingOperation; return res; });
+                    context.ongoingOperation = Dexie.spawn(function () {
+                        return Dexie.vip(function () {
+                            return fn();
+                        });
+                    }).then(function (res) {
+                        delete context.ongoingOperation; return res;
+                    });
                 } else {
                     context.ongoingOperation = context.ongoingOperation.then(function () {
                         return enque(context, fn, instanceID);
@@ -879,13 +855,13 @@
             if (!instanceID) {
                 // Caller wants to enque it until database becomes open.
                 if (db.isOpen()) {
-                    return db.vip(_enque);
+                    return _enque();
                 } else {
                     return Promise.reject(new Error ("Database was closed"));
                 }
             } else if (db._localSyncNode && instanceID === db._localSyncNode.id) {
                 // DB is already open but queuer doesnt want it to be queued if database has been closed (request bound to current instance of DB)
-                return db.vip(_enque);
+                return _enque();
             } else {
                 return Promise.reject(new Error("Database was closed"));
             }
