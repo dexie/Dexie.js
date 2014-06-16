@@ -76,7 +76,9 @@
     asyncTest("exceptionThrown-request-catch", function () {
         db.transaction("r", db.users, function (users) {
             users.where("username").equals("apa").toArray(function () {
-                users.where("username").equals("kceder").toArray(function () {
+                users.where("username").equals("kceder").toArray().then(function () {
+                    return "a";
+                }).then(function(){
                     NonExistingSymbol.EnotherIdioticError = "Why not make an exception for a change?";
                 });
             });
@@ -128,36 +130,5 @@
         });
 
     });
-    
-    asyncTest("Accessing direct db tables in transaction scope", function () {
-        var promises = [];
-        promises.push(db.users.each(function (user) {
-            ok(true, "Found user: " + user.username);
-        }));
-        promises.push(db.transaction("r", db.users, function (users) {
-            users.where("username").equals("dfahlander").first(function (user) {
-                ok(true, "Got David");
-                db.users.where("username").equals("dfahlander").first(function (user) {
-                    ok(false, "Should not come here because we by accident are using db.users in a transaction block");
-                });
-            }).catch(function (e) {
-                ok(true, "Got exception (1) because we by accident are using db.users in a transaction block: " + e);
-            });
-        }).catch(function (e) {
-            ok(true, "Got exception (2) because we by accident are using db.users in a transaction block: " + e);
-        }).then(function () {
-            return db.users.where("username").equals("dfahlander").first(function (user) {
-                ok(true, "Got David from within the then() clause the transaction scope");
-            });
-        }));
-        promises.push(db.users.where("username").equals("dfahlander").first(function (user) {
-            ok(true, "Got David after the transaction scope");
-        }));
-
-        Dexie.Promise.all(promises).catch(function (e) {
-            ok(false, "Unknown error occurred: " + e);
-        }).finally(start);
-    });
-
 })();
 
