@@ -139,7 +139,6 @@ asyncTest("open database without specifying version or schema", 10, function () 
     });
 });
 
-
 asyncTest("Dexie.getDatabaseNames", 11, function () {
     var defaultDatabases = [];
     var db1, db2;

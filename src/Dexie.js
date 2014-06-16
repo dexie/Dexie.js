@@ -577,30 +577,6 @@
         this.hasFailed = function () {
             return dbOpenError !== null;
         }
-        this.vip = function (fn) {
-            // To be used by subscribers to the on('ready') event.
-            // This will let caller through to access DB even when it is blocked while the db.ready() subscribers are firing.
-            // This would have worked automatically if we were certain that the Provider was using Dexie.Promise for all asyncronic operations. The promise PSD
-            // from the provider.connect() call would then be derived all the way to when provider would call localDatabase.applyChanges(). But since
-            // the provider more likely is using non-promise async APIs or other thenable implementations, we cannot assume that.
-            // Note that this method is only useful for on('ready') subscribers that is returning a Promise from the event. If not using vip()
-            // the database could deadlock since it wont open until the returned Promise is resolved, and any non-VIPed operation started by
-            // the caller will not resolve until database is opened.
-            var outerScope = Promise.psd();
-            try {
-                Promise.PSD.letThrough = true; // Make sure we are let through if still blocking db due to onready is firing.
-                return fn();
-            } finally {
-                Promise.PSD = outerScope;
-            }
-        },
-
-        // db.currentTransaction property. Only applicable for transactions entered using the new "transact()" method.
-        Object.defineProperty(this, "currentTransaction", {
-            get: function () {
-                return Promise.PSD && Promise.PSD.trans || null;
-            }
-        });
 
         /*this.dbg = function (collection, counter) {
             if (!this._dbgResult || !this._dbgResult[counter]) {
@@ -639,12 +615,6 @@
             db.on("error").fire(new Error());
         });
 
-        this.transact = function (mode, tableInstances, scopeFunc) {
-            // New version of transaction() - let users use "db.<table>" as normally instead of using provided table arguments.
-            arguments[0] = mode + "+";
-            return this.transaction.apply(this, arguments);
-        }
-
         this.transaction = function (mode, tableInstances, scopeFunc) {
             /// <summary>
             /// 
@@ -675,14 +645,12 @@
                         }
                     });
 
-                    var newTransactionMode = mode.indexOf('+') !== -1;
-
                     //
                     // Resolve mode. Allow shortcuts "r" and "rw".
                     //
-                    if (mode == "r" || mode == "r+" || mode.indexOf(READONLY) == 0)
+                    if (mode == "r" || mode == READONLY)
                         mode = READONLY;
-                    else if (mode == "rw" || mode == "rw+" || mode.indexOf(READWRITE) == 0)
+                    else if (mode == "rw" || mode == READWRITE)
                         mode = READWRITE;
                     else
                         throw new Error("Invalid transaction mode");
@@ -692,21 +660,13 @@
                     //
                     var trans = db._createTransaction(mode, storeNames, globalSchema);
 
-                    var tableArgs;
-                    if (newTransactionMode) {
-                        // New transaction mode - let users use "db.<table>" as normally instead of using provided table arguments.
-                        tableArgs = [trans];
-                        // Let the transaction instance be part of a Promise-specific data (PSD) value.
-                        Promise.PSD.trans = trans;
-                        trans.scopeFunc = scopeFunc; // For Error ("Table " + storeNames[0] + " not part of transaction") when it happens. This may help localizing the code that started a transaction used on another place.
-                    } else {
-                        //
-                        // Supply table instances bound to the new Transaction and provide them as callback arguments
-                        //
-                        tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
-                        // Let last argument be the Transaction instance itself
-                        tableArgs.push(trans);
-                    }
+                    // Provide arguments to the scope function (for backward compatibility)
+                    var tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
+                    tableArgs.push(trans);
+
+                    // Let the transaction instance be part of a Promise-specific data (PSD) value.
+                    Promise.PSD.trans = trans;
+                    trans.scopeFunc = scopeFunc; // For Error ("Table " + storeNames[0] + " not part of transaction") when it happens. This may help localizing the code that started a transaction used on another place.
 
                     // If transaction completes, resolve the Promise with the return value of scopeFunc.
                     var returnValue;
@@ -1135,7 +1095,7 @@
                 if (!this._locked()) {
                     var p = new Promise(function (resolve, reject) {
                         if (!self.idbtrans && mode) {
-                            if (!idbdb) throw dbOpenError;
+                            if (!idbdb) throw dbOpenError || new Error("Database not open");
                             var idbtrans = self.idbtrans = idbdb.transaction(self.storeNames, self.mode);
                             idbtrans.onerror = function (e) {
                                 self.on("error").fire(e && e.target.error);
@@ -1881,7 +1841,7 @@
                                     if (Promise.PSD && Promise.PSD.trans) {
                                         var trans = Promise.PSD.trans;
                                         if (!trans.active) throw new Error("Transaction Inactive. Has already committed or failed. Scope Function: " + trans.scopeFunc);
-                                        if (trans.tables.hasOwnProperty(tableName) && (mode == READONLY || trans.mode == READWRITE)) {
+                                        if (trans.tables.hasOwnProperty(tableName)) {
                                             // Current transaction has given tableName in it and is of a compatible mode. Use it.
                                             return Promise.PSD.trans.table(tableName);
                                         }
@@ -2809,6 +2769,32 @@
             Promise.PSD = outerScope;
         }
     }
+
+    Dexie.vip = function (fn) {
+        // To be used by subscribers to the on('ready') event.
+        // This will let caller through to access DB even when it is blocked while the db.ready() subscribers are firing.
+        // This would have worked automatically if we were certain that the Provider was using Dexie.Promise for all asyncronic operations. The promise PSD
+        // from the provider.connect() call would then be derived all the way to when provider would call localDatabase.applyChanges(). But since
+        // the provider more likely is using non-promise async APIs or other thenable implementations, we cannot assume that.
+        // Note that this method is only useful for on('ready') subscribers that is returning a Promise from the event. If not using vip()
+        // the database could deadlock since it wont open until the returned Promise is resolved, and any non-VIPed operation started by
+        // the caller will not resolve until database is opened.
+        var outerScope = Promise.psd();
+        try {
+            Promise.PSD.letThrough = true; // Make sure we are let through if still blocking db due to onready is firing.
+            return fn();
+        } finally {
+            Promise.PSD = outerScope;
+        }
+    }
+
+    // Dexie.currentTransaction property. Only applicable for transactions entered using the new "transact()" method.
+    Object.defineProperty(Dexie, "currentTransaction", {
+        get: function () {
+            return Promise.PSD && Promise.PSD.trans || null;
+        }
+    })
+
     
     // Export our Promise implementation since it can be handy as a standalone Promise implementation
     Dexie.Promise = Promise;

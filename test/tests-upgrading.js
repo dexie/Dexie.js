@@ -21,6 +21,7 @@
         // V Delete DB and open it with all version specs again but in reverse order
         var DBNAME = "Upgrade-test";
         var db = null;
+        var baseNumberOfTables = 0; // Instead of expecting an empty database to have 0 tables, we read how many an empty database has. Reason: Addons may add meta tables.
 
         Promise.resolve(function () {
             return Dexie.delete("Upgrade-test");
@@ -31,6 +32,7 @@
             return db.open();
         }).then(function () {
             ok(true, "Could create empty database without any schema");
+            baseNumberOfTables = db.tables.length;
             db.close();
             db = new Dexie(DBNAME);
             db.version(1).stores({});
@@ -110,7 +112,7 @@
             return db.open();
         }).then(function () {
             ok(true, "Could upgrade to version 6");
-            equal(db.tables.length, 1, "There should be 2 stores now");
+            equal(db.tables.length, baseNumberOfTables + 1, "There should be 1 store now");
             return db.table('store1').get(1, function (apaUser) {
                 ok(apaUser.email instanceof Array, "email is now an array");
                 equal(apaUser.email[0], "user1@abc.com", "First email is user1@abc.com");
@@ -134,7 +136,7 @@
             return db.open();
         }).then(function () {
             ok(true, "Could upgrade to version 7");
-            equal(db.tables.length, 2, "There should be 2 stores now");
+            equal(db.tables.length, baseNumberOfTables + 2, "There should be 2 stores now");
             db.close();
 
             //
@@ -147,7 +149,7 @@
             return db.open();
         }).then(function () {
             ok(true, "Could upgrade to version 8 - deleting an object store");
-            equal(db.tables.length, 1, "There should only be 1 store now");
+            equal(db.tables.length, baseNumberOfTables + 1, "There should only be 1 store now");
 
             // Now test: Delete DB and open it with ALL versions specs specified (check it will run in sequence)
             return db.delete();
@@ -175,9 +177,10 @@
         }).then(function () {
             ok(true, "Could create new database");
             equal(db.verno, 8, "Version is 8");
-            equal(db.tables.length, 1, "There should only be 1 store now");
-            equal(db.tables[0].name, "store2", "The store we have is store2");
-            equal(db.tables[0].schema.primKey.name, "uuid", "The prim key is uuid");
+            equal(db.tables.length, baseNumberOfTables + 1, "There should only be 1 store now");
+            var store2Table = db.tables.filter(function (table) { return table.name == "store2" })[0];
+            ok(store2Table, "The store we have is store2");
+            equal(store2Table.schema.primKey.name, "uuid", "The prim key is uuid");
             return db.delete();
         }).then(function() {
             // Once recreate the database but now use a reverse order of the versions:
@@ -204,9 +207,10 @@
         }).then(function () {
             ok(true, "Could create new database");
             equal(db.verno, 8, "Version is 8");
-            equal(db.tables.length, 1, "There should only be 1 store now");
-            equal(db.tables[0].name, "store2", "The store we have is store2");
-            equal(db.tables[0].schema.primKey.name, "uuid", "The prim key is uuid");
+            equal(db.tables.length, baseNumberOfTables + 1, "There should only be 1 store now");
+            var store2Table = db.tables.filter(function (table) { return table.name == "store2" })[0];
+            ok(store2Table, "The store we have is store2");
+            equal(store2Table.schema.primKey.name, "uuid", "The prim key is uuid");
         }).catch(function (err) {
             ok(false, "Error: " + err);
         }).finally(function () {
