@@ -3,7 +3,7 @@
 
    By David Fahlander, david.fahlander@gmail.com
 
-   Version 0.9.7.3 (alpha - not yet distributed) - DATE, YEAR.
+   Version 0.9.8 (alpha - not yet distributed) - DATE, YEAR.
 
    Tested successfully on Chrome, IE11, Firefox and Opera.
 
@@ -118,13 +118,6 @@
             }
         }
 
-        /*function compileSchema() {
-            var stores = {};
-                this._parseStoresSpec(version.storesSource, dbschema);
-            });
-        }*/
-
-
         extend(Version.prototype, {
             stores: function (stores) {
                 /// <summary>
@@ -154,9 +147,7 @@
                 // Update API
                 globalSchema = db._dbSchema = dbschema;
                 removeTablesApi([allTables, db]);
-                setApiOnPlace(allTables, db._transPromiseFactory, Object.keys(dbschema), READWRITE, dbschema);
-                setApiOnPlace(db, db._transPromiseFactory, Object.keys(dbschema), READWRITE, dbschema, true);
-                setApiOnPlace(this._cfg.tables, db._transPromiseFactory, Object.keys(dbschema), READWRITE, dbschema, true);
+                setApiOnPlace([allTables, db, this._cfg.tables], db._transPromiseFactory, Object.keys(dbschema), READWRITE, dbschema, true);
                 dbStoreNames = Object.keys(dbschema);
                 return this;
             },
@@ -198,7 +189,6 @@
                 // Populate data
                 var t = db._createTransaction(READWRITE, dbStoreNames, globalSchema);
                 t.idbtrans = trans;
-                t.active = true;
                 t.idbtrans.onerror = eventRejectHandler(reject,  ["populating database"]);
                 db.on("populate").fire(t);
             } else {
@@ -249,7 +239,6 @@
                                 anyContentUpgraderHasRun = true;
                                 var t = db._createTransaction(READWRITE, [].slice.call(trans.db.objectStoreNames, 0), newSchema);
                                 t.idbtrans = trans;
-                                t.active = true;
                                 var uncompletedRequests = 0;
                                 t._promise = override (t._promise, function(orig_promise) {
                                     return function (mode, fn, writeLock) {
@@ -606,6 +595,13 @@
             }
         },
 
+        // db.currentTransaction property. Only applicable for transactions entered using the new "transact()" method.
+        Object.defineProperty(this, "currentTransaction", {
+            get: function () {
+                return Promise.PSD && Promise.PSD.trans || null;
+            }
+        });
+
         /*this.dbg = function (collection, counter) {
             if (!this._dbgResult || !this._dbgResult[counter]) {
                 if (typeof collection === 'string') collection = this.table(collection).toCollection().limit(100);
@@ -643,6 +639,12 @@
             db.on("error").fire(new Error());
         });
 
+        this.transact = function (mode, tableInstances, scopeFunc) {
+            // New version of transaction() - let users use "db.<table>" as normally instead of using provided table arguments.
+            arguments[0] = mode + "+";
+            return this.transaction.apply(this, arguments);
+        }
+
         this.transaction = function (mode, tableInstances, scopeFunc) {
             /// <summary>
             /// 
@@ -655,15 +657,10 @@
             tableInstances = [].slice.call(arguments, 1, arguments.length - 1);
             // Let scopeFunc be the last argument
             scopeFunc = arguments[arguments.length - 1];
+
             return db._whenReady(function (resolve, reject) {
                 var outerPSD = Promise.psd(); // Need to make sure Promise.PSD.prohibitDB does not continue over to the then() callback of our returned Promise! Callers may use direct DB access after transaction completes!
                 try {
-                    // Prohibit direct table access on db instance. This is to help people resolve
-                    // issues when changing non-transactional code into code encapsulated in a transaction block.
-                    // It very easily happens that one forgets to change all db calls from db.friends.add() to just friends.add(). 
-                    // This "Promise Specific Data" member informs the table getter that we are in a transaction block. It will then throw an Error if trying to access db.friends.
-                    Promise.PSD.prohibitDB = true; 
-
                     //
                     // Get storeNames from arguments. Either through given table instances, or through given table names.
                     //
@@ -678,12 +675,14 @@
                         }
                     });
 
+                    var newTransactionMode = mode.indexOf('+') !== -1;
+
                     //
                     // Resolve mode. Allow shortcuts "r" and "rw".
                     //
-                    if (mode == "r" || mode == READONLY)
+                    if (mode == "r" || mode == "r+" || mode.indexOf(READONLY) == 0)
                         mode = READONLY;
-                    else if (mode == "rw" || mode == READWRITE)
+                    else if (mode == "rw" || mode == "rw+" || mode.indexOf(READWRITE) == 0)
                         mode = READWRITE;
                     else
                         throw new Error("Invalid transaction mode");
@@ -693,12 +692,21 @@
                     //
                     var trans = db._createTransaction(mode, storeNames, globalSchema);
 
-                    //
-                    // Supply table instances bound to the new Transaction and provide them as callback arguments
-                    //
-                    var tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
-                    // Let last argument be the Transaction instance itself
-                    tableArgs.push(trans);
+                    var tableArgs;
+                    if (newTransactionMode) {
+                        // New transaction mode - let users use "db.<table>" as normally instead of using provided table arguments.
+                        tableArgs = [trans];
+                        // Let the transaction instance be part of a Promise-specific data (PSD) value.
+                        Promise.PSD.trans = trans;
+                        trans.scopeFunc = scopeFunc; // For Error ("Table " + storeNames[0] + " not part of transaction") when it happens. This may help localizing the code that started a transaction used on another place.
+                    } else {
+                        //
+                        // Supply table instances bound to the new Transaction and provide them as callback arguments
+                        //
+                        tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
+                        // Let last argument be the Transaction instance itself
+                        tableArgs.push(trans);
+                    }
 
                     // If transaction completes, resolve the Promise with the return value of scopeFunc.
                     var returnValue;
@@ -714,6 +722,7 @@
                     // Finally, call the scope function with our table and transaction arguments.
                     try {
                         returnValue = scopeFunc.apply(trans, tableArgs);
+                        if (!trans.idbtrans) trans.on.complete.fire(); // Empty block (not starting any transaction)
                     } catch (e) {
                         // If exception occur, abort the transaction and reject Promise.
                         trans.abort();
@@ -854,19 +863,25 @@
 
                     // Now, subscribe to the when("reading") event to make all objects that come out from this table inherit from given class
                     // no matter which method to use for reading (Table.get() or Table.where(...)... )
-                    this.hook("reading", use_proto ?
-                        function makeInherited (obj) {
+                    var readHook = use_proto ?
+                        function makeInherited(obj) {
                             if (!obj) return obj; // No valid object. (Value is null). Return as is.
                             // The JS engine supports __proto__. Just change that pointer on the existing object. A little more efficient way.
                             obj.__proto__ = constructor.prototype;
                             return obj;
-                        } : function makeInherited (obj) {
+                        } : function makeInherited(obj) {
                             if (!obj) return obj; // No valid object. (Value is null). Return as is.
                             // __proto__ not supported - do it by the standard: return a new object and clone the members from the old one.
                             var res = Object.create(constructor.prototype);
                             for (var m in obj) if (obj.hasOwnProperty(m)) res[m] = obj[m];
                             return res;
-                        });
+                        };
+                    
+                    if (this.schema.readHook) {
+                        this.hook.reading.unsubscribe(this.schema.readHook);
+                    }
+                    this.schema.readHook = readHook;
+                    this.hook("reading", readHook);
                     return constructor;
                 },
                 defineClass: function (structure) {
@@ -1057,7 +1072,7 @@
             this._reculock = 0;
             this._blockedFuncs = [];
             this._psd = null;
-            this.active = false;
+            this.active = true;
             this._dbschema = dbschema;
             this._tpf = transactionPromiseFactory;
             this.tables = {};
@@ -1082,7 +1097,6 @@
         }
 
         extend(Transaction.prototype, {
-
             //
             // Transaction Protected Methods (not required by API users, but needed internally and eventually by dexie extensions)
             //
@@ -1123,7 +1137,6 @@
                         if (!self.idbtrans && mode) {
                             if (!idbdb) throw dbOpenError;
                             var idbtrans = self.idbtrans = idbdb.transaction(self.storeNames, self.mode);
-                            self.active = true;
                             idbtrans.onerror = function (e) {
                                 self.on("error").fire(e && e.target.error);
                                 e.preventDefault(); // Prohibit default bubbling to window.error
@@ -1139,7 +1152,7 @@
                             }
                         }
                         if (bWriteLock) self._lock(); // Write lock if write operation is requested
-                        fn(resolve, reject, self);
+                        fn (resolve, reject, self);
                     });
                     if (bWriteLock) p.finally(function () {
                         self._unlock();
@@ -1177,11 +1190,10 @@
                 } catch (e) { }
             },
             table: function (name) {
-                if (!this.tables.hasOwnProperty(name)) { throw new Error("Table does not exist"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
+                if (!this.tables.hasOwnProperty(name)) { throw new Error("Table " + name + " not in transaction"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
                 return this.tables[name];
             }
         });
-
 
         //
         //
@@ -1856,26 +1868,32 @@
             return a._cfg.version - b._cfg.version;
         }
 
-        function setApiOnPlace(obj, transactionPromiseFactory, tableNames, mode, dbschema, enableProhibitedDB) {
+        function setApiOnPlace(objs, transactionPromiseFactory, tableNames, mode, dbschema, enableProhibitedDB) {
             tableNames.forEach(function (tableName) {
-                if (!obj[tableName]) {
-                    var tableInstance = db._tableFactory(mode, dbschema[tableName], transactionPromiseFactory);
-                    if (enableProhibitedDB) {
-                        Object.defineProperty(obj, tableName, {
-                            configurable: true,
-                            enumerable: true,
-                            get: function () {
-                                if (Promise.PSD && Promise.PSD.prohibitDB) {
-                                    throw new Error("Dont call db." + tableName + " directly. Use tables from your db.transaction() callback instead, or use db.table(tableName) to explicitely show you know what you're doing.");
-                                    return { A_NON_TRANSACTIONAL_TABLE_ACCESS_IN_TRANSCATION_SCOPE: 1 }; // For code completion in IDE.
+                var tableInstance = db._tableFactory(mode, dbschema[tableName], transactionPromiseFactory);
+                objs.forEach(function (obj) {
+                    if (!obj[tableName]) {
+                        if (enableProhibitedDB) {
+                            Object.defineProperty(obj, tableName, {
+                                configurable: true,
+                                enumerable: true,
+                                get: function () {
+                                    if (Promise.PSD && Promise.PSD.trans) {
+                                        var trans = Promise.PSD.trans;
+                                        if (!trans.active) throw new Error("Transaction Inactive. Has already committed or failed. Scope Function: " + trans.scopeFunc);
+                                        if (trans.tables.hasOwnProperty(tableName) && (mode == READONLY || trans.mode == READWRITE)) {
+                                            // Current transaction has given tableName in it and is of a compatible mode. Use it.
+                                            return Promise.PSD.trans.table(tableName);
+                                        }
+                                    }
+                                    return tableInstance;
                                 }
-                                return tableInstance;
-                            }
-                        });
-                    } else {
-                        obj[tableName] = tableInstance;
+                            });
+                        } else {
+                            obj[tableName] = tableInstance;
+                        }
                     }
-                }
+                });
             });
         }
 
@@ -1888,6 +1906,7 @@
         }
 
         function iterate(req, filter, fn, resolve, reject, readingHook) {
+            var psd = Promise.PSD;
             readingHook = readingHook || mirror;
             if (!req.onerror) req.onerror = eventRejectHandler(reject);
             if (filter) {
@@ -1901,7 +1920,7 @@
                     } else {
                         resolve();
                     }
-                }, reject);
+                }, reject, psd);
             } else {
                 req.onsuccess = trycatch(function filter_record(e) {
                     var cursor = req.result;
@@ -1912,7 +1931,7 @@
                     } else {
                         resolve();
                     }
-                }, reject);
+                }, reject, psd);
             }
         }
 
@@ -1972,7 +1991,7 @@
                 }
                 globalSchema[storeName] = new TableSchema(storeName, primKey, indexes, {});
             });
-            setApiOnPlace(allTables, db._transPromiseFactory, Object.keys(globalSchema), READWRITE, globalSchema);
+            setApiOnPlace([allTables], db._transPromiseFactory, Object.keys(globalSchema), READWRITE, globalSchema);
         }
 
         extend(this, {
@@ -2252,9 +2271,9 @@
             });
         };
 
-        Promise.PSD = null; // Promise Specific Data - a TLS Pattern (Thread Local Storage) for Promises.
+        Promise.PSD = null; // Promise Specific Data - a TLS Pattern (Thread Local Storage) for Promises. TODO: Rename Promise.PSD to Promise.data
 
-        Promise.psd = function () {
+        Promise.psd = function () { // TODO: Rename psd() to newData()
             // Create new PSD scope (Promise Specific Data)
             var outerScope = Promise.PSD;
             function F() { }
@@ -2479,13 +2498,17 @@
         clearTimeout(to);
     }
 
-    function trycatch(fn, reject) {
+    function trycatch(fn, reject, psd) {
         return function () {
+            var outerPSD = Promise.PSD; // Support Promise-specific data (PSD) in callback calls
+            Promise.PSD = psd;
             try {
                 fn.apply(this, arguments);
             } catch (e) {
                 reject(e);
-            };
+            } finally {
+                Promise.PSD = outerPSD;
+            }
         };
     }
 
@@ -2756,6 +2779,36 @@
         applyStructure(Class.prototype, structure);
         return Class;
     }
+
+    Dexie.spawn = function (scopeFunc) {
+        // In case caller is within a transaction but needs to create a separate transaction.
+        // Example of usage:
+        // 
+        // Let's say we have a logger function in our app. Other application-logic should be unaware of the
+        // logger function and not need to include the 'logentries' table in all transaction it performs.
+        // The logging should always be done in a separate transaction and not be dependant on the current
+        // running transaction context. Then you could use Dexie.spawn() to run code that starts a new transaction.
+        //
+        //     Dexie.spawn(function() {
+        //         db.logentries.add(newLogEntry);
+        //     });
+        //
+        // Unless using Dexie.spawn(), the above example would try to reuse the current transaction
+        // in current Promise-scope.
+        //
+        // An alternative to Dexie.spawn() would be setImmediate() or setTimeout(). The reason we still provide an
+        // API for this because
+        //  1) The intention of writing the statement could be unclear if using setImmediate() or setTimeout().
+        //  2) setTimeout() would wait unnescessary until firing. This is however not the case with setImmediate().
+        //  3) setImmediate() is not supported in the ES standard.
+        var outerScope = Promise.PSD;
+        Promise.PSD = null;
+        try {
+            return scopeFunc();
+        } finally {
+            Promise.PSD = outerScope;
+        }
+    }
     
     // Export our Promise implementation since it can be handy as a standalone Promise implementation
     Dexie.Promise = Promise;
@@ -2797,7 +2850,7 @@
     }
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-    Dexie.version = 0.973;
+    Dexie.version = 0.98;
 
 
 
