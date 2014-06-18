@@ -235,7 +235,7 @@
         }).finally(start);
     });
 
-    asyncTest("Table is not in read-mode", function () {
+    asyncTest("Transaction is not in read-mode", function () {
         db.transaction('r', db.users, db.pets, function () {
             db.users.toArray();
             db.transaction('rw', db.users, db.pets, function () {
@@ -247,5 +247,198 @@
             ok(true, "Got error: " + err);
         }).finally(start);
     });
+    
+    asyncTest("Transaction bound to different db instance", function () {
+
+        var counter = 0;
+        var db2 = new Dexie("TestDB");
+        db2.open();        
+        db.transaction('rw', "users", "pets", function () {
+            ok(true, "Entered outer transaction scope");
+            db2.transaction('rw', "users", "pets", function () {
+                ok(false, "Should not enter transaction scope when incompatible database instances");
+            }).catch(function (err) {
+                ok(true, "Got error: " + err);
+            }).finally(function () {
+                db2.close();
+                if (++counter == 2) start();
+            });
+        }).then(function () {
+            ok(false, "Main transaction should not resolve due to error in sub transaction");
+        }).catch(function (err) {
+            ok(true, "Got error: " + err);
+        }).finally(function() {
+            if (++counter == 2) start();
+        });
+    });
+
+    //
+    // Testing the "!" mode
+    //
+
+    asyncTest("'!' mode: Table not in main transactions", function () {
+        var counter = 0;
+        db.transaction('rw', db.users, function () {
+            db.users.add({ username: "bertil" });
+            db.transaction('rw!', db.users, db.pets, function () {
+                db.pets.add({ kind: "cat" });
+            }).then(function () {
+                ok(true, "Inner transaction complete");
+            }).catch(function (err) {
+                ok(false, "Got error in inner transaction: " + err);
+            }).finally(function () {
+                if (++counter == 2) start();
+            });
+            Dexie.currentTransaction.abort(); // Aborting outer transaction should not abort inner.
+
+        }).then(function () {
+            ok(false, "Outer transaction should not complete");
+        }).catch(function (err) {
+            ok(true, "Got Abort Error: " + err);
+        }).finally(function () {
+            if (++counter == 2) start();
+        });
+    });
+
+    asyncTest("'!' mode: Transaction is not in read-mode", function () {
+        var counter = 0;
+        db.transaction('r', db.users, db.pets, function () {
+            db.users.toArray();
+            db.transaction('rw!', db.users, db.pets, function () {
+                db.pets.add({ kind: "cat" });
+            }).then(function () {
+                ok(true, "Inner transaction complete");
+            }).catch(function (err) {
+                ok(false, "Got error: " + err);
+            }).finally(function () {
+                if (++counter == 2) start();
+            });
+        }).then(function () {
+            ok(true, "Outer transaction complete");
+        }).catch(function (err) {
+            ok(false, "Got error: " + err);
+        }).finally(function () {
+            if (++counter == 2) start();
+        });
+    });
+
+    asyncTest("'!' mode: Transaction bound to different db instance", function () {
+        var counter = 0;
+        var db2 = new Dexie("TestDB2");
+        db2.version(1).stores({
+            users: "username",
+            pets: "++id,kind",
+            petsPerUser: "++,user,pet"
+        });
+        db2.open();
+        db.transaction('rw', "users", "pets", function () {
+            db2.transaction('rw!', "users", "pets", function () {
+                ok(true, "Possible to enter a transaction in db2");
+            }).catch(function (err) {
+                ok(false, "Got error: " + err);
+            }).finally(function () {
+                db2.delete().then(function () {
+                    if (++counter == 2) start();
+                });
+            });
+        }).finally(function () {
+            if (++counter == 2) start();
+        });
+    });
+
+    //
+    // Testing the "?" mode
+    //
+
+    asyncTest("'?' mode: Table not in main transactions", function () {
+        var counter = 0;
+        db.transaction('rw', db.users, function () {
+            db.users.add({ username: "bertil" });
+            db.transaction('rw?', db.users, db.pets, function () {
+                db.pets.add({ kind: "cat" });
+            }).then(function () {
+                ok(true, "Inner transaction complete");
+            }).catch(function (err) {
+                ok(false, "Got error in inner transaction: " + err);
+            }).finally(function () {
+                if (++counter == 2) start();
+            });
+            Dexie.currentTransaction.abort(); // Aborting outer transaction should not abort inner.
+
+        }).then(function () {
+            ok(false, "Outer transaction should not complete");
+        }).catch(function (err) {
+            ok(true, "Got Abort Error: " + err);
+        }).finally(function () {
+            if (++counter == 2) start();
+        });
+    });
+
+    asyncTest("'?' mode: Transaction is not in read-mode", function () {
+        var counter = 0;
+        db.transaction('r', db.users, db.pets, function () {
+            db.users.toArray();
+            db.transaction('rw?', db.users, db.pets, function () {
+                db.pets.add({ kind: "cat" });
+            }).then(function () {
+                ok(true, "Inner transaction complete");
+            }).catch(function (err) {
+                ok(false, "Got error: " + err);
+            }).finally(function () {
+                if (++counter == 2) start();
+            });
+        }).then(function () {
+            ok(true, "Outer transaction complete");
+        }).catch(function (err) {
+            ok(false, "Got error: " + err);
+        }).finally(function () {
+            if (++counter == 2) start();
+        });
+    });
+
+    asyncTest("'?' mode: Transaction bound to different db instance", function () {
+        var counter = 0;
+        var db2 = new Dexie("TestDB2");
+        db2.version(1).stores({
+            users: "username",
+            pets: "++id,kind",
+            petsPerUser: "++,user,pet"
+        });
+        db2.open();
+        db.transaction('rw', "users", "pets", function () {
+            db2.transaction('rw?', "users", "pets", function () {
+                ok(true, "Possible to enter a transaction in db2");
+            }).catch(function (err) {
+                ok(false, "Got error: " + err);
+            }).finally(function () {
+                db2.delete().then(function () {
+                    if (++counter == 2) start();
+                });
+            });
+        }).finally(function () {
+            if (++counter == 2) start();
+        });
+    });
+
+    asyncTest("'?' mode: Three-level sub transactions", function () {
+        db.transaction('rw', db.users, db.pets, db.petsPerUser, function () {
+            db.users.add({ username: "ojsan" });
+            db.transaction('rw?', db.users, db.pets, function () {
+                db.users.add({ username: "ojsan2" });
+                db.users.toCollection().delete();
+                db.transaction('r?', db.users, function () {
+                    db.users.toArray(function (usersArray) {
+                        equal(usersArray.length, 0, "All users should be deleted");
+                        Dexie.currentTransaction.abort();
+                    });
+                });
+            });
+        }).then(function () {
+            ok(false, "Shouldnt work");
+        }).catch(function (err) {
+            ok(true, "Got error: " + err);
+        }).finally(start);
+    });
+
 })();
 //debugger;

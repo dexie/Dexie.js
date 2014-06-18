@@ -159,7 +159,7 @@
                 /// <param name="upgradeFunction" optional="true">Function that performs upgrading actions.</param>
                 var self = this;
                 fakeAutoComplete(function () {
-                    upgradeFunction(db._createTransaction (READWRITE, Object.keys(self._cfg.dbschema), self._cfg.dbschema));// BUGBUG: No code completion for prev version's tables wont appear.
+                    upgradeFunction(db._createTransaction(READWRITE, Object.keys(self._cfg.dbschema), self._cfg.dbschema));// BUGBUG: No code completion for prev version's tables wont appear.
                 });
                 this._cfg.contentUpgrade = upgradeFunction;
                 return this;
@@ -214,7 +214,7 @@
                 if (!oldVersionStruct) throw new Error("Dexie specification of currently installed DB version is missing");
                 globalSchema = db._dbSchema = oldVersionStruct._cfg.dbschema;
                 var anyContentUpgraderHasRun = false;
-                
+
                 var versToRun = versions.filter(function (v) { return v._cfg.version > oldVersion; });
                 versToRun.forEach(function (version) {
                     /// <param name="version" type="Version"></param>
@@ -255,7 +255,7 @@
                                 var t = db._createTransaction(READWRITE, [].slice.call(idbtrans.db.objectStoreNames, 0), newSchema);
                                 t.idbtrans = idbtrans;
                                 var uncompletedRequests = 0;
-                                t._promise = override (t._promise, function(orig_promise) {
+                                t._promise = override(t._promise, function (orig_promise) {
                                     return function (mode, fn, writeLock) {
                                         ++uncompletedRequests;
                                         function proxy(fn) {
@@ -387,8 +387,8 @@
 
         this._allTables = allTables;
 
-        this._tableFactory = function createTable (mode, tableSchema, transactionPromiseFactory) {
-        	/// <param name="tableSchema" type="TableSchema"></param>
+        this._tableFactory = function createTable(mode, tableSchema, transactionPromiseFactory) {
+            /// <param name="tableSchema" type="TableSchema"></param>
             if (mode === READONLY)
                 return new Table(tableSchema.name, transactionPromiseFactory, tableSchema, Collection);
             else
@@ -499,7 +499,7 @@
                             // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
                             // If onupgradeneeded is called it means database did not exist. Reject the open() promise and make sure that we 
                             // do not create a new database by accident here.
-                            req.onerror = function (event) { event.preventDefault();}; // Prohibit onabort error from firing before we're done!
+                            req.onerror = function (event) { event.preventDefault(); }; // Prohibit onabort error from firing before we're done!
                             req.transaction.abort(); // Abort transaction (would hope that this would make DB disappear but it doesnt.)
                             // Close database and delete it.
                             req.result.close();
@@ -625,7 +625,7 @@
         // TODO: Change so that tables is a simple member and make sure to update it whenever allTables changes.
         Object.defineProperty(this, "tables", {
             get: function () {
-            	/// <returns type="Array" elementType="WriteableTable" />
+                /// <returns type="Array" elementType="WriteableTable" />
                 return Object.keys(allTables).map(function (name) { return allTables[name]; });
             }
         });
@@ -653,41 +653,77 @@
             // Let scopeFunc be the last argument
             scopeFunc = arguments[arguments.length - 1];
             var parentTransaction = Promise.PSD && Promise.PSD.trans;
-            if (parentTransaction)
+            if (mode.indexOf('!') !== -1) parentTransaction = null; // Caller dont want to reuse existing transaction
+            var onlyIfCompatible = mode.indexOf('?') !== -1;
+            mode = mode.replace('!', '').replace('?', '');
+            //
+            // Get storeNames from arguments. Either through given table instances, or through given table names.
+            //
+            var tables = Array.isArray(tableInstances[0]) ? tableInstances.reduce(function (a, b) { return a.concat(b) }) : tableInstances;
+            var error = null;
+            var storeNames = tables.map(function (tableInstance) {
+                if (typeof tableInstance == "string") {
+                    return tableInstance;
+                } else {
+                    if (!(tableInstance instanceof Table)) error = error || new TypeError("Invalid type. Arguments following mode must be instances of Table or String");
+                    return tableInstance.name;
+                }
+            });
+
+            //
+            // Resolve mode. Allow shortcuts "r" and "rw".
+            //
+            if (mode == "r" || mode == READONLY)
+                mode = READONLY;
+            else if (mode == "rw" || mode == READWRITE)
+                mode = READWRITE;
+            else
+                error = new Error("Invalid transaction mode: " + mode);
+
+            if (parentTransaction) {
+                // Basic checks
+                if (!error) {
+                    if (parentTransaction.db != db) {
+                        if (onlyIfCompatible) parentTransaction = null; // Spawn new transaction instead.
+                        else error = new Error("Current transaction bound to different database instance");
+                    }
+                    if (parentTransaction && parentTransaction.mode === READONLY && mode === READWRITE) {
+                        if (onlyIfCompatible) parentTransaction = null; // Spawn new transaction instead.
+                        else error = error || new Error("Cannot enter a sub-transaction with READWRITE mode when parent transaction is READONLY");
+                    }
+                    if (parentTransaction) {
+                        storeNames.forEach(function (storeName) {
+                            if (!parentTransaction.tables.hasOwnProperty(storeName)) {
+                                if (onlyIfCompatible) parentTransaction = null; // Spawn new transaction instead.
+                                else error = error || new Error("Table " + storeName + " not included in parent transaction");
+                            }
+                        });
+                    }
+                }
+            }
+            if (parentTransaction) {
                 // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
                 return parentTransaction._promise(mode, enterTransactionScope, "lock");
-            else
+            } else {
                 // If this is a root-level transaction, wait til database is ready and then launch the transaction.
                 return db._whenReady(enterTransactionScope);
+            }
 
             function enterTransactionScope(resolve, reject) {
-
-                var outerPSD = Promise.psd(); // Need to make sure Promise.PSD.trans runs in this scope only
+                // Our transaction. To be set later.
                 var trans = null;
-                try {
-                    //
-                    // Get storeNames from arguments. Either through given table instances, or through given table names.
-                    //
-                    var tables = Array.isArray(tableInstances[0]) ? tableInstances.reduce(function (a, b) { return a.concat(b) }) : tableInstances;
-                    var storeNames = tables.map(function (tableInstance) {
-                        if (typeof tableInstance == "string") {
-                            if (!globalSchema[tableInstance]) { throw new Error("Invalid table name: " + tableInstance); return { INVALID_TABLE_NAME: 1 } }; // Return statement is for IDE code completion.
-                            return tableInstance;
-                        } else {
-                            if (!(tableInstance instanceof Table)) { throw new TypeError("Invalid type. Arguments following mode must be instances of Table or String"); return { IVALID_TYPE: 1 }; }
-                            return tableInstance.name;
-                        }
-                    });
 
-                    //
-                    // Resolve mode. Allow shortcuts "r" and "rw".
-                    //
-                    if (mode == "r" || mode == READONLY)
-                        mode = READONLY;
-                    else if (mode == "rw" || mode == READWRITE)
-                        mode = READWRITE;
-                    else
-                        throw new Error("Invalid transaction mode");
+                // Create a new PSD frame to hold Promise.PSD.trans. Must not be bound to the current PSD frame since we want
+                // it to pop before then() callback is called of our returned Promise.
+                var outerPSD = Promise.psd();
+                try {
+                    // Throw any error if any of the above checks failed.
+                    // Real error defined some lines up. We throw it here from within a Promise to reject Promise
+                    // rather than make caller need to both use try..catch and promise catching. The reason we still
+                    // throw here rather than do Promise.reject(error) is that we like to have the stack attached to the
+                    // error. Also because there is a catch() clause bound to this try() that will bubble the error
+                    // to the parent transaction.
+                    if (error) throw error;
 
                     //
                     // Create Transaction instance
@@ -705,15 +741,8 @@
                     // If transaction completes, resolve the Promise with the return value of scopeFunc.
                     var returnValue;
                     var uncompletedRequests = 0;
-                    if (parentTransaction) {
-                        // Basic checks
-                        if (parentTransaction.mode === READONLY && mode === READWRITE)
-                            throw new Error("Cannot enter a sub-transaction with READWRITE mode when parent transaction is READONLY");
-                        storeNames.forEach(function (storeName) {
-                            if (!parentTransaction.tables.hasOwnProperty(storeName))
-                                throw new Error("Table " + storeName + " not included in parent transaction");
-                        });
 
+                    if (parentTransaction) {
                         // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
                         trans.idbtrans = parentTransaction.idbtrans;
                         trans._promise = override(trans._promise, function (orig) {
@@ -770,7 +799,7 @@
         }
 
         this.table = function (tableName) {
-        	/// <returns type="WriteableTable"></returns>
+            /// <returns type="WriteableTable"></returns>
             if (!autoSchema && !allTables.hasOwnProperty(tableName)) { throw new Error("Table does not exist"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
             return allTables[tableName];
         }
@@ -788,7 +817,7 @@
             this.schema = tableSchema;
             this.hook = allTables[name] ? allTables[name].hook : events(null, {
                 "creating": [hookCreatingChain, nop],
-                "reading":  [pureFunctionChain, mirror],
+                "reading": [pureFunctionChain, mirror],
                 "updating": [hookUpdatingChain, nop],
                 "deleting": [nonStoppableEventChain, nop]
             });
@@ -888,11 +917,11 @@
                         // Make sure primary key is not part of prototype because add() and put() fails on Chrome if primKey template lies on prototype due to a bug in its implementation
                         // of getByKeyPath(), that it accepts getting from prototype chain.
                         setByKeyPath(instanceTemplate, this.schema.primKey.keyPath, this.schema.primKey.auto ? 0 : "");
-                        delByKeyPath(constructor.prototype, this.schema.primKey.keyPath); 
+                        delByKeyPath(constructor.prototype, this.schema.primKey.keyPath);
                     }
                     if (structure) {
                         // structure and instanceTemplate is for IDE code competion only while constructor.prototype is for actual inheritance.
-                        applyStructure(instanceTemplate, structure); 
+                        applyStructure(instanceTemplate, structure);
                     }
                     this.schema.instanceTemplate = instanceTemplate;
 
@@ -911,7 +940,7 @@
                             for (var m in obj) if (obj.hasOwnProperty(m)) res[m] = obj[m];
                             return res;
                         };
-                    
+
                     if (this.schema.readHook) {
                         this.hook.reading.unsubscribe(this.schema.readHook);
                     }
@@ -1105,6 +1134,7 @@
             /// <param name="mode" type="String">Any of "readwrite" or "readonly"</param>
             /// <param name="storeNames" type="Array">Array of table names to operate on</param>
             var self = this;
+            this.db = db;
             this.mode = mode;
             this.storeNames = storeNames;
             this.idbtrans = null;
@@ -1117,7 +1147,7 @@
             this._tpf = transactionPromiseFactory;
             this.tables = Object.create(notInTransFallbackTables); // ...so that all non-included tables exists as instances (possible to call table.name for example) but will fail as soon as trying to execute a query on it.
 
-            function transactionPromiseFactory (mode, storeNames, fn, writeLocked) {
+            function transactionPromiseFactory(mode, storeNames, fn, writeLocked) {
                 // Creates a Promise instance and calls fn (resolve, reject, trans) where trans is the instance of this transaction object.
                 // Support for write-locking the transaction during the promise life time from creation to success/failure.
                 // This is actually not needed when just using single operations on IDB, since IDB implements this internally.
@@ -1192,7 +1222,7 @@
                             }
                         }
                         if (bWriteLock) self._lock(); // Write lock if write operation is requested
-                        fn (resolve, reject, self);
+                        fn(resolve, reject, self);
                     }) : Promise.reject(stack(new Error("Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
                     if (bWriteLock) p.finally(function () {
                         self._unlock();
@@ -1217,7 +1247,7 @@
             // Transaction Public Methods
             //
 
-            complete: function(cb) {
+            complete: function (cb) {
                 return this.on("complete", cb);
             },
             error: function (cb) {
@@ -1391,7 +1421,7 @@
                 anyOf: function (valueArray) {
                     var set = getSortedSet(arguments);
                     if (set.length === 0) return new this._ctx.collClass(this, IDBKeyRange.only("")).limit(0); // Return an empty collection.
-                    var c = new this._ctx.collClass(this, IDBKeyRange.bound(set[0], set[set.length-1]));
+                    var c = new this._ctx.collClass(this, IDBKeyRange.bound(set[0], set[set.length - 1]));
                     var sorter = ascending;
                     c._ondirectionchange = function (direction) {
                         sorter = (direction === "next" ? ascending : descending);
@@ -2048,7 +2078,7 @@
         init();
 
         Dexie.addons.forEach(function (fn) {
-            fn (db);
+            fn(db);
         });
     }
 
@@ -2348,7 +2378,7 @@
     //
     //
 
-    function nop() {}
+    function nop() { }
     function mirror(val) { return val; }
 
     function pureFunctionChain(f1, f2) {
@@ -2460,7 +2490,7 @@
             if (typeof eventName === 'object') return addConfiguredEvents(eventName);
             if (!chainFunction) chainFunction = stoppableEventChain;
             if (!defaultFunction) defaultFunction = nop;
-            
+
             var context = {
                 subscribers: [],
                 fire: defaultFunction,
@@ -2559,7 +2589,7 @@
         if (obj.hasOwnProperty(keyPath)) return obj[keyPath]; // This line is moved from last to first for optimization purpose.
         if (!keyPath) return obj;
         if (typeof keyPath !== 'string') {
-        //if (Array.isArray(keyPath)) {
+            //if (Array.isArray(keyPath)) {
             var rv = [];
             for (var i = 0, l = keyPath.length; i < l; ++i) {
                 var val = getByKeyPath(obj, keyPath[i]);
@@ -2619,7 +2649,7 @@
         var rv;
         if (Array.isArray(any)) {
             rv = [];
-            for (var i=0, l=any.length; i<l; ++i) {
+            for (var i = 0, l = any.length; i < l; ++i) {
                 rv.push(deepClone(any[i]));
             }
         } else if (any instanceof Date) {
@@ -2645,7 +2675,7 @@
         for (var prop in a) if (a.hasOwnProperty(prop)) {
             if (!b.hasOwnProperty(prop))
                 rv[prop] = undefined; // Property removed
-            else if (a[prop] !== b[prop] && JSON.stringify(a[prop]) != JSON.stringify(b[prop])) 
+            else if (a[prop] !== b[prop] && JSON.stringify(a[prop]) != JSON.stringify(b[prop]))
                 rv[prop] = b[prop]; // Property changed
         }
         for (var prop in b) if (b.hasOwnProperty(prop) && !a.hasOwnProperty(prop)) {
@@ -2883,12 +2913,12 @@
     // Dexie.currentTransaction property. Only applicable for transactions entered using the new "transact()" method.
     Object.defineProperty(Dexie, "currentTransaction", {
         get: function () {
-        	/// <returns type="Transaction"></returns>
+            /// <returns type="Transaction"></returns>
             return Promise.PSD && Promise.PSD.trans || null;
         }
     })
 
-    
+
     // Export our Promise implementation since it can be handy as a standalone Promise implementation
     Dexie.Promise = Promise;
     // Export our derive/extend/override methodology
@@ -2905,7 +2935,7 @@
     Dexie.addons = [];
     Dexie.fakeAutoComplete = fakeAutoComplete;
     Dexie.asap = asap;
-	// Export our static classes
+    // Export our static classes
     Dexie.ModifyError = ModifyError;
     Dexie.MultiModifyError = ModifyError; // Backward compatibility pre 0.9.8
     Dexie.IndexSpec = IndexSpec;
@@ -2942,4 +2972,3 @@
 }).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this == window)
     ? [window, function (name, value) { window[name] = value; }, true]    // Adapt to browser environment
     : [global, function (name, value) { module.exports = value; }, false]); // Adapt to Node.js environment
-
