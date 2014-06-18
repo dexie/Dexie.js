@@ -54,9 +54,9 @@
         }).then(function () {
             ok(true, "Could upgrade to version 3 (adding an index to a store)");
             // Testing that the added index is working indeed:
-            return db.transaction('rw', "store1", function (store1) {
-                store1.add({ name: "apa" });
-                store1.where("name").equals("apa").count(function (count) {
+            return db.transaction('rw', "store1", function () {
+                db.store1.add({ name: "apa" });
+                db.store1.where("name").equals("apa").count(function (count) {
                     equal(count, 1, "Apa was found by its new index (The newly added index really works!)");
                 });
             });
@@ -105,7 +105,7 @@
             db = new Dexie(DBNAME);
             db.version(5).stores({ store1: "++id,&email" }); // Need not to specify an upgrader function when we know it's not gonna run (we are already on ver 5)
             db.version(6).stores({ store1: "++id,*email" }).upgrade(function (trans) { // Changing email index from unique to multi-valued
-                trans.store1.toCollection().modify(function(obj) {
+                trans.table("store1").toCollection().modify(function(obj) {
                     obj.email = [obj.email]; // Turning single-valued unique email into an array of emails.
                 });
             }); 
@@ -167,7 +167,7 @@
                 });
             });
             db.version(6).stores({ store1: "++id,*email" }).upgrade(function (trans) { // Changing email index from unique to multi-valued
-                trans.store1.toCollection().modify(function (obj) {
+                trans.table("store1").toCollection().modify(function (obj) {
                     obj.email = [obj.email]; // Turning single-valued unique email into an array of emails.
                 });
             });
@@ -188,7 +188,7 @@
             db.version(8).stores({ store1: null });
             db.version(7).stores({ store2: "uuid" });
             db.version(6).stores({ store1: "++id,*email" }).upgrade(function (trans) { // Changing email index from unique to multi-valued
-                trans.store1.toCollection().modify(function (obj) {
+                trans.table("store1").toCollection().modify(function (obj) {
                     obj.email = [obj.email]; // Turning single-valued unique email into an array of emails.
                 });
             });

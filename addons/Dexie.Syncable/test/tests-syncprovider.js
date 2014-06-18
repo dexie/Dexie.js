@@ -125,9 +125,9 @@
         }).then(function () {
             ok(true, "The DELETE of friend 'Ylva' was sent all the way around as well");
             // Now send 1100 create requests
-            db2.transaction('rw', db2.pets, function (pets) {
+            db2.transaction('rw', db2.pets, function () {
                 for (var i = 0; i < 1100; ++i) {
-                    pets.add({name: "Josephina" + (i + 1), kind: "Dog"});
+                    db.pets.add({name: "Josephina" + (i + 1), kind: "Dog"});
                 }
             });
             return waitFor(db, { type: CREATE, name: "Josephina1100" });
@@ -143,9 +143,9 @@
             });
         }).then(function () {
             // Now send 1000 create this time (exact number of max changes per chunk)
-            db.transaction('rw', db.pets, function (pets) {
+            db.transaction('rw', db.pets, function () {
                 for (var i = 0; i < 1000; ++i) {
-                    pets.add({ name: "Tito" + (i + 1), kind: "Cat" });
+                    db.pets.add({ name: "Tito" + (i + 1), kind: "Cat" });
                 }
             });
             return waitFor(db, { type: CREATE, name: "Tito1000" });

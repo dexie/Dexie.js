@@ -42,11 +42,11 @@
 		db1.version(1).stores({ objects: "$$" });
 		db2.version(1).stores({ objects: "$$" });
 
-		db1.on('populate', function (trans) {
-			trans.objects.add({ name: "one" });
-			trans.objects.add({ name: "two" });
-			trans.objects.add({ name: "three" }).then(function (key) {
-				trans.objects.update(key, {name: "four"});
+		db1.on('populate', function () {
+			db1.objects.add({ name: "one" });
+			db1.objects.add({ name: "two" });
+			db1.objects.add({ name: "three" }).then(function (key) {
+				db1.objects.update(key, {name: "four"});
 			});
 		});
 		db1.on('error', function onError (err) {
@@ -148,9 +148,9 @@
 			equal(changes[0].obj.name, "eight", "change is eight");
 			equal(partial, false);
 			onChangesAccepted();
-			db1.transaction('rw', db1.objects, function (objects) {
+			db1.transaction('rw', db1.objects, function () {
 				for (var i = 0; i < 1001; ++i) {
-					objects.add({ name: "bulk" });
+					db1.objects.add({ name: "bulk" });
 				}
 			}).then(function () {
 				onSuccess({ again: 1 });

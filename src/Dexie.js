@@ -57,6 +57,7 @@
         var versions = [];
         var dbStoreNames = [];
         var allTables = {};
+        var notInTransFallbackTables = {};
         ///<var type="IDBDatabase" />
         var idbdb = null; // Instance of IDBDatabase
         var db_is_blocked = true;
@@ -116,6 +117,7 @@
                 tables: {},
                 contentUpgrade: null,
             }
+            this.stores({}); // Derive earlier schemas by default.
         }
 
         extend(Version.prototype, {
@@ -135,6 +137,7 @@
                 ///  "++" means auto-increment and only applicable for primary key <br/>
                 /// </param>
                 this._cfg.storesSource = this._cfg.storesSource ? extend(this._cfg.storesSource, stores) : stores;
+
                 // Derive stores from earlier versions if they are not explicitely specified as null or a new syntax.
                 var storesSpec = {};
                 versions.forEach(function (version) { // 'versions' is always sorted by lowest version first.
@@ -146,7 +149,8 @@
                 // Update the latest schema to this version
                 // Update API
                 globalSchema = db._dbSchema = dbschema;
-                removeTablesApi([allTables, db]);
+                removeTablesApi([allTables, db, notInTransFallbackTables]);
+                setApiOnPlace([notInTransFallbackTables], tableNotInTransaction, Object.keys(dbschema), READWRITE, dbschema);
                 setApiOnPlace([allTables, db, this._cfg.tables], db._transPromiseFactory, Object.keys(dbschema), READWRITE, dbschema, true);
                 dbStoreNames = Object.keys(dbschema);
                 return this;
@@ -179,18 +183,29 @@
             }
         });
 
-        function runUpgraders(oldVersion, trans, reject) {
+        function runUpgraders(oldVersion, idbtrans, reject, openReq) {
             if (oldVersion == 0) {
                 //globalSchema = versions[versions.length - 1]._cfg.dbschema;
                 // Create tables:
                 Object.keys(globalSchema).forEach(function (tableName) {
-                    createTable(trans, tableName, globalSchema[tableName].primKey, globalSchema[tableName].indexes);
+                    createTable(idbtrans, tableName, globalSchema[tableName].primKey, globalSchema[tableName].indexes);
                 });
                 // Populate data
                 var t = db._createTransaction(READWRITE, dbStoreNames, globalSchema);
-                t.idbtrans = trans;
-                t.idbtrans.onerror = eventRejectHandler(reject,  ["populating database"]);
-                db.on("populate").fire(t);
+                t.idbtrans = idbtrans;
+                t.idbtrans.onerror = eventRejectHandler(reject, ["populating database"]);
+                var outerScope = Promise.psd();
+                try {
+                    Promise.PSD.trans = t;
+                    db.on("populate").fire(t);
+                } catch (err) {
+                    openReq.onerror = idbtrans.onerror = function (ev) { ev.preventDefault(); } // Prohibit AbortError fire on db.on("error") in Firefox.
+                    try { idbtrans.abort(); } catch (e) { }
+                    idbtrans.db.close();
+                    reject(err);
+                } finally {
+                    Promise.PSD = outerScope;
+                }
             } else {
                 // Upgrade version to version, step-by-step from oldest to newest version.
                 // Each transaction object will contain the table set that was current in that version (but also not-yet-deleted tables from its previous version)
@@ -209,8 +224,8 @@
                     {
                         var diff = getSchemaDiff(oldSchema, newSchema);
                         diff.add.forEach(function (tuple) {
-                            queue.push(function (trans, cb) {
-                                createTable(trans, tuple[0], tuple[1].primKey, tuple[1].indexes);
+                            queue.push(function (idbtrans, cb) {
+                                createTable(idbtrans, tuple[0], tuple[1].primKey, tuple[1].indexes);
                                 cb();
                             });
                         });
@@ -218,8 +233,8 @@
                             if (change.recreate) {
                                 throw new Error("Not yet support for changing primary key");
                             } else {
-                                queue.push(function (trans, cb) {
-                                    var store = trans.objectStore(change.name);
+                                queue.push(function (idbtrans, cb) {
+                                    var store = idbtrans.objectStore(change.name);
                                     change.add.forEach(function (idx) {
                                         addIndex(store, idx);
                                     });
@@ -235,10 +250,10 @@
                             }
                         });
                         if (version._cfg.contentUpgrade) {
-                            queue.push(function (trans, cb) {
+                            queue.push(function (idbtrans, cb) {
                                 anyContentUpgraderHasRun = true;
-                                var t = db._createTransaction(READWRITE, [].slice.call(trans.db.objectStoreNames, 0), newSchema);
-                                t.idbtrans = trans;
+                                var t = db._createTransaction(READWRITE, [].slice.call(idbtrans.db.objectStoreNames, 0), newSchema);
+                                t.idbtrans = idbtrans;
                                 var uncompletedRequests = 0;
                                 t._promise = override (t._promise, function(orig_promise) {
                                     return function (mode, fn, writeLock) {
@@ -256,15 +271,15 @@
                                         }, writeLock);
                                     }
                                 });
-                                trans.onerror = eventRejectHandler(reject, ["running upgrader function for version", version._cfg.version]);
+                                idbtrans.onerror = eventRejectHandler(reject, ["running upgrader function for version", version._cfg.version]);
                                 version._cfg.contentUpgrade(t);
                                 if (uncompletedRequests === 0) cb(); // contentUpgrade() didnt call any db operations at all.
                             });
                         }
                         if (!anyContentUpgraderHasRun || !hasIEDeleteObjectStoreBug()) { // Dont delete old tables if ieBug is present and a content upgrader has run. Let tables be left in DB so far. This needs to be taken care of.
-                            queue.push(function (trans, cb) {
+                            queue.push(function (idbtrans, cb) {
                                 // Delete old tables
-                                deleteRemovedTables(newSchema, trans);
+                                deleteRemovedTables(newSchema, idbtrans);
                                 cb();
                             });
                         }
@@ -273,12 +288,18 @@
 
                 // Now, create a queue execution engine
                 var runNextQueuedFunction = function () {
-                    if (queue.length)
-                        queue.shift()(trans, runNextQueuedFunction);
-                    else
-                        createMissingTables(globalSchema, trans); // At last, make sure to create any missing tables. (Needed by addons that add stores to DB without specifying version)
+                    try {
+                        if (queue.length)
+                            queue.shift()(idbtrans, runNextQueuedFunction);
+                        else
+                            createMissingTables(globalSchema, idbtrans); // At last, make sure to create any missing tables. (Needed by addons that add stores to DB without specifying version)
+                    } catch (err) {
+                        openReq.onerror = idbtrans.onerror = function (ev) { ev.preventDefault(); } // Prohibit AbortError fire on db.on("error") in Firefox.
+                        idbtrans.abort();
+                        idbtrans.db.close();
+                        reject(err);
+                    }
                 };
-
                 runNextQueuedFunction();
             }
         }
@@ -330,26 +351,26 @@
             return diff;
         }
 
-        function createTable(trans, tableName, primKey, indexes) {
-            /// <param name="trans" type="IDBTransaction"></param>
-            var store = trans.db.createObjectStore(tableName, primKey.keyPath ? { keyPath: primKey.keyPath, autoIncrement: primKey.auto } : { autoIncrement: primKey.auto });
+        function createTable(idbtrans, tableName, primKey, indexes) {
+            /// <param name="idbtrans" type="IDBTransaction"></param>
+            var store = idbtrans.db.createObjectStore(tableName, primKey.keyPath ? { keyPath: primKey.keyPath, autoIncrement: primKey.auto } : { autoIncrement: primKey.auto });
             indexes.forEach(function (idx) { addIndex(store, idx); });
             return store;
         }
 
-        function createMissingTables(newSchema, trans) {
+        function createMissingTables(newSchema, idbtrans) {
             Object.keys(newSchema).forEach(function (tableName) {
-                if (!trans.db.objectStoreNames.contains(tableName)) {
-                    createTable(trans, tableName, newSchema[tableName].primKey, newSchema[tableName].indexes);
+                if (!idbtrans.db.objectStoreNames.contains(tableName)) {
+                    createTable(idbtrans, tableName, newSchema[tableName].primKey, newSchema[tableName].indexes);
                 }
             });
         }
 
-        function deleteRemovedTables(newSchema, trans) {
-            for (var i = 0; i < trans.db.objectStoreNames.length; ++i) {
-                var storeName = trans.db.objectStoreNames[i];
+        function deleteRemovedTables(newSchema, idbtrans) {
+            for (var i = 0; i < idbtrans.db.objectStoreNames.length; ++i) {
+                var storeName = idbtrans.db.objectStoreNames[i];
                 if (newSchema[storeName] === null || newSchema[storeName] === undefined) {
-                    trans.db.deleteObjectStore(storeName);
+                    idbtrans.db.deleteObjectStore(storeName);
                 }
             }
         }
@@ -376,6 +397,10 @@
 
         this._createTransaction = function (mode, storeNames, dbschema) {
             return new Transaction(mode, storeNames, dbschema);
+        }
+
+        function tableNotInTransaction(mode, storeNames) {
+            return Promise.reject(stack(new Error("Table " + storeNames[0] + " not part of transaction. Original Scope Function Source: " + Dexie.Promise.PSD.trans.scopeFunc.toString())));
         }
 
         this._transPromiseFactory = function transactionPromiseFactory(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
@@ -485,7 +510,7 @@
                         } else {
                             if (e.oldVersion == 0) dbWasCreated = true;
                             req.transaction.onerror = eventToError(openError);
-                            runUpgraders(e.oldVersion / 10, req.transaction, openError);
+                            runUpgraders(e.oldVersion / 10, req.transaction, openError, req);
                         }
                     };
                     req.onsuccess = function (e) {
@@ -627,9 +652,18 @@
             tableInstances = [].slice.call(arguments, 1, arguments.length - 1);
             // Let scopeFunc be the last argument
             scopeFunc = arguments[arguments.length - 1];
+            var parentTransaction = Promise.PSD && Promise.PSD.trans;
+            if (parentTransaction)
+                // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
+                return parentTransaction._promise(mode, enterTransactionScope, "lock");
+            else
+                // If this is a root-level transaction, wait til database is ready and then launch the transaction.
+                return db._whenReady(enterTransactionScope);
 
-            return db._whenReady(function (resolve, reject) {
-                var outerPSD = Promise.psd(); // Need to make sure Promise.PSD.prohibitDB does not continue over to the then() callback of our returned Promise! Callers may use direct DB access after transaction completes!
+            function enterTransactionScope(resolve, reject) {
+
+                var outerPSD = Promise.psd(); // Need to make sure Promise.PSD.trans runs in this scope only
+                var trans = null;
                 try {
                     //
                     // Get storeNames from arguments. Either through given table instances, or through given table names.
@@ -658,7 +692,7 @@
                     //
                     // Create Transaction instance
                     //
-                    var trans = db._createTransaction(mode, storeNames, globalSchema);
+                    trans = db._createTransaction(mode, storeNames, globalSchema);
 
                     // Provide arguments to the scope function (for backward compatibility)
                     var tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
@@ -670,31 +704,69 @@
 
                     // If transaction completes, resolve the Promise with the return value of scopeFunc.
                     var returnValue;
+                    var uncompletedRequests = 0;
+                    if (parentTransaction) {
+                        // Basic checks
+                        if (parentTransaction.mode === READONLY && mode === READWRITE)
+                            throw new Error("Cannot enter a sub-transaction with READWRITE mode when parent transaction is READONLY");
+                        storeNames.forEach(function (storeName) {
+                            if (!parentTransaction.tables.hasOwnProperty(storeName))
+                                throw new Error("Table " + storeName + " not included in parent transaction");
+                        });
+
+                        // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
+                        trans.idbtrans = parentTransaction.idbtrans;
+                        trans._promise = override(trans._promise, function (orig) {
+                            return function (mode, fn, writeLock) {
+                                ++uncompletedRequests;
+                                function proxy(fn2) {
+                                    return function (val) {
+                                        var retval = fn2(val);
+                                        if (--uncompletedRequests == 0 && trans.active) trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
+                                        return retval;
+                                    }
+                                }
+                                return orig.call(this, mode, function (resolve2, reject2, trans) {
+                                    return fn(proxy(resolve2), proxy(reject2), trans);
+                                }, writeLock);
+                            }
+                        });
+                    }
                     trans.complete(function () {
                         resolve(returnValue);
                     });
                     // If transaction fails, reject the Promise and bubble to db if noone catched this rejection.
                     trans.error(function (e) {
+                        trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
+                        trans.abort();
+                        if (parentTransaction) parentTransaction.active = false;
                         var catched = reject(e);
-                        if (!catched) db.on("error").fire(e); // If not catched, bubble error to db.on("error").
+                        if (parentTransaction) parentTransaction.on.error.fire(e); // Bubble to parent transaction
+                        else if (!catched) db.on.error.fire(e);// If not catched, bubble error to db.on("error").
                     });
 
                     // Finally, call the scope function with our table and transaction arguments.
-                    try {
-                        returnValue = scopeFunc.apply(trans, tableArgs);
-                        if (!trans.idbtrans) trans.on.complete.fire(); // Empty block (not starting any transaction)
-                    } catch (e) {
-                        // If exception occur, abort the transaction and reject Promise.
-                        trans.abort();
-                        asap(function () {
-                            // reject() would always return false if not calling using asap() since we are in the constructor,
-                            if (!reject(e)) db.on("error").fire(e); // If not catched, bubble exception to db.on("error");
-                        });
+                    returnValue = scopeFunc.apply(trans, tableArgs);
+                    if (!trans.idbtrans || parentTransaction && uncompletedRequests === 0) {
+                        Promise.PSD = outerPSD; // Save on.complete.fire() from deriving finished transaction.
+                        trans.active = false;
+                        trans.on.complete.fire(); // Empty block (not starting any transaction)
                     }
+
+                } catch (e) {
+                    // If exception occur, abort the transaction and reject Promise.
+                    Promise.PSD = outerPSD; // Save trans.abort() and on("error").fire from deriving finished transaction.
+                    if (trans && trans.idbtrans) trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
+                    if (trans) trans.abort();
+                    if (parentTransaction) parentTransaction.on.error.fire(e);
+                    asap(function () {
+                        // Need to use asap(=setImmediate/setTimeout) before calling reject because we are in the Promise constructor and reject() will always return false if so.
+                        if (!reject(e)) db.on("error").fire(e); // If not catched, bubble exception to db.on("error");
+                    });
                 } finally {
                     Promise.PSD = outerPSD;
                 }
-            });
+            }
         }
 
         this.table = function (tableName) {
@@ -725,6 +797,9 @@
         }
 
         extend(Table.prototype, function () {
+            function failReadonly() {
+                throw new Error("Current Transaction is READONLY");
+            }
             return {
                 //
                 // Table Protected Methods
@@ -852,7 +927,12 @@
                     /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
                     /// know what type each member has. Example: {name: String, emailAddresses: [String], properties: {shoeSize: Number}}</param>
                     return this.mapToClass(Dexie.defineClass(structure), structure);
-                }
+                },
+                add: failReadonly,
+                put: failReadonly,
+                'delete': failReadonly,
+                clear: failReadonly,
+                update: failReadonly
             };
         });
 
@@ -1035,7 +1115,7 @@
             this.active = true;
             this._dbschema = dbschema;
             this._tpf = transactionPromiseFactory;
-            this.tables = {};
+            this.tables = Object.create(notInTransFallbackTables); // ...so that all non-included tables exists as instances (possible to call table.name for example) but will fail as soon as trying to execute a query on it.
 
             function transactionPromiseFactory (mode, storeNames, fn, writeLocked) {
                 // Creates a Promise instance and calls fn (resolve, reject, trans) where trans is the instance of this transaction object.
@@ -1093,7 +1173,7 @@
                 var self = this;
                 // Read lock always
                 if (!this._locked()) {
-                    var p = new Promise(function (resolve, reject) {
+                    var p = self.active ? new Promise(function (resolve, reject) {
                         if (!self.idbtrans && mode) {
                             if (!idbdb) throw dbOpenError || new Error("Database not open");
                             var idbtrans = self.idbtrans = idbdb.transaction(self.storeNames, self.mode);
@@ -1113,13 +1193,13 @@
                         }
                         if (bWriteLock) self._lock(); // Write lock if write operation is requested
                         fn (resolve, reject, self);
-                    });
+                    }) : Promise.reject(stack(new Error("Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
                     if (bWriteLock) p.finally(function () {
                         self._unlock();
                     });
                     p.onuncatched = function (e) {
                         // Bubble to transaction. Even though IDB does this internally, it would just do it for error events and not for caught exceptions.
-                        self.on("error").fire(e);
+                        Dexie.spawn(function () { self.on("error").fire(e); });
                         self.abort();
                     }
                     return p;
@@ -1147,6 +1227,7 @@
                 if (this.idbtrans && this.active) try { // TODO: if !this.idbtrans, enqueue an abort() operation.
                     this.active = false;
                     this.idbtrans.abort();
+                    this.on.error.fire(new Error("Transaction Aborted"));
                 } catch (e) { }
             },
             table: function (name) {
@@ -1363,6 +1444,7 @@
             this._ctx = {
                 table: whereCtx.table,
                 index: whereCtx.index,
+                isPrimKey: (!whereCtx.index || (whereCtx.table.schema.primKey.keyPath && whereCtx.index === whereCtx.table.schema.primKey.keyPath)),
                 range: keyRange,
                 op: "openCursor",
                 dir: "next",
@@ -1392,8 +1474,7 @@
             }
 
             function getIndexOrStore(ctx, store) {
-                var index = ctx.index;
-                return (!index || (store.keyPath && index === store.keyPath)) ? store : store.index(index);
+                return ctx.isPrimKey ? store : store.index(ctx.index);
             }
 
             function openCursor(ctx, store) {
@@ -1615,9 +1696,9 @@
                 },
 
                 eachKey: function (cb) {
-                    var self = this;
+                    var self = this, ctx = this._ctx;
                     fakeAutoComplete(function () { cb(getInstanceTemplate(self._ctx)[self._ctx.index]); });
-                    this._ctx.op = "openKeyCursor";
+                    if (!ctx.isPrimKey) ctx.op = "openKeyCursor"; // Need the check because IDBObjectStore does not have "openKeyCursor()" while IDBIndex has.
                     return this.each(function (val, cursor) { cb(cursor.key, cursor); });
                 },
 
@@ -1630,7 +1711,7 @@
                     fakeAutoComplete(function () { cb([getInstanceTemplate(ctx)[self._ctx.index]]); });
                     var self = this,
                         ctx = this._ctx;
-                    this._ctx.op = "openKeyCursor";
+                    if (!ctx.isPrimKey) ctx.op = "openKeyCursor"; // Need the check because IDBObjectStore does not have "openKeyCursor()" while IDBIndex has.
                     var a = [];
                     return this.each(function (item, cursor) {
                         a.push(cursor.key);
@@ -1769,8 +1850,10 @@
                     var iterationComplete = false;
                     var failures = [];
                     var failKeys = [];
+                    var currentKey = null;
 
                     function modifyItem(item, cursor, advance) {
+                        currentKey = cursor.primaryKey;
                         var thisContext = { primKey: cursor.primaryKey, value: item };
                         if (modifyer.call(thisContext, item) !== false) { // If a callback explicitely returns false, do not perform the update!
                             var bDelete = !thisContext.hasOwnProperty("value");
@@ -1791,8 +1874,11 @@
                     }
 
                     function doReject(e) {
-                        if (e) failures.push(e);
-                        return reject(new MultiModifyError("Error modifying one or more objects", failures, successCount, failKeys));
+                        if (e) {
+                            failures.push(e);
+                            failKeys.push(currentKey);
+                        }
+                        return reject(new ModifyError("Error modifying one or more objects", failures, successCount, failKeys));
                     }
 
                     function checkFinished() {
@@ -1839,12 +1925,7 @@
                                 enumerable: true,
                                 get: function () {
                                     if (Promise.PSD && Promise.PSD.trans) {
-                                        var trans = Promise.PSD.trans;
-                                        if (!trans.active) throw new Error("Transaction Inactive. Has already committed or failed. Scope Function: " + trans.scopeFunc);
-                                        if (trans.tables.hasOwnProperty(tableName)) {
-                                            // Current transaction has given tableName in it and is of a compatible mode. Use it.
-                                            return Promise.PSD.trans.table(tableName);
-                                        }
+                                        return Promise.PSD.trans.tables[tableName];
                                     }
                                     return tableInstance;
                                 }
@@ -1998,7 +2079,7 @@
         } : function (fn, arg1, arg2, argN) {
             setImmediate.apply(this, arguments); // IE10+ and node.
         };
-
+        //var PromiseID = 0;
         function Promise(fn) {
             if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');
             if (typeof fn !== 'function') throw new TypeError('not a function');
@@ -2006,6 +2087,7 @@
             this._value = null; // error or result
             this._deferreds = [];
             this._catched = false; // for onuncatched
+            //this._id = ++PromiseID;
             var self = this;
             var constructing = true;
             var outerPSD = Promise.psd();
@@ -2631,6 +2713,16 @@
             }
         };
     }
+    function stack(error) {
+        try {
+            throw error;
+        } catch (e) {
+            return e;
+        }
+    }
+    function preventDefault(e) {
+        e.preventDefault();
+    }
 
     function globalDatabaseList(cb) {
         var val;
@@ -2681,16 +2773,16 @@
     }
 
     //
-    // MultiModifyError Class (extends Error)
+    // ModifyError Class (extends Error)
     //
-    function MultiModifyError(msg, failures, successCount, failedKeys) {
-        this.name = "MultiModifyError";
+    function ModifyError(msg, failures, successCount, failedKeys) {
+        this.name = "ModifyError";
         this.failures = failures;
         this.failedKeys = failedKeys;
         this.successCount = successCount;
         this.message = failures.join('\n');
     }
-    derive(MultiModifyError).from(Error);
+    derive(ModifyError).from(Error);
 
     //
     // Static delete() method.
@@ -2761,8 +2853,8 @@
         //  1) The intention of writing the statement could be unclear if using setImmediate() or setTimeout().
         //  2) setTimeout() would wait unnescessary until firing. This is however not the case with setImmediate().
         //  3) setImmediate() is not supported in the ES standard.
-        var outerScope = Promise.PSD;
-        Promise.PSD = null;
+        var outerScope = Promise.psd();
+        Promise.PSD.trans = null;
         try {
             return scopeFunc();
         } finally {
@@ -2791,6 +2883,7 @@
     // Dexie.currentTransaction property. Only applicable for transactions entered using the new "transact()" method.
     Object.defineProperty(Dexie, "currentTransaction", {
         get: function () {
+        	/// <returns type="Transaction"></returns>
             return Promise.PSD && Promise.PSD.trans || null;
         }
     })
@@ -2813,7 +2906,8 @@
     Dexie.fakeAutoComplete = fakeAutoComplete;
     Dexie.asap = asap;
 	// Export our static classes
-    Dexie.MultiModifyError = MultiModifyError;
+    Dexie.ModifyError = ModifyError;
+    Dexie.MultiModifyError = ModifyError; // Backward compatibility pre 0.9.8
     Dexie.IndexSpec = IndexSpec;
     Dexie.TableSchema = TableSchema;
     //

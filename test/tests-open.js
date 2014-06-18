@@ -46,13 +46,13 @@ asyncTest("open, add and query data using transaction", function () {
         start();
     });
 
-    db.transaction("rw", db.employees, function (employees) {
+    db.transaction("rw", db.employees, function () {
 
         // Add employee
-        employees.add({ first: "David", last: "Fahlander" });
+        db.employees.add({ first: "David", last: "Fahlander" });
 
         // Query employee
-        employees.where("first").equals("David").toArray(function (a) {
+        db.employees.where("first").equals("David").toArray(function (a) {
             equal(a.length, 1, "Could retrieve employee based on where() clause");
             var first = a[0].first;
             var last = a[0].last;

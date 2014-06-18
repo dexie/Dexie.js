@@ -15,9 +15,8 @@
     });
 
     db.on("populate", function (trans) {
-        var users = trans.table("users");
-        users.add({first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"]});
-        users.add({first: "Karl", last: "Faadersköld", username: "kceder", email: ["karl@ceder.what", "dadda@ceder.what"], pets: []});
+        db.users.add({first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"]});
+        db.users.add({first: "Karl", last: "Faadersköld", username: "kceder", email: ["karl@ceder.what", "dadda@ceder.what"], pets: []});
     });
 
     module("table", {
@@ -51,75 +50,75 @@
     });
 
     asyncTest("where", function () {
-        db.transaction("r", db.users, function (users) {
-            users.where("username").equals("kceder").first(function (user) {
+        db.transaction("r", db.users, function () {
+            db.users.where("username").equals("kceder").first(function (user) {
                 equal(user.first, "Karl", "where().equals()");
             }),
-            users.where("id").above(1).toArray(function (a) {
+            db.users.where("id").above(1).toArray(function (a) {
                 ok(a.length == 1, "where().above()");
             }),
-            users.where("id").aboveOrEqual(1).toArray(function (a) {
+            db.users.where("id").aboveOrEqual(1).toArray(function (a) {
                 ok(a.length == 2, "where().aboveOrEqual()");
             }),
-            users.where("id").below(2).count(function (count) {
+            db.users.where("id").below(2).count(function (count) {
                 ok(count == 1, "where().below().count()");
             }),
-            users.where("id").below(1).count(function (count) {
+            db.users.where("id").below(1).count(function (count) {
                 ok(count == 0, "where().below().count() should be zero");
             }),
-            users.where("id").belowOrEqual(1).count(function (count) {
+            db.users.where("id").belowOrEqual(1).count(function (count) {
                 ok(count == 1, "where().belowOrEqual()");
             }),
-            users.where("id").between(1, 1).count(function (count) {
+            db.users.where("id").between(1, 1).count(function (count) {
                 ok(count == 0, "where().between(1, 1)");
             }),
-            users.where("id").between(0, 100).count(function (count) {
+            db.users.where("id").between(0, 100).count(function (count) {
                 ok(count == 2, "where().between(0, 100)");
             }),
-            users.where("id").between(1, 1, true, true).count(function (count) {
+            db.users.where("id").between(1, 1, true, true).count(function (count) {
                 ok(count == 1, "where().between(1, 1, true, true)");
             }),
-            users.where("id").between(1, -1, true, true).count(function (count) {
+            db.users.where("id").between(1, -1, true, true).count(function (count) {
                 ok(count == 0, "where().between(1, -1, true, true)");
             }),
-            users.where("id").between(1, 2).count(function (count) {
+            db.users.where("id").between(1, 2).count(function (count) {
                 ok(count == 1, "where().between(1, 2)");
             }),
-            users.where("id").between(1, 2, true, true).count(function (count) {
+            db.users.where("id").between(1, 2, true, true).count(function (count) {
                 ok(count == 2, "where().between(1, 2, true, true)");
             }),
-            users.where("id").between(1, 2, false, false).count(function (count) {
+            db.users.where("id").between(1, 2, false, false).count(function (count) {
                 ok(count == 0, "where().between(1, 2, false, false)");
             });
-            users.where("last").startsWith("Fah").toArray(function (a) {
+            db.users.where("last").startsWith("Fah").toArray(function (a) {
                 equal(a.length, 1, "where().startsWith(existing) only matches Fahlander, not Faadersköld");
                 equal(a[0].first, "David");
             });
-            users.where("last").startsWith("Faa").toArray(function (a) {
+            db.users.where("last").startsWith("Faa").toArray(function (a) {
                 equal(a.length, 1, "where().startsWith(existing) only matches Faadersköld, not Fahlander");
                 equal(a[0].first, "Karl");
             });
-            users.where("last").startsWith("Fa").toArray(function (a) {
+            db.users.where("last").startsWith("Fa").toArray(function (a) {
                 equal(a.length, 2, "length = 2 on: where().startsWith(2 existing)");
                 equal(a[0].first, "Karl", "Karl found first on last 'Faadersköld'");
                 equal(a[1].first, "David", "David found second on last 'Fahlander'");
             });
-            users.where("last").anyOf("Fahlander", "Faadersköld").toArray(function (a) {
+            db.users.where("last").anyOf("Fahlander", "Faadersköld").toArray(function (a) {
                 equal(a.length, 2, "in() returned expected number of items");
                 equal(a[0].last, "Faadersköld", "Faadersköld is first");
             });
-            users.where("last").anyOf("Fahlander", "Faadersköld").reverse().toArray(function (a) {
+            db.users.where("last").anyOf("Fahlander", "Faadersköld").reverse().toArray(function (a) {
                 equal(a.length, 2, "in().reverse() returned expected number of items");
                 equal(a[0].last, "Fahlander", "Fahlander is first");
             });
-            users.where("last").anyOf("Faadersköld").toArray(function (a) {
+            db.users.where("last").anyOf("Faadersköld").toArray(function (a) {
                 equal(a.length, 1, "in() returned expected number of items");
             });
 
-            users.where("email").equals("david@awarica.com").toArray(function (a) { // Fails in IE with 0 due to that IE is not implementing to index string arrays.
+            db.users.where("email").equals("david@awarica.com").toArray(function (a) { // Fails in IE with 0 due to that IE is not implementing to index string arrays.
                 equal(a.length, 1, "Finding items from array members. Expect to fail on IE10/IE11.");
             });
-            users.where("email").startsWith("da").distinct().toArray(function (a) { // Fails on IE with 0
+            db.users.where("email").startsWith("da").distinct().toArray(function (a) { // Fails on IE with 0
                 equal(a.length, 2, "Found both because both have emails starting with 'da'. Expect to fail on IE10/IE11.");
             });
         }).catch(function (e) {
@@ -146,14 +145,14 @@
         }).finally(start);
     });
     asyncTest("limit(),orderBy(),modify(), abort(), reverse()", function () {
-        db.transaction("rw", db.users, function (users) {
+        db.transaction("rw", db.users, function () {
             // Modify first found user with a helloMessage
-            users.orderBy("first").reverse().limit(1).modify(function (user) {
+            db.users.orderBy("first").reverse().limit(1).modify(function (user) {
                 user.helloMessage = "Hello " + user.first;
             });
 
             // Check that the modification went fine:
-            users.orderBy("first").reverse().toArray(function (a) {
+            db.users.orderBy("first").reverse().toArray(function (a) {
                 equal(a[0].first, "Karl", "First item is Karl");
                 equal(a[0].helloMessage, "Hello Karl", "Karl got helloMessage 'Hello Karl'");
                 equal(a[1].first, "David", "Second item is David");
@@ -189,19 +188,19 @@
     });
 
     asyncTest("put", function () {
-        db.transaction("rw", db.users, function (users) {
+        db.transaction("rw", db.users, function () {
             var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
-            users.put(newUser).then(function (id) {
+            db.users.put(newUser).then(function (id) {
                 equal(id, 3, "Got id 3 because we didnt supply an id");
                 equal(newUser.id, id, "The id property of the new user was set");
             });
-            users.where("username").equals("aper").first(function (user) {
+            db.users.where("username").equals("aper").first(function (user) {
                 equal(user.last, "Persbrant", "The correct item was actually added");
                 user.last = "ChangedLastName";
-                users.put(user).then(function (id) {
+                db.users.put(user).then(function (id) {
                     equal(id, 3, "Still got id 3 because we update same object");
                 });
-                users.where("last").equals("ChangedLastName").first(function (user) {
+                db.users.where("last").equals("ChangedLastName").first(function (user) {
                     equal(user.last, "ChangedLastName", "LastName was successfully changed");
                 });
             });
@@ -231,15 +230,15 @@
 
 
     asyncTest("add", function () {
-        db.transaction("rw", db.users, function (users) {
+        db.transaction("rw", db.users, function () {
             var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
 
-            users.add(newUser).then(function (id) {
+            db.users.add(newUser).then(function (id) {
                 equal(id, 3, "Got id 3 because we didnt supply an id");
                 equal(newUser.id, id, "The id property of the new user was set");
             });
 
-            users.where("username").equals("aper").first(function (user) {
+            db.users.where("username").equals("aper").first(function (user) {
                 equal(user.last, "Persbrant", "The correct item was actually added");
             });
 
@@ -265,12 +264,12 @@
     });
     asyncTest("delete(using transaction)", function() {
         // With transaction
-        db.transaction("rw", db.users, function (users) {
-            users.get(1, function (user) {
+        db.transaction("rw", db.users, function () {
+            db.users.get(1, function (user) {
                 notEqual(user, null, "User with id 1 exists");
             });
-            users.delete(1);
-            users.get(1, function (user) {
+            db.users.delete(1);
+            db.users.get(1, function (user) {
                 equal(user, null, "User not found anymore");
             });
         }).catch(function (e) {
@@ -278,12 +277,12 @@
         }).finally(start);
     });
     asyncTest("clear", function () {
-        db.transaction("rw", "users", function (users) {
-            users.count(function (count) {
+        db.transaction("rw", "users", function () {
+            db.users.count(function (count) {
                 equal(count, 2, "There are 2 items in database before clearing it");
             });
-            users.clear();
-            users.count(function (count) {
+            db.users.clear();
+            db.users.count(function (count) {
                 equal(count, 0, "There are 0 items in database after it has been cleared");
             });
         }).catch(function (e) {

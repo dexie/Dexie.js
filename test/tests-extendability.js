@@ -31,21 +31,20 @@
 
         db.delete().then(function () { db.open(); });
 
-        db.transaction("rw", db.activities, db.tasks, function (acts, tasks, trans) {
-            //trans._ctx.tf.createPromise(function (resolve, reject) {
+        db.transaction("rw", db.activities, db.tasks, function () {
             var outerPLS = Dexie.Promise.psd();
             try {
-                trans._lock();
-                acts.where("Type").equals(2).modify({ Flags: 2 }).finally(function () {
-                    trans._unlock();
+                Dexie.currentTransaction._lock();
+                db.activities.where("Type").equals(2).modify({ Flags: 2 }).finally(function () {
+                    Dexie.currentTransaction._unlock();
                 });
             } finally {
                 Dexie.Promise.PSD = outerPLS;
             }
-            acts.where("Flags").equals(2).count(function (count) {
+            db.activities.where("Flags").equals(2).count(function (count) {
                 equal(count, 1, "Should have put one entry there now");
             });
-            acts.where("Flags").equals(2).each(function (act) {
+            db.activities.where("Flags").equals(2).each(function (act) {
                 equal(act.Type, 2, "The entry is correct");
             });
 

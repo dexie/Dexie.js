@@ -23,17 +23,17 @@
         //
         function populateSomeData() {
             log("Populating some data", "heading");
-            return db.transaction("rw", db.friends, function (friends) {
-                friends.clear();
-                friends.add({ name: "David", shoeSize: 43 });
-                friends.add({ name: "Ylva", shoeSize: 37 });
-                friends.add({ name: "Jon", shoeSize: 44 });
-                friends.add({ name: "Måns", shoeSize: 42 });
-                friends.add({ name: "Daniel", shoeSize: 39 });
-                friends.add({ name: "Nils", shoeSize: 45 });
-                friends.add({ name: "Zlatan", shoeSize: 47 });
+            return db.transaction("rw", db.friends, function () {
+                db.friends.clear();
+                db.friends.add({ name: "David", shoeSize: 43 });
+                db.friends.add({ name: "Ylva", shoeSize: 37 });
+                db.friends.add({ name: "Jon", shoeSize: 44 });
+                db.friends.add({ name: "Måns", shoeSize: 42 });
+                db.friends.add({ name: "Daniel", shoeSize: 39 });
+                db.friends.add({ name: "Nils", shoeSize: 45 });
+                db.friends.add({ name: "Zlatan", shoeSize: 47 });
                 // Log data from DB:
-                friends.orderBy('name').each(function (friend) {
+                db.friends.orderBy('name').each(function (friend) {
                     log(JSON.stringify(friend));
                 });
             }).catch(function (e) {

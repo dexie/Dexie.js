@@ -44,9 +44,9 @@
     // Application code:
     //
 
-    db.transaction('rw', db.emails, function (emails) {
+    db.transaction('rw', db.emails, function () {
         // Add an email:
-        emails.add({
+        db.emails.add({
             subject: "Testing full-text search",
             from: "david@abc.com",
             to: ["test@abc.com"],
@@ -54,7 +54,7 @@
         });
 
         // Search for emails:
-        emails.where("messageWords").startsWithIgnoreCase("v").distinct().toArray(function (a) {
+        db.emails.where("messageWords").startsWithIgnoreCase("v").distinct().toArray(function (a) {
             alert("Found " + a.length + " emails containing a word starting with 'v'");
         });
     }).catch(function (e) {

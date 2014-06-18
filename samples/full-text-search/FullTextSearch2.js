@@ -86,9 +86,9 @@ db.open();
 // Application code:
 //
 
-db.transaction('rw', db.emails, db._emailWords, function (emails, emailWords) {
+db.transaction('rw', db.emails, db._emailWords, function () {
     // Add an email:
-    emails.add({
+    db.emails.add({
         subject: "Testing full-text search",
         from: "david@abc.com",
         to: ["test@abc.com"],
@@ -97,7 +97,7 @@ db.transaction('rw', db.emails, db._emailWords, function (emails, emailWords) {
 
     // Search for emails:
     var foundIds = {};
-    emailWords.where("word").startsWith("v").each(function (wordToEmailMapping) {
+    db._emailWords.where("word").startsWith("v").each(function (wordToEmailMapping) {
         foundIds[wordToEmailMapping.emailId.toString()] = true;
     }).then(function () {
         // Now we got all email IDs in the keys of foundIds object.
@@ -105,7 +105,7 @@ db.transaction('rw', db.emails, db._emailWords, function (emails, emailWords) {
         var emailIds = Object.keys(foundIds).map(function (idStr) { return parseInt(idStr); });
         alert("Found " + emailIds.length + " emails containing a word starting with 'v'");
         // Now query all items from the array:
-        emails.where("id").anyOf(emailIds).each(function (email) {
+        db.emails.where("id").anyOf(emailIds).each(function (email) {
             alert ("Found email:  "  + JSON.stringify(email));
         });
     });

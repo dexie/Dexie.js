@@ -42,9 +42,9 @@
 
             // Create 10,000 emails
             ok(true, "Creating 10,000 emails");
-            return db.transaction("rw", db.emails, function (emails) {
+            return db.transaction("rw", db.emails, function () {
                 for (var i = 1; i <= 10000; ++i) {
-                    emails.add({
+                    db.emails.add({
                         from: "from" + i + "@test.com",
                         to: "to" + i + "@test.com",
                         subject: "subject" + i,

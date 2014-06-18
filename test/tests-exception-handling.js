@@ -30,8 +30,8 @@
     });
 
     asyncTest("eventError-transaction-catch", function () {
-        db.transaction("rw", db.users, function (users) {
-            users.add({ username: "dfahlander" }).then(function () {
+        db.transaction("rw", db.users, function () {
+            db.users.add({ username: "dfahlander" }).then(function () {
                 ok(false, "Should not be able to add two users with same username");
             });
         }).then(function () {
@@ -42,13 +42,13 @@
     });
     
     asyncTest("eventError-request-catch", function () {
-        db.transaction("rw", db.users, function (users) {
-            users.add({ username: "dfahlander" }).then(function () {
+        db.transaction("rw", db.users, function () {
+            db.users.add({ username: "dfahlander" }).then(function () {
                 ok(false, "Should not be able to add two users with same username");
             }).catch(function (e) {
                 ok(true, "Got request error: " + e);
             });
-            users.add({ first: "Trazan", last: "Apansson", username: "tapan", email: ["trazan@apansson.barnarne"], pets: ["monkey"] }).then(function (id) {
+            db.users.add({ first: "Trazan", last: "Apansson", username: "tapan", email: ["trazan@apansson.barnarne"], pets: ["monkey"] }).then(function (id) {
                 ok(id > 2, "Could continue transaction and add Trazan since last error event was catched");
             });
         }).then(function () {
@@ -60,7 +60,7 @@
 
 
     asyncTest("exceptionThrown-transaction-catch", function () {
-        db.transaction("r", db.users, function (users) {
+        db.transaction("r", db.users, function () {
             throw new SyntaxError("Why not throw an exception for a change?");
         }).then(function () {
             ok(false, "Transaction should not complete since an error should have occurred");
@@ -74,9 +74,9 @@
     });
 
     asyncTest("exceptionThrown-request-catch", function () {
-        db.transaction("r", db.users, function (users) {
-            users.where("username").equals("apa").toArray(function () {
-                users.where("username").equals("kceder").toArray().then(function () {
+        db.transaction("r", db.users, function () {
+            db.users.where("username").equals("apa").toArray(function () {
+                db.users.where("username").equals("kceder").toArray().then(function () {
                     return "a";
                 }).then(function(){
                     NonExistingSymbol.EnotherIdioticError = "Why not make an exception for a change?";
@@ -89,13 +89,66 @@
         }).finally(start);
     });
 
+    asyncTest("exception in upgrader", function () {
+        // Create a database:
+        var db = new Dexie("TestUpgrader");
+        db.version(1).stores({ cars: "++id,name,brand" });
+        db.open().then(function(){
+            // Once it opens, close it and create an upgraded version that will fail to upgrade.
+            db.close();
+            db = new Dexie("TestUpgrader");
+            db.version(1).stores({ cars: "++id,name,brand" });
+            db.version(2).upgrade(function (trans) { trans.cars.add({ name: "My car", brand: "Pegeut" }); });
+            db.version(3).upgrade(function (trans) {
+                throw new Error("Oops. Failing in upgrade function");
+            });
+            return db.open();
+        }).catch(function (err) {
+            // Got error
+            ok(err.toString().indexOf("Oops. Failing in upgrade function") != -1, "Got error: " + err);
+            // Create 3rd instance of db that will only read from the existing DB.
+            // What we want to check here is that the DB is there but is still
+            // only on version 1.
+            db = new Dexie("TestUpgrader");
+            return db.open();
+        }).then(function (){
+            equal(db.verno, 1, "Database is still on version 1 since it failed to upgrade to version 2.");
+        }).finally(function () {
+            db.delete().then(start);
+        });
+    });
+
+    asyncTest("exception in on('populate')", function () {
+        // Create a database:
+        var db = new Dexie("TestUpgrader");
+        db.version(1).stores({ cars: "++id,name,brand" });
+        db.on('populate', function () {
+            throw new Error("Oops. Failing in upgrade function");
+        });
+        db.open().catch(function (err) {
+            // Got error
+            ok(err.toString().indexOf("Oops. Failing in upgrade function") != -1, "Got error: " + err);
+            // Create 3rd instance of db that will only read from the existing DB.
+            // What we want to check here is that the DB is there but is still
+            // only on version 1.
+            db = new Dexie("TestUpgrader");
+            return db.open();
+        }).then(function () {
+            ok(false, "The database should not have been created");
+        }).catch(function (err) {
+            ok(err.toString().indexOf("doesnt exist") != -1, "The database doesnt exist");
+        }).finally(function () {
+            db.delete().then(start);
+        });
+    });
+
+
     asyncTest("catch-all with db.on('error')", 3, function () {
         var ourDB = new Dexie("TestDB2");
         ourDB.version(1).stores({ users: "++id,first,last,&username,&*email,*pets" });
-        ourDB.on("populate", function (trans) {
-            var users = trans.table("users");
-            users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
-            users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
+        ourDB.on("populate", function () {
+            db.users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
+            db.users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
         });
         var errorCount = 0;
         ourDB.on("error", function (e) {
@@ -107,22 +160,22 @@
 
         ourDB.open();
 
-        ourDB.transaction("rw", ourDB.users, function (users) {
-            users.add({ username: "dfahlander" }).then(function () {
+        ourDB.transaction("rw", ourDB.users, function () {
+            db.users.add({ username: "dfahlander" }).then(function () {
                 ok(false, "Should not be able to add two users with same username");
             });
         }).then(function () {
             ok(false, "Transaction should not complete since errors wasnt catched");
         });
-        ourDB.transaction("rw", ourDB.users, function (users) {
-            users.add({ username: "dfahlander" }).then(function () {
+        ourDB.transaction("rw", ourDB.users, function () {
+            db.users.add({ username: "dfahlander" }).then(function () {
                 ok(false, "Should not be able to add two users with same username");
             });
         }).then(function () {
             ok(false, "Transaction should not complete since errors wasnt catched");
         });
-        ourDB.transaction("rw", ourDB.users, function (users) {
-            users.add({ username: "dfahlander" }).then(function () {
+        ourDB.transaction("rw", ourDB.users, function () {
+            db.users.add({ username: "dfahlander" }).then(function () {
                 ok(false, "Should not be able to add two users with same username");
             });
         }).then(function () {

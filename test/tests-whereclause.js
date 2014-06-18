@@ -22,9 +22,9 @@
         folderId: Number
     });
 
-    File.prototype.getFullPath = function (trans) {
+    File.prototype.getFullPath = function () {
         var file = this;
-        return (trans || db).table("folders").get(this.folderId, function (folder) {
+        return db.folders.get(this.folderId, function (folder) {
             return folder.path + "/" + file.filename + (file.extension || "");
         });
     }
@@ -69,21 +69,21 @@
 
 
     asyncTest("anyOf()", function () {
-        db.transaction("r", [db.files, db.folders], function (files, folders, transaction) {
+        db.transaction("r", db.files, db.folders, function () {
 
-            files.where("filename").anyOf("hello", "hello-there", "README", "gösta").toArray(function (a) {
+            db.files.where("filename").anyOf("hello", "hello-there", "README", "gösta").toArray(function (a) {
                 equal(a.length, 3, "Should find 3 files");
                 equal(a[0].filename, "README", "First match is README because capital R comes before lower 'h' in lexical sort");
                 equal(a[1].filename, "hello", "Second match is hello");
                 equal(a[2].filename, "hello-there", "Third match is hello-there");
 
-                a[0].getFullPath(transaction).then(function (fullPath) {
+                a[0].getFullPath().then(function (fullPath) {
                     equal(fullPath, "/usr/local/src/README.TXT", "Full path of README.TXT is: " + fullPath);
                 });
-                a[1].getFullPath(transaction).then(function (fullPath) {
+                a[1].getFullPath().then(function (fullPath) {
                     equal(fullPath, "/usr/local/bin/hello.exe", "Full path of hello.exe is: " + fullPath);
                 });
-                a[2].getFullPath(transaction).then(function (fullPath) {
+                a[2].getFullPath().then(function (fullPath) {
                     equal("/var/bin/hello-there.exe", fullPath, "Full path of hello-there.exe is: " + fullPath);
                 });
             });
@@ -129,12 +129,12 @@
                 return file;
             });
 
-            db.transaction("rw", db.files, function (files) {
+            db.transaction("rw", db.files, function () {
                 fileArray.forEach(function (file) {
-                    files.add(file);
+                    db.files.add(file);
                 });
 
-                files.where("filename").equalsIgnoreCase("apan japan").toArray(function (a) {
+                db.files.where("filename").equalsIgnoreCase("apan japan").toArray(function (a) {
                     equal(a.length, 4, "There should be 4 files with that name");
                     equal(a[0].filename, "APAN JAPAN", "APAN JAPAN");
                     equal(a[1].filename, "Apan JapaN", "Apan JapaN");
@@ -167,13 +167,13 @@
                 return file;
             });
 
-            db.transaction("rw", db.files, function (files) {
+            db.transaction("rw", db.files, function () {
 
                 fileArray.forEach(function (file) {
-                    files.add(file);
+                    db.files.add(file);
                 });
 
-                files
+                db.files
                     .where("filename").equalsIgnoreCase("apan japan")
                     .and(function (f) { return f.folderId === folderId }) // Just for fun - only look in the newly created /etc folder.
                     .reverse()
@@ -192,19 +192,19 @@
     });
 
     asyncTest("equalsIgnoreCase() 3 (first key shorter than needle)", function () {
-        db.transaction("rw", db.files, function (files, t) {
-            files.clear();
-            files.add({ filename: "Hello-there-", folderId: 1 });
-            files.add({ filename: "hello-there-", folderId: 1 });
-            files.add({ filename: "hello-there-everyone", folderId: 1 });
-            files.add({ filename: "hello-there-everyone-of-you!", folderId: 1 });
+        db.transaction("rw", db.files, function () {
+            db.files.clear();
+            db.files.add({ filename: "Hello-there-", folderId: 1 });
+            db.files.add({ filename: "hello-there-", folderId: 1 });
+            db.files.add({ filename: "hello-there-everyone", folderId: 1 });
+            db.files.add({ filename: "hello-there-everyone-of-you!", folderId: 1 });
             // Ascending
-            files.where("filename").equalsIgnoreCase("hello-there-everyone").toArray(function (a) {
+            db.files.where("filename").equalsIgnoreCase("hello-there-everyone").toArray(function (a) {
                 equal(a.length, 1, "Should find one file");
                 equal(a[0].filename, "hello-there-everyone", "First file is " + a[0].filename);
             });
             // Descending
-            files.where("filename").equalsIgnoreCase("hello-there-everyone").reverse().toArray(function (a) {
+            db.files.where("filename").equalsIgnoreCase("hello-there-everyone").reverse().toArray(function (a) {
                 equal(a.length, 1, "Should find one file");
                 equal(a[0].filename, "hello-there-everyone", "First file is " + a[0].filename);
             });
@@ -214,16 +214,16 @@
     });
 
     asyncTest("startsWithIgnoreCase()", function () {
-        db.transaction("r", db.folders, function (folders, t) {
+        db.transaction("r", db.folders, function () {
 
-            folders.count(function (count) {
+            db.folders.count(function (count) {
                 ok(true, "Number of folders in database: " + count);
-                folders.where("path").startsWithIgnoreCase("/").toArray(function (a) {
+                db.folders.where("path").startsWithIgnoreCase("/").toArray(function (a) {
                     equal(a.length, count, "Got all folder objects because all of them starts with '/'");
                 });
             });
 
-            folders.where("path").startsWithIgnoreCase("/usr").toArray(function (a) {
+            db.folders.where("path").startsWithIgnoreCase("/usr").toArray(function (a) {
                 equal(a.length, 6, "6 folders found: " + a.map(function (folder) { return '"' + folder.path + '"' }).join(', '));
             });
 
@@ -245,8 +245,8 @@
     });
 
     asyncTest("compount-index", 2, function () {
-        db.transaction("r", db.files, function (files) {
-            files.where("[filename+extension]").equals(["README", ".TXT"]).toArray(function (a) {
+        db.transaction("r", db.files, function () {
+            db.files.where("[filename+extension]").equals(["README", ".TXT"]).toArray(function (a) {
                 equal(a.length, 1, "Found one file by compound index search");
                 equal(a[0].filename, "README", "The found file was README.TXT");
             });
@@ -317,30 +317,5 @@
             ok(false, err.stack || err);
         }).finally(start);
     });
-
-    /*asyncTest("empty", function () {
-        db.transaction("rw", [db.files, db.folders], function (files, folders) {
-            files.add({ filename: "readmeDotEmpty", extension: "", folderId: 1 });
-            files.add({ filename: "readmeDotNothing", folderId: 1 });
-            files.add({ filename: "readmeDotUndefined", extension: undefined, folderId: 1 });
-            files.add({ filename: "readmeDotNull", extension: null, folderId: 1 });
-            files.add({ filename: "readmeDotZero", extension: 0, folderId: 1 });
-            files.add({ filename: "readmeDotOne", extension: 1, folderId: 1 });
-            files.add({ filename: "readmeDotDate", extension: new Date(), folderId: 1 });
-            files.add({ filename: "readmeDotTxt", extension: ".txt", folderId: 1 });
-            files.where("extension").empty().toArray(function (a) {
-                ok(a.some(function (f) { return f.filename === "readmeDotEmpty"; }), "Found readmeDotEmpty");
-                ok(a.some(function (f) { return f.filename === "readmeDotNothing"; }), "Found readmeDotNothing");
-                ok(a.some(function (f) { return f.filename === "readmeDotUndefined"; }), "Found readmeDotUndefined");
-                ok(!a.some(function (f) { return f.filename === "readmeDotOne"; }), "Not found readmeDotOne");
-                ok(!a.some(function (f) { return f.filename === "readmeDotDate"; }), "Not found readmeDotDate");
-                ok(!a.some(function (f) { return f.filename === "readmeDotDate"; }), "Not found readmeDotDate");
-            });
-        }).catch(function(e) {
-            ok(false, e);
-        }).finally(function () {
-            start();
-        });
-    });*/
 
 })();

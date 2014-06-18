@@ -83,10 +83,10 @@
                         // By returning the db.transaction() promise, framework will keep
                         // waiting for this transaction to commit before resuming other
                         // db-operations.
-                        return db.transaction('rw', db.someTable, function (someTable) {
+                        return db.transaction('rw', db.someTable, function () {
                             data.someInitArrayOfObjects.forEach(function (item) {
                                 console.log("Adding object: " + JSON.stringify(item));
-                                someTable.add(item);
+                                db.someTable.add(item);
                             });
                         });
                     }).then(function () {
