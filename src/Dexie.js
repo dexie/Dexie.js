@@ -3,9 +3,9 @@
 
    By David Fahlander, david.fahlander@gmail.com
 
-   Version 0.9.8 (alpha - not yet distributed) - DATE, YEAR.
+   Version 0.9.8.1 (alpha - not yet distributed) - DATE, YEAR.
 
-   Tested successfully on Chrome, IE11, Firefox and Opera.
+   Tested successfully on Chrome, IE, Firefox and Opera.
 
    Official Website: https://github.com/dfahlander/Dexie.js/wiki/Dexie.js
 
@@ -2930,7 +2930,7 @@
     }
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-    Dexie.version = 0.98;
+    Dexie.version = 0.981;
 
 
 
