@@ -620,8 +620,7 @@
                                 var lastChangeType = 0;
                                 var lastCreatePromise = null;
                                 for (var i=offset, len = changes.length; i<len; ++i) {
-                                    var change = changes[i];
-                                    (function (change) {
+                                    (function (change, i) {
                                         var table = trans.tables[change.table];
                                         if (change.type === CREATE) {
                                             // Optimize CREATE changes because on initial sync with server, the entire DB will be downloaded in forms of CREATE changes.
@@ -635,20 +634,20 @@
                                             // We did some CREATE changes but now stumbled upon another type of change.
                                             // Let's wait for the last CREATE change to resolve and then call applyChanges again at current position. Next time, lastCreatePromise will be null and a case below will happen.
                                             return lastCreatePromise.then(function () {
-                                                applyChanges(changes, i);
+                                                return applyChanges(changes, i);
                                             });
                                         } else if (change.type === UPDATE) {
                                             return table.update(change.key, change.mods).then(function () {
                                                 // Wait for update to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
-                                                applyChanges(changes, i + 1);
+                                                return applyChanges(changes, i + 1);
                                             });
                                         } else if (change.type === DELETE) {
                                             return table.delete(change.key).then(function () {
                                                 // Wait for delete to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
-                                                applyChanges(changes, i + 1);
+                                                return applyChanges(changes, i + 1);
                                             });
                                         }
-                                    })(change);
+                                    })(changes[i], i);
                                 }
                                 return lastCreatePromise || Promise.resolve(null); // Will return null or a Promise and make the entire applyChanges promise finally resolve.
                             }
