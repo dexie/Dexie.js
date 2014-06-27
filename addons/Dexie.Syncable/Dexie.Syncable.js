@@ -28,7 +28,7 @@
                     // We are master node and another non-master node wants us to do the connect.
                     db.syncable.connect(msg.protocolName, msg.url, msg.options).then(msg.resolve, msg.reject);
                 } else if (msg.type == 'disconnect') {
-                    db.syncable.disconnect(msg.url);
+                    db.syncable.disconnect(msg.url).then(msg.resolve, msg.reject);
                 } else if (msg.type == 'syncStatusChanged') {
                     // We are client and a master node informs us about syncStatus change.
                     // Lookup the connectedProvider and call its event
@@ -71,7 +71,7 @@
                         if (connectedRemoteNodes.length > 0) {
                             return Promise.all(connectedRemoteNodes.map(function (node) {
                                 return db.syncable.connect(node.syncProtocol, node.url, node.syncOptions)
-                                    .catch(function () {
+                                    .catch(function (err) {
                                         return undefined;// If a node fails to connect, don't make db.open() reject. Accept it!
                                     }); 
                             }));
@@ -106,9 +106,13 @@
                 });
             } else {
                 db._syncNodes.where('isMaster').above(0).first(function (masterNode) {
-                    db.sendMessage('disconnect', { url: url }, masterNode.id);
+                    db.sendMessage('disconnect', { url: url }, masterNode.id, { wantReply: true });
                 });
             }
+            //return db._syncNodes.where("type").equals("remote").and(function (node) { return node.url == url }).modify(function (node) {
+            return db._syncNodes.where("url").equals(url).modify(function (node) {
+                node.status = Statuses.OFFLINE;
+            });
         }
 
         db.syncable.connect = function (protocolName, url, options) {
@@ -124,10 +128,11 @@
                     } else {
                         // We are not master node
                         // Request master node to do the connect:
-                        return db.table('_syncNodes').where('isMaster').above(0).first(function (masterNode) {
+                        db.table('_syncNodes').where('isMaster').above(0).first(function (masterNode) {
                             // There will always be a master node. In theory we may self have become master node when we come here. But that's ok. We'll request ourselves.
                             return db.sendMessage('connect', { protocolName: protocolName, url: url, options: options }, masterNode.id, { wantReply: true });
                         });
+                        return Promise.resolve();
                     }
                 } else {
                     // Database not yet open
@@ -194,6 +199,7 @@
 
             function getOrCreateSyncNode() {
                 return db.transaction('rw', db._syncNodes, function () {
+                    if (!url) throw new Error("Url cannot be empty");
                     // Returning a promise from transaction scope will make the transaction promise resolve with the value of that promise.
                     return db._syncNodes.where("url").equalsIgnoreCase(url).first(function (node) {
                         if (node) {
@@ -227,10 +233,8 @@
                         }
                         PersistedContext.prototype.save = function () {
                             // Store this instance in the syncContext property of the node it belongs to.
-                            return Dexie.spawn(function () {
-                                return Dexie.vip(function () {
-                                    return node.save();
-                                });
+                            return Dexie.vip(function () {
+                                return node.save();
                             });
                             
                             //return db._syncNodes.update(this.nodeID, { syncContext: this });
@@ -609,7 +613,7 @@
                                         }
                                     }
                                 }
-                                node.save();
+                                node.save(); // We are not including _syncNodes in transaction, so this save() call will execute in its own transaction.
                                 //var tock = Date.now();
                                 //alert("finallyCommitAllChanges() has done its job. " + changes.length + " changes applied in " + ((tock - tick) / 1000) + "seconds");
                             });
@@ -830,7 +834,10 @@
 
         var syncNodeSaveQueContexts = {};
         db.observable.SyncNode.prototype.save = function () {
-            return db._syncNodes.put(this);
+            var self = this;
+            return db.transaction('rw?', db._syncNodes, function () {
+                db._syncNodes.put(self);
+            });
         }
 
         function enque(context, fn, instanceID) {
