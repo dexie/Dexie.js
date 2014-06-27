@@ -29,8 +29,8 @@
     	/// </summary>
         /// <param name="db" type="Dexie"></param>
 
-        var NODE_TIMEOUT = 30000, // 30 seconds before local db instances are timed out. This is so that old changes can be deleted when not needed and to garbage collect old _syncNodes objects.
-            HIBERNATE_GRACE_PERIOD = 30000, // 30 seconds
+        var NODE_TIMEOUT = 20000, // 20 seconds before local db instances are timed out. This is so that old changes can be deleted when not needed and to garbage collect old _syncNodes objects.
+            HIBERNATE_GRACE_PERIOD = 20000, // 20 seconds
             // LOCAL_POLL: The time to wait before polling local db for changes and cleaning up old nodes. 
             // Polling for changes is a fallback only needed in certain circomstances (when the onstorage event doesnt reach all listeners - when different browser windows doesnt share the same process)
             LOCAL_POLL = 2000, // 1 second. In real-world there will be this value + the time it takes to poll().
@@ -169,7 +169,6 @@
                 // If this transaction is bound to any observable table, make sure to add changes when transaction completes.
                 if (addChanges) {
                     trans._lastWrittenRevision = 0;
-                    if (Dexie.Observable.currentSource) trans.source = Dexie.Observable.currentSource;
                     trans.on('complete', function () {
                         if (trans._lastWrittenRevision) {
                             // Changes were written in this transaction.
@@ -181,6 +180,9 @@
                             }, 25);
                         }
                     });
+                    // Derive "source" property from parent transaction by default
+                    var currentTransaction = Dexie.currentTransaction;
+                    if (currentTransaction && currentTransaction.source) trans.source = currentTransaction.source;
                 }
                 return trans;
             }
