@@ -493,7 +493,9 @@
                     var dbWasCreated = false;
                     var req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, db.verno * 10);
                     req.onerror = eventToError(openError);
-                    req.onblocked = db.on("blocked").fire;
+                    req.onblocked = function (ev) {
+                        db.on("blocked").fire(ev);
+                    }
                     req.onupgradeneeded = function (e) {
                         if (autoSchema && !db._allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
                             // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
@@ -568,7 +570,9 @@
         }
 
         this.delete = function () {
+            var args = arguments;
             return new Promise(function (resolve, reject) {
+                if (args.length > 0) throw new Error("Arguments not allowed in db.delete()");
                 function doDelete() {
                     db.close();
                     var req = indexedDB.deleteDatabase(dbName);
