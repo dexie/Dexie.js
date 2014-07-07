@@ -78,7 +78,7 @@
             db.users.where("username").equals("apa").toArray(function () {
                 db.users.where("username").equals("kceder").toArray().then(function () {
                     return "a";
-                }).then(function(){
+                }).then(function () {
                     NonExistingSymbol.EnotherIdioticError = "Why not make an exception for a change?";
                 });
             });
@@ -88,6 +88,73 @@
             ok(true, "Transaction got error: " + e);
         }).finally(start);
     });
+
+    asyncTest("exceptionThrown-iteration-should-abort-when-using-hook", function () {
+        db.users.hook('deleting', function () {
+            // Testing with 
+        })
+        db.transaction('rw', db.users, function () {
+
+            function deleteKarls() {
+                db.users.toCollection().modify(function (user) {
+                    delete this.value;
+                    throw "Throwing something";
+                });
+            }
+            
+            db.users.delete(1);
+            deleteKarls();
+
+        }).then(function () {
+            ok(false, "Transaction should not complete!");
+        }).catch(function (err) {
+            ok(true, "Transaction aborted");
+        }).finally(start);
+    });
+
+    asyncTest("exceptionThrown-iteration-should-not-abort-when-using-hook", function () {
+        db.users.hook('deleting', function () {
+            // Testing with 
+        })
+        db.transaction('rw', db.users, function () {
+
+            function deleteKarls() {
+                db.users.toCollection().modify(function (user) {
+                    delete this.value;
+                    throw "Throwing something";
+                }).catch(function (err) {
+                    // Catching error should prevent transaction from aborting.
+                });
+            }
+
+            db.users.delete(1);
+            deleteKarls();
+
+        }).then(function () {
+            ok(true, "Transaction completed");
+        }).catch(function (err) {
+            ok(false, "Transaction should not abort!");
+        }).finally(start);
+    });
+
+    /*asyncTest("promise-test", function () {
+        var p = new Dexie.Promise(function (resolve, reject) {
+            setTimeout(function () {
+                reject("apa error");
+            }, 0);
+        });
+        p.catch(function (err) {
+            return Dexie.Promise.reject(err);
+        });
+        p.then(function(){}).catch(function (err) {
+            return Dexie.Promise.reject(err);
+        });
+        p.onuncatched = function () {
+            debugger;
+        }
+        p.finally(start);
+    });*/
+
 
     asyncTest("exception in upgrader", function () {
         // Create a database:

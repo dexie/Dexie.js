@@ -406,13 +406,16 @@
         this._transPromiseFactory = function transactionPromiseFactory(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
             if (db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
                 // Database is paused. Wait til resumed.
-                return new Promise(function (resolve, reject) {
+                var blockedPromise = new Promise(function (resolve, reject) {
                     pausedResumeables.push({
                         resume: function () {
-                            db._transPromiseFactory(mode, storeNames, fn).then(resolve, reject);
+                            var p = db._transPromiseFactory(mode, storeNames, fn);
+                            blockedPromise.onuncatched = p.onuncatched;
+                            p.then(resolve, reject);
                         }
                     });
                 });
+                return blockedPromise;
             } else {
                 var trans = db._createTransaction(mode, storeNames, globalSchema);
                 return trans._promise(mode, function (resolve, reject) {
@@ -441,7 +444,7 @@
                     fakeAutoComplete(function () { new Promise(function () { fn(resolve, reject); }); });
                     pausedResumeables.push({
                         resume: function () {
-                            new Promise(function () {
+                            new Promise(function () { // Encapsulating in Promise just to get PSD scope.
                                 fn(resolve, reject);
                             });
                         }
@@ -699,7 +702,7 @@
                         storeNames.forEach(function (storeName) {
                             if (!parentTransaction.tables.hasOwnProperty(storeName)) {
                                 if (onlyIfCompatible) parentTransaction = null; // Spawn new transaction instead.
-                                else error = error || new Error("Table " + storeName + " not included in parent transaction");
+                                else error = error || new Error("Table " + storeName + " not included in parent transaction. Parent Transaction function: " + parentTransaction.scopeFunc.toString());
                             }
                         });
                     }
@@ -1204,10 +1207,11 @@
                 return this._reculock && (!this._psd || !(Promise.PSD instanceof this._psd));
             },
             _promise: function (mode, fn, bWriteLock) {
-                var self = this;
+                var self = this,
+                    p;
                 // Read lock always
                 if (!this._locked()) {
-                    var p = self.active ? new Promise(function (resolve, reject) {
+                    p = self.active ? new Promise(function (resolve, reject) {
                         if (!self.idbtrans && mode) {
                             if (!idbdb) throw dbOpenError || new Error("Database not open");
                             var idbtrans = self.idbtrans = idbdb.transaction(self.storeNames, self.mode);
@@ -1228,23 +1232,23 @@
                         if (bWriteLock) self._lock(); // Write lock if write operation is requested
                         fn(resolve, reject, self);
                     }) : Promise.reject(stack(new Error("Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
-                    if (bWriteLock) p.finally(function () {
+                    if (self.active && bWriteLock) p.finally(function () {
                         self._unlock();
                     });
-                    p.onuncatched = function (e) {
-                        // Bubble to transaction. Even though IDB does this internally, it would just do it for error events and not for caught exceptions.
-                        Dexie.spawn(function () { self.on("error").fire(e); });
-                        self.abort();
-                    }
-                    return p;
                 } else {
                     // Transaction is write-locked. Wait for mutex.
-                    return new Promise(function (resolve, reject) {
+                    p = new Promise(function (resolve, reject) {
                         self._blockedFuncs.push(function () {
                             self._promise(mode, fn, bWriteLock).then(resolve, reject);
                         });
                     });
                 }
+                p.onuncatched = function (e) {
+                    // Bubble to transaction. Even though IDB does this internally, it would just do it for error events and not for caught exceptions.
+                    Dexie.spawn(function () { self.on("error").fire(e); });
+                    self.abort();
+                };
+                return p;
             },
 
             //
@@ -2291,7 +2295,7 @@
                 handle.call(self, new Deferred(onFulfilled, onRejected, resolve, reject));
             });
             p._PSD = this._PSD;
-            p.onuncatched = this.onuncatched;
+            p.onuncatched = this.onuncatched; // Needed when exception occurs in a then() clause of a successful parent promise. Want onuncatched to be called even in callbacks of callbacks of the original promise.
             p._parent = this; // Used for recursively calling onuncatched event on self and all parents.
             return p;
         };
