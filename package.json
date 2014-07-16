@@ -1,0 +1,21 @@
+{
+  "name": "Dexie",
+  "version": "0.9.8",
+  "description": "Minimalistic IndexedDB API with bullet proof transactions",
+  "main": "src/Dexie.js",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dfahlander/Dexie.js.git"
+  },
+  "keywords": [
+    "indexeddb",
+    "browser",
+    "database"
+  ],
+  "author": "David Fahlander",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/dfahlander/Dexie.js/issues"
+  },
+  "homepage": "https://github.com/dfahlander/Dexie.js"
+}
