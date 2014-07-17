@@ -27,15 +27,16 @@
 		var callbacks = [];
 		Dexie.Syncable.registerSyncProtocol("testProtocol", {
 			sync: function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
-				var thiz = this, args = arguments;
-				new Dexie.Promise(function () {
-					Dexie.Promise.PSD.letThrough = true;
-					callbacks[testNo++].apply(thiz, args);
-				}).catch(function (err) {
-					db1.close();
-					ok(false, err);
-					start();
-				});
+			    var thiz = this, args = arguments;
+			    Dexie.vip(function () {
+			        try {
+			            callbacks[testNo++].apply(thiz, args);
+			        } catch (err) {
+			            db1.close();
+			            ok(false, err);
+			            start();
+			        }
+			    });
 			}
 		});
 

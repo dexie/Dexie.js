@@ -166,13 +166,13 @@
             });
         }).then(function (retval) {
             equal(retval, "hello...", "Return value went all the way down to transaction resolvance");
-            db.users.count(function (count) {
+            db.users.count(function (count) { // Transaction-less operation!
                 equal(count, 5, "There are five users in db");
             });
-            db.pets.count(function (count) {
+            db.pets.count(function (count) {// Transaction-less operation!
                 equal(count, 3, "There are three pets in db");
             });
-            db.petsPerUser.count(function (count) {
+            db.petsPerUser.count(function (count) {// Transaction-less operation!
                 equal(count, 3, "There are three pets-to-user relations");
             });
         }).then(function () {

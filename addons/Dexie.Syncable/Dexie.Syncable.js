@@ -50,7 +50,7 @@
                     .and(function (node) { return node.status !== Statuses.OFFLINE && node.status !== Statuses.ERROR; })
                     .each(function (connectedRemoteNode) {
                         // There are connected remote nodes that we must take over
-                        // Since we may be in the on(ready) event, we must get VIPed to continue - Promise.PSD is not derived in Collection.each() since it is a callback called outside a Promise.
+                        // Since we may be in the on(ready) event, we must get VIPed to continue
                         Dexie.spawn(function () {
                             Dexie.vip(function () {
                                 db.syncable.connect(connectedRemoteNode.syncProtocol, connectedRemoteNode.url, connectedRemoteNode.syncOptions);

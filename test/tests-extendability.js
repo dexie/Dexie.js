@@ -30,17 +30,14 @@
         });
 
         db.delete().then(function () { db.open(); });
-
+        
         db.transaction("rw", db.activities, db.tasks, function () {
-            var outerPLS = Dexie.Promise.psd();
-            try {
+            Dexie.Promise.newPSD(function () {
                 Dexie.currentTransaction._lock();
                 db.activities.where("Type").equals(2).modify({ Flags: 2 }).finally(function () {
                     Dexie.currentTransaction._unlock();
                 });
-            } finally {
-                Dexie.Promise.PSD = outerPLS;
-            }
+            });
             db.activities.where("Flags").equals(2).count(function (count) {
                 equal(count, 1, "Should have put one entry there now");
             });
@@ -54,4 +51,62 @@
             db.delete().then(start);
         });
     });
+
+    test("protochain", function () {
+        var Promise=Dexie.Promise;
+        var root,
+            branch1,
+            branch2;
+
+        Promise.newPSD(function () {
+            root = Promise.PSD;
+            root.constructor = function () { }
+            root.constructor.prototype = root;
+
+            Promise.newPSD(function () {
+                branch1 = Promise.PSD;
+                branch1.constructor = function () { }
+                branch1.constructor.prototype = branch1;
+            });
+            Promise.newPSD(function () {
+                branch2 = Promise.PSD;
+                branch2.constructor = function () { }
+                branch2.constructor.prototype = branch2;
+            });
+        });
+
+        ok(branch1 instanceof root.constructor, "branch1 instanceof root.constructor");
+        ok(branch2 instanceof root.constructor, "branch2 instanceof root.constructor");
+        ok(!(root instanceof branch1.constructor), "!(root instanceof branch1.constructor)");
+        ok(!(root instanceof branch2.constructor), "!(root instanceof branch2.constructor)");
+        ok(!(branch1 instanceof branch2.constructor), "!(branch1 instanceof branch2.constructor)");
+        ok(!(branch2 instanceof branch1.constructor), "!(branch2 instanceof branch1.constructor)");
+
+
+    });
+
+    test("protochain2", function () {
+        var derive = Dexie.derive;
+
+        function Root() { }
+        function Branch1() { }
+        function Branch2() { }
+
+        derive(Branch1).from(Root);
+        derive(Branch2).from(Root);
+
+        var root = new Root();
+        var branch1 = new Branch1();
+        var branch2 = new Branch2();
+
+        ok(branch1 instanceof root.constructor, "branch1 instanceof root.constructor");
+        ok(branch2 instanceof root.constructor, "branch2 instanceof root.constructor");
+        ok(!(root instanceof branch1.constructor), "!(root instanceof branch1.constructor)");
+        ok(!(root instanceof branch2.constructor), "!(root instanceof branch2.constructor)");
+        ok(!(branch1 instanceof branch2.constructor), "!(branch1 instanceof branch2.constructor)");
+        ok(!(branch2 instanceof branch1.constructor), "!(branch2 instanceof branch1.constructor)");
+
+    });
+
+
 })();

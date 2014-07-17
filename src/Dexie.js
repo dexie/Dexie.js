@@ -194,18 +194,17 @@
                 var t = db._createTransaction(READWRITE, dbStoreNames, globalSchema);
                 t.idbtrans = idbtrans;
                 t.idbtrans.onerror = eventRejectHandler(reject, ["populating database"]);
-                var outerScope = Promise.psd();
-                try {
+                Promise.newPSD(function () {
                     Promise.PSD.trans = t;
-                    db.on("populate").fire(t);
-                } catch (err) {
-                    openReq.onerror = idbtrans.onerror = function (ev) { ev.preventDefault(); } // Prohibit AbortError fire on db.on("error") in Firefox.
-                    try { idbtrans.abort(); } catch (e) { }
-                    idbtrans.db.close();
-                    reject(err);
-                } finally {
-                    Promise.PSD = outerScope;
-                }
+                    try {
+                        db.on("populate").fire(t);
+                    } catch (err) {
+                        openReq.onerror = idbtrans.onerror = function (ev) { ev.preventDefault(); } // Prohibit AbortError fire on db.on("error") in Firefox.
+                        try { idbtrans.abort(); } catch (e) { }
+                        idbtrans.db.close();
+                        reject(err);
+                    }
+                });
             } else {
                 // Upgrade version to version, step-by-step from oldest to newest version.
                 // Each transaction object will contain the table set that was current in that version (but also not-yet-deleted tables from its previous version)
@@ -444,9 +443,7 @@
                     fakeAutoComplete(function () { new Promise(function () { fn(resolve, reject); }); });
                     pausedResumeables.push({
                         resume: function () {
-                            new Promise(function () { // Encapsulating in Promise just to get PSD scope.
-                                fn(resolve, reject);
-                            });
+                            fn(resolve, reject);
                         }
                     });
                 });
@@ -528,34 +525,34 @@
                         });
                         // Now, let any subscribers to the on("ready") fire BEFORE any other db operations resume!
                         // If an the on("ready") subscriber returns a Promise, we will wait til promise completes or rejects before 
-                        var outerScope = Promise.psd();
-                        Promise.PSD.letThrough = true; // Set a Promise-Specific Data property informing that onready is firing. This will make db._whenReady() let the subscribers use the DB but block all others (!). Quite cool ha?
-                        try {
-                            var res = db.on.ready.fire();
-                            if (res && typeof res.then == 'function') {
-                                // If on('ready') returns a promise, wait for it to complete and then resume any pending operations.
-                                res.then(resume, function (err) {
-                                    idbdb.close();
-                                    idbdb = null;
-                                    openError(err);
-                                });
-                            } else {
-                                asap(resume); // Cannot call resume directly because then the pauseResumables would inherit from our PSD scope.
+                        Promise.newPSD(function () {
+                            Promise.PSD.letThrough = true; // Set a Promise-Specific Data property informing that onready is firing. This will make db._whenReady() let the subscribers use the DB but block all others (!). Quite cool ha?
+                            try {
+                                var res = db.on.ready.fire();
+                                if (res && typeof res.then == 'function') {
+                                    // If on('ready') returns a promise, wait for it to complete and then resume any pending operations.
+                                    res.then(resume, function (err) {
+                                        idbdb.close();
+                                        idbdb = null;
+                                        openError(err);
+                                    });
+                                } else {
+                                    asap(resume); // Cannot call resume directly because then the pauseResumables would inherit from our PSD scope.
+                                }
+                            } catch (e) {
+                                openError(e);
                             }
-                        } catch (e) {
-                            openError(e);
-                        } finally {
-                            Promise.PSD = outerScope; // Always end a PSD scope in a finally scope. Otherwise we may mess it up totally.
-                        }
-                        function resume() {
-                            db_is_blocked = false;
-                            pausedResumeables.forEach(function (resumable) {
-                                // If anyone has made operations on a table instance before the db was opened, the operations will start executing now.
-                                resumable.resume();
-                            });
-                            pausedResumeables = [];
-                            resolve();
-                        }
+
+                            function resume() {
+                                db_is_blocked = false;
+                                pausedResumeables.forEach(function (resumable) {
+                                    // If anyone has made operations on a table instance before the db was opened, the operations will start executing now.
+                                    resumable.resume();
+                                });
+                                pausedResumeables = [];
+                                resolve();
+                            }
+                        });
                     };
                 } catch (err) {
                     openError(err);
@@ -720,9 +717,6 @@
                 // Our transaction. To be set later.
                 var trans = null;
 
-                // Create a new PSD frame to hold Promise.PSD.trans. Must not be bound to the current PSD frame since we want
-                // it to pop before then() callback is called of our returned Promise.
-                var outerPSD = Promise.psd();
                 try {
                     // Throw any error if any of the above checks failed.
                     // Real error defined some lines up. We throw it here from within a Promise to reject Promise
@@ -741,57 +735,62 @@
                     var tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
                     tableArgs.push(trans);
 
-                    // Let the transaction instance be part of a Promise-specific data (PSD) value.
-                    Promise.PSD.trans = trans;
-                    trans.scopeFunc = scopeFunc; // For Error ("Table " + storeNames[0] + " not part of transaction") when it happens. This may help localizing the code that started a transaction used on another place.
-
                     // If transaction completes, resolve the Promise with the return value of scopeFunc.
                     var returnValue;
                     var uncompletedRequests = 0;
 
-                    if (parentTransaction) {
-                        // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
-                        trans.idbtrans = parentTransaction.idbtrans;
-                        trans._promise = override(trans._promise, function (orig) {
-                            return function (mode, fn, writeLock) {
-                                ++uncompletedRequests;
-                                function proxy(fn2) {
-                                    return function (val) {
-                                        var retval = fn2(val);
-                                        if (--uncompletedRequests == 0 && trans.active) trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
-                                        return retval;
+                    // Create a new PSD frame to hold Promise.PSD.trans. Must not be bound to the current PSD frame since we want
+                    // it to pop before then() callback is called of our returned Promise.
+                    Promise.newPSD(function () {
+                        // Let the transaction instance be part of a Promise-specific data (PSD) value.
+                        Promise.PSD.trans = trans;
+                        trans.scopeFunc = scopeFunc; // For Error ("Table " + storeNames[0] + " not part of transaction") when it happens. This may help localizing the code that started a transaction used on another place.
+
+                        if (parentTransaction) {
+                            // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
+                            trans.idbtrans = parentTransaction.idbtrans;
+                            trans._promise = override(trans._promise, function (orig) {
+                                return function (mode, fn, writeLock) {
+                                    ++uncompletedRequests;
+                                    function proxy(fn2) {
+                                        return function (val) {
+                                            var retval = fn2(val);
+                                            if (--uncompletedRequests == 0 && trans.active) trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
+                                            return retval;
+                                        }
                                     }
+                                    return orig.call(this, mode, function (resolve2, reject2, trans) {
+                                        return fn(proxy(resolve2), proxy(reject2), trans);
+                                    }, writeLock);
                                 }
-                                return orig.call(this, mode, function (resolve2, reject2, trans) {
-                                    return fn(proxy(resolve2), proxy(reject2), trans);
-                                }, writeLock);
+                            });
+                        }
+                        trans.complete(function () {
+                            resolve(returnValue);
+                        });
+                        // If transaction fails, reject the Promise and bubble to db if noone catched this rejection.
+                        trans.error(function (e) {
+                            trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
+                            trans.abort();
+                            if (parentTransaction) {
+                                parentTransaction.active = false;
+                                parentTransaction.on.error.fire(e); // Bubble to parent transaction
+                            }
+                            var catched = reject(e);
+                            if (!parentTransaction && !catched) {
+                                db.on.error.fire(e);// If not catched, bubble error to db.on("error").
                             }
                         });
-                    }
-                    trans.complete(function () {
-                        resolve(returnValue);
-                    });
-                    // If transaction fails, reject the Promise and bubble to db if noone catched this rejection.
-                    trans.error(function (e) {
-                        trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
-                        trans.abort();
-                        if (parentTransaction) parentTransaction.active = false;
-                        var catched = reject(e);
-                        if (parentTransaction) parentTransaction.on.error.fire(e); // Bubble to parent transaction
-                        else if (!catched) db.on.error.fire(e);// If not catched, bubble error to db.on("error").
-                    });
 
-                    // Finally, call the scope function with our table and transaction arguments.
-                    returnValue = scopeFunc.apply(trans, tableArgs);
+                        // Finally, call the scope function with our table and transaction arguments.
+                        returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
+                    });
                     if (!trans.idbtrans || parentTransaction && uncompletedRequests === 0) {
-                        Promise.PSD = outerPSD; // Save on.complete.fire() from deriving finished transaction.
                         trans.active = false;
                         trans.on.complete.fire(); // Empty block (not starting any transaction)
                     }
-
                 } catch (e) {
                     // If exception occur, abort the transaction and reject Promise.
-                    Promise.PSD = outerPSD; // Save trans.abort() and on("error").fire from deriving finished transaction.
                     if (trans && trans.idbtrans) trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
                     if (trans) trans.abort();
                     if (parentTransaction) parentTransaction.on.error.fire(e);
@@ -799,8 +798,6 @@
                         // Need to use asap(=setImmediate/setTimeout) before calling reject because we are in the Promise constructor and reject() will always return false if so.
                         if (!reject(e)) db.on("error").fire(e); // If not catched, bubble exception to db.on("error");
                     });
-                } finally {
-                    Promise.PSD = outerPSD;
                 }
             }
         }
@@ -1181,12 +1178,12 @@
             _lock: function () {
                 // Temporary set all requests into a pending queue if they are called before database is ready.
                 ++this._reculock; // Recursive read/write lock pattern using PSD (Promise Specific Data) instead of TLS (Thread Local Storage)
-                if (this._reculock === 1) this._psd = Promise.PSD && Promise.PSD.constructor;
+                if (this._reculock === 1 && Promise.PSD) Promise.PSD.lockOwnerFor = this;
                 return this;
             },
             _unlock: function () {
                 if (--this._reculock === 0) {
-                    this._psd = null;
+                    if (Promise.PSD) Promise.PSD.lockOwnerFor = null;
                     while (this._blockedFuncs.length > 0 && !this._locked()) {
                         var fn = this._blockedFuncs.shift();
                         try { fn(); } catch (e) { }
@@ -1203,52 +1200,55 @@
                 //         * callback given to the Promise() constructor  (function (resolve, reject){...})
                 //         * callbacks given to then()/catch()/finally() methods (function (value){...})
                 // If creating a new independant Promise instance from within a Promise call stack, the new Promise will derive the PSD from the call stack of the parent Promise.
-                // Derivation is done so that the inner PSD __proto__ points to the outer PSD and the inner PSD is instanceof the constructor of the outer PSD.
-                return this._reculock && (!this._psd || !(Promise.PSD instanceof this._psd));
+                // Derivation is done so that the inner PSD __proto__ points to the outer PSD.
+                // Promise.PSD.lockOwnerFor will point to current transaction object if the currently executing PSD scope owns the lock.
+                return this._reculock && (!Promise.PSD || Promise.PSD.lockOwnerFor !== this);
             },
             _promise: function (mode, fn, bWriteLock) {
-                var self = this,
-                    p;
-                // Read lock always
-                if (!this._locked()) {
-                    p = self.active ? new Promise(function (resolve, reject) {
-                        if (!self.idbtrans && mode) {
-                            if (!idbdb) throw dbOpenError || new Error("Database not open");
-                            var idbtrans = self.idbtrans = idbdb.transaction(self.storeNames, self.mode);
-                            idbtrans.onerror = function (e) {
-                                self.on("error").fire(e && e.target.error);
-                                e.preventDefault(); // Prohibit default bubbling to window.error
-                                self.abort(); // Make sure transaction is aborted since we preventDefault.
+                var self = this;
+                return Promise.newPSD(function() {
+                    var p;
+                    // Read lock always
+                    if (!self._locked()) {
+                        p = self.active ? new Promise(function (resolve, reject) {
+                            if (!self.idbtrans && mode) {
+                                if (!idbdb) throw dbOpenError || new Error("Database not open");
+                                var idbtrans = self.idbtrans = idbdb.transaction(self.storeNames, self.mode);
+                                idbtrans.onerror = function (e) {
+                                    self.on("error").fire(e && e.target.error);
+                                    e.preventDefault(); // Prohibit default bubbling to window.error
+                                    self.abort(); // Make sure transaction is aborted since we preventDefault.
+                                }
+                                idbtrans.onabort = function (e) {
+                                    self.active = false;
+                                    self.on("abort").fire(e);
+                                }
+                                idbtrans.oncomplete = function (e) {
+                                    self.active = false;
+                                    self.on("complete").fire(e);
+                                }
                             }
-                            idbtrans.onabort = function (e) {
-                                self.active = false;
-                                self.on("abort").fire(e);
-                            }
-                            idbtrans.oncomplete = function (e) {
-                                self.active = false;
-                                self.on("complete").fire(e);
-                            }
-                        }
-                        if (bWriteLock) self._lock(); // Write lock if write operation is requested
-                        fn(resolve, reject, self);
-                    }) : Promise.reject(stack(new Error("Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
-                    if (self.active && bWriteLock) p.finally(function () {
-                        self._unlock();
-                    });
-                } else {
-                    // Transaction is write-locked. Wait for mutex.
-                    p = new Promise(function (resolve, reject) {
-                        self._blockedFuncs.push(function () {
-                            self._promise(mode, fn, bWriteLock).then(resolve, reject);
+                            if (bWriteLock) self._lock(); // Write lock if write operation is requested
+                            fn(resolve, reject, self);
+                        }) : Promise.reject(stack(new Error("Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
+                        if (self.active && bWriteLock) p.finally(function () {
+                            self._unlock();
                         });
-                    });
-                }
-                p.onuncatched = function (e) {
-                    // Bubble to transaction. Even though IDB does this internally, it would just do it for error events and not for caught exceptions.
-                    Dexie.spawn(function () { self.on("error").fire(e); });
-                    self.abort();
-                };
-                return p;
+                    } else {
+                        // Transaction is write-locked. Wait for mutex.
+                        p = new Promise(function (resolve, reject) {
+                            self._blockedFuncs.push(function () {
+                                self._promise(mode, fn, bWriteLock).then(resolve, reject);
+                            });
+                        });
+                    }
+                    p.onuncatched = function (e) {
+                        // Bubble to transaction. Even though IDB does this internally, it would just do it for error events and not for caught exceptions.
+                        Dexie.spawn(function () { self.on("error").fire(e); });
+                        self.abort();
+                    };
+                    return p;
+                });
             },
 
             //
@@ -2128,7 +2128,6 @@
             //this._id = ++PromiseID;
             var self = this;
             var constructing = true;
-            var outerPSD = Promise.psd();
             this._PSD = Promise.PSD;
 
             try {
@@ -2147,7 +2146,6 @@
                 });
             } finally {
                 constructing = false;
-                Promise.PSD = outerPSD;
             }
         }
 
@@ -2353,28 +2351,16 @@
 
         Promise.PSD = null; // Promise Specific Data - a TLS Pattern (Thread Local Storage) for Promises. TODO: Rename Promise.PSD to Promise.data
 
-        Promise.psd = function () { // TODO: Rename psd() to newData()
+        Promise.newPSD = function (fn) {
             // Create new PSD scope (Promise Specific Data)
             var outerScope = Promise.PSD;
-            function F() { }
-            if (outerScope) F.prototype = outerScope;
-            Promise.PSD = new F();
-            Promise.PSD.constructor = F;
-            return outerScope;
-        }
-
-        /*Promise.psdScope = function (fn, promise) {
-            var outerScope = Promise.PSD;
-            if (promise)
-                Promise.PSD = promise._PSD;
-            else
-                Promise.psd();
+            Promise.PSD = outerScope ? Object.create(outerScope) : {};
             try {
                 return fn();
             } finally {
                 Promise.PSD = outerScope;
             }
-        }*/
+        }
 
         return Promise;
     })();
@@ -2891,13 +2877,10 @@
         //  1) The intention of writing the statement could be unclear if using setImmediate() or setTimeout().
         //  2) setTimeout() would wait unnescessary until firing. This is however not the case with setImmediate().
         //  3) setImmediate() is not supported in the ES standard.
-        var outerScope = Promise.psd();
-        Promise.PSD.trans = null;
-        try {
+        return Promise.newPSD(function () {
+            Promise.PSD.trans = null;
             return scopeFunc();
-        } finally {
-            Promise.PSD = outerScope;
-        }
+        });
     }
 
     Dexie.vip = function (fn) {
@@ -2909,13 +2892,10 @@
         // Note that this method is only useful for on('ready') subscribers that is returning a Promise from the event. If not using vip()
         // the database could deadlock since it wont open until the returned Promise is resolved, and any non-VIPed operation started by
         // the caller will not resolve until database is opened.
-        var outerScope = Promise.psd();
-        try {
+        return Promise.newPSD(function () {
             Promise.PSD.letThrough = true; // Make sure we are let through if still blocking db due to onready is firing.
             return fn();
-        } finally {
-            Promise.PSD = outerScope;
-        }
+        });
     }
 
     // Dexie.currentTransaction property. Only applicable for transactions entered using the new "transact()" method.
