@@ -1220,7 +1220,7 @@
                     if (!self._locked()) {
                         p = self.active ? new Promise(function (resolve, reject) {
                             if (!self.idbtrans && mode) {
-                                if (!idbdb) throw dbOpenError ? new Error("Database not open. Following error in populate, ready or upgrade function made Dexie.open() fail: " + dbOpenError) : new Error("Database not open");
+                                if (!idbdb) throw dbOpenError || new Error("Database not open");
                                 var idbtrans = self.idbtrans = idbdb.transaction(self.storeNames, self.mode);
                                 idbtrans.onerror = function (e) {
                                     self.on("error").fire(e && e.target.error);
