@@ -194,6 +194,7 @@
                 var t = db._createTransaction(READWRITE, dbStoreNames, globalSchema);
                 t.idbtrans = idbtrans;
                 t.idbtrans.onerror = eventRejectHandler(reject, ["populating database"]);
+                t.on('error').subscribe(reject);
                 Promise.newPSD(function () {
                     Promise.PSD.trans = t;
                     try {
@@ -271,6 +272,7 @@
                                     }
                                 });
                                 idbtrans.onerror = eventRejectHandler(reject, ["running upgrader function for version", version._cfg.version]);
+                                t.on('error').subscribe(reject);
                                 version._cfg.contentUpgrade(t);
                                 if (uncompletedRequests === 0) cb(); // contentUpgrade() didnt call any db operations at all.
                             });
@@ -492,7 +494,7 @@
                     if (!indexedDB) throw new Error("indexedDB API not found. If using IE10+, make sure to run your code on a server URL (not locally). If using Safari, make sure to include indexedDB polyfill.");
                     var dbWasCreated = false;
                     var req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, db.verno * 10);
-                    req.onerror = eventToError(openError);
+                    req.onerror = eventRejectHandler(openError, ["opening database", dbName]);
                     req.onblocked = function (ev) {
                         db.on("blocked").fire(ev);
                     }
@@ -511,7 +513,7 @@
                             }
                         } else {
                             if (e.oldVersion == 0) dbWasCreated = true;
-                            req.transaction.onerror = eventToError(openError);
+                            req.transaction.onerror = eventRejectHandler(openError);
                             runUpgraders(e.oldVersion / 10, req.transaction, openError, req);
                         }
                     };
@@ -1002,17 +1004,23 @@
                                     key = keyToUse;
                             }
                         }
-                        var req = key ? idbstore.add(obj, key) : idbstore.add(obj);
-                        req.onerror = eventRejectHandler(function (e) {
-                            if (thisCtx.onerror) thisCtx.onerror(e);
-                            return reject(e);
-                        }, ["adding", obj, "into", self.name]);
-                        req.onsuccess = function (ev) {
-                            var keyPath = idbstore.keyPath;
-                            if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
-                            if (thisCtx.onsuccess) thisCtx.onsuccess(ev.target.result);
-                            resolve(req.result);
-                        };
+                        //try {
+                            var req = key ? idbstore.add(obj, key) : idbstore.add(obj);
+                            req.onerror = eventRejectHandler(function (e) {
+                                if (thisCtx.onerror) thisCtx.onerror(e);
+                                return reject(e);
+                            }, ["adding", obj, "into", self.name]);
+                            req.onsuccess = function (ev) {
+                                var keyPath = idbstore.keyPath;
+                                if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
+                                if (thisCtx.onsuccess) thisCtx.onsuccess(ev.target.result);
+                                resolve(req.result);
+                            };
+                        /*} catch (e) {
+                            trans.on("error").fire(e);
+                            trans.abort();
+                            reject(e);
+                        }*/
                     });
                 },
 
@@ -1229,7 +1237,19 @@
                                 }
                             }
                             if (bWriteLock) self._lock(); // Write lock if write operation is requested
-                            fn(resolve, reject, self);
+                            try {
+                                fn(resolve, reject, self);
+                            } catch (e) {
+                                // Direct exception happened when doin operation.
+                                // We must immediately fire the error and abort the transaction.
+                                // When this happens we are still constructing the Promise so we don't yet know
+                                // whether the caller is about to catch() the error or not. Have to make
+                                // transaction fail. Catching such an error wont stop transaction from failing.
+                                // This is a limitation we have to live with.
+                                Dexie.spawn(function () { self.on('error').fire(e); });
+                                self.abort();
+                                reject(e);
+                            }
                         }) : Promise.reject(stack(new Error("Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
                         if (self.active && bWriteLock) p.finally(function () {
                             self._unlock();
@@ -2699,11 +2719,6 @@
         });
     }
 
-    function eventToError(fn) {
-        return function (e) {
-            return fn(e && e.target && e.target.error);
-        }
-    }
     function eventRejectHandler(reject, sentance) {
         return function (event) {
             var errObj = (event && event.target.error) || new Error();
@@ -2728,15 +2743,14 @@
                     errObj = errObj + occurredWhen;
                 }
             };
-            var catched = reject(errObj);
-            if (catched) {
-                // Rejection was catched. Stop error from propagating to IDBTransaction.
-                event.stopPropagation();
-                event.preventDefault();
-                return false;
-            }
+            reject(errObj);
+            // Stop error from propagating to IDBTransaction. Let us handle that manually instead.
+            event.stopPropagation();
+            event.preventDefault();
+            return false;
         };
     }
+
     function stack(error) {
         try {
             throw error;

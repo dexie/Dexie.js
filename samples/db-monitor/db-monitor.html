@@ -1,0 +1,24 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>IndexedDB Monitor</title>
+    <script src="../../src/Dexie.js"></script>
+    <script src="../../addons/Dexie.Observable/Dexie.Observable.js"></script>
+    <script src="https://code.jquery.com/jquery-2.1.1.min.js"></script>
+    <script src="db-monitor.js"></script>
+    <script>
+        $(function () {
+            new DBMonitor ($('#searchbox'), $('#results'));
+        });
+    </script>
+</head>
+<body>
+    <h1>IndexedDB Monitor</h1>
+    <input id="searchbox" type="text" placeholder="Search for some content..." />
+    <table>
+        <tbody id="results">
+
+        </tbody>
+    </table>
+</body>
+</html>

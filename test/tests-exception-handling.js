@@ -250,5 +250,29 @@
         });
 
     });
+
+    asyncTest("Error in on('populate') should abort database creation", function () {
+        var popufail = new Dexie("PopufailDB");
+        popufail.version(1).stores({ users: "++id,first,last,&username,&*email,*pets" });
+        popufail.on('populate', function () {
+            db.users.add({ first: NaN, last: undefined, username: function () { } }).catch(function (e) {
+                ok(true, "Got error when catching add() operation: " + e);
+                return Dexie.Promise.reject(e);
+            });
+        });
+        popufail.open().catch(function (err) {
+            ok(true, "Got error (as expected):" + err);
+        });
+        popufail.users.count(function (count) {
+            ok(false, "Could query database even though an error happened in the populate event!");
+        }).catch(function (err) {
+            ok(true, "Got error when trying to query: " + err);
+        }).finally(function () {
+            popufail.delete();
+            start();
+        });
+    });
+
+
 })();
 

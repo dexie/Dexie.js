@@ -411,6 +411,54 @@
         }).finally(start);
     });
 
+    asyncTest("or-issue#15-test", function () {
+        var db = new Dexie("MyDB_issue15");
+        db.version(1).stores({
+            phones: "++id, additionalFeatures, android, availability, battery, camera, connectivity, description, display, hardware, id, images, name, sizeAndWeight, storage"
+        });
+        db.on('populate', function () {
+            ok(true, "on(populate) called");
+            for (var i = 0; i < 100; ++i) {
+                db.phones.add({ name: "Name" + randomString(16), additionalFeatures: [randomString(10)], android: 1, availability: 0, battery: 1, camera: 1 });
+            }
+
+            function randomString(count) {
+                var ms = [];
+                for (var i = 0; i < count; ++i) {
+                    ms.push(String.fromCharCode(32 + Math.floor(Math.random() * 96)));
+                }
+                return ms.join('');
+            }
+        });
+
+        db.open().catch(function (err) {
+            ok(false, "DB ERROR: " + err);
+        });
+
+
+        var numRuns = 10;
+
+        for (var i = 0; i < numRuns; ++i) {
+
+            db.phones.where("name").startsWithIgnoreCase("name").or("id").below(50).toArray(function (a) {
+
+                equal(a.length, 100, "Found 100 phones");
+
+            }).catch(function (err) {
+
+                ok(false, "error:" + err);
+
+            }).finally(function () {
+                if (--numRuns == 0) {
+                    // All test runs finished. Delete DB and exit unit test.
+                    db.delete();
+                    start();
+                }
+            });
+        }
+
+    });
+
     asyncTest("until", function () {
         db.transaction("rw", db.users, function () {
             db.users.add({ first: "Apa1", username: "apa1" });
