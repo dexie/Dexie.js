@@ -199,7 +199,9 @@
                 // Set the static property lastRevision[db.name] to the revision of the last written change.
                 Dexie.Observable.latestRevision[db.name] = lastWrittenRevision;
                 // Wakeup ourselves, and any other db instances on this window:
-                Dexie.Observable.on('latestRevisionIncremented').fire(db.name, lastWrittenRevision);
+                Dexie.spawn(function () {
+                    Dexie.Observable.on('latestRevisionIncremented').fire(db.name, lastWrittenRevision);
+                });
                 // Dexie.Observable.on.latestRevisionIncremented will only wakeup db's in current window.
                 // We need a storage event to wakeup other windwos.
                 // Since indexedDB lacks storage events, let's use the storage event from WebStorage just for
@@ -362,7 +364,7 @@
                     //cleanup();
                 //});
             });
-        });
+        }, true); // True means the on(ready) event will survive a db reopening (db.close() / db.open()).
 
         var handledRevision = 0;
         function onLatestRevisionIncremented(dbname, latestRevision) {
@@ -692,7 +694,9 @@
                 var rev = parseInt(event.newValue, 10);
                 if (!isNaN(rev) && rev > Dexie.Observable.latestRevision[dbname]) {
                     Dexie.Observable.latestRevision[dbname] = rev;
-                    Dexie.Observable.on('latestRevisionIncremented').fire(dbname, rev);
+                    Dexie.spawn(function () {
+                        Dexie.Observable.on('latestRevisionIncremented').fire(dbname, rev);
+                    });
                 }
             } else if (prop.indexOf("deadnode:") === 0) {
                 var nodeID = parseInt(prop.split(':')[1], 10);

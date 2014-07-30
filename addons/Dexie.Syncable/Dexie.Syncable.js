@@ -78,7 +78,7 @@
                         }
                     });
             }
-        });
+        }, true); // True means the ready event will survive a db reopen - db.close()/db.open()
 
 
         db.syncable = {};
@@ -139,7 +139,6 @@
                     // Wait for it to open
                     return new Promise(function (resolve, reject) {
                         db.on("ready", function syncWhenReady() {
-                            db.on.ready.unsubscribe(syncWhenReady);
                             return Dexie.vip(function(){
                                 return db.syncable.connect(protocolName, url, options).then(resolve).catch(function (err) {
                                     // Reject the promise returned to the caller of db.syncable.connect():

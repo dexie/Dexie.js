@@ -641,6 +641,24 @@
         //
         this.on = events(this, "error", "populate", "blocked", { "ready": [promisableChain, nop], "versionchange": [reverseStoppableEventChain, nop] });
 
+        // Handle on('ready') specifically: If DB is already open, trigger the event immediately. Also, default to unsubscribe immediately after being triggered.
+        this.on.ready.subscribe = override(this.on.ready.subscribe, function (origSubscribe) {
+            return function (subscriber, bSticky) {
+                function proxy () {
+                    if (!bSticky) db.on.ready.unsubscribe(proxy);
+                    return subscriber.apply(this, arguments);
+                }
+                origSubscribe.call(this, proxy);
+                if (db.isOpen()) {
+                    if (db_is_blocked) {
+                        pausedResumeables.push({ resume: proxy });
+                    } else {
+                        proxy();
+                    }
+                }
+            };
+        });
+
         fakeAutoComplete(function () {
             db.on("populate").fire(db._createTransaction(READWRITE, dbStoreNames, globalSchema));
             db.on("error").fire(new Error());
@@ -2490,7 +2508,9 @@
         var rv = function (eventName, subscriber) {
             if (subscriber) {
                 // Subscribe
-                evs[eventName].subscribe(subscriber);
+                var args = [].slice.call(arguments, 1);
+                var ev = evs[eventName];
+                ev.subscribe.apply(ev, args);
                 return ctx;
             } else if (typeof (eventName) === 'string') {
                 // Return interface allowing to fire or unsubscribe from event
