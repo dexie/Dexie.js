@@ -396,8 +396,8 @@
                 return new WriteableTable(tableSchema.name, transactionPromiseFactory, tableSchema);
         }
 
-        this._createTransaction = function (mode, storeNames, dbschema) {
-            return new Transaction(mode, storeNames, dbschema);
+        this._createTransaction = function (mode, storeNames, dbschema, parentTransaction) {
+            return new Transaction(mode, storeNames, dbschema, parentTransaction);
         }
 
         function tableNotInTransaction(mode, storeNames) {
@@ -749,7 +749,7 @@
                     //
                     // Create Transaction instance
                     //
-                    trans = db._createTransaction(mode, storeNames, globalSchema);
+                    trans = db._createTransaction(mode, storeNames, globalSchema, parentTransaction);
 
                     // Provide arguments to the scope function (for backward compatibility)
                     var tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
@@ -775,7 +775,10 @@
                                     function proxy(fn2) {
                                         return function (val) {
                                             var retval = fn2(val);
-                                            if (--uncompletedRequests == 0 && trans.active) trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
+                                            if (--uncompletedRequests == 0 && trans.active) {
+                                                trans.active = false;
+                                                trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
+                                            }
                                             return retval;
                                         }
                                     }
@@ -806,8 +809,7 @@
                         returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
                     });
                     if (!trans.idbtrans || parentTransaction && uncompletedRequests === 0) {
-                        trans.active = false;
-                        trans.on.complete.fire(); // Empty block (not starting any transaction)
+                        trans._nop(); // Make sure transaction is being used so that it will resolve.
                     }
                 } catch (e) {
                     // If exception occur, abort the transaction and reject Promise.
@@ -1157,7 +1159,7 @@
         //
         //
         //
-        function Transaction(mode, storeNames, dbschema) {
+        function Transaction(mode, storeNames, dbschema, parent) {
             /// <summary>
             ///    Transaction class. Represents a database transaction. All operations on db goes through a Transaction.
             /// </summary>
@@ -1174,6 +1176,7 @@
             this._psd = null;
             this.active = true;
             this._dbschema = dbschema;
+            if (parent) this.parent = parent;
             this._tpf = transactionPromiseFactory;
             this.tables = Object.create(notInTransFallbackTables); // ...so that all non-included tables exists as instances (possible to call table.name for example) but will fail as soon as trying to execute a query on it.
 
@@ -1229,6 +1232,10 @@
                 // Derivation is done so that the inner PSD __proto__ points to the outer PSD.
                 // Promise.PSD.lockOwnerFor will point to current transaction object if the currently executing PSD scope owns the lock.
                 return this._reculock && (!Promise.PSD || Promise.PSD.lockOwnerFor !== this);
+            },
+            _nop: function (cb) {
+                // An asyncronic no-operation that may call given callback when done doing nothing. An alternative to asap() if we must not lose the transaction.
+                this.tables[this.storeNames[0]].get(0).then(cb);
             },
             _promise: function (mode, fn, bWriteLock) {
                 var self = this;
