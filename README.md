@@ -21,9 +21,9 @@ A bullet proof indexedDB wrapper.
    * Chrome for Android
    * Firefox for Android
    * IE Mobile
-   * Safari (requires polyfill: http://nparashuram.com/IndexedDBShim/)
-   * IOS Safari (requires polyfill: http://nparashuram.com/IndexedDBShim/)
- * Extended key range queries: startsWith(), startsWithIgnoreCase(), equalsIgnoreCase(), anyOf([a,b,c,d,...])
+   * Safari 8
+   * IOS Safari 8
+ * Extended key range queries: equalsIgnoreCase(), anyOf([a,b,c,d,...]), startsWith(), startsWithIgnoreCase()
  * Logical "OR": friends.where("age").below(40).or("length").above(200).toArray(...);
  * Built to be easily extended and build addons upon.
  * Simplified and robust error handling
