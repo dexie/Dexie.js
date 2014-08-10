@@ -37,16 +37,11 @@
             });
         });
 
-        db.on('cleanup', function (nodes, changes, intercomm, trans, weBecameMaster) {
-            /// <param name="nodes" type="db.WriteableTable"></param>
-            /// <param name="changes" type="db.WriteableTable"></param>
-            /// <param name="intercomm" type="db.WriteableTable"></param>
-            /// <param name="trans" type="db.Transaction"></param>
-
+        db.on('cleanup', function (weBecameMaster) {
             // A cleanup (done in Dexie.Observable) may result in that a master node is removed and we become master.
             if (weBecameMaster) {
                 // We took over the master role in Observable's cleanup method
-                nodes.where('type').equals('remote')
+                db._syncNodes.where('type').equals('remote')
                     .and(function (node) { return node.status !== Statuses.OFFLINE && node.status !== Statuses.ERROR; })
                     .each(function (connectedRemoteNode) {
                         // There are connected remote nodes that we must take over
@@ -84,11 +79,15 @@
         db.syncable = {};
 
         db.syncable.getStatus = function (url, cb) {
-            return Dexie.vip(function(){
-                return db._syncNodes.where('url').equals(url).first(function (node) {
-                    return node ? node.status : Statuses.OFFLINE;
-                });
-            }).then(cb);
+            if (db.isOpen()) {
+                return Dexie.vip(function () {
+                    return db._syncNodes.where('url').equals(url).first(function (node) {
+                        return node ? node.status : Statuses.OFFLINE;
+                    });
+                }).then(cb);
+            } else {
+                return Promise.resolve(Dexie.Syncable.Statuses.OFFLINE).then(cb);
+            }
         }
 
         db.syncable.list = function () {
@@ -307,7 +306,7 @@
                                                     }
                                                 }, again);
                                                 changeStatusTo(Statuses.ERROR_WILL_RETRY, error);
-                                                if (connectedContinuation.disconnect) connectedContinuation.disconnect();
+                                                if (connectedContinuation && connectedContinuation.disconnect) connectedContinuation.disconnect();
                                                 connectedContinuation = null;
                                             } else {
                                                 abortTheProvider(error); // Will fire ERROR on statusChanged event.
@@ -622,37 +621,49 @@
                             	/// <param name="offset" type="Number"></param>
                                 var lastChangeType = 0;
                                 var lastCreatePromise = null;
-                                for (var i=offset, len = changes.length; i<len; ++i) {
-                                    (function (change, i) {
-                                        var table = trans.tables[change.table];
-                                        if (change.type === CREATE) {
-                                            // Optimize CREATE changes because on initial sync with server, the entire DB will be downloaded in forms of CREATE changes.
-                                            // Instead of waiting for each change to resolve, do all CREATE changes in bulks until another type of change is stepped upon.
-                                            // This case is the only case that allows i to increment and the for-loop to continue since it does not return anything.
-                                            var specifyKey = !table.schema.primKey.keyPath;
-                                            lastCreatePromise = (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).catch("ConstraintError", function (e) {
-                                                return (specifyKey ? table.put(change.obj, change.key) : table.put(change.obj));
-                                            });
-                                        } else if (lastCreatePromise) {
-                                            // We did some CREATE changes but now stumbled upon another type of change.
-                                            // Let's wait for the last CREATE change to resolve and then call applyChanges again at current position. Next time, lastCreatePromise will be null and a case below will happen.
-                                            return lastCreatePromise.then(function () {
-                                                return applyChanges(changes, i);
-                                            });
-                                        } else if (change.type === UPDATE) {
-                                            return table.update(change.key, change.mods).then(function () {
-                                                // Wait for update to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
-                                                return applyChanges(changes, i + 1);
-                                            });
-                                        } else if (change.type === DELETE) {
-                                            return table.delete(change.key).then(function () {
-                                                // Wait for delete to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
-                                                return applyChanges(changes, i + 1);
-                                            });
-                                        }
-                                    })(changes[i], i);
+                                if (offset >= changes.length) return Promise.resolve(null);
+                                var change = changes[offset];
+                                var table = trans.tables[change.table];
+                                while (change && change.type === CREATE) {
+                                    // Optimize CREATE changes because on initial sync with server, the entire DB will be downloaded in forms of CREATE changes.
+                                    // Instead of waiting for each change to resolve, do all CREATE changes in bulks until another type of change is stepped upon.
+                                    // This case is the only case that allows i to increment and the for-loop to continue since it does not return anything.
+                                    var specifyKey = !table.schema.primKey.keyPath;
+                                    lastCreatePromise = (function (change) {
+                                        return (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).catch("ConstraintError", function (e) {
+                                            return (specifyKey ? table.put(change.obj, change.key) : table.put(change.obj));
+                                        });
+                                    })(change);
+                                    change = changes[++offset];
                                 }
-                                return lastCreatePromise || Promise.resolve(null); // Will return null or a Promise and make the entire applyChanges promise finally resolve.
+
+                                if (lastCreatePromise) {
+                                    // We did some CREATE changes but now stumbled upon another type of change.
+                                    // Let's wait for the last CREATE change to resolve and then call applyChanges again at current position. Next time, lastCreatePromise will be null and a case below will happen.
+                                    return lastCreatePromise.then(function () {
+                                        if (offset < changes.length) {
+                                            return applyChanges(changes, offset);
+                                        }
+                                    });
+                                }
+
+                                if (change) {
+                                    if (change.type === UPDATE) {
+                                        return table.update(change.key, change.mods).then(function () {
+                                            // Wait for update to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
+                                            return applyChanges(changes, offset + 1);
+                                        });
+                                    }
+
+                                    if (change.type === DELETE) {
+                                        return table.delete(change.key).then(function () {
+                                            // Wait for delete to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
+                                            return applyChanges(changes, offset + 1);
+                                        });
+                                    }
+                                }
+
+                                return Promise.resolve(null); // Will return null or a Promise and make the entire applyChanges promise finally resolve.
                             }
                         });
                     }

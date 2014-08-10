@@ -22,6 +22,7 @@
     // Import some usable helper functions
     var override = Dexie.override;
     var Promise = Dexie.Promise;
+    var browserIsShuttingDown = false;
 
     Dexie.Observable = function (db) {
     	/// <summary>
@@ -408,6 +409,12 @@
                 if (changes.length > 0) {
                     var lastChange = changes[changes.length - 1];
                     partial = (changes.length == 1000); // Same as limit.
+                    // Let all objects pass through the READING hook before notifying our listeners:
+                    changes.forEach(function (change) {
+                        var table = db.table(change.table);
+                        if (change.obj) change.obj = table.hook.reading.fire(change.obj);
+                        if (change.oldObj) change.oldObj = table.hook.reading.fire(change.oldObj);
+                    });
                     db.on('changes').fire(changes, partial);
                     ourSyncNode.myRevision = lastChange.rev;
                 } else if (wasPartial) {
@@ -423,10 +430,14 @@
             }).then(function (nodeWasUpdated) {
                 if (!nodeWasUpdated) {
                     // My node has been deleted. We must have been lazy and got removed by another node.
-                    db.close();
-                    alert("Out of sync"); // TODO: What to do? Reload the page?
-                    window.location.reload(true);
-                    throw new Error("Out of sync"); // Will make current promise reject
+                    if (browserIsShuttingDown) {
+                        throw new Error("Browser is shutting down");
+                    } else {
+                        db.close();
+                        alert("Out of sync"); // TODO: What to do? Reload the page?
+                        window.location.reload(true);
+                        throw new Error("Out of sync"); // Will make current promise reject
+                    }
                 }
 
                 // Check if more changes have come since we started reading changes in the first place. If so, relaunch readChanges and let the ongoing promise not
@@ -435,13 +446,6 @@
                     // Either there were more than 1000 changes or additional changes where added while we were reading these changes,
                     // In either case, call readChanges() again until we're done.
                     return readChanges(Dexie.Observable.latestRevision[db.name], (recursion || 0) + 1, partial);
-                }
-
-            }).catch(function (e) { // TODO: Remove this catch() clause. This is temporary while debugging.
-
-                if (db.isOpen()) {
-                    
-                    alert(e.stack || e);
                 }
 
             }).finally(function () {
@@ -522,6 +526,7 @@
         function onBeforeUnload(event) {
             // Mark our own sync node for deletion.
             if (!mySyncNode) return;
+            browserIsShuttingDown = true;
             mySyncNode.deleteTimeStamp = 1; // One millisecond after 1970. Makes it occur in the past but still keeps it truthy.
             mySyncNode.lastHeartBeat = 0;
             db._syncNodes.put(mySyncNode); // This async operation may be cancelled since the browser is closing down now.
