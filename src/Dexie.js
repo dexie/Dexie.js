@@ -2466,7 +2466,9 @@
             var res2 = f2.apply(this, arguments);
             if (onsuccess) this.onsuccess = this.onsuccess ? callBoth(onsuccess, this.onsuccess) : onsuccess;
             if (onerror) this.onerror = this.onerror ? callBoth(onerror, this.onerror) : onerror;
-            return res === undefined ? res2 === undefined ? undefined : res2 : res.extend(res2);
+            return res === undefined ?
+                (res2 === undefined ? undefined : res2) :
+                (res2 === undefined ? res : extend(res, res2));
         }
     }
 
