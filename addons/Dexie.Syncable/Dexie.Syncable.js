@@ -635,6 +635,7 @@
                                         });
                                     })(change);
                                     change = changes[++offset];
+                                    if (change) table = trans.tables[change.table];
                                 }
 
                                 if (lastCreatePromise) {
