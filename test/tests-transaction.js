@@ -257,7 +257,7 @@
             pets: "++id,kind",
             petsPerUser: "++,user,pet"
         });
-        var db2OpenPromise = db2.open();
+        db2.open();
         db.transaction('rw', "users", "pets", function () {
             ok(true, "Entered outer transaction scope");
             db2.transaction('rw', "users", "pets", function () {
@@ -265,22 +265,14 @@
             }).catch(function (err) {
                 ok(true, "Got error: " + err);
             }).finally(function () {
-                db2OpenPromise.finally(function () {
-                    return db2.delete();
-                }).then(function () {
-                    if (++counter == 2) start();
-                });
+                if (++counter == 2) db2.delete().then(start);
             });
         }).then(function () {
             ok(false, "Main transaction should not resolve due to error in sub transaction");
         }).catch(function (err) {
             ok(true, "Got error: " + err);
         }).finally(function() {
-            db2OpenPromise.then(function () {
-                return db2.delete();
-            }).then(function () {
-                if (++counter == 2) start();
-            });
+            if (++counter == 2) db2.delete().then(start);
         });
     });
 
@@ -342,25 +334,19 @@
             pets: "++id,kind",
             petsPerUser: "++,user,pet"
         });
-        var db2OpenPromise = db2.open();
+        db2.open();
         db.transaction('rw', "users", "pets", function () {
             db2.transaction('rw!', "users", "pets", function () {
                 ok(true, "Possible to enter a transaction in db2");
             }).catch(function (err) {
                 ok(false, "Got error: " + err);
             }).finally(function () {
-                db2OpenPromise.then(function () {
-                    return db2.delete();
-                }).then(function () {
-                    if (++counter == 2) start();
-                });
+                if (++counter == 2) db2.delete().then(start);
+                console.log("finally() in db2.transaction(). counter == " + counter);
             });
         }).finally(function () {
-            db2OpenPromise.then(function () {
-                return db2.delete();
-            }).then(function () {
-                if (++counter == 2) start();
-            });
+            if (++counter == 2) db2.delete().then(start);
+            console.log("finally() in db.transaction(). counter == " + counter);
         });
     });
 
@@ -422,25 +408,17 @@
             pets: "++id,kind",
             petsPerUser: "++,user,pet"
         });
-        var db2OpenPromise = db2.open();
+        db2.open();
         db.transaction('rw', "users", "pets", function () {
             db2.transaction('rw?', "users", "pets", function () {
                 ok(true, "Possible to enter a transaction in db2");
             }).catch(function (err) {
                 ok(false, "Got error: " + err);
             }).finally(function () {
-                db2OpenPromise.then(function () {
-                    return db2.delete();
-                }).then(function () {
-                    if (++counter == 2) start();
-                });
+                if (++counter == 2) db2.delete().then(start);
             });
         }).finally(function () {
-            db2OpenPromise.then(function () {
-                return db2.delete();
-            }).then(function () {
-                if (++counter == 2) start();
-            });
+            if (++counter == 2) db2.delete().then(start);
         });
     });
 
