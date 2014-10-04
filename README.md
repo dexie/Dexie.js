@@ -34,6 +34,10 @@ Documentation
 -------------
 https://github.com/dfahlander/Dexie.js/wiki/Dexie.js
 
+Samples
+-------
+https://github.com/dfahlander/Dexie.js/wiki/Samples
+
 Forum
 -----
 https://groups.google.com/forum/#!forum/dexiejs
