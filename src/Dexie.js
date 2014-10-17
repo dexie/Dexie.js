@@ -2066,7 +2066,7 @@
             indexes.split(',').forEach(function (index) {
                 index = index.trim();
                 var name = index.replace("&", "").replace("++", "").replace("*", "");
-                var keyPath = (name.indexOf('[') !== 0 ? name : index.substring(1, index.indexOf(']')).split('+'));
+                var keyPath = (name.indexOf('[') !== 0 ? name : index.substring(index.indexOf('[') + 1, index.indexOf(']')).split('+'));
 
                 rv.push(new IndexSpec(
                     name,
