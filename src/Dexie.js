@@ -66,7 +66,6 @@
         var READONLY = "readonly", READWRITE = "readwrite";
         var db = this;
         var pausedResumeables = [];
-        var use_proto = (function () { function F() { }; var a = new F(); try { a.__proto__ = Object.prototype; return !(a instanceof F) } catch (e) { return false; } })()
         var autoSchema = false;
 
         function init() {
@@ -953,15 +952,15 @@
 
                     // Now, subscribe to the when("reading") event to make all objects that come out from this table inherit from given class
                     // no matter which method to use for reading (Table.get() or Table.where(...)... )
-                    var readHook = use_proto ?
+                    var readHook = Object.setPrototypeOf ?
                         function makeInherited(obj) {
                             if (!obj) return obj; // No valid object. (Value is null). Return as is.
-                            // The JS engine supports __proto__. Just change that pointer on the existing object. A little more efficient way.
-                            obj.__proto__ = constructor.prototype;
+                            // Object.setPrototypeOf() supported. Just change that pointer on the existing object. A little more efficient way.
+                            Object.setPrototypeOf(obj, constructor.prototype);
                             return obj;
                         } : function makeInherited(obj) {
                             if (!obj) return obj; // No valid object. (Value is null). Return as is.
-                            // __proto__ not supported - do it by the standard: return a new object and clone the members from the old one.
+                            // Object.setPrototypeOf not supported (IE10)- return a new object and clone the members from the old one.
                             var res = Object.create(constructor.prototype);
                             for (var m in obj) if (obj.hasOwnProperty(m)) res[m] = obj[m];
                             return res;
@@ -2632,21 +2631,18 @@
         if (obj.hasOwnProperty(keyPath)) return obj[keyPath]; // This line is moved from last to first for optimization purpose.
         if (!keyPath) return obj;
         if (typeof keyPath !== 'string') {
-            //if (Array.isArray(keyPath)) {
             var rv = [];
             for (var i = 0, l = keyPath.length; i < l; ++i) {
                 var val = getByKeyPath(obj, keyPath[i]);
-                if (val === undefined) return;
                 rv.push(val);
             }
-            return val;
+            return rv;
         }
         var period = keyPath.indexOf('.');
         if (period !== -1) {
             var innerObj = obj[keyPath.substr(0, period)];
             return innerObj === undefined ? undefined : getByKeyPath(innerObj, keyPath.substr(period + 1));
         }
-        //return obj.hasOwnProperty(keyPath) ? obj[keyPath] : undefined;
         return undefined;
     }
 
