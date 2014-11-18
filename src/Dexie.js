@@ -513,7 +513,8 @@
                         } else {
                             if (e.oldVersion == 0) dbWasCreated = true;
                             req.transaction.onerror = eventRejectHandler(openError);
-                            runUpgraders(e.oldVersion / 10, req.transaction, openError, req);
+                            var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
+                            runUpgraders(oldVer / 10, req.transaction, openError, req);
                         }
                     };
                     req.onsuccess = function (e) {
