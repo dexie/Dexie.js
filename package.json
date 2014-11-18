@@ -1,5 +1,5 @@
 {
-  "name": "Dexie",
+  "name": "dexie",
   "version": "1.0.0",
   "description": "Minimalistic IndexedDB API with bullet proof transactions",
   "main": "src/Dexie.js",
