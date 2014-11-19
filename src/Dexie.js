@@ -2156,12 +2156,29 @@
     var Promise = (function () {
 
         // The use of asap in handle() is remarked because we must NOT use setTimeout(fn,0) because it causes premature commit of indexedDB transactions - which is according to indexedDB specification.
-        var asap = typeof (setImmediate) === 'undefined' ? function (fn, arg1, arg2, argN) {
+        var _slice = [].slice;
+        var _asap = typeof (setImmediate) === 'undefined' ? function(fn, arg1, arg2, argN) {
             var args = arguments;
-            setTimeout(function () { fn.apply(this, [].slice.call(args, 1)) }, 0);// If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
-        } : function (fn, arg1, arg2, argN) {
-            setImmediate.apply(this, arguments); // IE10+ and node.
-        };
+            setTimeout(function() { fn.apply(window, _slice.call(args, 1)); }, 0); // If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
+        } : setImmediate; // IE10+ and node.
+
+        var asap = _asap,
+            isRootExecution = true;
+
+        var operationsQueue = [];
+        function enqueueImmediate(fn, args) {
+            operationsQueue.push([fn, _slice.call(arguments, 1)]);
+        }
+
+        function executeOperationsQueue() {
+            var queue = operationsQueue;
+            operationsQueue = [];
+            for (var i = 0, l = queue.length; i < l; ++i) {
+                var item = queue[i];
+                item[0].apply(window, item[1]);
+            }
+        }
+
         //var PromiseID = 0;
         function Promise(fn) {
             if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');
@@ -2194,10 +2211,9 @@
             }
         }
 
-        function handle(deferred) {
-            var self = this;
-            if (this._state === null) {
-                this._deferreds.push(deferred);
+        function handle(self, deferred) {
+            if (self._state === null) {
+                self._deferreds.push(deferred);
                 return;
             }
 
@@ -2206,7 +2222,9 @@
                 // This Deferred doesnt have a listener for the event being triggered (onFulfilled or onReject) so lets forward the event to any eventual listeners on the Promise instance returned by then() or catch()
                 return (self._state ? deferred.resolve : deferred.reject)(self._value);
             }
-            var ret;
+            var ret, isRootExec = isRootExecution;
+            isRootExecution = false;
+            asap = enqueueImmediate;
             try {
                 ret = cb(self._value);
                 if (!self._state && (!ret || typeof ret.then !== 'function' || ret._state !== false)) setCatched(self); // Caller did 'return Promise.reject(err);' - don't regard it as catched!
@@ -2218,6 +2236,11 @@
                 return;
             }
             deferred.resolve(ret);
+            if (isRootExec) {
+                while(operationsQueue.length > 0) executeOperationsQueue();
+                asap = _asap;
+                isRootExecution = true;
+            }
         }
 
         function setCatched(promise) {
@@ -2266,7 +2289,7 @@
 
         function finale() {
             for (var i = 0, len = this._deferreds.length; i < len; i++) {
-                handle.call(this, this._deferreds[i]);
+                handle(this, this._deferreds[i]);
             }
             this._deferreds = [];
         }
@@ -2335,7 +2358,10 @@
         Promise.prototype.then = function (onFulfilled, onRejected) {
             var self = this;
             var p = new Promise(function (resolve, reject) {
-                handle.call(self, new Deferred(onFulfilled, onRejected, resolve, reject));
+                if (self._state === null)
+                    handle(self, new Deferred(onFulfilled, onRejected, resolve, reject));
+                else
+                    asap(handle, self, new Deferred(onFulfilled, onRejected, resolve, reject));
             });
             p._PSD = this._PSD;
             p.onuncatched = this.onuncatched; // Needed when exception occurs in a then() clause of a successful parent promise. Want onuncatched to be called even in callbacks of callbacks of the original promise.
@@ -2873,7 +2899,10 @@
                 }
                 req.onerror = eventRejectHandler(reject);
             } else {
-                globalDatabaseList(resolve);
+                globalDatabaseList(function (val) {
+                    resolve(val);
+                    return false;
+                });
             }
         }).then(cb);
     }
