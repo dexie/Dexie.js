@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -6,23 +6,26 @@
   <link rel="stylesheet" href="qunit.css">
 </head>
 <body>
-  <div id="qunit"></div>
-  <div id="qunit-fixture"></div>
-  <script src="qunit.js"></script>
-  <script>
-    if (!(window.indexedDB || window.window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB))
+    <div id="qunit"></div>
+    <div id="qunit-fixture"></div>
+    <script src="qunit.js"></script>
+    <script>
+        if (!(window.indexedDB || window.window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB))
         // Pull down the polyfill if needed (Safari + older opera browser)
-        document.write('<script src="http://nparashuram.com/IndexedDBShim/dist/IndexedDBShim.min.js">\x3C/script>');
-  </script>
-  <script src="../src/Dexie.js"></script>
-  <script src="tests-extendability.js"></script>
-  <script src="tests-table.js"></script>
-  <script src="tests-open.js"></script>
-  <script src="tests-collection.js"></script>
-  <script src="tests-whereclause.js"></script>
-  <script src="tests-exception-handling.js"></script>
-  <script src="tests-upgrading.js"></script>
-  <script src="tests-transaction.js"></script>
-  <script src="tests-performance.js"></script>
+            document.write('<script src="http://nparashuram.com/IndexedDBShim/dist/IndexedDBShim.min.js">\x3C/script>');
+        if (window.location.hash.indexOf('iegap=false') === -1)
+            document.write('<script src="https://rawgit.com/dfahlander/idb-iegap/master/idb-iegap.min.js">\x3C/script>');
+    </script>
+    <script src="../src/Dexie.js"></script>
+    <script src="tests-extendability.js"></script>
+    <script src="tests-promise.js"></script>
+    <script src="tests-table.js"></script>
+    <script src="tests-open.js"></script>
+    <script src="tests-collection.js"></script>
+    <script src="tests-whereclause.js"></script>
+    <script src="tests-exception-handling.js"></script>
+    <script src="tests-upgrading.js"></script>
+    <script src="tests-transaction.js"></script>
+    <script src="tests-performance.js"></script>
 </body>
 </html>
