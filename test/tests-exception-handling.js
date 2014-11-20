@@ -251,6 +251,37 @@
 
     });
 
+    asyncTest("Issue #32: db.on('error') doesnt catch 'not found index' DOMExceptions", function () {
+        var ourDB = new Dexie("TestDB2");
+        new Dexie.Promise(function (finalResolve) {
+            ourDB.version(1).stores({ users: "++id" });
+            ourDB.on("populate", function() {
+                db.users.add({ first: "David", last: "Fahlander" });
+            });
+            var errorHasBubbled = false;
+            ourDB.on("error", function(e) {
+                errorHasBubbled = true;
+                ok(true, "Uncatched error successfully bubbled to db.on('error'): " + e);
+                finalResolve();
+            });
+
+            ourDB.open().then(function () {
+
+                // Make the db fail by not finding a correct index:
+                ourDB.users.where("I am a little frog!").equals(18).toArray();
+
+                setTimeout(function() {
+                    if (!errorHasBubbled) {
+                        ok(false, "Timeout! Error never bubbled to db.on('error')");
+                    }
+                    finalResolve();
+                }, 300);
+            });
+        }).then(function() {
+            ourDB.delete().then(start);
+        });
+    });
+
     asyncTest("Error in on('populate') should abort database creation", function () {
         var popufail = new Dexie("PopufailDB");
         popufail.version(1).stores({ users: "++id,first,last,&username,&*email,*pets" });
