@@ -255,6 +255,21 @@
         }).finally(start);
     });
 
+    asyncTest("Issue #31 - Compound Index with anyOf", function() {
+        db.files
+            .where("[filename+extension]")
+            .anyOf([["hello", ".exe"], ["README", ".TXT"]])
+            .toArray(function (a) {
+                equal(a.length, 2, "Should find two files");
+                equal(a[0].filename, "README", "First comes the uppercase README.TXT");
+                equal(a[1].filename, "hello", "Second comes the lowercase hello.exe");
+
+            }).catch(function(e) {
+                ok(false, e);
+
+            }).finally(start);
+    });
+
     asyncTest("above, aboveOrEqual, below, belowOrEqual, between", 32, function () {
         db.folders.where('id').above(5).toArray(function (a) {
             equal(a.length, 4, "Four folders have id above 5");
