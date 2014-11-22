@@ -219,6 +219,8 @@
                     /// <param name="version" type="Version"></param>
                     var oldSchema = globalSchema;
                     var newSchema = version._cfg.dbschema;
+                    adjustToExistingIndexNames(oldSchema, idbtrans);
+                    adjustToExistingIndexNames(newSchema, idbtrans);
                     globalSchema = db._dbSchema = newSchema;
                     {
                         var diff = getSchemaDiff(oldSchema, newSchema);
@@ -491,13 +493,13 @@
                     // A future version of Dexie.js will stopover an intermediate version to workaround this.
                     // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
                     if (!indexedDB) throw new Error("indexedDB API not found. If using IE10+, make sure to run your code on a server URL (not locally). If using Safari, make sure to include indexedDB polyfill.");
-                    var dbWasCreated = false;
-                    var req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, db.verno * 10);
+                    var dbWasCreated = false; // TODO: Remove this line. Never used.
+                    var req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
                     req.onerror = eventRejectHandler(openError, ["opening database", dbName]);
                     req.onblocked = function (ev) {
                         db.on("blocked").fire(ev);
                     }
-                    req.onupgradeneeded = function (e) {
+                    req.onupgradeneeded = trycatch (function (e) {
                         if (autoSchema && !db._allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
                             // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
                             // If onupgradeneeded is called it means database did not exist. Reject the open() promise and make sure that we 
@@ -511,16 +513,18 @@
                                 openError(new Error("Database '" + dbName + "' doesnt exist"));
                             }
                         } else {
-                            if (e.oldVersion == 0) dbWasCreated = true;
+                            if (e.oldVersion == 0) dbWasCreated = true; // TODO: Remove this line. Never used.
                             req.transaction.onerror = eventRejectHandler(openError);
                             var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
                             runUpgraders(oldVer / 10, req.transaction, openError, req);
                         }
-                    };
-                    req.onsuccess = function (e) {
+                    }, openError);
+                    req.onsuccess = trycatch(function (e) {
                         isBeingOpened = false;
                         idbdb = req.result;
                         if (autoSchema) readGlobalSchema();
+                        else if (idbdb.objectStoreNames.length > 0)
+                            adjustToExistingIndexNames(globalSchema, idbdb.transaction(idbdb.objectStoreNames, READONLY));
                         idbdb.onversionchange = db.on("versionchange").fire; // Not firing it here, just setting the function callback to any registered subscriber.
                         globalDatabaseList(function (databaseNames) {
                             if (databaseNames.indexOf(dbName) === -1) return databaseNames.push(dbName);
@@ -555,7 +559,7 @@
                                 resolve();
                             }
                         });
-                    };
+                    }, openError);
                 } catch (err) {
                     openError(err);
                 }
@@ -1557,7 +1561,10 @@
             }
 
             function getIndexOrStore(ctx, store) {
-                return ctx.isPrimKey ? store : store.index(ctx.index);
+                if (ctx.isPrimKey) return store;
+                var indexSpec = ctx.table.schema.idxByKeyPath[ctx.index];
+                if (!indexSpec) throw new Error("KeyPath " + ctx.index + " on object store " + store.name + " is not indexed");
+                return ctx.isPrimKey ? store : store.index(indexSpec.name);
             }
 
             function openCursor(ctx, store) {
@@ -2116,6 +2123,28 @@
                 globalSchema[storeName] = new TableSchema(storeName, primKey, indexes, {});
             });
             setApiOnPlace([allTables], db._transPromiseFactory, Object.keys(globalSchema), READWRITE, globalSchema);
+        }
+
+        function adjustToExistingIndexNames(schema, idbtrans) {
+            /// <summary>
+            /// Issue #30 Problem with existing db - adjust to existing index names when migrating from non-dexie db
+            /// </summary>
+            /// <param name="schema" type="Object">Map between name and TableSchema</param>
+            /// <param name="idbtrans" type="IDBTransaction"></param>
+            var storeNames = idbtrans.db.objectStoreNames;
+            for (var i = 0; i < storeNames.length; ++i) {
+                var storeName = storeNames[i];
+                var store = idbtrans.objectStore(storeName);
+                for (var j = 0; j < store.indexNames.length; ++j) {
+                    var indexName = store.indexNames[j];
+                    var keyPath = store.index(indexName).keyPath;
+                    if (typeof keyPath !== 'string') keyPath = "[" + [].slice.call(keyPath).join('+') + "]";
+                    if (schema[storeName]) {
+                        var indexSpec = schema[storeName].idxByKeyPath[keyPath];
+                        if (indexSpec) indexSpec.name = indexName;
+                    }
+                }
+            }
         }
 
         extend(this, {
@@ -2860,6 +2889,10 @@
         this.indexes = indexes || [new IndexSpec()];
         this.instanceTemplate = instanceTemplate;
         this.mappedClass = null;
+        this.idxByKeyPath = indexes.reduce(function (hashSet, index) {
+            hashSet[index.name] = index;
+            return hashSet;
+        }, {});
     }
 
     //

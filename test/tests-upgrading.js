@@ -320,7 +320,7 @@
             });
         }).then(function() {
             // Test umbrella compound index
-            return db.umbrellas.where("[size+color]").above(["2014-11-20", "22:00"]).count(function(count) {
+            return db.umbrellas.where("[size+color]").above([98, "pina"]).count(function(count) {
                 equal(count, 1, "Could count umbrellas based on a query on compound index");
             });
         }).then(function () {
