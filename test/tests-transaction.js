@@ -62,6 +62,16 @@
         }).finally(start);
     });
 
+    asyncTest("Table not in transaction 2", function () {
+      return db.transaction('rw', db.users, function () {
+        db.pets.add({kind: "dog"});
+      }).then(function () {
+        ok(false, "Transaction should not commit because I made an error");
+      }).catch(function (err) {
+        ok(true, "Got error since we tried using a table not in transaction: " + err);
+      }).finally(start);
+    });
+
     asyncTest("Write into readonly transaction", function () {
         return db.transaction('r', db.users, function () {
             db.users.add({ username: "arne" }).then(function(){
