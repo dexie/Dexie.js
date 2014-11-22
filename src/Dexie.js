@@ -1353,8 +1353,8 @@
                 return collection;
             }
 
-            function getSortedSet(args) {
-                return Array.prototype.slice.call(Array.isArray(args[0]) ? args[0] : args, 0).sort(ascending);
+            function getSetArgs(args) {
+                return Array.prototype.slice.call(args.length === 1 && Array.isArray(args[0]) ? args[0] : args);
             }
 
             function upperFactory(dir) {
@@ -1476,18 +1476,25 @@
                     return c;
                 },
                 anyOf: function (valueArray) {
-                    var set = getSortedSet(arguments);
+                    var ctx = this._ctx,
+                        schema = ctx.table.schema;
+                    var idxSpec = ctx.index ? schema.idxByKeyPath[ctx.index] : schema.primKey;
+                    var isCompound = idxSpec && idxSpec.compound;
+                    var set = getSetArgs(arguments);
+                    var compare = isCompound ? compoundCompare(ascending) : ascending;
+                    set.sort(compare);
                     if (set.length === 0) return new this._ctx.collClass(this, IDBKeyRange.only("")).limit(0); // Return an empty collection.
                     var c = new this._ctx.collClass(this, IDBKeyRange.bound(set[0], set[set.length - 1]));
-                    var sorter = ascending;
+                    
                     c._ondirectionchange = function (direction) {
-                        sorter = (direction === "next" ? ascending : descending);
-                        set.sort(sorter);
+                        compare = (direction === "next" ? ascending : descending);
+                        if (isCompound) compare = compoundCompare(compare);
+                        set.sort(compare);
                     };
                     var i = 0;
                     c._addAlgorithm(function (cursor, advance, resolve) {
                         var key = cursor.key;
-                        while (sorter(key, set[i]) > 0) {
+                        while (compare(key, set[i]) > 0) {
                             // The cursor has passed beyond this key. Check next.
                             ++i;
                             if (i === set.length) {
@@ -1496,7 +1503,7 @@
                                 return false;
                             }
                         }
-                        if (key === set[i]) {
+                        if (compare(key, set[i]) === 0) {
                             // The current cursor value should be included and we should continue a single step in case next item has the same key or possibly our next key in set.
                             advance(function () { cursor.continue(); });
                             return true;
@@ -2095,6 +2102,19 @@
         function descending(a, b) {
             return a < b ? 1 : a > b ? -1 : 0;
         }
+
+        function compoundCompare(itemCompare) {
+            return function (a, b) {
+                for (var i = 0;;) {
+                    var result = itemCompare(a[i], b[i]);
+                    if (result !== 0) return result;
+                    ++i;
+                    if (i === a.length || i == b.length)
+                        return itemCompare(a.length, b.length);
+                }
+            }
+        }
+
 
         function combine(filter1, filter2) {
             return filter1 ? filter2 ? function () { return filter1.apply(this, arguments) && filter2.apply(this, arguments) } : filter1 : filter2;
