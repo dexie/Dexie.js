@@ -1126,7 +1126,7 @@
                     if (this.hook.deleting.subscribers.length) {
                         // People listens to when("deleting") event. Must implement delete using WriteableCollection.delete() that will
                         // call the CRUD event. Only WriteableCollection.delete() will knows which objects that are actually deleted.
-                        this.toCollection().delete();
+                        return this.toCollection().delete();
                     } else {
                         return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
                             var req = idbstore.clear();
