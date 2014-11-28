@@ -3,7 +3,7 @@
 
    By David Fahlander, david.fahlander@gmail.com
 
-   Version 1.0.0.1 (alpha - not yet distributed) - DATE, YEAR.
+   Version 1.0.2 (alpha - not yet distributed) - DATE, YEAR.
 
    Tested successfully on Chrome, IE, Firefox and Opera.
 
@@ -3075,7 +3075,7 @@
     }
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-    Dexie.version = 1.01;
+    Dexie.version = 1.02;
 
 
 
