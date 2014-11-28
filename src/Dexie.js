@@ -421,6 +421,11 @@
             } else {
                 var trans = db._createTransaction(mode, storeNames, globalSchema);
                 return trans._promise(mode, function (resolve, reject) {
+                    // An uncatched operation will bubble to this anonymous transaction. Make sure
+                    // to continue bubbling it up to db.on('error'):
+                    trans.error(function (err) {
+                        db.on('error').fire(err);
+                    });
                     fn(function (value) {
                         // Instead of resolving value directly, wait with resolving it until transaction has completed.
                         // Otherwise the data would not be in the DB if requesting it in the then() operation.
