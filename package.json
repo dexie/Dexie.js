@@ -1,6 +1,6 @@
 {
   "name": "dexie",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Minimalistic IndexedDB API with bullet proof transactions",
   "main": "src/Dexie.js",
   "repository": {
@@ -17,5 +17,5 @@
   "bugs": {
     "url": "https://github.com/dfahlander/Dexie.js/issues"
   },
-  "homepage": "https://github.com/dfahlander/Dexie.js/wiki/Dexie.js"
+  "homepage": "http://www.dexie.org"
 }
