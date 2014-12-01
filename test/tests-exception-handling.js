@@ -282,36 +282,6 @@
         });
     });
 
-    asyncTest("Issue #43: Another db.on('error') issue found by https://github.com/OleLaursen.", function () {
-        var db = new Dexie("testdb");
-        new Dexie.Promise(function (finalResolve) {
-
-            db.version(1).stores({ table1: "id" });
-            var errorHasBubbled = false;
-            db.on('error', function(err) {
-                errorHasBubbled = true;
-                ok(true, "Uncatched error successfully bubbled to db.on('error'): " + err);
-                equal(err, "FOO", "Error is 'FOO'");
-                finalResolve();
-            });
-
-            db.open().then(function() {
-                setTimeout(function () {
-                    if (!errorHasBubbled) {
-                        ok(false, "Timeout! Error never bubbled to db.on('error')");
-                    }
-                    finalResolve();
-                }, 50);
-
-                ok(true, "before");
-                throw "FOO"; // Issue #43 - this exception doesnt trigger db.on('error')
-            });
-
-        }).then(function() {
-            return db.delete();
-        }).finally(start);
-    });
-
     asyncTest("Error in on('populate') should abort database creation", function () {
         var popufail = new Dexie("PopufailDB");
         popufail.version(1).stores({ users: "++id,first,last,&username,&*email,*pets" });
