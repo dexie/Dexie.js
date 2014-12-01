@@ -1,6 +1,11 @@
 ﻿/// <reference path="../../../src/Dexie.js" />
 /// <reference path="../Dexie.Observable/Dexie.Observable.js" />
 /// <reference path="Dexie.Syncable.SyncProtocolAPI.js" />
+/*
+ * Disclaimber: This addon is in alpha status meaning that
+ * its API and behavior may change.
+ */
+
 (function (window, publish, isBrowser, undefined) {
 
     var override = Dexie.override,

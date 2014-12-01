@@ -1,7 +1,12 @@
 ﻿/// <reference path="../../src/Dexie.js" />
+/*
+ * Disclaimber: This addon is in alpha status meaning that
+ * its API and behavior may change.
+ */
+
 (function (window, publish, isBrowser, undefined) {
 
-    "use strict"
+    "use strict";
 
     /** class DatabaseChange
      *

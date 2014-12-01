@@ -19,7 +19,7 @@
   "license": "Apache-2.0",
   "ignore": [
     "**/.*",
-    "addons",
+    "addons/*/test",
     "test",
     "samples",
     "dist/allversions/",
