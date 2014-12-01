@@ -1483,7 +1483,7 @@
                 anyOf: function (valueArray) {
                     var ctx = this._ctx,
                         schema = ctx.table.schema;
-                    var idxSpec = ctx.index ? schema.idxByKeyPath[ctx.index] : schema.primKey;
+                    var idxSpec = ctx.index ? schema.idxByName[ctx.index] : schema.primKey;
                     var isCompound = idxSpec && idxSpec.compound;
                     var set = getSetArgs(arguments);
                     var compare = isCompound ? compoundCompare(ascending) : ascending;
@@ -1543,7 +1543,7 @@
             this._ctx = {
                 table: whereCtx.table,
                 index: whereCtx.index,
-                isPrimKey: (!whereCtx.index || (whereCtx.table.schema.primKey.keyPath && whereCtx.index === whereCtx.table.schema.primKey.keyPath)),
+                isPrimKey: (!whereCtx.index || (whereCtx.table.schema.primKey.keyPath && whereCtx.index === whereCtx.table.schema.primKey.name)),
                 range: keyRange,
                 op: "openCursor",
                 dir: "next",
@@ -1574,7 +1574,7 @@
 
             function getIndexOrStore(ctx, store) {
                 if (ctx.isPrimKey) return store;
-                var indexSpec = ctx.table.schema.idxByKeyPath[ctx.index];
+                var indexSpec = ctx.table.schema.idxByName[ctx.index];
                 if (!indexSpec) throw new Error("KeyPath " + ctx.index + " on object store " + store.name + " is not indexed");
                 return ctx.isPrimKey ? store : store.index(indexSpec.name);
             }
@@ -2165,7 +2165,7 @@
                     var keyPath = store.index(indexName).keyPath;
                     if (typeof keyPath !== 'string') keyPath = "[" + [].slice.call(keyPath).join('+') + "]";
                     if (schema[storeName]) {
-                        var indexSpec = schema[storeName].idxByKeyPath[keyPath];
+                        var indexSpec = schema[storeName].idxByName[keyPath];
                         if (indexSpec) indexSpec.name = indexName;
                     }
                 }
@@ -2729,8 +2729,8 @@
 
     function setByKeyPath(obj, keyPath, value) {
         if (!obj || keyPath === undefined) return;
-        if (Array.isArray(keyPath)) {
-            assert(Array.isArray(value));
+        if (typeof keyPath !== 'string' && 'length' in keyPath) {
+            assert(typeof value !== 'string' && 'length' in value);
             for (var i = 0, l = keyPath.length; i < l; ++i) {
                 setByKeyPath(obj, keyPath[i], value[i]);
             }
@@ -2914,7 +2914,7 @@
         this.indexes = indexes || [new IndexSpec()];
         this.instanceTemplate = instanceTemplate;
         this.mappedClass = null;
-        this.idxByKeyPath = indexes.reduce(function (hashSet, index) {
+        this.idxByName = indexes.reduce(function (hashSet, index) {
             hashSet[index.name] = index;
             return hashSet;
         }, {});

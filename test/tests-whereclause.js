@@ -6,7 +6,8 @@
     var db = new Dexie("TestDB-WhereClause");
     db.version(1).stores({
         folders: "++id,&path",
-        files: "++id,filename,extension,[filename+extension],folderId"
+        files: "++id,filename,extension,[filename+extension],folderId",
+        people: "[name+number],name,number"
     });
 
     var Folder = db.folders.defineClass({
@@ -252,6 +253,25 @@
             });
         }).catch(function (e) {
             ok(false, e + ". Expected to fail on IE10/IE11 - no support compound indexs.");
+        }).finally(start);
+    });
+
+    asyncTest("compound-primkey (Issue #37)", function() {
+        db.transaction('rw', db.people, function() {
+            db.people.add({ name: "Santaclaus", number: 123 });
+            db.people.add({ name: "Santaclaus", number: 124 });
+            db.people.add({ name: "Santaclaus2", number: 1 });
+            return db.people.get(["Santaclaus", 123]);
+        }).then(function(santa) {
+            ok(!!santa, "Got santa");
+            equal(santa.name, "Santaclaus", "Santa's name is correct");
+            equal(santa.number, 123, "Santa's number is correct");
+
+            return db.people.where("[name+number]").between(["Santaclaus", 1], ["Santaclaus", 200]).toArray();
+        }).then(function(santas) {
+            equal(santas.length, 2, "Got two santas");
+        }).catch(function (e) {
+            ok(false, e);
         }).finally(start);
     });
 
