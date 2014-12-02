@@ -2137,12 +2137,16 @@
             if (dbStoreNames.length == 0) return; // Database contains no stores.
             var trans = idbdb.transaction(dbStoreNames, 'readonly');
             dbStoreNames.forEach(function (storeName) {
-                var store = trans.objectStore(storeName);
-                var primKey = new IndexSpec(store.keyPath, store.keyPath || "", false, false, !!store.autoIncrement, false, store.keyPath && store.keyPath.indexOf('.') != -1);
+                var store = trans.objectStore(storeName),
+                    keyPath = store.keyPath,
+                    dotted = keyPath && typeof keyPath == 'string' && keyPath.indexOf('.') != -1;
+                var primKey = new IndexSpec(keyPath, keyPath || "", false, false, !!store.autoIncrement, keyPath && typeof keyPath !== 'string', dotted);
                 var indexes = [];
                 for (var j = 0; j < store.indexNames.length; ++j) {
                     var idbindex = store.index(store.indexNames[j]);
-                    var index = new IndexSpec(idbindex.name, idbindex.keyPath, !!idbindex.unique, !!idbindex.multiEntry, false, typeof idbindex.keyPath !== 'string', idbindex.keyPath.indexOf('.') != -1);
+                    keyPath = idbindex.keyPath;
+                    dotted = keyPath && typeof keyPath == 'string' && keyPath.indexOf('.') != -1;
+                    var index = new IndexSpec(idbindex.name, keyPath, !!idbindex.unique, !!idbindex.multiEntry, false, keyPath && typeof keyPath !== 'string', dotted);
                     indexes.push(index);
                 }
                 globalSchema[storeName] = new TableSchema(storeName, primKey, indexes, {});
@@ -2898,7 +2902,8 @@
         this.auto = auto;
         this.compound = compound;
         this.dotted = dotted;
-        this.src = (unique ? '&' : '') + (multi ? '*' : '') + (auto ? "++" : "") + keyPath;
+        var keyPathSrc = typeof keyPath == 'string' ? keyPath : keyPath && ('[' + [].join.call(keyPath, '+') + ']');
+        this.src = (unique ? '&' : '') + (multi ? '*' : '') + (auto ? "++" : "") + keyPathSrc;
     }
 
     //
