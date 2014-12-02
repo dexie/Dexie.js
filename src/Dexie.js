@@ -2167,9 +2167,9 @@
                 for (var j = 0; j < store.indexNames.length; ++j) {
                     var indexName = store.indexNames[j];
                     var keyPath = store.index(indexName).keyPath;
-                    if (typeof keyPath !== 'string') keyPath = "[" + [].slice.call(keyPath).join('+') + "]";
+                    var dexieName = typeof keyPath === 'string' ? keyPath : "[" + [].slice.call(keyPath).join('+') + "]";
                     if (schema[storeName]) {
-                        var indexSpec = schema[storeName].idxByName[keyPath];
+                        var indexSpec = schema[storeName].idxByName[dexieName];
                         if (indexSpec) indexSpec.name = indexName;
                     }
                 }
