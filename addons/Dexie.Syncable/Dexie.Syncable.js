@@ -158,6 +158,27 @@
                 return new Promise(); // For code completion
             }
         }
+        
+        db.syncable.delete = function (url) {
+            // Surround with a readwrite-transaction
+            return db.transaction('rw', db._syncNodes, db._changes, db._uncommittedChanges, function () {
+                // Find the node
+                db._syncNodes.where("url").equals(url).first(function (node) {
+                    // If not found, resolve here (nothing deleted), else continue the promise chain and
+                    // delete the node and all that refers to it...
+                    if (!node) {
+                        return;
+                    } else {
+                        var nodeId = node.id;
+                        return db._syncNodes.delete(nodeId).then(function () {
+                            return db._changes.clear().then(function () {
+                                return db._uncommittedChanges.where('node').equals(nodeId).delete();
+                            });
+                        });
+                    }
+                });
+            });
+        };
 
         function connect (protocolInstance, protocolName, url, options, dbAliveID) {
             /// <param name="protocolInstance" type="ISyncProtocol"></param>
