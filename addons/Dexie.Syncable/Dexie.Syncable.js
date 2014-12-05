@@ -158,6 +158,37 @@
                 return new Promise(); // For code completion
             }
         }
+        
+        db.syncable.delete = function (url) {
+            // Notice: Caller should call db.syncable.disconnect(url) and wait for it to finish before calling db.syncable.delete(url)
+            // Surround with a readwrite-transaction
+            return db.transaction('rw', db._syncNodes, db._changes, db._uncommittedChanges, function() {
+                // Find the node
+                db._syncNodes.where("url").equals(url).first(function(node) {
+                    // If not found, resolve here (nothing deleted), else continue the promise chain and
+                    // delete the node and all that refers to it...
+                    if (!node) {
+                        return;
+                    } else {
+                        var nodeId = node.id;
+                        // Delete the node
+                        return db._syncNodes.delete(nodeId).then(function() {
+                            // When this node is gone, let's clear the _changes table by
+                            // from all revisions older than the oldest node.
+                            // First check which is the currenly oldest node, now when we have deleted
+                            // the given node:
+                            return db._syncNodes.orderBy("myRevision").first();
+                        }).then(function(oldestNode) {
+                            // Delete all changes older than revision of oldest node:
+                            return db._changes.where("rev").below(oldestNode.myRevision).delete();
+                        }).then(function() {
+                            // Also don't forget to delete all uncommittedChanges for the deleted node:
+                            return db._uncommittedChanges.where('node').equals(nodeId).delete();
+                        });
+                    }
+                });
+            });
+        };
 
         function connect (protocolInstance, protocolName, url, options, dbAliveID) {
             /// <param name="protocolInstance" type="ISyncProtocol"></param>
