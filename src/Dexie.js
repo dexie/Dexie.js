@@ -1,4 +1,4 @@
-﻿/* Minimalistic IndexedDB Wrapper with Bullet Proof Transactions
+/* Minimalistic IndexedDB Wrapper with Bullet Proof Transactions
    =============================================================
 
    By David Fahlander, david.fahlander@gmail.com
@@ -106,7 +106,7 @@
             versions.push(versionInstance);
             versions.sort(lowerVersionFirst);
             return versionInstance;
-        }
+        }; 
 
         function Version(versionNumber) {
             this._cfg = {
@@ -115,7 +115,7 @@
                 dbschema: {},
                 tables: {},
                 contentUpgrade: null,
-            }
+            }; 
             this.stores({}); // Derive earlier schemas by default.
         }
 
@@ -199,7 +199,7 @@
                     try {
                         db.on("populate").fire(t);
                     } catch (err) {
-                        openReq.onerror = idbtrans.onerror = function (ev) { ev.preventDefault(); } // Prohibit AbortError fire on db.on("error") in Firefox.
+                        openReq.onerror = idbtrans.onerror = function (ev) { ev.preventDefault(); };  // Prohibit AbortError fire on db.on("error") in Firefox.
                         try { idbtrans.abort(); } catch (e) { }
                         idbtrans.db.close();
                         reject(err);
@@ -296,7 +296,7 @@
                         else
                             createMissingTables(globalSchema, idbtrans); // At last, make sure to create any missing tables. (Needed by addons that add stores to DB without specifying version)
                     } catch (err) {
-                        openReq.onerror = idbtrans.onerror = function (ev) { ev.preventDefault(); } // Prohibit AbortError fire on db.on("error") in Firefox.
+                        openReq.onerror = idbtrans.onerror = function (ev) { ev.preventDefault(); };  // Prohibit AbortError fire on db.on("error") in Firefox.
                         idbtrans.abort();
                         idbtrans.db.close();
                         reject(err);
@@ -395,11 +395,11 @@
                 return new Table(tableSchema.name, transactionPromiseFactory, tableSchema, Collection);
             else
                 return new WriteableTable(tableSchema.name, transactionPromiseFactory, tableSchema);
-        }
+        }; 
 
         this._createTransaction = function (mode, storeNames, dbschema, parentTransaction) {
             return new Transaction(mode, storeNames, dbschema, parentTransaction);
-        }
+        }; 
 
         function tableNotInTransaction(mode, storeNames) {
             throw new Error("Table " + storeNames[0] + " not part of transaction. Original Scope Function Source: " + Dexie.Promise.PSD.trans.scopeFunc.toString());
@@ -443,7 +443,7 @@
                     }, reject, trans);
                 });
             }
-        }
+        }; 
 
         this._whenReady = function (fn) {
             if (db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
@@ -457,7 +457,7 @@
                 });
             }
             return new Promise(fn);
-        },
+        }; 
 
         //
         //
@@ -503,7 +503,7 @@
                     req.onerror = eventRejectHandler(openError, ["opening database", dbName]);
                     req.onblocked = function (ev) {
                         db.on("blocked").fire(ev);
-                    }
+                    }; 
                     req.onupgradeneeded = trycatch (function (e) {
                         if (autoSchema && !db._allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
                             // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
@@ -516,7 +516,7 @@
                             var delreq = indexedDB.deleteDatabase(dbName); // The upgrade transaction is atomic, and javascript is single threaded - meaning that there is no risk that we delete someone elses database here!
                             delreq.onsuccess = delreq.onerror = function () {
                                 openError(new Error("Database '" + dbName + "' doesnt exist"));
-                            }
+                            }; 
                         } else {
                             if (e.oldVersion == 0) dbWasCreated = true; // TODO: Remove this line. Never used.
                             req.transaction.onerror = eventRejectHandler(openError);
@@ -569,7 +569,7 @@
                     openError(err);
                 }
             });
-        }
+        }; 
 
         this.close = function () {
             if (idbdb) {
@@ -578,7 +578,7 @@
                 db_is_blocked = true;
                 dbOpenError = null;
             }
-        }
+        }; 
 
         this.delete = function () {
             var args = arguments;
@@ -605,18 +605,18 @@
                     doDelete();
                 }
             });
-        }
+        }; 
 
         this.backendDB = function () {
             return idbdb;
-        }
+        }; 
 
         this.isOpen = function () {
             return idbdb !== null;
-        }
+        }; 
         this.hasFailed = function () {
             return dbOpenError !== null;
-        }
+        }; 
 
         /*this.dbg = function (collection, counter) {
             if (!this._dbgResult || !this._dbgResult[counter]) {
@@ -831,13 +831,13 @@
                     });
                 }
             }
-        }
+        }; 
 
         this.table = function (tableName) {
             /// <returns type="WriteableTable"></returns>
             if (!autoSchema && !allTables.hasOwnProperty(tableName)) { throw new Error("Table does not exist"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
             return allTables[tableName];
-        }
+        }; 
 
         //
         //
@@ -1260,15 +1260,15 @@
                                     self.on("error").fire(e && e.target.error);
                                     e.preventDefault(); // Prohibit default bubbling to window.error
                                     self.abort(); // Make sure transaction is aborted since we preventDefault.
-                                }
+                                }; 
                                 idbtrans.onabort = function (e) {
                                     self.active = false;
                                     self.on("abort").fire(e);
-                                }
+                                }; 
                                 idbtrans.oncomplete = function (e) {
                                     self.active = false;
                                     self.on("complete").fire(e);
-                                }
+                                }; 
                             }
                             if (bWriteLock) self._lock(); // Write lock if write operation is requested
                             try {
@@ -1344,7 +1344,7 @@
                 index: index === ":id" ? null : index,
                 collClass: table._collClass,
                 or: orCollection
-            }
+            }; 
         }
 
         extend(WhereClause.prototype, function () {
@@ -1555,7 +1555,7 @@
                 limit: Infinity,
                 error: null, // If set, any promise must be rejected with this error
                 or: whereCtx.or
-            }
+            }; 
         }
 
         extend(Collection.prototype, function () {
@@ -1909,7 +1909,7 @@
                                         });
                                     }
                                 }
-                            }
+                            }; 
                         }
                     } else if (updatingHook === nop) {
                         // changes is a set of {keyPath: value} and no one is listening to the updating hook.
@@ -1925,7 +1925,7 @@
                                 }
                             }
                             return anythingModified;
-                        }
+                        }; 
                     } else {
                         // changes is a set of {keyPath: value} and people are listening to the updating hook so we need to call it and
                         // allow it to add additional modifications to make.
@@ -1944,7 +1944,7 @@
                             });
                             if (additionalChanges) changes = shallowClone(origChanges); // Restore original changes.
                             return anythingModified;
-                        }
+                        }; 
                     }
 
                     var count = 0;
@@ -1971,7 +1971,7 @@
                                 if (thisContext.onsuccess) thisContext.onsuccess(thisContext.value);
                                 ++successCount;
                                 checkFinished();
-                            }
+                            }; 
                         }
                     }
 
@@ -2110,14 +2110,14 @@
 
         function compoundCompare(itemCompare) {
             return function (a, b) {
-                for (var i = 0;;) {
+                for (var i = 0;i>-1;i++) { 
                     var result = itemCompare(a[i], b[i]);
                     if (result !== 0) return result;
-                    ++i;
-                    if (i === a.length || i == b.length)
+                    //++i;
+                    if ((i+1) === a.length || (i+1) == b.length)
                         return itemCompare(a.length, b.length);
                 }
-            }
+            }; 
         }
 
 
@@ -2489,7 +2489,7 @@
             } finally {
                 Promise.PSD = outerScope;
             }
-        }
+        }; 
 
         return Promise;
     })();
@@ -2510,14 +2510,14 @@
         if (f1 === mirror) return f2;
         return function (val) {
             return f2(f1(val));
-        }
+        }; 
     }
 
     function callBoth(on1, on2) {
         return function () {
             on1.apply(this, arguments);
             on2.apply(this, arguments);
-        }
+        }; 
     }
 
     function hookCreatingChain(f1, f2) {
@@ -2535,7 +2535,7 @@
             if (onsuccess) this.onsuccess = this.onsuccess ? callBoth(onsuccess, this.onsuccess) : onsuccess;
             if (onerror) this.onerror = this.onerror ? callBoth(onerror, this.onerror) : onerror;
             return res2 !== undefined ? res2 : res;
-        }
+        }; 
     }
 
     function hookUpdatingChain(f1, f2) {
@@ -2553,7 +2553,7 @@
             return res === undefined ?
                 (res2 === undefined ? undefined : res2) :
                 (res2 === undefined ? res : extend(res, res2));
-        }
+        }; 
     }
 
     function stoppableEventChain(f1, f2) {
@@ -2562,7 +2562,7 @@
         return function () {
             if (f1.apply(this, arguments) === false) return false;
             return f2.apply(this, arguments);
-        }
+        }; 
     }
 
     function reverseStoppableEventChain(f1, f2) {
@@ -2570,7 +2570,7 @@
         return function () {
             if (f2.apply(this, arguments) === false) return false;
             return f1.apply(this, arguments);
-        }
+        }; 
     }
 
     function nonStoppableEventChain(f1, f2) {
@@ -2578,7 +2578,7 @@
         return function () {
             f1.apply(this, arguments);
             f2.apply(this, arguments);
-        }
+        }; 
     }
 
     function promisableChain(f1, f2) {
@@ -2592,7 +2592,7 @@
                 });
             }
             return f2.apply(this, arguments);
-        }
+        }; 
     }
 
     function events(ctx, eventNames) {
@@ -2609,7 +2609,7 @@
                 // Return interface allowing to fire or unsubscribe from event
                 return evs[eventName];
             }
-        }
+        }; 
         rv.addEventType = add;
 
         function add(eventName, chainFunction, defaultFunction) {
@@ -2655,12 +2655,12 @@
                         // Change how subscribe works to not replace the fire function but to just add the subscriber to subscribers
                         if (context.subscribers.indexOf(fn) === -1)
                             context.subscribers.push(fn);
-                    }
+                    }; 
                     context.unsubscribe = function (fn) {
                         // Change how unsubscribe works for the same reason as above.
                         var idxOfFn = context.subscribers.indexOf(fn);
                         if (idxOfFn !== -1) context.subscribers.splice(idxOfFn, 1);
-                    }
+                    }; 
                 } else throw new Error("Invalid event config");
             });
         }
@@ -2948,7 +2948,7 @@
             return this;
         };
         return promise;
-    }
+    }; 
 
     //
     // Static method for retrieving a list of all existing databases at current host.
@@ -2959,7 +2959,7 @@
                 var req = ('getDatabaseNames' in indexedDB ? indexedDB.getDatabaseNames() : indexedDB.webkitGetDatabaseNames());
                 req.onsuccess = function (event) {
                     resolve([].slice.call(event.target.result, 0)); // Converst DOMStringList to Array<String>
-                }
+                }; 
                 req.onerror = eventRejectHandler(reject);
             } else {
                 globalDatabaseList(function (val) {
@@ -2968,7 +2968,7 @@
                 });
             }
         }).then(cb);
-    }
+    }; 
 
     Dexie.defineClass = function (structure) {
         /// <summary>
@@ -2986,7 +2986,7 @@
         }
         applyStructure(Class.prototype, structure);
         return Class;
-    }
+    }; 
 
     Dexie.spawn = function (scopeFunc) {
         // In case caller is within a transaction but needs to create a separate transaction.
@@ -3013,7 +3013,7 @@
             Promise.PSD.trans = null;
             return scopeFunc();
         });
-    }
+    }; 
 
     Dexie.vip = function (fn) {
         // To be used by subscribers to the on('ready') event.
@@ -3028,7 +3028,7 @@
             Promise.PSD.letThrough = true; // Make sure we are let through if still blocking db due to onready is firing.
             return fn();
         });
-    }
+    }; 
 
     // Dexie.currentTransaction property. Only applicable for transactions entered using the new "transact()" method.
     Object.defineProperty(Dexie, "currentTransaction", {
@@ -3036,7 +3036,7 @@
             /// <returns type="Transaction"></returns>
             return Promise.PSD && Promise.PSD.trans || null;
         }
-    })
+    }); 
 
 
     // Export our Promise implementation since it can be handy as a standalone Promise implementation
@@ -3077,7 +3077,7 @@
         SyntaxError: window.SyntaxError || String,
         TypeError: window.TypeError || String,
         DOMError: window.DOMError || String
-    }
+    }; 
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
     Dexie.version = 1.02;
