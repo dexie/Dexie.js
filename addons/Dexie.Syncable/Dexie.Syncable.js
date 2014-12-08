@@ -189,6 +189,12 @@
                 });
             });
         };
+        
+        db.syncable.unsyncedChanges = function (url) {
+            return db._syncNodes.where("url").equals(url).first(function (node) {
+                return db._changes.where('rev').above(node.myRevision).toArray();
+            });
+        };
 
         function connect (protocolInstance, protocolName, url, options, dbAliveID) {
             /// <param name="protocolInstance" type="ISyncProtocol"></param>
