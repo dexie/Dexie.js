@@ -1,4 +1,4 @@
-/* Minimalistic IndexedDB Wrapper with Bullet Proof Transactions
+﻿/* Minimalistic IndexedDB Wrapper with Bullet Proof Transactions
    =============================================================
 
    By David Fahlander, david.fahlander@gmail.com
@@ -126,12 +126,12 @@
                 /// </summary>
                 /// <param name="stores" type="Object">
                 /// Example: <br/>
-                ///   {users: "id++,first,last,&username,*email", <br/>
-                ///   passwords: "id++,&username"}<br/>
+                ///   {users: "id++,first,last,&amp;username,*email", <br/>
+                ///   passwords: "id++,&amp;username"}<br/>
                 /// <br/>
-                /// Syntax: {Table: "[primaryKey][++],[&][*]index1,[&][*]index2,..."}<br/><br/>
+                /// Syntax: {Table: "[primaryKey][++],[&amp;][*]index1,[&amp;][*]index2,..."}<br/><br/>
                 /// Special characters:<br/>
-                ///  "&"  means unique key, <br/>
+                ///  "&amp;"  means unique key, <br/>
                 ///  "*"  means value is multiEntry, <br/>
                 ///  "++" means auto-increment and only applicable for primary key <br/>
                 /// </param>
