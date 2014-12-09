@@ -20,7 +20,7 @@
         type: Number,   // 1 = CREATE, 2 = UPDATE, 3 = DELETE
         obj: Object,    // CREATE: obj contains the object created.
         mods: Object,   // UPDATE: mods contains the modifications made to the object.
-        oldObj: Object, // DELETE: oldObj contains the object deleted. UPDATE: oldObj contains the old object before updates applied.
+        oldObj: Object // DELETE: oldObj contains the object deleted. UPDATE: oldObj contains the old object before updates applied.
     });
 
 
@@ -118,7 +118,7 @@
                 // Allow UUID primary keys using $$ prefix on primary key or indexes
                 Object.keys(dbSchema).forEach(function (tableName) {
                     var schema = dbSchema[tableName];
-                    if (schema.primKey.name.indexOf('$$') == 0) {
+                    if (schema.primKey.name.indexOf('$$') === 0) {
                         schema.primKey.uuid = true;
                         schema.primKey.name = schema.primKey.name.substr(2);
                         schema.primKey.keyPath = schema.primKey.keyPath.substr(2);
@@ -127,7 +127,7 @@
                 // Now mark all observable tables
                 Object.keys(dbSchema).forEach(function (tableName) {
                     // Marked observable tables with "observable" in their TableSchema.
-                    if (tableName.indexOf('_') != 0 && tableName.indexOf('$') != 0) {
+                    if (tableName.indexOf('_') !== 0 && tableName.indexOf('$') !== 0) {
                         dbSchema[tableName].observable = true;
                     }
                 });
@@ -147,7 +147,7 @@
                     table.mapToClass(SyncNode);
                 }
                 return table;
-            }
+            };
         });
 
         // changes event on db:
@@ -203,7 +203,7 @@
                     if (trans.parent && trans.parent.source) trans.source = trans.parent.source;
                 }
                 return trans;
-            }
+            };
         });
 
         // If Dexie.Observable.latestRevsion[db.name] is undefined, set it to 0 so that comparing against it always works.
@@ -253,7 +253,7 @@
                 if (pollHandle) clearTimeout(pollHandle);
                 pollHandle = null;
                 return origClose.apply(this, arguments);
-            }
+            };
         });
 
         // Override Dexie.delete() in order to delete Dexie.Observable.latestRevision[db.name].
@@ -264,7 +264,7 @@
                     Dexie.Observable.latestRevision[db.name] = 0;
                     return result;
                 });
-            }
+            };
         });
 
         //
@@ -336,7 +336,7 @@
                     }).then(function (rev) {
                         trans._lastWrittenRevision = rev;
                     });
-                }
+                };
             });
         }
 
@@ -351,7 +351,7 @@
                     type: "local",
                     lastHeartBeat: Date.now(),
                     deleteTimeStamp: null,
-                    isMaster: 0,
+                    isMaster: 0
                 });
                 if (Dexie.Observable.latestRevision[db.name] < latestRevision) {
                     // Side track . For correctness whenever setting Dexie.Observable.latestRevision[db.name] we must make sure the event is fired if increased:
@@ -413,7 +413,7 @@
             var promise = db._changes.where("rev").above(ourSyncNode.myRevision).limit(1000).toArray(function (changes) {
                 if (changes.length > 0) {
                     var lastChange = changes[changes.length - 1];
-                    partial = (changes.length == 1000); // Same as limit.
+                    partial = (changes.length === 1000); // Same as limit.
                     // Let all objects pass through the READING hook before notifying our listeners:
                     changes.forEach(function (change) {
                         var table = db.table(change.table);
@@ -487,7 +487,7 @@
                 // Because client may have been in hybernate mode and recently woken up. That would lead to deletion of all nodes.
                 // Instead, we should mark any old nodes for deletion in a minute or so. If they still dont wakeup after that minute we could consider them dead.
                 var weBecameMaster = false;
-                db._syncNodes.where("lastHeartBeat").below(Date.now() - NODE_TIMEOUT).and(function (node) { return node.type === 'local' }).modify(function (node) {
+                db._syncNodes.where("lastHeartBeat").below(Date.now() - NODE_TIMEOUT).and(function (node) { return node.type === 'local'; }).modify(function (node) {
                     if (node.deleteTimeStamp && node.deleteTimeStamp < Date.now()) {
                         // Delete the node.
                         delete this.value;
@@ -599,17 +599,17 @@
                     });
                 }
             });
-        }
+        };
 
         db.broadcastMessage = function (type, message, bIncludeSelf) {
             if (!mySyncNode) return Promise.reject("Database closed");
             var mySyncNodeId = mySyncNode.id;
             db._syncNodes.each(function (node) {
-                if (node.type == 'local' && (bIncludeSelf || node.id !== mySyncNodeId)) {
+                if (node.type === 'local' && (bIncludeSelf || node.id !== mySyncNodeId)) {
                     db.sendMessage(type, message, node.id);
                 }
             });
-        }
+        };
 
         db.observable = {};
         db.observable.SyncNode = SyncNode;
@@ -642,10 +642,10 @@
                 // This is a message or request. Fire the event and add an API for the subscriber to use if reply is requested
                 msg.resolve = function (result) {
                     db.sendMessage('response', { result: result }, msg.sender, { requestId: msg.id });
-                }
+                };
                 msg.reject = function (error) {
                     db.sendMessage('response', { error: error.toString() }, msg.sender, { isFailure: true, requestId: msg.id });
-                }
+                };
                 var message = msg.message;
                 delete msg.message;
                 Dexie.extend(msg, message);
@@ -670,7 +670,7 @@
 
     var asap = typeof (setImmediate) === 'undefined' ? function (fn, arg1, arg2, argN) {
         var args = arguments;
-        setTimeout(function () { fn.apply(this, [].slice.call(args, 1)) }, 0);// If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
+        setTimeout(function () { fn.apply(this, [].slice.call(args, 1)); }, 0);// If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
     } : setImmediate;
 
     function nop() { };
@@ -679,14 +679,14 @@
         if (f1 === nop) return f2;
         return function () {
             var res = f1.apply(this, arguments);
-            if (res && typeof res.then == 'function') {
+            if (res && typeof res.then === 'function') {
                 var thiz = this, args = arguments;
                 return res.then(function () {
                     return f2.apply(thiz, args);
                 });
             }
             return f2.apply(this, arguments);
-        }
+        };
     }
 
     //
@@ -701,10 +701,10 @@
         var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function (c) {
             var r = (d + Math.random() * 16) % 16 | 0;
             d = Math.floor(d / 16);
-            return (c == 'x' ? r : (r & 0x7 | 0x8)).toString(16);
+            return (c === 'x' ? r : (r & 0x7 | 0x8)).toString(16);
         });
         return uuid;
-    }
+    };
     
     Dexie.Observable._onStorage = function onStorage(event) {
         // We use the onstorage event to trigger onLatestRevisionIncremented since we will wake up when other windows modify the DB as well!
@@ -731,11 +731,11 @@
                 }
             }
         }
-    }
+    };
 
     Dexie.Observable._onBeforeUnload = function () {
         Dexie.Observable.on.beforeunload.fire();
-    }
+    };
 
     Dexie.Observable.localStorageImpl = window.localStorage;
 
@@ -745,7 +745,7 @@
     // Finally, add this addon to Dexie:
     Dexie.addons.push(Dexie.Observable);
 
-}).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this == window) 
+}).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this === window) 
 ? [window, function (name, value) { window[name] = value; }, true ]    // Adapt to browser environment
 : [global, function (name, value) { module.exports = value; }, false]); // Adapt to Node.js environment
 

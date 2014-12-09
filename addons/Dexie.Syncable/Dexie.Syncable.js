@@ -29,12 +29,12 @@
         db.on('message', function (msg) {
             // Message from other local node arrives...
             Dexie.vip(function () {
-                if (msg.type == 'connect') {
+                if (msg.type === 'connect') {
                     // We are master node and another non-master node wants us to do the connect.
                     db.syncable.connect(msg.protocolName, msg.url, msg.options).then(msg.resolve, msg.reject);
-                } else if (msg.type == 'disconnect') {
+                } else if (msg.type === 'disconnect') {
                     db.syncable.disconnect(msg.url).then(msg.resolve, msg.reject);
-                } else if (msg.type == 'syncStatusChanged') {
+                } else if (msg.type === 'syncStatusChanged') {
                     // We are client and a master node informs us about syncStatus change.
                     // Lookup the connectedProvider and call its event
                     db.syncable.on.statusChanged.fire(msg.newStatus, msg.url);
@@ -93,19 +93,19 @@
             } else {
                 return Promise.resolve(Dexie.Syncable.Statuses.OFFLINE).then(cb);
             }
-        }
+        };
 
         db.syncable.list = function () {
             return db._syncNodes.where('type').equals('remote').toArray(function (a) {
                 return a.map(function (node) { return node.url; });
             });
-        }
+        };
 
         db.syncable.on = Dexie.events(db, { statusChanged: "asap" });
 
         db.syncable.disconnect = function (url) {
             if (db._localSyncNode && db._localSyncNode.isMaster) {
-                activePeers.filter(function (peer) { return peer.url === url }).forEach(function (peer) {
+                activePeers.filter(function (peer) { return peer.url === url; }).forEach(function (peer) {
                     peer.disconnect(Statuses.OFFLINE);
                 });
             } else {
@@ -117,7 +117,7 @@
             return db._syncNodes.where("url").equals(url).modify(function (node) {
                 node.status = Statuses.OFFLINE;
             });
-        }
+        };
 
         db.syncable.connect = function (protocolName, url, options) {
             options = options || {}; // Make sure options is always an object because 1) Provider expects it to be. 2) We'll be persisting it and you cannot persist undefined.
@@ -157,7 +157,7 @@
                 throw new Error("ISyncProtocol '" + protocolName + "' is not registered in Dexie.Syncable.registerSyncProtocol()");
                 return new Promise(); // For code completion
             }
-        }
+        };
         
         db.syncable.delete = function (url) {
             // Notice: Caller should call db.syncable.disconnect(url) and wait for it to finish before calling db.syncable.delete(url)
@@ -198,7 +198,7 @@
 
         function connect (protocolInstance, protocolName, url, options, dbAliveID) {
             /// <param name="protocolInstance" type="ISyncProtocol"></param>
-            var existingPeer = activePeers.filter(function (peer) { return peer.url == url; });
+            var existingPeer = activePeers.filter(function (peer) { return peer.url === url; });
             if (existingPeer.length > 0) {
                 // Never create multiple syncNodes with same protocolName and url. Instead, let the next call to connect() return the same promise that
                 // have already been started and eventually also resolved. If promise has already resolved (node connected), calling existing promise.then() will give a callback directly.
@@ -278,7 +278,7 @@
                             });
                             
                             //return db._syncNodes.update(this.nodeID, { syncContext: this });
-                        }
+                        };
 
                         return node; // returning node will make the db.transaction()-promise resolve with this value.
                     });
@@ -289,7 +289,7 @@
                 /// <param name="node" type="db.observable.SyncNode"></param>
 
                 function changeStatusTo(newStatus) {
-                    if (node.status != newStatus) {
+                    if (node.status !== newStatus) {
                         node.status = newStatus;
                         node.save();
                         db.syncable.on.statusChanged.fire(newStatus, url);
@@ -316,7 +316,7 @@
                             var finalSyncPromise = new Promise(function (resolve, reject) {
                                 rejectConnectPromise = function (err) {
                                     reject(err);
-                                }
+                                };
                                 Dexie.asap(function () {
                                     try {
                                         protocolInstance.sync(
@@ -392,7 +392,7 @@
                             return {
                                 maxClientRevision: i === node.remoteBaseRevisions.length - 1 ? Infinity : node.remoteBaseRevisions[i + 1].local,
                                 remoteBaseRevision: node.remoteBaseRevisions[i].remote
-                            }
+                            };
                         }
                     }
                     // There are at least one item in the list but the server hasnt yet become up-to-date with the 0 revision from client. 
@@ -404,7 +404,7 @@
 
                 function getLocalChangesForNode_autoAckIfEmpty(node, cb) {
                     return getLocalChangesForNode(node, function autoAck (changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
-                        if (changes.length === 0 && 'myRevision' in nodeModificationsOnAck && nodeModificationsOnAck.myRevision != node.myRevision) {
+                        if (changes.length === 0 && 'myRevision' in nodeModificationsOnAck && nodeModificationsOnAck.myRevision !== node.myRevision) {
                             Object.keys(nodeModificationsOnAck).forEach(function (keyPath) {
                                 Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
                             });
@@ -433,7 +433,7 @@
                     } else {
                         // Node hasn't got anything from our local database yet. We will need to upload entire DB to the node in the form of CREATE changes.
                         // Check if we're in the middle of already doing that:
-                        if (node.dbUploadState == null) {
+                        if (node.dbUploadState === null) {
                             // Initiatalize dbUploadState
                             var tablesToUpload = db.tables.filter(function (table) { return table.schema.observable; }).map(function (table) { return table.name; });
                             if (tablesToUpload.length === 0) return Promise.resolve(cb([], null, false, {})); // There are no synched tables at all.
@@ -471,7 +471,7 @@
                                 type: CREATE,
                                 table: state.currentTable,
                                 key: cursor.key,
-                                obj: cursor.value,
+                                obj: cursor.value
                             });
                             state.currentKey = cursor.key;
                         }).then(function () {
@@ -481,7 +481,7 @@
                                 return cb(changes, null, true, {dbUploadState: state});
                             } else {
                                 // Done iterating this table. Check if there are more tables to go through:
-                                if (state.tablesToUpload.length == 0) {
+                                if (state.tablesToUpload.length === 0) {
                                     // Done iterating all tables
                                     // Now append changes occurred during our dbUpload:
                                     var brmcr = getBaseRevisionAndMaxClientRevision(node);
@@ -507,7 +507,7 @@
                         var ignoreSource = node.id;
                         var nextRevision = revision;
                         return db.transaction('r', db._changes, function () {
-                            var query = (maxRevision == Infinity ?
+                            var query = (maxRevision === Infinity ?
                                 db._changes.where('rev').above(revision) :
                                 db._changes.where('rev').between(revision, maxRevision, false, true));
                             query.until(function () {
@@ -525,9 +525,9 @@
                                     table: change.table,
                                     key: change.key
                                 };
-                                if (change.type == CREATE)
+                                if (change.type === CREATE)
                                     changeToSend.obj = change.obj;
-                                else if (change.type == UPDATE)
+                                else if (change.type === UPDATE)
                                     changeToSend.mods = change.mods;
 
                                 var id = change.table + ":" + change.key;
@@ -612,7 +612,7 @@
                         //var tick = Date.now();
 
                         // 1. Open a write transaction on all tables in DB
-                        return db.transaction('rw', db.tables.filter(function (table) { return table.name == '_changes' || table.name == '_uncommittedChanges' || table.schema.observable }), function () {
+                        return db.transaction('rw', db.tables.filter(function (table) { return table.name === '_changes' || table.name === '_uncommittedChanges' || table.schema.observable; }), function () {
                             var trans = Dexie.currentTransaction;
                             var localRevisionBeforeChanges = 0;
                             db._changes.orderBy('rev').last(function (lastChange) {
@@ -882,7 +882,7 @@
                     peer.disconnect();
                 });
                 return origClose.apply(this, arguments);
-            }
+            };
         });
 
         var syncNodeSaveQueContexts = {};
@@ -891,7 +891,7 @@
             return db.transaction('rw?', db._syncNodes, function () {
                 db._syncNodes.put(self);
             });
-        }
+        };
 
         function enque(context, fn, instanceID) {
             function _enque () {
@@ -925,7 +925,7 @@
                 return Promise.reject(new Error("Database was closed"));
             }
         }
-    }
+    };
 
 
 
@@ -942,7 +942,7 @@
         Object.keys(nextChange.mods).forEach(function (keyPath) {
             // If prev-change was changing a parent path of this keyPath, we must update the parent path rather than adding this keyPath
             var hadParentPath = false;
-            Object.keys(prevChange.mods).filter(function (parentPath) { return keyPath.indexOf(parentPath + '.') === 0 }).forEach(function (parentPath) {
+            Object.keys(prevChange.mods).filter(function (parentPath) { return keyPath.indexOf(parentPath + '.') === 0; }).forEach(function (parentPath) {
                 setByKeyPath(clonedChange[parentPath], keyPath.substr(parentPath.length + 1), nextChange.mods[keyPath]);
                 hadParentPath = true;
             });
@@ -952,7 +952,7 @@
             }
             // In case prevChange contained sub-paths to the new keyPath, we must make sure that those sub-paths are removed since
             // we must mimic what would happen if applying the two changes after each other:
-            Object.keys(prevChange.mods).filter(function (subPath) { return subPath.indexOf(keyPath + '.') === 0 }).forEach(function (subPath) {
+            Object.keys(prevChange.mods).filter(function (subPath) { return subPath.indexOf(keyPath + '.') === 0; }).forEach(function (subPath) {
                 delete clonedChange[subPath];
             });
         });
@@ -965,7 +965,7 @@
         CONNECTING:         1,  // Trying to connect to server
         ONLINE:             2,  // Connected to server and currently in sync with server
         SYNCING:            3,  // Syncing with server. For poll pattern, this is every poll call. For react pattern, this is when local changes are being sent to server.
-        ERROR_WILL_RETRY:   4,  // An error occured such as net down but the sync provider will retry to connect.
+        ERROR_WILL_RETRY:   4  // An error occured such as net down but the sync provider will retry to connect.
     };
 
     Dexie.Syncable.StatusTexts = {
@@ -975,7 +975,7 @@
         "2": "ONLINE",
         "3": "SYNCING",
         "4": "ERROR_WILL_RETRY"
-    }
+    };
 
     Dexie.Syncable.registeredProtocols = {}; // Map<String,ISyncProviderFactory> when key is the provider name.
 
@@ -986,11 +986,11 @@
         /// <param name="name" type="String">Provider name</param>
         /// <param name="protocolInstance" type="ISyncProtocol">Implementation of ISyncProtocol</param>
         Dexie.Syncable.registeredProtocols[name] = protocolInstance;
-    }
+    };
 
     // Finally, add this addon to Dexie:
     Dexie.addons.push(Dexie.Syncable);
 
-}).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this == window)
+}).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this === window)
 ? [window, function (name, value) { window[name] = value; }, true]    // Adapt to browser environment
 : [global, function (name, value) { module.exports = value; }, false]); // Adapt to Node.js environment
