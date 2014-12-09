@@ -2110,14 +2110,15 @@
 
         function compoundCompare(itemCompare) {
             return function (a, b) {
-                for (var i = 0;i>-1;i++) { 
+                var i = 0;
+                while (true) {
                     var result = itemCompare(a[i], b[i]);
                     if (result !== 0) return result;
-                    //++i;
-                    if ((i+1) === a.length || (i+1) == b.length)
+                    ++i;
+                    if (i === a.length || i === b.length)
                         return itemCompare(a.length, b.length);
                 }
-            }; 
+            };
         }
 
 
