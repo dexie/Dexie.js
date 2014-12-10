@@ -1,4 +1,4 @@
-﻿/// <reference path="../../src/Dexie.js" />
+/// <reference path="../../src/Dexie.js" />
 /*
  * Disclaimber: This addon is in alpha status meaning that
  * its API and behavior may change.
