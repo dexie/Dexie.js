@@ -113,11 +113,9 @@
                     db.sendMessage('disconnect', { url: url }, masterNode.id, { wantReply: true });
                 });
             }
-                            
-            return db.transaction('rw', db._syncNodes, function () {
-                return db._syncNodes.where("url").equals(url).modify(function (node) {
-                    node.status = Statuses.OFFLINE;
-                });
+
+            return db._syncNodes.where("url").equals(url).modify(function (node) {
+                node.status = Statuses.OFFLINE;
             });
         };
 
@@ -166,16 +164,19 @@
             // Surround with a readwrite-transaction
             return db.transaction('rw', db._syncNodes, db._changes, db._uncommittedChanges, function() {
                 // Find the node
-                db._syncNodes.where("url").equals(url).each(function (node) {
-                    // If not found, resolve here (nothing deleted), else continue the promise chain and
-                    // delete the node and all that refers to it...
-                    if (!node) {
-                        return;
-                    } else {
-                        var nodeId = node.id;
-                        // Delete the node
-                        return db._syncNodes.delete(nodeId).then(function() {
-                            // When this node is gone, let's clear the _changes table by
+                db._syncNodes.where("url").equals(url).toArray(function (nodes) {
+                    // If it's found (or even several found, as detected by @martindiphoorn),
+                    // let's delete it (or them) and cleanup _changes and _uncommittedChanges
+                    // accordingly.
+                    if (nodes.length > 0) {
+                        var nodeIDs = nodes.map(function (node) { return node.id; });
+                        // The following 'return' statement is not needed right now, but I leave it 
+                        // there because if we would like to add a 'then()' statement to the main ,
+                        // operation above ( db._syncNodes.where("url").equals(url).toArray(...) ) , 
+                        // this return statement will asure that the whole chain is waited for 
+                        // before entering the then() callback.
+                        return db._syncNodes.where('id').anyOf(nodeIDs).delete().then(function() {
+                            // When theese nodes are gone, let's clear the _changes table
                             // from all revisions older than the oldest node.
                             // First check which is the currenly oldest node, now when we have deleted
                             // the given node:
@@ -185,7 +186,7 @@
                             return db._changes.where("rev").below(oldestNode.myRevision).delete();
                         }).then(function() {
                             // Also don't forget to delete all uncommittedChanges for the deleted node:
-                            return db._uncommittedChanges.where('node').equals(nodeId).delete();
+                            return db._uncommittedChanges.where('node').anyOf(nodeIDs).delete();
                         });
                     }
                 });
