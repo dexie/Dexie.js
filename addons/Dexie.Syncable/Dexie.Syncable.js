@@ -1,4 +1,4 @@
-﻿/// <reference path="../../../src/Dexie.js" />
+/// <reference path="../../../src/Dexie.js" />
 /// <reference path="../Dexie.Observable/Dexie.Observable.js" />
 /// <reference path="Dexie.Syncable.SyncProtocolAPI.js" />
 /*
@@ -113,9 +113,11 @@
                     db.sendMessage('disconnect', { url: url }, masterNode.id, { wantReply: true });
                 });
             }
-            //return db._syncNodes.where("type").equals("remote").and(function (node) { return node.url == url }).modify(function (node) {
-            return db._syncNodes.where("url").equals(url).modify(function (node) {
-                node.status = Statuses.OFFLINE;
+                            
+            return db.transaction('rw', db._syncNodes, function () {
+                return db._syncNodes.where("url").equals(url).modify(function (node) {
+                    node.status = Statuses.OFFLINE;
+                });
             });
         };
 
@@ -164,7 +166,7 @@
             // Surround with a readwrite-transaction
             return db.transaction('rw', db._syncNodes, db._changes, db._uncommittedChanges, function() {
                 // Find the node
-                db._syncNodes.where("url").equals(url).first(function(node) {
+                db._syncNodes.where("url").equals(url).each(function (node) {
                     // If not found, resolve here (nothing deleted), else continue the promise chain and
                     // delete the node and all that refers to it...
                     if (!node) {
