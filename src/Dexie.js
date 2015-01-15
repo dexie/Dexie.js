@@ -1,4 +1,4 @@
-﻿/* Minimalistic IndexedDB Wrapper with Bullet Proof Transactions
+/* Minimalistic IndexedDB Wrapper with Bullet Proof Transactions
    =============================================================
 
    By David Fahlander, david.fahlander@gmail.com
