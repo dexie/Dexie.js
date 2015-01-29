@@ -3070,9 +3070,10 @@
     //
     Dexie.dependencies = {
         // Required:
-        indexedDB: window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB,
-        IDBKeyRange: window.IDBKeyRange || window.webkitIDBKeyRange,
-        IDBTransaction: window.IDBTransaction || window.webkitIDBTransaction,
+        // NOTE: The "_"-prefixed versions are for prioritizing IDB-shim on IOS8 before the native IDB in case the shim was included.
+        indexedDB: window._indexedDB || window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB,
+        IDBKeyRange: window._IDBKeyRange || window.IDBKeyRange || window.webkitIDBKeyRange,
+        IDBTransaction: window._IDBTransaction || window.IDBTransaction || window.webkitIDBTransaction,
         // Optional:
         Error: window.Error || String,
         SyntaxError: window.SyntaxError || String,
