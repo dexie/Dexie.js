@@ -529,7 +529,7 @@
                         idbdb = req.result;
                         if (autoSchema) readGlobalSchema();
                         else if (idbdb.objectStoreNames.length > 0)
-                            adjustToExistingIndexNames(globalSchema, idbdb.transaction(idbdb.objectStoreNames, READONLY));
+                            adjustToExistingIndexNames(globalSchema, idbdb.transaction(ios8Fix(idbdb.objectStoreNames), READONLY));
                         idbdb.onversionchange = db.on("versionchange").fire; // Not firing it here, just setting the function callback to any registered subscriber.
                         globalDatabaseList(function (databaseNames) {
                             if (databaseNames.indexOf(dbName) === -1) return databaseNames.push(dbName);
@@ -1255,7 +1255,7 @@
                         p = self.active ? new Promise(function (resolve, reject) {
                             if (!self.idbtrans && mode) {
                                 if (!idbdb) throw dbOpenError ? new Error("Database not open. Following error in populate, ready or upgrade function made Dexie.open() fail: " + dbOpenError) : new Error("Database not open");
-                                var idbtrans = self.idbtrans = idbdb.transaction(self.storeNames, self.mode);
+                                var idbtrans = self.idbtrans = idbdb.transaction(ios8Fix(self.storeNames), self.mode);
                                 idbtrans.onerror = function (e) {
                                     self.on("error").fire(e && e.target.error);
                                     e.preventDefault(); // Prohibit default bubbling to window.error
@@ -2136,7 +2136,7 @@
             db._dbSchema = globalSchema = {};
             dbStoreNames = [].slice.call(idbdb.objectStoreNames, 0);
             if (dbStoreNames.length == 0) return; // Database contains no stores.
-            var trans = idbdb.transaction(dbStoreNames, 'readonly');
+            var trans = idbdb.transaction(ios8Fix(dbStoreNames), 'readonly');
             dbStoreNames.forEach(function (storeName) {
                 var store = trans.objectStore(storeName),
                     keyPath = store.keyPath,
@@ -3039,6 +3039,9 @@
         }
     }); 
 
+    function ios8Fix(storeNames) {
+        return storeNames.length === 1 ? storeNames[0] : storeNames;
+    }
 
     // Export our Promise implementation since it can be handy as a standalone Promise implementation
     Dexie.Promise = Promise;
