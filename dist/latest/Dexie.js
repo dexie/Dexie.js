@@ -3,7 +3,7 @@
 
    By David Fahlander, david.fahlander@gmail.com
 
-   Version 1.0.2 - December 9, 2014.
+   Version 1.0.3 - February 11, 2015.
 
    Tested successfully on Chrome, IE, Firefox and Opera.
 
@@ -263,7 +263,7 @@
                                             return function () {
                                                 fn.apply(this, arguments);
                                                 if (--uncompletedRequests === 0) cb(); // A called db operation has completed without starting a new operation. The flow is finished, now run next upgrader.
-                                            };
+                                            }
                                         }
                                         return orig_promise.call(this, mode, function (resolve, reject, trans) {
                                             arguments[0] = proxy(resolve);
@@ -529,7 +529,7 @@
                         idbdb = req.result;
                         if (autoSchema) readGlobalSchema();
                         else if (idbdb.objectStoreNames.length > 0)
-                            adjustToExistingIndexNames(globalSchema, idbdb.transaction(idbdb.objectStoreNames, READONLY));
+                            adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
                         idbdb.onversionchange = db.on("versionchange").fire; // Not firing it here, just setting the function callback to any registered subscriber.
                         globalDatabaseList(function (databaseNames) {
                             if (databaseNames.indexOf(dbName) === -1) return databaseNames.push(dbName);
@@ -595,7 +595,7 @@
                         resolve();
                     };
                     req.onerror = eventRejectHandler(reject, ["deleting", dbName]);
-                    req.onblocked = function () {
+                    req.onblocked = function() {
                         db.on("blocked").fire();
                     };
                 }
@@ -706,9 +706,9 @@
             //
             // Resolve mode. Allow shortcuts "r" and "rw".
             //
-            if (mode === "r" || mode === READONLY)
+            if (mode == "r" || mode == READONLY)
                 mode = READONLY;
-            else if (mode === "rw" || mode === READWRITE)
+            else if (mode == "rw" || mode == READWRITE)
                 mode = READWRITE;
             else
                 error = new Error("Invalid transaction mode: " + mode);
@@ -789,7 +789,7 @@
                                                 trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
                                             }
                                             return retval;
-                                        };
+                                        }
                                     }
                                     return orig.call(this, mode, function (resolve2, reject2, trans) {
                                         return fn(proxy(resolve2), proxy(reject2), trans);
@@ -1157,7 +1157,7 @@
                         // key to modify
                         return this.where(":id").equals(keyOrObject).modify(modifications);
                     }
-                }
+                },
             };
         });
 
@@ -1255,7 +1255,7 @@
                         p = self.active ? new Promise(function (resolve, reject) {
                             if (!self.idbtrans && mode) {
                                 if (!idbdb) throw dbOpenError ? new Error("Database not open. Following error in populate, ready or upgrade function made Dexie.open() fail: " + dbOpenError) : new Error("Database not open");
-                                var idbtrans = self.idbtrans = idbdb.transaction(self.storeNames, self.mode);
+                                var idbtrans = self.idbtrans = idbdb.transaction(safariMultiStoreFix(self.storeNames), self.mode);
                                 idbtrans.onerror = function (e) {
                                     self.on("error").fire(e && e.target.error);
                                     e.preventDefault(); // Prohibit default bubbling to window.error
@@ -2136,7 +2136,7 @@
             db._dbSchema = globalSchema = {};
             dbStoreNames = [].slice.call(idbdb.objectStoreNames, 0);
             if (dbStoreNames.length === 0) return; // Database contains no stores.
-            var trans = idbdb.transaction(dbStoreNames, 'readonly');
+            var trans = idbdb.transaction(safariMultiStoreFix(dbStoreNames), 'readonly');
             dbStoreNames.forEach(function (storeName) {
                 var store = trans.objectStore(storeName),
                     keyPath = store.keyPath,
@@ -2800,7 +2800,7 @@
         for (var prop in a) if (a.hasOwnProperty(prop)) {
             if (!b.hasOwnProperty(prop))
                 rv[prop] = undefined; // Property removed
-            else if (a[prop] !== b[prop] && JSON.stringify(a[prop]) !== JSON.stringify(b[prop]))
+            else if (a[prop] !== b[prop] && JSON.stringify(a[prop]) != JSON.stringify(b[prop]))
                 rv[prop] = b[prop]; // Property changed
         }
         for (var prop in b) if (b.hasOwnProperty(prop) && !a.hasOwnProperty(prop)) {
@@ -3039,6 +3039,9 @@
         }
     }); 
 
+    function safariMultiStoreFix(storeNames) {
+        return storeNames.length === 1 ? storeNames[0] : storeNames;
+    }
 
     // Export our Promise implementation since it can be handy as a standalone Promise implementation
     Dexie.Promise = Promise;
@@ -3070,9 +3073,10 @@
     //
     Dexie.dependencies = {
         // Required:
-        indexedDB: window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB,
-        IDBKeyRange: window.IDBKeyRange || window.webkitIDBKeyRange,
-        IDBTransaction: window.IDBTransaction || window.webkitIDBTransaction,
+        // NOTE: The "_"-prefixed versions are for prioritizing IDB-shim on IOS8 before the native IDB in case the shim was included.
+        indexedDB: window._indexedDB || window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB,
+        IDBKeyRange: window._IDBKeyRange || window.IDBKeyRange || window.webkitIDBKeyRange,
+        IDBTransaction: window._IDBTransaction || window.IDBTransaction || window.webkitIDBTransaction,
         // Optional:
         Error: window.Error || String,
         SyntaxError: window.SyntaxError || String,
@@ -3081,7 +3085,7 @@
     }; 
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-    Dexie.version = 1.02;
+    Dexie.version = 1.03;
 
 
 
@@ -3090,6 +3094,6 @@
     // Publish the Dexie to browser or NodeJS environment.
     publish("Dexie", Dexie);
 
-}).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this === window)
+}).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this == window)
     ? [window, function (name, value) { window[name] = value; }, true]    // Adapt to browser environment
     : [global, function (name, value) { module.exports = value; }, false]); // Adapt to Node.js environment
