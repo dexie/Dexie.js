@@ -67,6 +67,7 @@
         var db = this;
         var pausedResumeables = [];
         var autoSchema = false;
+        var hasNativeGetDatabaseNames = !!getNativeGetDatabaseNamesFn();
 
         function init() {
             // If browser (not node.js or other), subscribe to versionchange event and reload page
@@ -531,9 +532,12 @@
                         else if (idbdb.objectStoreNames.length > 0)
                             adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
                         idbdb.onversionchange = db.on("versionchange").fire; // Not firing it here, just setting the function callback to any registered subscriber.
-                        globalDatabaseList(function (databaseNames) {
-                            if (databaseNames.indexOf(dbName) === -1) return databaseNames.push(dbName);
-                        });
+                        if (!hasNativeGetDatabaseNames) {
+                            // Update localStorage with list of database names
+                            globalDatabaseList(function (databaseNames) {
+                                if (databaseNames.indexOf(dbName) === -1) return databaseNames.push(dbName);
+                            });
+                        }
                         // Now, let any subscribers to the on("ready") fire BEFORE any other db operations resume!
                         // If an the on("ready") subscriber returns a Promise, we will wait til promise completes or rejects before 
                         Promise.newPSD(function () {
@@ -588,10 +592,12 @@
                     db.close();
                     var req = indexedDB.deleteDatabase(dbName);
                     req.onsuccess = function () {
-                        globalDatabaseList(function (databaseNames) {
-                            var pos = databaseNames.indexOf(dbName);
-                            if (pos >= 0) return databaseNames.splice(pos, 1);
-                        });
+                        if (!hasNativeGetDatabaseNames) {
+                            globalDatabaseList(function(databaseNames) {
+                                var pos = databaseNames.indexOf(dbName);
+                                if (pos >= 0) return databaseNames.splice(pos, 1);
+                            });
+                        }
                         resolve();
                     };
                     req.onerror = eventRejectHandler(reject, ["deleting", dbName]);
@@ -2874,7 +2880,9 @@
     }
 
     function globalDatabaseList(cb) {
-        var val;
+        var val,
+            localStorage = Dexie.dependencies.localStorage;
+        if (!localStorage) return cb([]); // Envs without localStorage support
         try {
             val = JSON.parse(localStorage.getItem('Dexie.DatabaseNames') || "[]");
         } catch (e) {
@@ -2956,8 +2964,9 @@
     //
     Dexie.getDatabaseNames = function (cb) {
         return new Promise(function (resolve, reject) {
-            if ('webkitGetDatabaseNames' in indexedDB || 'getDatabaseNames' in indexedDB) { // In case getDatabaseNames() becomes standard, let's prepare to support it:
-                var req = ('getDatabaseNames' in indexedDB ? indexedDB.getDatabaseNames() : indexedDB.webkitGetDatabaseNames());
+            var getDatabaseNames = getNativeGetDatabaseNamesFn();
+            if (getDatabaseNames) { // In case getDatabaseNames() becomes standard, let's prepare to support it:
+                var req = getDatabaseNames();
                 req.onsuccess = function (event) {
                     resolve([].slice.call(event.target.result, 0)); // Converst DOMStringList to Array<String>
                 }; 
@@ -3081,15 +3090,18 @@
         Error: window.Error || String,
         SyntaxError: window.SyntaxError || String,
         TypeError: window.TypeError || String,
-        DOMError: window.DOMError || String
+        DOMError: window.DOMError || String,
+        localStorage: window.localStorage // Optional. Only needed on non-chromium browsers for Dexie.getDatabaseNames() to work
     }; 
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
     Dexie.version = 1.03;
 
-
-
-
+    function getNativeGetDatabaseNamesFn() {
+        var indexedDB = Dexie.dependencies.indexedDB;
+        var fn = (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
+        return fn && fn.bind(indexedDB);
+    }
 
     // Publish the Dexie to browser or NodeJS environment.
     publish("Dexie", Dexie);
