@@ -3091,7 +3091,7 @@
         SyntaxError: window.SyntaxError || String,
         TypeError: window.TypeError || String,
         DOMError: window.DOMError || String,
-        localStorage: window.localStorage // Optional. Only needed on non-chromium browsers for Dexie.getDatabaseNames() to work
+        localStorage: ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : window.localStorage)
     }; 
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
