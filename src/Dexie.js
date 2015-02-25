@@ -1971,6 +1971,7 @@
                                 failures.push(e);
                                 failKeys.push(thisContext.primKey);
                                 if (thisContext.onerror) thisContext.onerror(e);
+                                checkFinished();
                                 return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
                             }, bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]);
                             req.onsuccess = function (ev) {
