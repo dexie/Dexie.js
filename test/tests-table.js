@@ -276,6 +276,23 @@
             ok(false, e);
         }).finally(start);
     });
+	asyncTest("delete nonexisting item", 3, function () {
+		var numUsers;
+		db.users.count().then(function(count) {
+			numUsers = count;
+			ok(true, "Number of users before delete: " + count);
+		}).then(function() {
+			return db.users.delete(98);
+		}).then(function(){
+			ok(true, "Success even though nothing was deleted");
+		}).then(function(){
+			return db.users.count();
+		}).then(function(count){
+			equal(numUsers, count, "Just verifying number of items in user table is still same");
+		}).catch(function (err) {
+			ok(false, "Got error: " + err);
+		}).finally (start);
+	});
     asyncTest("clear", function () {
         db.transaction("rw", "users", function () {
             db.users.count(function (count) {
