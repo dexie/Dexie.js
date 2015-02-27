@@ -41,8 +41,9 @@
         return overridedFactory(origFunc);
     }
 
-    function Dexie(dbName) {
-
+    function Dexie(dbName, options) {
+        /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
+        var addons = (options && options.addons) || Dexie.addons;
         // Resolve all external dependencies:
         var deps = Dexie.dependencies;
         var indexedDB = deps.indexedDB,
@@ -622,7 +623,10 @@
         }; 
         this.hasFailed = function () {
             return dbOpenError !== null;
-        }; 
+        };
+        this.dynamicallyOpened = function() {
+            return autoSchema;
+        }
 
         /*this.dbg = function (collection, counter) {
             if (!this._dbgResult || !this._dbgResult[counter]) {
@@ -2196,7 +2200,7 @@
 
         init();
 
-        Dexie.addons.forEach(function (fn) {
+        addons.forEach(function (fn) {
             fn(db);
         });
     }
