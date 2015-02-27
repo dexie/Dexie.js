@@ -692,7 +692,8 @@
             // Let scopeFunc be the last argument
             scopeFunc = arguments[arguments.length - 1];
             var parentTransaction = Promise.PSD && Promise.PSD.trans;
-            if (mode.indexOf('!') !== -1) parentTransaction = null; // Caller dont want to reuse existing transaction
+			// Check if parent transactions is bound to this db instance, and if caller wants to reuse it
+            if (!parentTransaction || parentTransaction.db !== db || mode.indexOf('!') !== -1) parentTransaction = null;
             var onlyIfCompatible = mode.indexOf('?') !== -1;
             mode = mode.replace('!', '').replace('?', '');
             //
@@ -722,10 +723,6 @@
             if (parentTransaction) {
                 // Basic checks
                 if (!error) {
-                    if (parentTransaction.db !== db) {
-                        if (onlyIfCompatible) parentTransaction = null; // Spawn new transaction instead.
-                        else error = new Error("Current transaction bound to different database instance");
-                    }
                     if (parentTransaction && parentTransaction.mode === READONLY && mode === READWRITE) {
                         if (onlyIfCompatible) parentTransaction = null; // Spawn new transaction instead.
                         else error = error || new Error("Cannot enter a sub-transaction with READWRITE mode when parent transaction is READONLY");
@@ -2032,8 +2029,9 @@
                                 configurable: true,
                                 enumerable: true,
                                 get: function () {
-                                    if (Promise.PSD && Promise.PSD.trans) {
-                                        return Promise.PSD.trans.tables[tableName];
+									var currentTrans = Promise.PSD && Promise.PSD.trans;
+                                    if (currentTrans && currentTrans.db === db) {
+                                        return currentTrans.tables[tableName];
                                     }
                                     return tableInstance;
                                 }

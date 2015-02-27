@@ -214,12 +214,12 @@
         var ourDB = new Dexie("TestDB2");
         ourDB.version(1).stores({ users: "++id,first,last,&username,&*email,*pets" });
         ourDB.on("populate", function () {
-            db.users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
-            db.users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
+            ourDB.users.add({ first: "Daniel", last: "Fahlenius", username: "dfahlenius", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
+            ourDB.users.add({ first: "Carl", last: "Cedersköld", username: "cceder", email: ["karl@ceder.what"], pets: [] });
         });
         var errorCount = 0;
         ourDB.on("error", function (e) {
-            ok(errorCount < 3, "Uncatched error successfully bubbled to db.on('error'): " + e);
+            ok(errorCount < 3, "Uncatched error successfully bubbled to ourDB.on('error'): " + e);
             if (++errorCount == 3) {
                 ourDB.delete().then(start);
             }
@@ -228,21 +228,21 @@
         ourDB.open();
 
         ourDB.transaction("rw", ourDB.users, function () {
-            db.users.add({ username: "dfahlander" }).then(function () {
+            ourDB.users.add({ username: "dfahlenius" }).then(function () {
                 ok(false, "Should not be able to add two users with same username");
             });
         }).then(function () {
             ok(false, "Transaction should not complete since errors wasnt catched");
         });
         ourDB.transaction("rw", ourDB.users, function () {
-            db.users.add({ username: "dfahlander" }).then(function () {
+            ourDB.users.add({ username: "dfahlenius" }).then(function () {
                 ok(false, "Should not be able to add two users with same username");
             });
         }).then(function () {
             ok(false, "Transaction should not complete since errors wasnt catched");
         });
         ourDB.transaction("rw", ourDB.users, function () {
-            db.users.add({ username: "dfahlander" }).then(function () {
+            ourDB.users.add({ username: "dfahlenius" }).then(function () {
                 ok(false, "Should not be able to add two users with same username");
             });
         }).then(function () {
@@ -286,7 +286,7 @@
         var popufail = new Dexie("PopufailDB");
         popufail.version(1).stores({ users: "++id,first,last,&username,&*email,*pets" });
         popufail.on('populate', function () {
-            db.users.add({ first: NaN, last: undefined, username: function () { } }).catch(function (e) {
+            popufail.users.add({ first: NaN, last: undefined, username: function () { } }).catch(function (e) {
                 ok(true, "Got error when catching add() operation: " + e);
                 return Dexie.Promise.reject(e);
             });

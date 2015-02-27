@@ -258,34 +258,6 @@
         }).finally(start);
     });
     
-    asyncTest("Transaction bound to different db instance", function () {
-
-        var counter = 0;
-        var db2 = new Dexie("TestDB2");
-        db2.version(1).stores({
-            users: "username",
-            pets: "++id,kind",
-            petsPerUser: "++,user,pet"
-        });
-        db2.open();
-        db.transaction('rw', "users", "pets", function () {
-            ok(true, "Entered outer transaction scope");
-            db2.transaction('rw', "users", "pets", function () {
-                ok(false, "Should not enter transaction scope when incompatible database instances");
-            }).catch(function (err) {
-                ok(true, "Got error: " + err);
-            }).finally(function () {
-                if (++counter == 2) db2.delete().then(start);
-            });
-        }).then(function () {
-            ok(false, "Main transaction should not resolve due to error in sub transaction");
-        }).catch(function (err) {
-            ok(true, "Got error: " + err);
-        }).finally(function() {
-            if (++counter == 2) db2.delete().then(start);
-        });
-    });
-
     //
     // Testing the "!" mode
     //
@@ -452,5 +424,37 @@
         }).finally(start);
     });
 
+	asyncTest("Transactions in multiple databases", function () {
+		var logDb = new Dexie("logger");
+		logDb.version(1).stores({
+			log: "++,time,type,message"
+		});
+		logDb.open();
+		var lastLogAddPromise;
+		db.transaction('rw', db.pets, function () {
+			// Test that a non-transactional add in the other DB can coexist with
+			// the current transaction on db:
+			logDb.log.add({time: new Date(), type: "info", message: "Now adding a dog"});
+			db.pets.add({kind: "dog"}).then(function(petId){
+				// Test that a transactional add in the other DB can coexist with
+				// the current transaction on db:
+				lastLogAddPromise = logDb.transaction('rw!', logDb.log, function (){
+					logDb.log.add({time: new Date(), type: "info", message: "Added dog got key " + petId});
+				});
+			});
+		}).then(function() {
+			return lastLogAddPromise; // Need to wait for the transaction of the other database to complete as well.
+		}).then(function(){
+			return logDb.log.toArray();
+		}).then(function (logItems) {
+			equal(logItems.length, 2, "Log has two items");
+			equal(logItems[0].message, "Now adding a dog", "First message in log is: " + logItems[0].message);
+			equal(logItems[1].message, "Added dog got key 1", "Second message in log is: " + logItems[1].message);
+		}).catch(function (err) {
+			ok(false, err);
+		}).finally(function(){
+			return logDb.delete();
+		}).finally(start);
+	});
 })();
 //debugger;
