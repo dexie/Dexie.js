@@ -13,7 +13,8 @@
         setByKeyPath = Dexie.setByKeyPath;
 
     Dexie.Syncable = function (db) {
-    	/// <param name="db" type="Dexie"></param>
+        /// <param name="db" type="Dexie"></param>
+
         var activePeers = [];
 
         // Change Types
@@ -674,11 +675,11 @@
                                     // Instead of waiting for each change to resolve, do all CREATE changes in bulks until another type of change is stepped upon.
                                     // This case is the only case that allows i to increment and the for-loop to continue since it does not return anything.
                                     var specifyKey = !table.schema.primKey.keyPath;
-                                    lastCreatePromise = (function (change) {
+                                    lastCreatePromise = (function (change, table, specifyKey) {
                                         return (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).catch("ConstraintError", function (e) {
                                             return (specifyKey ? table.put(change.obj, change.key) : table.put(change.obj));
                                         });
-                                    })(change);
+                                    })(change, table, specifyKey);
                                     change = changes[++offset];
                                     if (change) table = trans.tables[change.table];
                                 }
@@ -687,9 +688,7 @@
                                     // We did some CREATE changes but now stumbled upon another type of change.
                                     // Let's wait for the last CREATE change to resolve and then call applyChanges again at current position. Next time, lastCreatePromise will be null and a case below will happen.
                                     return lastCreatePromise.then(function () {
-                                        if (offset < changes.length) {
-                                            return applyChanges(changes, offset);
-                                        }
+                                        return (offset < changes.length ? applyChanges(changes, offset) : null);
                                     });
                                 }
 
