@@ -792,8 +792,13 @@
                                         return function (val) {
                                             var retval = fn2(val);
                                             if (--uncompletedRequests === 0 && trans.active) {
-                                                trans.active = false;
-                                                trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
+                                                // _rootExec needed so that we do not loose our main transaction
+                                                // There is a unit test that will fail if we remove this line:
+                                                //      "Chained operations in parent transaction hijacked by sub transaction"
+                                                Promise._rootExec(function() {
+                                                    trans.active = false;
+                                                    trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
+                                                });
                                             }
                                             return retval;
                                         }
@@ -1945,11 +1950,11 @@
                             Object.keys(changes).forEach(function (keyPath) {
                                 var val = changes[keyPath];
                                 if (getByKeyPath(item, keyPath) !== val) {
-                                    setByKeyPath(item, keyPath, changes[keyPath]);
+                                    setByKeyPath(item, keyPath, val);
                                     anythingModified = true;
                                 }
                             });
-                            if (additionalChanges) changes = shallowClone(origChanges); // Restore original changes.
+                            if (additionalChanges) changes = shallowClone(origChanges); // Restore original changes for next iteration
                             return anythingModified;
                         }; 
                     }
@@ -1980,6 +1985,9 @@
                                 ++successCount;
                                 checkFinished();
                             }; 
+                        } else if (thisContext.onsuccess) {
+                            // Hook will expect either onerror or onsuccess to always be called!
+                            thisContext.onsuccess(thisContext.value);
                         }
                     }
 
@@ -2296,18 +2304,36 @@
             try {
                 ret = cb(self._value);
                 if (!self._state && (!ret || typeof ret.then !== 'function' || ret._state !== false)) setCatched(self); // Caller did 'return Promise.reject(err);' - don't regard it as catched!
+                deferred.resolve(ret);
             } catch (e) {
                 var catched = deferred.reject(e);
                 if (!catched && self.onuncatched) {
-                    try { self.onuncatched(e); } catch (e) { }
+                    try {
+                        self.onuncatched(e);
+                    } catch (e) {
+                    }
                 }
-                return;
+            } finally {
+                if (isRootExec) {
+                    while (operationsQueue.length > 0) executeOperationsQueue();
+                    asap = _asap;
+                    isRootExecution = true;
+                }
             }
-            deferred.resolve(ret);
-            if (isRootExec) {
-                while(operationsQueue.length > 0) executeOperationsQueue();
-                asap = _asap;
-                isRootExecution = true;
+        }
+
+        function _rootExec(fn) {
+            var isRootExec = isRootExecution;
+            isRootExecution = false;
+            asap = enqueueImmediate;
+            try {
+                fn();
+            } finally {
+                if (isRootExec) {
+                    while (operationsQueue.length > 0) executeOperationsQueue();
+                    asap = _asap;
+                    isRootExecution = true;
+                }
             }
         }
 
@@ -2437,6 +2463,10 @@
             return p;
         };
 
+        Promise.prototype._then = function (onFulfilled, onRejected) {
+            handle(this, new Deferred(onFulfilled, onRejected, nop,nop));
+        };
+
         Promise.prototype['catch'] = function (onRejected) {
             if (arguments.length === 1) return this.then(null, onRejected);
             // First argument is the Error type to catch
@@ -2499,7 +2529,9 @@
             } finally {
                 Promise.PSD = outerScope;
             }
-        }; 
+        };
+
+        Promise._rootExec = _rootExec;
 
         return Promise;
     })();
