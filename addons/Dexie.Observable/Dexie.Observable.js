@@ -273,44 +273,77 @@
         function crudMonitor(table) {
             /// <param name="table" type="db.Table"></param>
             var tableName = table.name;
-            /*table.hook('creating').subscribe(function () { });
-            table.hook('updating').subscribe(function () { });*/
+
             table.hook('creating').subscribe (function (primKey, obj, trans) {
                 /// <param name="trans" type="db.Transaction"></param>
                 var rv = undefined;
                 if (primKey === undefined && table.schema.primKey.uuid) {
                     primKey = rv = Dexie.createUUID();
+                    if (table.schema.primKey.keyPath) {
+                        Dexie.setByKeyPath(obj, table.schema.primKey.keyPath, primKey);
+                    }
                 }
 
-                // Wait for onsuccess so that we have the primKey if it is auto-incremented.
-                // Also, only add the change if operation succeeds. Caller might catch the error to prohibit transaction
-                // from being aborted. If not waiting for onsuccess we would add the change to _changes even thought it wouldnt succeed.
-                this.onsuccess = function (primKey) {
-                    
-                    trans.tables._changes.add({
-                        source: trans.source || null, // If a "source" is marked on the transaction, store it. Useful for observers that want to ignore their own changes.
-                        table: tableName,
-                        key: primKey,
-                        type: CREATE,
-                        obj: obj
-                    }).then(function (rev) {
-                        trans._lastWrittenRevision = rev;
-                    });
-
+                var change = {
+                    source: trans.source || null, // If a "source" is marked on the transaction, store it. Useful for observers that want to ignore their own changes.
+                    table: tableName,
+                    key: primKey === undefined ? null : primKey,
+                    type: CREATE,
+                    obj: obj
                 };
+
+                var promise = trans.tables._changes.add(change).then(function(rev) {
+                    trans._lastWrittenRevision = Math.max(trans._lastWrittenRevision, rev);
+                    return rev;
+                });
+
+                // Wait for onsuccess so that we have the primKey if it is auto-incremented and update the change item if so.
+                this.onsuccess = function(resultKey) {
+                    if (primKey != resultKey)
+                        promise._then(function() {
+                            change.key = resultKey;
+                            trans.tables._changes.put(change);
+                        });
+                }
+                this.onerror = function(err) {
+                    // If the main operation fails, make sure to regret the change
+                    promise._then(function(rev) {
+                        // Will only happen if app code catches the main operation error to prohibit transaction from aborting.
+                        trans.tables._changes.delete(rev);
+                    });
+                }
+
                 return rv;
             });
+
             table.hook('updating').subscribe(function (mods, primKey, oldObj, trans) {
                 /// <param name="trans" type="db.Transaction"></param>
-                this.onsuccess = function (newObj) {
-                    // Only add change if the operation succeeds.
-                    var modsWithoutUndefined = Dexie.deepClone(mods);
-                    for (var prop in modsWithoutUndefined) {
-                        if (typeof modsWithoutUndefined[prop] === 'undefined') {
-                            modsWithoutUndefined[prop] = null; // Null is as close we could come to deleting a property when not allowing undefined.
+                // mods may contain property paths with undefined as value if the property
+                // is being deleted. Since we cannot persist undefined we need to act
+                // like those changes is setting the value to null instead.
+                var modsWithoutUndefined = {};
+                // As of current Dexie version (1.0.3) hook may be called even if it wouldnt really change.
+                // Therefore we may do that kind of optimization here - to not add change entries if
+                // there's nothing to change.
+                var anythingChanged = false;
+                var newObj = Dexie.deepClone(oldObj);
+                for (var propPath in mods) {
+                    var mod = mods[propPath];
+                    if (typeof mod === 'undefined') {
+                        Dexie.delByKeyPath(newObj, propPath);
+                        modsWithoutUndefined[propPath] = null; // Null is as close we could come to deleting a property when not allowing undefined.
+                        anythingChanged = true;
+                    } else {
+                        var currentValue = Dexie.getByKeyPath(oldObj, propPath);
+                        if (mod !== currentValue && JSON.stringify(mod) !== JSON.stringify(currentValue)) {
+                            Dexie.setByKeyPath(newObj, propPath, mod);
+                            modsWithoutUndefined[propPath] = mod;
+                            anythingChanged = true;
                         }
                     }
-                    trans.tables._changes.add({
+                }
+                if (anythingChanged) {
+                    var change = {
                         source: trans.source || null, // If a "source" is marked on the transaction, store it. Useful for observers that want to ignore their own changes.
                         table: tableName,
                         key: primKey,
@@ -318,23 +351,42 @@
                         mods: modsWithoutUndefined,
                         oldObj: oldObj,
                         obj: newObj
-                    }).then(function (rev) {
-                        trans._lastWrittenRevision = rev;
-                    });
-
-                };
+                    };
+                    var promise = trans.tables._changes.add(change); // Just so we get the correct revision order of the update...
+                    this.onsuccess = function() {
+                        promise._then(function(rev) {
+                            trans._lastWrittenRevision = Math.max(trans._lastWrittenRevision, rev);
+                        });
+                    };
+                    this.onerror = function(err) {
+                        // If the main operation fails, make sure to regret the change.
+                        promise._then(function(rev) {
+                            // Will only happen if app code catches the main operation error to prohibit transaction from aborting.
+                            trans.tables._changes.delete(rev);
+                        });
+                    };
+                }
             });
+
             table.hook('deleting').subscribe(function (primKey, obj, trans) {
                 /// <param name="trans" type="db.Transaction"></param>
-                this.onsuccess = function () {
-                    trans.tables._changes.add({
-                        source: trans.source || null, // If a "source" is marked on the transaction, store it. Useful for observers that want to ignore their own changes.
-                        table: tableName,
-                        key: primKey,
-                        type: DELETE,
-                        oldObj: obj
-                    }).then(function (rev) {
-                        trans._lastWrittenRevision = rev;
+                var promise = trans.tables._changes.add({
+                    source: trans.source || null, // If a "source" is marked on the transaction, store it. Useful for observers that want to ignore their own changes.
+                    table: tableName,
+                    key: primKey,
+                    type: DELETE,
+                    oldObj: obj
+                }).then(function (rev) {
+                    trans._lastWrittenRevision = Math.max(trans._lastWrittenRevision, rev);
+                    return rev;
+                });
+                this.onerror = function () {
+                    // If the main operation fails, make sure to regret the change.
+                    // Using _then because if promise is already fullfilled, the standard then() would
+                    // do setTimeout() and we would loose the transaction.
+                    promise._then(function (rev) {
+                        // Will only happen if app code catches the main operation error to prohibit transaction from aborting.
+                        trans.tables._changes.delete(rev);
                     });
                 };
             });
@@ -439,7 +491,7 @@
                         throw new Error("Browser is shutting down");
                     } else {
                         db.close();
-                        alert("Out of sync"); // TODO: What to do? Reload the page?
+                        console.error("Out of sync"); // TODO: What to do? Reload the page?
                         window.location.reload(true);
                         throw new Error("Out of sync"); // Will make current promise reject
                     }
