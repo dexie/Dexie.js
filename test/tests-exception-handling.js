@@ -304,6 +304,43 @@
         });
     });
 
+    asyncTest("Issue#73 Catching default error where specific error has already been declared in a previous catch clause(A)", function () {
+        function CustomError() { }
+
+        var wasCatched = false;
+        new Dexie.Promise(function (resolve, reject) {
+            setTimeout(function () {
+                reject(new Error("apa"));
+            }, 0);
+        }).then(function () {
+            ok(false, "Should not come here");
+        }).catch(CustomError, function (e) {
+            ok(false, "Should not come here");
+        }).catch(function (e) {
+            wasCatched = true;
+        }).finally(function () {
+            ok(wasCatched, "The error was catched in the generic catcher");
+            start();
+        });
+    });
+
+    asyncTest("Issue#73 Catching default error where specific error has already been declared in a previous catch clause(B)", function () {
+        function CustomError() { }
+
+        var wasCatched = false;
+        Dexie.Promise.resolve(null).then(function () {
+            throw new Error("apa");
+        }).then(function () {
+            ok(false, "Should not come here");
+        }).catch(CustomError, function (e) {
+            ok(false, "Should not come here");
+        }).catch(function (e) {
+            wasCatched = true;
+        }).finally(function () {
+            ok(wasCatched, "The error was catched in the generic catcher");
+            start();
+        });
+    });
 
 })();
 

@@ -1,4 +1,4 @@
-﻿///<reference path="qunit.js" />
+///<reference path="qunit.js" />
 ///<reference path="../src/Dexie.js" />
 (function () {
     var db = new Dexie("TestDB");
@@ -456,5 +456,29 @@
 			return logDb.delete();
 		}).finally(start);
 	});
+
+	asyncTest("Issue #71 If returning a Promise from from a sub transaction, parent transaction will abort", function () {
+        db.transaction('rw', db.users, db.pets, function () {
+            ok(true, "Entered parent transaction");
+            ok(true, "Now adding Gunnar in parent transaction");
+            db.users.add({ username: "Gunnar" }).then(function() {
+                ok(true, "First add on parent transaction finished. Now adding another object in parent transaction.");
+                db.pets.add({ kind: "cat", name: "Garfield" }).then(function() {
+                    ok(true, "Successfully added second object in parent transaction.");
+                }).catch(function(err) {
+                    ok(false, "Failed to add second object in parent transaction: " + err.stack || err);
+                });
+            });
+
+            db.transaction('rw', db.users, function() {
+                ok(true, "Entered sub transaction");
+                return db.users.add({ username: "JustAnnoyingMyParentTransaction" }).then(function() {
+                    ok(true, "Add on sub transaction succeeded");
+                }).catch(function(err) {
+                    ok(false, "Failed to add object in sub transaction: " + err.stack || err);
+                });
+            });
+        }).finally(start);
+    });
 })();
-//debugger;
+

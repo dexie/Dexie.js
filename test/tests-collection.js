@@ -1,4 +1,5 @@
-﻿///<reference path="run-unit-tests.html" />
+﻿///<reference path="../src/Dexie.js" />
+///<reference path="qunit.js" />
 
 (function () {
     var db = new Dexie("TestDB");
@@ -536,4 +537,19 @@
         });
     });
 
+    asyncTest("Promise chain from within each() operation", 2, function () {
+        db.transaction('r', db.users, function() {
+            db.users.each(function(user) {
+                db.users.where('id').equals(user.id).first(function(usr) {
+                    return db.users.where('id').equals(usr.id).first();
+                }).then(function(u) {
+                    return u;
+                }).then(function(u2) {
+                    equal(u2.id, user.id, "Could get the same user after some chains of Promise.resolve()");
+                });
+            });
+        }).catch(function(err) {
+            ok(false, err.stack || err);
+        }).finally(start);
+    });
 })();
