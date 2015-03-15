@@ -1453,23 +1453,23 @@
                     includeUpper = includeUpper === true;    // Default to false
                     if ((lower > upper) ||
                         (lower === upper && (includeLower || includeUpper) && !(includeLower && includeUpper)))
-                        return new this._ctx.collClass(this, IDBKeyRange.only(lower)).limit(0); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
-                    return new this._ctx.collClass(this, IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper));
+                        return new this._ctx.collClass(this, function() { return IDBKeyRange.only(lower); }).limit(0); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
+                    return new this._ctx.collClass(this, function() { return IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper); });
                 },
                 equals: function (value) {
-                    return new this._ctx.collClass(this, IDBKeyRange.only(value));
+                    return new this._ctx.collClass(this, function() { return IDBKeyRange.only(value); });
                 },
                 above: function (value) {
-                    return new this._ctx.collClass(this, IDBKeyRange.lowerBound(value, true));
+                    return new this._ctx.collClass(this, function() { return IDBKeyRange.lowerBound(value, true); });
                 },
                 aboveOrEqual: function (value) {
-                    return new this._ctx.collClass(this, IDBKeyRange.lowerBound(value));
+                    return new this._ctx.collClass(this, function() { return IDBKeyRange.lowerBound(value); });
                 },
                 below: function (value) {
-                    return new this._ctx.collClass(this, IDBKeyRange.upperBound(value, true));
+                    return new this._ctx.collClass(this, function() { return IDBKeyRange.upperBound(value, true); });
                 },
                 belowOrEqual: function (value) {
-                    return new this._ctx.collClass(this, IDBKeyRange.upperBound(value));
+                    return new this._ctx.collClass(this, function() { return IDBKeyRange.upperBound(value); });
                 },
                 startsWith: function (str) {
                     /// <param name="str" type="String"></param>
@@ -1480,7 +1480,7 @@
                     /// <param name="str" type="String"></param>
                     if (typeof str !== 'string') return fail(new this._ctx.collClass(this), new TypeError("String expected"));
                     if (str === "") return this.startsWith(str);
-                    var c = new this._ctx.collClass(this, IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase() + String.fromCharCode(65535)));
+                    var c = new this._ctx.collClass(this, function() { return IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase() + String.fromCharCode(65535)); });
                     addIgnoreCaseAlgorithm(c, function (a, b) { return a.indexOf(b) === 0; }, str);
                     c._ondirectionchange = function () { fail(c, new Error("reverse() not supported with WhereClause.startsWithIgnoreCase()")); };
                     return c;
@@ -1488,7 +1488,7 @@
                 equalsIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
                     if (typeof str !== 'string') return fail(new this._ctx.collClass(this), new TypeError("String expected"));
-                    var c = new this._ctx.collClass(this, IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase()));
+                    var c = new this._ctx.collClass(this, function() { return IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase()); });
                     addIgnoreCaseAlgorithm(c, function (a, b) { return a === b; }, str);
                     return c;
                 },
@@ -1501,7 +1501,7 @@
                     var compare = isCompound ? compoundCompare(ascending) : ascending;
                     set.sort(compare);
                     if (set.length === 0) return new this._ctx.collClass(this, IDBKeyRange.only("")).limit(0); // Return an empty collection.
-                    var c = new this._ctx.collClass(this, IDBKeyRange.bound(set[0], set[set.length - 1]));
+                    var c = new this._ctx.collClass(this, function () { return IDBKeyRange.bound(set[0], set[set.length - 1]); });
                     
                     c._ondirectionchange = function (direction) {
                         compare = (direction === "next" ? ascending : descending);
@@ -1545,12 +1545,19 @@
         //
         //
         //
-        function Collection(whereClause, keyRange) {
+        function Collection(whereClause, keyRangeGenerator) {
             /// <summary>
             /// 
             /// </summary>
             /// <param name="whereClause" type="WhereClause">Where clause instance</param>
-            /// <param name="keyRange" type="IDBKeyRange" optional="true"></param>
+            /// <param name="keyRangeGenerator" value="function(){ return IDBKeyRange.bound(0,1);}" optional="true"></param>
+            var keyRange = null, error = null;
+            if (keyRangeGenerator) try {
+                keyRange = keyRangeGenerator();
+            } catch (ex) {
+                error = ex;
+            }
+
             var whereCtx = whereClause._ctx;
             this._ctx = {
                 table: whereCtx.table,
@@ -1565,9 +1572,9 @@
                 isMatch: null,
                 offset: 0,
                 limit: Infinity,
-                error: null, // If set, any promise must be rejected with this error
+                error: error, // If set, any promise must be rejected with this error
                 or: whereCtx.or
-            }; 
+            };
         }
 
         extend(Collection.prototype, function () {

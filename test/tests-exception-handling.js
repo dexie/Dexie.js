@@ -342,5 +342,89 @@
         });
     });
 
+    asyncTest("Issue #67 - Exception can be thrown in WhereClause methods", function() {
+        try {
+            Dexie.Promise.all([
+                // WhereClause.equals()
+                db.users.where('first').equals(false) // Using a non-valid key (boolean) must fail but as a Promise rejection, not an exception.
+                .toArray()
+                .catch(function(err) {
+                    ok(true, "Invalid key passed to WhereClause.equals() returned as a failed Promise and not an exception.");
+                }),
+                // WhereClause.above()
+                db.users.where('first').above(undefined) // Using a non-valid key (undefined) must fail but as a Promise rejection, not an exception.
+                .toArray()
+                .catch(function(err) {
+                    ok(true, "Invalid key passed to WhereClause.above() returned as a failed Promise and not an exception.");
+                }),
+                // WhereClause.aboveOrEqual()
+                db.users.where('first').aboveOrEqual(undefined) // Using a non-valid key (undefined) must fail but as a Promise rejection, not an exception.
+                .toArray()
+                .catch(function(err) {
+                    ok(true, "Invalid key passed to WhereClause.aboveOrEqual() returned as a failed Promise and not an exception.");
+                }),
+                // WhereClause.below()
+                db.users.where('first').below(undefined) // Using a non-valid key (undefined) must fail but as a Promise rejection, not an exception.
+                .toArray()
+                .catch(function(err) {
+                    ok(true, "Invalid key passed to WhereClause.below() returned as a failed Promise and not an exception.");
+                }),
+                // WhereClause.belowOrEqual()
+                db.users.where('first').belowOrEqual(undefined) // Using a non-valid key (undefined) must fail but as a Promise rejection, not an exception.
+                .toArray()
+                .catch(function(err) {
+                    ok(true, "Invalid key passed to WhereClause.belowOrEqual() returned as a failed Promise and not an exception.");
+                }),
+                // WhereClause.anyOf()
+                db.users.where('first').anyOf([undefined, null, false]) // Using a non-valid key (undefined, false) must fail but as a Promise rejection, not an exception.
+                .toArray()
+                .catch(function(err) {
+                    ok(true, "Invalid key passed to WhereClause.anyOf() returned as a failed Promise and not an exception.");
+                }),
+                // WhereClause.between()
+                db.users.where('first').between(false, true) // Using a non-valid key (boolean) must fail but as a Promise rejection, not an exception.
+                .toArray()
+                .catch(function(err) {
+                    ok(true, "Invalid key passed to WhereClause.between() returned as a failed Promise and not an exception.");
+                }),
+                // WhereClause.equalsIgnoreCase()
+                db.users.where('first').equalsIgnoreCase(undefined) // Using a non-valid key (undefined) must fail but as a Promise rejection, not an exception.
+                .toArray()
+                .catch(function(err) {
+                    ok(true, "Invalid key passed to WhereClause.equalsIgnoreCase() returned as a failed Promise and not an exception.");
+                }),
+                // WhereClause.startsWith()
+                db.users.where('first').startsWith(undefined) // Using a non-valid key (undefined) must fail but as a Promise rejection, not an exception.
+                .toArray()
+                .catch(function(err) {
+                    ok(true, "Invalid key passed to WhereClause.startsWith() returned as a failed Promise and not an exception.");
+                }),
+                // WhereClause.startsWithIgnoreCase()
+                db.users.where('first').startsWithIgnoreCase(undefined) // Using a non-valid key (undefined) must fail but as a Promise rejection, not an exception.
+                .toArray()
+                .catch(function(err) {
+                    ok(true, "Invalid key passed to WhereClause.startsWithIgnoreCase() returned as a failed Promise and not an exception.");
+                })
+            ]).catch(function() {
+                ok(false, "No promise should finally reject because we catch them all explicitely.")
+            }).finally(start);
+        } catch (ex) {
+            ok(false, "Error was not encapsulated as a Promise failure: " + (ex.stack || ex));
+            start();
+        }
+    });
+
+    asyncTest("Issue #67 - Regression test - Transaction still fails if error in key", function () {
+        db.transaction('rw', db.users, function () {
+            db.users.where('first').above("").delete().then(function (num) {
+                ok(true, num + " users deleted");
+                db.users.where('first').above(undefined).delete();
+            });
+        }).then(function() {
+            ok(false, "Transaction should not commit when we an unhandled error has happened");
+        }).catch(function(err) {
+            ok(true, "Good, transaction failed as expected");
+        }).finally(start);
+    });
 })();
 
