@@ -184,3 +184,66 @@ asyncTest("Dexie.getDatabaseNames", 11, function () {
         });
     });
 });
+
+asyncTest("Issue #76 Dexie inside Web Worker", function () {
+    //
+    // Imports to include from the web worker:
+    //
+    var imports = ["../src/Dexie.js"];
+
+    //
+    // Code to execute in the web worker:
+    //
+    function CodeToExecuteInWebWorker(ok, done) {
+        ok(true, "Could enter the web worker");
+
+        var db = new Dexie("codeFromWorker");
+        ok(true, "Could create a Dexie instance from within a web worker");
+
+        db.version(1).stores({ table1: "++" });
+        ok(true, "Could define schema");
+
+        db.open();
+        ok(true, "Could open the database");
+
+        db.transaction('rw', db.table1, function() {
+            ok(true, "Could create a transaction");
+            db.table1.add({ name: "My first object" }).then(function(id) {
+                ok(true, "Could add object that got id " + id);
+            }).catch(function(err) {
+                ok(false, "Got error: err");
+            });
+        }).then(function () {
+            ok(true, "Transaction committed");
+        }).catch(function(err) {
+            ok(false, "Transaction failed");
+        }).finally(done);
+    }
+
+    //
+    // Frameworking...
+    //
+    if (!window.Worker) {
+        ok(false, "WebWorkers not supported");
+        start();
+        return;
+    }
+
+    var worker = new Worker("worker.js");
+    worker.postMessage({
+        imports: imports,
+        code: CodeToExecuteInWebWorker.toString()
+    });
+
+    worker.onmessage = function(e) {
+        switch (e.data[0]) {
+        case "ok":
+            ok(e.data[1], e.data[2]);
+            break;
+        case "done":
+            worker.terminate();
+            start();
+            break;
+        }
+    }
+});
