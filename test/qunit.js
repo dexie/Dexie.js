@@ -260,13 +260,13 @@ config = {
 		},
 	    {
 	        id: "polyfillIE",
-	        label: "Include IE Polyfill",
-            tooltip: "Enabling this will include the idb-iegap polyfill that makes IE10&IE11 support multiEntry and compound indexes as well as compound primary keys"
+	        label: "idb-iegap polyfill",
+            tooltip: "Enabling this will include the idb-iegap polyfill that makes IE10/IE11 support multiEntry and compound indexes as well as compound primary keys"
 	    },
 	    {
 	        id: "indexedDBShim",
-	        label: "IndexedDBShim (UseWebSQL as backend)",
-            tooltip: "Enable this in Safari browsers without indexedDB support or with poor indexedDB support"
+	        label: "IndexedDBShim (WebSQL as backend)",
+            tooltip: "If enabled in browsers with WebSQL support (Safari,Chrome or Opera) all indexedDB calls will go through IndexedDBShim with WebSQL as backend"
 	    }
 	],
 
@@ -2322,8 +2322,8 @@ if ( typeof module !== "undefined" && module.exports ) {
 
 // Include optional polyfills
 if (window.location.search.indexOf('polyfillIE=true') != -1) {
-    document.write('<script src="https://rawgit.com/dfahlander/idb-iegap/master/idb-iegap.min.js">\x3C/script>');
+    document.write('<script src="https://rawgit.com/dfahlander/idb-iegap/master/idb-iegap.js">\x3C/script>');
 }
 if (window.location.search.indexOf('indexedDBShim=true') != -1) {
-    document.write('<script src="https://rawgit.com/axemclion/IndexedDBShim/master/dist/IndexedDBShim.min.js">\x3C/script>');
+    document.write('<script src="https://rawgit.com/axemclion/IndexedDBShim/master/dist/IndexedDBShim.js">\x3C/script>');
 }
