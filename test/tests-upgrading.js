@@ -238,22 +238,27 @@
                 }
 
                 req = indexedDB.open("raw-db", 2);
-                req.onupgradeneeded = function(ev) {
-                    console.log("onupgradeneeded called");
-                    rawdb = req.result;
-                    // Stores
-                    var people = rawdb.createObjectStore("people", { keyPath: "_id", autoIncrement: false });
-                    var messages = rawdb.createObjectStore("messages", { autoIncrement: true });
-                    var umbrellas = rawdb.createObjectStore("umbrellas", { keyPath: ["date", "time"] });
-                    // Indexes:
-                    messages.createIndex("text_index", "text", { unique: false, multiEntry: false });
-                    messages.createIndex("words_index", "words", { unique: false, multiEntry: true });
-                    messages.createIndex("id_index", "id", { unique: true, multiEntry: false });
-                    umbrellas.createIndex("size_color_index", ["size", "color"], { unique: false, multiEntry: false });
-                    // Data:
-                    people.add({ _id: "9AF56447-66CE-470A-A70F-674A32EF2D51", name: "Kalle" });
-                    messages.add({ text: "Here is a text", words: ["here", "is", "a", "text"], id: 1 });
-                    umbrellas.add({ date: "2014-11-20", time: "22:18", size: 98, color: "pink", name: "My Fine Umbrella!" });
+                req.onupgradeneeded = function (ev) {
+                    try {
+                        console.log("onupgradeneeded called");
+                        rawdb = req.result;
+                        // Stores
+                        var people = rawdb.createObjectStore("people", { keyPath: "_id", autoIncrement: false });
+                        var messages = rawdb.createObjectStore("messages", { autoIncrement: true });
+                        var umbrellas = rawdb.createObjectStore("umbrellas", { keyPath: ["date", "time"] });
+                        // Indexes:
+                        messages.createIndex("text_index", "text", { unique: false, multiEntry: false });
+                        messages.createIndex("words_index", "words", { unique: false, multiEntry: true });
+                        messages.createIndex("id_index", "id", { unique: true, multiEntry: false });
+                        umbrellas.createIndex("size_color_index", ["size", "color"], { unique: false, multiEntry: false });
+                        // Data:
+                        people.add({ _id: "9AF56447-66CE-470A-A70F-674A32EF2D51", name: "Kalle" });
+                        messages.add({ text: "Here is a text", words: ["here", "is", "a", "text"], id: 1 });
+                        umbrellas.add({ date: "2014-11-20", time: "22:18", size: 98, color: "pink", name: "My Fine Umbrella!" });
+                    } catch (ex) {
+                        if (rawdb) rawdb.close();
+                        reject(ex);
+                    }
                 }
                 req.onsuccess = function() {
                     console.log("onsuccess called");
@@ -345,9 +350,10 @@
             ok(!!kalle, "Could find at least one object by its name index");
             equal(kalle.name, "Kalle", "The found object was Kalle indeed");
         }).catch(function (err) {
-            ok(false, "Error: " + err);
+            ok(false, "Error (expected in IE10/IE11 without iegap polyfill because we are testing compound indexes): " + err);
         }).finally(function () {
-            db.delete().then(start);
+            if (db) db.close();
+            Dexie.delete("raw-db").then(start);
         });
     });
 

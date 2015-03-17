@@ -3122,12 +3122,13 @@
     //
     // In node.js, however, these properties must be set "manually" before instansiating a new Dexie(). For node.js, you need to require indexeddb-js or similar and then set these deps.
     //
+    var idbshim = window.idbModules || {};
     Dexie.dependencies = {
         // Required:
         // NOTE: The "_"-prefixed versions are for prioritizing IDB-shim on IOS8 before the native IDB in case the shim was included.
-        indexedDB: window._indexedDB || window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB,
-        IDBKeyRange: window._IDBKeyRange || window.IDBKeyRange || window.webkitIDBKeyRange,
-        IDBTransaction: window._IDBTransaction || window.IDBTransaction || window.webkitIDBTransaction,
+        indexedDB: idbshim.shimIndexedDB || window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB,
+        IDBKeyRange: idbshim.IDBKeyRange || window.IDBKeyRange || window.webkitIDBKeyRange,
+        IDBTransaction: idbshim.IDBTransaction || window.IDBTransaction || window.webkitIDBTransaction,
         // Optional:
         Error: window.Error || String,
         SyntaxError: window.SyntaxError || String,

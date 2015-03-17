@@ -257,7 +257,17 @@ config = {
 			id: "notrycatch",
 			label: "No try-catch",
 			tooltip: "Enabling this will run tests outside of a try-catch block. Makes debugging exceptions in IE reasonable. Stored as query-strings."
-		}
+		},
+	    {
+	        id: "polyfillIE",
+	        label: "Include IE Polyfill",
+            tooltip: "Enabling this will include the idb-iegap polyfill that makes IE10&IE11 support multiEntry and compound indexes as well as compound primary keys"
+	    },
+	    {
+	        id: "indexedDBShim",
+	        label: "IndexedDBShim (UseWebSQL as backend)",
+            tooltip: "Enable this in Safari browsers without indexedDB support or with poor indexedDB support"
+	    }
 	],
 
 	// Set of all modules.
@@ -1279,7 +1289,18 @@ Test.prototype = {
 			this.testEnvironment.setup.call( this.testEnvironment, QUnit.assert );
 			return;
 		}
-		try {
+        /*
+		if (config.polyfillIE && ![].slice.call(document.getElementsByTagName("script")).some(function (s) { return s.src.indexOf("idb-iegap") != -1; })) {
+		    var scriptTag = document.createElement('script');
+		    scriptTag.src = "https://rawgit.com/dfahlander/idb-iegap/master/idb-iegap.min.js";
+		    document.head.appendChild(scriptTag);
+		}
+	    if (config.indexedDBShim && ![].slice.call(document.getElementsByTagName("script")).some(function(s) { return s.src.indexOf("IndexedDBShim") != -1; })) {
+	        var scriptTag = document.createElement('script');
+	        scriptTag.src = "https://rawgit.com/axemclion/IndexedDBShim/master/dist/IndexedDBShim.min.js";
+	        document.head.appendChild(scriptTag);
+	    }*/
+	    try {
 			this.testEnvironment.setup.call( this.testEnvironment, QUnit.assert );
 		} catch( e ) {
 			QUnit.pushFailure( "Setup failed on " + this.testName + ": " + ( e.message || e ), extractStacktrace( e, 1 ) );
@@ -2298,3 +2319,11 @@ if ( typeof module !== "undefined" && module.exports ) {
 }( (function() {
 	return this;
 })() ));
+
+// Include optional polyfills
+if (window.location.search.indexOf('polyfillIE=true') != -1) {
+    document.write('<script src="https://rawgit.com/dfahlander/idb-iegap/master/idb-iegap.min.js">\x3C/script>');
+}
+if (window.location.search.indexOf('indexedDBShim=true') != -1) {
+    document.write('<script src="https://rawgit.com/axemclion/IndexedDBShim/master/dist/IndexedDBShim.min.js">\x3C/script>');
+}

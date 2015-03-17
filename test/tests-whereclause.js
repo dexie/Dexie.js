@@ -271,7 +271,7 @@
         }).then(function(santas) {
             equal(santas.length, 2, "Got two santas");
         }).catch(function (e) {
-            ok(false, e);
+            ok(false, "Failed (will fail in IE without polyfill):" + e);
         }).finally(start);
     });
 
@@ -285,8 +285,7 @@
                 equal(a[1].filename, "hello", "Second comes the lowercase hello.exe");
 
             }).catch(function(e) {
-                ok(false, e);
-
+                ok(false, "Failed (will fail in IE without polyfill):" + e);
             }).finally(start);
     });
 

@@ -9,13 +9,6 @@
     <div id="qunit"></div>
     <div id="qunit-fixture"></div>
     <script src="qunit.js"></script>
-    <script>
-        if (!(window.indexedDB || window.window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB))
-        // Pull down the polyfill if needed (Safari + older opera browser)
-            document.write('<script src="http://nparashuram.com/IndexedDBShim/dist/IndexedDBShim.min.js">\x3C/script>');
-        if (window.location.hash.indexOf('iegap=false') === -1)
-            document.write('<script src="https://rawgit.com/dfahlander/idb-iegap/master/idb-iegap.min.js">\x3C/script>');
-    </script>
     <script src="../src/Dexie.js"></script>
     <script src="tests-extendability.js"></script>
     <script src="tests-promise.js"></script>
