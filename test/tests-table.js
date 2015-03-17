@@ -36,17 +36,18 @@
     });
 
     asyncTest("get", 4, function () {
-        db.table("users").get(1, function (obj) {
+        db.table("users").get(1).then(function(obj) {
             equal(obj.first, "David", "Got the first object");
-            db.users.get(2).then(function (obj) {
-                equal(obj.first, "Karl", "Got the second object");
-                db.users.get(100).then(function (obj) {
-                    ok(true, "Got then() even when getting non-existing object");
-                    equal(obj, undefined, "Result is 'undefined' when not existing");
-                    start();
-                });
-            });
-        });
+            return db.users.get(2);
+        }).then(function(obj) {
+            equal(obj.first, "Karl", "Got the second object");
+            return db.users.get(100);
+        }).then(function(obj) {
+            ok(true, "Got then() even when getting non-existing object");
+            equal(obj, undefined, "Result is 'undefined' when not existing");
+        }).catch(function(err) {
+            ok(false, "Error: " + err);
+        }).finally(start);
     });
 
     asyncTest("where", function () {
