@@ -189,7 +189,7 @@ asyncTest("Issue #76 Dexie inside Web Worker", function () {
     //
     // Imports to include from the web worker:
     //
-    var imports = ["../src/Dexie.js"];
+    var imports = window.workerImports || ["../src/Dexie.js"];
 
     //
     // Code to execute in the web worker:
@@ -197,21 +197,23 @@ asyncTest("Issue #76 Dexie inside Web Worker", function () {
     function CodeToExecuteInWebWorker(ok, done) {
         ok(true, "Could enter the web worker");
 
-        var db = new Dexie("codeFromWorker");
-        ok(true, "Could create a Dexie instance from within a web worker");
+        Dexie.delete("codeFromWorker").then(function() {
+            var db = new Dexie("codeFromWorker");
+            ok(true, "Could create a Dexie instance from within a web worker");
 
-        db.version(1).stores({ table1: "++" });
-        ok(true, "Could define schema");
+            db.version(1).stores({ table1: "++" });
+            ok(true, "Could define schema");
 
-        db.open();
-        ok(true, "Could open the database");
+            db.open();
+            ok(true, "Could open the database");
 
-        db.transaction('rw', db.table1, function() {
-            ok(true, "Could create a transaction");
-            db.table1.add({ name: "My first object" }).then(function(id) {
-                ok(true, "Could add object that got id " + id);
-            }).catch(function(err) {
-                ok(false, "Got error: err");
+            return db.transaction('rw', db.table1, function() {
+                ok(true, "Could create a transaction");
+                db.table1.add({ name: "My first object" }).then(function(id) {
+                    ok(true, "Could add object that got id " + id);
+                }).catch(function(err) {
+                    ok(false, "Got error: " + err);
+                });
             });
         }).then(function () {
             ok(true, "Transaction committed");
@@ -229,7 +231,7 @@ asyncTest("Issue #76 Dexie inside Web Worker", function () {
         return;
     }
 
-    var worker = new Worker("worker.js");
+    var worker = new Worker(window.workerSource || "worker.js");
     worker.postMessage({
         imports: imports,
         code: CodeToExecuteInWebWorker.toString()

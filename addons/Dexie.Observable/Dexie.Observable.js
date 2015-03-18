@@ -797,8 +797,8 @@
     // Finally, add this addon to Dexie:
     Dexie.addons.push(Dexie.Observable);
 
-}).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this === window) 
-? [window, function (name, value) { window[name] = value; }, true ]    // Adapt to browser environment
-: [global, function (name, value) { module.exports = value; }, false]); // Adapt to Node.js environment
+}).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this == self)
+    ? [self, function (name, value) { self[name] = value; }, true]          // Adapt to browser and WebWorker environment
+    : [global, function (name, value) { module.exports = value; }, false]); // Adapt to Node.js environment
 
 

@@ -1,4 +1,4 @@
-﻿<!DOCTYPE html>
+<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
@@ -8,6 +8,11 @@
 <body>
   <div id="qunit"></div>
   <div id="qunit-fixture"></div>
+  <script>
+    // Hack for making the WebWorker test behave also here...
+    window.workerImports = ["../src/Dexie.js", "../addons/Dexie.Observable/Dexie.Observable.js"];
+    window.workerSource = "../../../test/worker.js";
+  </script>
   <script src="../../../test/qunit.js"></script>
   <script src="../../../src/Dexie.js"></script>
   <script src="../Dexie.Observable.js"></script>
