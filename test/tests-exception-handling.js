@@ -1,5 +1,5 @@
-﻿///<reference path="run-unit-tests.html" />
-
+﻿/// <reference path="../src/Dexie.js" />
+/// <reference path="qunit.js" />
 
 (function () {
     var db = new Dexie("TestDB");
@@ -425,6 +425,83 @@
         }).catch(function(err) {
             ok(true, "Good, transaction failed as expected");
         }).finally(start);
+    });
+
+    asyncTest("Issue #69 Global exception handler for promises", function () {
+        var errorList = [];
+        function globalRejectionHandler(e) {
+            console.log("Got error: " + e);
+            if (errorList.indexOf(e) === -1) // Current implementation: accept multiple redundant triggers
+                errorList.push(e);
+        }
+
+        Dexie.Promise.on("error", globalRejectionHandler);
+        
+        // The most simple case: Any Promise reject that is not catched should
+        // be handled by the global error listener.
+        new Dexie.Promise(function(resolve, reject) {
+            reject("first error (by reject)");
+        });
+
+        // Also if the rejection was caused by a throw...
+        new Dexie.Promise(function() {
+            throw "second error (throw)";
+        });
+
+        // But when catched it should not trigger the global event:
+        new Dexie.Promise(function(resolve, reject) {
+            reject("third error (catched)");
+        }).catch(function(e) {
+            ok(true, "Catched error explicitely: " + e);
+        });
+
+        // If catching an explicit error type that was not thrown, it should be triggered
+        new Dexie.Promise(function(resolve, reject) {
+            reject("Simple error 1");
+        }).catch(TypeError, function(e) {
+            ok(false, "Error should not have been TypeError");
+        });// Real error slip away... should be handled by global handler
+
+        new Dexie.Promise(function(resolve, reject) {
+            reject(new TypeError("Type Error 1"));
+        }).catch(TypeError, function(e) {
+            ok(true, "Catched the TypeError");
+            // Now we have handled it. Not bubble to global handler!
+        });
+
+        // With finally, it should yet trigger the global event:
+        new Dexie.Promise(function(resolve, reject) {
+            reject("forth error (uncatched but with finally)");
+        }).finally(function() {
+            // From issue #43:
+            // Prepare by cleaning up any unfinished previous run:
+            Dexie.delete("testdb").then(function() {
+                // Now just do some Dexie stuff...
+                var db = new Dexie("testdb");
+                db.version(1).stores({ table1: "id" });
+                db.on('error', function(err) {
+                    // Global 'db' error handler (will never be called 'cause the error is not in a transaction)
+                    console.log("db.on.error: " + err);
+                    errorList.push("Got db.on.error: " + err);
+                });
+                db.open().then(function() {
+                    console.log("before");
+                    throw "FOO"; // Here a generic error is thrown (not a DB error)
+                    console.log("after");
+                });
+                db.delete().finally(function() {
+                    equal(errorList.length, 5, "THere should be 4 global errors triggered");
+                    equal(errorList[0], "first error (by reject)", "first error (by reject)");
+                    equal(errorList[1], "second error (throw)", "second error (throw)");
+                    equal(errorList[2], "Simple error 1", "Simple error 1");
+                    equal(errorList[3], "forth error (uncatched but with finally)", "forth error (uncatched but with finally)");
+                    equal(errorList[4], "FOO", "FOO");
+                    // cleanup:
+                    Dexie.Promise.on("error").unsubscribe(globalRejectionHandler);
+                    start();
+                });
+            });
+        });
     });
 })();
 

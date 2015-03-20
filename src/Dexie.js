@@ -2381,8 +2381,13 @@
             promise._value = newValue;
 
             finale.call(promise);
-            if (!promise._catched && promise.onuncatched) {
-                try { promise.onuncatched(promise._value); } catch (e) { }
+            if (!promise._catched) {
+                try {
+                    if (promise.onuncatched)
+                        promise.onuncatched(promise._value);
+                    Promise.on.error.fire(promise._value);
+                } catch (e) {
+                }
             }
             Promise.PSD = outerPSD;
             return promise._catched;
@@ -2425,6 +2430,8 @@
                 return onRejected(ex);
             }
         }
+
+        Promise.on = events(null, "error");
 
         Promise.all = function () {
             var args = Array.prototype.slice.call(arguments.length === 1 && Array.isArray(arguments[0]) ? arguments[0] : arguments);
