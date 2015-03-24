@@ -3,7 +3,7 @@
 
    By David Fahlander, david.fahlander@gmail.com
 
-   Version 1.0.3 - February 11, 2015.
+   Version 1.0.4 - March 24, 2015.
 
    Tested successfully on Chrome, IE, Firefox and Opera.
 
@@ -41,8 +41,9 @@
         return overridedFactory(origFunc);
     }
 
-    function Dexie(dbName) {
-
+    function Dexie(dbName, options) {
+        /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
+        var addons = (options && options.addons) || Dexie.addons;
         // Resolve all external dependencies:
         var deps = Dexie.dependencies;
         var indexedDB = deps.indexedDB,
@@ -67,6 +68,7 @@
         var db = this;
         var pausedResumeables = [];
         var autoSchema = false;
+        var hasNativeGetDatabaseNames = !!getNativeGetDatabaseNamesFn();
 
         function init() {
             // If browser (not node.js or other), subscribe to versionchange event and reload page
@@ -531,9 +533,12 @@
                         else if (idbdb.objectStoreNames.length > 0)
                             adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
                         idbdb.onversionchange = db.on("versionchange").fire; // Not firing it here, just setting the function callback to any registered subscriber.
-                        globalDatabaseList(function (databaseNames) {
-                            if (databaseNames.indexOf(dbName) === -1) return databaseNames.push(dbName);
-                        });
+                        if (!hasNativeGetDatabaseNames) {
+                            // Update localStorage with list of database names
+                            globalDatabaseList(function (databaseNames) {
+                                if (databaseNames.indexOf(dbName) === -1) return databaseNames.push(dbName);
+                            });
+                        }
                         // Now, let any subscribers to the on("ready") fire BEFORE any other db operations resume!
                         // If an the on("ready") subscriber returns a Promise, we will wait til promise completes or rejects before 
                         Promise.newPSD(function () {
@@ -588,10 +593,12 @@
                     db.close();
                     var req = indexedDB.deleteDatabase(dbName);
                     req.onsuccess = function () {
-                        globalDatabaseList(function (databaseNames) {
-                            var pos = databaseNames.indexOf(dbName);
-                            if (pos >= 0) return databaseNames.splice(pos, 1);
-                        });
+                        if (!hasNativeGetDatabaseNames) {
+                            globalDatabaseList(function(databaseNames) {
+                                var pos = databaseNames.indexOf(dbName);
+                                if (pos >= 0) return databaseNames.splice(pos, 1);
+                            });
+                        }
                         resolve();
                     };
                     req.onerror = eventRejectHandler(reject, ["deleting", dbName]);
@@ -616,7 +623,10 @@
         }; 
         this.hasFailed = function () {
             return dbOpenError !== null;
-        }; 
+        };
+        this.dynamicallyOpened = function() {
+            return autoSchema;
+        }
 
         /*this.dbg = function (collection, counter) {
             if (!this._dbgResult || !this._dbgResult[counter]) {
@@ -686,7 +696,8 @@
             // Let scopeFunc be the last argument
             scopeFunc = arguments[arguments.length - 1];
             var parentTransaction = Promise.PSD && Promise.PSD.trans;
-            if (mode.indexOf('!') !== -1) parentTransaction = null; // Caller dont want to reuse existing transaction
+			// Check if parent transactions is bound to this db instance, and if caller wants to reuse it
+            if (!parentTransaction || parentTransaction.db !== db || mode.indexOf('!') !== -1) parentTransaction = null;
             var onlyIfCompatible = mode.indexOf('?') !== -1;
             mode = mode.replace('!', '').replace('?', '');
             //
@@ -716,10 +727,6 @@
             if (parentTransaction) {
                 // Basic checks
                 if (!error) {
-                    if (parentTransaction.db !== db) {
-                        if (onlyIfCompatible) parentTransaction = null; // Spawn new transaction instead.
-                        else error = new Error("Current transaction bound to different database instance");
-                    }
                     if (parentTransaction && parentTransaction.mode === READONLY && mode === READWRITE) {
                         if (onlyIfCompatible) parentTransaction = null; // Spawn new transaction instead.
                         else error = error || new Error("Cannot enter a sub-transaction with READWRITE mode when parent transaction is READONLY");
@@ -785,8 +792,13 @@
                                         return function (val) {
                                             var retval = fn2(val);
                                             if (--uncompletedRequests === 0 && trans.active) {
-                                                trans.active = false;
-                                                trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
+                                                // _rootExec needed so that we do not loose our main transaction
+                                                // There is a unit test that will fail if we remove this line:
+                                                //      "Chained operations in parent transaction hijacked by sub transaction"
+                                                Promise._rootExec(function() {
+                                                    trans.active = false;
+                                                    trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
+                                                });
                                             }
                                             return retval;
                                         }
@@ -1441,23 +1453,23 @@
                     includeUpper = includeUpper === true;    // Default to false
                     if ((lower > upper) ||
                         (lower === upper && (includeLower || includeUpper) && !(includeLower && includeUpper)))
-                        return new this._ctx.collClass(this, IDBKeyRange.only(lower)).limit(0); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
-                    return new this._ctx.collClass(this, IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper));
+                        return new this._ctx.collClass(this, function() { return IDBKeyRange.only(lower); }).limit(0); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
+                    return new this._ctx.collClass(this, function() { return IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper); });
                 },
                 equals: function (value) {
-                    return new this._ctx.collClass(this, IDBKeyRange.only(value));
+                    return new this._ctx.collClass(this, function() { return IDBKeyRange.only(value); });
                 },
                 above: function (value) {
-                    return new this._ctx.collClass(this, IDBKeyRange.lowerBound(value, true));
+                    return new this._ctx.collClass(this, function() { return IDBKeyRange.lowerBound(value, true); });
                 },
                 aboveOrEqual: function (value) {
-                    return new this._ctx.collClass(this, IDBKeyRange.lowerBound(value));
+                    return new this._ctx.collClass(this, function() { return IDBKeyRange.lowerBound(value); });
                 },
                 below: function (value) {
-                    return new this._ctx.collClass(this, IDBKeyRange.upperBound(value, true));
+                    return new this._ctx.collClass(this, function() { return IDBKeyRange.upperBound(value, true); });
                 },
                 belowOrEqual: function (value) {
-                    return new this._ctx.collClass(this, IDBKeyRange.upperBound(value));
+                    return new this._ctx.collClass(this, function() { return IDBKeyRange.upperBound(value); });
                 },
                 startsWith: function (str) {
                     /// <param name="str" type="String"></param>
@@ -1468,7 +1480,7 @@
                     /// <param name="str" type="String"></param>
                     if (typeof str !== 'string') return fail(new this._ctx.collClass(this), new TypeError("String expected"));
                     if (str === "") return this.startsWith(str);
-                    var c = new this._ctx.collClass(this, IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase() + String.fromCharCode(65535)));
+                    var c = new this._ctx.collClass(this, function() { return IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase() + String.fromCharCode(65535)); });
                     addIgnoreCaseAlgorithm(c, function (a, b) { return a.indexOf(b) === 0; }, str);
                     c._ondirectionchange = function () { fail(c, new Error("reverse() not supported with WhereClause.startsWithIgnoreCase()")); };
                     return c;
@@ -1476,7 +1488,7 @@
                 equalsIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
                     if (typeof str !== 'string') return fail(new this._ctx.collClass(this), new TypeError("String expected"));
-                    var c = new this._ctx.collClass(this, IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase()));
+                    var c = new this._ctx.collClass(this, function() { return IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase()); });
                     addIgnoreCaseAlgorithm(c, function (a, b) { return a === b; }, str);
                     return c;
                 },
@@ -1489,7 +1501,7 @@
                     var compare = isCompound ? compoundCompare(ascending) : ascending;
                     set.sort(compare);
                     if (set.length === 0) return new this._ctx.collClass(this, IDBKeyRange.only("")).limit(0); // Return an empty collection.
-                    var c = new this._ctx.collClass(this, IDBKeyRange.bound(set[0], set[set.length - 1]));
+                    var c = new this._ctx.collClass(this, function () { return IDBKeyRange.bound(set[0], set[set.length - 1]); });
                     
                     c._ondirectionchange = function (direction) {
                         compare = (direction === "next" ? ascending : descending);
@@ -1533,12 +1545,19 @@
         //
         //
         //
-        function Collection(whereClause, keyRange) {
+        function Collection(whereClause, keyRangeGenerator) {
             /// <summary>
             /// 
             /// </summary>
             /// <param name="whereClause" type="WhereClause">Where clause instance</param>
-            /// <param name="keyRange" type="IDBKeyRange" optional="true"></param>
+            /// <param name="keyRangeGenerator" value="function(){ return IDBKeyRange.bound(0,1);}" optional="true"></param>
+            var keyRange = null, error = null;
+            if (keyRangeGenerator) try {
+                keyRange = keyRangeGenerator();
+            } catch (ex) {
+                error = ex;
+            }
+
             var whereCtx = whereClause._ctx;
             this._ctx = {
                 table: whereCtx.table,
@@ -1553,9 +1572,9 @@
                 isMatch: null,
                 offset: 0,
                 limit: Infinity,
-                error: null, // If set, any promise must be rejected with this error
+                error: error, // If set, any promise must be rejected with this error
                 or: whereCtx.or
-            }; 
+            };
         }
 
         extend(Collection.prototype, function () {
@@ -1938,11 +1957,11 @@
                             Object.keys(changes).forEach(function (keyPath) {
                                 var val = changes[keyPath];
                                 if (getByKeyPath(item, keyPath) !== val) {
-                                    setByKeyPath(item, keyPath, changes[keyPath]);
+                                    setByKeyPath(item, keyPath, val);
                                     anythingModified = true;
                                 }
                             });
-                            if (additionalChanges) changes = shallowClone(origChanges); // Restore original changes.
+                            if (additionalChanges) changes = shallowClone(origChanges); // Restore original changes for next iteration
                             return anythingModified;
                         }; 
                     }
@@ -1965,6 +1984,7 @@
                                 failures.push(e);
                                 failKeys.push(thisContext.primKey);
                                 if (thisContext.onerror) thisContext.onerror(e);
+                                checkFinished();
                                 return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
                             }, bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]);
                             req.onsuccess = function (ev) {
@@ -1972,6 +1992,9 @@
                                 ++successCount;
                                 checkFinished();
                             }; 
+                        } else if (thisContext.onsuccess) {
+                            // Hook will expect either onerror or onsuccess to always be called!
+                            thisContext.onsuccess(thisContext.value);
                         }
                     }
 
@@ -2026,8 +2049,9 @@
                                 configurable: true,
                                 enumerable: true,
                                 get: function () {
-                                    if (Promise.PSD && Promise.PSD.trans) {
-                                        return Promise.PSD.trans.tables[tableName];
+									var currentTrans = Promise.PSD && Promise.PSD.trans;
+                                    if (currentTrans && currentTrans.db === db) {
+                                        return currentTrans.tables[tableName];
                                     }
                                     return tableInstance;
                                 }
@@ -2189,7 +2213,7 @@
 
         init();
 
-        Dexie.addons.forEach(function (fn) {
+        addons.forEach(function (fn) {
             fn(db);
         });
     }
@@ -2287,18 +2311,36 @@
             try {
                 ret = cb(self._value);
                 if (!self._state && (!ret || typeof ret.then !== 'function' || ret._state !== false)) setCatched(self); // Caller did 'return Promise.reject(err);' - don't regard it as catched!
+                deferred.resolve(ret);
             } catch (e) {
                 var catched = deferred.reject(e);
                 if (!catched && self.onuncatched) {
-                    try { self.onuncatched(e); } catch (e) { }
+                    try {
+                        self.onuncatched(e);
+                    } catch (e) {
+                    }
                 }
-                return;
+            } finally {
+                if (isRootExec) {
+                    while (operationsQueue.length > 0) executeOperationsQueue();
+                    asap = _asap;
+                    isRootExecution = true;
+                }
             }
-            deferred.resolve(ret);
-            if (isRootExec) {
-                while(operationsQueue.length > 0) executeOperationsQueue();
-                asap = _asap;
-                isRootExecution = true;
+        }
+
+        function _rootExec(fn) {
+            var isRootExec = isRootExecution;
+            isRootExecution = false;
+            asap = enqueueImmediate;
+            try {
+                fn();
+            } finally {
+                if (isRootExec) {
+                    while (operationsQueue.length > 0) executeOperationsQueue();
+                    asap = _asap;
+                    isRootExecution = true;
+                }
             }
         }
 
@@ -2339,8 +2381,13 @@
             promise._value = newValue;
 
             finale.call(promise);
-            if (!promise._catched && promise.onuncatched) {
-                try { promise.onuncatched(promise._value); } catch (e) { }
+            if (!promise._catched) {
+                try {
+                    if (promise.onuncatched)
+                        promise.onuncatched(promise._value);
+                    Promise.on.error.fire(promise._value);
+                } catch (e) {
+                }
             }
             Promise.PSD = outerPSD;
             return promise._catched;
@@ -2384,6 +2431,8 @@
             }
         }
 
+        Promise.on = events(null, "error");
+
         Promise.all = function () {
             var args = Array.prototype.slice.call(arguments.length === 1 && Array.isArray(arguments[0]) ? arguments[0] : arguments);
 
@@ -2426,6 +2475,10 @@
             p.onuncatched = this.onuncatched; // Needed when exception occurs in a then() clause of a successful parent promise. Want onuncatched to be called even in callbacks of callbacks of the original promise.
             p._parent = this; // Used for recursively calling onuncatched event on self and all parents.
             return p;
+        };
+
+        Promise.prototype._then = function (onFulfilled, onRejected) {
+            handle(this, new Deferred(onFulfilled, onRejected, nop,nop));
         };
 
         Promise.prototype['catch'] = function (onRejected) {
@@ -2490,7 +2543,9 @@
             } finally {
                 Promise.PSD = outerScope;
             }
-        }; 
+        };
+
+        Promise._rootExec = _rootExec;
 
         return Promise;
     })();
@@ -2874,7 +2929,9 @@
     }
 
     function globalDatabaseList(cb) {
-        var val;
+        var val,
+            localStorage = Dexie.dependencies.localStorage;
+        if (!localStorage) return cb([]); // Envs without localStorage support
         try {
             val = JSON.parse(localStorage.getItem('Dexie.DatabaseNames') || "[]");
         } catch (e) {
@@ -2956,8 +3013,9 @@
     //
     Dexie.getDatabaseNames = function (cb) {
         return new Promise(function (resolve, reject) {
-            if ('webkitGetDatabaseNames' in indexedDB || 'getDatabaseNames' in indexedDB) { // In case getDatabaseNames() becomes standard, let's prepare to support it:
-                var req = ('getDatabaseNames' in indexedDB ? indexedDB.getDatabaseNames() : indexedDB.webkitGetDatabaseNames());
+            var getDatabaseNames = getNativeGetDatabaseNamesFn();
+            if (getDatabaseNames) { // In case getDatabaseNames() becomes standard, let's prepare to support it:
+                var req = getDatabaseNames();
                 req.onsuccess = function (event) {
                     resolve([].slice.call(event.target.result, 0)); // Converst DOMStringList to Array<String>
                 }; 
@@ -3071,29 +3129,33 @@
     //
     // In node.js, however, these properties must be set "manually" before instansiating a new Dexie(). For node.js, you need to require indexeddb-js or similar and then set these deps.
     //
+    var idbshim = window.idbModules && window.idbModules.shimIndexedDB ? window.idbModules : {};
     Dexie.dependencies = {
         // Required:
         // NOTE: The "_"-prefixed versions are for prioritizing IDB-shim on IOS8 before the native IDB in case the shim was included.
-        indexedDB: window._indexedDB || window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB,
-        IDBKeyRange: window._IDBKeyRange || window.IDBKeyRange || window.webkitIDBKeyRange,
-        IDBTransaction: window._IDBTransaction || window.IDBTransaction || window.webkitIDBTransaction,
+        indexedDB: idbshim.shimIndexedDB || window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB,
+        IDBKeyRange: idbshim.IDBKeyRange || window.IDBKeyRange || window.webkitIDBKeyRange,
+        IDBTransaction: idbshim.IDBTransaction || window.IDBTransaction || window.webkitIDBTransaction,
         // Optional:
         Error: window.Error || String,
         SyntaxError: window.SyntaxError || String,
         TypeError: window.TypeError || String,
-        DOMError: window.DOMError || String
+        DOMError: window.DOMError || String,
+        localStorage: ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : window.localStorage)
     }; 
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-    Dexie.version = 1.03;
+    Dexie.version = 1.04;
 
-
-
-
+    function getNativeGetDatabaseNamesFn() {
+        var indexedDB = Dexie.dependencies.indexedDB;
+        var fn = (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
+        return fn && fn.bind(indexedDB);
+    }
 
     // Publish the Dexie to browser or NodeJS environment.
     publish("Dexie", Dexie);
 
-}).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this == window)
-    ? [window, function (name, value) { window[name] = value; }, true]    // Adapt to browser environment
+}).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this == self)
+    ? [self, function (name, value) { self[name] = value; }, true]          // Adapt to browser and WebWorker environment
     : [global, function (name, value) { module.exports = value; }, false]); // Adapt to Node.js environment
