@@ -3149,7 +3149,7 @@
 
     function getNativeGetDatabaseNamesFn() {
         var indexedDB = Dexie.dependencies.indexedDB;
-        var fn = (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
+        var fn = indexedDB && (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
         return fn && fn.bind(indexedDB);
     }
 
