@@ -1500,7 +1500,7 @@
                     var set = getSetArgs(arguments);
                     var compare = isCompound ? compoundCompare(ascending) : ascending;
                     set.sort(compare);
-                    if (set.length === 0) return new this._ctx.collClass(this, IDBKeyRange.only("")).limit(0); // Return an empty collection.
+                    if (set.length === 0) return new this._ctx.collClass(this, function() { return IDBKeyRange.only(""); }).limit(0); // Return an empty collection.
                     var c = new this._ctx.collClass(this, function () { return IDBKeyRange.bound(set[0], set[set.length - 1]); });
                     
                     c._ondirectionchange = function (direction) {

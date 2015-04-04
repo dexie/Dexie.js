@@ -102,6 +102,14 @@
         }).finally(start);
     });
 
+    asyncTest("anyOf(emptyArray)", function () {
+        db.files.where('id').anyOf([]).toArray(function (a) {
+            equal(a.length, 0, "Should be empty");
+        }).catch(function (e) {
+            ok(false, "Error: " + e.stack || e);
+        }).finally(start);
+    });
+
     asyncTest("equalsIgnoreCase()", function () {
 
         db.files.where("filename").equalsIgnoreCase("hello").toArray(function (a) {
