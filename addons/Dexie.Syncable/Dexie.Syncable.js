@@ -52,7 +52,7 @@
                     .each(function (connectedRemoteNode) {
                         // There are connected remote nodes that we must take over
                         // Since we may be in the on(ready) event, we must get VIPed to continue
-                        Dexie.spawn(function () {
+                        Dexie.ignoreTransaction(function () {
                             Dexie.vip(function () {
                                 db.syncable.connect(connectedRemoteNode.syncProtocol, connectedRemoteNode.url, connectedRemoteNode.syncOptions);
                             });
@@ -898,7 +898,7 @@
         function enque(context, fn, instanceID) {
             function _enque () {
                 if (!context.ongoingOperation) {
-                    context.ongoingOperation = Dexie.spawn(function () {
+                    context.ongoingOperation = Dexie.ignoreTransaction(function () {
                         return Dexie.vip(function () {
                             return fn();
                         });

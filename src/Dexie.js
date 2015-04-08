@@ -3,7 +3,7 @@
 
    By David Fahlander, david.fahlander@gmail.com
 
-   Version 1.0.4+ (alpha - not yet distributed) - DATE, YEAR.
+   Version 1.1.0 (alpha - not yet distributed) - DATE, YEAR.
 
    Tested successfully on Chrome, IE, Firefox and Opera.
 
@@ -1292,7 +1292,7 @@
                                 // whether the caller is about to catch() the error or not. Have to make
                                 // transaction fail. Catching such an error wont stop transaction from failing.
                                 // This is a limitation we have to live with.
-                                Dexie.spawn(function () { self.on('error').fire(e); });
+                                Dexie.ignoreTransaction(function () { self.on('error').fire(e); });
                                 self.abort();
                                 reject(e);
                             }
@@ -1310,7 +1310,7 @@
                     }
                     p.onuncatched = function (e) {
                         // Bubble to transaction. Even though IDB does this internally, it would just do it for error events and not for caught exceptions.
-                        Dexie.spawn(function () { self.on("error").fire(e); });
+                        Dexie.ignoreTransaction(function () { self.on("error").fire(e); });
                         self.abort();
                     };
                     return p;
@@ -3047,23 +3047,23 @@
         return Class;
     }; 
 
-    Dexie.spawn = function (scopeFunc) {
+    Dexie.ignoreTransaction = function (scopeFunc) {
         // In case caller is within a transaction but needs to create a separate transaction.
         // Example of usage:
         // 
         // Let's say we have a logger function in our app. Other application-logic should be unaware of the
         // logger function and not need to include the 'logentries' table in all transaction it performs.
         // The logging should always be done in a separate transaction and not be dependant on the current
-        // running transaction context. Then you could use Dexie.spawn() to run code that starts a new transaction.
+        // running transaction context. Then you could use Dexie.ignoreTransaction() to run code that starts a new transaction.
         //
-        //     Dexie.spawn(function() {
+        //     Dexie.ignoreTransaction(function() {
         //         db.logentries.add(newLogEntry);
         //     });
         //
-        // Unless using Dexie.spawn(), the above example would try to reuse the current transaction
+        // Unless using Dexie.ignoreTransaction(), the above example would try to reuse the current transaction
         // in current Promise-scope.
         //
-        // An alternative to Dexie.spawn() would be setImmediate() or setTimeout(). The reason we still provide an
+        // An alternative to Dexie.ignoreTransaction() would be setImmediate() or setTimeout(). The reason we still provide an
         // API for this because
         //  1) The intention of writing the statement could be unclear if using setImmediate() or setTimeout().
         //  2) setTimeout() would wait unnescessary until firing. This is however not the case with setImmediate().
@@ -3072,7 +3072,11 @@
             Promise.PSD.trans = null;
             return scopeFunc();
         });
-    }; 
+    };
+    Dexie.spawn = function () {
+        if (window.console) console.warn("Dexie.spawn() is deprecated. Use Dexie.ignoreTransaction() instead.");
+        return Dexie.ignoreTransaction.apply(this, arguments);
+    }
 
     Dexie.vip = function (fn) {
         // To be used by subscribers to the on('ready') event.
@@ -3145,7 +3149,7 @@
     }; 
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-    Dexie.version = 1.04;
+    Dexie.version = 1.10;
 
     function getNativeGetDatabaseNamesFn() {
         var indexedDB = Dexie.dependencies.indexedDB;

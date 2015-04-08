@@ -217,7 +217,7 @@
                 // Set the static property lastRevision[db.name] to the revision of the last written change.
                 Dexie.Observable.latestRevision[db.name] = lastWrittenRevision;
                 // Wakeup ourselves, and any other db instances on this window:
-                Dexie.spawn(function () {
+                Dexie.ignoreTransaction(function () {
                     Dexie.Observable.on('latestRevisionIncremented').fire(db.name, lastWrittenRevision);
                 });
                 // Dexie.Observable.on.latestRevisionIncremented will only wakeup db's in current window.
@@ -409,7 +409,7 @@
                     // Side track . For correctness whenever setting Dexie.Observable.latestRevision[db.name] we must make sure the event is fired if increased:
                     // There are other db instances in same window that hasnt yet been informed about a new revision
                     Dexie.Observable.latestRevision[db.name] = latestRevision;
-                    Dexie.spawn(function () {
+                    Dexie.ignoreTransaction(function () {
                         Dexie.Observable.on.latestRevisionIncremented.fire(latestRevision);
                     });
                 }
@@ -559,7 +559,7 @@
                             delete this.value;
                             if (msg.wantReply) {
                                 // Message wants a reply, meaning someone must take over its messages when it dies. Let us be that one!
-                                Dexie.spawn(function () {
+                                Dexie.ignoreTransaction(function () {
                                     consumeMessage(msg);
                                 });
                             }
@@ -640,7 +640,7 @@
                 function addMessage(msg) {
                     return db._intercomm.add(msg).then(function (messageId) {
                         localStorage.setItem("Dexie.Observable/intercomm/" + db.name, messageId.toString());
-                        Dexie.spawn(function () {
+                        Dexie.ignoreTransaction(function () {
                             Dexie.Observable.on.intercomm.fire(db.name);
                         });
                         if (options.wantReply) {
@@ -672,7 +672,7 @@
             return db.table('_intercomm').where("destinationNode").equals(mySyncNode.id).modify(function (msg) {
                 // For each message, fire the event and remove message.
                 delete this.value;
-                Dexie.spawn(function () {
+                Dexie.ignoreTransaction(function () {
                     consumeMessage(msg);
                 });
             });
@@ -768,7 +768,7 @@
                 var rev = parseInt(event.newValue, 10);
                 if (!isNaN(rev) && rev > Dexie.Observable.latestRevision[dbname]) {
                     Dexie.Observable.latestRevision[dbname] = rev;
-                    Dexie.spawn(function () {
+                    Dexie.ignoreTransaction(function () {
                         Dexie.Observable.on('latestRevisionIncremented').fire(dbname, rev);
                     });
                 }
