@@ -3153,9 +3153,11 @@
         return fn && fn.bind(indexedDB);
     }
 
-    // Publish the Dexie to browser or NodeJS environment.
+    // Export Dexie to window or as a module depending on environment.
     publish("Dexie", Dexie);
 
 }).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this == self)
-    ? [self, function (name, value) { self[name] = value; }, true]          // Adapt to browser and WebWorker environment
+    ? typeof define === 'function' && define.amd
+    ? [self, function (name, value) { define(name, function () { return value; }); }, true] // Adapt to requirejs / AMD
+    : [self, function (name, value) { self[name] = value; }, true]          // Adapt to browser and WebWorker environment
     : [global, function (name, value) { module.exports = value; }, false]); // Adapt to Node.js environment
