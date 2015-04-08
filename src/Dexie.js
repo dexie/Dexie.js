@@ -11,7 +11,7 @@
 
    Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
 */
-(function (window, publish, isBrowser, undefined) {
+(function (global, publish, isBrowser, undefined) {
 
     "use strict";
 
@@ -78,7 +78,7 @@
                 if (ev.newVersion) { // Only reload page if versionchange event isnt a deletion of db.
                     // Default behavior for versionchange event is to reload the page.
                     // Caller can override this behavior by doing db.on("versionchange", function(){ return false; });
-                    window.location.reload(true);
+                    global.location.reload(true);
                     /* The logic behind this default handler is:
                         1. Since this event means that the db is upgraded in another IDBDatabase instance (in tab or window that has a newer version of the code),
                            it makes sense to reload our page and force reload from cache. When reloaded, we get the newest version of the code - making app in synch with db.
@@ -2242,7 +2242,7 @@
         var _slice = [].slice;
         var _asap = typeof (setImmediate) === 'undefined' ? function(fn, arg1, arg2, argN) {
             var args = arguments;
-            setTimeout(function() { fn.apply(window, _slice.call(args, 1)); }, 0); // If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
+            setTimeout(function() { fn.apply(global, _slice.call(args, 1)); }, 0); // If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
         } : setImmediate; // IE10+ and node.
 
         var asap = _asap,
@@ -2258,7 +2258,7 @@
             operationsQueue = [];
             for (var i = 0, l = queue.length; i < l; ++i) {
                 var item = queue[i];
-                item[0].apply(window, item[1]);
+                item[0].apply(global, item[1]);
             }
         }
 
@@ -2703,7 +2703,7 @@
                         var args = arguments;
                         context.subscribers.forEach(function (fn) {
                             asap(function fireEvent() {
-                                fn.apply(window, args);
+                                fn.apply(global, args);
                             });
                         });
                     });
@@ -2745,7 +2745,7 @@
     }
 
     function asap(fn) {
-        if (window.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
+        if (global.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
     }
 
     function fakeAutoComplete(fn) {
@@ -3074,7 +3074,7 @@
         });
     };
     Dexie.spawn = function () {
-        if (window.console) console.warn("Dexie.spawn() is deprecated. Use Dexie.ignoreTransaction() instead.");
+        if (global.console) console.warn("Dexie.spawn() is deprecated. Use Dexie.ignoreTransaction() instead.");
         return Dexie.ignoreTransaction.apply(this, arguments);
     }
 
@@ -3133,19 +3133,19 @@
     //
     // In node.js, however, these properties must be set "manually" before instansiating a new Dexie(). For node.js, you need to require indexeddb-js or similar and then set these deps.
     //
-    var idbshim = window.idbModules && window.idbModules.shimIndexedDB ? window.idbModules : {};
+    var idbshim = global.idbModules && global.idbModules.shimIndexedDB ? global.idbModules : {};
     Dexie.dependencies = {
         // Required:
         // NOTE: The "_"-prefixed versions are for prioritizing IDB-shim on IOS8 before the native IDB in case the shim was included.
-        indexedDB: idbshim.shimIndexedDB || window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB,
-        IDBKeyRange: idbshim.IDBKeyRange || window.IDBKeyRange || window.webkitIDBKeyRange,
-        IDBTransaction: idbshim.IDBTransaction || window.IDBTransaction || window.webkitIDBTransaction,
+        indexedDB: idbshim.shimIndexedDB || global.indexedDB || global.mozIndexedDB || global.webkitIndexedDB || global.msIndexedDB,
+        IDBKeyRange: idbshim.IDBKeyRange || global.IDBKeyRange || global.webkitIDBKeyRange,
+        IDBTransaction: idbshim.IDBTransaction || global.IDBTransaction || global.webkitIDBTransaction,
         // Optional:
-        Error: window.Error || String,
-        SyntaxError: window.SyntaxError || String,
-        TypeError: window.TypeError || String,
-        DOMError: window.DOMError || String,
-        localStorage: ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : window.localStorage)
+        Error: global.Error || String,
+        SyntaxError: global.SyntaxError || String,
+        TypeError: global.TypeError || String,
+        DOMError: global.DOMError || String,
+        localStorage: ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : global.localStorage)
     }; 
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
