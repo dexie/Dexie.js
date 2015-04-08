@@ -2889,7 +2889,7 @@
         return function (event) {
             var errObj = (event && event.target.error) || new Error();
             if (sentance) {
-                var occurredWhen = " occured when " + sentance.map(function (word) {
+                var occurredWhen = " occurred when " + sentance.map(function (word) {
                     switch (typeof (word)) {
                         case 'function': return word();
                         case 'string': return word;
