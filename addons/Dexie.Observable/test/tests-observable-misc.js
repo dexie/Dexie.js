@@ -69,7 +69,7 @@
     (function () {
         // ...and the winner is:
         function TicketList() {
-            var source = Dexie.createUUID();
+            var source = Dexie.Observable.createUUID();
 
             db.on('changes', function (changes) {
                 changes.forEach(function (change) {

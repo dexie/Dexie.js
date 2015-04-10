@@ -11,7 +11,7 @@
 
    Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
 */
-(function (global, publish, isBrowser, undefined) {
+(function (global, publish, undefined) {
 
     "use strict";
 
@@ -72,20 +72,15 @@
 
         function init() {
             // If browser (not node.js or other), subscribe to versionchange event and reload page
-            if (isBrowser) db.on("versionchange", function (ev) {
+            db.on("versionchange", function (ev) {
+                // Default behavior for versionchange event is to close database connection.
+                // Caller can override this behavior by doing db.on("versionchange", function(){ return false; });
                 // Let's not block the other window from making it's delete() or open() call.
                 db.close();
-                if (ev.newVersion) { // Only reload page if versionchange event isnt a deletion of db.
-                    // Default behavior for versionchange event is to reload the page.
-                    // Caller can override this behavior by doing db.on("versionchange", function(){ return false; });
-                    global.location.reload(true);
-                    /* The logic behind this default handler is:
-                        1. Since this event means that the db is upgraded in another IDBDatabase instance (in tab or window that has a newer version of the code),
-                           it makes sense to reload our page and force reload from cache. When reloaded, we get the newest version of the code - making app in synch with db.
-                        2. There wont be an infinite loop here even if our page still get the old version, becuase the next time onerror will be triggered and not versionchange.
-                        3. If not solving this by default, the API user would be obligated to handle versionchange, and would have to be on place in every example of Dexie code.
-                    */
-                };
+                db.on('error').fire(new Error("Database version changed by other database connection."));
+                // In many web applications, it would be recommended to force window.reload()
+                // when this event occurs. Do do that, subscribe to the versionchange event
+                // and call window.location.reload(true);
             });
         }
 
@@ -3160,8 +3155,16 @@
     // Export Dexie to window or as a module depending on environment.
     publish("Dexie", Dexie);
 
-}).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this == self)
-    ? typeof define === 'function' && define.amd
-    ? [self, function (name, value) { define(name, function () { return value; }); }, true] // Adapt to requirejs / AMD
-    : [self, function (name, value) { self[name] = value; }, true]          // Adapt to browser and WebWorker environment
-    : [global, function (name, value) { module.exports = value; }, false]); // Adapt to Node.js environment
+}).apply(null,
+
+    // AMD:
+    typeof define === 'function' && define.amd ?
+    [self, function (name, value) { define(name, function () { return value; }); }] :
+
+    // CommonJS:
+    typeof global !== 'undefined' && typeof module !== 'undefined' && module.exports ?
+    [global, function (name, value) { module.exports = value; }]
+
+    // Vanilla HTML and WebWorkers:
+    : [self, function (name, value) { self[name] = value; }]);
+
