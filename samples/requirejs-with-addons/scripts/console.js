@@ -1,4 +1,5 @@
-﻿define(function () {
+﻿///<reference path="require.js" />
+define(function () {
 
     function Console() {
         this.textarea = document.createElement('textarea');

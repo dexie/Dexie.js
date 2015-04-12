@@ -1,12 +1,12 @@
-﻿///<reference path="require.js" />
+﻿///<reference path="app.js" />
 define(['./db'], function (db) {
-
+    
     function Contact(id, first, last) {
         this.id = id;
         this.first = first;
         this.last = last;
     }
-
+    
     Contact.prototype.resolve = function () {
         var contact = this;
 

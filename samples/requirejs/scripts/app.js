@@ -1,5 +1,4 @@
-﻿///<reference path="require.js" />
-
+﻿/// <reference path="require.js" />
 require.config({
     paths: {
         "Dexie": "../../../src/Dexie"
@@ -9,10 +8,10 @@ require.config({
 requirejs(['Dexie', './console', './db', './Contact'], function (Dexie, console, db, Contact) {
 
     db.transaction('r', db.contacts, db.phones, db.emails, function () {
-
+        
         // Query all contacts
         db.contacts.toArray(function (contacts) {
-
+            
             // Resolve all foreign keys
             return Dexie.Promise.all(contacts.map(function (contact) {
 

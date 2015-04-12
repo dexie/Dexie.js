@@ -1,6 +1,6 @@
-﻿///<reference path="require.js" />
+﻿///<reference path="app.js" />
 define(['Dexie'], function (Dexie) {
-
+    
     // Declare Dexie instance
     var db = new Dexie("appdb");
 
@@ -13,7 +13,7 @@ define(['Dexie'], function (Dexie) {
 
     // Populate ground data
     db.on('populate', function () {
-
+        
         // Populate a contact
         db.contacts.add({ first: 'Arnold', last: 'Fitzgerald' }).then(function (id) {
 
@@ -27,6 +27,6 @@ define(['Dexie'], function (Dexie) {
 
     // Open database
     db.open();
-
+    
     return db;
 });
