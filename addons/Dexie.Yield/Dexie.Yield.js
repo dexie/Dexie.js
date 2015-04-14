@@ -22,36 +22,46 @@
             });
         }
 
-        function spawn(generatorFn) {
-            return iterate(generatorFn());
-        }
-
         function iterate(iter) {
-            var onSuccess,
-                onError;
+            var Promise = Dexie.Promise,
+                callNext = function (result) { return iter.next(result); },
+                doThrow = function (error) { return iter.throw(error); },
+                onSuccess = step(callNext),
+                onError = step(doThrow);
 
-            function step(getNext) {
-                return function(val) {
+            function step(getNext, initial) {
+                return function (val) {
                     var next = getNext(val);
                     if (next.done) {
                         if (next.value && typeof next.value.then === 'function')
-                            throw new TypeError("Illegal to return a promise without yield");
-                        return Promise.resolve(next.value);
+                            // Emphasize using "return yield <promise>;" instead of just "return <promise>;".
+                            return Promise.reject(new TypeError("Illegal to return a promise without yield"));
+
+                        // Promise.resolve() only needed when no yield has been used at all.
+                        // Try not to use Promise.resolve() unless needed, because it will convert
+                        // the returned Promise implementation to our Promise implementation and
+                        // the user could not get the features and benefits of various Promise implementations.
+                        return initial ? Promise.resolve(next.value) : next.value;
                     }
+
                     if (!next.value || typeof next.value.then !== 'function')
-                        throw new TypeError("Only acceptable to yield a Promise");
+                        // Don't accept yielding a non-promise such as "yield 3;".
+                        // By not accepting that, we could detect bugs better.
+                        iter.throw(new TypeError("Only acceptable to yield a Promise"));
+
                     return next.value.then(onSuccess, onError);
                 }
             }
 
-            onSuccess = step(function(result) { return iter.next(result); });
-            onError = step(function(error) { return iter.throw(error); });
-
             try {
-                return onSuccess();
+                return step(callNext, true)();
             } catch (e) {
                 return Promise.reject(e);
             }
+        }
+
+        function spawn(generatorFn) {
+            return iterate(generatorFn());
         }
 
         function async(generatorFn) {
@@ -59,7 +69,6 @@
                 return iterate(generatorFn.apply(this, arguments));
             }
         }
-
 
         DexieYield.async = async;
         DexieYield.spawn = spawn;

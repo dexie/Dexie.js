@@ -13,30 +13,21 @@
     <script src="../../Dexie.Yield/Dexie.Yield.js"></script>
     <script>
         var db = new Dexie("test-yield-db2");
-        var async = Dexie.Yield.async;
+        var async = Dexie.Yield.async,
+            spawn = Dexie.Yield.spawn;
 
         db.version(1).stores({
             friends: '++id,name,*groups',
             pets: '++id,name'
         });
 
-        module("yield", {
-            setup: async(function* () {
-                stop();
-                yield db.delete();
-                db.open();
-                start();
-            }),
-            teardown: async(function* () {
-                stop();
-                yield db.delete();
-                start();
-            })
-        });
-
         asyncTest ("db.transaction() with yield", async(function* () {
             var finallyWasReached = false;
             try {
+                yield db.delete();
+                ok(true, "db deleted");
+                yield db.open();
+                ok(true, "db opened");
                 yield db.transaction('rw', 'friends', 'pets', function* () {
                     // Add a cat and store it's final ID
                     var catId = yield db.pets.add({ name: "Tito", kind: "cat" });
@@ -61,12 +52,15 @@
                 finallyWasReached = true;
             }
             ok(finallyWasReached, "finally was reached");
+            yield db.delete();
             start();
         }));
 
         asyncTest ("Catching indexedDB error event", 2, async(function* ()
         {
             try {
+                yield db.delete();
+                yield db.open();
                 yield db.pets.add({id: 1, name: "Tidi", kind: "Honeybadger"});
                 ok(true, "Should come so far");
                 yield db.pets.add({id: 1, name: "Todoo", kind: "Snake"}); // Should generate an IDB error event!
@@ -74,11 +68,14 @@
             } catch (e) {
                 equal(e.name, "ConstraintError", "Caught indexedDB DOMError event ConstraintError");
             }
+            yield db.delete();
             start();
         }));
 
         asyncTest ("Catching error prevents transaction from aborting", 5, async(function* () {
             try {
+                yield db.delete();
+                yield db.open();
                 yield db.transaction('rw', 'pets', function*(){
                     try {
                         yield db.pets.add({id: 1, name: "Tidi", kind: "Honeybadger"});
@@ -91,9 +88,10 @@
                 });
                 ok (true, "Should come here - transaction committed because we caught the error");
 
-                ok (yield db.pets.get(1), "A pet with ID 1 exists in DB");
+                ok ((yield db.pets.get(1)), "A pet with ID 1 exists in DB");
                 equal ((yield db.pets.get(1)).name, "Tidi", "It was Tidi in the first position");
             } finally {
+                yield db.delete();
                 start();
             }
         }));
@@ -101,6 +99,8 @@
         asyncTest("Transaction not committing when not catching error event", 4, async(function* ()
         {
             try {
+                yield db.delete();
+                yield db.open();
                 yield db.transaction('rw', 'pets', function* ()
                 {
                     yield db.pets.add({id: 1, name: "Tidi", kind: "Honeybadger"});
@@ -114,13 +114,91 @@
 
                 ok(true, "Transaction should fail");
                 equal (e.name, "ConstraintError", "Error caught was a ConstraintError!");
-                equal (yield db.pets.count(), 0, "Pets table should still be empty because transaction failed");
+                equal ((yield db.pets.count()), 0, "Pets table should still be empty because transaction failed");
 
+            } finally {
+                yield db.delete();
+                start();
+            }
+        }));
+
+        asyncTest("Should not allow yielding a non-promise", async(function* () {
+            try {
+                yield 3;
+                ok(false, "Yielding a non-Thenable shouldn't be allowed");
+            } catch (e) {
+                ok(true, "Got exception when trying to do 'yield 3;'");
             } finally {
                 start();
             }
         }));
 
+        asyncTest("Should not allow yielding a non-promise 2", async(function* () {
+            try {
+                yield Dexie.Promise.resolve(3);
+                ok(true, "Could yield a promise");
+                yield 3;
+                ok(false, "Yielding a non-Thenable shouldn't be allowed");
+            } catch (e) {
+                ok(true, "Got exception when trying to do 'yield 3;'");
+            } finally {
+                start();
+            }
+        }));
+
+        asyncTest("Should not allow yielding a non-promise 3", function () {
+            spawn (function*()
+            {
+                yield 3;
+                ok(false, "Yielding a non-Thenable shouldn't be allowed");
+            }).then (function() {
+                ok(false, "Yielding a non-Thenable shouldn't be allowed");
+            }).catch (TypeError, function(e) {
+                ok(true, "A TypeError should have been thrown");
+            }).catch (function() {
+                ok(false, "Another exception than TypeError was thrown");
+            }).finally(start);
+        });
+
+        asyncTest("Should not allow yielding a non-promise 4", function () {
+            spawn (function*()
+            {
+                yield Dexie.Promise.resolve(3);
+                ok(true, "Could yield a promise");
+                yield 3;
+                ok(false, "Yielding a non-Thenable shouldn't be allowed");
+            }).then (function() {
+                ok(false, "Yielding a non-Thenable shouldn't be allowed");
+            }).catch (TypeError, function(e) {
+                ok(true, "A TypeError should have been thrown");
+            }).catch (function() {
+                ok(false, "Another exception than TypeError was thrown");
+            }).finally(start);
+        });
+
+        asyncTest("Should not allow returning a promise", function () {
+            spawn (function*()
+            {
+                return Dexie.Promise.resolve(3);
+            }).then (function() {
+                ok(false, "Returning a directly shouldn't be allowed");
+            }).catch (TypeError, function(e) {
+                ok(true, "A TypeError should have been thrown");
+            }).catch (function() {
+                ok(false, "Another exception than TypeError was thrown");
+            }).finally(start);
+        });
+
+        asyncTest("Should be able to do 'return yield Promise.resolve(x);'", function () {
+            spawn (function*()
+            {
+                return yield Dexie.Promise.resolve(3);
+            }).then (function() {
+                ok(true, "Should be able to do 'return yield Promise.resolve(x);'");
+            }).catch (function() {
+                ok(false, "Error occurred");
+            }).finally(start);
+        });
 
     </script>
 </body>
