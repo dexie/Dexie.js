@@ -153,11 +153,9 @@
                 ok(false, "Yielding a non-Thenable shouldn't be allowed");
             }).then (function() {
                 ok(false, "Yielding a non-Thenable shouldn't be allowed");
-            }).catch (TypeError, function(e) {
-                ok(true, "A TypeError should have been thrown");
-            }).catch (function() {
-                ok(false, "Another exception than TypeError was thrown");
-            }).finally(start);
+            }).catch (function(e) {
+                ok(e instanceof TypeError, "A TypeError should have been thrown");
+            }).then(start);
         });
 
         asyncTest("Should not allow yielding a non-promise 4", function () {
@@ -169,35 +167,31 @@
                 ok(false, "Yielding a non-Thenable shouldn't be allowed");
             }).then (function() {
                 ok(false, "Yielding a non-Thenable shouldn't be allowed");
-            }).catch (TypeError, function(e) {
-                ok(true, "A TypeError should have been thrown");
-            }).catch (function() {
-                ok(false, "Another exception than TypeError was thrown");
-            }).finally(start);
+            }).catch (function(e) {
+                ok(e instanceof TypeError, "A TypeError should have been thrown");
+            }).then(start);
         });
 
         asyncTest("Should not allow returning a promise", function () {
             spawn (function*()
             {
-                return Dexie.Promise.resolve(3);
+                return Promise.resolve(3);
             }).then (function() {
                 ok(false, "Returning a directly shouldn't be allowed");
-            }).catch (TypeError, function(e) {
-                ok(true, "A TypeError should have been thrown");
-            }).catch (function() {
-                ok(false, "Another exception than TypeError was thrown");
-            }).finally(start);
+            }).catch (function(e) {
+                ok(e instanceof TypeError, "A TypeError should have been thrown");
+            }).then(start);
         });
 
         asyncTest("Should be able to do 'return yield Promise.resolve(x);'", function () {
             spawn (function*()
             {
-                return yield Dexie.Promise.resolve(3);
+                return yield Promise.resolve(3);
             }).then (function() {
                 ok(true, "Should be able to do 'return yield Promise.resolve(x);'");
             }).catch (function() {
                 ok(false, "Error occurred");
-            }).finally(start);
+            }).then(start);
         });
 
     </script>
