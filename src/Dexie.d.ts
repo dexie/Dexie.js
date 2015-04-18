@@ -34,18 +34,19 @@ declare class Dexie {
 
     static deepClone(obj: Object): Object;
 
-        version(versionNumber: Number): Dexie.Version
+    version(versionNumber: Number): Dexie.Version
 
-        on: {
+    on: {
         (eventName: string, subscriber: () => any): void;
-        ready: Dexie.DexieEvent;
-        error: Dexie.DexieEvent;
+        (eventName: string, subscriber: () => any, bSticky: boolean): void;
+        ready: Dexie.DexieOnReadyEvent;
+        error: Dexie.DexieErrorEvent;
         populate: Dexie.DexieEvent;
         blocked: Dexie.DexieEvent;
-        versionchange: Dexie.DexieEvent;
+        versionchange: Dexie.DexieVersionChangeEvent;
     }
 
-        open(): Dexie.Promise<void>;
+    open(): Dexie.Promise<void>;
 
     table(tableName: string): Dexie.Table<any, any>;
 
@@ -101,6 +102,8 @@ declare module Dexie {
 
         catch<U>(ExceptionType: Function, onRejected: (error) => Promise<U>): Promise<U>;
 
+        catch<U>(errorName: string, onRejected: (error) => Promise<U>): Promise<U>;
+
         finally<R>(onFinally: () => any): Promise<R>;
 
         onuncatched: () => any;
@@ -120,9 +123,10 @@ declare module Dexie {
         function newPSD<R>(scope: () => R): R;
 
         var PSD: any;
+
         var on: {
-            (eventName: string, subscriber: () => any): void;
-            error: DexieEvent;
+            (eventName: string, subscriber: (...args) => any): void;
+            error: DexieErrorEvent;
         }
     }
 
@@ -153,6 +157,25 @@ declare module Dexie {
 
     interface DexieEvent {
         subscribe(fn: () => any);
+        unsubscribe(fn: () => any);
+        fire();
+    }
+
+    interface DexieErrorEvent {
+        subscribe(fn: (error) => any);
+        unsubscribe(fn: (error) => any);
+        fire(error);
+    }
+
+    interface DexieVersionChangeEvent {
+        subscribe(fn: (event: IDBVersionChangeEvent) => any);
+        unsubscribe(fn: (event: IDBVersionChangeEvent) => any);
+        fire(event: IDBVersionChangeEvent);
+    }
+
+    interface DexieOnReadyEvent
+    {
+        subscribe(fn: () => any, bSticky: boolean);
         unsubscribe(fn: () => any);
         fire();
     }

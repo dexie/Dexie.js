@@ -152,3 +152,11 @@ $RECYCLE.BIN/
 
 *.csproj
 Dexie.sln
+samples/typescript/appdb.js
+samples/typescript/app.js
+samples/typescript/app.js.map
+samples/typescript/appdb.js.map
+samples/typescript/console.js
+samples/typescript/console.js.map
+samples/typescript/utils.js
+samples/typescript/utils.js.map
