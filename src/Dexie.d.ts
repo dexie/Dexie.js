@@ -6,6 +6,82 @@ interface Thenable<R> {
     then<U>(onFulfilled?: (value: R) => U, onRejected?: (error: any) => U): Thenable<U>;
 }
 
+declare class Dexie {
+    constructor(databaseName: string);
+
+    constructor(databaseName: string, options: { addons: Array<(db: Dexie) => void> });
+
+    name: string;
+    tables: Dexie.Table<any, any>[];
+    verno: number;
+
+    static addons: Array<(db: Dexie) => void>;
+    static version: number;
+
+    static getDatabaseNames(): Dexie.Promise<Array<string>>;
+
+    static getDatabaseNames<U>(onFulfilled: (value: Array<string>) => Thenable<U>): Dexie.Promise<U>;
+
+    static getDatabaseNames<U>(onFulfilled: (value: Array<string>) => U): Dexie.Promise<U>;
+
+    static getByKeyPath(obj: Object, keyPath: string): any;
+
+    static setByKeyPath(obj: Object, keyPath: string, value: any): void;
+
+    static delByKeyPath(obj: Object, keyPath: string): void;
+
+    static shallowClone(obj: Object): Object;
+
+    static deepClone(obj: Object): Object;
+
+        version(versionNumber: Number): Dexie.Version
+
+        on: {
+        (eventName: string, subscriber: () => any): void;
+        ready: Dexie.DexieEvent;
+        error: Dexie.DexieEvent;
+        populate: Dexie.DexieEvent;
+        blocked: Dexie.DexieEvent;
+        versionchange: Dexie.DexieEvent;
+    }
+
+        open(): Dexie.Promise<void>;
+
+    table(tableName: string): Dexie.Table<any, any>;
+
+    table<T>(tableName: string): Dexie.Table<T, any>;
+
+    table<T, Key>(tableName: string): Dexie.Table<T, Key>;
+
+    transaction<U>(mode: string, table: Dexie.Table<any, any>, scope: () => Thenable<U>): Dexie.Promise<U>;
+
+    transaction<U>(mode: string, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, scope: () => Thenable<U>): Dexie.Promise<U>;
+
+    transaction<U>(mode: string, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, table3: Dexie.Table<any, any>, scope: () => Thenable<U>): Dexie.Promise<U>;
+
+    transaction<U>(mode: string, tables: Dexie.Table<any, any>[], scope: () => Thenable<U>): Dexie.Promise<U>;
+
+    transaction<U>(mode: string, table: Dexie.Table<any, any>, scope: () => U): Dexie.Promise<U>;
+
+    transaction<U>(mode: string, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, scope: () => U): Dexie.Promise<U>;
+
+    transaction<U>(mode: string, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, table3: Dexie.Table<any, any>, scope: () => U): Dexie.Promise<U>;
+
+    transaction<U>(mode: string, tables: Dexie.Table<any, any>[], scope: () => U): Dexie.Promise<U>;
+
+    close(): void;
+
+    delete(): Dexie.Promise<void>;
+
+    isOpen(): boolean;
+
+    hasFailed(): boolean;
+
+    backendDB(): IDBDatabase;
+
+    vip<U>(scopeFunction: () => U): U;
+}
+
 declare module Dexie {
 
     class Promise<R> implements Thenable<R> {
@@ -208,82 +284,6 @@ declare module Dexie {
         compound: boolean;
         src: string;
     }
-}
-
-declare class Dexie {
-    constructor(databaseName: string);
-
-    constructor(databaseName: string, options: { addons: Array<(db: Dexie) => void> });
-
-    name: string;
-    tables: Dexie.Table<any, any>[];
-    verno: number;
-
-    static addons: Array<(db: Dexie) => void>;
-    static version: number;
-
-    static getDatabaseNames(): Dexie.Promise<Array<string>>;
-
-    static getDatabaseNames<U>(onFulfilled: (value: Array<string>) => Thenable<U>): Dexie.Promise<U>;
-
-    static getDatabaseNames<U>(onFulfilled: (value: Array<string>) => U): Dexie.Promise<U>;
-
-    static getByKeyPath(obj: Object, keyPath: string): any;
-
-    static setByKeyPath(obj: Object, keyPath: string, value: any): void;
-
-    static delByKeyPath(obj: Object, keyPath: string): void;
-
-    static shallowClone(obj: Object): Object;
-
-    static deepClone(obj: Object): Object;
-
-        version(versionNumber: Number): Dexie.Version
-
-        on: {
-            (eventName: string, subscriber: () => any): void;
-            ready: Dexie.DexieEvent;
-            error: Dexie.DexieEvent;
-            populate: Dexie.DexieEvent;
-            blocked: Dexie.DexieEvent;
-            versionchange: Dexie.DexieEvent;
-        }
-
-        open(): Dexie.Promise<void>;
-
-    table(tableName: string): Dexie.Table<any, any>;
-
-    table<T>(tableName: string): Dexie.Table<T, any>;
-
-    table<T, Key>(tableName: string): Dexie.Table<T, Key>;
-
-    transaction<U>(mode: string, table: Dexie.Table<any, any>, scope: () => Thenable<U>): Dexie.Promise<U>;
-
-    transaction<U>(mode: string, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, scope: () => Thenable<U>): Dexie.Promise<U>;
-
-    transaction<U>(mode: string, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, table3: Dexie.Table<any, any>, scope: () => Thenable<U>): Dexie.Promise<U>;
-
-    transaction<U>(mode: string, tables: Dexie.Table<any, any>[], scope: () => Thenable<U>): Dexie.Promise<U>;
-
-    transaction<U>(mode: string, table: Dexie.Table<any, any>, scope: () => U): Dexie.Promise<U>;
-
-    transaction<U>(mode: string, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, scope: () => U): Dexie.Promise<U>;
-
-    transaction<U>(mode: string, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, table3: Dexie.Table<any, any>, scope: () => U): Dexie.Promise<U>;
-
-    transaction<U>(mode: string, tables: Dexie.Table<any, any>[], scope: () => U): Dexie.Promise<U>;
-
-    close(): void;
-
-    delete(): Dexie.Promise<void>;
-
-    isOpen(): boolean;
-
-    hasFailed(): boolean;
-
-    backendDB(): IDBDatabase;
-
-    vip<U>(scopeFunction: () => U): U;
 }
 
 declare module 'Dexie' {
