@@ -88,8 +88,8 @@ module AppDb {
                     Dexie.Promise.all(this.phones.map(phone => db.phones.put(phone))))
                 .then(results => {
                     // Remove items from DB that is was not saved here:
-                    var emailIds = results[0],
-                        phoneIds = results[1];
+                    var emailIds = results[0], // array of resulting primary keys
+                        phoneIds = results[1]; // array of resulting primary keys
 
                     db.emails.where('contactId').equals(this.id)
                         .and(email => emailIds.indexOf(email.id) === -1)
