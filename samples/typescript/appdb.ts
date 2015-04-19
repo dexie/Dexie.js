@@ -24,47 +24,9 @@ module AppDb {
             });
 
             // Let's physically map Contact class to contacts table.
-            // This will make it possible to call the resolve() method
+            // This will make it possible to call loadEmailsAndPhones()
             // directly on retrieved database objects.
             db.contacts.mapToClass(Contact);
-
-            // Populate ground data
-            db.on('populate', () => {
-
-                // Populate a contact
-                db.contacts.add(new Contact('Arnold', 'Fitzgerald')).then(id => {
-                    // Populate some emails and phone numbers for the contact
-                    db.emails.add({ contactId: id, type: 'home', email: 'arnold@email.com' });
-                    db.emails.add({ contactId: id, type: 'work', email: 'arnold@abc.com' });
-                    db.phones.add({ contactId: id, type: 'home', phone: '12345678' });
-                    db.phones.add({ contactId: id, type: 'work', phone: '987654321' });
-                });
-            });
-        }
-    }
-
-    /* This is a 'physical' class that is mapped to
-     * the contacts table. We can have methods on it that
-     * we could call on retrieved database objects.
-     */
-    export class Contact {
-        id: number;
-        constructor(public first: string, public last: string) { }
-
-        resolve() {
-            return db.emails
-                .where('contactId').equals(this.id)
-                .toArray(emails =>
-                    db.phones
-                        .where('contactId').equals(this.id)
-                        .toArray(phones => (
-                            {
-                                id: this.id,
-                                first: this.first,
-                                last: this.last,
-                                emails: emails,
-                                phones: phones
-                            })));
         }
     }
 
@@ -86,6 +48,66 @@ module AppDb {
         contactId: number;
         type: string;
         phone: string;
+    }
+
+    /* This is a 'physical' class that is mapped to
+     * the contacts table. We can have methods on it that
+     * we could call on retrieved database objects.
+     */
+    export class Contact {
+        id: number;
+        first: string;
+        last: string;
+        emails: IEmailAddress[];
+        phones: IPhoneNumber[];
+
+        constructor(first: string, last: string, id?:number) {
+            this.first = first;
+            this.last = last;
+            if (id) this.id = id;
+        }
+
+        loadEmailsAndPhones() {
+            return Dexie.Promise.all(
+                db.emails
+                  .where('contactId').equals(this.id)
+                  .toArray(emails => this.emails = emails)
+                ,
+                db.phones
+                  .where('contactId').equals(this.id)
+                  .toArray(phones => this.phones = phones)
+
+            ).then(x => this);
+        }
+
+        save() {
+            return db.transaction('rw', db.contacts, db.emails, db.phones, () => {
+                Dexie.Promise.all(
+                    // Save existing arrays
+                    Dexie.Promise.all(this.emails.map(email => db.emails.put(email))),
+                    Dexie.Promise.all(this.phones.map(phone => db.phones.put(phone))))
+                .then(results => {
+                    // Remove items from DB that is was not saved here:
+                    var emailIds = results[0],
+                        phoneIds = results[1];
+
+                    db.emails.where('contactId').equals(this.id)
+                        .and(email => emailIds.indexOf(email.id) === -1)
+                        .delete();
+
+                    db.phones.where('contactId').equals(this.id)
+                        .and(phone => phoneIds.indexOf(phone.id) === -1)
+                        .delete();
+
+                    // At last, save our own properties.
+                    // (Must not do put(this) because we would get
+                    // reduntant emails/phones arrays saved into db)
+                    db.contacts.put(
+                        new Contact(this.first, this.last, this.id))
+                        .then(id => this.id = id);
+                });
+            });
+        }
     }
 
     export var db = new AppDatabase();

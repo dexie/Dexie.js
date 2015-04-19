@@ -118,6 +118,8 @@ declare module Dexie {
 
         function all<R>(promises: Thenable<R>[]): Promise<R[]>;
 
+        function all<R>(...promises: Thenable<R>[]): Promise<R[]>;
+
         function race<R>(promises: Thenable<R>[]): Promise<R>;
 
         function newPSD<R>(scope: () => R): R;
@@ -254,7 +256,7 @@ declare module Dexie {
     }
 
     interface Collection<T, Key> {
-        and(filter: (x: any) => boolean): Collection<T, Key>;
+        and(filter: (x: T) => boolean): Collection<T, Key>;
         count(): Promise<number>;
         count<U>(onFulfilled: (value: number) => Thenable<U>): Promise<U>;
         count<U>(onFulfilled: (value: number) => U): Promise<U>;
