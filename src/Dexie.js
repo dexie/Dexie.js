@@ -3159,12 +3159,12 @@
 
     // AMD:
     typeof define === 'function' && define.amd ?
-    [self, function (name, value) { define(name, function () { return value; }); }] :
+    [self || window, function (name, value) { define(name, function () { return value; }); }] :
 
     // CommonJS:
     typeof global !== 'undefined' && typeof module !== 'undefined' && module.exports ?
     [global, function (name, value) { module.exports = value; }]
 
     // Vanilla HTML and WebWorkers:
-    : [self, function (name, value) { self[name] = value; }]);
+    : [self || window, function (name, value) { (self || window)[name] = value; }]);
 

@@ -799,17 +799,17 @@
     });
 }).apply(null, 
     // AMD:
-    typeof define === 'function' && define.amd ? [self, define] : 
+    typeof define === 'function' && define.amd ? [self || window, define] : 
     // CommonJS:
     typeof global !== 'undefined' && typeof module !== 'undefined' && typeof require != 'undefined' ?
         [global, function (name, modules, fn) { 
             module.exports = fn.apply(null, modules.map(function(id) { return require(id); }));
         }] :
     // Vanilla HTML and WebWorkers:
-    [self, function (name, modules, fn) {   
-        var addon = fn.apply(null,modules.map(function(m){return m.split('.').reduce(function(p,c){return p&&p[c];},self);})),
+    [self || window, function (name, modules, fn) {   
+        var addon = fn.apply(null,modules.map(function(m){return m.split('.').reduce(function(p,c){return p&&p[c];},self || window);})),
             path = name.split('.'),
-            nsHost = path.slice(0,path.length-1).reduce(function(p,c){return p&&p[c];},self);
+            nsHost = path.slice(0,path.length-1).reduce(function(p,c){return p&&p[c];},self || window);
         Dexie.addons.push(addon);
         nsHost[path[path.length-1]] = addon;
     }]
