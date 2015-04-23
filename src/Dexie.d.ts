@@ -1,4 +1,8 @@
-﻿
+﻿// Type definitions for Dexie v1.1
+// Project: https://github.com/dfahlander/Dexie.js
+// Definitions by: David Fahlander <http://github.com/dfahlander>
+// Definitions: https://github.com/borisyankov/DefinitelyTyped
+
 interface Thenable<R> {
     then<U>(onFulfilled: (value: R) => Thenable<U>, onRejected: (error: any) => Thenable<U>): Thenable<U>;
     then<U>(onFulfilled: (value: R) => Thenable<U>, onRejected?: (error: any) => U): Thenable<U>;
@@ -100,9 +104,9 @@ declare module Dexie {
 
         catch<U>(onRejected: (error: any) => Promise<U>): Promise<U>;
 
-        catch<U>(ExceptionType: Function, onRejected: (error) => Promise<U>): Promise<U>;
+        catch<U>(ExceptionType: Function, onRejected: (error: any) => Promise<U>): Promise<U>;
 
-        catch<U>(errorName: string, onRejected: (error) => Promise<U>): Promise<U>;
+        catch<U>(errorName: string, onRejected: (error: any) => Promise<U>): Promise<U>;
 
         finally<R>(onFinally: () => any): Promise<R>;
 
@@ -127,7 +131,7 @@ declare module Dexie {
         var PSD: any;
 
         var on: {
-            (eventName: string, subscriber: (...args) => any): void;
+            (eventName: string, subscriber: (...args: any[]) => any): void;
             error: DexieErrorEvent;
         }
     }
@@ -158,28 +162,27 @@ declare module Dexie {
     }
 
     interface DexieEvent {
-        subscribe(fn: () => any);
-        unsubscribe(fn: () => any);
-        fire();
+        subscribe(fn: () => any): void;
+        unsubscribe(fn: () => any): void;
+        fire(): any;
     }
 
     interface DexieErrorEvent {
-        subscribe(fn: (error) => any);
-        unsubscribe(fn: (error) => any);
-        fire(error);
+        subscribe(fn: (error: any) => any): void;
+        unsubscribe(fn: (error: any) => any): void;
+        fire(error: any): any;
     }
 
     interface DexieVersionChangeEvent {
-        subscribe(fn: (event: IDBVersionChangeEvent) => any);
-        unsubscribe(fn: (event: IDBVersionChangeEvent) => any);
-        fire(event: IDBVersionChangeEvent);
+        subscribe(fn: (event: IDBVersionChangeEvent) => any): void;
+        unsubscribe(fn: (event: IDBVersionChangeEvent) => any): void;
+        fire(event: IDBVersionChangeEvent): any;
     }
 
-    interface DexieOnReadyEvent
-    {
-        subscribe(fn: () => any, bSticky: boolean);
-        unsubscribe(fn: () => any);
-        fire();
+    interface DexieOnReadyEvent {
+        subscribe(fn: () => any, bSticky: boolean): void;
+        unsubscribe(fn: () => any): void;
+        fire(): any;
     }
 
     interface Table<T, Key> {
@@ -217,7 +220,7 @@ declare module Dexie {
         reverse(): Collection<T, Key>;
         mapToClass(constructor: Function): Function;
         add(item: T, key?: Key): Promise<Key>;
-        update(key: Key, changes: { [keyPath: string]: any });
+        update(key: Key, changes: { [keyPath: string]: any }): Promise<number>;
         put(item: T, key?: Key): Promise<Key>;
         delete(key: Key): Promise<void>;
         clear(): Promise<void>;
