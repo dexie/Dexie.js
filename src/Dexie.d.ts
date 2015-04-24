@@ -305,7 +305,7 @@ declare module Dexie {
 
     interface IndexSpec {
         name: string;
-        keyPath: any;
+        keyPath: any; // string | Array<string>
         unique: boolean;
         multi: boolean;
         auto: boolean;
