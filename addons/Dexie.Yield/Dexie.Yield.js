@@ -36,7 +36,7 @@
                     if (!next.value || typeof next.value.then !== 'function')
                         // Don't accept yielding a non-promise such as "yield 3;".
                         // By not accepting that, we could detect bugs better.
-                        iterable.throw(new TypeError("Only acceptable to yield a Promise"));
+                        return step(doThrow, initial)(new TypeError("Only acceptable to yield a Promise"));
                     return next.value.then(onSuccess, onError);
                 }
             }

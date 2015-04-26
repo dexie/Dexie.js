@@ -172,6 +172,43 @@
             }).then(start);
         });
 
+
+        asyncTest("Should not allow yielding a non-promise 5", function () {
+            spawn (function*()
+            {
+                yield Dexie.Promise.resolve(3);
+                ok(true, "Could yield a promise");
+                try {
+                    yield 3;
+                    ok(false, "Yielding a non-Thenable shouldn't be allowed");
+                } catch (e) {
+                    ok(e instanceof TypeError, "Catched exception about not able to yield non promise: " + e);
+                }
+                return 4;
+            }).then (function(x) {
+                equal(x, 4, "Finally got the value 4");
+            }).catch (function(e) {
+                ok(false, "Something is rotten in the state of Denmark: " + e);
+            }).then(start);
+        });
+
+        asyncTest("Should not allow yielding a non-promise 6", function () {
+            spawn (function*()
+            {
+                try {
+                    yield 3;
+                    ok(false, "Yielding a non-Thenable shouldn't be allowed");
+                } catch (e) {
+                    ok(e instanceof TypeError, "Catched exception about not able to yield non promise: " + e);
+                }
+                return 4;
+            }).then (function(x) {
+                equal(x, 4, "Finally got the value 4");
+            }).catch (function(e) {
+                ok(false, "Something is rotten in the state of Denmark: " + e);
+            }).then(start);
+        });
+
         asyncTest("Should not allow returning a promise", function () {
             spawn (function*()
             {
@@ -189,8 +226,8 @@
                 return yield Promise.resolve(3);
             }).then (function() {
                 ok(true, "Should be able to do 'return yield Promise.resolve(x);'");
-            }).catch (function() {
-                ok(false, "Error occurred");
+            }).catch (function(e) {
+                ok(false, "Error occurred: " + e);
             }).then(start);
         });
 
