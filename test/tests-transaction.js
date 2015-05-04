@@ -479,6 +479,37 @@
                 });
             });
         }).finally(start);
-    });
+	});
+
+	asyncTest("Issue #91 Promise.resolve() from within parent transaction", function () {
+	    db.transaction('rw', db.users, db.pets, function () {
+	        ok(true, "Entered parent transaction");
+	        var trans = Dexie.currentTransaction;
+
+	        return db.transaction('rw', db.users, function() {
+	            ok(true, "Entered sub transaction");
+	            ok(Dexie.currentTransaction !== trans, "We are not in parent transaction");
+	            ok(Dexie.currentTransaction.parent === trans, "...but in a sub transaction");
+	            return Dexie.Promise.resolve(3);
+	        }).then(function (result) {
+	            equal(result, 3, "Got 3");
+	            ok(Dexie.currentTransaction === trans, "Now we are in parent transaction");
+	            db.users.add({ username: "Gunnar" });
+	            return db.users.where("username").equals("Gunnar").first();
+	        }).then(function(result) {
+	            ok(!!result, "Got result");
+	            equal(result.username, "Gunnar", "Got the Gunnar we expected");
+	            return Dexie.Promise.resolve(result);
+	        }).catch(function(e) {
+	            ok(false, "Error: " + e);
+	        });
+	    }).then(function(result) {
+	        ok(!!result, "Got result");
+	        equal(result.username, "Gunnar", "Got the Gunnar we expected");
+	    }).catch(function(e) {
+	        ok(false, "Error at root scope: " + e);
+	    }).finally(start);
+	});
+
 })();
 
