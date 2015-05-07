@@ -2929,10 +2929,12 @@
             };
             reject(errObj);
 
-            if (event) {
+            if (event) {// Old versions of IndexedDBShim doesnt provide an error event
                 // Stop error from propagating to IDBTransaction. Let us handle that manually instead.
-                event.stopPropagation();
-                event.preventDefault();
+                if (event.stopPropagation) // IndexedDBShim doesnt support this
+                    event.stopPropagation();
+                if (event.preventDefault) // IndexedDBShim doesnt support this
+                    event.preventDefault();
             }
 
             return false;

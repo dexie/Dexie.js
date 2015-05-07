@@ -56,17 +56,23 @@
         db.delete().then(function () {
             return db.open();
         }).then(function () {
-            var promise = db.friends.toCollection().each(function () { });
+            var promise = db.friends.toCollection().each(function() {});
             log.push('1');
             promise.then(function () {
                 log.push('2');
                 log.push('a');
-                promise.then(function () {
+                promise.then(function() {
                     log.push('b');
                     check();
+                }).catch(function(e) {
+                    ok(false, "error: " + e);
+                    start();
                 });
                 log.push('c');
                 check();
+            }).catch(function(e) {
+                ok(false, "error: " + e);
+                start();
             });
             log.push('3');
             check();

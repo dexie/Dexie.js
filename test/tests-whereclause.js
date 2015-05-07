@@ -201,6 +201,12 @@
     });
 
     asyncTest("equalsIgnoreCase() 3 (first key shorter than needle)", function () {
+        if (typeof idbModules !== 'undefined' && Dexie.dependencies.indexedDB === idbModules.shimIndexedDB) {
+            // Using indexedDBShim.
+            ok(false, "This test would hang with IndexedDBShim as of 2015-05-07");
+            start();
+            return;
+        }
         db.transaction("rw", db.files, function () {
             db.files.clear();
             db.files.add({ filename: "Hello-there-", folderId: 1 });

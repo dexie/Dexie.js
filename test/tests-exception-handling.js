@@ -211,6 +211,12 @@
 
 
     asyncTest("catch-all with db.on('error')", 3, function () {
+        if (typeof idbModules !== 'undefined' && Dexie.dependencies.indexedDB === idbModules.shimIndexedDB) {
+            // Using indexedDBShim.
+            ok(false, "This test would hang with IndexedDBShim as of 2015-05-07");
+            start();
+            return;
+        }
         var ourDB = new Dexie("TestDB2");
         ourDB.version(1).stores({ users: "++id,first,last,&username,&*email,*pets" });
         ourDB.on("populate", function () {

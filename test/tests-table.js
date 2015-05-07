@@ -212,21 +212,22 @@
 
     asyncTest("put-no-transaction", function () {
         var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
-        db.users.put(newUser).then(function (id) {
+        db.users.put(newUser).then(function(id) {
             equal(id, 3, "Got id 3 because we didnt supply an id");
             equal(newUser.id, id, "The id property of the new user was set");
-            db.users.where("username").equals("aper").first(function (user) {
+            return db.users.where("username").equals("aper").first(function(user) {
                 equal(user.last, "Persbrant", "The correct item was actually added");
                 user.last = "ChangedLastName";
-                db.users.put(user).then(function (id) {
+                return db.users.put(user).then(function(id) {
                     equal(id, 3, "Still got id 3 because we update same object");
-                    db.users.where("last").equals("ChangedLastName").first(function (user) {
+                    return db.users.where("last").equals("ChangedLastName").first(function(user) {
                         equal(user.last, "ChangedLastName", "LastName was successfully changed");
-                        start();
                     });
                 });
             });
-        });
+        }).catch(function(e) {
+            ok(false, e);
+        }).finally(start);
     });
 
 

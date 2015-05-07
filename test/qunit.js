@@ -2325,5 +2325,5 @@ if (window.location.search.indexOf('polyfillIE=true') != -1) {
     document.write('<script src="https://rawgit.com/dfahlander/idb-iegap/master/idb-iegap.js">\x3C/script>');
 }
 if (window.location.search.indexOf('indexedDBShim=true') != -1) {
-    document.write('<script src="https://rawgit.com/axemclion/IndexedDBShim/master/dist/IndexedDBShim.js">\x3C/script>');
+    document.write('<script src="https://rawgit.com/axemclion/IndexedDBShim/master/dist/indexeddbshim.js">\x3C/script>');
 }
