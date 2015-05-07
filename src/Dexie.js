@@ -2928,9 +2928,13 @@
                 }
             };
             reject(errObj);
-            // Stop error from propagating to IDBTransaction. Let us handle that manually instead.
-            event.stopPropagation();
-            event.preventDefault();
+
+            if (event) {
+                // Stop error from propagating to IDBTransaction. Let us handle that manually instead.
+                event.stopPropagation();
+                event.preventDefault();
+            }
+
             return false;
         };
     }
