@@ -785,16 +785,20 @@
                                     ++uncompletedRequests;
                                     function proxy(fn2) {
                                         return function (val) {
-                                            var retval = fn2(val);
-                                            if (--uncompletedRequests === 0 && trans.active) {
-                                                // _rootExec needed so that we do not loose our main transaction
-                                                // There is a unit test that will fail if we remove this line:
-                                                //      "Chained operations in parent transaction hijacked by sub transaction"
-                                                Promise._rootExec(function() {
-                                                    trans.active = false;
-                                                    trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
+                                            var retval;
+                                            // _rootExec needed so that we do not loose any IDBTransaction in a setTimeout() call.
+                                            Promise._rootExec(function () {
+                                                retval = fn2(val);
+                                                // _tickFinalize makes sure to support lazy micro tasks executed in Promise._rootExec().
+                                                // We certainly do not want to copy the bad pattern from IndexedDB but instead allow
+                                                // execution of Promise.then() callbacks until the're all done.
+                                                Promise._tickFinalize(function () {
+                                                    if (--uncompletedRequests === 0 && trans.active) {
+                                                        trans.active = false;
+                                                        trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
+                                                    }
                                                 });
-                                            }
+                                            });
                                             return retval;
                                         }
                                     }
@@ -822,9 +826,11 @@
                         });
 
                         // Finally, call the scope function with our table and transaction arguments.
-                        returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
+                        Promise._rootExec(function() {
+                            returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
+                        });
                     });
-                    if (!trans.idbtrans || parentTransaction && uncompletedRequests === 0) {
+                    if (!trans.idbtrans || (parentTransaction && uncompletedRequests === 0)) {
                         trans._nop(); // Make sure transaction is being used so that it will resolve.
                     }
                 } catch (e) {
@@ -2244,6 +2250,7 @@
             isRootExecution = true;
 
         var operationsQueue = [];
+        var tickFinalizers = [];
         function enqueueImmediate(fn, args) {
             operationsQueue.push([fn, _slice.call(arguments, 1)]);
         }
@@ -2304,6 +2311,8 @@
             isRootExecution = false;
             asap = enqueueImmediate;
             try {
+                var outerPSD = Promise.PSD;
+                Promise.PSD = self._PSD;
                 ret = cb(self._value);
                 if (!self._state && (!ret || typeof ret.then !== 'function' || ret._state !== false)) setCatched(self); // Caller did 'return Promise.reject(err);' - don't regard it as catched!
                 deferred.resolve(ret);
@@ -2316,8 +2325,13 @@
                     }
                 }
             } finally {
+                Promise.PSD = outerPSD;
                 if (isRootExec) {
-                    while (operationsQueue.length > 0) executeOperationsQueue();
+                    do {
+                        while (operationsQueue.length > 0) executeOperationsQueue();
+                        var finalizer = tickFinalizers.pop();
+                        if (finalizer) try {finalizer();} catch(e){}
+                    } while (tickFinalizers.length > 0 || operationsQueue.length > 0);
                     asap = _asap;
                     isRootExecution = true;
                 }
@@ -2332,7 +2346,11 @@
                 fn();
             } finally {
                 if (isRootExec) {
-                    while (operationsQueue.length > 0) executeOperationsQueue();
+                    do {
+                        while (operationsQueue.length > 0) executeOperationsQueue();
+                        var finalizer = tickFinalizers.pop();
+                        if (finalizer) try { finalizer(); } catch (e) { }
+                    } while (tickFinalizers.length > 0 || operationsQueue.length > 0);
                     asap = _asap;
                     isRootExecution = true;
                 }
@@ -2352,6 +2370,7 @@
                 if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
                     if (typeof newValue.then === 'function') {
                         doResolve(promise, function (resolve, reject) {
+                            //newValue instanceof Promise ? newValue._then(resolve, reject) : newValue.then(resolve, reject);
                             newValue.then(resolve, reject);
                         }, function (data) {
                             resolve(promise, data);
@@ -2541,6 +2560,10 @@
         };
 
         Promise._rootExec = _rootExec;
+        Promise._tickFinalize = function(callback) {
+            if (isRootExecution) throw new Error("Not in a virtual tick");
+            tickFinalizers.push(callback);
+        };
 
         return Promise;
     })();

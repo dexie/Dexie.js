@@ -511,5 +511,160 @@
 	    }).finally(start);
 	});
 
+	asyncTest("Issue #95 Nested transactions fails if parent transaction don't execute any operation", function () {
+        function smallChild() {
+            return db.transaction('rw', db.users, db.pets, function () {
+                console.log("Entering small child");
+                return db.users.add({ // Here: Test succeeded if removing the 'return' statement here!
+                    username: 123,
+                    value: 'val'
+                }).then(function (res) {
+                    ok(true, "smallChild() could add user with primary key " + res);
+                    return res;
+                }).catch(function (err) {
+                    ok(false, 'SCCA' + err);
+                });
+            }).then(function(res) {
+                ok(true, "smallChild's 3rd level nested transaction commited with result " + res);
+            }).catch (function (err) {
+                ok(false, 'SCTR' + err);
+            });
+        }
+
+        function middleChild() {
+            return db.transaction('rw', db.users, db.pets, function () {
+                console.log("Entering middle child");
+                return db.pets.add({
+                    id: 321,
+                    value: 'anotherval'
+                }).catch (function (err) {
+                    ok(false, 'MCCA' + err);
+                });
+            }).catch (function (err) {
+                ok(false, 'MCTR' + err);
+            });
+        }
+
+        function bigParent() {
+            // Nesting transaction without starting the real indexedDB transaction cause an error?
+            return db.transaction('rw', db.users, db.pets, function () { // Here: Test succeeded if skipping the outermost transaction scope.
+                console.log("Entering root transaction");
+                return db.transaction('rw', db.users, db.pets, function () {
+                    console.log("Entering first sub transaction");
+                    return smallChild().then(function () {
+                        return middleChild();
+                    }).catch (function (err) {
+                        ok(false, 'BPCA ' + err);
+                    });
+                }).catch (function (err) {
+                    ok(false, 'BPTRI ' + err);
+                });
+            }).catch (function (err) {
+                ok(false, 'BPTRX ' + err);
+            });
+        }
+
+        bigParent().then(function(res) {
+            ok(true, "done");
+        }).catch(function(e) {
+            ok(false, "Final error: " + e);
+        }).finally(start);
+    });
+
+	asyncTest("Issue #91 / #95 with Dexie.Promise.resolve() mixed in here and there...", function () {
+	    ok(!Dexie.currentTransaction, "There is no ongoing transaction");
+        db.transaction('rw', db.pets, function () {
+            var rootLevelTransaction = Dexie.currentTransaction;
+            ok(true, "Entered root transaction scope");
+            return db.transaction('rw', db.pets, function() {
+                ok(true, "Entered sub scope");
+                var level2Transaction = Dexie.currentTransaction;
+                ok(level2Transaction.parent === rootLevelTransaction, "Level2 transaction's parent is the root level transaction");
+                return db.transaction('rw', db.pets, function() {
+                    ok(true, "Entered sub of sub scope");
+                    var innermostTransaction = Dexie.currentTransaction;
+                    ok(!!innermostTransaction, "There is an ongoing transaction (direct in 3rd level scope)");
+                    ok(innermostTransaction.parent === level2Transaction, "Parent is level2 transaction");
+                    return Dexie.Promise.resolve().then(function() {
+                        ok(true, "Sub of sub scope: Promise.resolve().then() called");
+                        ok(!!Dexie.currentTransaction, "There is an ongoing transaction");
+                        ok(Dexie.currentTransaction === innermostTransaction, "Still in innermost transaction");
+                        return db.pets.add({
+                            id: 123,
+                            value: 'val'
+                        }).then(function(resultId) {
+                            ok(true, "Sub of sub scope: add() resolved");
+                            ok(Dexie.currentTransaction === innermostTransaction, "Still in innermost transaction");
+                            return Dexie.Promise.resolve(resultId).then(function(res) {
+                                return Dexie.Promise.resolve(res);
+                            });
+                        }).then(function(resultId) {
+                            ok(true, "Sub if sub scope: Promise.resolve() after add() resolve");
+                            ok(Dexie.currentTransaction === innermostTransaction, "Still in innermost transaction");
+                            return Dexie.Promise.resolve(resultId);
+                        });
+                    }).then(function() {
+                        ok(true, "sub of sub scope chaining further in promise chains...");
+                        ok(Dexie.currentTransaction === innermostTransaction, "Still in innermost transaction");
+                        return Dexie.Promise.resolve(db.pets.get(123));
+                    }).then(function(pet) {
+                        ok(true, "sub of sub scope chaining further in promise chains 2...");
+                        ok(Dexie.currentTransaction === innermostTransaction, "Still in innermost transaction");
+                        return Dexie.Promise.resolve(pet.id);
+                    });
+                }).then(function(resultId) {
+                    ok(true, "Innermost transaction completed");
+                    ok(Dexie.currentTransaction == level2Transaction, "We should now be executing within level 2 sub transaction");
+                    return Dexie.Promise.resolve(resultId);
+                }).then(function(resultId) {
+                    ok(Dexie.currentTransaction == level2Transaction, "We should still be executing within level 2 sub transaction");
+                    return Dexie.Promise.resolve(resultId);
+                }).then(function(resultId) {
+                    equal(resultId, 123, "Result was 123 as expected");
+                }).then(function() {
+                    return db.transaction('rw', db.pets, function() {
+                        var innermostTransaction2 = Dexie.currentTransaction;
+                        ok(innermostTransaction2.parent == level2Transaction, "Another 3rd level transaction has parent set to our level2 transaction");
+                        return db.pets.add({
+                            id: 321,
+                            value: 'val'
+                        }).then(function(resultId2) {
+                            return Dexie.Promise.resolve(resultId2);
+                        }).then(function(resultId2) {
+                            ok(Dexie.currentTransaction === innermostTransaction2, "We're still in the innermostTransaction (second one)");
+                            return Dexie.Promise.resolve(resultId2).then(function(x) {
+                                ok(Dexie.currentTransaction === innermostTransaction2, "We're still in the innermostTransaction (second one)");
+                                return x;
+                            });
+                        });
+                    }).then(function(resultId2) {
+                        equal(resultId2, 321, "Result2 was 321 as expected");
+                        ok(Dexie.currentTransaction === level2Transaction, "We should still be executing within level 2 sub transaction");
+                        return "finalResult";
+                    });
+                });
+            }).then(function(x) {
+
+                ok(Dexie.currentTransaction === rootLevelTransaction, "Now we're at the root level transaction and can do some more stuff here");
+
+                return db.pets.clear().then(function() {
+                    return x;
+                }).then(function(y) {
+                    ok(true, "Could clear the pets table for example.");
+                    return y;
+                }).catch(function(e) {
+                    ok(false, "oops, this was not what I expected!: " + e);
+                });
+            });
+
+        }).then(function(finalResult) {
+            equal(finalResult, "finalResult", "Got the final result");
+            ok(!Dexie.currentTransaction, "No ongoing transaction now");
+            ok(true, "done");
+        }).catch(function(error) {
+            ok(false, error);
+        }).finally(start);
+        ok(!Dexie.currentTransaction, "After main transaction scope: Still no ongoing transaction at this scope");
+    });
 })();
 

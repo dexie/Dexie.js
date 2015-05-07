@@ -82,4 +82,18 @@
         });
     });
 
+    asyncTest("Issue #97 A transaction may be lost after calling Dexie.Promise.resolve().then(...)", function() {
+        Dexie.Promise.newPSD(function () {
+
+            Dexie.Promise.PSD.hello = "promise land";
+
+            Dexie.Promise.resolve().then(function () {
+                ok(!!Dexie.Promise.PSD, "We should have a Dexie.Promise.PSD");
+                equal(Dexie.Promise.PSD.hello, "promise land");
+            }).catch(function(e) {
+                ok(false, "Error: " + e);
+            }).finally(start);
+
+        });
+    });
 })();
