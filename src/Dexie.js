@@ -2766,7 +2766,9 @@
         if (global.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
     }
 
-    function fakeAutoComplete(fn) {
+    var fakeAutoComplete = function() {};
+
+    function doFakeAutoComplete(fn) {
         var to = setTimeout(fn, 1000);
         clearTimeout(to);
     }
@@ -3184,6 +3186,10 @@
     // Export Dexie to window or as a module depending on environment.
     publish("Dexie", Dexie);
 
+    // Fool IDE to improve autocomplete. Tested with Visual Studio 2013 but should work with 2012 and 2015 as well.
+    doFakeAutoComplete(function() {
+        fakeAutoComplete = doFakeAutoComplete;
+    });
 }).apply(null,
 
     // AMD:
