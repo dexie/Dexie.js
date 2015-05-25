@@ -294,7 +294,7 @@
                             createMissingTables(globalSchema, idbtrans); // At last, make sure to create any missing tables. (Needed by addons that add stores to DB without specifying version)
                     } catch (err) {
                         openReq.onerror = idbtrans.onerror = function (ev) { ev.preventDefault(); };  // Prohibit AbortError fire on db.on("error") in Firefox.
-                        idbtrans.abort();
+                        try { idbtrans.abort(); } catch(e) {}
                         idbtrans.db.close();
                         reject(err);
                     }
@@ -470,7 +470,15 @@
         this.open = function () {
             return new Promise(function (resolve, reject) {
                 if (idbdb || isBeingOpened) throw new Error("Database already opened or being opened");
+                var req, dbWasCreated = false;
                 function openError(err) {
+                    try { req.transaction.abort(); } catch (e) { }
+                    /*if (dbWasCreated) {
+                        // Workaround for issue with some browsers. Seem not to be needed though.
+                        // Unit test "Issue#100 - not all indexes are created" works without it on chrome,FF,opera and IE.
+                        idbdb.close();
+                        indexedDB.deleteDatabase(db.name); 
+                    }*/
                     isBeingOpened = false;
                     dbOpenError = err;
                     db_is_blocked = false;
@@ -495,8 +503,7 @@
                     // A future version of Dexie.js will stopover an intermediate version to workaround this.
                     // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
                     if (!indexedDB) throw new Error("indexedDB API not found. If using IE10+, make sure to run your code on a server URL (not locally). If using Safari, make sure to include indexedDB polyfill.");
-                    var dbWasCreated = false; // TODO: Remove this line. Never used.
-                    var req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
+                    req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
                     req.onerror = eventRejectHandler(openError, ["opening database", dbName]);
                     req.onblocked = function (ev) {
                         db.on("blocked").fire(ev);
@@ -515,7 +522,7 @@
                                 openError(new Error("Database '" + dbName + "' doesnt exist"));
                             }; 
                         } else {
-                            if (e.oldVersion === 0) dbWasCreated = true; // TODO: Remove this line. Never used.
+                            if (e.oldVersion === 0) dbWasCreated = true;
                             req.transaction.onerror = eventRejectHandler(openError);
                             var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
                             runUpgraders(oldVer / 10, req.transaction, openError, req);
@@ -813,8 +820,8 @@
                         });
                         // If transaction fails, reject the Promise and bubble to db if noone catched this rejection.
                         trans.error(function (e) {
-                            trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
-                            trans.abort();
+                            if (trans.idbtrans) trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
+                            try {trans.abort();} catch(e2){}
                             if (parentTransaction) {
                                 parentTransaction.active = false;
                                 parentTransaction.on.error.fire(e); // Bubble to parent transaction

@@ -249,3 +249,52 @@ asyncTest("Issue #76 Dexie inside Web Worker", function () {
         }
     }
 });
+
+asyncTest("Issue#100 - not all indexes are created", function () {
+    var db = new Dexie("TestDB");
+    db.version(20)
+      .stores({
+          t: 'id,displayName,*displayNameParts,isDeleted,countryRef,[countryRef+isDeleted],autoCreated,needsReview,[autoCreated+isDeleted],[needsReview+isDeleted],[autoCreated+needsReview+isDeleted],[autoCreated+countryRef+needsReview+isDeleted],[autoCreated+countryRef+needsReview+isDeleted],[autoCreated+robotsNoIndex+isDeleted],[autoCreated+needsReview+robotsNoIndex+isDeleted],[autoCreated+countryRef+robotsNoIndex+isDeleted],[autoCreated+countryRef+needsReview+robotsNoIndex+isDeleted]',
+      });
+    db.open().then(function() {
+        return Dexie.Promise.all(
+            db.t.orderBy("id").first(),
+            db.t.orderBy("displayName").first(),
+            db.t.orderBy("displayNameParts").first(),
+            db.t.orderBy("isDeleted").first(),
+            db.t.orderBy("countryRef").first(),
+            db.t.orderBy("[countryRef+isDeleted]").first(),
+            db.t.orderBy("autoCreated").first(),
+            db.t.orderBy("needsReview").first(),
+            db.t.orderBy("[autoCreated+isDeleted]").first(),
+            db.t.orderBy("[needsReview+isDeleted]").first(),
+            db.t.orderBy("[autoCreated+needsReview+isDeleted]").first(),
+            db.t.orderBy("[autoCreated+countryRef+needsReview+isDeleted]").first(),
+            db.t.orderBy("[autoCreated+robotsNoIndex+isDeleted]").first(),
+            db.t.orderBy("[autoCreated+needsReview+robotsNoIndex+isDeleted]").first(),
+            db.t.orderBy("[autoCreated+countryRef+robotsNoIndex+isDeleted]").first(),
+            db.t.orderBy("[autoCreated+countryRef+needsReview+robotsNoIndex+isDeleted]").first()
+        );
+    }).then(function(res) {
+        ok(false, "Should not succeed with creating the same index twice");
+    }).catch(function(err) {
+        ok(true, "Catched error trying to create duplicate indexes: " + err);
+        return db.t.toArray();
+    }).then(function(a) {
+        ok(false, "Database should have failed here");
+    }).catch(function(err) {
+        ok(true, "Got exception when trying to work agains DB: " + err);
+    }).then(function () {
+        // Close the database and open dynamically to check that
+        // it should not exist when failed to open.
+        db.close();
+        db = new Dexie("TestDB");
+        return db.open(); 
+    }).then(function() {
+        ok(false, "Should not succeed to open the database. It should not have been created.");
+        equal(db.tables.length, 0, "At least expect no tables to have been created on the database");
+    }).catch(function(err) {
+        ok(true, "Should not succeed to dynamically open db because it should not exist");
+    }).finally(start);
+
+});
