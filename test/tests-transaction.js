@@ -87,12 +87,14 @@
     asyncTest("Inactive transaction", function () {
         return db.transaction('rw', db.users, function () {
             return new Dexie.Promise(function (resolve, reject) {
-                // Wait a little with resolving this custom promise.... (so that IDB framework must commit the transaction)
-                setTimeout(resolve, 100);
 
                 // Notify log when transaction completes too early
                 Dexie.currentTransaction.complete(function () {
                     ok(true, "Transaction committing too early...");
+                    // Resolve the promise after transaction commit.
+                    // Flow will continue in the same Transaction scope but with an
+                    // inactive transaction
+                    resolve();
                 });
 
             }).then(function () {
@@ -115,13 +117,11 @@
 
                 // Create a custom promise that will use setTimeout() so that IDB transaction will commit
                 return new Dexie.Promise(function (resolve, reject) {
-                    // Wait a little with resolving this custom promise.... (so that IDB framework must commit the transaction)
-                    setTimeout(resolve, 100);
-
                     // Notify log when transaction completes too early
-                    Dexie.currentTransaction.complete(function () {
+                    Dexie.currentTransaction.complete(function() {
                         ok(true, "Transaction committing too early...");
-                    })
+                        resolve();
+                    });
                 });
             }).then(function () {
                 // Now when transaction has already committed, try to add a user with the current transaction:
