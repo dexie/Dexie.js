@@ -3,7 +3,7 @@
 
    By David Fahlander, david.fahlander@gmail.com
 
-   Version 1.0.4 - March 24, 2015.
+   Version 1.1 - May 26, 2015.
 
    Tested successfully on Chrome, IE, Firefox and Opera.
 
@@ -11,7 +11,7 @@
 
    Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
 */
-(function (window, publish, isBrowser, undefined) {
+(function (global, publish, undefined) {
 
     "use strict";
 
@@ -72,20 +72,15 @@
 
         function init() {
             // If browser (not node.js or other), subscribe to versionchange event and reload page
-            if (isBrowser) db.on("versionchange", function (ev) {
+            db.on("versionchange", function (ev) {
+                // Default behavior for versionchange event is to close database connection.
+                // Caller can override this behavior by doing db.on("versionchange", function(){ return false; });
                 // Let's not block the other window from making it's delete() or open() call.
                 db.close();
-                if (ev.newVersion) { // Only reload page if versionchange event isnt a deletion of db.
-                    // Default behavior for versionchange event is to reload the page.
-                    // Caller can override this behavior by doing db.on("versionchange", function(){ return false; });
-                    window.location.reload(true);
-                    /* The logic behind this default handler is:
-                        1. Since this event means that the db is upgraded in another IDBDatabase instance (in tab or window that has a newer version of the code),
-                           it makes sense to reload our page and force reload from cache. When reloaded, we get the newest version of the code - making app in synch with db.
-                        2. There wont be an infinite loop here even if our page still get the old version, becuase the next time onerror will be triggered and not versionchange.
-                        3. If not solving this by default, the API user would be obligated to handle versionchange, and would have to be on place in every example of Dexie code.
-                    */
-                };
+                db.on('error').fire(new Error("Database version changed by other database connection."));
+                // In many web applications, it would be recommended to force window.reload()
+                // when this event occurs. Do do that, subscribe to the versionchange event
+                // and call window.location.reload(true);
             });
         }
 
@@ -299,7 +294,7 @@
                             createMissingTables(globalSchema, idbtrans); // At last, make sure to create any missing tables. (Needed by addons that add stores to DB without specifying version)
                     } catch (err) {
                         openReq.onerror = idbtrans.onerror = function (ev) { ev.preventDefault(); };  // Prohibit AbortError fire on db.on("error") in Firefox.
-                        idbtrans.abort();
+                        try { idbtrans.abort(); } catch(e) {}
                         idbtrans.db.close();
                         reject(err);
                     }
@@ -475,7 +470,15 @@
         this.open = function () {
             return new Promise(function (resolve, reject) {
                 if (idbdb || isBeingOpened) throw new Error("Database already opened or being opened");
+                var req, dbWasCreated = false;
                 function openError(err) {
+                    try { req.transaction.abort(); } catch (e) { }
+                    /*if (dbWasCreated) {
+                        // Workaround for issue with some browsers. Seem not to be needed though.
+                        // Unit test "Issue#100 - not all indexes are created" works without it on chrome,FF,opera and IE.
+                        idbdb.close();
+                        indexedDB.deleteDatabase(db.name); 
+                    }*/
                     isBeingOpened = false;
                     dbOpenError = err;
                     db_is_blocked = false;
@@ -500,8 +503,7 @@
                     // A future version of Dexie.js will stopover an intermediate version to workaround this.
                     // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
                     if (!indexedDB) throw new Error("indexedDB API not found. If using IE10+, make sure to run your code on a server URL (not locally). If using Safari, make sure to include indexedDB polyfill.");
-                    var dbWasCreated = false; // TODO: Remove this line. Never used.
-                    var req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
+                    req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
                     req.onerror = eventRejectHandler(openError, ["opening database", dbName]);
                     req.onblocked = function (ev) {
                         db.on("blocked").fire(ev);
@@ -520,7 +522,7 @@
                                 openError(new Error("Database '" + dbName + "' doesnt exist"));
                             }; 
                         } else {
-                            if (e.oldVersion === 0) dbWasCreated = true; // TODO: Remove this line. Never used.
+                            if (e.oldVersion === 0) dbWasCreated = true;
                             req.transaction.onerror = eventRejectHandler(openError);
                             var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
                             runUpgraders(oldVer / 10, req.transaction, openError, req);
@@ -790,16 +792,20 @@
                                     ++uncompletedRequests;
                                     function proxy(fn2) {
                                         return function (val) {
-                                            var retval = fn2(val);
-                                            if (--uncompletedRequests === 0 && trans.active) {
-                                                // _rootExec needed so that we do not loose our main transaction
-                                                // There is a unit test that will fail if we remove this line:
-                                                //      "Chained operations in parent transaction hijacked by sub transaction"
-                                                Promise._rootExec(function() {
-                                                    trans.active = false;
-                                                    trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
+                                            var retval;
+                                            // _rootExec needed so that we do not loose any IDBTransaction in a setTimeout() call.
+                                            Promise._rootExec(function () {
+                                                retval = fn2(val);
+                                                // _tickFinalize makes sure to support lazy micro tasks executed in Promise._rootExec().
+                                                // We certainly do not want to copy the bad pattern from IndexedDB but instead allow
+                                                // execution of Promise.then() callbacks until the're all done.
+                                                Promise._tickFinalize(function () {
+                                                    if (--uncompletedRequests === 0 && trans.active) {
+                                                        trans.active = false;
+                                                        trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
+                                                    }
                                                 });
-                                            }
+                                            });
                                             return retval;
                                         }
                                     }
@@ -814,8 +820,8 @@
                         });
                         // If transaction fails, reject the Promise and bubble to db if noone catched this rejection.
                         trans.error(function (e) {
-                            trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
-                            trans.abort();
+                            if (trans.idbtrans) trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
+                            try {trans.abort();} catch(e2){}
                             if (parentTransaction) {
                                 parentTransaction.active = false;
                                 parentTransaction.on.error.fire(e); // Bubble to parent transaction
@@ -827,9 +833,11 @@
                         });
 
                         // Finally, call the scope function with our table and transaction arguments.
-                        returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
+                        Promise._rootExec(function() {
+                            returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
+                        });
                     });
-                    if (!trans.idbtrans || parentTransaction && uncompletedRequests === 0) {
+                    if (!trans.idbtrans || (parentTransaction && uncompletedRequests === 0)) {
                         trans._nop(); // Make sure transaction is being used so that it will resolve.
                     }
                 } catch (e) {
@@ -1292,7 +1300,7 @@
                                 // whether the caller is about to catch() the error or not. Have to make
                                 // transaction fail. Catching such an error wont stop transaction from failing.
                                 // This is a limitation we have to live with.
-                                Dexie.spawn(function () { self.on('error').fire(e); });
+                                Dexie.ignoreTransaction(function () { self.on('error').fire(e); });
                                 self.abort();
                                 reject(e);
                             }
@@ -1310,7 +1318,7 @@
                     }
                     p.onuncatched = function (e) {
                         // Bubble to transaction. Even though IDB does this internally, it would just do it for error events and not for caught exceptions.
-                        Dexie.spawn(function () { self.on("error").fire(e); });
+                        Dexie.ignoreTransaction(function () { self.on("error").fire(e); });
                         self.abort();
                     };
                     return p;
@@ -1500,7 +1508,7 @@
                     var set = getSetArgs(arguments);
                     var compare = isCompound ? compoundCompare(ascending) : ascending;
                     set.sort(compare);
-                    if (set.length === 0) return new this._ctx.collClass(this, IDBKeyRange.only("")).limit(0); // Return an empty collection.
+                    if (set.length === 0) return new this._ctx.collClass(this, function() { return IDBKeyRange.only(""); }).limit(0); // Return an empty collection.
                     var c = new this._ctx.collClass(this, function () { return IDBKeyRange.bound(set[0], set[set.length - 1]); });
                     
                     c._ondirectionchange = function (direction) {
@@ -2242,13 +2250,14 @@
         var _slice = [].slice;
         var _asap = typeof (setImmediate) === 'undefined' ? function(fn, arg1, arg2, argN) {
             var args = arguments;
-            setTimeout(function() { fn.apply(window, _slice.call(args, 1)); }, 0); // If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
+            setTimeout(function() { fn.apply(global, _slice.call(args, 1)); }, 0); // If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
         } : setImmediate; // IE10+ and node.
 
         var asap = _asap,
             isRootExecution = true;
 
         var operationsQueue = [];
+        var tickFinalizers = [];
         function enqueueImmediate(fn, args) {
             operationsQueue.push([fn, _slice.call(arguments, 1)]);
         }
@@ -2258,7 +2267,7 @@
             operationsQueue = [];
             for (var i = 0, l = queue.length; i < l; ++i) {
                 var item = queue[i];
-                item[0].apply(window, item[1]);
+                item[0].apply(global, item[1]);
             }
         }
 
@@ -2309,6 +2318,8 @@
             isRootExecution = false;
             asap = enqueueImmediate;
             try {
+                var outerPSD = Promise.PSD;
+                Promise.PSD = self._PSD;
                 ret = cb(self._value);
                 if (!self._state && (!ret || typeof ret.then !== 'function' || ret._state !== false)) setCatched(self); // Caller did 'return Promise.reject(err);' - don't regard it as catched!
                 deferred.resolve(ret);
@@ -2321,8 +2332,13 @@
                     }
                 }
             } finally {
+                Promise.PSD = outerPSD;
                 if (isRootExec) {
-                    while (operationsQueue.length > 0) executeOperationsQueue();
+                    do {
+                        while (operationsQueue.length > 0) executeOperationsQueue();
+                        var finalizer = tickFinalizers.pop();
+                        if (finalizer) try {finalizer();} catch(e){}
+                    } while (tickFinalizers.length > 0 || operationsQueue.length > 0);
                     asap = _asap;
                     isRootExecution = true;
                 }
@@ -2337,7 +2353,11 @@
                 fn();
             } finally {
                 if (isRootExec) {
-                    while (operationsQueue.length > 0) executeOperationsQueue();
+                    do {
+                        while (operationsQueue.length > 0) executeOperationsQueue();
+                        var finalizer = tickFinalizers.pop();
+                        if (finalizer) try { finalizer(); } catch (e) { }
+                    } while (tickFinalizers.length > 0 || operationsQueue.length > 0);
                     asap = _asap;
                     isRootExecution = true;
                 }
@@ -2357,6 +2377,7 @@
                 if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
                     if (typeof newValue.then === 'function') {
                         doResolve(promise, function (resolve, reject) {
+                            //newValue instanceof Promise ? newValue._then(resolve, reject) : newValue.then(resolve, reject);
                             newValue.then(resolve, reject);
                         }, function (data) {
                             resolve(promise, data);
@@ -2546,6 +2567,10 @@
         };
 
         Promise._rootExec = _rootExec;
+        Promise._tickFinalize = function(callback) {
+            if (isRootExecution) throw new Error("Not in a virtual tick");
+            tickFinalizers.push(callback);
+        };
 
         return Promise;
     })();
@@ -2703,7 +2728,7 @@
                         var args = arguments;
                         context.subscribers.forEach(function (fn) {
                             asap(function fireEvent() {
-                                fn.apply(window, args);
+                                fn.apply(global, args);
                             });
                         });
                     });
@@ -2745,10 +2770,12 @@
     }
 
     function asap(fn) {
-        if (window.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
+        if (global.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
     }
 
-    function fakeAutoComplete(fn) {
+    var fakeAutoComplete = function() {};
+
+    function doFakeAutoComplete(fn) {
         var to = setTimeout(fn, 1000);
         clearTimeout(to);
     }
@@ -2889,7 +2916,7 @@
         return function (event) {
             var errObj = (event && event.target.error) || new Error();
             if (sentance) {
-                var occurredWhen = " occured when " + sentance.map(function (word) {
+                var occurredWhen = " occurred when " + sentance.map(function (word) {
                     switch (typeof (word)) {
                         case 'function': return word();
                         case 'string': return word;
@@ -2910,9 +2937,15 @@
                 }
             };
             reject(errObj);
-            // Stop error from propagating to IDBTransaction. Let us handle that manually instead.
-            event.stopPropagation();
-            event.preventDefault();
+
+            if (event) {// Old versions of IndexedDBShim doesnt provide an error event
+                // Stop error from propagating to IDBTransaction. Let us handle that manually instead.
+                if (event.stopPropagation) // IndexedDBShim doesnt support this
+                    event.stopPropagation();
+                if (event.preventDefault) // IndexedDBShim doesnt support this
+                    event.preventDefault();
+            }
+
             return false;
         };
     }
@@ -3047,23 +3080,23 @@
         return Class;
     }; 
 
-    Dexie.spawn = function (scopeFunc) {
+    Dexie.ignoreTransaction = function (scopeFunc) {
         // In case caller is within a transaction but needs to create a separate transaction.
         // Example of usage:
         // 
         // Let's say we have a logger function in our app. Other application-logic should be unaware of the
         // logger function and not need to include the 'logentries' table in all transaction it performs.
         // The logging should always be done in a separate transaction and not be dependant on the current
-        // running transaction context. Then you could use Dexie.spawn() to run code that starts a new transaction.
+        // running transaction context. Then you could use Dexie.ignoreTransaction() to run code that starts a new transaction.
         //
-        //     Dexie.spawn(function() {
+        //     Dexie.ignoreTransaction(function() {
         //         db.logentries.add(newLogEntry);
         //     });
         //
-        // Unless using Dexie.spawn(), the above example would try to reuse the current transaction
+        // Unless using Dexie.ignoreTransaction(), the above example would try to reuse the current transaction
         // in current Promise-scope.
         //
-        // An alternative to Dexie.spawn() would be setImmediate() or setTimeout(). The reason we still provide an
+        // An alternative to Dexie.ignoreTransaction() would be setImmediate() or setTimeout(). The reason we still provide an
         // API for this because
         //  1) The intention of writing the statement could be unclear if using setImmediate() or setTimeout().
         //  2) setTimeout() would wait unnescessary until firing. This is however not the case with setImmediate().
@@ -3072,7 +3105,11 @@
             Promise.PSD.trans = null;
             return scopeFunc();
         });
-    }; 
+    };
+    Dexie.spawn = function () {
+        if (global.console) console.warn("Dexie.spawn() is deprecated. Use Dexie.ignoreTransaction() instead.");
+        return Dexie.ignoreTransaction.apply(this, arguments);
+    }
 
     Dexie.vip = function (fn) {
         // To be used by subscribers to the on('ready') event.
@@ -3129,33 +3166,47 @@
     //
     // In node.js, however, these properties must be set "manually" before instansiating a new Dexie(). For node.js, you need to require indexeddb-js or similar and then set these deps.
     //
-    var idbshim = window.idbModules && window.idbModules.shimIndexedDB ? window.idbModules : {};
+    var idbshim = global.idbModules && global.idbModules.shimIndexedDB ? global.idbModules : {};
     Dexie.dependencies = {
         // Required:
         // NOTE: The "_"-prefixed versions are for prioritizing IDB-shim on IOS8 before the native IDB in case the shim was included.
-        indexedDB: idbshim.shimIndexedDB || window.indexedDB || window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB,
-        IDBKeyRange: idbshim.IDBKeyRange || window.IDBKeyRange || window.webkitIDBKeyRange,
-        IDBTransaction: idbshim.IDBTransaction || window.IDBTransaction || window.webkitIDBTransaction,
+        indexedDB: idbshim.shimIndexedDB || global.indexedDB || global.mozIndexedDB || global.webkitIndexedDB || global.msIndexedDB,
+        IDBKeyRange: idbshim.IDBKeyRange || global.IDBKeyRange || global.webkitIDBKeyRange,
+        IDBTransaction: idbshim.IDBTransaction || global.IDBTransaction || global.webkitIDBTransaction,
         // Optional:
-        Error: window.Error || String,
-        SyntaxError: window.SyntaxError || String,
-        TypeError: window.TypeError || String,
-        DOMError: window.DOMError || String,
-        localStorage: ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : window.localStorage)
+        Error: global.Error || String,
+        SyntaxError: global.SyntaxError || String,
+        TypeError: global.TypeError || String,
+        DOMError: global.DOMError || String,
+        localStorage: ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : global.localStorage)
     }; 
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-    Dexie.version = 1.04;
+    Dexie.version = 1.10;
 
     function getNativeGetDatabaseNamesFn() {
         var indexedDB = Dexie.dependencies.indexedDB;
-        var fn = (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
+        var fn = indexedDB && (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
         return fn && fn.bind(indexedDB);
     }
 
-    // Publish the Dexie to browser or NodeJS environment.
+    // Export Dexie to window or as a module depending on environment.
     publish("Dexie", Dexie);
 
-}).apply(this, typeof module === 'undefined' || (typeof window !== 'undefined' && this == self)
-    ? [self, function (name, value) { self[name] = value; }, true]          // Adapt to browser and WebWorker environment
-    : [global, function (name, value) { module.exports = value; }, false]); // Adapt to Node.js environment
+    // Fool IDE to improve autocomplete. Tested with Visual Studio 2013 but should work with 2012 and 2015 as well.
+    doFakeAutoComplete(function() {
+        fakeAutoComplete = doFakeAutoComplete;
+    });
+}).apply(null,
+
+    // AMD:
+    typeof define === 'function' && define.amd ?
+    [self || window, function (name, value) { define(name, function () { return value; }); }] :
+
+    // CommonJS:
+    typeof global !== 'undefined' && typeof module !== 'undefined' && module.exports ?
+    [global, function (name, value) { module.exports = value; }]
+
+    // Vanilla HTML and WebWorkers:
+    : [self || window, function (name, value) { (self || window)[name] = value; }]);
+
