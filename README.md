@@ -3,7 +3,7 @@ Dexie.js
 
 [![NPM Version][npm-image]][npm-url]
 
-A bullet proof indexedDB wrapper.
+Simple and robust indexedDB wrapper.
 
  * Minimalistic and straight forward API, easy to use.
  * Code Completion friendly - Your IDE will guide you as you type!
@@ -18,18 +18,17 @@ A bullet proof indexedDB wrapper.
    * Chrome
    * Firefox
    * Opera 15+
-   * Android browser
-   * Blackberry browser
+   * Android browser (untested)
+   * Blackberry browser (untested)
    * Opera mobile 16+
    * Chrome for Android
    * Firefox for Android
-   * IE Mobile
-   * Safari 8
-   * IOS Safari 8
+   * IE Mobile (untested)
+   * Safari 8 (with some limitations)
+   * IOS Safari 8 (with some limitations)
  * Extended key range queries: equalsIgnoreCase(), anyOf([a,b,c,d,...]), startsWith(), startsWithIgnoreCase()
  * Logical "OR": friends.where("age").below(40).or("length").above(200).toArray(...);
  * Built to be easily extended and build addons upon.
- * Simplified and robust error handling
  * Simplified upgrading framework
  * Thoroughly unit tested
 
