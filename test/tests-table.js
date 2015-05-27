@@ -1,7 +1,8 @@
 ﻿///<reference path="../src/Dexie.js" />
+///<reference path="dexie-unittest-utils.js" />
 
 (function(){
-    var db = new Dexie("TestDB");
+    var db = new Dexie("TestDBTable");
     db.version(1).stores({ users: "++id,first,last,&username,*&email,*pets" });
 
     //db.users.mapToClass(User);
@@ -13,35 +14,37 @@
         email:      [String],
         pets:       [String],
     });
+    var idOfFirstUser = 0,
+        idOfLastUser = 0;
 
     db.on("populate", function (trans) {
-        db.users.add({first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"]});
-        db.users.add({first: "Karl", last: "Faadersköld", username: "kceder", email: ["karl@ceder.what", "dadda@ceder.what"], pets: []});
+        db.users.add({first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"]}).then(function(id) {
+            idOfFirstUser = id;
+        });
+        db.users.add({first: "Karl", last: "Faadersköld", username: "kceder", email: ["karl@ceder.what", "dadda@ceder.what"], pets: []}).then(function(id) {
+            idOfLastUser = id;
+        });
     });
 
     module("table", {
         setup: function () {
             stop();
-            db.delete().then(function () {
-                db.open();
-                start();
-            }).catch(function (e) {
-                ok(false, "Error deleting database: " + e);
-                start();
-            });
+            resetDatabase(db).catch(function (e) {
+                ok(false, "Error resetting database: " + e);
+            }).finally(start);
         },
         teardown: function () {
-            stop(); db.delete().finally(start);
+            stop(); deleteDatabase(db).finally(start);
         }
     });
 
     asyncTest("get", 4, function () {
-        db.table("users").get(1).then(function(obj) {
+        db.table("users").get(idOfFirstUser).then(function(obj) {
             equal(obj.first, "David", "Got the first object");
-            return db.users.get(2);
+            return db.users.get(idOfLastUser);
         }).then(function(obj) {
             equal(obj.first, "Karl", "Got the second object");
-            return db.users.get(100);
+            return db.users.get("nonexisting key");
         }).then(function(obj) {
             ok(true, "Got then() even when getting non-existing object");
             equal(obj, undefined, "Result is 'undefined' when not existing");
@@ -55,40 +58,40 @@
             db.users.where("username").equals("kceder").first(function (user) {
                 equal(user.first, "Karl", "where().equals()");
             }),
-            db.users.where("id").above(1).toArray(function (a) {
+            db.users.where("id").above(idOfFirstUser).toArray(function (a) {
                 ok(a.length == 1, "where().above()");
             }),
-            db.users.where("id").aboveOrEqual(1).toArray(function (a) {
+            db.users.where("id").aboveOrEqual(idOfFirstUser).toArray(function (a) {
                 ok(a.length == 2, "where().aboveOrEqual()");
             }),
-            db.users.where("id").below(2).count(function (count) {
+            db.users.where("id").below(idOfLastUser).count(function (count) {
                 ok(count == 1, "where().below().count()");
             }),
-            db.users.where("id").below(1).count(function (count) {
+            db.users.where("id").below(idOfFirstUser).count(function (count) {
                 ok(count == 0, "where().below().count() should be zero");
             }),
-            db.users.where("id").belowOrEqual(1).count(function (count) {
+            db.users.where("id").belowOrEqual(idOfFirstUser).count(function (count) {
                 ok(count == 1, "where().belowOrEqual()");
             }),
-            db.users.where("id").between(1, 1).count(function (count) {
+            db.users.where("id").between(idOfFirstUser, idOfFirstUser).count(function (count) {
                 ok(count == 0, "where().between(1, 1)");
             }),
-            db.users.where("id").between(0, 100).count(function (count) {
-                ok(count == 2, "where().between(0, 100)");
+            db.users.where("id").between(0, Infinity).count(function (count) {
+                ok(count == 2, "where().between(0, Infinity)");
             }),
-            db.users.where("id").between(1, 1, true, true).count(function (count) {
+            db.users.where("id").between(idOfFirstUser, idOfFirstUser, true, true).count(function (count) {
                 ok(count == 1, "where().between(1, 1, true, true)");
             }),
             db.users.where("id").between(1, -1, true, true).count(function (count) {
                 ok(count == 0, "where().between(1, -1, true, true)");
             }),
-            db.users.where("id").between(1, 2).count(function (count) {
+            db.users.where("id").between(idOfFirstUser, idOfLastUser).count(function (count) {
                 ok(count == 1, "where().between(1, 2)");
             }),
-            db.users.where("id").between(1, 2, true, true).count(function (count) {
+            db.users.where("id").between(idOfFirstUser, idOfLastUser, true, true).count(function (count) {
                 ok(count == 2, "where().between(1, 2, true, true)");
             }),
-            db.users.where("id").between(1, 2, false, false).count(function (count) {
+            db.users.where("id").between(idOfFirstUser, idOfLastUser, false, false).count(function (count) {
                 ok(count == 0, "where().between(1, 2, false, false)");
             });
             db.users.where("last").startsWith("Fah").toArray(function (a) {
@@ -192,14 +195,14 @@
         db.transaction("rw", db.users, function () {
             var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
             db.users.put(newUser).then(function (id) {
-                equal(id, 3, "Got id 3 because we didnt supply an id");
+                equal(id, idOfLastUser + 1, "Got id " + (idOfLastUser + 1) + " (lastId + 1) because we didnt supply an id");
                 equal(newUser.id, id, "The id property of the new user was set");
             });
             db.users.where("username").equals("aper").first(function (user) {
                 equal(user.last, "Persbrant", "The correct item was actually added");
                 user.last = "ChangedLastName";
                 db.users.put(user).then(function (id) {
-                    equal(id, 3, "Still got id 3 because we update same object");
+                    equal(id, idOfLastUser + 1, "Still got id (lastId + 1) because we update same object");
                 });
                 db.users.where("last").equals("ChangedLastName").first(function (user) {
                     equal(user.last, "ChangedLastName", "LastName was successfully changed");
@@ -213,13 +216,13 @@
     asyncTest("put-no-transaction", function () {
         var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
         db.users.put(newUser).then(function(id) {
-            equal(id, 3, "Got id 3 because we didnt supply an id");
+            equal(id, idOfLastUser + 1, "Got id (lastId + 1) because we didnt supply an id");
             equal(newUser.id, id, "The id property of the new user was set");
             return db.users.where("username").equals("aper").first(function(user) {
                 equal(user.last, "Persbrant", "The correct item was actually added");
                 user.last = "ChangedLastName";
                 return db.users.put(user).then(function(id) {
-                    equal(id, 3, "Still got id 3 because we update same object");
+                    equal(id, idOfLastUser + 1, "Still got (lastId + 1) because we update same object");
                     return db.users.where("last").equals("ChangedLastName").first(function(user) {
                         equal(user.last, "ChangedLastName", "LastName was successfully changed");
                     });
@@ -236,7 +239,7 @@
             var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
 
             db.users.add(newUser).then(function (id) {
-                equal(id, 3, "Got id 3 because we didnt supply an id");
+                equal(id, idOfLastUser + 1, "Got id (lastId + 1) because we didnt supply an id");
                 equal(newUser.id, id, "The id property of the new user was set");
             });
 
@@ -250,7 +253,7 @@
     });
     asyncTest("delete", function () {
         // Without transaction
-        db.users.get(1, function (user) {
+        db.users.get(idOfFirstUser, function (user) {
             notEqual(user, null, "User with id 1 exists");
         }).then(function () {
             db.users.delete(1).then(function () {
@@ -267,11 +270,11 @@
     asyncTest("delete(using transaction)", function() {
         // With transaction
         db.transaction("rw", db.users, function () {
-            db.users.get(1, function (user) {
+            db.users.get(idOfFirstUser, function (user) {
                 notEqual(user, null, "User with id 1 exists");
             });
-            db.users.delete(1);
-            db.users.get(1, function (user) {
+            db.users.delete(idOfFirstUser);
+            db.users.get(idOfFirstUser, function (user) {
                 equal(user, null, "User not found anymore");
             });
         }).catch(function (e) {
@@ -284,7 +287,7 @@
 			numUsers = count;
 			ok(true, "Number of users before delete: " + count);
 		}).then(function() {
-			return db.users.delete(98);
+			return db.users.delete("nonexisting key");
 		}).then(function(){
 			ok(true, "Success even though nothing was deleted");
 		}).then(function(){

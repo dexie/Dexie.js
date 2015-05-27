@@ -11,16 +11,12 @@
     module("transaction", {
         setup: function () {
             stop();
-            db.delete().then(function () {
-                db.open();
-                start();
-            }).catch(function (e) {
-                ok(false, "Error deleting database: " + e);
-                start();
-            });
+            resetDatabase(db).catch(function (e) {
+                ok(false, "Error resetting database: " + e);
+            }).finally(start);
         },
         teardown: function () {
-            stop(); db.delete().finally(start);
+            stop(); deleteDatabase(db).finally(start);
         }
     });
 
@@ -449,7 +445,7 @@
 		}).then(function (logItems) {
 			equal(logItems.length, 2, "Log has two items");
 			equal(logItems[0].message, "Now adding a dog", "First message in log is: " + logItems[0].message);
-			equal(logItems[1].message, "Added dog got key 1", "Second message in log is: " + logItems[1].message);
+			ok(logItems[1].message.indexOf("Added dog got key ") === 0, "Second message in log is: " + logItems[1].message);
 		}).catch(function (err) {
 			ok(false, err);
 		}).finally(function(){

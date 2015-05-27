@@ -1,89 +1,90 @@
-<!DOCTYPE html>
+﻿<!DOCTYPE html>
 <html>
 <head>
   <meta charset="utf-8">
   <title>Dexie Unit tests with Dexie.Syncable applied and dummy ISyncProtocol</title>
   <link rel="stylesheet" href="../../../test/qunit.css">
 </head>
-<body>
-  <div id="qunit"></div>
-  <div id="qunit-fixture"></div>
-  <script>
-    // Hack for making the WebWorker test behave also here...
-    window.workerImports = ["../src/Dexie.js", "../addons/Dexie.Observable/Dexie.Observable.js", "../addons/Dexie.Syncable/Dexie.Syncable.js"];
-    window.workerSource = "../../../test/worker.js";
-  </script>
-  <script src="../../../test/qunit.js"></script>
-  <script src="../../../src/Dexie.js"></script>
-  <script src="../../Dexie.Observable/Dexie.Observable.js"></script>
-  <script src="../Dexie.Syncable.js"></script>
-    <script>
-        Dexie.Syncable.registerSyncProtocol("logger", {
-            sync: function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
-                /// <param name="changes" type="Array" elementType="IDatabaseChange"></param>
-                /// <param name="applyRemoteChanges" value="function (changes, lastRevision, partial, clear) {}"></param>
-                /// <param name="onSuccess" value="function (continuation) {}"></param>
-                console.log("sync(changes.length: "+ changes.length + ", baseRevision:" + baseRevision + ", " + (partial ? "partial" : "full") + ", syncedRevision:" + syncedRevision + ")");
-                changes.forEach(function (change) {
-                    console.log(JSON.stringify(change, null, true));
-                });
+    <body>
+        <div id="qunit"></div>
+        <div id="qunit-fixture"></div>
+        <script>
+            // Hack for making the WebWorker test behave also here...
+            window.workerImports = ["../src/Dexie.js", "../addons/Dexie.Observable/Dexie.Observable.js", "../addons/Dexie.Syncable/Dexie.Syncable.js"];
+            window.workerSource = "../../../test/worker.js";
+        </script>
+        <script src="../../../test/qunit.js"></script>
+        <script src="../../../src/Dexie.js"></script>
+        <script src="../../Dexie.Observable/Dexie.Observable.js"></script>
+        <script src="../Dexie.Syncable.js"></script>
+        <script src="../../../test/dexie-unittest-utils.js"></script>
+        <script>
+            Dexie.Syncable.registerSyncProtocol("logger", {
+                sync: function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
+                    /// <param name="changes" type="Array" elementType="IDatabaseChange"></param>
+                    /// <param name="applyRemoteChanges" value="function (changes, lastRevision, partial, clear) {}"></param>
+                    /// <param name="onSuccess" value="function (continuation) {}"></param>
+                    console.log("sync(changes.length: "+ changes.length + ", baseRevision:" + baseRevision + ", " + (partial ? "partial" : "full") + ", syncedRevision:" + syncedRevision + ")");
+                    changes.forEach(function (change) {
+                        console.log(JSON.stringify(change, null, true));
+                    });
                 
-                setTimeout(function () {
-                    var dummyRev = 1,
-                        CREATE = 1,
-                        UPDATE = 2,
-                        DELETE = 3;
+                    setTimeout(function () {
+                        var dummyRev = 1,
+                            CREATE = 1,
+                            UPDATE = 2,
+                            DELETE = 3;
 
-                    onChangesAccepted();
+                        onChangesAccepted();
 
-                    applyRemoteChanges([], "ServerRevision" + dummyRev++, true, false);
-                    applyRemoteChanges([], "ServerRevision" + dummyRev++, false, false);
+                        applyRemoteChanges([], "ServerRevision" + dummyRev++, true, false);
+                        applyRemoteChanges([], "ServerRevision" + dummyRev++, false, false);
 
-                    /*var dummyPoller = setInterval(function(){
+                        /*var dummyPoller = setInterval(function(){
                         applyRemoteChanges([], "ServerRevision" + dummyRev++, true, false);
                         applyRemoteChanges([], "ServerRevision" + dummyRev++, false, false);
                     }, 10);*/
                     
-                    onSuccess({
-                        react: function (changes, baseRevision, partial, onChangesAccepted) {
-                            console.log("react(changes.length: " + changes.length + ", baseRevision:" + baseRevision + ", " + (partial ? "partial" : "full") + ")");
-                            changes.forEach(function (change) {
-                                console.log(JSON.stringify(change, null, true));
-                            });
-                            setTimeout(onChangesAccepted, 0);
-                        },
-                        disconnect: function () {
-                            console.log("disconned()");
-                            //clearInterval(dummyPoller);
-                        }
-                    });
-                }, 0);
-            }
-        });
-
-        // Make sure to always call sync() before any call to open().
-        Dexie.addons.push(function (db) {
-            db.open = Dexie.override(db.open, function (origFunc) {
-                return function () {
-                    console.log("Calling db.sync() on " + db.name);
-                    db.syncable.connect("logger", "logger").then(function () {
-                        console.log("connect() promise was resolved (database="+db.name+")");
-                    }).catch(function (err) {
-                        console.error("Error from connect() (database=" + db.name + "): " + err.stack || err);
-                    });
-                    return origFunc.apply(this, arguments);
+                        onSuccess({
+                            react: function (changes, baseRevision, partial, onChangesAccepted) {
+                                console.log("react(changes.length: " + changes.length + ", baseRevision:" + baseRevision + ", " + (partial ? "partial" : "full") + ")");
+                                changes.forEach(function (change) {
+                                    console.log(JSON.stringify(change, null, true));
+                                });
+                                setTimeout(onChangesAccepted, 0);
+                            },
+                            disconnect: function () {
+                                console.log("disconned()");
+                                //clearInterval(dummyPoller);
+                            }
+                        });
+                    }, 0);
                 }
             });
-        });
-    </script>
-  <script src="../../../test/tests-extendability.js"></script>
-  <script src="../../../test/tests-table.js"></script>
-  <script src="../../../test/tests-open.js"></script>
-  <script src="../../../test/tests-collection.js"></script>
-  <script src="../../../test/tests-whereclause.js"></script>
-  <script src="../../../test/tests-exception-handling.js"></script>
-  <script src="../../../test/tests-upgrading.js"></script>
-  <script src="../../../test/tests-transaction.js"></script>
-  <script src="../../../test/tests-performance.js"></script>
-</body>
+
+            // Make sure to always call sync() before any call to open().
+            Dexie.addons.push(function (db) {
+                db.open = Dexie.override(db.open, function (origFunc) {
+                    return function () {
+                        console.log("Calling db.sync() on " + db.name);
+                        db.syncable.connect("logger", "logger").then(function () {
+                            console.log("connect() promise was resolved (database="+db.name+")");
+                        }).catch(function (err) {
+                            console.error("Error from connect() (database=" + db.name + "): " + err.stack || err);
+                        });
+                        return origFunc.apply(this, arguments);
+                    }
+                });
+            });
+        </script>
+        <script src="../../../test/tests-extendability.js"></script>
+        <script src="../../../test/tests-table.js"></script>
+        <script src="../../../test/tests-open.js"></script>
+        <script src="../../../test/tests-collection.js"></script>
+        <script src="../../../test/tests-whereclause.js"></script>
+        <script src="../../../test/tests-exception-handling.js"></script>
+        <script src="../../../test/tests-upgrading.js"></script>
+        <script src="../../../test/tests-transaction.js"></script>
+        <script src="../../../test/tests-performance.js"></script>
+    </body>
 </html>

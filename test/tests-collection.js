@@ -1,9 +1,10 @@
 ﻿///<reference path="../src/Dexie.js" />
 ///<reference path="qunit.js" />
+///<reference path="dexie-unittest-utils.js" />
 
 (function () {
-    var db = new Dexie("TestDB");
-    db.version(1).stores({ users: "++id,first,last,&username,*&email,*pets" });
+    var db = new Dexie("TestDBCollection");
+    db.version(1).stores({ users: "id,first,last,&username,*&email,*pets" });
 
     var User = db.users.defineClass({
         id:         Number,
@@ -15,23 +16,19 @@
     });
     db.on("populate", function (trans) {
         var users = trans.table("users");
-        users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
-        users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
+        users.add({ id: 1, first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
+        users.add({ id: 2, first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
     });
 
     module("collection", {
         setup: function () {
             stop();
-            db.delete().then(function () {
-                db.open();
-                start();
-            }).catch(function (e) {
-                ok(false, "Error deleting database: " + e);
-                start();
-            });
+            resetDatabase(db).catch(function (e) {
+                ok(false, "Error resetting database: " + e);
+            }).finally(start);
         },
         teardown: function () {
-            stop(); db.delete().finally(start);
+            stop(); deleteDatabase(db).finally(start);
         }
     });
 
@@ -93,7 +90,7 @@
     asyncTest("offset().limit() with advanced combinations", 22, function () {
         db.transaction("rw", db.users, function () {
             for (var i = 0; i < 10; ++i) {
-                db.users.add({ first: "First" + i, last: "Last" + i, username: "user" + i, email: ["user" + i + "@abc.se"] });
+                db.users.add({ id: 3+i, first: "First" + i, last: "Last" + i, username: "user" + i, email: ["user" + i + "@abc.se"] });
             }
 
             // Using algorithm + count()
@@ -304,7 +301,7 @@
 
     asyncTest("delete(2)", 3, function () {
         db.transaction("rw", db.users, function () {
-            db.users.add({ first: "dAvid", last: "Helenius", username: "dahel" });
+            db.users.add({ id: 3, first: "dAvid", last: "Helenius", username: "dahel" });
             db.users.where("first").equalsIgnoreCase("david").delete().then(function (deleteCount) {
                 equal(deleteCount, 2, "Two items deleted (Both davids)");
             });
@@ -319,7 +316,7 @@
 
     asyncTest("delete(3, combine with OR)", 3, function () {
         db.transaction("rw", db.users, function () {
-            db.users.add({ first: "dAvid", last: "Helenius", username: "dahel" });
+            db.users.add({ id: 3, first: "dAvid", last: "Helenius", username: "dahel" });
             db.users.where("first").equals("dAvid").or("username").equals("kceder").delete().then(function (deleteCount) {
                 equal(deleteCount, 2, "Two items deleted (Both dAvid Helenius and Karl Cedersköld)");
             });
@@ -345,7 +342,7 @@
 
     asyncTest("uniqueKeys", function () {
         db.transaction("rw", db.users, function () {
-            db.users.add({ first: "David", last: "Helenius", username: "dahel" });
+            db.users.add({ id: 3, first: "David", last: "Helenius", username: "dahel" });
             db.users.orderBy("first").keys(function (a) {
                 ok(a.length, 3, "when not using uniqueKeys, length is 3");
                 equal(a[0], "David", "First is David");
@@ -364,7 +361,7 @@
 
     asyncTest("eachKey and eachUniqueKey", function () {
         db.transaction("rw", db.users, function () {
-            db.users.add({ first: "Ylva", last: "Fahlander", username: "yfahlander" });
+            db.users.add({ id: 3, first: "Ylva", last: "Fahlander", username: "yfahlander" });
             var a = [];
             db.users.orderBy("last").eachKey(function (lastName) {
                 a.push(lastName);
@@ -385,7 +382,7 @@
 
     asyncTest("or", 14, function () {
         db.transaction("rw", db.users, function () {
-            db.users.add({ first: "Apan", last: "Japan", username: "apanjapan" });
+            db.users.add({ id: 3, first: "Apan", last: "Japan", username: "apanjapan" });
             db.users.where("first").equalsIgnoreCase("david").or("last").equals("Japan").sortBy("first", function (a) {
                 equal(a.length, 2, "Got two users");
                 equal(a[0].first, "Apan", "First is Apan");
@@ -420,7 +417,7 @@
         db.on('populate', function () {
             ok(true, "on(populate) called");
             for (var i = 0; i < 100; ++i) {
-                db.phones.add({ name: "Name" + randomString(16), additionalFeatures: [randomString(10)], android: 1, availability: 0, battery: 1, camera: 1 });
+                db.phones.add({ id: 3 + i, name: "Name" + randomString(16), additionalFeatures: [randomString(10)], android: 1, availability: 0, battery: 1, camera: 1 });
             }
 
             function randomString(count) {
@@ -462,9 +459,9 @@
 
     asyncTest("until", function () {
         db.transaction("rw", db.users, function () {
-            db.users.add({ first: "Apa1", username: "apa1" });
-            db.users.add({ first: "Apa2", username: "apa2" });
-            db.users.add({ first: "Apa3", username: "apa3" });
+            db.users.add({ id: 3, first: "Apa1", username: "apa1" });
+            db.users.add({ id: 4, first: "Apa2", username: "apa2" });
+            db.users.add({ id: 5, first: "Apa3", username: "apa3" });
 
             // Checking that it stops immediately when first item is the stop item:
             db.users.orderBy(":id").until(function (user) { return user.first == "David" }).toArray(function (a) {

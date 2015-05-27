@@ -267,6 +267,12 @@ config = {
 	        id: "indexedDBShim",
 	        label: "IndexedDBShim (WebSQL as backend)",
             tooltip: "If enabled in browsers with WebSQL support (Safari,Chrome or Opera) all indexedDB calls will go through IndexedDBShim with WebSQL as backend"
+	    },
+	    {
+	        
+	        id: "dontoptimize",
+	        label: "Dont optimize tests",
+	        tooltip: "Always delete and recreate the DB between each test"
 	    }
 	],
 

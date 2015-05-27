@@ -1,13 +1,14 @@
 ﻿/// <reference path="../src/Dexie.js" />
 /// <reference path="qunit.js" />
+/// <reference path="dexie-unittest-utils.js" />
 
 (function () {
-    var db = new Dexie("TestDB");
-    db.version(1).stores({ users: "++id,first,last,&username,&*email,*pets" });
+    var db = new Dexie("TestDBException");
+    db.version(1).stores({ users: "id,first,last,&username,&*email,*pets" });
     db.on("populate", function (trans) {
         var users = trans.table("users");
-        users.add({ first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
-        users.add({ first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
+        users.add({ id: 1, first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
+        users.add({ id: 2, first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
     });
     db.on("error", function (e) {
         ok(false, "An error bubbled out to the db.on('error'). Should not happen because all tests should catch their errors themselves. " + e);
@@ -16,22 +17,21 @@
     module("exception-handling", {
         setup: function () {
             stop();
-            db.delete().then(function () {
-                db.open().catch(function (e) { ok(false, "Got bubbled!");});
-                start();
-            }).catch(function (e) {
-                ok(false, "Error deleting database: " + e);
-                start();
-            });
+            resetDatabase(db).catch(function (e) {
+                ok(false, "Error resetting database: " + e);
+            }).finally(start);
         },
         teardown: function () {
-            stop(); db.delete().finally(start);
+            stop();
+            deleteDatabase(db)
+                .catch(function (e) { ok(false, "Got bubbled!: " + e); })
+                .finally(start);
         }
     });
 
     asyncTest("eventError-transaction-catch", function () {
         db.transaction("rw", db.users, function () {
-            db.users.add({ username: "dfahlander" }).then(function () {
+            db.users.add({ id: 100, username: "dfahlander" }).then(function () {
                 ok(false, "Should not be able to add two users with same username");
             });
         }).then(function () {
@@ -43,12 +43,12 @@
     
     asyncTest("eventError-request-catch", function () {
         db.transaction("rw", db.users, function () {
-            db.users.add({ username: "dfahlander" }).then(function () {
+            db.users.add({ id: 100, username: "dfahlander" }).then(function () {
                 ok(false, "Should not be able to add two users with same username");
             }).catch(function (e) {
                 ok(true, "Got request error: " + e);
             });
-            db.users.add({ first: "Trazan", last: "Apansson", username: "tapan", email: ["trazan@apansson.barnarne"], pets: ["monkey"] }).then(function (id) {
+            db.users.add({ id: 101, first: "Trazan", last: "Apansson", username: "tapan", email: ["trazan@apansson.barnarne"], pets: ["monkey"] }).then(function (id) {
                 ok(id > 2, "Could continue transaction and add Trazan since last error event was catched");
             });
         }).then(function () {
@@ -262,7 +262,7 @@
         new Dexie.Promise(function (finalResolve) {
             ourDB.version(1).stores({ users: "++id" });
             ourDB.on("populate", function() {
-                db.users.add({ first: "David", last: "Fahlander" });
+                db.users.add({ id: 100, first: "David", last: "Fahlander" });
             });
             var errorHasBubbled = false;
             ourDB.on("error", function(e) {
