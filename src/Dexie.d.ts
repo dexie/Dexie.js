@@ -1,4 +1,4 @@
-﻿// Type definitions for Dexie v1.1
+﻿// Type definitions for Dexie v1.2
 // Project: https://github.com/dfahlander/Dexie.js
 // Definitions by: David Fahlander <http://github.com/dfahlander>
 // Definitions: https://github.com/borisyankov/DefinitelyTyped
@@ -255,6 +255,8 @@ declare module Dexie {
         equals(key: Array<any>): Collection<T, Key>;
         equalsIgnoreCase(key: string): Collection<T, Key>;
         startsWith(key: string): Collection<T, Key>;
+        startsWithAnyOf(prefixes: string[]): Collection<T, Key>;
+        startsWithAnyOf(...prefixes: string[]): Collection<T, Key>;
         startsWithIgnoreCase(key: string): Collection<T, Key>;
     }
 
