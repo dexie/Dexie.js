@@ -1548,19 +1548,36 @@
                     if (!set.every(function (s) { return typeof s === 'string'; })) {
                         return fail(new ctx.collClass(this), new TypeError("startsWithAnyOf() only works with strings"));
                     }
-                    var setEnds = set.map(function(s) { return s + String.fromCharCode(65535); });
-                    set.sort(ascending);
-                    if (set.length === 0) return new ctx.collClass(this,function() {return IDBKeyRange.only("");}).limit(0); // Return an empty collection.
+                    if (set.length === 0) return new ctx.collClass(this, function () { return IDBKeyRange.only(""); }).limit(0); // Return an empty collection.
+
+                    var setEnds = set.map(function (s) { return s + String.fromCharCode(65535); });
+                    
+                    var sortDirection = ascending;
+                    set.sort(sortDirection);
+                    var i = 0;
+                    function keyIsBeyondCurrentEntry(key) { return key > setEnds[i]; }
+                    function keyIsBeforeCurrentEntry(key) { return key < set[i]; }
+                    var checkKey = keyIsBeyondCurrentEntry;
+
                     var c = new ctx.collClass(this, function () {
                         return IDBKeyRange.bound(set[0], set[set.length - 1] + String.fromCharCode(65535));
                     });
                     
-                    c._ondirectionchange = function () { fail(c, new Error("reverse() not supported with WhereClause.startsWithAnyOf()")); };
+                    c._ondirectionchange = function (direction) {
+                        if (direction === "next") {
+                            checkKey = keyIsBeyondCurrentEntry;
+                            sortDirection = ascending;
+                        } else {
+                            checkKey = keyIsBeforeCurrentEntry;
+                            sortDirection = descending;
+                        }
+                        set.sort(sortDirection);
+                        setEnds.sort(sortDirection);
+                    };
 
-                    var i = 0;
                     c._addAlgorithm(function (cursor, advance, resolve) {
                         var key = cursor.key;
-                        while (key > setEnds[i]) {
+                        while (checkKey(key)) {
                             // The cursor has passed beyond this key. Check next.
                             ++i;
                             if (i === set.length) {
@@ -2193,7 +2210,6 @@
                 }
             };
         }
-
 
         function combine(filter1, filter2) {
             return filter1 ? filter2 ? function () { return filter1.apply(this, arguments) && filter2.apply(this, arguments); } : filter1 : filter2;
