@@ -1592,7 +1592,10 @@
                             return true;
                         } else {
                             // cursor.key not yet at set[i]. Forward cursor to the next key to hunt for.
-                            advance(function () { cursor.continue(set[i]); });
+                            advance(function() {
+                                if (sortDirection === ascending) cursor.continue(set[i]);
+                                else cursor.continue(setEnds[i]);
+                            });
                             return false;
                         }
                     });
