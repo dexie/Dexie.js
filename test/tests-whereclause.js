@@ -36,17 +36,17 @@
         folders.add({path: "/", description: "Root folder"}); // 1
         folders.add({path: "/usr"}); // 2
         folders.add({path: "/usr/local"}); // 3
-        folders.add({ path: "/usr/local/bin" }).then(function (id) { // 4
+        folders.add({path: "/usr/local/bin" }).then(function (id) { // 4
             files.add({filename: "Hello", folderId: id});
             files.add({filename: "hello", extension: ".exe", folderId: id});
         });
-        folders.add({ path: "/usr/local/src" }).then(function (id) { // 5
+        folders.add({path: "/usr/local/src"}).then(function (id) { // 5
             files.add({filename: "world", extension: ".js", folderId: id});
             files.add({filename: "README", extension: ".TXT", folderId: id});
         });
         folders.add({ path: "/usr/local/var" }); // 6
         folders.add({ path: "/USR/local/VAR" }); // 7
-        folders.add({path: "/var"}); // 8
+        folders.add({ path: "/var"}); // 8
         folders.add({ path: "/var/bin" }).then(function (id) { // 9
             files.add({filename: "hello-there", extension: ".exe", folderId: id});
         });
@@ -68,6 +68,64 @@
         }
     });
 
+    asyncTest("startsWithAnyOf()", function () {
+        //
+        // Basic Flow:
+        //
+        return db.folders
+            .where('path').startsWithAnyOf('/usr/local', '/var')
+            .toArray(function(result) {
+                equal(result.length, 6, "Query should match 6 folders");
+                equal(result[0].path, '/usr/local', '/usr/local');
+                equal(result[1].path, '/usr/local/bin', '/usr/local/bin');
+                equal(result[2].path, '/usr/local/src', '/usr/local/src');
+                equal(result[3].path, '/usr/local/var', '/usr/local/var');
+                equal(result[4].path, '/var', '/var');
+                equal(result[5].path, '/var/bin', '/var/bin');
+
+                //
+                // Require a slash at beginning (and use an array of strings as argument instead)
+                //
+                return db.folders
+                    .where('path').startsWithAnyOf(['/usr/local/', '/var/'])
+                    .toArray();
+
+            }).then(function(result) {
+                equal(result.length, 4, "Query should match 4 folders");
+                equal(result[0].path, '/usr/local/bin', '/usr/local/bin');
+                equal(result[1].path, '/usr/local/src', '/usr/local/src');
+                equal(result[2].path, '/usr/local/var', '/usr/local/var');
+                equal(result[3].path, '/var/bin', '/var/bin');
+
+                //
+                // Some specialities
+                //
+                return Dexie.Promise.all(
+                    db.folders.where('path').startsWithAnyOf([]).count(), // Empty
+                    db.folders.where('path').startsWithAnyOf('/var', '/var', '/var').count(), // Duplicates
+                    db.folders.where('path').startsWithAnyOf('').count(), // Empty string should match all
+                    db.folders.count(),
+                    db.folders.where('path').startsWithAnyOf('nonexisting').count() // Non-existing match
+                );
+            }).then(function(results) {
+                equal(results[0], 0, "startsWithAnyOf([]).count() == 0");
+                equal(results[1], 2, "startsWithAnyOf('/var', '/var', '/var') == 2");
+                equal(results[2], results[3], "startsWithAnyOf('').count() == db.folders.count()");
+                equal(results[4], 0, "startsWithAnyOf('nonexisting').count() == 0");
+
+                //
+                // Error handling
+                //
+
+                return db.folders.where('path').startsWithAnyOf([null, '/']).toArray(function(res) {
+                    ok(false, "Should not succeed to have null in parameter");
+                }).catch(function(e) {
+                    ok(true, "As expected: failed to have null in arguments: " + e);
+                });
+            }).catch(function(e) {
+                ok(false, "Error: " + e);
+            }).finally(start);
+    });
 
     asyncTest("anyOf()", function () {
         db.transaction("r", db.files, db.folders, function () {

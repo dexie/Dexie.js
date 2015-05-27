@@ -3,7 +3,7 @@
 
    By David Fahlander, david.fahlander@gmail.com
 
-   Version 1.1.0 (alpha - not yet distributed) - DATE, YEAR.
+   Version 1.2 (alpha - not yet distributed) - DATE, YEAR.
 
    Tested successfully on Chrome, IE, Firefox and Opera.
 
@@ -1529,6 +1529,47 @@
                             }
                         }
                         if (compare(key, set[i]) === 0) {
+                            // The current cursor value should be included and we should continue a single step in case next item has the same key or possibly our next key in set.
+                            advance(function () { cursor.continue(); });
+                            return true;
+                        } else {
+                            // cursor.key not yet at set[i]. Forward cursor to the next key to hunt for.
+                            advance(function () { cursor.continue(set[i]); });
+                            return false;
+                        }
+                    });
+                    return c;
+                },
+
+                startsWithAnyOf: function (valueArray) {
+                    var ctx = this._ctx,
+                        set = getSetArgs(arguments);
+
+                    if (!set.every(function (s) { return typeof s === 'string'; })) {
+                        return fail(new ctx.collClass(this), new TypeError("startsWithAnyOf() only works with strings"));
+                    }
+                    var setEnds = set.map(function(s) { return s + String.fromCharCode(65535); });
+                    set.sort(ascending);
+                    if (set.length === 0) return new ctx.collClass(this,function() {return IDBKeyRange.only("");}).limit(0); // Return an empty collection.
+                    var c = new ctx.collClass(this, function () {
+                        return IDBKeyRange.bound(set[0], set[set.length - 1] + String.fromCharCode(65535));
+                    });
+                    
+                    c._ondirectionchange = function () { fail(c, new Error("reverse() not supported with WhereClause.startsWithAnyOf()")); };
+
+                    var i = 0;
+                    c._addAlgorithm(function (cursor, advance, resolve) {
+                        var key = cursor.key;
+                        while (key > setEnds[i]) {
+                            // The cursor has passed beyond this key. Check next.
+                            ++i;
+                            if (i === set.length) {
+                                // There is no next. Stop searching.
+                                advance(resolve);
+                                return false;
+                            }
+                        }
+                        if (key >= set[i] && key <= setEnds[i]) {
                             // The current cursor value should be included and we should continue a single step in case next item has the same key or possibly our next key in set.
                             advance(function () { cursor.continue(); });
                             return true;
@@ -3182,7 +3223,7 @@
     }; 
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-    Dexie.version = 1.10;
+    Dexie.version = 1.20;
 
     function getNativeGetDatabaseNamesFn() {
         var indexedDB = Dexie.dependencies.indexedDB;
