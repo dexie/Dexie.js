@@ -16,7 +16,7 @@
         }
     });
 
-    asyncTest("performance", function () {
+    asyncTest("performance: add/equalsIgnoreCase/each", function () {
         var db = new Dexie("PerformanceDB");
         db.version(1).stores({ emails: "++id,from,to,subject,message,shortStr" });
         db.on("blocked", function() {
@@ -42,7 +42,7 @@
 
             // Create 10,000 emails
             ok(true, "Creating 10,000 emails");
-            return db.transaction("rw", db.emails, function () {
+            return db.transaction("rw", db.emails, function() {
                 for (var i = 1; i <= 10000; ++i) {
                     db.emails.add({
                         from: "from" + i + "@test.com",
@@ -52,7 +52,7 @@
                         shortStr: randomString(2)()
                     });
                 }
-            })
+            });
 
         }).then(function () {
             ok(true, "Time taken: " + (Date.now() - tick));
@@ -89,15 +89,29 @@
                     foundEmails.push(email);
             }).then(function () { return foundEmails; });
 
-        }).then (function (foundEmails) {
+        }).then (function(foundEmails) {
             var tock = Date.now();
             ok(true, "Time taken: " + (tock - tick));
             ok(true, "Num emails found: " + foundEmails.length);
             ok(true, "Time taken per found item: " + (tock - tick) / foundEmails.length);
-
+            // Measure the time it takes for db.emails.toArra():
+            ok(true, "Speed of db.emails.toArray()");
+            tick = Date.now();
+            return db.emails.toArray();
+        }).then(function(result) {
+            var tock = Date.now();
+            ok(true, "Time taken: " + (tock - tick));
+            ok(true, "Num emails found: " + result.length);
+            // Measure the time it takes for db.emails.where('message').startsWith('message').toArray()
+            ok(true, "Speed of db.emails.where('message').startsWith('message').toArray();");
+            tick = Date.now();
+            return db.emails.where('message').startsWith('message').toArray();
+        }).then(function (result) {
+            var tock = Date.now();
+            ok(true, "Time taken: " + (tock - tick));
+            ok(true, "Num emails found: " + result.length);
         }).catch(Error, function (e) {
             ok(false, e.name + ":" + e.message + " " + e.stack);
-
         }).catch(function (e) {
             ok(false, e.toString());
 
@@ -106,4 +120,6 @@
             start();
         });
     });
+
+
 })();
