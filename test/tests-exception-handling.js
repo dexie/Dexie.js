@@ -22,10 +22,6 @@
             }).finally(start);
         },
         teardown: function () {
-            stop();
-            deleteDatabase(db)
-                .catch(function (e) { ok(false, "Got bubbled!: " + e); })
-                .finally(start);
         }
     });
 

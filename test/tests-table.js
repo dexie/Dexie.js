@@ -34,7 +34,6 @@
             }).finally(start);
         },
         teardown: function () {
-            stop(); deleteDatabase(db).finally(start);
         }
     });
 
@@ -195,14 +194,15 @@
         db.transaction("rw", db.users, function () {
             var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
             db.users.put(newUser).then(function (id) {
-                equal(id, idOfLastUser + 1, "Got id " + (idOfLastUser + 1) + " (lastId + 1) because we didnt supply an id");
+                ok(id > idOfLastUser, "Got id " + id + " because we didnt supply an id");
                 equal(newUser.id, id, "The id property of the new user was set");
             });
             db.users.where("username").equals("aper").first(function (user) {
                 equal(user.last, "Persbrant", "The correct item was actually added");
                 user.last = "ChangedLastName";
+                var currentId = user.id;
                 db.users.put(user).then(function (id) {
-                    equal(id, idOfLastUser + 1, "Still got id (lastId + 1) because we update same object");
+                    equal(id, currentId, "Still got same id because we update same object");
                 });
                 db.users.where("last").equals("ChangedLastName").first(function (user) {
                     equal(user.last, "ChangedLastName", "LastName was successfully changed");
@@ -216,13 +216,14 @@
     asyncTest("put-no-transaction", function () {
         var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
         db.users.put(newUser).then(function(id) {
-            equal(id, idOfLastUser + 1, "Got id (lastId + 1) because we didnt supply an id");
+            ok(id > idOfLastUser, "Got id " + id + " because we didnt supply an id");
             equal(newUser.id, id, "The id property of the new user was set");
             return db.users.where("username").equals("aper").first(function(user) {
                 equal(user.last, "Persbrant", "The correct item was actually added");
                 user.last = "ChangedLastName";
+                var userId = user.id;
                 return db.users.put(user).then(function(id) {
-                    equal(id, idOfLastUser + 1, "Still got (lastId + 1) because we update same object");
+                    equal(id, userId, "Still got same id because we update same object");
                     return db.users.where("last").equals("ChangedLastName").first(function(user) {
                         equal(user.last, "ChangedLastName", "LastName was successfully changed");
                     });
@@ -239,7 +240,7 @@
             var newUser = { first: "Åke", last: "Persbrant", username: "aper", email: ["aper@persbrant.net"] };
 
             db.users.add(newUser).then(function (id) {
-                equal(id, idOfLastUser + 1, "Got id (lastId + 1) because we didnt supply an id");
+                ok(id > idOfLastUser, "Got id " + id + " because we didnt supply an id");
                 equal(newUser.id, id, "The id property of the new user was set");
             });
 

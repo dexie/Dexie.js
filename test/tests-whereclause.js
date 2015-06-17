@@ -72,7 +72,6 @@
             }).finally(start);
         },
         teardown: function () {
-            stop(); deleteDatabase(db).finally(start);
         }
     });
 
