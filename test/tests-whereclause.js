@@ -453,4 +453,61 @@
         }).finally(start);
     });
 
+    asyncTest("notEqual", function () {
+        db.folders.where('path').notEqual("/usr/local").sortBy("path", function (result) {
+            result = result.map(function(x) { return x.path; });
+            equal(JSON.stringify(result,null,4), JSON.stringify([
+                "/",
+                "/USR/local/VAR",
+                "/usr",
+                //"/usr/local"
+                "/usr/local/bin",
+                "/usr/local/src",
+                "/usr/local/var",
+                "/var",
+                "/var/bin"
+            ],null,4), "/usr/local should be removed");
+        }).catch(function (err) {
+            ok(false, err.stack || err);
+        }).finally(start);
+    });
+
+    asyncTest("noneOf", function () {
+        db.folders.where('path').noneOf("/usr/local", "/", "/var/bin", "not existing key").sortBy("path", function (result) {
+            result = result.map(function (x) { return x.path; });
+            equal(JSON.stringify(result, null, 4), JSON.stringify([
+                //"/",
+                "/USR/local/VAR",
+                "/usr",
+                //"/usr/local"
+                "/usr/local/bin",
+                "/usr/local/src",
+                "/usr/local/var",
+                "/var",
+                //"/var/bin"
+            ], null, 4), "Only items not specified in query should come into result");
+        }).catch(function (err) {
+            ok(false, err.stack || err);
+        }).finally(start);
+    });
+
+    asyncTest("noneOf keys", function () {
+        db.folders.where('path').noneOf("/usr/local", "/", "/var/bin", "not existing key").keys(function (result) {
+            result = result.sort(function(a, b) { return a < b ? -1 : a === b ? 0 : 1; });
+            equal(JSON.stringify(result, null, 4), JSON.stringify([
+                //"/",
+                "/USR/local/VAR",
+                "/usr",
+                //"/usr/local"
+                "/usr/local/bin",
+                "/usr/local/src",
+                "/usr/local/var",
+                "/var",
+                //"/var/bin"
+            ], null, 4), "Only keys not specified in query should come into result");
+        }).catch(function (err) {
+            ok(false, err.stack || err);
+        }).finally(start);
+    });
+
 })();

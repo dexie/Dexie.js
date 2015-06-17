@@ -1541,6 +1541,33 @@
                     return c;
                 },
 
+                notEqual: function(value) {
+                    return this.below(value).or(this._ctx.index).above(value);
+                },
+
+                noneOf: function(valueArray) {
+                    var ctx = this._ctx,
+                        schema = ctx.table.schema;
+                    var idxSpec = ctx.index ? schema.idxByName[ctx.index] : schema.primKey;
+                    var isCompound = idxSpec && idxSpec.compound;
+                    var set = getSetArgs(arguments);
+                    if (set.length === 0) return new this._ctx.collClass(this); // Return entire collection.
+                    var compare = isCompound ? compoundCompare(ascending) : ascending;
+                    set.sort(compare);
+                    // Transform ["a","b","c"] to a set of ranges for between/above/below: [[null,"a"], ["a","b"], ["b","c"], ["c",null]]
+                    var ranges = set.reduce(function (res, val) { return res ? res.concat([[res[res.length - 1][1], val]]) : [[null, val]]; }, null);
+                    ranges.push([set[set.length - 1], null]);
+                    // Transform range-sets to a big or() expression between ranges:
+                    var thiz = this, index = ctx.index;
+                    return ranges.reduce(function(collection, range) {
+                        return collection ?
+                            range[1] === null ?
+                                collection.or(index).above(range[0]) :
+                                collection.or(index).between(range[0], range[1], false, false)
+                            : thiz.below(range[1]);
+                    }, null);
+                },
+
                 startsWithAnyOf: function (valueArray) {
                     var ctx = this._ctx,
                         set = getSetArgs(arguments);
