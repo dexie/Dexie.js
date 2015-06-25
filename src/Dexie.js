@@ -2929,7 +2929,12 @@
     }
 
     function delByKeyPath(obj, keyPath) {
-        setByKeyPath(obj, keyPath, undefined);
+        if (typeof keyPath === 'string')
+            setByKeyPath(obj, keyPath, undefined);
+        else if ('length' in keyPath)
+            [].map.call(keyPath, function(kp) {
+                 setByKeyPath(obj, kp, undefined);
+            });
     }
 
     function shallowClone(obj) {
