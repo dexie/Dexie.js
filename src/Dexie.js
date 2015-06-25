@@ -445,7 +445,6 @@
         this._whenReady = function (fn) {
             if (db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
                 return new Promise(function (resolve, reject) {
-                    fake&& new Promise(function() { fn(resolve, reject); });
                     pausedResumeables.push({
                         resume: function () {
                             fn(resolve, reject);
@@ -893,6 +892,7 @@
                     return this._tpf(mode, [this.name], fn, writeLocked);
                 },
                 _idbstore: function getIDBObjectStore(mode, fn, writeLocked) {
+                    if (fake) return new Promise(fn); // Simplify the work for Intellisense/Code completion.
                     var self = this;
                     return this._tpf(mode, [this.name], function (resolve, reject, trans) {
                         fn(resolve, reject, trans.idbtrans.objectStore(self.name), trans);
@@ -904,8 +904,8 @@
                 //
                 get: function (key, cb) {
                     var self = this;
-                    fake && cb(self.schema.instanceTemplate);
                     return this._idbstore(READONLY, function (resolve, reject, idbstore) {
+                        fake && resolve(self.schema.instanceTemplate);
                         var req = idbstore.get(key);
                         req.onerror = eventRejectHandler(reject, ["getting", key, "from", self.name]);
                         req.onsuccess = function () {
@@ -942,8 +942,8 @@
                 },
                 toArray: function (cb) {
                     var self = this;
-                    fake && cb([self.schema.instanceTemplate]);
                     return this._idbstore(READONLY, function (resolve, reject, idbstore) {
+                        fake && resolve([self.schema.instanceTemplate]);
                         var a = [];
                         var req = idbstore.openCursor();
                         req.onerror = eventRejectHandler(reject, ["calling", "Table.toArray()", "on", self.name]);
@@ -1765,7 +1765,7 @@
                 },
 
                 count: function (cb) {
-                    fake && cb(0);
+                    if (fake) return Promise.resolve(0).then(cb);
                     var self = this,
                         ctx = this._ctx;
 
@@ -1791,7 +1791,6 @@
                 sortBy: function (keyPath, cb) {
                     /// <param name="keyPath" type="String"></param>
                     var ctx = this._ctx;
-                    fake && cb([getInstanceTemplate(ctx)]);
                     var parts = keyPath.split('.').reverse(),
                         lastPart = parts[0],
                         lastIndex = parts.length - 1;
@@ -1813,10 +1812,8 @@
 
                 toArray: function (cb) {
                     var ctx = this._ctx;
-
-                    fake && cb([getInstanceTemplate(ctx)]);
-
                     return this._read(function (resolve, reject, idbstore) {
+                        fake && resolve([getInstanceTemplate(ctx)]);
                         var a = [];
                         iter(ctx, function (item) { a.push(item); }, function arrayComplete() {
                             resolve(a);
@@ -1867,7 +1864,6 @@
                 },
 
                 first: function (cb) {
-                    fake && cb(getInstanceTemplate(this._ctx));
                     return this.limit(1).toArray(function (a) { return a[0]; }).then(cb);
                 },
 
@@ -1901,7 +1897,7 @@
 
                 eachKey: function (cb) {
                     var ctx = this._ctx;
-                    fake && cb(getInstanceTemplate(this._ctx)[this._ctx.index]);
+                    fake && cb(getByKeyPath(getInstanceTemplate(this._ctx), this._ctx.index ? this._ctx.table.schema.idxByName[this._ctx.index].keyPath : this._ctx.table.schema.primKey.keyPath));
                     if (!ctx.isPrimKey) ctx.op = "openKeyCursor"; // Need the check because IDBObjectStore does not have "openKeyCursor()" while IDBIndex has.
                     return this.each(function (val, cursor) { cb(cursor.key, cursor); });
                 },
@@ -1913,9 +1909,9 @@
 
                 keys: function (cb) {
                     var ctx = this._ctx;
-                    fake && cb([getInstanceTemplate(ctx)[this._ctx.index]]);
                     if (!ctx.isPrimKey) ctx.op = "openKeyCursor"; // Need the check because IDBObjectStore does not have "openKeyCursor()" while IDBIndex has.
                     var a = [];
+                    if (fake) return new Promise(this.eachKey.bind(this)).then(function(x) { return [x]; }).then(cb);
                     return this.each(function (item, cursor) {
                         a.push(cursor.key);
                     }).then(function () {
@@ -2314,10 +2310,17 @@
 
         // The use of asap in handle() is remarked because we must NOT use setTimeout(fn,0) because it causes premature commit of indexedDB transactions - which is according to indexedDB specification.
         var _slice = [].slice;
-        var _asap = typeof (setImmediate) === 'undefined' ? function(fn, arg1, arg2, argN) {
+        var _asap = typeof setImmediate === 'undefined' ? function(fn, arg1, arg2, argN) {
             var args = arguments;
             setTimeout(function() { fn.apply(global, _slice.call(args, 1)); }, 0); // If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
         } : setImmediate; // IE10+ and node.
+
+        doFakeAutoComplete(function () {
+            // Simplify the job for VS Intellisense. This piece of code is one of the keys to the new marvellous intellisense support in Dexie.
+            _asap = asap = enqueueImmediate = function(fn) {
+                var args = arguments; setTimeout(function() { fn.apply(global, _slice.call(args, 1)); }, 0);
+            };
+        });
 
         var asap = _asap,
             isRootExecution = true;
