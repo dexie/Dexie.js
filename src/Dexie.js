@@ -167,7 +167,7 @@
                         var indexes = parseIndexSyntax(stores[tableName]);
                         var primKey = indexes.shift();
                         if (primKey.multi) throw new Error("Primary key cannot be multi-valued");
-                        if (primKey.keyPath && primKey.auto) setByKeyPath(instanceTemplate, primKey.keyPath, 0);
+                        if (primKey.keyPath) setByKeyPath(instanceTemplate, primKey.keyPath, primKey.auto ? 0 : primKey.keyPath);
                         indexes.forEach(function (idx) {
                             if (idx.auto) throw new Error("Only primary key can be marked as autoIncrement (++)");
                             if (!idx.keyPath) throw new Error("Index must have a name and cannot be an empty string");
@@ -968,14 +968,6 @@
                     /// know what type each member has. Example: {name: String, emailAddresses: [String], password}</param>
                     this.schema.mappedClass = constructor;
                     var instanceTemplate = Object.create(constructor.prototype);
-                    if (this.schema.primKey.keyPath) {
-                        // Make sure primary key is not part of prototype because add() and put() fails on Chrome if primKey template lies on prototype due to a bug in its implementation
-                        // of getByKeyPath(), that it accepts getting from prototype chain.
-                        setByKeyPath(instanceTemplate, this.schema.primKey.keyPath, this.schema.primKey.auto ?
-                            0 : // Let the type be a number
-                            this.schema.primKey.keyPath);// Default the type to string or Array<string> depending on keyPath type
-                        delByKeyPath(constructor.prototype, this.schema.primKey.keyPath);
-                    }
                     if (structure) {
                         // structure and instanceTemplate is for IDE code competion only while constructor.prototype is for actual inheritance.
                         applyStructure(instanceTemplate, structure);
@@ -984,19 +976,14 @@
 
                     // Now, subscribe to the when("reading") event to make all objects that come out from this table inherit from given class
                     // no matter which method to use for reading (Table.get() or Table.where(...)... )
-                    var readHook = Object.setPrototypeOf ?
-                        function makeInherited(obj) {
-                            if (!obj) return obj; // No valid object. (Value is null). Return as is.
-                            // Object.setPrototypeOf() supported. Just change that pointer on the existing object. A little more efficient way.
-                            Object.setPrototypeOf(obj, constructor.prototype);
-                            return obj;
-                        } : function makeInherited(obj) {
-                            if (!obj) return obj; // No valid object. (Value is null). Return as is.
-                            // Object.setPrototypeOf not supported (IE10)- return a new object and clone the members from the old one.
-                            var res = Object.create(constructor.prototype);
-                            for (var m in obj) if (obj.hasOwnProperty(m)) res[m] = obj[m];
-                            return res;
-                        };
+                    var readHook = function (obj) {
+                        if (!obj) return obj; // No valid object. (Value is null). Return as is.
+                        // Create a new object that derives from constructor:
+                        var res = Object.create(constructor.prototype);
+                        // Clone members:
+                        for (var m in obj) if (obj.hasOwnProperty(m)) res[m] = obj[m];
+                        return res;
+                    };
 
                     if (this.schema.readHook) {
                         this.hook.reading.unsubscribe(this.schema.readHook);
@@ -2862,7 +2849,8 @@
         if (global.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
     }
 
-    var fakeAutoComplete = function() {};
+    var fakeAutoComplete = function () { };
+    var fake = false;
 
     function doFakeAutoComplete(fn) {
         var to = setTimeout(fn, 1000);
@@ -3168,9 +3156,8 @@
         function Class(properties) {
             /// <param name="properties" type="Object" optional="true">Properties to initialize object with.
             /// </param>
-            if (properties) extend(this, properties);
+            properties ? extend(this, properties) : fake && applyStructure(this, structure);
         }
-        applyStructure(Class.prototype, structure);
         return Class;
     }; 
 
@@ -3287,9 +3274,10 @@
     // Export Dexie to window or as a module depending on environment.
     publish("Dexie", Dexie);
 
-    // Fool IDE to improve autocomplete. Tested with Visual Studio 2013 but should work with 2012 and 2015 as well.
+    // Fool IDE to improve autocomplete. Tested with Visual Studio 2013 and 2015.
     doFakeAutoComplete(function() {
-        fakeAutoComplete = doFakeAutoComplete;
+        Dexie.fakeAutoComplete = fakeAutoComplete = doFakeAutoComplete;
+        Dexie.fake = fake = true;
     });
 }).apply(null,
 
