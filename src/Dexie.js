@@ -971,7 +971,9 @@
                     if (this.schema.primKey.keyPath) {
                         // Make sure primary key is not part of prototype because add() and put() fails on Chrome if primKey template lies on prototype due to a bug in its implementation
                         // of getByKeyPath(), that it accepts getting from prototype chain.
-                        setByKeyPath(instanceTemplate, this.schema.primKey.keyPath, this.schema.primKey.auto ? 0 : "");
+                        setByKeyPath(instanceTemplate, this.schema.primKey.keyPath, this.schema.primKey.auto ?
+                            0 : // Let the type be a number
+                            this.schema.primKey.keyPath);// Default the type to string or Array<string> depending on keyPath type
                         delByKeyPath(constructor.prototype, this.schema.primKey.keyPath);
                     }
                     if (structure) {
