@@ -445,7 +445,7 @@
         this._whenReady = function (fn) {
             if (db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
                 return new Promise(function (resolve, reject) {
-                    fakeAutoComplete(function () { new Promise(function () { fn(resolve, reject); }); });
+                    fake&& new Promise(function() { fn(resolve, reject); });
                     pausedResumeables.push({
                         resume: function () {
                             fn(resolve, reject);
@@ -904,7 +904,7 @@
                 //
                 get: function (key, cb) {
                     var self = this;
-                    fakeAutoComplete(function () { cb(self.schema.instanceTemplate); });
+                    fake && cb(self.schema.instanceTemplate);
                     return this._idbstore(READONLY, function (resolve, reject, idbstore) {
                         var req = idbstore.get(key);
                         req.onerror = eventRejectHandler(reject, ["getting", key, "from", self.name]);
@@ -933,7 +933,7 @@
                 },
                 each: function (fn) {
                     var self = this;
-                    fakeAutoComplete(function () { fn(self.schema.instanceTemplate); });
+                    fake && fn(self.schema.instanceTemplate);
                     return this._idbstore(READONLY, function (resolve, reject, idbstore) {
                         var req = idbstore.openCursor();
                         req.onerror = eventRejectHandler(reject, ["calling", "Table.each()", "on", self.name]);
@@ -942,7 +942,7 @@
                 },
                 toArray: function (cb) {
                     var self = this;
-                    fakeAutoComplete(function () { cb([self.schema.instanceTemplate]); });
+                    fake && cb([self.schema.instanceTemplate]);
                     return this._idbstore(READONLY, function (resolve, reject, idbstore) {
                         var a = [];
                         var req = idbstore.openCursor();
@@ -1757,7 +1757,7 @@
                 each: function (fn) {
                     var ctx = this._ctx;
 
-                    fakeAutoComplete(function () { fn(getInstanceTemplate(ctx)); });
+                    fake && fn(getInstanceTemplate(ctx));
 
                     return this._read(function (resolve, reject, idbstore) {
                         iter(ctx, fn, resolve, reject, idbstore);
@@ -1765,7 +1765,7 @@
                 },
 
                 count: function (cb) {
-                    fakeAutoComplete(function () { cb(0); });
+                    fake && cb(0);
                     var self = this,
                         ctx = this._ctx;
 
@@ -1791,7 +1791,7 @@
                 sortBy: function (keyPath, cb) {
                     /// <param name="keyPath" type="String"></param>
                     var ctx = this._ctx;
-                    fakeAutoComplete(function () { cb([getInstanceTemplate(ctx)]); });
+                    fake && cb([getInstanceTemplate(ctx)]);
                     var parts = keyPath.split('.').reverse(),
                         lastPart = parts[0],
                         lastIndex = parts.length - 1;
@@ -1814,7 +1814,7 @@
                 toArray: function (cb) {
                     var ctx = this._ctx;
 
-                    fakeAutoComplete(function () { cb([getInstanceTemplate(ctx)]); });
+                    fake && cb([getInstanceTemplate(ctx)]);
 
                     return this._read(function (resolve, reject, idbstore) {
                         var a = [];
@@ -1854,7 +1854,7 @@
 
                 until: function (filterFunction, bIncludeStopEntry) {
                     var ctx = this._ctx;
-                    fakeAutoComplete(function () { filterFunction(getInstanceTemplate(ctx)); });
+                    fake && filterFunction(getInstanceTemplate(ctx));
                     addFilter(this._ctx, function (cursor, advance, resolve) {
                         if (filterFunction(cursor.value)) {
                             advance(resolve);
@@ -1867,8 +1867,7 @@
                 },
 
                 first: function (cb) {
-                    var self = this;
-                    fakeAutoComplete(function () { cb(getInstanceTemplate(self._ctx)); });
+                    fake && cb(getInstanceTemplate(this._ctx));
                     return this.limit(1).toArray(function (a) { return a[0]; }).then(cb);
                 },
 
@@ -1878,8 +1877,7 @@
 
                 and: function (filterFunction) {
                     /// <param name="jsFunctionFilter" type="Function">function(val){return true/false}</param>
-                    var self = this;
-                    fakeAutoComplete(function () { filterFunction(getInstanceTemplate(self._ctx)); });
+                    fake && filterFunction(getInstanceTemplate(this._ctx));
                     addFilter(this._ctx, function (cursor) {
                         return filterFunction(cursor.value);
                     });
@@ -1902,8 +1900,8 @@
                 },
 
                 eachKey: function (cb) {
-                    var self = this, ctx = this._ctx;
-                    fakeAutoComplete(function () { cb(getInstanceTemplate(self._ctx)[self._ctx.index]); });
+                    var ctx = this._ctx;
+                    fake && cb(getInstanceTemplate(this._ctx)[this._ctx.index]);
                     if (!ctx.isPrimKey) ctx.op = "openKeyCursor"; // Need the check because IDBObjectStore does not have "openKeyCursor()" while IDBIndex has.
                     return this.each(function (val, cursor) { cb(cursor.key, cursor); });
                 },
@@ -1914,9 +1912,8 @@
                 },
 
                 keys: function (cb) {
-                    fakeAutoComplete(function () { cb([getInstanceTemplate(ctx)[self._ctx.index]]); });
-                    var self = this,
-                        ctx = this._ctx;
+                    var ctx = this._ctx;
+                    fake && cb([getInstanceTemplate(ctx)[this._ctx.index]]);
                     if (!ctx.isPrimKey) ctx.op = "openKeyCursor"; // Need the check because IDBObjectStore does not have "openKeyCursor()" while IDBIndex has.
                     var a = [];
                     return this.each(function (item, cursor) {
@@ -1932,9 +1929,6 @@
                 },
 
                 firstKey: function (cb) {
-                    var self = this;
-                    //fakeAutoComplete(function () { cb(getInstanceTemplate(self._ctx)[self._ctx.index]); });
-                    //debugger;
                     return this.limit(1).keys(function (a) { return a[0]; }).then(cb);
                 },
 
@@ -1978,11 +1972,7 @@
                     updatingHook = hook.updating.fire,
                     deletingHook = hook.deleting.fire;
 
-                fakeAutoComplete(function () {
-                    if (typeof changes === 'function') {
-                        changes.call({ value: ctx.table.schema.instanceTemplate }, ctx.table.schema.instanceTemplate);
-                    }
-                });
+                fake && typeof changes === 'function' && changes.call({ value: ctx.table.schema.instanceTemplate }, ctx.table.schema.instanceTemplate);
 
                 return this._write(function (resolve, reject, idbstore, trans) {
                     var modifyer;
@@ -2849,8 +2839,8 @@
         if (global.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
     }
 
-    var fakeAutoComplete = function () { };
-    var fake = false;
+    var fakeAutoComplete = function () { };// Will never be changed. We just fake for the IDE that we change it (see doFakeAutoComplete())
+    var fake = false; // Will never be changed. We just fake for the IDE that we change it (see doFakeAutoComplete())
 
     function doFakeAutoComplete(fn) {
         var to = setTimeout(fn, 1000);
