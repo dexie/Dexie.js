@@ -75,7 +75,7 @@ function getAllWords(text) {
             prev[current] = true;
             return prev;
         }, {});
-        return Object.keys(set);
+        return Object.keys(wordSet);
     }
 }
 
