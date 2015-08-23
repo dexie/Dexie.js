@@ -3276,7 +3276,7 @@
 
     // AMD:
     typeof define === 'function' && define.amd ?
-    [self || window, function (name, value) { define(name, function () { return value; }); }] :
+    [self || window, function (name, value) { define(function () { return value; }); }] :
 
     // CommonJS:
     typeof global !== 'undefined' && typeof module !== 'undefined' && module.exports ?
