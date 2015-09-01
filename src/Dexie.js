@@ -567,7 +567,7 @@
                                     resumable.resume();
                                 });
                                 pausedResumeables = [];
-                                resolve();
+                                resolve(db);
                             }
                         });
                     }, openError);
