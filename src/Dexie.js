@@ -263,9 +263,10 @@
                                             }
                                         }
                                         return orig_promise.call(this, mode, function (resolve, reject, trans) {
-                                            arguments[0] = proxy(resolve);
-                                            arguments[1] = proxy(reject);
-                                            fn.apply(this, arguments);
+                                            var args = getArgsSafe(arguments);
+                                            args[0] = proxy(resolve);
+                                            args[1] = proxy(reject);
+                                            fn.apply(this, args);
                                         }, writeLock);
                                     };
                                 });
@@ -692,10 +693,11 @@
             /// <param name="tableInstances">Table instance, Array of Table instances, String or String Array of object stores to include in the transaction</param>
             /// <param name="scopeFunc" type="Function">Function to execute with transaction</param>
 
+            var args = getArgsSafe(arguments);
             // Let table arguments be all arguments between mode and last argument.
-            tableInstances = [].slice.call(arguments, 1, arguments.length - 1);
+            tableInstances = args.slice(1, args.length - 1);
             // Let scopeFunc be the last argument
-            scopeFunc = arguments[arguments.length - 1];
+            scopeFunc = args[args.length - 1];
             var parentTransaction = Promise.PSD && Promise.PSD.trans;
 			// Check if parent transactions is bound to this db instance, and if caller wants to reuse it
             if (!parentTransaction || parentTransaction.db !== db || mode.indexOf('!') !== -1) parentTransaction = null;
@@ -1494,7 +1496,7 @@
                         schema = ctx.table.schema;
                     var idxSpec = ctx.index ? schema.idxByName[ctx.index] : schema.primKey;
                     var isCompound = idxSpec && idxSpec.compound;
-                    var set = getSetArgs(arguments);
+                    var set = getSetArgs(getArgsSafe(arguments));
                     var compare = isCompound ? compoundCompare(ascending) : ascending;
                     set.sort(compare);
                     if (set.length === 0) return new this._ctx.collClass(this, function() { return IDBKeyRange.only(""); }).limit(0); // Return an empty collection.
@@ -1539,7 +1541,7 @@
                         schema = ctx.table.schema;
                     var idxSpec = ctx.index ? schema.idxByName[ctx.index] : schema.primKey;
                     var isCompound = idxSpec && idxSpec.compound;
-                    var set = getSetArgs(arguments);
+                    var set = getSetArgs(getArgsSafe(arguments));
                     if (set.length === 0) return new this._ctx.collClass(this); // Return entire collection.
                     var compare = isCompound ? compoundCompare(ascending) : ascending;
                     set.sort(compare);
@@ -1559,7 +1561,7 @@
 
                 startsWithAnyOf: function (valueArray) {
                     var ctx = this._ctx,
-                        set = getSetArgs(arguments);
+                        set = getSetArgs(getArgsSafe(arguments));
 
                     if (!set.every(function (s) { return typeof s === 'string'; })) {
                         return fail(new ctx.collClass(this), new TypeError("startsWithAnyOf() only works with strings"));
@@ -2217,7 +2219,9 @@
         }
 
         function combine(filter1, filter2) {
-            return filter1 ? filter2 ? function () { return filter1.apply(this, arguments) && filter2.apply(this, arguments); } : filter1 : filter2;
+            return filter1 ? filter2 ? function () {
+                return filter1.apply(this, arguments) && filter2.apply(this, arguments);
+            } : filter1 : filter2;
         }
 
         function hasIEDeleteObjectStoreBug() {
@@ -2309,16 +2313,15 @@
     var Promise = (function () {
 
         // The use of asap in handle() is remarked because we must NOT use setTimeout(fn,0) because it causes premature commit of indexedDB transactions - which is according to indexedDB specification.
-        var _slice = [].slice;
         var _asap = typeof setImmediate === 'undefined' ? function(fn, arg1, arg2, argN) {
-            var args = arguments;
-            setTimeout(function() { fn.apply(global, _slice.call(args, 1)); }, 0); // If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
+            var args = getArgsSafe(arguments);
+            setTimeout(function() { fn.apply(global, args.slice(1)); }, 0); // If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
         } : setImmediate; // IE10+ and node.
 
         doFakeAutoComplete(function () {
             // Simplify the job for VS Intellisense. This piece of code is one of the keys to the new marvellous intellisense support in Dexie.
             _asap = asap = enqueueImmediate = function(fn) {
-                var args = arguments; setTimeout(function() { fn.apply(global, _slice.call(args, 1)); }, 0);
+                var args = getArgsSafe(arguments); setTimeout(function() { fn.apply(global, args.slice(1)); }, 0);
             };
         });
 
@@ -2328,7 +2331,7 @@
         var operationsQueue = [];
         var tickFinalizers = [];
         function enqueueImmediate(fn, args) {
-            operationsQueue.push([fn, _slice.call(arguments, 1)]);
+            operationsQueue.push([fn, getArgsSafe(arguments).slice(1)]);
         }
 
         function executeOperationsQueue() {
@@ -2524,7 +2527,8 @@
         Promise.on = events(null, "error");
 
         Promise.all = function () {
-            var args = Array.prototype.slice.call(arguments.length === 1 && Array.isArray(arguments[0]) ? arguments[0] : arguments);
+            var safeArgs = getArgsSafe(arguments);
+            var args = safeArgs.length === 1 && Array.isArray(safeArgs[0]) ? safeArgs[0].slice() : safeArgs;
 
             return new Promise(function (resolve, reject) {
                 if (args.length === 0) return resolve([]);
@@ -2675,13 +2679,14 @@
         // This pattern is used in the hook("creating") event.
         if (f1 === nop) return f2;
         return function () {
-            var res = f1.apply(this, arguments);
-            if (res !== undefined) arguments[0] = res;
+            var args = getArgsSafe(arguments)
+            var res = f1.apply(this, args);
+            if (res !== undefined) args[0] = res;
             var onsuccess = this.onsuccess, // In case event listener has set this.onsuccess
                 onerror = this.onerror;     // In case event listener has set this.onerror
             delete this.onsuccess;
             delete this.onerror;
-            var res2 = f2.apply(this, arguments);
+            var res2 = f2.apply(this, args);
             if (onsuccess) this.onsuccess = this.onsuccess ? callBoth(onsuccess, this.onsuccess) : onsuccess;
             if (onerror) this.onerror = this.onerror ? callBoth(onerror, this.onerror) : onerror;
             return res2 !== undefined ? res2 : res;
@@ -2691,13 +2696,14 @@
     function hookUpdatingChain(f1, f2) {
         if (f1 === nop) return f2;
         return function () {
-            var res = f1.apply(this, arguments);
-            if (res !== undefined) extend(arguments[0], res); // If f1 returns new modifications, extend caller's modifications with the result before calling next in chain.
+            var args = getArgsSafe(arguments);
+            var res = f1.apply(this, args);
+            if (res !== undefined) extend(args[0], res); // If f1 returns new modifications, extend caller's modifications with the result before calling next in chain.
             var onsuccess = this.onsuccess, // In case event listener has set this.onsuccess
                 onerror = this.onerror;     // In case event listener has set this.onerror
             delete this.onsuccess;
             delete this.onerror;
-            var res2 = f2.apply(this, arguments);
+            var res2 = f2.apply(this, args);
             if (onsuccess) this.onsuccess = this.onsuccess ? callBoth(onsuccess, this.onsuccess) : onsuccess;
             if (onerror) this.onerror = this.onerror ? callBoth(onerror, this.onerror) : onerror;
             return res === undefined ?
@@ -2738,7 +2744,7 @@
             if (res && typeof res.then === 'function') {
                 var thiz = this, args = arguments;
                 return res.then(function () {
-                    return f2.apply(thiz, args);
+                    return f2.apply(thiz, arguments);
                 });
             }
             return f2.apply(this, arguments);
@@ -2746,14 +2752,13 @@
     }
 
     function events(ctx, eventNames) {
-        var args = arguments;
+        var args = getArgsSafe(arguments);
         var evs = {};
         var rv = function (eventName, subscriber) {
             if (subscriber) {
                 // Subscribe
-                var args = [].slice.call(arguments, 1);
                 var ev = evs[eventName];
-                ev.subscribe.apply(ev, args);
+                ev.subscribe.apply(ev, getArgsSafe(arguments).slice(1));
                 return ctx;
             } else if (typeof (eventName) === 'string') {
                 // Return interface allowing to fire or unsubscribe from event
@@ -2787,10 +2792,10 @@
         function addConfiguredEvents(cfg) {
             // events(this, {reading: [functionChain, nop]});
             Object.keys(cfg).forEach(function (eventName) {
-                var args = cfg[eventName];
-                if (Array.isArray(args)) {
+                var cfgEvent = cfg[eventName];
+                if (Array.isArray(cfgEvent)) {
                     add(eventName, cfg[eventName][0], cfg[eventName][1]);
-                } else if (args === 'asap') {
+                } else if (cfgEvent === 'asap') {
                     // Rather than approaching event subscription using a functional approach, we here do it in a for-loop where subscriber is executed in its own stack
                     // enabling that any exception that occur wont disturb the initiator and also not nescessary be catched and forgotten.
                     var context = add(eventName, null, function fire() {
@@ -3034,6 +3039,14 @@
     }
     function preventDefault(e) {
         e.preventDefault();
+    }
+
+    function getArgsSafe(args) {
+        var res = new Array(args.length);
+        for (var i = 0; i < res.length; ++i) {
+            res[i] = args[i];
+        }
+        return res;
     }
 
     function globalDatabaseList(cb) {
@@ -3284,4 +3297,3 @@
 
     // Vanilla HTML and WebWorkers:
     : [self || window, function (name, value) { (self || window)[name] = value; }]);
-
