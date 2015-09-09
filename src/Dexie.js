@@ -3264,6 +3264,42 @@
         return fn && fn.bind(indexedDB);
     }
 
+    //
+    // Static delete() method.
+    //
+    Dexie.exists = (function(){
+        var get = getNativeGetDatabaseNamesFn();
+        var indexedDB = Dexie.dependencies.indexedDB;
+        var slice = [].slice;
+
+        return get && function(name){
+            // See if it exist
+            return new Promise(function (resolve, reject){
+                var req = get();
+                
+                req.onsuccess = function (evt) {
+                    ~(slice.call(evt.target.result)).indexOf(name) ? 
+                        resolve(true):
+                        reject(false);
+                };
+            });
+        } || function(name){
+            // Try if it exist
+            return new Promise(function (resolve, reject){
+                var req = indexedDB.open(name);
+                req.onsuccess = function () {
+                    req.result.close();
+                    resolve(true);
+                }
+                req.onupgradeneeded = function (evt) {
+                    evt.target.transaction.abort();
+                    reject(false);
+                }
+            });
+        }
+    })()
+
+
     // Export Dexie to window or as a module depending on environment.
     publish("Dexie", Dexie);
 
