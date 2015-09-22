@@ -162,8 +162,9 @@
             //
             // Overide transaction creation to always include the "_changes" store when any observable store is involved.
             //
-            db._createTransaction = override(db._createTransaction, function(origFunc) {
-                return function(mode, storenames, dbschema, parent) {
+            db._createTransaction = override(db._createTransaction, function (origFunc) {
+                return function (mode, storenames, dbschema, parent) {
+                    if (db.dynamicallyOpened()) return origFunc.apply(this, arguments); // Don't observe dynamically opened databases.
                     var addChanges = false;
                     if (mode === 'readwrite' && storenames.some(function(storeName) { return dbschema[storeName] && dbschema[storeName].observable; })) {
                         // At least one included store is a observable store. Make sure to also include the _changes store.
@@ -231,7 +232,8 @@
             }
 
             db.close = override(db.close, function(origClose) {
-                return function() {
+                return function () {
+                    if (db.dynamicallyOpened()) return origClose.apply(this, arguments); // Don't observe dynamically opened databases.
                     // Teardown our framework.
                     if (wakeupObservers.timeoutHandle) {
                         clearTimeout(wakeupObservers.timeoutHandle);
@@ -396,6 +398,7 @@
 
             // When db opens, make sure to start monitor any changes before other db operations will start.
             db.on("ready", function startObserving() {
+                if (db.dynamicallyOpened()) return db; // Don't observe dynamically opened databases.
                 return db.table("_changes").orderBy("rev").last(function(lastChange) {
                     // Since startObserving() is called before database open() method, this will be the first database operation enqueued to db.
                     // Therefore we know that the retrieved value will be This query will

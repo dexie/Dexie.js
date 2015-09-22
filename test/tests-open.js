@@ -69,10 +69,6 @@ asyncTest("open, add and query data using transaction", function () {
 });
 
 asyncTest("test-if-database-exists", 3, function () {
-    if (Dexie.Observable) {
-        ok(false, "Dexie.Observable currently not compatible with this mode");
-        return start();
-    }
     var db = new Dexie("TestDB");
     var db2 = null;
     return db.open().then(function () {

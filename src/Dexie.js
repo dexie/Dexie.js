@@ -5,7 +5,7 @@
 
    Version 1.2 (alpha - not yet distributed) - DATE, YEAR.
 
-   Tested successfully on Chrome, IE, Firefox and Opera.
+   Tested successfully on Chrome, Opera, Firefox, Edge, and IE.
 
    Official Website: https://github.com/dfahlander/Dexie.js/wiki/Dexie.js
 
@@ -67,7 +67,7 @@
         var READONLY = "readonly", READWRITE = "readwrite";
         var db = this;
         var pausedResumeables = [];
-        var autoSchema = false;
+        var autoSchema = true;
         var hasNativeGetDatabaseNames = !!getNativeGetDatabaseNamesFn();
 
         function init() {
@@ -494,9 +494,7 @@
                     isBeingOpened = true;
 
                     // Make sure caller has specified at least one version
-                    if (versions.length === 0) {
-                        autoSchema = true;
-                    }
+                    if (versions.length > 0) autoSchema = false;
 
                     // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE: 
                     // IE fails when deleting objectStore after reading from it.
