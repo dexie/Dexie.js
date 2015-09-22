@@ -1,9 +1,9 @@
-/* Minimalistic IndexedDB Wrapper with Bullet Proof Transactions
-   =============================================================
+/* A Minimalistic Wrapper for IndexedDB
+   ====================================
 
    By David Fahlander, david.fahlander@gmail.com
 
-   Version 1.2 (alpha - not yet distributed) - DATE, YEAR.
+   Version 1.2.x (alpha - not yet distributed) - DATE, YEAR.
 
    Tested successfully on Chrome, Opera, Firefox, Edge, and IE.
 

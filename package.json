@@ -1,7 +1,7 @@
 {
   "name": "dexie",
-  "version": "1.1.0",
-  "description": "Minimalistic IndexedDB API with bullet proof transactions",
+  "version": "1.2.0",
+  "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/latest/Dexie.js",
   "repository": {
     "type": "git",
