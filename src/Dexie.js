@@ -7,7 +7,7 @@
 
    Tested successfully on Chrome, Opera, Firefox, Edge, and IE.
 
-   Official Website: https://github.com/dfahlander/Dexie.js/wiki/Dexie.js
+   Official Website: www.dexie.com
 
    Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
 */
@@ -854,9 +854,10 @@
 
         this.table = function (tableName) {
             /// <returns type="WriteableTable"></returns>
-            if (!autoSchema && !allTables.hasOwnProperty(tableName)) { throw new Error("Table does not exist"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
+            if (fake && autoSchema) return new WriteableTable(tableName);
+            if (!allTables.hasOwnProperty(tableName)) { throw new Error("Table does not exist"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
             return allTables[tableName];
-        }; 
+        };
 
         //
         //
