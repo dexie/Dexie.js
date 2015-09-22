@@ -693,5 +693,19 @@
             ok(false, "Error:" + e);
         }).finally(start);
     });
+
+    asyncTest("Issue #137 db.table() does not respect current transaction", function() {
+        db.transaction('rw', db.users, function() {
+            db.users.add({ username: "erictheviking", color: "blue" }).then(function() {
+                db.table('users').get('erictheviking', function (eric) {
+                    ok(eric, "Got back an object");
+                    equal(eric.color, "blue", "eric.color is still blue. If red, the getter must have been run from another transaction.");
+                });
+                db.users.put({ username: "erictheviking", color: "red" });
+            });
+        }).catch(function(e) {
+            ok(false, "Error: " + e);
+        }).finally(start);
+    });
 })();
 
