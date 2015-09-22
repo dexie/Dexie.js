@@ -505,5 +505,50 @@
             });
         });
     });
+
+    /* This test could not be used to reproduce the low disk issue. Therefore, remarking it.
+    asyncTest("Transaction promise never complete on low disk space (chrome issue)", function() {
+        var numSuccess = 0,
+            numFailures = 0,
+            transactionDone = false;
+
+        function success() { ++numSuccess; }
+
+        function fail(e) {
+            ++numFailures;
+            ok(true, "Operation failed with: " + e);
+        }
+
+        db.transaction('rw', db.users, function() {
+            db.users.add({ id: 98324 }).then(success).catch(fail).then(function() {
+                    ok(true, "Done with operation 1");
+                    return db.users.add({ id: 98325 });
+                }).then(success)
+                .catch(fail)
+                .then(function() {
+                    ok(true, "Done with operation 2");
+                });
+            Dexie.currentTransaction.idbtrans.abort();
+            Dexie.currentTransaction.idbtrans.onabort();
+        }).then(function() {
+            ok(false, "Transaction shouldnt commit! It was aborted");
+            transactionDone = true;
+        }).catch(function(e) {
+            ok(true, "Transaction promise completed with an AbortError: " + e);
+            transactionDone = true;
+        }).finally(function () {
+            if (numSuccess + numFailures == 2) {
+                start();
+            } else {
+                ok(true, "Still not all promises have completed. Let's wait for next tick...");
+                setTimeout(function() {
+                    ok(numSuccess + numFailures === 2, "numSuccess + numFailures === 2");
+                    ok(transactionDone, "transactionDone == true");
+                    start();
+                }, 0);
+            }
+        });
+    });
+    */
 })();
 

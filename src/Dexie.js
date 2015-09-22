@@ -443,7 +443,7 @@
         }; 
 
         this._whenReady = function (fn) {
-            if (db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
+            if (!fake && db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
                 return new Promise(function (resolve, reject) {
                     pausedResumeables.push({
                         resume: function () {
@@ -749,7 +749,7 @@
                 // If this is a root-level transaction, wait til database is ready and then launch the transaction.
                 return db._whenReady(enterTransactionScope);
             }
-
+            
             function enterTransactionScope(resolve, reject) {
                 // Our transaction. To be set later.
                 var trans = null;
@@ -1272,9 +1272,14 @@
                                     self.abort(); // Make sure transaction is aborted since we preventDefault.
                                 }; 
                                 idbtrans.onabort = function (e) {
+                                    // Workaround for issue #78 - low disk space on chrome.
+                                    // onabort is called but never onerror. Call onerror explicitely.
+                                    // Do this in a future tick so we allow default onerror to execute before doing the fallback.
+                                    asap(function () { self.on('error').fire(new Error("Transaction aborted for unknown reason")); });
+
                                     self.active = false;
                                     self.on("abort").fire(e);
-                                }; 
+                                };
                                 idbtrans.oncomplete = function (e) {
                                     self.active = false;
                                     self.on("complete").fire(e);
