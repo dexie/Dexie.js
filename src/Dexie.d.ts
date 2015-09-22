@@ -50,7 +50,7 @@ declare class Dexie {
         versionchange: Dexie.DexieVersionChangeEvent;
     }
 
-    open(): Dexie.Promise<void>;
+    open(): Dexie.Promise<Dexie>;
 
     table(tableName: string): Dexie.Table<any, any>;
 
@@ -77,6 +77,8 @@ declare class Dexie {
     close(): void;
 
     delete(): Dexie.Promise<void>;
+
+    exists(name : string) : Dexie.Promise<boolean>;
 
     isOpen(): boolean;
 
@@ -258,6 +260,8 @@ declare module Dexie {
         startsWithAnyOf(prefixes: string[]): Collection<T, Key>;
         startsWithAnyOf(...prefixes: string[]): Collection<T, Key>;
         startsWithIgnoreCase(key: string): Collection<T, Key>;
+        noneOf(keys: Array<string | number | Date | Array<string | number | Date>>): Collection<T, Key>;
+        notEqual(key: string | number | Date | Array<string | number | Date>): Collection<T, Key>;
     }
 
     interface Collection<T, Key> {
