@@ -14,10 +14,14 @@
 (function (global, publish, undefined) {
 
     "use strict";
+    
+    var isArray = Array.isArray;
+    var keys = Object.keys;
+    var _slice = [].slice;
 
     function extend(obj, extension) {
         if (typeof extension !== 'object') extension = extension(); // Allow to supply a function returning the extension. Useful for simplifying private scopes.
-        Object.keys(extension).forEach(function (key) {
+        keys(extension).forEach(function (key) {
             obj[key] = extension[key];
         });
         return obj;
@@ -35,6 +39,10 @@
                 };
             }
         };
+    }
+
+    function slice(args, start, end) {
+        return _slice.call(args, start, end);
     }
 
     function override(origFunc, overridedFactory) {
@@ -146,22 +154,22 @@
                 // Update API
                 globalSchema = db._dbSchema = dbschema;
                 removeTablesApi([allTables, db, notInTransFallbackTables]);
-                setApiOnPlace([notInTransFallbackTables], tableNotInTransaction, Object.keys(dbschema), READWRITE, dbschema);
-                setApiOnPlace([allTables, db, this._cfg.tables], db._transPromiseFactory, Object.keys(dbschema), READWRITE, dbschema, true);
-                dbStoreNames = Object.keys(dbschema);
+                setApiOnPlace([notInTransFallbackTables], tableNotInTransaction, keys(dbschema), READWRITE, dbschema);
+                setApiOnPlace([allTables, db, this._cfg.tables], db._transPromiseFactory, keys(dbschema), READWRITE, dbschema, true);
+                dbStoreNames = keys(dbschema);
                 return this;
             },
             upgrade: function (upgradeFunction) {
                 /// <param name="upgradeFunction" optional="true">Function that performs upgrading actions.</param>
                 var self = this;
                 fakeAutoComplete(function () {
-                    upgradeFunction(db._createTransaction(READWRITE, Object.keys(self._cfg.dbschema), self._cfg.dbschema));// BUGBUG: No code completion for prev version's tables wont appear.
+                    upgradeFunction(db._createTransaction(READWRITE, keys(self._cfg.dbschema), self._cfg.dbschema));// BUGBUG: No code completion for prev version's tables wont appear.
                 });
                 this._cfg.contentUpgrade = upgradeFunction;
                 return this;
             },
             _parseStoresSpec: function (stores, outSchema) {
-                Object.keys(stores).forEach(function (tableName) {
+                keys(stores).forEach(function (tableName) {
                     if (stores[tableName] !== null) {
                         var instanceTemplate = {};
                         var indexes = parseIndexSyntax(stores[tableName]);
@@ -183,7 +191,7 @@
             if (oldVersion === 0) {
                 //globalSchema = versions[versions.length - 1]._cfg.dbschema;
                 // Create tables:
-                Object.keys(globalSchema).forEach(function (tableName) {
+                keys(globalSchema).forEach(function (tableName) {
                     createTable(idbtrans, tableName, globalSchema[tableName].primKey, globalSchema[tableName].indexes);
                 });
                 // Populate data
@@ -250,7 +258,7 @@
                         if (version._cfg.contentUpgrade) {
                             queue.push(function (idbtrans, cb) {
                                 anyContentUpgraderHasRun = true;
-                                var t = db._createTransaction(READWRITE, [].slice.call(idbtrans.db.objectStoreNames, 0), newSchema);
+                                var t = db._createTransaction(READWRITE, slice(idbtrans.db.objectStoreNames), newSchema);
                                 t.idbtrans = idbtrans;
                                 var uncompletedRequests = 0;
                                 t._promise = override(t._promise, function (orig_promise) {
@@ -358,7 +366,7 @@
         }
 
         function createMissingTables(newSchema, idbtrans) {
-            Object.keys(newSchema).forEach(function (tableName) {
+            keys(newSchema).forEach(function (tableName) {
                 if (!idbtrans.db.objectStoreNames.contains(tableName)) {
                     createTable(idbtrans, tableName, newSchema[tableName].primKey, newSchema[tableName].indexes);
                 }
@@ -652,7 +660,7 @@
         Object.defineProperty(this, "tables", {
             get: function () {
                 /// <returns type="Array" elementType="WriteableTable" />
-                return Object.keys(allTables).map(function (name) { return allTables[name]; });
+                return keys(allTables).map(function (name) { return allTables[name]; });
             }
         });
 
@@ -693,7 +701,7 @@
             /// <param name="scopeFunc" type="Function">Function to execute with transaction</param>
 
             // Let table arguments be all arguments between mode and last argument.
-            tableInstances = [].slice.call(arguments, 1, arguments.length - 1);
+            tableInstances = slice(arguments, 1, arguments.length - 1);
             // Let scopeFunc be the last argument
             scopeFunc = arguments[arguments.length - 1];
             var parentTransaction = Promise.PSD && Promise.PSD.trans;
@@ -704,7 +712,7 @@
             //
             // Get storeNames from arguments. Either through given table instances, or through given table names.
             //
-            var tables = Array.isArray(tableInstances[0]) ? tableInstances.reduce(function (a, b) { return a.concat(b); }) : tableInstances;
+            var tables = isArray(tableInstances[0]) ? tableInstances.reduce(function (a, b) { return a.concat(b); }) : tableInstances;
             var error = null;
             var storeNames = tables.map(function (tableInstance) {
                 if (typeof tableInstance === "string") {
@@ -1154,10 +1162,10 @@
                 },
 
                 update: function (keyOrObject, modifications) {
-                    if (typeof modifications !== 'object' || Array.isArray(modifications)) throw new Error("db.update(keyOrObject, modifications). modifications must be an object.");
-                    if (typeof keyOrObject === 'object' && !Array.isArray(keyOrObject)) {
+                    if (typeof modifications !== 'object' || isArray(modifications)) throw new Error("db.update(keyOrObject, modifications). modifications must be an object.");
+                    if (typeof keyOrObject === 'object' && !isArray(keyOrObject)) {
                         // object to modify. Also modify given object with the modifications:
-                        Object.keys(modifications).forEach(function (keyPath) {
+                        keys(modifications).forEach(function (keyPath) {
                             setByKeyPath(keyOrObject, keyPath, modifications[keyPath]);
                         });
                         var key = getByKeyPath(keyOrObject, this.schema.primKey.keyPath);
@@ -1374,7 +1382,7 @@
             }
 
             function getSetArgs(args) {
-                return Array.prototype.slice.call(args.length === 1 && Array.isArray(args[0]) ? args[0] : args);
+                return slice(args.length === 1 && isArray(args[0]) ? args[0] : args);
             }
 
             function upperFactory(dir) {
@@ -2000,7 +2008,7 @@
                                     if (additionalChanges) {
                                         // Hook want to apply additional modifications. Make sure to fullfill the will of the hook.
                                         item = this.value;
-                                        Object.keys(additionalChanges).forEach(function (keyPath) {
+                                        keys(additionalChanges).forEach(function (keyPath) {
                                             setByKeyPath(item, keyPath, additionalChanges[keyPath]);  // Adding {keyPath: undefined} means that the keyPath should be deleted. Handled by setByKeyPath
                                         });
                                     }
@@ -2009,7 +2017,7 @@
                         }
                     } else if (updatingHook === nop) {
                         // changes is a set of {keyPath: value} and no one is listening to the updating hook.
-                        var keyPaths = Object.keys(changes);
+                        var keyPaths = keys(changes);
                         var numKeys = keyPaths.length;
                         modifyer = function (item) {
                             var anythingModified = false;
@@ -2031,7 +2039,7 @@
                             var anythingModified = false;
                             var additionalChanges = updatingHook.call(this, changes, this.primKey, deepClone(item), trans);
                             if (additionalChanges) extend(changes, additionalChanges);
-                            Object.keys(changes).forEach(function (keyPath) {
+                            keys(changes).forEach(function (keyPath) {
                                 var val = changes[keyPath];
                                 if (getByKeyPath(item, keyPath) !== val) {
                                     setByKeyPath(item, keyPath, val);
@@ -2194,7 +2202,7 @@
                     index.indexOf('&') !== -1,
                     index.indexOf('*') !== -1,
                     index.indexOf("++") !== -1,
-                    Array.isArray(keyPath),
+                    isArray(keyPath),
                     keyPath.indexOf('.') !== -1
                 ));
             });
@@ -2234,7 +2242,7 @@
         function readGlobalSchema() {
             db.verno = idbdb.version / 10;
             db._dbSchema = globalSchema = {};
-            dbStoreNames = [].slice.call(idbdb.objectStoreNames, 0);
+            dbStoreNames = slice(idbdb.objectStoreNames, 0);
             if (dbStoreNames.length === 0) return; // Database contains no stores.
             var trans = idbdb.transaction(safariMultiStoreFix(dbStoreNames), 'readonly');
             dbStoreNames.forEach(function (storeName) {
@@ -2252,7 +2260,7 @@
                 }
                 globalSchema[storeName] = new TableSchema(storeName, primKey, indexes, {});
             });
-            setApiOnPlace([allTables], db._transPromiseFactory, Object.keys(globalSchema), READWRITE, globalSchema);
+            setApiOnPlace([allTables], db._transPromiseFactory, keys(globalSchema), READWRITE, globalSchema);
         }
 
         function adjustToExistingIndexNames(schema, idbtrans) {
@@ -2268,7 +2276,7 @@
                 for (var j = 0; j < store.indexNames.length; ++j) {
                     var indexName = store.indexNames[j];
                     var keyPath = store.index(indexName).keyPath;
-                    var dexieName = typeof keyPath === 'string' ? keyPath : "[" + [].slice.call(keyPath).join('+') + "]";
+                    var dexieName = typeof keyPath === 'string' ? keyPath : "[" + slice(keyPath).join('+') + "]";
                     if (schema[storeName]) {
                         var indexSpec = schema[storeName].idxByName[dexieName];
                         if (indexSpec) indexSpec.name = indexName;
@@ -2315,16 +2323,19 @@
     var Promise = (function () {
 
         // The use of asap in handle() is remarked because we must NOT use setTimeout(fn,0) because it causes premature commit of indexedDB transactions - which is according to indexedDB specification.
-        var _slice = [].slice;
-        var _asap = typeof setImmediate === 'undefined' ? function(fn, arg1, arg2, argN) {
-            var args = arguments;
-            setTimeout(function() { fn.apply(global, _slice.call(args, 1)); }, 0); // If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
-        } : setImmediate; // IE10+ and node.
+        var _asap = global.setImmediate || function(fn) {
+            var args = slice(arguments, 1);
+            
+             // If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
+            setTimeout(function() { 
+                fn.apply(global, args);
+            }, 0);
+        }
 
         doFakeAutoComplete(function () {
             // Simplify the job for VS Intellisense. This piece of code is one of the keys to the new marvellous intellisense support in Dexie.
             _asap = asap = enqueueImmediate = function(fn) {
-                var args = arguments; setTimeout(function() { fn.apply(global, _slice.call(args, 1)); }, 0);
+                var args = arguments; setTimeout(function() { fn.apply(global, slice(args, 1)); }, 0);
             };
         });
 
@@ -2334,7 +2345,7 @@
         var operationsQueue = [];
         var tickFinalizers = [];
         function enqueueImmediate(fn, args) {
-            operationsQueue.push([fn, _slice.call(arguments, 1)]);
+            operationsQueue.push([fn, slice(arguments, 1)]);
         }
 
         function executeOperationsQueue() {
@@ -2530,7 +2541,7 @@
         Promise.on = events(null, "error");
 
         Promise.all = function () {
-            var args = Array.prototype.slice.call(arguments.length === 1 && Array.isArray(arguments[0]) ? arguments[0] : arguments);
+            var args = slice(arguments.length === 1 && isArray(arguments[0]) ? arguments[0] : arguments);
 
             return new Promise(function (resolve, reject) {
                 if (args.length === 0) return resolve([]);
@@ -2757,7 +2768,7 @@
         var rv = function (eventName, subscriber) {
             if (subscriber) {
                 // Subscribe
-                var args = [].slice.call(arguments, 1);
+                var args = slice(arguments, 1);
                 var ev = evs[eventName];
                 ev.subscribe.apply(ev, args);
                 return ctx;
@@ -2769,7 +2780,7 @@
         rv.addEventType = add;
 
         function add(eventName, chainFunction, defaultFunction) {
-            if (Array.isArray(eventName)) return addEventGroup(eventName);
+            if (isArray(eventName)) return addEventGroup(eventName);
             if (typeof eventName === 'object') return addConfiguredEvents(eventName);
             if (!chainFunction) chainFunction = stoppableEventChain;
             if (!defaultFunction) defaultFunction = nop;
@@ -2792,9 +2803,9 @@
 
         function addConfiguredEvents(cfg) {
             // events(this, {reading: [functionChain, nop]});
-            Object.keys(cfg).forEach(function (eventName) {
+            keys(cfg).forEach(function (eventName) {
                 var args = cfg[eventName];
-                if (Array.isArray(args)) {
+                if (isArray(args)) {
                     add(eventName, cfg[eventName][0], cfg[eventName][1]);
                 } else if (args === 'asap') {
                     // Rather than approaching event subscription using a functional approach, we here do it in a for-loop where subscriber is executed in its own stack
@@ -2935,7 +2946,7 @@
     function deepClone(any) {
         if (!any || typeof any !== 'object') return any;
         var rv;
-        if (Array.isArray(any)) {
+        if (isArray(any)) {
             rv = [];
             for (var i = 0, l = any.length; i < l; ++i) {
                 rv.push(deepClone(any[i]));
@@ -2975,7 +2986,7 @@
     function parseType(type) {
         if (typeof type === 'function') {
             return new type();
-        } else if (Array.isArray(type)) {
+        } else if (isArray(type)) {
             return [parseType(type[0])];
         } else if (type && typeof type === 'object') {
             var rv = {};
@@ -2987,7 +2998,7 @@
     }
 
     function applyStructure(obj, structure) {
-        Object.keys(structure).forEach(function (member) {
+        keys(structure).forEach(function (member) {
             var value = parseType(structure[member]);
             obj[member] = value;
         });
@@ -3143,7 +3154,7 @@
             if (getDatabaseNames) { // In case getDatabaseNames() becomes standard, let's prepare to support it:
                 var req = getDatabaseNames();
                 req.onsuccess = function (event) {
-                    resolve([].slice.call(event.target.result, 0)); // Converst DOMStringList to Array<String>
+                    resolve(slice(event.target.result, 0)); // Converst DOMStringList to Array<String>
                 }; 
                 req.onerror = eventRejectHandler(reject);
             } else {
@@ -3302,4 +3313,3 @@
 
     // Vanilla HTML and WebWorkers:
     : [self || window, function (name, value) { (self || window)[name] = value; }]);
-
