@@ -21,6 +21,7 @@
         var db = new Dexie("ObservableTest");
         db.version(1).stores({
             friends: "++id,name,shoeSize",
+            CapitalIdTest: "$$Id,name"
             //pets: "++id,name,kind",
             //$emailWords: "",
         });
@@ -63,7 +64,22 @@
             ok(false, "Error: " + e.stack || e);
             start();
         });
+    });
 
+    asyncTest("Capital$$Id-test", function() {
+        var db = createDB();
+        db.open();
+        db.CapitalIdTest.put({ name: "Hilda" }).then(function() {
+            return db.CapitalIdTest.toCollection().first();
+        }).then(function(firstItem) {
+            ok(firstItem.name == "Hilda", "Got first item");
+            ok(firstItem.Id, "First item has a primary key set: " + firstItem.Id);
+        }).catch(function(e) {
+            ok(false, "Error: " + e);
+        }).finally(function() {
+            db.close();
+            start();
+        });
     });
 
     (function () {
