@@ -298,3 +298,30 @@ asyncTest("Issue#100 - not all indexes are created", function () {
     }).finally(start);
 
 });
+
+asyncTest("Dexie.exists", function () {
+    var db = null;
+    Dexie.exists("TestDB").then(function(result) {
+        equal(result, false, "Should not exist yet");
+        db = new Dexie("TestDB");
+        db.version(1).stores({
+            some: "schema"
+        });
+        return db.open();
+    }).then(function() {
+        return Dexie.exists("TestDB");
+    }).then(function(result) {
+        equal(result, true, "Should exist now and has another open connection.");
+        db.close();
+        return Dexie.exists("TestDB");
+    }).then(function(result) {
+        equal(result, true, "Should still exist");
+        return Dexie.delete("TestDB");
+    }).then(function () {
+        return Dexie.exists("TestDB");
+    }).then(function(result) {
+        equal(result, false, "Should have been deleted now");
+    }).catch(function(e) {
+        ok(false, "Error: " + e);
+    }).finally(start);
+});
