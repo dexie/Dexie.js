@@ -38,24 +38,26 @@ db.friends.add({name: "Josephine", age: 21}).then(function() {
 
 Documentation
 -------------
-https://github.com/dfahlander/Dexie.js/wiki/Dexie.js
+[https://github.com/dfahlander/Dexie.js/wiki/Dexie.js](https://github.com/dfahlander/Dexie.js/wiki/Dexie.js)
 
 Samples
 -------
-https://github.com/dfahlander/Dexie.js/wiki/Samples
+[https://github.com/dfahlander/Dexie.js/wiki/Samples](https://github.com/dfahlander/Dexie.js/wiki/Samples)
 
 Forum
 -----
-https://groups.google.com/forum/#!forum/dexiejs
+[https://groups.google.com/forum/#!forum/dexiejs](https://groups.google.com/forum/#!forum/dexiejs)
 
 Website
 -------
-http://www.dexie.org
+[http://www.dexie.org](http://www.dexie.org)
 
 Download
 --------
-https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.js
-https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.min.js
+[https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.js](https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.js)
+[https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.min.js]([https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.min.js)
+[https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.min.js.map]([https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.min.js.map)
+[https://raw.githubusercontent.com/dfahlander/Dexie.js/master/src/Dexie.d.ts]([https://raw.githubusercontent.com/dfahlander/Dexie.js/master/src/Dexie.d.ts)
 
 [npm-image]: https://img.shields.io/npm/v/dexie.svg?style=flat
 [npm-url]: https://npmjs.org/package/dexie
