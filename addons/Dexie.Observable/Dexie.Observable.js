@@ -578,7 +578,7 @@
                         }
                     }).then(function() {
                         // Cleanup old revisions that no node is interested of.
-                        Observable.deleteOldChanges();
+                        Observable.deleteOldChanges(db);
                         return db.on("cleanup").fire(weBecameMaster);
                     });
                 });
@@ -756,7 +756,7 @@
             return uuid;
         };
 
-        Observable.deleteOldChanges = function() {
+        Observable.deleteOldChanges = function(db) {
             db._syncNodes.orderBy("myRevision").first(function (oldestNode) {
                 var timeout = Date.now() + 300,
                     timedout = false;
@@ -765,7 +765,9 @@
                     .delete()
                     .then(function () {
                         // If not done garbage collecting, reschedule a continuation of it until done.
-                        if (timedout) setTimeout(Observable.deleteOldChanges, 10);
+                        if (timedout) setTimeout(function() {
+                            Observable.deleteOldChanges(db);
+                        }, 10);
                     });
             });
         }
