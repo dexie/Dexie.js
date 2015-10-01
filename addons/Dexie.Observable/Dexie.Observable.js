@@ -489,7 +489,8 @@
 
                     return db.table("_syncNodes").update(ourSyncNode, {
                         lastHeartBeat: Date.now(),
-                        deleteTimeStamp: null // Reset "deleteTimeStamp" flag if it was there.
+                        deleteTimeStamp: null, // Reset "deleteTimeStamp" flag if it was there.
+                        myRevision: ourSyncNode.myRevision
                     });
                 }).then(function(nodeWasUpdated) {
                     if (!nodeWasUpdated) {
@@ -577,15 +578,11 @@
                         }
                     }).then(function() {
                         // Cleanup old revisions that no node is interested of.
-                        return db._syncNodes.orderBy("myRevision").first(function(oldestNode) {
-                            return db._changes.where("rev").below(oldestNode.myRevision).delete();
-                        });
-                    }).then(function() {
+                        Observable.deleteOldChanges();
                         return db.on("cleanup").fire(weBecameMaster);
                     });
                 });
             }
-
 
             function onBeforeUnload(event) {
                 // Mark our own sync node for deletion.
@@ -758,6 +755,20 @@
             });
             return uuid;
         };
+
+        Observable.deleteOldChanges = function() {
+            db._syncNodes.orderBy("myRevision").first(function (oldestNode) {
+                var timeout = Date.now() + 300,
+                    timedout = false;
+                db._changes.where("rev").below(oldestNode.myRevision)
+                    .until(function () { return (timedout = (Date.now() > timeout)); })
+                    .delete()
+                    .then(function () {
+                        // If not done garbage collecting, reschedule a continuation of it until done.
+                        if (timedout) setTimeout(Observable.deleteOldChanges, 10);
+                    });
+            });
+        }
 
         Observable._onStorage = function onStorage(event) {
             // We use the onstorage event to trigger onLatestRevisionIncremented since we will wake up when other windows modify the DB as well!

@@ -183,13 +183,8 @@
                             return db._syncNodes.where('id').anyOf(nodeIDs).delete().then(function() {
                                 // When theese nodes are gone, let's clear the _changes table
                                 // from all revisions older than the oldest node.
-                                // First check which is the currenly oldest node, now when we have deleted
-                                // the given node:
-                                return db._syncNodes.orderBy("myRevision").first();
-                            }).then(function(oldestNode) {
                                 // Delete all changes older than revision of oldest node:
-                                return db._changes.where("rev").below(oldestNode.myRevision).delete();
-                            }).then(function() {
+                                Observable.deleteOldChanges();
                                 // Also don't forget to delete all uncommittedChanges for the deleted node:
                                 return db._uncommittedChanges.where('node').anyOf(nodeIDs).delete();
                             });
