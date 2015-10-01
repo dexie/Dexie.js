@@ -260,8 +260,11 @@ declare module Dexie {
         startsWithAnyOf(prefixes: string[]): Collection<T, Key>;
         startsWithAnyOf(...prefixes: string[]): Collection<T, Key>;
         startsWithIgnoreCase(key: string): Collection<T, Key>;
-        noneOf(keys: Array<string | number | Date | Array<string | number | Date>>): Collection<T, Key>;
-        notEqual(key: string | number | Date | Array<string | number | Date>): Collection<T, Key>;
+        noneOf(keys: Array<any>): Collection<T, Key>;
+        notEqual(key: number): Collection<T, Key>;
+        notEqual(key: string): Collection<T, Key>;
+        notEqual(key: Date): Collection<T, Key>;
+        notEqual(key: Array<any>): Collection<T, Key>;
     }
 
     interface Collection<T, Key> {
