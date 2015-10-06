@@ -2618,6 +2618,7 @@
         Promise.prototype.onuncatched = null; // Optional event triggered if promise is rejected but no one listened.
 
         Promise.resolve = function (value) {
+            if (value && typeof value.then === 'function') return value;
             var p = new Promise(function () { });
             p._state = true;
             p._value = value;
