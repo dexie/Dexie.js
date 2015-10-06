@@ -122,67 +122,96 @@
             }
         }));
 
-        asyncTest("Should not allow yielding a non-promise", async(function* () {
+        asyncTest("Should allow yielding a non-promise", async(function* () {
             try {
-                yield 3;
-                ok(false, "Yielding a non-Thenable shouldn't be allowed");
+                var x = yield 3;
+                equal(x, 3, "Could yield a non-promise");
             } catch (e) {
-                ok(true, "Got exception when trying to do 'yield 3;'");
+                ok(false, "Yielding a non-Thenable wasn't be allowed");
             } finally {
                 start();
             }
         }));
 
-        asyncTest("Should not allow yielding a non-promise 2", async(function* () {
+        asyncTest("Should allow yielding an array with a mix of values and thenables", async(function* () {
             try {
-                yield Dexie.Promise.resolve(3);
-                ok(true, "Could yield a promise");
-                yield 3;
-                ok(false, "Yielding a non-Thenable shouldn't be allowed");
+                var results = yield [1, 2, Dexie.Promise.resolve(3)];
+                equal(results.length, 3, "Yielded array is of size 3");
+                equal(results[0], 1, "First value is 1");
+                equal(results[1], 2, "Second value is 2");
+                equal(results[2], 3, "Third value is 3");
             } catch (e) {
-                ok(true, "Got exception when trying to do 'yield 3;'");
+                ok(false, "Got exception when trying to do yield an array of mixed values/promises");
             } finally {
                 start();
             }
         }));
 
-        asyncTest("Should not allow yielding a non-promise 3", function () {
+        asyncTest("Should allow yielding an array of non-promises only", function () {
             spawn (function*()
             {
-                yield 3;
-                ok(false, "Yielding a non-Thenable shouldn't be allowed");
-            }).then (function() {
-                ok(false, "Yielding a non-Thenable shouldn't be allowed");
+                var results = yield [1,2,3];
+                equal(results.length, 3, "Yielded array is of size 3");
+                equal(results[0], 1, "First value is 1");
+                equal(results[1], 2, "Second value is 2");
+                equal(results[2], 3, "Third value is 3");
             }).catch (function(e) {
-                ok(e instanceof TypeError, "A TypeError should have been thrown");
+                ok(false, e);
             }).then(start);
         });
 
-        asyncTest("Should not allow yielding a non-promise 4", function () {
+        asyncTest("Should allow yielding an empty array", function () {
             spawn (function*()
             {
-                yield Dexie.Promise.resolve(3);
-                ok(true, "Could yield a promise");
-                yield 3;
-                ok(false, "Yielding a non-Thenable shouldn't be allowed");
-            }).then (function() {
-                ok(false, "Yielding a non-Thenable shouldn't be allowed");
+                var results = yield [];
+                equal(results.length, 0, "Yielded array is of size 0");
             }).catch (function(e) {
-                ok(e instanceof TypeError, "A TypeError should have been thrown");
+                ok(false, e);
             }).then(start);
         });
 
 
-        asyncTest("Should not allow yielding a non-promise 5", function () {
+        asyncTest("Should allow yielding an array of different kind of any kind of promise", function () {
             spawn (function*()
             {
-                yield Dexie.Promise.resolve(3);
-                ok(true, "Could yield a promise");
+                var results = yield [Promise.resolve(1), Dexie.Promise.resolve(2), Promise.resolve(3)];
+                equal(results.length, 3, "Yielded array is of size 3");
+                equal(results[0], 1, "First value is 1");
+                equal(results[1], 2, "Second value is 2");
+                equal(results[2], 3, "Third value is 3");
+                return 4;
+            }).then (function(x) {
+                equal(x, 4, "Finally got the value 4");
+            }).catch (function(e) {
+                ok(false, "Something is rotten in the state of Denmark: " + e);
+            }).then(start);
+        });
+
+        asyncTest("Throw after yield", function () {
+            spawn (function*()
+            {
                 try {
                     yield 3;
-                    ok(false, "Yielding a non-Thenable shouldn't be allowed");
+                    ok(true, "yielded a value");
+                    throw "error";
                 } catch (e) {
-                    ok(e instanceof TypeError, "Catched exception about not able to yield non promise: " + e);
+                    ok(e === "error", "Catched exception: " + e);
+                }
+                return 4;
+            }).then (function(x) {
+                equal(x, 4, "Finally got the value 4");
+            }).catch (function(e) {
+                ok(false, "Something is rotten in the state of Denmark: " + e);
+            }).then(start);
+        });
+            
+        asyncTest("Throw before yield", function () {
+            spawn (function*()
+            {
+                try {
+                    throw "error";
+                } catch (e) {
+                    ok(e === "error", "Catched exception: " + e);
                 }
                 return 4;
             }).then (function(x) {
@@ -192,14 +221,13 @@
             }).then(start);
         });
 
-        asyncTest("Should not allow yielding a non-promise 6", function () {
-            spawn (function*()
-            {
+        asyncTest("Catch rejected promise", function () {
+            spawn (function*() {
                 try {
-                    yield 3;
-                    ok(false, "Yielding a non-Thenable shouldn't be allowed");
+                    yield new Promise(function(resolve, reject) { reject("fault fault!"); });
+                    ok(false, "Shouldn't come here");
                 } catch (e) {
-                    ok(e instanceof TypeError, "Catched exception about not able to yield non promise: " + e);
+                    ok(e === "fault fault!", "Catched exception: " + e);
                 }
                 return 4;
             }).then (function(x) {
@@ -209,14 +237,30 @@
             }).then(start);
         });
 
-        asyncTest("Should not allow returning a promise", function () {
+        asyncTest("Catch rejected promise in an array", function () {
+            spawn (function*() {
+                try {
+                    yield [1, 2, new Promise(function(resolve, reject) { reject("fault fault!"); }), 4];
+                    ok(false, "Shouldn't come here");
+                } catch (e) {
+                    ok(e === "fault fault!", "Catched exception: " + e);
+                }
+                return 4;
+            }).then (function(x) {
+                equal(x, 4, "Finally got the value 4");
+            }).catch (function(e) {
+                ok(false, "Something is rotten in the state of Denmark: " + e);
+            }).then(start);
+        });
+
+        asyncTest("Should allow returning a promise", function () {
             spawn (function*()
             {
                 return Promise.resolve(3);
-            }).then (function() {
-                ok(false, "Returning a directly shouldn't be allowed");
+            }).then (function(result) {
+                equal(result, 3, "Returning a directly should also be allowed");
             }).catch (function(e) {
-                ok(e instanceof TypeError, "A TypeError should have been thrown");
+                ok(false, e);
             }).then(start);
         });
 

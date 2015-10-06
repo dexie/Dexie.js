@@ -1,6 +1,7 @@
 ﻿(function (global, define, undefined) {
 
     define('Dexie.Yield', ["Dexie"], function (Dexie) {
+        var Promise = Dexie.Promise;
 
         function spawn(generatorFn) {
             return iterate(generatorFn());
@@ -21,22 +22,14 @@
             function step(getNext, initial) {
                 return function (val) {
                     var next = getNext(val);
-                    if (next.done) {
-                        if (next.value && typeof next.value.then === 'function')
-                            // Emphasize using "return yield <promise>;" instead of just "return <promise>;".
-                            return Promise.reject(new TypeError("Illegal to return a promise without yield"));
-
-                        // Promise.resolve() only needed when no yield has been used at all.
-                        // Try not to use Promise.resolve() unless needed, because it will convert
-                        // the returned Promise implementation to the default Promise implementation and
-                        // the user could not get the features and benefits of various Promise implementations.
+                    if (next.done)
                         return initial ? Promise.resolve(next.value) : next.value;
-                    }
 
                     if (!next.value || typeof next.value.then !== 'function')
-                        // Don't accept yielding a non-promise such as "yield 3;".
-                        // By not accepting that, we could detect bugs better.
-                        return step(doThrow, initial)(new TypeError("Only acceptable to yield a Promise"));
+                        if (Array.isArray(next.value))
+                            return Promise.all(next.value).then(onSuccess, onError);
+                        else
+                            return Promise.resolve(next.value).then(onSuccess, onError);
                     return next.value.then(onSuccess, onError);
                 }
             }
