@@ -11,7 +11,8 @@
     <script src="../../../test/qunit.js"></script>
     <script src="../../../src/Dexie.js"></script>
     <script src="../../Dexie.Yield/Dexie.Yield.js"></script>
-    <script>
+<script>
+    "use strict";
         var db = new Dexie("test-yield-db2");
         var async = Dexie.Yield.async,
             spawn = Dexie.Yield.spawn;
@@ -273,6 +274,16 @@
             }).catch (function(e) {
                 ok(false, "Error occurred: " + e);
             }).then(start);
+        });
+
+        asyncTest("Arrow functions and let", function() {
+            spawn(function*() {
+                let x = yield [1, 2, 3];
+                let y = x.map(a => a - 1);
+                equal(y[0], 0);
+                equal(y[1], 1);
+                equal(y[2], 2);
+            }).finally(start);
         });
 
     </script>
