@@ -208,7 +208,7 @@
                     return existingPeer[0].connectPromise;
                 }
 
-                var connectPromise = getOrCreateSyncNode().then(function(node) {
+                var connectPromise = getOrCreateSyncNode(options).then(function(node) {
                     return connectProtocol(node);
                 });
 
@@ -240,10 +240,25 @@
                     return db._localSyncNode && db._localSyncNode.id === dbAliveID;
                 }
 
-                function getOrCreateSyncNode() {
+                function getOrCreateSyncNode(options) {
                     return db.transaction('rw', db._syncNodes, function() {
                         if (!url) throw new Error("Url cannot be empty");
                         // Returning a promise from transaction scope will make the transaction promise resolve with the value of that promise.
+
+                        //
+                        // PersistedContext : IPersistedContext
+                        //
+                        function PersistedContext(nodeID) {
+                            this.nodeID = nodeID;
+                        }
+
+                        PersistedContext.prototype.save = function () {
+                            // Store this instance in the syncContext property of the node it belongs to.
+                            return Dexie.vip(function () {
+                                return node.save();
+                            });
+                        };
+
                         return db._syncNodes.where("url").equalsIgnoreCase(url).first(function(node) {
                             if (node) {
                                 // Node already there. Make syncContext become an instance of PersistedContext:
@@ -262,27 +277,19 @@
                                 node.syncOptions = options;
                                 node.lastHeartBeat = Date.now();
                                 node.dbUploadState = null;
-                                db._syncNodes.put(node).then(function(nodeId) {
-                                    node.syncContext = new PersistedContext(nodeId); // Update syncContext in db with correct nodeId.
-                                    db._syncNodes.put(node);
+                                Promise.resolve(function () {
+                                    // If options.initialUpload is explicitely false, set myRevision to currentRevision.
+                                    if (options.initialUpload === false)
+                                        return db._changes.lastKey(function(currentRevision) {
+                                            node.myRevision = currentRevision;
+                                        });
+                                }).then(function() {
+                                    db._syncNodes.add(node).then(function (nodeId) {
+                                        node.syncContext = new PersistedContext(nodeId); // Update syncContext in db with correct nodeId.
+                                        db._syncNodes.put(node);
+                                    });
                                 });
                             }
-
-                            //
-                            // PersistedContext : IPersistedContext
-                            //
-                            function PersistedContext(nodeID) {
-                                this.nodeID = nodeID;
-                            }
-
-                            PersistedContext.prototype.save = function() {
-                                // Store this instance in the syncContext property of the node it belongs to.
-                                return Dexie.vip(function() {
-                                    return node.save();
-                                });
-
-                                //return db._syncNodes.update(this.nodeID, { syncContext: this });
-                            };
 
                             return node; // returning node will make the db.transaction()-promise resolve with this value.
                         });
