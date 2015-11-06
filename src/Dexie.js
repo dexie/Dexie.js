@@ -1030,7 +1030,83 @@
         }
 
         derive(WriteableTable).from(Table).extend(function () {
+
+            function BulkErrorHandler(errorList, resolve, hookCtx) {
+                return function(ev) {
+                    if (ev.stopPropagation) ev.stopPropagation();
+                    if (ev.preventDefault) ev.preventDefault();
+                    errorList.push(ev.target.error);
+                    if (hookCtx && hookCtx.onerror) hookCtx.onerror(ev.target.error);
+                    if (resolve) resolve(errorList); // Only done in last request.
+                }
+            }
+
+            function BulkSuccessHandler(errorList, resolve, hookCtx) {
+                return hookCtx ? function(ev) {
+                    hookCtx.onsuccess && hookCtx.onsuccess(ev.target.result);
+                    if (resolve) resolve(errorList);
+                } : function() {
+                    resolve(errorList);
+                };
+            }
+
             return {
+                bulkAdd: function(objects) {
+                    var self = this,
+                        creatingHook = this.hook.creating.fire;
+                    return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
+                        if (!idbstore.keyPath) throw new Error("bulkAdd() only support inbound keys");
+                        if (objects.length === 0) return resolve([]); // Caller provided empty list.
+                        var req,
+                            errorList = [],
+                            errorHandler,
+                            successHandler;
+                        if (creatingHook !== nop) {
+                            //
+                            // There are subscribers to hook('creating')
+                            // Must behave as documented.
+                            //
+                            var keyPath = idbstore.keyPath,
+                                hookCtx = { onerror: null, onsuccess: null };
+                            errorHandler = BulkErrorHandler(errorList, null, hookCtx);
+                            successHandler = BulkSuccessHandler(errorList, null, hookCtx);
+                            for (var i = 0, l = objects.length; i < l; ++i) {
+                                var obj = objects[i],
+                                    effectiveKey = getByKeyPath(obj, keyPath),
+                                    keyToUse = creatingHook.call(hookCtx, effectiveKey, obj, trans);
+                                if (effectiveKey === undefined && keyToUse !== undefined) {
+                                    obj = deepClone(obj);
+                                    setByKeyPath(obj, keyPath, keyToUse);
+                                }
+
+                                req = idbstore.add(obj);
+                                if (i < l - 1) {
+                                    req.onerror = errorHandler;
+                                    if (hookCtx.onsuccess)
+                                        req.onsuccess = successHandler;
+                                    // Reset event listeners for next iteration.
+                                    hookCtx.onerror = null;
+                                    hookCtx.onsuccess = null;
+                                }
+                            }
+                            req.onerror = BulkErrorHandler(errorList, resolve, hookCtx);
+                            req.onsuccess = BulkSuccessHandler(errorList, resolve, hookCtx);
+                        } else {
+                            //
+                            // Standard Bulk (no 'creating' hook to care about)
+                            //
+                            errorHandler = BulkErrorHandler(errorList);
+                            for (var i = 0, l = objects.length; i < l; ++i) {
+                                req = idbstore.add(objects[i]);
+                                req.onerror = errorHandler;
+                            }
+                            // Only need to catch success or error on the last operation
+                            // according to the IDB spec.
+                            req.onerror = BulkErrorHandler(errorList, resolve);
+                            req.onsuccess = BulkSuccessHandler(errorList, resolve);
+                        }
+                    });
+                },
                 add: function (obj, key) {
                     /// <summary>
                     ///   Add an object to the database. In case an object with same primary key already exists, the object will not be added.
@@ -1040,7 +1116,7 @@
                     var self = this,
                         creatingHook = this.hook.creating.fire;
                     return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
-                        var thisCtx = {};
+                        var thisCtx = {onsuccess:null, onerror:null};
                         if (creatingHook !== nop) {
                             var effectiveKey = key || (idbstore.keyPath ? getByKeyPath(obj, idbstore.keyPath) : undefined);
                             var keyToUse = creatingHook.call(thisCtx, effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
@@ -2060,7 +2136,12 @@
 
                     function modifyItem(item, cursor, advance) {
                         currentKey = cursor.primaryKey;
-                        var thisContext = { primKey: cursor.primaryKey, value: item };
+                        var thisContext = {
+                            primKey: cursor.primaryKey,
+                            value: item,
+                            onsuccess: null,
+                            onerror: null
+                        };
                         if (modifyer.call(thisContext, item) !== false) { // If a callback explicitely returns false, do not perform the update!
                             var bDelete = !thisContext.hasOwnProperty("value");
                             var req = (bDelete ? cursor.delete() : cursor.update(thisContext.value));
@@ -2697,8 +2778,8 @@
             if (res !== undefined) arguments[0] = res;
             var onsuccess = this.onsuccess, // In case event listener has set this.onsuccess
                 onerror = this.onerror;     // In case event listener has set this.onerror
-            delete this.onsuccess;
-            delete this.onerror;
+            this.onsuccess = null;
+            this.onerror = null;
             var res2 = f2.apply(this, arguments);
             if (onsuccess) this.onsuccess = this.onsuccess ? callBoth(onsuccess, this.onsuccess) : onsuccess;
             if (onerror) this.onerror = this.onerror ? callBoth(onerror, this.onerror) : onerror;
@@ -2713,8 +2794,8 @@
             if (res !== undefined) extend(arguments[0], res); // If f1 returns new modifications, extend caller's modifications with the result before calling next in chain.
             var onsuccess = this.onsuccess, // In case event listener has set this.onsuccess
                 onerror = this.onerror;     // In case event listener has set this.onerror
-            delete this.onsuccess;
-            delete this.onerror;
+            this.onsuccess = null;
+            this.onerror = null;
             var res2 = f2.apply(this, arguments);
             if (onsuccess) this.onsuccess = this.onsuccess ? callBoth(onsuccess, this.onsuccess) : onsuccess;
             if (onerror) this.onerror = this.onerror ? callBoth(onerror, this.onerror) : onerror;

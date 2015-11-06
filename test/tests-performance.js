@@ -24,36 +24,36 @@
         });
 
         var tick;
-        db.delete().then(function () {
-
-            function randomString(count) {
-                return function () {
-                    var ms = [];
-                    for (var i = 0; i < count; ++i) {
-                        ms.push(String.fromCharCode(32 + Math.floor(Math.random() * 96)));
-                    }
-                    return ms.join('');
+        function randomString(count) {
+            return function () {
+                var ms = [];
+                for (var i = 0; i < count; ++i) {
+                    ms.push(String.fromCharCode(32 + Math.floor(Math.random() * 96)));
                 }
+                return ms.join('');
             }
+        }
+        db.delete().then(function () {
+            return db.open();
+        }).then(function(){
 
-            db.open();
+            var i;
+            var bulkArray = new Array(10000);
+            for (i = 1; i <= 10000; ++i) {
+                bulkArray[i - 1] = {
+                    from: "from" + i + "@test.com",
+                    to: "to" + i + "@test.com",
+                    subject: "subject" + i,
+                    message: "message" + i,
+                    shortStr: randomString(2)()
+                };
+            }
 
             tick = Date.now();
 
             // Create 10,000 emails
             ok(true, "Creating 10,000 emails");
-            return db.transaction("rw", db.emails, function() {
-                for (var i = 1; i <= 10000; ++i) {
-                    db.emails.add({
-                        from: "from" + i + "@test.com",
-                        to: "to" + i + "@test.com",
-                        subject: "subject" + i,
-                        message: "message" + i,
-                        shortStr: randomString(2)()
-                    });
-                }
-            });
-
+            return db.emails.bulkAdd(bulkArray);
         }).then(function () {
             ok(true, "Time taken: " + (Date.now() - tick));
 

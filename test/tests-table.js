@@ -252,6 +252,25 @@
             ok(false, "Error: " + e);
         }).finally(start);
     });
+    asyncTest("bulkAdd", function() {
+        db.transaction("rw", db.users, function() {
+            var newUsers = [
+                { first: "Åke1", last: "Persbrant1", username: "aper1", email: ["aper1@persbrant.net"] },
+                { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] },
+                { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] }, // Should fail
+                { first: "Åke3", last: "Persbrant3", username: "aper3", email: ["aper3@persbrant.net"] }
+            ];
+            db.users.bulkAdd(newUsers).then(function(errors) {
+                equal(errors.length, 1, "One error due to a duplicate username");
+            });
+
+            db.users.where("username").startsWith("aper").count(function(count) {
+                equal(count, 3);
+            });
+        }).catch(function (e) {
+            ok(false, "Error: " + e);
+        }).finally(start);
+    });
     asyncTest("delete", function () {
         // Without transaction
         db.users.get(idOfFirstUser, function (user) {
