@@ -707,5 +707,80 @@
             ok(false, "Error: " + e);
         }).finally(start);
     });
+
+    asyncTest("Dexie.currentTransaction in CRUD hooks", 27, function () {
+
+        function CurrentTransChecker(scope, trans) {
+            return function() {
+                ok(Dexie.currentTransaction === trans, "Dexie.currentTransaction correct in " + scope);
+            }
+        }
+
+        function onCreating(primKey, obj, transaction) {
+            ok(!!Dexie.currentTransaction, "Dexie.currentTransaction should exist in creating");
+            ok(Dexie.currentTransaction === transaction,
+                "Dexie.currentTransaction correct in creating");
+            this.onerror = CurrentTransChecker("creating.onerror", transaction);
+            this.onsuccess = CurrentTransChecker("creating.onsuccess", transaction);
+        }
+
+        function onReading(obj) {
+            ok(!!Dexie.currentTransaction, "Dexie.currentTransaction should exist in reading");
+            return obj;
+        }
+
+        function onUpdating(modifications, primKey, obj, transaction) {
+            ok(Dexie.currentTransaction === transaction,
+                "Dexie.currentTransaction correct in updating");
+            this.onerror = CurrentTransChecker("updating.onerror", transaction);
+            this.onsuccess = CurrentTransChecker("updating.onsuccess", transaction);
+        }
+
+        function onDeleting(primKey, obj, transaction) {
+            ok(Dexie.currentTransaction === transaction,
+                "Dexie.currentTransaction correct in deleting");
+            this.onsuccess = CurrentTransChecker("deleting.onsuccess", transaction);
+        }
+
+        db.users.hook.creating.subscribe(onCreating);
+        db.users.hook.reading.subscribe(onReading);
+        db.users.hook.updating.subscribe(onUpdating);
+        db.users.hook.deleting.subscribe(onDeleting);
+
+        function doTheTests() {
+            db.users.add({ username: "monkey1" });
+            db.users.add({ username: "monkey1" }).catch(function(ex) {
+                ok(true, "Should fail adding a second monkey1");
+            }); // Trigger creating.onerror
+            // Test bulkAdd as well:
+            ok(true, "Testing bulkAdd");
+            db.users.bulkAdd([{ username: "monkey1" }, { username: "monkey2" }]);
+            db.users.where("username").equals("monkey1").modify({
+                name: "Monkey 1"
+            });
+            db.users.where("username").equals("monkey1").modify(function (user) {
+                debugger;
+                user.username = "monkey2";// trigger updating.onerror
+            }).catch(function(ex) {
+                ok(true, "Should fail modifying primary key");
+            });
+            db.users.toArray();
+            db.users.delete("monkey2");
+            return db.users.delete("monkey1");
+        };
+
+        doTheTests().then(function () {
+            ok(true, "Now in an explicit transaction block...");
+            return db.transaction('rw', db.users, function() {
+                doTheTests();
+            });
+        }).catch(function(ex) {
+            ok(false, ex);
+        }).finally(function() {
+            db.users.hook.creating.unsubscribe(onCreating);
+            db.users.hook.updating.unsubscribe(onUpdating);
+            start();
+        });
+    });
 })();
 
