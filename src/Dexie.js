@@ -431,21 +431,24 @@
                     trans.error(function (err) {
                         db.on('error').fire(err);
                     });
-                    fn(function (value) {
-                        // Instead of resolving value directly, wait with resolving it until transaction has completed.
-                        // Otherwise the data would not be in the DB if requesting it in the then() operation.
-                        // Specifically, to ensure that the following expression will work:
-                        //
-                        //   db.friends.put({name: "Arne"}).then(function () {
-                        //       db.friends.where("name").equals("Arne").count(function(count) {
-                        //           assert (count === 1);
-                        //       });
-                        //   });
-                        //
-                        trans.complete(function () {
-                            resolve(value);
-                        });
-                    }, reject, trans);
+                    Promise.newPSD(function () {
+                        Promise.PSD.trans = trans;
+                        fn(function(value) {
+                            // Instead of resolving value directly, wait with resolving it until transaction has completed.
+                            // Otherwise the data would not be in the DB if requesting it in the then() operation.
+                            // Specifically, to ensure that the following expression will work:
+                            //
+                            //   db.friends.put({name: "Arne"}).then(function () {
+                            //       db.friends.where("name").equals("Arne").count(function(count) {
+                            //           assert (count === 1);
+                            //       });
+                            //   });
+                            //
+                            trans.complete(function() {
+                                resolve(value);
+                            });
+                        }, reject, trans);
+                    });
                 });
             }
         }; 
@@ -1031,19 +1034,27 @@
 
         derive(WriteableTable).from(Table).extend(function () {
 
-            function BulkErrorHandler(errorList, resolve, hookCtx) {
+            function BulkErrorHandler(errorList, resolve, hookCtx, transaction) {
                 return function(ev) {
                     if (ev.stopPropagation) ev.stopPropagation();
                     if (ev.preventDefault) ev.preventDefault();
                     errorList.push(ev.target.error);
-                    if (hookCtx && hookCtx.onerror) hookCtx.onerror(ev.target.error);
+                    if (hookCtx && hookCtx.onerror) {
+                        Promise.newPSD(function () {
+                            Promise.PSD.trans = transaction;
+                            hookCtx.onerror(ev.target.error);
+                        });
+                    }
                     if (resolve) resolve(errorList); // Only done in last request.
                 }
             }
 
-            function BulkSuccessHandler(errorList, resolve, hookCtx) {
+            function BulkSuccessHandler(errorList, resolve, hookCtx, transaction) {
                 return hookCtx ? function(ev) {
-                    hookCtx.onsuccess && hookCtx.onsuccess(ev.target.result);
+                    hookCtx.onsuccess && Promise.newPSD(function () {
+                        Promise.PSD.trans = transaction;
+                        hookCtx.onsuccess(ev.target.result);
+                    });
                     if (resolve) resolve(errorList);
                 } : function() {
                     resolve(errorList);
@@ -1068,8 +1079,8 @@
                             //
                             var keyPath = idbstore.keyPath,
                                 hookCtx = { onerror: null, onsuccess: null };
-                            errorHandler = BulkErrorHandler(errorList, null, hookCtx);
-                            successHandler = BulkSuccessHandler(errorList, null, hookCtx);
+                            errorHandler = BulkErrorHandler(errorList, null, hookCtx, trans);
+                            successHandler = BulkSuccessHandler(errorList, null, hookCtx, trans);
                             for (var i = 0, l = objects.length; i < l; ++i) {
                                 var obj = objects[i],
                                     effectiveKey = getByKeyPath(obj, keyPath),
@@ -1089,8 +1100,8 @@
                                     hookCtx.onsuccess = null;
                                 }
                             }
-                            req.onerror = BulkErrorHandler(errorList, resolve, hookCtx);
-                            req.onsuccess = BulkSuccessHandler(errorList, resolve, hookCtx);
+                            req.onerror = BulkErrorHandler(errorList, resolve, hookCtx, trans);
+                            req.onsuccess = BulkSuccessHandler(errorList, resolve, hookCtx, trans);
                         } else {
                             //
                             // Standard Bulk (no 'creating' hook to care about)
@@ -1127,23 +1138,25 @@
                                     key = keyToUse;
                             }
                         }
-                        //try {
-                            var req = key ? idbstore.add(obj, key) : idbstore.add(obj);
-                            req.onerror = eventRejectHandler(function (e) {
-                                if (thisCtx.onerror) thisCtx.onerror(e);
-                                return reject(e);
-                            }, ["adding", obj, "into", self.name]);
-                            req.onsuccess = function (ev) {
-                                var keyPath = idbstore.keyPath;
-                                if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
-                                if (thisCtx.onsuccess) thisCtx.onsuccess(ev.target.result);
-                                resolve(req.result);
-                            };
-                        /*} catch (e) {
-                            trans.on("error").fire(e);
-                            trans.abort();
-                            reject(e);
-                        }*/
+                        var req = key ? idbstore.add(obj, key) : idbstore.add(obj);
+                        req.onerror = eventRejectHandler(function (e) {
+                            if (thisCtx.onerror)
+                                Promise.newPSD(function () {
+                                    Promise.PSD.trans = trans;
+                                    thisCtx.onerror(e);
+                                });
+                            return reject(e);
+                        }, ["adding", obj, "into", self.name]);
+                        req.onsuccess = function (ev) {
+                            var keyPath = idbstore.keyPath;
+                            if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
+                            if (thisCtx.onsuccess)
+                                Promise.newPSD(function () {
+                                    Promise.PSD.trans = trans;
+                                    thisCtx.onsuccess(ev.target.result);
+                                });
+                            resolve(req.result);
+                        };
                     });
                 },
 
@@ -2149,12 +2162,20 @@
                             req.onerror = eventRejectHandler(function (e) {
                                 failures.push(e);
                                 failKeys.push(thisContext.primKey);
-                                if (thisContext.onerror) thisContext.onerror(e);
+                                if (thisContext.onerror)
+                                    Promise.newPSD(function () {
+                                        Promise.PSD.trans = trans;
+                                        thisContext.onerror(e);
+                                    });
                                 checkFinished();
                                 return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
                             }, bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]);
                             req.onsuccess = function (ev) {
-                                if (thisContext.onsuccess) thisContext.onsuccess(thisContext.value);
+                                if (thisContext.onsuccess)
+                                    Promise.newPSD(function () {
+                                        Promise.PSD.trans = trans;
+                                        thisContext.onsuccess(thisContext.value);
+                                    });
                                 ++successCount;
                                 checkFinished();
                             }; 
