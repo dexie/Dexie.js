@@ -1,8 +1,8 @@
 (function (global, factory) {
-    typeof exports === 'object' && typeof module !== 'undefined' ? factory(exports) :
-    typeof define === 'function' && define.amd ? define(['exports'], factory) :
-    factory((global.Dexie = {}));
-}(this, function (exports) { 'use strict';
+    typeof exports === 'object' && typeof module !== 'undefined' ? module.exports = factory() :
+    typeof define === 'function' && define.amd ? define(factory) :
+    global.Dexie = factory();
+}(this, function () { 'use strict';
 
     /* A Minimalistic Wrapper for IndexedDB
     ====================================
@@ -17,6 +17,10 @@
 
     Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
     */
+
+    if (typeof global === 'undefined') {
+        var global = self || window; 
+    }
 
     var isArray = Array.isArray;
     var keys = Object.keys;
@@ -3422,7 +3426,7 @@
         Dexie.fake = fake = true;
     });
 
-    exports.Dexie = Dexie;
+    return Dexie;
 
 }));
 //# sourceMappingURL=Dexie.js.map
