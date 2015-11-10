@@ -469,16 +469,11 @@
                 if (!ourSyncNode) {
                     return Promise.reject("Database closed");
                 }
-                var promise = db._changes.where("rev").above(ourSyncNode.myRevision).limit(1000).toArray(function(changes) {
+                var LIMIT = 1000;
+                var promise = db._changes.where("rev").above(ourSyncNode.myRevision).limit(LIMIT).toArray(function (changes) {
                     if (changes.length > 0) {
                         var lastChange = changes[changes.length - 1];
-                        partial = (changes.length === 1000); // Same as limit.
-                        // Let all objects pass through the READING hook before notifying our listeners:
-                        changes.forEach(function(change) {
-                            var table = db.table(change.table);
-                            if (change.obj) change.obj = table.hook.reading.fire(change.obj);
-                            if (change.oldObj) change.oldObj = table.hook.reading.fire(change.oldObj);
-                        });
+                        partial = (changes.length === LIMIT);
                         db.on('changes').fire(changes, partial);
                         ourSyncNode.myRevision = lastChange.rev;
                     } else if (wasPartial) {

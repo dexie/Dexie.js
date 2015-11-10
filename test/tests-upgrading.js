@@ -272,7 +272,7 @@
             });
         }).then(function() {
             // Try open the database using Dexie:
-            db = new Dexie("raw-db");
+            db = new Dexie("raw-db", {addons: []}); // Explicitely don't use addons here. Syncable would fail to open an existing db.
             db.version(0.2).stores({
                 people: "_id",
                 messages: "++,text,words,id,[size+color]",
