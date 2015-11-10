@@ -2158,30 +2158,36 @@
                             onsuccess: null,
                             onerror: null
                         };
+
+                        function onerror(e) {
+                            failures.push(e);
+                            failKeys.push(thisContext.primKey);
+                            if (thisContext.onerror)
+                                Promise.newPSD(function () {
+                                    Promise.PSD.trans = trans;
+                                    thisContext.onerror(e);
+                                });
+                            checkFinished();
+                            return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
+                        }
+
                         if (modifyer.call(thisContext, item) !== false) { // If a callback explicitely returns false, do not perform the update!
                             var bDelete = !thisContext.hasOwnProperty("value");
-                            var req = (bDelete ? cursor.delete() : cursor.update(thisContext.value));
                             ++count;
-                            req.onerror = eventRejectHandler(function (e) {
-                                failures.push(e);
-                                failKeys.push(thisContext.primKey);
-                                if (thisContext.onerror)
-                                    Promise.newPSD(function () {
-                                        Promise.PSD.trans = trans;
-                                        thisContext.onerror(e);
-                                    });
-                                checkFinished();
-                                return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
-                            }, bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]);
-                            req.onsuccess = function (ev) {
-                                if (thisContext.onsuccess)
-                                    Promise.newPSD(function () {
-                                        Promise.PSD.trans = trans;
-                                        thisContext.onsuccess(thisContext.value);
-                                    });
-                                ++successCount;
-                                checkFinished();
-                            }; 
+                            miniTryCatch(function () {
+                                var req = (bDelete ? cursor.delete() : cursor.update(thisContext.value));
+                                req.onerror = eventRejectHandler(onerror,
+                                    bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]);
+                                req.onsuccess = function (ev) {
+                                    if (thisContext.onsuccess)
+                                        Promise.newPSD(function () {
+                                            Promise.PSD.trans = trans;
+                                            thisContext.onsuccess(thisContext.value);
+                                        });
+                                    ++successCount;
+                                    checkFinished();
+                                };
+                            }, onerror);
                         } else if (thisContext.onsuccess) {
                             // Hook will expect either onerror or onsuccess to always be called!
                             thisContext.onsuccess(thisContext.value);
@@ -2985,6 +2991,14 @@
                 Promise.PSD = outerPSD;
             }
         };
+    }
+
+    function miniTryCatch(fn, onerror) {
+        try {
+            fn();
+        } catch (ex) {
+            onerror(ex);
+        }
     }
 
     function getByKeyPath(obj, keyPath) {

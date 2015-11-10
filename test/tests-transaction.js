@@ -1,7 +1,7 @@
 ///<reference path="qunit.js" />
 ///<reference path="../src/Dexie.js" />
 (function () {
-    var db = new Dexie("TestDB");
+    var db = new Dexie("TestDBTrans");
     db.version(1).stores({
         users: "username",
         pets: "++id,kind",
@@ -708,7 +708,7 @@
         }).finally(start);
     });
 
-    asyncTest("Dexie.currentTransaction in CRUD hooks", 27, function () {
+    asyncTest("Dexie.currentTransaction in CRUD hooks", 59, function () {
 
         function CurrentTransChecker(scope, trans) {
             return function() {
@@ -778,7 +778,9 @@
             ok(false, ex);
         }).finally(function() {
             db.users.hook.creating.unsubscribe(onCreating);
+            db.users.hook.reading.unsubscribe(onReading);
             db.users.hook.updating.unsubscribe(onUpdating);
+            db.users.hook.deleting.unsubscribe(onDeleting);
             start();
         });
     });
