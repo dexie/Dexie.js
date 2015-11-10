@@ -413,6 +413,7 @@
         this._transPromiseFactory = function transactionPromiseFactory(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
             if (db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
                 // Database is paused. Wait til resumed.
+                if (!isBeingOpened) db.open(); // Force open if not being opened.
                 var blockedPromise = new Promise(function (resolve, reject) {
                     pausedResumeables.push({
                         resume: function () {
@@ -455,6 +456,7 @@
 
         this._whenReady = function (fn) {
             if (!fake && db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
+                if (!isBeingOpened) db.open(); // Force open if not being opened.
                 return new Promise(function (resolve, reject) {
                     pausedResumeables.push({
                         resume: function () {
@@ -480,7 +482,8 @@
         this.open = function () {
             return new Promise(function (resolve, reject) {
                 if (fake) resolve(db);
-                if (idbdb || isBeingOpened) throw new Error("Database already opened or being opened");
+                if (idbdb) { resolve(db); return;}
+                if (isBeingOpened) { db._whenReady(function () { resolve(db); }, function (e) { reject(e); }); return;}
                 var req, dbWasCreated = false;
                 function openError(err) {
                     try { req.transaction.abort(); } catch (e) { }
