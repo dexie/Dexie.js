@@ -759,7 +759,6 @@
                 name: "Monkey 1"
             });
             db.users.where("username").equals("monkey1").modify(function (user) {
-                debugger;
                 user.username = "monkey2";// trigger updating.onerror
             }).catch(function(ex) {
                 ok(true, "Should fail modifying primary key");
