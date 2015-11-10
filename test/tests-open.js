@@ -185,7 +185,7 @@ asyncTest("Issue #76 Dexie inside Web Worker", function () {
     //
     // Imports to include from the web worker:
     //
-    var imports = window.workerImports || ["../src/Dexie.js"];
+    var imports = window.workerImports || ["../dist/latest/Dexie.js"];
 
     //
     // Code to execute in the web worker:

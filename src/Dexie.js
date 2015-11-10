@@ -12,6 +12,10 @@ Official Website: www.dexie.com
 Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
 */
 
+if (typeof global === 'undefined') {
+    var global = self || window; 
+}
+
 var isArray = Array.isArray;
 var keys = Object.keys;
 var _slice = [].slice;
@@ -46,7 +50,7 @@ function override(origFunc, overridedFactory) {
     return overridedFactory(origFunc);
 }
 
-export function Dexie(dbName, options) {
+export default function Dexie(dbName, options) {
     /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
     var addons = (options && options.addons) || Dexie.addons;
     // Resolve all external dependencies:
