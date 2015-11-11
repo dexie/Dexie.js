@@ -3,13 +3,12 @@
 
 By David Fahlander, david.fahlander@gmail.com
 
-Version 1.2.x (alpha - not yet distributed) - DATE, YEAR.
-
-Tested successfully on Chrome, Opera, Firefox, Edge, and IE.
+Version {version}
 
 Official Website: www.dexie.com
 
 Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
+
 */
 
 if (typeof global === 'undefined') {
@@ -544,7 +543,7 @@ export default function Dexie(dbName, options) {
                     if (autoSchema) readGlobalSchema();
                         else if (idbdb.objectStoreNames.length > 0) {
                             try {
-                                adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
+                        adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
                             } catch (e) {
                                 // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
                             }
@@ -1405,7 +1404,7 @@ export default function Dexie(dbName, options) {
                                     throw new Error(e);
                                 } catch (e2) {
                                     reject(e2);
-                                }
+                        }
                             }
                     }) : Promise.reject(stack(new Error("Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
                     if (self.active && bWriteLock) p.finally(function () {
@@ -1758,7 +1757,7 @@ export default function Dexie(dbName, options) {
                     throw new Error(ex); // Rethrowing to get a callstack with the error. Needed in IE and Edge.
                 } catch (ex2) {
                     error = ex2;
-                }
+        }
             }
 
         var whereCtx = whereClause._ctx;
@@ -3418,7 +3417,10 @@ Dexie.dependencies = {
 }; 
 
 // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-Dexie.version = 1.20;
+Dexie.semVer = "{version}";
+Dexie.version = Dexie.semVer.split('.')
+    .map(function(n){return parseInt(n);})
+    .reduce(function (p,c,i) { return p + (c/Math.pow(10,i*2));});
 
 function getNativeGetDatabaseNamesFn() {
     var indexedDB = Dexie.dependencies.indexedDB;
