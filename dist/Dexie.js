@@ -3408,7 +3408,7 @@
         TypeError: global.TypeError || String,
         DOMError: global.DOMError || String,
         localStorage: ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : global.localStorage)
-    }; 
+    };
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
     Dexie.semVer = "1.3.0";

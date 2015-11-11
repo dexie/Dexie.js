@@ -54,6 +54,22 @@ function replaceInFile(filename, replacements) {
         .then(replacedContent => writeFile(filename, replacedContent));
 }
 
+function throttle(millisecs, cb) {
+    var tHandle = null;
+    var calls = [];
+
+    function onTimeout() {
+        tHandle = null;
+        cb(calls);
+    }
+    return function () {
+        var args = [].slice.call(arguments);
+        calls.push(args);
+        if (tHandle) clearTimeout(tHandle);
+        tHandle = setTimeout(onTimeout, millisecs);
+    }
+}
+
 module.exports = {
     copyFile: copyFile,
     copyFiles: copyFiles,
@@ -61,5 +77,6 @@ module.exports = {
     writeFile: writeFile,
     parsePackageVersion: parsePackageVersion,
     replace: replace,
-    replaceInFile: replaceInFile
+    replaceInFile: replaceInFile,
+    throttle: throttle
 };

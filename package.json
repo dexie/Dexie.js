@@ -21,6 +21,8 @@
   },
   "homepage": "http://www.dexie.org",
   "scripts": {
+    "build": "node --harmony build/build.js",
+    "watch": "node --harmony build/watch.js"
     "build": "node build/build.js",
     "test": "node_modules/.bin/karma start karma.conf.js --single-run --browsers Chrome",
     "test:debug": "node_modules/.bin/karma start karma.conf.js --browsers Chrome"
