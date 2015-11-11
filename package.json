@@ -20,7 +20,8 @@
     "url": "https://github.com/dfahlander/Dexie.js/issues"
   },
   "scripts": {
-    "build": "node --harmony build/build.js"
+    "build": "node --harmony build/build.js",
+    "watch": "node --harmony build/watch.js"
   },
   "homepage": "http://www.dexie.org",
   "devDependencies": {

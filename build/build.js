@@ -10,8 +10,9 @@ rollup.rollup({ entry: "src/Dexie.js" }).then(bundle => {
         dest: 'dist/Dexie.es6.js',
         sourceMap: true
     });
-}).then(() => utils.parsePackageVersion())
-  .then(version => {
+}).then(() => {
+    return utils.parsePackageVersion();
+}).then(version => {
      console.log("Replacing {version}=>'"+version+"' =>\tdist/Dexie.es6.js");
      return utils.replaceInFile("dist/Dexie.es6.js", { "{version}": version });
 }).then(()=>{
@@ -24,8 +25,7 @@ rollup.rollup({ entry: "src/Dexie.js" }).then(bundle => {
         format: 'umd',
         dest: 'dist/Dexie.js',
         sourceMap: true,
-        moduleName: 'Dexie',
-        sourceMapRelativePaths: true
+        moduleName: 'Dexie'
     });
 }).then(() => {
     console.log("Minifying the ES5 UMD bundle =>\tdist/Dexie.min.js, (including .map)");
