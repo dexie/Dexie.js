@@ -2,9 +2,9 @@
   "name": "dexie",
   "version": "1.3.0",
   "description": "A Minimalistic Wrapper for IndexedDB",
-  "main": "dist/latest/Dexie.js",
-  "jsnext:main": "dist/latest/Dexie.es6.js",
-  "typings": "dist/latest/Dexie.d.ts",
+  "main": "dist/Dexie.js",
+  "jsnext:main": "dist/Dexie.es6.js",
+  "typings": "dist/Dexie.d.ts",
   "repository": {
     "type": "git",
     "url": "https://github.com/dfahlander/Dexie.js.git"
