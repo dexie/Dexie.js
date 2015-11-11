@@ -3,13 +3,12 @@
 
 By David Fahlander, david.fahlander@gmail.com
 
-Version 1.2.x (alpha - not yet distributed) - DATE, YEAR.
-
-Tested successfully on Chrome, Opera, Firefox, Edge, and IE.
+Version {version}
 
 Official Website: www.dexie.com
 
 Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
+
 */
 
 if (typeof global === 'undefined') {
@@ -3406,7 +3405,10 @@ Dexie.dependencies = {
 }; 
 
 // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-Dexie.version = 1.20;
+Dexie.semVer = "{version}";
+Dexie.version = Dexie.semVer.split('.')
+    .map(function(n){return parseInt(n);})
+    .reduce(function (p,c,i) { return p + (c/Math.pow(10,i*2));});
 
 function getNativeGetDatabaseNamesFn() {
     var indexedDB = Dexie.dependencies.indexedDB;

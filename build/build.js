@@ -3,20 +3,23 @@ var rollup = require('rollup');
 var uglify = require("uglify-js");
 var utils = require('./build-utils');
 
-utils.copyFiles({
-    "src/Dexie.js": "dist/Dexie.es6.js",
-    "src/Dexie.d.ts": "dist/Dexie.d.ts"
-}).then(() => {
-    console.log("Reading and bundling source <= \tsrc/Dexie.js");
-    return rollup.rollup({
-        // The bundle's starting point. This file will be
-        // included, along with the minimum necessary code
-        // from its dependencies
-        entry: 'src/Dexie.js'
+rollup.rollup({ entry: "src/Dexie.js" }).then(bundle => {
+    console.log('Writing ES6 bundle to =>\tdist/Dexie.es6.js');
+    return bundle.write({
+        format: 'es6',
+        dest: 'dist/Dexie.es6.js',
+        sourceMap: true
     });
+}).then(() => utils.parsePackageVersion())
+  .then(version => {
+     console.log("Replacing {version}=>'"+version+"' =>\tdist/Dexie.es6.js");
+     return utils.replaceInFile("dist/Dexie.es6.js", { "{version}": version });
+}).then(()=>{
+    console.log("Reading ES6 bundle again <= \tdist/Dexie.es6.js");
+    return rollup.rollup({entry: 'dist/Dexie.es6.js'});
 }).then(bundle => {
     // Generate bundle + sourcemap
-    console.log('Writing UMD bundle to =>\tdist/Dexie.js');
+    console.log('Writing ES5 bundle to =>\tdist/Dexie.js');
     return bundle.write({
         format: 'umd',
         dest: 'dist/Dexie.js',
@@ -30,7 +33,10 @@ utils.copyFiles({
         inSourceMap: "dist/Dexie.js.map",
         outSourceMap: "Dexie.min.js.map"
     });
-
-    fs.writeFileSync('dist/Dexie.min.js', result.code);
-    fs.writeFileSync('dist/Dexie.min.js.map', result.map);
-}).catch(err => console.error(err));
+    return Promise.all([
+        utils.writeFile('dist/Dexie.min.js', result.code),
+        utils.writeFile('dist/Dexie.min.js.map', result.map)
+    ]);
+}).then(()=>utils.copyFiles({
+    "src/Dexie.d.ts": "dist/Dexie.d.ts"
+})).catch(err => console.error(err));

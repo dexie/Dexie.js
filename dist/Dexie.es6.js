@@ -3,13 +3,12 @@
 
 By David Fahlander, david.fahlander@gmail.com
 
-Version 1.2.x (alpha - not yet distributed) - DATE, YEAR.
-
-Tested successfully on Chrome, Opera, Firefox, Edge, and IE.
+Version 1.3.0
 
 Official Website: www.dexie.com
 
 Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
+
 */
 
 if (typeof global === 'undefined') {
@@ -50,7 +49,7 @@ function override(origFunc, overridedFactory) {
     return overridedFactory(origFunc);
 }
 
-export default function Dexie(dbName, options) {
+function Dexie(dbName, options) {
     /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
     var addons = (options && options.addons) || Dexie.addons;
     // Resolve all external dependencies:
@@ -3406,7 +3405,10 @@ Dexie.dependencies = {
 }; 
 
 // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-Dexie.version = 1.20;
+Dexie.semVer = "1.3.0";
+Dexie.version = Dexie.semVer.split('.')
+    .map(function(n){return parseInt(n);})
+    .reduce(function (p,c,i) { return p + (c/Math.pow(10,i*2));});
 
 function getNativeGetDatabaseNamesFn() {
     var indexedDB = Dexie.dependencies.indexedDB;
@@ -3419,3 +3421,6 @@ doFakeAutoComplete(function() {
     Dexie.fakeAutoComplete = fakeAutoComplete = doFakeAutoComplete;
     Dexie.fake = fake = true;
 });
+
+export default Dexie;
+//# sourceMappingURL=Dexie.es6.js.map
