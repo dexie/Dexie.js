@@ -2,47 +2,46 @@
 var rollup = require('rollup');
 var utils = require('./build-utils');
 
-function rebuild(version) {
-    return rollup.rollup({ entry: "src/Dexie.js" })
+process.on('uncaughtException', function (err) {
+    console.error(err);
+});
+
+function rebuild(version, files) {
+    return Promise.all(files.map(file => utils.babelTransform("src/" + file, "tmp/" + file)))
+        .then(()=>rollup.rollup({ entry: "tmp/Dexie.js" }))
 
         // Bundle to ES6 Bundle dist/Dexie.es6.js
         .then(bundle =>bundle.write({
-            format: 'es6',
-            dest: 'dist/Dexie.es6.js',
-            sourceMap: true
+            format: 'umd',
+            dest: 'dist/dexie.js',
+            sourceMap: true,
+            moduleName: "Dexie"
         }))
 
         // Replace {version}
-        .then(() => utils.replaceInFile("dist/Dexie.es6.js", { "{version}": version }))
-
-        // Generate dist/Dexie.js (ES5 bundle)
-        .then(()=> rollup.rollup({ entry: 'dist/Dexie.es6.js' }))
-        .then(bundle => bundle.write({
-            format: 'umd',
-            dest: 'dist/Dexie.js',
-            sourceMap: true,
-            moduleName: 'Dexie'
-        }));
+        .then(() => utils.replaceInFile("dist/dexie.js", { "{version}": version }));
 }
 
-utils.parsePackageVersion().then(version => {
-    console.log("Building dist/Dexie.js and dist/Dexie.es6.js...");
-    rebuild(version).then(() => {
+utils.parsePackageVersion().then(version => utils.listSourceFiles().then(files => {
+    console.log("Building dist/dexie.js...");
+    try { fs.mkdirSync("tmp"); } catch (e) { }
+    rebuild(version, files).then(() => {
         console.log("Done. Now watching src/* for changes...");
         fs.watch("src", utils.throttle(50, calls => {
             var filenames = calls.map(args => args[1])
                 .filter(filename => filename)
-                .filter(filename => filename.toLowerCase().lastIndexOf('.js') === filename.length - ".js".length)
+                .filter(filename => filename.toLowerCase().endsWith('.js'))
                 .reduce((p, c) =>(p[c] = true, p), {});
-
-            if (Object.keys(filenames).length > 0) {
-                Object.keys(filenames).forEach(filename => console.log("Changed file: " + filename));
-                rebuild(version)
-                    .then(() =>console.log("Done rebuilding dist/Dexie.js and dist/Dexie.es6.js"))
+           
+            var changedFiles = Object.keys(filenames);
+            if (changedFiles.length > 0) {
+                changedFiles.forEach(filename => console.log("Changed file: " + filename));
+                rebuild(version, changedFiles)
+                    .then(() =>console.log("Done rebuilding dist/dexie.js and dist/dexie.es6.js"))
                     .catch(e => console.error("Failed rebuilding: " + e.stack));
             }
         }));
     }).catch(err=> {
         console.error("Failed to build: " + err.stack);
     });
-});
+}));

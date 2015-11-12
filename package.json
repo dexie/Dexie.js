@@ -33,6 +33,11 @@
   },
 
   "devDependencies": {
+    "babel-core": "^6.1.4",
+    "babel-plugin-transform-es2015-modules-systemjs": "^6.1.4",
+    "babel-plugin-transform-es2015-modules-umd": "^6.1.4",
+    "babel-preset-es2015": "^6.1.4",
+
     "qunit": "^0.7.7",
     "qunitjs": "^1.14.0",
     "karma": "^0.13.19",

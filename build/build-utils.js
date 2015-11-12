@@ -1,4 +1,59 @@
 ﻿var fs = require('fs');
+var babel = require('babel-core');
+
+function listSourceFiles() {
+    return new Promise((resolve, reject) => {
+        fs.readdir('src/', (err, files) => {
+            if (err)
+                reject(err);
+            else
+                resolve(files.filter(f=>f.toLowerCase().endsWith('.js')));
+        });
+    });
+}
+
+function babelTransform(source, destination) {
+    return new Promise((resolve, reject) => {
+        var options = {
+            //sourceMaps: true,
+            //inputSourceMap: inSourceMap,
+            compact: false,
+            comments: true,
+            //presets: ["es2015"],
+            plugins: [
+                "transform-es2015-arrow-functions",
+                "transform-es2015-block-scoped-functions",
+                "transform-es2015-block-scoping",
+                "transform-es2015-classes",
+                "transform-es2015-computed-properties",
+                "transform-es2015-constants",
+                //"transform-es2015-destructuring",
+                //"transform-es2015-for-of",
+                //"transform-es2015-function-name",
+                "transform-es2015-literals",
+                //"transform-es2015-modules-commonjs"  Replaced with "es2015-modules-umd"!
+                "transform-es2015-object-super",
+                "transform-es2015-parameters",
+                "transform-es2015-shorthand-properties",
+                "transform-es2015-spread",
+                //"transform-es2015-sticky-regex",
+                "transform-es2015-template-literals",
+                //"transform-es2015-typeof-symbol",
+                //"transform-es2015-unicode-regex",
+                "transform-regenerator",
+                //"transform-es2015-modules-systemjs"
+                //"transform-es2015-modules-umd",
+            ]
+        };
+        babel.transformFile(source, options, (err, result) => {
+            if (err) return reject(err);
+            Promise.all([
+                writeFile(destination, result.code),
+                writeFile(destination + ".map", result.map)
+            ]).then(resolve, reject);
+        });
+    });
+}
 
 function copyFile(source, target) {
     console.log('Copying '+source+' => \t'+target);
@@ -78,5 +133,7 @@ module.exports = {
     parsePackageVersion: parsePackageVersion,
     replace: replace,
     replaceInFile: replaceInFile,
-    throttle: throttle
+    throttle: throttle,
+    listSourceFiles: listSourceFiles,
+    babelTransform: babelTransform
 };
