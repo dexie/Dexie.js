@@ -11,42 +11,17 @@ Licensed under the Apache License Version 2.0, January 2004, http://www.apache.o
 
 */
 
+import * as utils from './utils';
+
+var isArray = Array.isArray,
+    keys = Object.keys,
+    extend = utils.extend,
+    derive = utils.derive,
+    slice = utils.slice,
+    override = utils.override;
+
 if (typeof global === 'undefined') {
     var global = self || window; 
-}
-
-var isArray = Array.isArray;
-var keys = Object.keys;
-var _slice = [].slice;
-
-function extend(obj, extension) {
-    if (typeof extension !== 'object') extension = extension(); // Allow to supply a function returning the extension. Useful for simplifying private scopes.
-    keys(extension).forEach(function (key) {
-        obj[key] = extension[key];
-    });
-    return obj;
-}
-
-function derive(Child) {
-    return {
-        from: function (Parent) {
-            Child.prototype = Object.create(Parent.prototype);
-            Child.prototype.constructor = Child;
-            return {
-                extend: function (extension) {
-                    extend(Child.prototype, typeof extension !== 'object' ? extension(Parent.prototype) : extension);
-                }
-            };
-        }
-    };
-}
-
-function slice(args, start, end) {
-    return _slice.call(args, start, end);
-}
-
-function override(origFunc, overridedFactory) {
-    return overridedFactory(origFunc);
 }
 
 export default function Dexie(dbName, options) {
@@ -3407,8 +3382,8 @@ Dexie.dependencies = {
 // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
 Dexie.semVer = "{version}";
 Dexie.version = Dexie.semVer.split('.')
-    .map(function(n){return parseInt(n);})
-    .reduce(function (p,c,i) { return p + (c/Math.pow(10,i*2));});
+    .map(n => parseInt(n))
+    .reduce((p,c,i) => p + (c/Math.pow(10,i*2)));
 
 function getNativeGetDatabaseNamesFn() {
     var indexedDB = Dexie.dependencies.indexedDB;

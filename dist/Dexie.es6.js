@@ -1,16 +1,3 @@
-/* A Minimalistic Wrapper for IndexedDB
-====================================
-
-By David Fahlander, david.fahlander@gmail.com
-
-Version 1.3.0
-
-Official Website: www.dexie.com
-
-Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
-
-*/
-
 if (typeof global === 'undefined') {
     var global = self || window; 
 }
@@ -3402,13 +3389,13 @@ Dexie.dependencies = {
     TypeError: global.TypeError || String,
     DOMError: global.DOMError || String,
     localStorage: ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : global.localStorage)
-};
+}; 
 
 // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
 Dexie.semVer = "1.3.0";
 Dexie.version = Dexie.semVer.split('.')
-    .map(function(n){return parseInt(n);})
-    .reduce(function (p,c,i) { return p + (c/Math.pow(10,i*2));});
+    .map(n => parseInt(n))
+    .reduce((p,c,i) => p + (c/Math.pow(10,i*2)));
 
 function getNativeGetDatabaseNamesFn() {
     var indexedDB = Dexie.dependencies.indexedDB;
@@ -3423,4 +3410,4 @@ doFakeAutoComplete(function() {
 });
 
 export default Dexie;
-//# sourceMappingURL=Dexie.es6.js.map
+//# sourceMappingURL=dexie.es6.js.map
