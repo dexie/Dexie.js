@@ -12,7 +12,7 @@ export function async(generatorFn) {
         return iterate(generatorFn.apply(this, arguments));
     }
 }
-        
+
 export function iterate (iterable) {
     var callNext = function (result) { return iterable.next(result); },
         doThrow = function (error) { return iterable.throw(error); },
@@ -41,7 +41,13 @@ export function iterate (iterable) {
     }
 }
 
-export default function DexieYield(db) {
+Dexie.addons.push(function (db) {
+    //
+    // Allow db.transaction() to handle iterable functions as async without explicitely having to write async() around the transaction scope func:
+    //
+    //  db.transaction('rw', db.friends, async(function*(){})); - not needed.
+    //  db.transaction('rw', db.friends, function*(){}); // prettier.
+    //
     db.transaction = Dexie.override(db.transaction, function (origDbTransaction) {
         return function () {
             var scopeFunc = arguments[arguments.length - 1];
@@ -59,4 +65,4 @@ export default function DexieYield(db) {
             return origDbTransaction.apply(this, arguments);
         }
     });
-}
+});
