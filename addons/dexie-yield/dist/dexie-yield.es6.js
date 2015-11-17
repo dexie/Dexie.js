@@ -1,50 +1,48 @@
 ﻿
 import Dexie from 'dexie';
 
-var Promise = Dexie.Promise;
-
-export function spawn(generatorFn) {
-    return iterate(generatorFn());
-}
-
 export function async(generatorFn) {
     return function () {
         return iterate(generatorFn.apply(this, arguments));
     }
 }
 
+export function spawn(generatorFn, promiseImpl) {
+    return iterate(generatorFn());
+}
+
 export function iterate (iterable) {
-    var callNext = function (result) { return iterable.next(result); },
-        doThrow = function (error) { return iterable.throw(error); },
+    var callNext = result => iterable.next(result),
+        doThrow = error => iterable.throw(error),
         onSuccess = step(callNext),
         onError = step(doThrow);
 
-    function step(getNext, initial) {
-        return function (val) {
-            var next = getNext(val);
-            if (next.done)
-                return initial ? Promise.resolve(next.value) : next.value;
+    function step(getNext) {
+        return val => {
+            var next = getNext(val),
+                value = next.value;
 
-            if (!next.value || typeof next.value.then !== 'function')
-                if (Array.isArray(next.value))
-                    return Promise.all(next.value).then(onSuccess, onError);
-                else
-                    return Promise.resolve(next.value).then(onSuccess, onError);
-            return next.value.then(onSuccess, onError);
+            return next.done ? value :
+                (!value || typeof value.then !== 'function' ?
+                    Array.isArray(value) ? awaitAll(value, 0) : onSuccess(value) :
+                    value.then(onSuccess, onError));
         }
     }
 
-    try {
-        return step(callNext, true)();
-    } catch (e) {
-        return Promise.reject(e);
+    function awaitAll (values, i) {
+        if (i === values.length) return onSuccess(values);
+        var value = values[i];
+        return value.constructor && typeof value.constructor.all == 'function' ?
+            value.constructor.all(values).then(onSuccess, onError) :
+            awaitAll (values, i + 1);
     }
+
+    return step(callNext)();
 }
 
 Dexie.addons.push(function (db) {
     //
-    // Allow db.transaction() to handle iterable functions as async without explicitely having to write async() around the transaction scope func:
-    //
+    // Adjust db.transaction() to handle iterable functions as async without explicitely having to write async() around the transaction scope func:
     //  db.transaction('rw', db.friends, async(function*(){})); - not needed.
     //  db.transaction('rw', db.friends, function*(){}); // prettier.
     //
