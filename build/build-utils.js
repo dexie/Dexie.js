@@ -24,34 +24,33 @@ function gzip(source, destination) {
 function babelTransform(source, destination) {
     return new Promise((resolve, reject) => {
         var options = {
-            //sourceMaps: true,
-            //inputSourceMap: inSourceMap,
             compact: false,
             comments: true,
             //presets: ["es2015"],
             plugins: [
+                //
+                // Select which plugins from "babel-preset-es2015" that we want:
+                //
                 "transform-es2015-arrow-functions",
                 "transform-es2015-block-scoped-functions",
                 "transform-es2015-block-scoping",
                 "transform-es2015-classes",
                 "transform-es2015-computed-properties",
                 "transform-es2015-constants",
-                //"transform-es2015-destructuring",
-                //"transform-es2015-for-of",
-                //"transform-es2015-function-name",
+                "transform-es2015-destructuring",
+                "transform-es2015-for-of",
+                //"transform-es2015-function-name",         // Slightly increases the code size, but could improve debugging experience a bit.
                 "transform-es2015-literals",
-                //"transform-es2015-modules-commonjs"  Replaced with "es2015-modules-umd"!
+                //"transform-es2015-modules-commonjs"       // Let rollup fix the moduling instead.
                 "transform-es2015-object-super",
                 "transform-es2015-parameters",
                 "transform-es2015-shorthand-properties",
                 "transform-es2015-spread",
-                //"transform-es2015-sticky-regex",
+                "transform-es2015-sticky-regex",
                 "transform-es2015-template-literals",
-                //"transform-es2015-typeof-symbol",
-                //"transform-es2015-unicode-regex",
-                "transform-regenerator",
-                //"transform-es2015-modules-systemjs"
-                //"transform-es2015-modules-umd",
+                //"transform-es2015-typeof-symbol",         // Bloats our code because each time typeof x === 'object' is checked, it needs to polyfill stuff.
+                //"transform-es2015-unicode-regex",         // Wont be needed.
+                "transform-regenerator"
             ]
         };
         babel.transformFile(source, options, (err, result) => {
@@ -150,6 +149,12 @@ function throttle(millisecs, cb) {
 function build(version, files, options) {
     if (!options) options = {};
     try { fs.mkdirSync("tmp"); } catch (e) { }
+
+    var varsToReplace = {
+        "{version}": version,
+        "{date}": new Date().toDateString()
+    };
+
     return Promise.all(files.map(file => babelTransform("src/" + file, "tmp/" + file)))
     .then(() =>rollup.rollup({ entry: "tmp/Dexie.js" }))
 
@@ -161,8 +166,8 @@ function build(version, files, options) {
         moduleName: "Dexie"
     }))
 
-    // Replace {version}
-    .then(() => replaceInFile("dist/dexie.js", { "{version}": version }))
+    // Replace {version} and {date}
+    .then(() => replaceInFile("dist/dexie.js", varsToReplace))
 
     // Optional build steps goes here:
     .then(() => {
@@ -175,7 +180,7 @@ function build(version, files, options) {
                     dest: 'dist/dexie.es6.js',
                     sourceMap: true
                 }))
-                .then(() => replaceInFile("dist/dexie.es6.js", { "{version}": version }));
+                .then(() => replaceInFile("dist/dexie.es6.js", varsToReplace));
         }
     })
     .then(() => {
