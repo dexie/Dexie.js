@@ -1,30 +1,42 @@
-/* A Minimalistic Wrapper for IndexedDB
-====================================
+var keys = Object.keys;
+var isArray = Array.isArray;
 
-By David Fahlander, david.fahlander@gmail.com
+function extend(obj, extension) {
+    if (typeof extension !== 'object') extension = extension(); // Allow to supply a function returning the extension. Useful for simplifying private scopes.
+    keys(extension).forEach(function (key) {
+        obj[key] = extension[key];
+    });
+    return obj;
+}
 
-Version {version}
+function derive(Child) {
+    return {
+        from: function (Parent) {
+            Child.prototype = Object.create(Parent.prototype);
+            Child.prototype.constructor = Child;
+            return {
+                extend: function (extension) {
+                    extend(Child.prototype, typeof extension !== 'object' ? extension(Parent.prototype) : extension);
+                }
+            };
+        }
+    };
+}
 
-Official Website: www.dexie.com
+var _slice = [].slice;
+function slice(args, start, end) {
+    return _slice.call(args, start, end);
+}
 
-Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
-
-*/
-
-import {
-    keys,
-    isArray,
-    extend,
-    derive,
-    slice,
-    override
-} from './utils';
+function override(origFunc, overridedFactory) {
+    return overridedFactory(origFunc);
+}
 
 if (typeof global === 'undefined') {
     var global = self || window; 
 }
 
-export default function Dexie(dbName, options) {
+function Dexie(dbName, options) {
     /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
     var addons = (options && options.addons) || Dexie.addons;
     // Resolve all external dependencies:
@@ -3380,7 +3392,7 @@ Dexie.dependencies = {
 }; 
 
 // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-Dexie.semVer = "{version}";
+Dexie.semVer = "1.3.0";
 Dexie.version = Dexie.semVer.split('.')
     .map(n => parseInt(n))
     .reduce((p,c,i) => p + (c/Math.pow(10,i*2)));
@@ -3396,3 +3408,6 @@ doFakeAutoComplete(function() {
     Dexie.fakeAutoComplete = fakeAutoComplete = doFakeAutoComplete;
     Dexie.fake = fake = true;
 });
+
+export default Dexie;
+//# sourceMappingURL=dexie.es6.js.map

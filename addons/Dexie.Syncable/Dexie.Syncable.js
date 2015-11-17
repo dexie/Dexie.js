@@ -1,4 +1,4 @@
-/// <reference path="../../../src/Dexie.js" />
+/// <reference path="../../../dist/dexie.js" />
 /// <reference path="../Dexie.Observable/Dexie.Observable.js" />
 /// <reference path="Dexie.Syncable.SyncProtocolAPI.js" />
 /*

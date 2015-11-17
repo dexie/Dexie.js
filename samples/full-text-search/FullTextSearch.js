@@ -1,4 +1,4 @@
-﻿    ///<reference path="../src/Dexie.js" />
+﻿    ///<reference path="../dist/dexie.js" />
 
     /*
         This example is a simple implementation of full-text search based on multi-valued indexes and Dexie hooks.

@@ -1,4 +1,4 @@
-﻿/// <reference path="../../src/Dexie.js" />
+﻿/// <reference path="../../dist/dexie.js" />
 /// <reference path="../../addons/Dexie.Syncable.js" />
 /// <reference path="../../addons/Dexie.Syncable.Remote.js" />
 /// <reference path="../../addons/Dexie.Syncable.Remote.SyncProtocolAPI.js" />

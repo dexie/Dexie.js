@@ -4,24 +4,25 @@
     global.Dexie = factory();
 }(this, function () { 'use strict';
 
-    var keys$1 = keys$1 = Object.keys;
+    var keys = Object.keys;
+    var isArray = Array.isArray;
 
-    function extend$1(obj, extension) {
+    function extend(obj, extension) {
         if (typeof extension !== 'object') extension = extension(); // Allow to supply a function returning the extension. Useful for simplifying private scopes.
-        keys$1(extension).forEach(function (key) {
+        keys(extension).forEach(function (key) {
             obj[key] = extension[key];
         });
         return obj;
     }
 
-    function derive$1(Child) {
+    function derive(Child) {
         return {
             from: function (Parent) {
                 Child.prototype = Object.create(Parent.prototype);
                 Child.prototype.constructor = Child;
                 return {
                     extend: function (extension) {
-                        extend$1(Child.prototype, typeof extension !== 'object' ? extension(Parent.prototype) : extension);
+                        extend(Child.prototype, typeof extension !== 'object' ? extension(Parent.prototype) : extension);
                     }
                 };
             }
@@ -29,21 +30,14 @@
     }
 
     var _slice = [].slice;
-
-    function slice$1(args, start, end) {
+    function slice(args, start, end) {
         return _slice.call(args, start, end);
     }
 
-    function override$1(origFunc, overridedFactory) {
+    function override(origFunc, overridedFactory) {
         return overridedFactory(origFunc);
     }
 
-    var isArray = Array.isArray;
-    var keys = Object.keys;
-    var extend = extend$1;
-    var derive = derive$1;
-    var slice = slice$1;
-    var override = override$1;
     if (typeof global === 'undefined') {
         var global = self || window;
     }
