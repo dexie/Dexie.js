@@ -1,6 +1,3 @@
-//var fs = require('fs');
-//var rollup = require('rollup');
-//var uglify = require("uglify-js");
 var utils = require('./build-utils');
 
 console.log("Building...");
