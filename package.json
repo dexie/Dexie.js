@@ -2,8 +2,8 @@
   "name": "dexie",
   "version": "1.3.0",
   "description": "A Minimalistic Wrapper for IndexedDB",
-  "main": "dist/Dexie.js",
-  "jsnext:main": "dist/Dexie.es6.js",
+  "main": "dist/dexie.js",
+  "jsnext:main": "dist/dexie.es6.js",
   "typings": "dist/Dexie.d.ts",
   "repository": {
     "type": "git",
@@ -34,8 +34,6 @@
 
   "devDependencies": {
     "babel-core": "^6.1.4",
-    "babel-plugin-transform-es2015-modules-systemjs": "^6.1.4",
-    "babel-plugin-transform-es2015-modules-umd": "^6.1.4",
     "babel-preset-es2015": "^6.1.4",
 
     "qunit": "^0.7.7",

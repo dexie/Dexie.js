@@ -1,4 +1,4 @@
-﻿///<reference path="../src/Dexie.js" />
+﻿///<reference path="../dist/dexie.js" />
 
 /*
     This example is an implementation of full-text search based hook ("creating") and hook("updating").

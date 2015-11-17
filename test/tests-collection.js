@@ -1,4 +1,4 @@
-﻿///<reference path="../src/Dexie.js" />
+﻿///<reference path="../dist/dexie.js" />
 ///<reference path="qunit.js" />
 ///<reference path="dexie-unittest-utils.js" />
 

@@ -1,5 +1,6 @@
 ﻿
-var keys = keys = Object.keys;
+export var keys = Object.keys;
+export var isArray = Array.isArray;
 
 export function extend(obj, extension) {
     if (typeof extension !== 'object') extension = extension(); // Allow to supply a function returning the extension. Useful for simplifying private scopes.
@@ -24,7 +25,6 @@ export function derive(Child) {
 }
 
 var _slice = [].slice;
-
 export function slice(args, start, end) {
     return _slice.call(args, start, end);
 }

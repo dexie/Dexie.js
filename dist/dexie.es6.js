@@ -1,30 +1,42 @@
-/* A Minimalistic Wrapper for IndexedDB
-====================================
+var keys = Object.keys;
+var isArray = Array.isArray;
 
-By David Fahlander, david.fahlander@gmail.com
+function extend(obj, extension) {
+    if (typeof extension !== 'object') extension = extension(); // Allow to supply a function returning the extension. Useful for simplifying private scopes.
+    keys(extension).forEach(function (key) {
+        obj[key] = extension[key];
+    });
+    return obj;
+}
 
-Version {version}
+function derive(Child) {
+    return {
+        from: function (Parent) {
+            Child.prototype = Object.create(Parent.prototype);
+            Child.prototype.constructor = Child;
+            return {
+                extend: function (extension) {
+                    extend(Child.prototype, typeof extension !== 'object' ? extension(Parent.prototype) : extension);
+                }
+            };
+        }
+    };
+}
 
-Official Website: www.dexie.com
+var _slice = [].slice;
+function slice(args, start, end) {
+    return _slice.call(args, start, end);
+}
 
-Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
-
-*/
-
-import {
-    keys,
-    isArray,
-    extend,
-    derive,
-    slice,
-    override
-} from './utils';
+function override(origFunc, overridedFactory) {
+    return overridedFactory(origFunc);
+}
 
 if (typeof global === 'undefined') {
     var global = self || window; 
 }
 
-export default function Dexie(dbName, options) {
+function Dexie(dbName, options) {
     /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
     var addons = (options && options.addons) || Dexie.addons;
     // Resolve all external dependencies:
@@ -462,8 +474,12 @@ export default function Dexie(dbName, options) {
             var req, dbWasCreated = false;
             function openError(err) {
                 try { req.transaction.abort(); } catch (e) { }
-                    if (idbdb) try { idbdb.close(); } catch (e) { }
-                    idbdb = null;
+                /*if (dbWasCreated) {
+                    // Workaround for issue with some browsers. Seem not to be needed though.
+                    // Unit test "Issue#100 - not all indexes are created" works without it on chrome,FF,opera and IE.
+                    idbdb.close();
+                    indexedDB.deleteDatabase(db.name); 
+                }*/
                 isBeingOpened = false;
                 dbOpenError = err;
                 db_is_blocked = false;
@@ -516,14 +532,8 @@ export default function Dexie(dbName, options) {
                     isBeingOpened = false;
                     idbdb = req.result;
                     if (autoSchema) readGlobalSchema();
-                        else if (idbdb.objectStoreNames.length > 0) {
-                            try {
+                    else if (idbdb.objectStoreNames.length > 0)
                         adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
-                            } catch (e) {
-                                // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
-                            }
-                        }
-
                     idbdb.onversionchange = db.on("versionchange").fire; // Not firing it here, just setting the function callback to any registered subscriber.
                     if (!hasNativeGetDatabaseNames) {
                         // Update localStorage with list of database names
@@ -1118,7 +1128,7 @@ export default function Dexie(dbName, options) {
                                 key = keyToUse;
                         }
                     }
-                        var req = key !== undefined ? idbstore.add(obj, key) : idbstore.add(obj);
+                    var req = key ? idbstore.add(obj, key) : idbstore.add(obj);
                     req.onerror = eventRejectHandler(function (e) {
                         if (thisCtx.onerror)
                             Promise.newPSD(function () {
@@ -1185,7 +1195,7 @@ export default function Dexie(dbName, options) {
                 } else {
                     // Use the standard IDB put() method.
                     return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
-                            var req = key !== undefined ? idbstore.put(obj, key) : idbstore.put(obj);
+                        var req = key ? idbstore.put(obj, key) : idbstore.put(obj);
                         req.onerror = eventRejectHandler(reject, ["putting", obj, "into", self.name]);
                         req.onsuccess = function (ev) {
                             var keyPath = idbstore.keyPath;
@@ -1366,7 +1376,7 @@ export default function Dexie(dbName, options) {
                         try {
                             fn(resolve, reject, self);
                         } catch (e) {
-                                // Direct exception happened when doing operation.
+                            // Direct exception happened when doin operation.
                             // We must immediately fire the error and abort the transaction.
                             // When this happens we are still constructing the Promise so we don't yet know
                             // whether the caller is about to catch() the error or not. Have to make
@@ -1374,13 +1384,8 @@ export default function Dexie(dbName, options) {
                             // This is a limitation we have to live with.
                             Dexie.ignoreTransaction(function () { self.on('error').fire(e); });
                             self.abort();
-                                // Make sure to include a call stack in the exception. Needed in IE and Edge.
-                                try {
-                                    throw new Error(e);
-                                } catch (e2) {
-                                    reject(e2);
+                            reject(e);
                         }
-                            }
                     }) : Promise.reject(stack(new Error("Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
                     if (self.active && bWriteLock) p.finally(function () {
                         self._unlock();
@@ -1728,12 +1733,8 @@ export default function Dexie(dbName, options) {
         if (keyRangeGenerator) try {
             keyRange = keyRangeGenerator();
         } catch (ex) {
-                try {
-                    throw new Error(ex); // Rethrowing to get a callstack with the error. Needed in IE and Edge.
-                } catch (ex2) {
-                    error = ex2;
+            error = ex;
         }
-            }
 
         var whereCtx = whereClause._ctx;
         this._ctx = {
@@ -3009,7 +3010,6 @@ function getByKeyPath(obj, keyPath) {
 
 function setByKeyPath(obj, keyPath, value) {
     if (!obj || keyPath === undefined) return;
-        if ('isFrozen' in Object && Object.isFrozen(obj)) return;
     if (typeof keyPath !== 'string' && 'length' in keyPath) {
         assert(typeof value !== 'string' && 'length' in value);
         for (var i = 0, l = keyPath.length; i < l; ++i) {
@@ -3392,7 +3392,7 @@ Dexie.dependencies = {
 }; 
 
 // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-Dexie.semVer = "{version}";
+Dexie.semVer = "1.3.0";
 Dexie.version = Dexie.semVer.split('.')
     .map(n => parseInt(n))
     .reduce((p,c,i) => p + (c/Math.pow(10,i*2)));
@@ -3408,3 +3408,6 @@ doFakeAutoComplete(function() {
     Dexie.fakeAutoComplete = fakeAutoComplete = doFakeAutoComplete;
     Dexie.fake = fake = true;
 });
+
+export default Dexie;
+//# sourceMappingURL=dexie.es6.js.map

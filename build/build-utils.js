@@ -1,5 +1,8 @@
 ﻿var fs = require('fs');
+var rollup = require('rollup');
+var uglify = require("uglify-js");
 var babel = require('babel-core');
+var zlib = require('zlib');
 
 function listSourceFiles() {
     return new Promise((resolve, reject) => {
@@ -10,6 +13,12 @@ function listSourceFiles() {
                 resolve(files.filter(f=>f.toLowerCase().endsWith('.js')));
         });
     });
+}
+
+function gzip(source, destination) {
+    return readFile(source).then(content => new Promise((resolve, reject) =>
+        zlib.gzip(content, (err, data) => err ? reject(err) : resolve(data))
+    )).then(gzipped => writeFile(destination, gzipped));
 }
 
 function babelTransform(source, destination) {
@@ -112,17 +121,91 @@ function replaceInFile(filename, replacements) {
 function throttle(millisecs, cb) {
     var tHandle = null;
     var calls = [];
+    var ongoingCallback = false;
 
     function onTimeout() {
         tHandle = null;
-        cb(calls);
+        ongoingCallback = false;
+        var callsClone = calls.slice(0);
+        calls = [];
+        if (callsClone.length === 0) {
+            return;
+        }
+        ongoingCallback = true;
+        Promise.resolve()
+            .then(() => cb(callsClone))
+            .catch(e => console.error(e))
+            .then(onTimeout);
     }
     return function () {
         var args = [].slice.call(arguments);
         calls.push(args);
-        if (tHandle) clearTimeout(tHandle);
-        tHandle = setTimeout(onTimeout, millisecs);
+        if (!ongoingCallback) {
+            if (tHandle) clearTimeout(tHandle);
+            tHandle = setTimeout(onTimeout, millisecs);
+        }
     }
+}
+
+function build(version, files, options) {
+    if (!options) options = {};
+    try { fs.mkdirSync("tmp"); } catch (e) { }
+    return Promise.all(files.map(file => babelTransform("src/" + file, "tmp/" + file)))
+    .then(() =>rollup.rollup({ entry: "tmp/Dexie.js" }))
+
+    // Bundle to ES6 Bundle dist/Dexie.es6.js
+    .then(bundle =>bundle.write({
+        format: 'umd',
+        dest: 'dist/dexie.js',
+        sourceMap: true,
+        moduleName: "Dexie"
+    }))
+
+    // Replace {version}
+    .then(() => replaceInFile("dist/dexie.js", { "{version}": version }))
+
+    // Optional build steps goes here:
+    .then(() => {
+
+        // Rollup ES6 sources to a monolit ES6 output "dexie.es6.js"?
+        if (options.includeES6) {
+            return rollup.rollup({ entry: "src/Dexie.js" }).then(bundle =>
+                bundle.write({
+                    format: 'es6',
+                    dest: 'dist/dexie.es6.js',
+                    sourceMap: true
+                }))
+                .then(() => replaceInFile("dist/dexie.es6.js", { "{version}": version }));
+        }
+    })
+    .then(() => {
+
+        // Output a minified version of the main output (ES5 UMD module "dexie.min.js")
+        if (options.includeMinified) {
+            var result = uglify.minify("dist/dexie.js", {
+                inSourceMap: "dist/dexie.js.map",
+                outSourceMap: "dexie.min.js.map"
+            });
+            return Promise.all([
+                writeFile('dist/dexie.min.js', result.code),
+                writeFile('dist/dexie.min.js.map', result.map)
+            ]);
+        }
+    })
+    .then(() => {
+        if (options.includeGzipped) {
+            return gzip('dist/dexie.min.js', 'dist/dexie.min.js.gz');
+        }
+    })
+    .then(() => {
+
+        // Copy Dexie.d.ts as well?
+        if (options.includeTypings) {
+            return copyFiles({
+                "src/Dexie.d.ts": "dist/dexie.d.ts"
+            });
+        }
+    });
 }
 
 module.exports = {
@@ -135,5 +218,6 @@ module.exports = {
     replaceInFile: replaceInFile,
     throttle: throttle,
     listSourceFiles: listSourceFiles,
-    babelTransform: babelTransform
+    babelTransform: babelTransform,
+    build: build
 };
