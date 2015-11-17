@@ -4,6 +4,17 @@
     global.Dexie = factory();
 }(this, function () { 'use strict';
 
+    /*
+    * Dexie.js - a minimalistic wrapper for IndexedDB
+    * ===============================================
+    *
+    * By David Fahlander, david.fahlander@gmail.com
+    *
+    * Version 1.3.0, Tue Nov 17 2015
+    * www.dexie.com
+    * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
+    */
+
     var keys = Object.keys;
     var isArray = Array.isArray;
 

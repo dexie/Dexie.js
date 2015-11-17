@@ -1,24 +1,15 @@
-/* A Minimalistic Wrapper for IndexedDB
-====================================
+/*
+ * Dexie.js - a minimalistic wrapper for IndexedDB
+ * ===============================================
+ *
+ * By David Fahlander, david.fahlander@gmail.com
+ *
+ * Version {version}, {date}
+ * www.dexie.com
+ * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
+ */
 
-By David Fahlander, david.fahlander@gmail.com
-
-Version {version}
-
-Official Website: www.dexie.com
-
-Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
-
-*/
-
-import {
-    keys,
-    isArray,
-    extend,
-    derive,
-    slice,
-    override
-} from './utils';
+import { keys, isArray, extend, derive, slice, override } from './utils';
 
 if (typeof global === 'undefined') {
     var global = self || window; 
