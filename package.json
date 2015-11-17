@@ -4,7 +4,7 @@
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "jsnext:main": "dist/dexie.es6.js",
-  "typings": "dist/Dexie.d.ts",
+  "typings": "dist/dexie.d.ts",
   "repository": {
     "type": "git",
     "url": "https://github.com/dfahlander/Dexie.js.git"
