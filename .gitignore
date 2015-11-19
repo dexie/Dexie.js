@@ -163,3 +163,5 @@ samples/typescript/console.js
 samples/typescript/console.js.map
 samples/typescript/utils.js
 samples/typescript/utils.js.map
+/.vscode
+/jsconfig.json
