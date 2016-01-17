@@ -2904,6 +2904,7 @@
 
     function setByKeyPath(obj, keyPath, value) {
         if (!obj || keyPath === undefined) return;
+        if ('isFrozen' in Object && Object.isFrozen(obj)) return;
         if (typeof keyPath !== 'string' && 'length' in keyPath) {
             assert(typeof value !== 'string' && 'length' in value);
             for (var i = 0, l = keyPath.length; i < l; ++i) {
