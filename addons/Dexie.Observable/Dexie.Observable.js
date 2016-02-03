@@ -435,7 +435,9 @@
                                 pollHandle = setTimeout(poll, LOCAL_POLL);
                             });
                         });
-                    }).then(cleanup);
+                    }).then(function () {
+                        cleanup();
+                    });
                     //cleanup();
                     //});
                 });
