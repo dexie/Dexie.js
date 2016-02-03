@@ -487,12 +487,8 @@
                 var req, dbWasCreated = false;
                 function openError(err) {
                     try { req.transaction.abort(); } catch (e) { }
-                    /*if (dbWasCreated) {
-                        // Workaround for issue with some browsers. Seem not to be needed though.
-                        // Unit test "Issue#100 - not all indexes are created" works without it on chrome,FF,opera and IE.
-                        idbdb.close();
-                        indexedDB.deleteDatabase(db.name); 
-                    }*/
+                    if (idbdb) try { idbdb.close(); } catch (e) { }
+                    idbdb = null;
                     isBeingOpened = false;
                     dbOpenError = err;
                     db_is_blocked = false;
@@ -545,8 +541,14 @@
                         isBeingOpened = false;
                         idbdb = req.result;
                         if (autoSchema) readGlobalSchema();
-                        else if (idbdb.objectStoreNames.length > 0)
-                            adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
+                        else if (idbdb.objectStoreNames.length > 0) {
+                            try {
+                                adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
+                            } catch (e) {
+                                // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
+                            }
+                        }
+
                         idbdb.onversionchange = db.on("versionchange").fire; // Not firing it here, just setting the function callback to any registered subscriber.
                         if (!hasNativeGetDatabaseNames) {
                             // Update localStorage with list of database names
