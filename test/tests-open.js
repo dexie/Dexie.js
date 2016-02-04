@@ -244,6 +244,12 @@ asyncTest("Issue #76 Dexie inside Web Worker", function () {
             break;
         }
     }
+
+    worker.onerror = function(e) {
+        worker.terminate();
+        ok(false, "Worker errored: " + e.message);
+        start();
+    };
 });
 
 asyncTest("Issue#100 - not all indexes are created", function () {
@@ -285,7 +291,7 @@ asyncTest("Issue#100 - not all indexes are created", function () {
         // it should not exist when failed to open.
         db.close();
         db = new Dexie("TestDB");
-        return db.open(); 
+        return db.open();
     }).then(function() {
         ok(false, "Should not succeed to open the database. It should not have been created.");
         equal(db.tables.length, 0, "At least expect no tables to have been created on the database");

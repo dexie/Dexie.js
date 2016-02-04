@@ -18,5 +18,22 @@
   "bugs": {
     "url": "https://github.com/dfahlander/Dexie.js/issues"
   },
-  "homepage": "http://www.dexie.org"
+  "homepage": "http://www.dexie.org",
+
+  "scripts": {
+    "test": "node_modules/.bin/karma start karma.conf.js --single-run --browsers Chrome",
+    "test:debug": "node_modules/.bin/karma start karma.conf.js --browsers Chrome"
+  },
+
+  "engines": {
+    "node": ">=4.2 <5.0"
+  },
+
+  "devDependencies": {
+    "qunit": "^0.7.7",
+    "karma": "^0.13.19",
+    "karma-qunit": "^0.1.9",
+    "karma-mocha-reporter": "^1.1.5",
+    "karma-chrome-launcher": "^0.2.2"
+  }
 }
