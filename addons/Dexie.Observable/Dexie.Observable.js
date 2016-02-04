@@ -435,7 +435,9 @@
                                 pollHandle = setTimeout(poll, LOCAL_POLL);
                             });
                         });
-                    }).then(cleanup);
+                    }).then(function () {
+                        cleanup();
+                    });
                     //cleanup();
                     //});
                 });
@@ -620,7 +622,7 @@
                 Dexie.extend(msg, options); // wantReply: wantReply, success: !isFailure, requestId: ...
                 var tables = ["_intercomm"];
                 if (options.wantReply) tables.push("_syncNodes"); // If caller wants a reply, include "_syncNodes" in transaction to check that there's a reciever there. Otherwise, new master will get it.
-                return db.transaction('rw', tables, function() {
+                return db.transaction('rw?', tables, function() {
                     if (options.wantReply) {
                         // Check that there is a reciever there to take the request.
                         return db._syncNodes.where('id').equals(destinationNode).count(function(recieverAlive) {

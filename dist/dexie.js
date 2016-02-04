@@ -10,7 +10,7 @@
     *
     * By David Fahlander, david.fahlander@gmail.com
     *
-    * Version 1.3.0, Tue Nov 17 2015
+    * Version 1.3.0, Thu Feb 04 2016
     * www.dexie.com
     * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
     */
@@ -520,12 +520,10 @@
                     try {
                         req.transaction.abort();
                     } catch (e) {}
-                    /*if (dbWasCreated) {
-                        // Workaround for issue with some browsers. Seem not to be needed though.
-                        // Unit test "Issue#100 - not all indexes are created" works without it on chrome,FF,opera and IE.
+                    if (idbdb) try {
                         idbdb.close();
-                        indexedDB.deleteDatabase(db.name); 
-                    }*/
+                    } catch (e) {}
+                    idbdb = null;
                     isBeingOpened = false;
                     dbOpenError = err;
                     db_is_blocked = false;
@@ -580,7 +578,14 @@
                     req.onsuccess = trycatch(function (e) {
                         isBeingOpened = false;
                         idbdb = req.result;
-                        if (autoSchema) readGlobalSchema();else if (idbdb.objectStoreNames.length > 0) adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
+                        if (autoSchema) readGlobalSchema();else if (idbdb.objectStoreNames.length > 0) {
+                            try {
+                                adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
+                            } catch (e) {
+                                // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
+                            }
+                        }
+
                         idbdb.onversionchange = db.on("versionchange").fire; // Not firing it here, just setting the function callback to any registered subscriber.
                         if (!hasNativeGetDatabaseNames) {
                             // Update localStorage with list of database names
@@ -1039,8 +1044,9 @@
                         // Create a new object that derives from constructor:
                         var res = Object.create(constructor.prototype);
                         // Clone members:
-                        for (var m in obj) if (obj.hasOwnProperty(m)) res[m] = obj[m];
-                        return res;
+                        for (var m in obj) {
+                            if (obj.hasOwnProperty(m)) res[m] = obj[m];
+                        }return res;
                     };
 
                     if (this.schema.readHook) {
@@ -2544,7 +2550,7 @@
     // Also, the event new Promise().onuncatched is called in case no one catches a reject call. This is used for us to manually bubble any request
     // errors to the transaction. We must not rely on IndexedDB implementation to do this, because it only does so when the source of the rejection
     // is an error event on a request, not in case an ordinary exception is thrown.
-    var Promise = (function () {
+    var Promise = function () {
 
         // The use of asap in handle() is remarked because we must NOT use setTimeout(fn,0) because it causes premature commit of indexedDB transactions - which is according to indexedDB specification.
         var _asap = global.setImmediate || function (fn) {
@@ -2644,8 +2650,9 @@
                 Promise.PSD = outerPSD;
                 if (isRootExec) {
                     do {
-                        while (operationsQueue.length > 0) executeOperationsQueue();
-                        var finalizer = tickFinalizers.pop();
+                        while (operationsQueue.length > 0) {
+                            executeOperationsQueue();
+                        }var finalizer = tickFinalizers.pop();
                         if (finalizer) try {
                             finalizer();
                         } catch (e) {}
@@ -2665,8 +2672,9 @@
             } finally {
                 if (isRootExec) {
                     do {
-                        while (operationsQueue.length > 0) executeOperationsQueue();
-                        var finalizer = tickFinalizers.pop();
+                        while (operationsQueue.length > 0) {
+                            executeOperationsQueue();
+                        }var finalizer = tickFinalizers.pop();
                         if (finalizer) try {
                             finalizer();
                         } catch (e) {}
@@ -2887,7 +2895,7 @@
         };
 
         return Promise;
-    })();
+    }();
 
     //
     //
@@ -3142,6 +3150,7 @@
 
     function setByKeyPath(obj, keyPath, value) {
         if (!obj || keyPath === undefined) return;
+        if ('isFrozen' in Object && Object.isFrozen(obj)) return;
         if (typeof keyPath !== 'string' && 'length' in keyPath) {
             assert(typeof value !== 'string' && 'length' in value);
             for (var i = 0, l = keyPath.length; i < l; ++i) {
@@ -3152,7 +3161,9 @@
             if (period !== -1) {
                 var currentKeyPath = keyPath.substr(0, period);
                 var remainingKeyPath = keyPath.substr(period + 1);
-                if (remainingKeyPath === "") if (value === undefined) delete obj[currentKeyPath];else obj[currentKeyPath] = value;else {
+                if (remainingKeyPath === "") {
+                    if (value === undefined) delete obj[currentKeyPath];else obj[currentKeyPath] = value;
+                } else {
                     var innerObj = obj[currentKeyPath];
                     if (!innerObj) innerObj = obj[currentKeyPath] = {};
                     setByKeyPath(innerObj, remainingKeyPath, value);
@@ -3205,14 +3216,16 @@
         // and not "somePropsObject.x". This is acceptable and true but could be optimized to support nestled changes if that would give a
         // big optimization benefit.
         var rv = {};
-        for (var prop in a) if (a.hasOwnProperty(prop)) {
-            if (!b.hasOwnProperty(prop)) rv[prop] = undefined; // Property removed
-            else if (a[prop] !== b[prop] && JSON.stringify(a[prop]) != JSON.stringify(b[prop])) rv[prop] = b[prop]; // Property changed
-        }
-        for (var prop in b) if (b.hasOwnProperty(prop) && !a.hasOwnProperty(prop)) {
-            rv[prop] = b[prop]; // Property added
-        }
-        return rv;
+        for (var prop in a) {
+            if (a.hasOwnProperty(prop)) {
+                if (!b.hasOwnProperty(prop)) rv[prop] = undefined; // Property removed
+                else if (a[prop] !== b[prop] && JSON.stringify(a[prop]) != JSON.stringify(b[prop])) rv[prop] = b[prop]; // Property changed
+            }
+        }for (var prop in b) {
+            if (b.hasOwnProperty(prop) && !a.hasOwnProperty(prop)) {
+                rv[prop] = b[prop]; // Property added
+            }
+        }return rv;
     }
 
     function parseType(type) {

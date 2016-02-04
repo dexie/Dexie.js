@@ -245,24 +245,26 @@
                         if (!url) throw new Error("Url cannot be empty");
                         // Returning a promise from transaction scope will make the transaction promise resolve with the value of that promise.
 
-                        //
-                        // PersistedContext : IPersistedContext
-                        //
-                        function PersistedContext(nodeID) {
-                            this.nodeID = nodeID;
-                        }
-
-                        PersistedContext.prototype.save = function () {
-                            // Store this instance in the syncContext property of the node it belongs to.
-                            return Dexie.vip(function () {
-                                return node.save();
-                            });
-                        };
 
                         return db._syncNodes.where("url").equalsIgnoreCase(url).first(function(node) {
+                            //
+                            // PersistedContext : IPersistedContext
+                            //
+                            function PersistedContext(nodeID, otherProps) {
+                                this.nodeID = nodeID;
+                                if (otherProps) Dexie.extend(this, otherProps);
+                            }
+
+                            PersistedContext.prototype.save = function () {
+                                // Store this instance in the syncContext property of the node it belongs to.
+                                return Dexie.vip(function () {
+                                    return node.save();
+                                });
+                            };
+
                             if (node) {
                                 // Node already there. Make syncContext become an instance of PersistedContext:
-                                node.syncContext = Dexie.extend(new PersistedContext(node.id), node.syncContext);
+                                node.syncContext = new PersistedContext(node.id, node.syncContext);
                                 node.syncProtocol = protocolName; // In case it was changed (would be very strange but...) could happen...
                                 db._syncNodes.put(node);
                             } else {

@@ -162,7 +162,12 @@ samples/typescript/appdb.js.map
 samples/typescript/console.js
 samples/typescript/console.js.map
 samples/typescript/utils.js
+<<<<<<< HEAD
 samples/typescript/utils.js.map
 /.vscode
 /jsconfig.json
+=======
+samples/typescript/utils.js.map
 
+node_modules/
+>>>>>>> aab3f8a5096720f3805c63043328d3923bd1cd5f
