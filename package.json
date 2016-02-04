@@ -31,6 +31,7 @@
 
   "devDependencies": {
     "qunit": "^0.7.7",
+    "qunitjs": "^1.14.0",
     "karma": "^0.13.19",
     "karma-qunit": "^0.1.9",
     "karma-mocha-reporter": "^1.1.5",
