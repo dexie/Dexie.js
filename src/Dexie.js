@@ -1374,15 +1374,28 @@ export default function Dexie(dbName, options) {
                                     reject(e2);
                         }
                             }
-                    }) : Promise.reject(stack(new Error("Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
-                    if (self.active && bWriteLock) p.finally(function () {
-                        self._unlock();
-                    });
-                } else {
-                    // Transaction is write-locked. Wait for mutex.
-                    p = new Promise(function (resolve, reject) {
-                        self._blockedFuncs.push(function () {
-                            self._promise(mode, fn, bWriteLock).then(resolve, reject);
+                            if (bWriteLock) self._lock(); // Write lock if write operation is requested
+                            try {
+                                fn(resolve, reject, self);
+                            } catch (e) {
+                                // Direct exception happened when doing operation.
+                                // We must immediately fire the error and abort the transaction.
+                                // When this happens we are still constructing the Promise so we don't yet know
+                                // whether the caller is about to catch() the error or not. Have to make
+                                // transaction fail. Catching such an error wont stop transaction from failing.
+                                // This is a limitation we have to live with.
+                                Dexie.ignoreTransaction(function() { self.on('error').fire(e); });
+                                self.abort();
+                                // Make sure to include a call stack in the exception. Needed in IE and Edge.
+                                try {
+                                    throw new Error(e);
+                                } catch (e2) {
+                                    reject(e2);
+                                }
+                            }
+                        }) : Promise.reject(stack(new Error("Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
+                        if (self.active && bWriteLock) p.finally(function () {
+                            self._unlock();
                         });
                     });
                 }
@@ -1704,28 +1717,28 @@ export default function Dexie(dbName, options) {
 
 
 
-    //
-    //
-    //
-    // Collection Class
-    //
-    //
-    //
-    function Collection(whereClause, keyRangeGenerator) {
-        /// <summary>
-        /// 
-        /// </summary>
-        /// <param name="whereClause" type="WhereClause">Where clause instance</param>
-        /// <param name="keyRangeGenerator" value="function(){ return IDBKeyRange.bound(0,1);}" optional="true"></param>
-        var keyRange = null, error = null;
-        if (keyRangeGenerator) try {
-            keyRange = keyRangeGenerator();
-        } catch (ex) {
+        //
+        //
+        //
+        // Collection Class
+        //
+        //
+        //
+        function Collection(whereClause, keyRangeGenerator) {
+            /// <summary>
+            /// 
+            /// </summary>
+            /// <param name="whereClause" type="WhereClause">Where clause instance</param>
+            /// <param name="keyRangeGenerator" value="function(){ return IDBKeyRange.bound(0,1);}" optional="true"></param>
+            var keyRange = null, error = null;
+            if (keyRangeGenerator) try {
+                keyRange = keyRangeGenerator();
+            } catch (ex) {
                 try {
                     throw new Error(ex); // Rethrowing to get a callstack with the error. Needed in IE and Edge.
                 } catch (ex2) {
                     error = ex2;
-        }
+                }
             }
 
         var whereCtx = whereClause._ctx;
