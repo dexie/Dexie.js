@@ -1,11 +1,11 @@
 ﻿/// <reference path="require.js" />
 require.config({
     paths: {
-        "Dexie": "../../../src/Dexie"
+        "dexie": "../../../dist/dexie"
     }
 });
 
-requirejs(['Dexie', './console', './db', './Contact'], function (Dexie, console, db, Contact) {
+requirejs(['dexie', './console', './db', './Contact'], function (Dexie, console, db, Contact) {
 
     db.transaction('r', db.contacts, db.phones, db.emails, function () {
         
