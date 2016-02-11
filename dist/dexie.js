@@ -10,7 +10,7 @@
     *
     * By David Fahlander, david.fahlander@gmail.com
     *
-    * Version 1.3.0, Thu Feb 04 2016
+    * Version 1.3.0, Thu Feb 11 2016
     * www.dexie.com
     * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
     */
@@ -1436,7 +1436,7 @@
                             try {
                                 fn(resolve, reject, self);
                             } catch (e) {
-                                // Direct exception happened when doin operation.
+                                // Direct exception happened when doing operation.
                                 // We must immediately fire the error and abort the transaction.
                                 // When this happens we are still constructing the Promise so we don't yet know
                                 // whether the caller is about to catch() the error or not. Have to make
@@ -1446,7 +1446,12 @@
                                     self.on('error').fire(e);
                                 });
                                 self.abort();
-                                reject(e);
+                                // Make sure to include a call stack in the exception. Needed in IE and Edge.
+                                try {
+                                    throw new Error(e);
+                                } catch (e2) {
+                                    reject(e2);
+                                }
                             }
                         }) : Promise.reject(stack(new Error("Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
                         if (self.active && bWriteLock) p.finally(function () {
@@ -1852,7 +1857,11 @@
             if (keyRangeGenerator) try {
                 keyRange = keyRangeGenerator();
             } catch (ex) {
-                error = ex;
+                try {
+                    throw new Error(ex); // Rethrowing to get a callstack with the error. Needed in IE and Edge.
+                } catch (ex2) {
+                    error = ex2;
+                }
             }
 
             var whereCtx = whereClause._ctx;
