@@ -1186,7 +1186,7 @@
                                 if (idbstore.keyPath) setByKeyPath(obj, idbstore.keyPath, keyToUse);else key = keyToUse;
                             }
                         }
-                        var req = key ? idbstore.add(obj, key) : idbstore.add(obj);
+                        var req = key !== undefined ? idbstore.add(obj, key) : idbstore.add(obj);
                         req.onerror = eventRejectHandler(function (e) {
                             if (thisCtx.onerror) Promise.newPSD(function () {
                                 Promise.PSD.trans = trans;
@@ -1251,7 +1251,7 @@
                     } else {
                         // Use the standard IDB put() method.
                         return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
-                            var req = key ? idbstore.put(obj, key) : idbstore.put(obj);
+                            var req = key !== undefined ? idbstore.put(obj, key) : idbstore.put(obj);
                             req.onerror = eventRejectHandler(reject, ["putting", obj, "into", self.name]);
                             req.onsuccess = function (ev) {
                                 var keyPath = idbstore.keyPath;
