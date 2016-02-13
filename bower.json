@@ -5,11 +5,12 @@
     "David Fahlander"
   ],
   "description": "Minimalistic IndexedDB API with bullet proof transactions",
-  "main": "dist/latest/Dexie.min.js",
+  "main": "dist/dexie.min.js",
   "moduleType": [
     "amd",
-    "globals",
-    "node"
+    "es6",
+    "node",
+    "globals"
   ],
   "keywords": [
     "indexeddb",

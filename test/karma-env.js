@@ -1,3 +1,3 @@
 QUnit.config.autostart = false;
-window.workerImports = ['../src/Dexie.js'];
+window.workerImports = ['../dist/dexie.min.js'];
 window.workerSource = 'base/test/worker.js';

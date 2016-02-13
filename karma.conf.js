@@ -17,7 +17,7 @@ module.exports = function(config) {
     files: [
       'test/qunit.js',
       'test/karma-env.js',
-      'src/*.js',
+      'dist/dexie.min.js',
       'test/dexie-unittest-utils.js',
       'test/tests-extendability.js',
       'test/tests-promise.js',

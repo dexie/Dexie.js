@@ -1,4 +1,4 @@
-﻿/// <reference path="../../src/Dexie.js" />
+﻿/// <reference path="../../dist/dexie.js" />
 /// <reference path="../../addons/Dexie.Observable/Dexie.Observable.js" />
 /// <reference path="https://code.jquery.com/jquery-2.1.1.js" />
 

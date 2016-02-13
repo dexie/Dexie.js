@@ -1,5 +1,5 @@
 ﻿///<reference path="qunit.js" />
-///<reference path="../src/Dexie.js" />
+///<reference path="../dist/dexie.js" />
 
 (function () {
     module("upgrading");

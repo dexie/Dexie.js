@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
   "name": "dexie",
   "version": "1.3.0",
@@ -21,24 +22,55 @@
   },
   "scripts": {
     "build": "node --harmony build/build.js",
-    "watch": "node --harmony build/watch.js",
-    "test": "node_modules/.bin/karma start karma.conf.js --single-run --browsers Chrome",
-    "test:debug": "node_modules/.bin/karma start karma.conf.js --browsers Chrome"
-  },
-  "engines": {
-    "node": ">=4.2 <5.0"
+    "watch": "node --harmony build/watch.js"
   },
   "homepage": "http://www.dexie.org",
   "devDependencies": {
-    "qunit": "^0.7.7",
-    "qunitjs": "^1.14.0",
-    "karma": "^0.13.19",
-    "karma-qunit": "^0.1.9",
-    "karma-mocha-reporter": "^1.1.5",
-    "karma-chrome-launcher": "^0.2.2",
     "babel-core": "^6.1.4",
     "babel-preset-es2015": "^6.1.4",
     "rollup": "^0.20.5",
     "uglify-js": "^2.5.0"
   }
 }
+=======
+{
+  "name": "dexie",
+  "version": "1.2.0",
+  "description": "A Minimalistic Wrapper for IndexedDB",
+  "main": "dist/latest/Dexie.js",
+  "typings": "dist/latest/Dexie.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dfahlander/Dexie.js.git"
+  },
+  "keywords": [
+    "indexeddb",
+    "browser",
+    "database"
+  ],
+  "author": "David Fahlander",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/dfahlander/Dexie.js/issues"
+  },
+  "homepage": "http://www.dexie.org",
+
+  "scripts": {
+    "test": "node_modules/.bin/karma start karma.conf.js --single-run --browsers Chrome",
+    "test:debug": "node_modules/.bin/karma start karma.conf.js --browsers Chrome"
+  },
+
+  "engines": {
+    "node": ">=4.2 <5.0"
+  },
+
+  "devDependencies": {
+    "qunit": "^0.7.7",
+    "qunitjs": "^1.14.0",
+    "karma": "^0.13.19",
+    "karma-qunit": "^0.1.9",
+    "karma-mocha-reporter": "^1.1.5",
+    "karma-chrome-launcher": "^0.2.2"
+  }
+}
+>>>>>>> aab3f8a5096720f3805c63043328d3923bd1cd5f
