@@ -10,7 +10,7 @@
     *
     * By David Fahlander, david.fahlander@gmail.com
     *
-    * Version 1.3.0, Thu Feb 11 2016
+    * Version 1.3.0, Wed Feb 24 2016
     * www.dexie.com
     * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
     */
@@ -53,6 +53,15 @@
         var global = self || window;
     }
 
+    var maxString = String.fromCharCode(65535);
+    var maxKey = function () {
+        try {
+            IDBKeyRange.only([[]]);return [[]];
+        } catch (e) {
+            return maxString;
+        }
+    }();
+    var INVALID_KEY_ARGUMENT = "Invalid key provided. Keys must be of type string, number, Date or Array<string | number | Date>.";
     function Dexie(dbName, options) {
         /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
         var addons = options && options.addons || Dexie.addons;
@@ -681,19 +690,6 @@
         this.dynamicallyOpened = function () {
             return autoSchema;
         };
-
-        /*this.dbg = function (collection, counter) {
-            if (!this._dbgResult || !this._dbgResult[counter]) {
-                if (typeof collection === 'string') collection = this.table(collection).toCollection().limit(100);
-                if (!this._dbgResult) this._dbgResult = [];
-                var db = this;
-                new Promise(function () {
-                    Promise.PSD.letThrough = true;
-                    db._dbgResult[counter] = collection.toArray();
-                });
-            }
-            return this._dbgResult[counter]._value;
-        }*/
 
         //
         // Properties
@@ -1525,13 +1521,20 @@
 
             // WhereClause private methods
 
-            function fail(collection, err) {
+            function fail(c, err, T) {
+                var collection = c instanceof WhereClause ? new c._ctx.collClass(c) : c;
                 try {
-                    throw err;
+                    throw T ? new T(err) : new TypeError(err);
                 } catch (e) {
                     collection._ctx.error = e;
                 }
                 return collection;
+            }
+
+            function emptyCollection(whereClause) {
+                return new whereClause._ctx.collClass(whereClause, function () {
+                    return IDBKeyRange.only("");
+                }).limit(0);
             }
 
             function getSetArgs(args) {
@@ -1570,22 +1573,47 @@
                 return llp < 0 ? null : key.substr(0, llp) + lowerNeedle[llp] + upperNeedle.substr(llp + 1);
             }
 
-            function addIgnoreCaseAlgorithm(c, match, needle) {
-                /// <param name="needle" type="String"></param>
-                var upper, lower, compare, upperNeedle, lowerNeedle, direction;
+            function addIgnoreCaseAlgorithm(whereClause, match, needles, suffix) {
+                /// <param name="needles" type="Array" elementType="String"></param>
+                var upper,
+                    lower,
+                    compare,
+                    upperNeedles,
+                    lowerNeedles,
+                    direction,
+                    nextKeySuffix,
+                    needlesLen = needles.length;
                 function initDirection(dir) {
                     upper = upperFactory(dir);
                     lower = lowerFactory(dir);
-                    compare = dir === "next" ? ascending : descending;
-                    upperNeedle = upper(needle);
-                    lowerNeedle = lower(needle);
+                    compare = dir === "next" ? simpleCompare : simpleCompareReverse;
+                    var needleBounds = needles.map(function (needle) {
+                        return { lower: lower(needle), upper: upper(needle) };
+                    }).sort(function (a, b) {
+                        return compare(a.lower, b.lower);
+                    });
+                    upperNeedles = needleBounds.map(function (nb) {
+                        return nb.upper;
+                    });
+                    lowerNeedles = needleBounds.map(function (nb) {
+                        return nb.lower;
+                    });
                     direction = dir;
+                    nextKeySuffix = dir === "next" ? "" : suffix;
                 }
                 initDirection("next");
+
+                var c = new whereClause._ctx.collClass(whereClause, function () {
+                    return IDBKeyRange.bound(upperNeedles[0], lowerNeedles[needlesLen - 1] + suffix);
+                });
+
                 c._ondirectionchange = function (direction) {
                     // This event onlys occur before filter is called the first time.
                     initDirection(direction);
                 };
+
+                var firstPossibleNeedle = 0;
+
                 c._addAlgorithm(function (cursor, advance, resolve) {
                     /// <param name="cursor" type="IDBCursor"></param>
                     /// <param name="advance" type="Function"></param>
@@ -1593,16 +1621,19 @@
                     var key = cursor.key;
                     if (typeof key !== 'string') return false;
                     var lowerKey = lower(key);
-                    if (match(lowerKey, lowerNeedle)) {
-                        advance(function () {
-                            cursor.continue();
-                        });
+                    if (match(lowerKey, lowerNeedles, firstPossibleNeedle)) {
                         return true;
                     } else {
-                        var nextNeedle = nextCasing(key, lowerKey, upperNeedle, lowerNeedle, compare, direction);
-                        if (nextNeedle) {
+                        var lowestPossibleCasing = null;
+                        for (var i = firstPossibleNeedle; i < needlesLen; ++i) {
+                            var casing = nextCasing(key, lowerKey, upperNeedles[i], lowerNeedles[i], compare, direction);
+                            if (casing === null && lowestPossibleCasing === null) firstPossibleNeedle = i + 1;else if (lowestPossibleCasing === null || compare(lowestPossibleCasing, casing) > 0) {
+                                lowestPossibleCasing = casing;
+                            }
+                        }
+                        if (lowestPossibleCasing !== null) {
                             advance(function () {
-                                cursor.continue(nextNeedle);
+                                cursor.continue(lowestPossibleCasing + nextKeySuffix);
                             });
                         } else {
                             advance(resolve);
@@ -1610,6 +1641,7 @@
                         return false;
                     }
                 });
+                return c;
             }
 
             //
@@ -1627,12 +1659,14 @@
                     /// <returns type="Collection"></returns>
                     includeLower = includeLower !== false; // Default to true
                     includeUpper = includeUpper === true; // Default to false
-                    if (lower > upper || lower === upper && (includeLower || includeUpper) && !(includeLower && includeUpper)) return new this._ctx.collClass(this, function () {
-                        return IDBKeyRange.only(lower);
-                    }).limit(0); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
-                    return new this._ctx.collClass(this, function () {
-                        return IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper);
-                    });
+                    try {
+                        if (cmp(lower, upper) > 0 || cmp(lower, upper) === 0 && (includeLower || includeUpper) && !(includeLower && includeUpper)) return emptyCollection(this); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
+                        return new this._ctx.collClass(this, function () {
+                            return IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper);
+                        });
+                    } catch (e) {
+                        return fail(this, INVALID_KEY_ARGUMENT);
+                    }
                 },
                 equals: function (value) {
                     return new this._ctx.collClass(this, function () {
@@ -1661,53 +1695,65 @@
                 },
                 startsWith: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof str !== 'string') return fail(new this._ctx.collClass(this), new TypeError("String expected"));
-                    return this.between(str, str + String.fromCharCode(65535), true, true);
+                    if (typeof str !== 'string') return fail(this, "String expected");
+                    return this.between(str, str + maxString, true, true);
                 },
                 startsWithIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof str !== 'string') return fail(new this._ctx.collClass(this), new TypeError("String expected"));
+                    if (typeof str !== 'string') return fail(this, "String expected");
                     if (str === "") return this.startsWith(str);
-                    var c = new this._ctx.collClass(this, function () {
-                        return IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase() + String.fromCharCode(65535));
-                    });
-                    addIgnoreCaseAlgorithm(c, function (a, b) {
-                        return a.indexOf(b) === 0;
-                    }, str);
-                    c._ondirectionchange = function () {
-                        fail(c, new Error("reverse() not supported with WhereClause.startsWithIgnoreCase()"));
-                    };
-                    return c;
+                    return addIgnoreCaseAlgorithm(this, function (x, a) {
+                        return x.indexOf(a[0]) === 0;
+                    }, [str], maxString);
                 },
                 equalsIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof str !== 'string') return fail(new this._ctx.collClass(this), new TypeError("String expected"));
-                    var c = new this._ctx.collClass(this, function () {
-                        return IDBKeyRange.bound(str.toUpperCase(), str.toLowerCase());
-                    });
-                    addIgnoreCaseAlgorithm(c, function (a, b) {
-                        return a === b;
-                    }, str);
-                    return c;
+                    if (typeof str !== 'string') return fail(this, "String expected");
+                    return addIgnoreCaseAlgorithm(this, function (x, a) {
+                        return x === a[0];
+                    }, [str], "");
+                },
+                anyOfIgnoreCase: function (stringsToFind) {
+                    var set = getSetArgs(arguments);
+                    if (set.length === 0) return emptyCollection(this);
+                    if (!set.every(function (s) {
+                        return typeof s === 'string';
+                    })) {
+                        return fail(this, "anyOfIgnoreCase() only works with strings");
+                    }
+                    return addIgnoreCaseAlgorithm(this, function (x, a) {
+                        return a.indexOf(x) !== -1;
+                    }, set, "");
+                },
+                startsWithAnyOfIgnoreCase: function (stringsToFind) {
+                    var set = getSetArgs(arguments);
+                    if (set.length === 0) return emptyCollection(this);
+                    if (!set.every(function (s) {
+                        return typeof s === 'string';
+                    })) {
+                        return fail(this, "anyOfIgnoreCase() only works with strings");
+                    }
+                    return addIgnoreCaseAlgorithm(this, function (x, a) {
+                        return a.some(function (n) {
+                            return x.indexOf(n) === 0;
+                        });
+                    }, set, maxString);
                 },
                 anyOf: function (valueArray) {
-                    var ctx = this._ctx,
-                        schema = ctx.table.schema;
-                    var idxSpec = ctx.index ? schema.idxByName[ctx.index] : schema.primKey;
-                    var isCompound = idxSpec && idxSpec.compound;
                     var set = getSetArgs(arguments);
-                    var compare = isCompound ? compoundCompare(ascending) : ascending;
-                    set.sort(compare);
-                    if (set.length === 0) return new this._ctx.collClass(this, function () {
-                        return IDBKeyRange.only("");
-                    }).limit(0); // Return an empty collection.
+                    var compare = ascending;
+                    try {
+                        set.sort(compare);
+                    } catch (e) {
+                        return fail(this, INVALID_KEY_ARGUMENT);
+                    }
+                    if (set.length === 0) return emptyCollection(this);
                     var c = new this._ctx.collClass(this, function () {
                         return IDBKeyRange.bound(set[0], set[set.length - 1]);
                     });
 
                     c._ondirectionchange = function (direction) {
                         compare = direction === "next" ? ascending : descending;
-                        if (isCompound) compare = compoundCompare(compare);
                         set.sort(compare);
                     };
                     var i = 0;
@@ -1724,9 +1770,6 @@
                         }
                         if (compare(key, set[i]) === 0) {
                             // The current cursor value should be included and we should continue a single step in case next item has the same key or possibly our next key in set.
-                            advance(function () {
-                                cursor.continue();
-                            });
                             return true;
                         } else {
                             // cursor.key not yet at set[i]. Forward cursor to the next key to hunt for.
@@ -1740,61 +1783,92 @@
                 },
 
                 notEqual: function (value) {
-                    return this.below(value).or(this._ctx.index).above(value);
+                    return this.inAnyRange([[-Infinity, value], [value, maxKey]], { includeLowers: false, includeUppers: false });
                 },
 
                 noneOf: function (valueArray) {
-                    var ctx = this._ctx,
-                        schema = ctx.table.schema;
-                    var idxSpec = ctx.index ? schema.idxByName[ctx.index] : schema.primKey;
-                    var isCompound = idxSpec && idxSpec.compound;
                     var set = getSetArgs(arguments);
                     if (set.length === 0) return new this._ctx.collClass(this); // Return entire collection.
-                    var compare = isCompound ? compoundCompare(ascending) : ascending;
-                    set.sort(compare);
-                    // Transform ["a","b","c"] to a set of ranges for between/above/below: [[null,"a"], ["a","b"], ["b","c"], ["c",null]]
+                    try {
+                        set.sort(ascending);
+                    } catch (e) {
+                        return fail(this, INVALID_KEY_ARGUMENT);
+                    }
+                    // Transform ["a","b","c"] to a set of ranges for between/above/below: [[-Infinity,"a"], ["a","b"], ["b","c"], ["c",maxKey]]
                     var ranges = set.reduce(function (res, val) {
-                        return res ? res.concat([[res[res.length - 1][1], val]]) : [[null, val]];
+                        return res ? res.concat([[res[res.length - 1][1], val]]) : [[-Infinity, val]];
                     }, null);
-                    ranges.push([set[set.length - 1], null]);
-                    // Transform range-sets to a big or() expression between ranges:
-                    var thiz = this,
-                        index = ctx.index;
-                    return ranges.reduce(function (collection, range) {
-                        return collection ? range[1] === null ? collection.or(index).above(range[0]) : collection.or(index).between(range[0], range[1], false, false) : thiz.below(range[1]);
-                    }, null);
+                    ranges.push([set[set.length - 1], maxKey]);
+                    return this.inAnyRange(ranges, { includeLowers: false, includeUppers: false });
                 },
 
-                startsWithAnyOf: function (valueArray) {
-                    var ctx = this._ctx,
-                        set = getSetArgs(arguments);
-
-                    if (!set.every(function (s) {
-                        return typeof s === 'string';
+                /** Filter out values withing given set of ranges.
+                * Example, give children and elders a rebate of 50%:
+                *
+                *   db.friends.where('age').inAnyRange([[0,18],[65,Infinity]]).modify({Rebate: 1/2});
+                *
+                * @param {(string|number|Date|Array)[][]} ranges 
+                * @param {{includeLowers: boolean, includeUppers: boolean}} options
+                */
+                inAnyRange: function (ranges, options) {
+                    var ctx = this._ctx;
+                    if (ranges.length === 0) return emptyCollection(this);
+                    if (!ranges.every(function (range) {
+                        return range[0] !== undefined && range[1] !== undefined && ascending(range[0], range[1]) <= 0;
                     })) {
-                        return fail(new ctx.collClass(this), new TypeError("startsWithAnyOf() only works with strings"));
+                        return fail(this, "First argument to inAnyRange() must be an Array of two-value Arrays [lower,upper] where upper must not be lower than lower", Error);
                     }
-                    if (set.length === 0) return new ctx.collClass(this, function () {
-                        return IDBKeyRange.only("");
-                    }).limit(0); // Return an empty collection.
+                    var includeLowers = !options || options.includeLowers !== false; // Default to true
+                    var includeUppers = options && options.includeUppers === true; // Default to false
 
-                    var setEnds = set.map(function (s) {
-                        return s + String.fromCharCode(65535);
-                    });
+                    function addRange(ranges, newRange) {
+                        for (var i = 0, l = ranges.length; i < l; ++i) {
+                            var range = ranges[i];
+                            if (cmp(newRange[0], range[1]) < 0 && cmp(newRange[1], range[0]) > 0) {
+                                range[0] = min(range[0], newRange[0]);
+                                range[1] = max(range[1], newRange[1]);
+                                break;
+                            }
+                        }
+                        if (i === l) ranges.push(newRange);
+                        return ranges;
+                    }
 
                     var sortDirection = ascending;
-                    set.sort(sortDirection);
+                    function rangeSorter(a, b) {
+                        return sortDirection(a[0], b[0]);
+                    }
+
+                    // Join overlapping ranges
+                    var set;
+                    try {
+                        set = ranges.reduce(addRange, []);
+                        set.sort(rangeSorter);
+                    } catch (ex) {
+                        return fail(this, INVALID_KEY_ARGUMENT);
+                    }
+
                     var i = 0;
-                    function keyIsBeyondCurrentEntry(key) {
-                        return key > setEnds[i];
+                    var keyIsBeyondCurrentEntry = includeUppers ? function (key) {
+                        return ascending(key, set[i][1]) > 0;
+                    } : function (key) {
+                        return ascending(key, set[i][1]) >= 0;
+                    };
+
+                    var keyIsBeforeCurrentEntry = includeLowers ? function (key) {
+                        return descending(key, set[i][0]) > 0;
+                    } : function (key) {
+                        return descending(key, set[i][0]) >= 0;
+                    };
+
+                    function keyWithinCurrentRange(key) {
+                        return !keyIsBeyondCurrentEntry(key) && !keyIsBeforeCurrentEntry(key);
                     }
-                    function keyIsBeforeCurrentEntry(key) {
-                        return key < set[i];
-                    }
+
                     var checkKey = keyIsBeyondCurrentEntry;
 
                     var c = new ctx.collClass(this, function () {
-                        return IDBKeyRange.bound(set[0], set[set.length - 1] + String.fromCharCode(65535));
+                        return IDBKeyRange.bound(set[0][0], set[set.length - 1][1], !includeLowers, !includeUppers);
                     });
 
                     c._ondirectionchange = function (direction) {
@@ -1805,8 +1879,7 @@
                             checkKey = keyIsBeforeCurrentEntry;
                             sortDirection = descending;
                         }
-                        set.sort(sortDirection);
-                        setEnds.sort(sortDirection);
+                        set.sort(rangeSorter);
                     };
 
                     c._addAlgorithm(function (cursor, advance, resolve) {
@@ -1820,21 +1893,37 @@
                                 return false;
                             }
                         }
-                        if (key >= set[i] && key <= setEnds[i]) {
+                        if (keyWithinCurrentRange(key)) {
                             // The current cursor value should be included and we should continue a single step in case next item has the same key or possibly our next key in set.
-                            advance(function () {
-                                cursor.continue();
-                            });
                             return true;
+                        } else if (cmp(key, set[i][1]) === 0 || cmp(key, set[i][0]) === 0) {
+                            // includeUpper or includeLower is false so keyWithinCurrentRange() returns false even though we are at range border.
+                            // Continue to next key but don't include this one.
+                            return false;
                         } else {
                             // cursor.key not yet at set[i]. Forward cursor to the next key to hunt for.
                             advance(function () {
-                                if (sortDirection === ascending) cursor.continue(set[i]);else cursor.continue(setEnds[i]);
+                                if (sortDirection === ascending) cursor.continue(set[i][0]);else cursor.continue(set[i][1]);
                             });
                             return false;
                         }
                     });
                     return c;
+                },
+                startsWithAnyOf: function (valueArray) {
+                    var ctx = this._ctx,
+                        set = getSetArgs(arguments);
+
+                    if (!set.every(function (s) {
+                        return typeof s === 'string';
+                    })) {
+                        return fail(this, "startsWithAnyOf() only works with strings");
+                    }
+                    if (set.length === 0) return emptyCollection(this);
+
+                    return this.inAnyRange(set.map(function (str) {
+                        return [str, str + maxString];
+                    }));
                 }
             };
         });
@@ -2447,12 +2536,32 @@
             return rv;
         }
 
+        function cmp(key1, key2) {
+            return indexedDB.cmp(key1, key2);
+        }
+
+        function min(a, b) {
+            return cmp(a, b) < 0 ? a : b;
+        }
+
+        function max(a, b) {
+            return cmp(a, b) > 0 ? a : b;
+        }
+
         function ascending(a, b) {
-            return a < b ? -1 : a > b ? 1 : 0;
+            return indexedDB.cmp(a, b);
         }
 
         function descending(a, b) {
-            return a < b ? 1 : a > b ? -1 : 0;
+            return indexedDB.cmp(b, a);
+        }
+
+        function simpleCompare(a, b) {
+            return a < b ? -1 : a === b ? 0 : 1;
+        }
+
+        function simpleCompareReverse(a, b) {
+            return a > b ? -1 : a === b ? 0 : 1;
         }
 
         function compoundCompare(itemCompare) {
@@ -3256,6 +3365,7 @@
             var value = parseType(structure[member]);
             obj[member] = value;
         });
+        return obj;
     }
 
     function eventRejectHandler(reject, sentance) {
@@ -3442,6 +3552,8 @@
         return Class;
     };
 
+    Dexie.applyStructure = applyStructure;
+
     Dexie.ignoreTransaction = function (scopeFunc) {
         // In case caller is within a transaction but needs to create a separate transaction.
         // Example of usage:
@@ -3521,6 +3633,7 @@
     Dexie.MultiModifyError = ModifyError; // Backward compatibility pre 0.9.8
     Dexie.IndexSpec = IndexSpec;
     Dexie.TableSchema = TableSchema;
+    Dexie.MaxKey = maxKey;
     //
     // Dependencies
     //
