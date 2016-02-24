@@ -7,7 +7,8 @@
     db.version(1).stores({
         folders: "++id,&path",
         files: "++id,filename,extension,[filename+extension],folderId",
-        people: "[name+number],name,number"
+        people: "[name+number],name,number",
+        friends: "++id,name,age"
     });
 
     var Folder = db.folders.defineClass({
@@ -28,6 +29,10 @@
         return db.folders.get(this.folderId, function (folder) {
             return folder.path + "/" + file.filename + (file.extension || "");
         });
+    }
+
+    Folder.prototype.getFiles = function () {
+        return db.files.where('folderId').equals(this.id).toArray();
     }
 
     var firstFolderId = 0,
@@ -329,6 +334,10 @@
                 equal(a.length, 6, "6 folders found: " + a.map(function (folder) { return '"' + folder.path + '"' }).join(', '));
             });
 
+            db.folders.where("path").startsWithIgnoreCase("/usr").reverse().toArray(function (a) {
+                equal(a.length, 6, "6 folders found in reverse mode: " + a.map(function(folder){ return '"' + folder.path + '"' }).join(', '));
+            });
+
         }).then(function(){
             ok(true, "Transaction complete");
         }).catch(function(e) {
@@ -507,6 +516,160 @@
             ], null, 4), "Only keys not specified in query should come into result");
         }).catch(function (err) {
             ok(false, err.stack || err);
+        }).finally(start);
+    });
+
+    asyncTest("inAnyOfRanges", function () {
+        db.transaction('rw', db.friends, function () {
+            db.friends.bulkAdd([
+                { name: "Simon", age: 3 },
+                { name: "Tyra", age: 0 },
+                { name: "David", age: 42 },
+                { name: "Ylva", age: 40 },
+                { name: "Ann-Sofie", age: 72 }]
+            ).then(function () {
+                //equal(errors.length, 0, "bulkAdd() succeeded");
+                return db.friends.where('age').inAnyRange([[0, 3], [65, Infinity]]).toArray();
+            }).then (function (result) {
+                equal(result.length, 2, "Should give us two persons");
+                equal(result[0].name, "Tyra", "First is Tyra");
+                equal(result[1].name, "Ann-Sofie", "Second is Ann-Sofie");
+                return db.friends.where("age").inAnyRange([[0, 3], [65, Infinity]], { includeUppers: true }).toArray();
+            }).then(function (result) {
+                equal(result.length, 3, "Should give us three persons");
+                equal(result[0].name, "Tyra", "First is Tyra");
+                equal(result[1].name, "Simon", "Second is Simon");
+                equal(result[2].name, "Ann-Sofie", "Third is Ann-Sofie");
+                return db.friends.where("age").inAnyRange([[0, 3], [65, Infinity]], { includeLowers: false }).toArray();
+            }).then(function (result) {
+                equal(result.length, 1, "Should give us one person");
+                equal(result[0].name, "Ann-Sofie", "Ann-Sofie is the only match");
+                return db.friends.where("age").inAnyRange([[40, 40], [40, 40], [40, 41], [41, 41], [42, 42]], { includeUppers: true }).toArray();
+            }).then(function (result) {
+                equal(result.length, 2, "Should give us two persons");
+                equal(result[0].name, "Ylva", "First is Ylva");
+                equal(result[1].name, "David", "Second is David");
+            });
+        }).catch(function (err) {
+            ok(false, err.stack || err);
+        }).finally(start);
+    });
+
+    asyncTest("anyOfIgnoreCase", function () {
+        db.transaction('r', db.folders, db.files, function () {
+            db.folders.where('path').anyOfIgnoreCase("/usr/local/var", "/").toArray(function (result) {
+                equal(result.length, 3);
+                equal(result[0].path, "/");
+                equal(result[1].path, "/USR/local/VAR");
+                equal(result[2].path, "/usr/local/var");
+                return db.folders.where('path').anyOfIgnoreCase("/usr/local/var", "/").reverse().toArray();
+            }).then(function (result) {
+                equal(result.length, 3);
+                equal(result[0].path, "/usr/local/var");
+                equal(result[1].path, "/USR/local/VAR");
+                equal(result[2].path, "/");
+                return db.files.where('filename').anyOfIgnoreCase(["hello", "world", "readme"]).toArray();
+            }).then(function (result) {
+                equal(result.length, 4);
+                equal(result[0].filename, "Hello");
+                equal(result[1].filename, "README");
+                equal(result[2].filename, "hello");
+                equal(result[3].filename, "world");
+            });
+        }).catch(function (err) {
+            ok(false, err.stack || err);
+        }).finally(start);
+    });
+    asyncTest("anyOfIgnoreCase(2)", function () {
+        db.files.where('filename').anyOfIgnoreCase(["hello", "world", "readme"]).toArray(function (result) {
+            equal(result.length, 4);
+            equal(result[0].filename, "Hello");
+            equal(result[1].filename, "README");
+            equal(result[2].filename, "hello");
+            equal(result[3].filename, "world");
+        }).catch(function (err) {
+            ok(false, err.stack || err);
+        }).finally(start);
+    });
+
+    asyncTest("startsWithAnyOfIgnoreCase()", function () {
+
+        function runTheTests(mippler) {
+            /// <param name="mippler" value="function(x){return x;}"></param>
+
+            //
+            // Basic Flow:
+            //
+            return mippler(db.folders
+                .where('path').startsWithAnyOfIgnoreCase('/usr/local', '/var'))
+                .toArray(function (result) {
+                    equal(result.length, 7, "Query should match 7 folders");
+                    ok(result.some(function (x) { return x.path == '/USR/local/VAR'; }), '/USR/local/VAR');
+                    ok(result.some(function (x) { return x.path == '/usr/local'; }), '/usr/local');
+                    ok(result.some(function (x) { return x.path == '/usr/local/bin'; }), '/usr/local/bin');
+                    ok(result.some(function (x) { return x.path == '/usr/local/src'; }), '/usr/local/src');
+                    ok(result.some(function (x) { return x.path == '/usr/local/var'; }), '/usr/local/var');
+                    ok(result.some(function (x) { return x.path == '/var'; }), '/var');
+                    ok(result.some(function (x) { return x.path == '/var/bin'; }), '/var/bin');
+
+                    //
+                    // Require a slash at beginning (and use an array of strings as argument instead)
+                    //
+                    return mippler(db.folders
+                        .where('path').startsWithAnyOfIgnoreCase(['/usr/local/', '/var/']))
+                        .toArray();
+
+                }).then(function (result) {
+                    equal(result.length, 5, "Query should match 5 folders");
+                    ok(result.some(function (x) { return x.path == '/USR/local/VAR'; }), '/USR/local/VAR');
+                    ok(result.some(function (x) { return x.path == '/usr/local/bin'; }), '/usr/local/bin');
+                    ok(result.some(function (x) { return x.path == '/usr/local/src'; }), '/usr/local/src');
+                    ok(result.some(function (x) { return x.path == '/usr/local/var'; }), '/usr/local/var');
+                    ok(result.some(function (x) { return x.path == '/var/bin'; }), '/var/bin');
+
+                    //
+                    // Some specialities
+                    //
+                    return Dexie.Promise.all(
+                        mippler(db.folders.where('path').startsWithAnyOfIgnoreCase([])).count(), // Empty
+                        mippler(db.folders.where('path').startsWithAnyOfIgnoreCase('/var', '/var', '/var')).count(), // Duplicates
+                        mippler(db.folders.where('path').startsWithAnyOfIgnoreCase('')).count(), // Empty string should match all
+                        mippler(db.folders).count(),
+                        mippler(db.folders.where('path').startsWithAnyOfIgnoreCase('nonexisting')).count() // Non-existing match
+                    );
+                }).then(function (results) {
+                    equal(results[0], 0, "startsWithAnyOfIgnoreCase([]).count() == 0");
+                    equal(results[1], 2, "startsWithAnyOfIgnoreCase('/var', '/var', '/var').count() == 2");
+                    equal(results[2], results[3], "startsWithAnyOfIgnoreCase('').count() == db.folders.count()");
+                    equal(results[4], 0, "startsWithAnyOfIgnoreCase('nonexisting').count() == 0");
+
+                    //
+                    // Error handling
+                    //
+
+                    return mippler(db.folders.where('path').startsWithAnyOfIgnoreCase([null, '/'])).toArray(function (res) {
+                        ok(false, "Should not succeed to have null in parameter");
+                    }).catch(function (e) {
+                        ok(true, "As expected: failed to have null in arguments: " + e);
+                    });
+                });
+        }
+
+        // Run tests without transaction and without reverse()
+        runTheTests(function (x) { return x; }).then(function () {
+            ok(true, "FINISHED NORMAL TEST!");
+            // Run tests with reverse()
+            return runTheTests(function (x) { return x.reverse(); });
+        }).then(function () {
+            ok(true, "FINISHED REVERSE TEST!");
+            // Run tests within a transaction
+            return db.transaction('r', db.folders, db.files, function () {
+                return runTheTests(function (x) { return x; });
+            });
+        }).then(function () {
+            ok(true, "FINISHED TRANSACTION TEST!");
+        }).catch(function (e) {
+            ok(false, "Error: " + e);
         }).finally(start);
     });
 
