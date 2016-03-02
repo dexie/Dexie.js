@@ -7,7 +7,11 @@ const zlib = promisifyAll(require('zlib'));
 const watch = require('node-watch');
 const path = require('path');
 
-export async function build (optionsList, replacements) {
+export async function build (optionsList) {
+    let replacements = {
+        "{version}": await parsePackageVersion(),
+        "{date}": new Date().toDateString()
+    };
     // Create tmp directory
     await mkdir("tmp/");
     // Create sub dirs to tmp/
@@ -151,7 +155,9 @@ async function rollupAndMinify(rollupInfo) {
 }
 
 
-export async function buildAndWatch (optionsList, version) {
+export async function buildAndWatch (optionsList) {
+    let version = await parsePackageVersion();
+
     await build(optionsList, {
         "{version}": version,
         "{date}": new Date().toDateString()
