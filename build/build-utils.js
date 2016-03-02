@@ -1,32 +1,201 @@
-﻿var fs = require('fs');
-var rollup = require('rollup');
-var uglify = require("uglify-js");
-var babel = require('babel-core');
-var zlib = require('zlib');
+﻿const promisifyAll = require('es6-promisify-all');
+const fs = promisifyAll(require('fs'));
+const rollup = require('rollup');
+const uglify = require("uglify-js");
+const babel = require('babel-core');
+const zlib = promisifyAll(require('zlib'));
+const watch = require('node-watch');
+const path = require('path');
 
-function listSourceFiles() {
-    return new Promise((resolve, reject) => {
-        fs.readdir('src/', (err, files) => {
-            if (err)
-                reject(err);
-            else
-                resolve(files.filter(f=>f.toLowerCase().endsWith('.js')));
-        });
+export async function build (optionsList, replacements) {
+    // Create tmp directory
+    await mkdir("tmp/");
+    // Create sub dirs to tmp/
+    await Promise.all(
+        flatten(
+            optionsList.map(options =>
+                options.dirs.map(dir =>
+                    mkdir("tmp/" + dir)))
+        )
+    );
+
+    for (let options of optionsList) {
+        // List all source files
+        let files = flatten(await Promise.all(options.dirs.map(dir => readdir(dir))));
+        // Build them all
+        await rebuildFiles(options, replacements, files);
+    }
+}
+
+export async function rebuildFiles(options, replacements, files) {
+    // File exclusions
+    let exclusions = flatten(flatten(
+        (options.excludes || []).concat( // configured excludes...
+            Object.keys(options.bundles).map(
+                key => options.bundles[key]) // Output files (like bundle.js)
+        )).map(filepath=>[
+                filepath,
+                `./${filepath}`  // Be insensitive to whether file is referenced with ./ or not.
+        ])
+    );
+
+    // Run babel on each js file
+    /*await Promise.all(files
+        .filter(file => ext(file) === ".js")
+        .filter(file => exclusions.indexOf(file) === -1)
+        .map (file => babelTransform(file, "tmp/" + file)));*/
+    files = files
+        .filter(file => ext(file) === ".js")
+        .filter(file => exclusions.map(x=>x.replace(/\\/g, '/'))
+            .indexOf(file.replace(/\\/g, '/')) === -1); // Insensitive to path separator style (WIN/UX)
+
+    if (files.length === 0)
+        return false;
+
+    for (let file of files) {
+        console.log(`Babel '${file}'`);
+        await babelTransform(file, `tmp/${file}`);
+    }
+
+    // Define bundles config
+    let bundles = Object.keys(options.bundles).map(key => {
+        let entry = key,
+            targets = options.bundles[key];
+
+        return {
+            entry: entry,
+            rollups: targets.filter(f=>ext(f) === '.js' || ext(f) === '.es6.js').map(f => ({
+                entry: `tmp/${entry}`,
+                rollupCfg: {
+                    format: ext(f) === '.js' ? 'umd' : 'es6',
+                    dest: f,
+                    sourceMap: targets.indexOf(f + '.map') !== -1,
+                    moduleName: getUmdModuleName(entry)
+                },
+                file: f,
+                map: targets.filter(mapFile => mapFile === f + '.map')[0],
+                min: targets.filter(minFile => minFile === minName(f)).map(minFile => ({
+                    file: minFile,
+                    map: targets.filter(file => file === minFile + '.map')[0],
+                    gz: targets.filter(file => file === minFile + '.gz')[0]
+                }))[0]
+            })),
+            dts: targets.filter(f=>ext(f) === '.d.ts')[0],
+            targets: targets
+        };
     });
+
+    // Execute bundling, minification, gzipping and copying of typings files
+    //await Promise.all(bundles.map(bundleInfo => makeBundle(bundleInfo, replacements)));
+    for (let bundleInfo of bundles) {
+        await makeBundle(bundleInfo, replacements);
+    }
+
+    return true;
 }
 
-function gzip(source, destination) {
-    return readFile(source).then(content => new Promise((resolve, reject) =>
-        zlib.gzip(content, (err, data) => err ? reject(err) : resolve(data))
-    )).then(gzipped => writeFile(destination, gzipped));
+async function makeBundle (bundleInfo, replacements) {
+
+    // Rollup (if anything to rollup)
+    //await Promise.all(bundleInfo.rollups.map(rollupInfo => rollupAndMinify(rollupInfo)));
+    for (let rollupInfo of bundleInfo.rollups) {
+        await rollupAndMinify(rollupInfo);
+    }
+
+    // Typings (if any .d.ts file to copy)
+    if (bundleInfo.dts) {
+        await copyFile (bundleInfo.entry, bundleInfo.dts);
+    }
+
+    // Replace version, date etc in targets
+    if (replacements) {
+        await Promise.all(bundleInfo.targets
+            .filter (file => file.toLowerCase().endsWith('.js') || file.toLowerCase().endsWith('.ts'))
+            .map(file => replaceInFile(file, replacements)));
+    }
 }
 
-function babelTransform(source, destination) {
+async function rollupAndMinify(rollupInfo) {
+    // Call rollup to generate bundle in memory
+    console.log (`Rollup --> ${rollupInfo.file}`);
+    let bundle = await rollup.rollup({
+        entry: rollupInfo.entry,
+        onwarn: msg =>
+            !/Treating .* as external dependency/i.test(msg) &&
+            console.warn(msg)
+    });
+
+    // Write bundle to disk
+    await bundle.write(rollupInfo.rollupCfg);
+
+    // Minify
+    if (rollupInfo.min) {
+        console.log (`Minify --> ${rollupInfo.min.file}`);
+        let result = uglify.minify(rollupInfo.file, rollupInfo.map && rollupInfo.min.map  ? {
+            inSourceMap: rollupInfo.map,
+            outSourceMap: rollupInfo.min.map
+        } : {});
+
+        // min.js
+        await writeFile(rollupInfo.min.file, result.code);
+
+        // min.js.map
+        if (rollupInfo.min.map)
+            await writeFile(rollupInfo.min.map, result.map);
+
+        // min.js.gz
+        if (rollupInfo.min.gz)
+            await gzip(rollupInfo.min.file, rollupInfo.min.gz);
+
+    }
+}
+
+
+export async function buildAndWatch (optionsList, version) {
+    await build(optionsList, {
+        "{version}": version,
+        "{date}": new Date().toDateString()
+    });
+
+    for (let o of optionsList) {
+        let options = o;
+        watch(options.dirs, throttle(50, async function (calls) {
+            try {
+                var filenames = calls.map(args => args[0])
+                    .filter(filename => filename)
+                    .filter(filename => filename.toLowerCase().endsWith('.js') || filename.toLowerCase().endsWith('.ts'))
+                    .reduce((p, c) =>(p[c] = true, p), {});
+
+                var changedFiles = Object.keys(filenames);
+                if (changedFiles.length > 0) {
+                    let anythingRebuilt = await rebuildFiles(options, {
+                        "{version}": version,
+                        "{date}": new Date().toDateString()
+                    }, changedFiles);
+
+                    if (anythingRebuilt)
+                        console.log("Done rebuilding all bundles");
+                }
+            } catch (err) {
+                console.error("Failed rebuilding: " + err.stack);
+            }
+        }));
+    }
+}
+
+export async function gzip(source, destination) {
+    let content = await readFile(source);
+    let gzipped = await zlib.gzipAsync(content);
+    await fs.writeFileAsync(destination, gzipped);
+}
+
+export function babelTransform(source, destination) {
     return new Promise((resolve, reject) => {
         var options = {
             compact: false,
             comments: true,
-            //presets: ["es2015"],
+            babelrc: false,
+            presets: [],
             plugins: [
                 //
                 // Select which plugins from "babel-preset-es2015" that we want:
@@ -63,7 +232,7 @@ function babelTransform(source, destination) {
     });
 }
 
-function copyFile(source, target) {
+export function copyFile(source, target) {
     console.log('Copying '+source+' => \t'+target);
     return new Promise(function (resolve, reject) {
         var rd = fs.createReadStream(source);
@@ -81,23 +250,21 @@ function copyFile(source, target) {
     });
 }
 
-function copyFiles (sourcesAndTargets) {
+export function copyFiles (sourcesAndTargets) {
     return Promise.all(
         Object.keys(sourcesAndTargets)
             .map(source => copyFile(source, sourcesAndTargets[source])));
 }
 
-function readFile(filename) {
-    return new Promise((resolve, reject) =>
-        fs.readFile(filename, "utf-8", (err, data) => err ? reject(err) : resolve(data)));
+export function readFile(filename) {
+    return fs.readFileAsync(filename, "utf-8");
 }
 
-function writeFile(filename, data) {
-    return new Promise((resolve, reject) =>
-        fs.writeFile(filename, data, err => err ? reject(err) : resolve()));
+export function writeFile(filename, data) {
+    return fs.writeFileAsync(filename, data);
 }
 
-function parsePackageVersion() {
+export function parsePackageVersion() {
     return readFile('package.json').then(data => JSON.parse(data).version);
 }
 
@@ -111,10 +278,52 @@ function replace(content, replacements) {
         }, content);
 }
 
-function replaceInFile(filename, replacements) {
-    return readFile(filename)
-        .then(content => replace(content, replacements))
-        .then(replacedContent => writeFile(filename, replacedContent));
+export async function replaceInFile(filename, replacements) {
+    let content = await readFile(filename);
+    let replacedContent = replace(content, replacements);
+    if (replacedContent !== content)
+        await writeFile(filename, replacedContent);
+}
+
+export async function readdir(dir) {
+    let files = await fs.readdirAsync(dir);
+    return files.map(file => dir + file);
+}
+
+function flatten (arrays) {
+    return [].concat.apply([], arrays);
+}
+
+function fileExists (file) {
+    return new Promise(resolve => fs.exists(file, resolve));
+}
+
+async function mkdir (dir) {
+    if (!await fileExists(dir))
+        await fs.mkdirAsync(dir);
+}
+
+function ext(filename) {
+    let dot = filename.indexOf('.');
+    return dot === -1 ?
+        filename.toLowerCase() :
+        filename.substr(dot).toLowerCase();
+}
+
+function minName (jsFile) {
+    if (!jsFile.toLowerCase().endsWith(".js"))
+        throw new Error ("Not a JS file");
+
+    return jsFile.substr(0, jsFile.length - ".js".length) + ".min.js";
+}
+
+function getUmdModuleName(filepath) {
+    // "Dexie.js" --> "Dexie"
+    // "Dexie.Observable.js" --> "Dexie.Observable"
+    let filename = filepath.split('/').reverse()[0];
+    let split = filename.split('.');
+    split.pop();
+    return split.join('.');
 }
 
 function throttle(millisecs, cb) {
@@ -134,7 +343,7 @@ function throttle(millisecs, cb) {
         Promise.resolve()
             .then(() => cb(callsClone))
             .catch(e => console.error(e))
-            .then(onTimeout);
+            .then(onTimeout); // Re-check if events occurred during the execution of the callback
     }
     return function () {
         var args = [].slice.call(arguments);
@@ -145,84 +354,3 @@ function throttle(millisecs, cb) {
         }
     }
 }
-
-function build(version, files, options) {
-    if (!options) options = {};
-    try { fs.mkdirSync("tmp"); } catch (e) { }
-
-    var varsToReplace = {
-        "{version}": version,
-        "{date}": new Date().toDateString()
-    };
-
-    return Promise.all(files.map(file => babelTransform("src/" + file, "tmp/" + file)))
-    .then(() =>rollup.rollup({ entry: "tmp/Dexie.js" }))
-
-    // Bundle to ES6 Bundle dist/Dexie.es6.js
-    .then(bundle =>bundle.write({
-        format: 'umd',
-        dest: 'dist/dexie.js',
-        sourceMap: true,
-        moduleName: "Dexie"
-    }))
-
-    // Replace {version} and {date}
-    .then(() => replaceInFile("dist/dexie.js", varsToReplace))
-
-    // Optional build steps goes here:
-    .then(() => {
-
-        // Rollup ES6 sources to a monolit ES6 output "dexie.es6.js"?
-        if (options.includeES6) {
-            return rollup.rollup({ entry: "src/Dexie.js" }).then(bundle =>
-                bundle.write({
-                    format: 'es6',
-                    dest: 'dist/dexie.es6.js',
-                    sourceMap: true
-                }))
-                .then(() => replaceInFile("dist/dexie.es6.js", varsToReplace));
-        }
-    })
-    .then(() => {
-
-        // Output a minified version of the main output (ES5 UMD module "dexie.min.js")
-        if (options.includeMinified) {
-            var result = uglify.minify("dist/dexie.js", {
-                inSourceMap: "dist/dexie.js.map",
-                outSourceMap: "dexie.min.js.map"
-            });
-            return Promise.all([
-                writeFile('dist/dexie.min.js', result.code),
-                writeFile('dist/dexie.min.js.map', result.map)
-            ]);
-        }
-    })
-    .then(() => {
-        if (options.includeGzipped) {
-            return gzip('dist/dexie.min.js', 'dist/dexie.min.js.gz');
-        }
-    })
-    .then(() => {
-
-        // Copy Dexie.d.ts as well?
-        if (options.includeTypings) {
-            return copyFiles({
-                "src/Dexie.d.ts": "dist/dexie.d.ts"
-            });
-        }
-    });
-}
-
-module.exports = {
-    copyFile: copyFile,
-    copyFiles: copyFiles,
-    readFile: readFile,
-    writeFile: writeFile,
-    parsePackageVersion: parsePackageVersion,
-    replace: replace,
-    replaceInFile: replaceInFile,
-    throttle: throttle,
-    listSourceFiles: listSourceFiles,
-    babelTransform: babelTransform,
-    build: build
-};

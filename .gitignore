@@ -168,6 +168,6 @@ samples/typescript/utils.js
 samples/typescript/utils.js.map
 /.vscode
 /jsconfig.json
-samples/typescript/utils.js.map
 
-node_modules/
+/.ntvs_analysis.dat
+/*.njsproj

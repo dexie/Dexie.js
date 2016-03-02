@@ -1,14 +1,35 @@
-var utils = require('./build-utils');
+import {build, parsePackageVersion} from './build-utils';
 
 console.log("Building...");
 
-utils.parsePackageVersion()
-    .then(version => utils.listSourceFiles()
-        .then(files => utils.build(version, files, {
-            includeMinified: true,
-            includeTypings: true,
-            includeES6: true,
-            includeGzipped: true
-        })))
-    .then(()=>console.log("All files successfully built. See dist/*"))
+parsePackageVersion().then(version =>
+    build([{
+        dirs: ["src/"],
+        bundles: {
+            "src/Dexie.js": [
+                "dist/dexie.js",
+                "dist/dexie.js.map",
+                "dist/dexie.min.js",
+                "dist/dexie.min.js.map",
+                "dist/dexie.min.js.gz",
+                "dist/dexie.es6.js",
+                "dist/dexie.es6.js.map"
+            ]
+        }
+    },{
+        dirs: ["test/"],
+        bundles: {
+            "test/tests-all.js": [
+                "test/bundle.js",
+                "test/bundle.js.map"
+            ]
+        },
+        excludes: ["test/worker.js", "test/karma-env.js", "test/require.js", "test/qunit.js"]
+    }], {
+        "{version}": version,
+        "{date}": new Date().toDateString()
+    }))
+
+    .then(()=>console.log("All files successfully build. See dist/*"))
+
     .catch(err => console.error(err));

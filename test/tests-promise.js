@@ -1,9 +1,7 @@
-﻿///<reference path="run-unit-tests.html" />
-///<reference path="qunit.js" />
-///<reference path="../dist/dexie.js" />
+﻿import Dexie from 'dexie';
+import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
 
-(function() {
-    module("promise");
+module("promise");
 
     function createDirectlyResolvedPromise() {
         return new Dexie.Promise(function(resolve) {
@@ -102,4 +100,4 @@
 
         });
     });
-})();
+

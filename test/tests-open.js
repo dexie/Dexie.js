@@ -1,4 +1,5 @@
-﻿///<reference path="run-unit-tests.html" />
+﻿import Dexie from 'dexie';
+import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
 
 module("open", {
     setup: function () {

@@ -1,0 +1,11 @@
+﻿// TODO: Config import loaders to use local qunit.js and not global.
+import "./tests-extendability.js";
+import "./tests-promise.js";
+import "./tests-table.js";
+import "./tests-open.js";
+import "./tests-collection.js";
+import "./tests-whereclause.js";
+import "./tests-exception-handling.js";
+import "./tests-upgrading.js";
+import "./tests-transaction.js";
+import "./tests-performance.js";

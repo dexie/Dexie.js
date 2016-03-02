@@ -1,7 +1,8 @@
-﻿/// <reference path="run-unit-tests.html" />
+﻿import Dexie from 'dexie';
+
 var no_optimize = window.no_optimize || window.location.search.indexOf('dontoptimize=true') != -1;
 
-function resetDatabase(db) {
+export function resetDatabase(db) {
     /// <param name="db" type="Dexie"></param>
     var Promise = Dexie.Promise;
     return no_optimize || !db._hasBeenCreated ?
@@ -72,7 +73,7 @@ function resetDatabase(db) {
         });
 }
 
-function deleteDatabase(db) {
+export function deleteDatabase(db) {
     var Promise = Dexie.Promise;
     return no_optimize ? db.delete() : db.transaction('rw!', db.tables, function() {
         // Got to do an operation in order for backend transaction to be created.
