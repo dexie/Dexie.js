@@ -1,4 +1,4 @@
-/// <reference path="../../dist/dexie.js" />
+/// <reference path="../../../dist/dexie.js" />
 import Dexie from 'dexie';
 
 /*
