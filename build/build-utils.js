@@ -49,7 +49,7 @@ export async function rebuildFiles(options, replacements, files) {
         .filter(file => exclusions.indexOf(file) === -1)
         .map (file => babelTransform(file, "tmp/" + file)));*/
     files = files
-        .filter(file => ext(file) === ".js")
+        .filter(file => file.toLowerCase().endsWith(".js"))
         .filter(file => exclusions.map(x=>x.replace(/\\/g, '/'))
             .indexOf(file.replace(/\\/g, '/')) === -1); // Insensitive to path separator style (WIN/UX)
 
