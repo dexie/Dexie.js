@@ -20,6 +20,7 @@ module.exports = function(config) {
       'dist/dexie.js',
       'test/bundle.js',
       { pattern: 'test/worker.js', included: false },
+      { pattern: '**/*.map', watched: false, included: false, served: true}
     ],
 
     port: 9876,
