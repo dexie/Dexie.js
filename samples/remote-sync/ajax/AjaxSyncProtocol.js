@@ -1,7 +1,6 @@
 ﻿/// <reference path="../../dist/dexie.js" />
-/// <reference path="../../addons/Dexie.Syncable.js" />
-/// <reference path="../../addons/Dexie.Syncable.Remote.js" />
-/// <reference path="../../addons/Dexie.Syncable.Remote.SyncProtocolAPI.js" />
+/// <reference path="../../addons/Dexie.Syncable/dist/dexie-syncable.js" />
+/// <reference path="../../addons/Dexie.Syncable/Dexie.Syncable.SyncProtocolAPI.js" />
 /// <reference path="includes/jquery-2.1.0.js" />
 
 Dexie.Syncable.Remote.registerSyncProtocol("sample_protocol", {

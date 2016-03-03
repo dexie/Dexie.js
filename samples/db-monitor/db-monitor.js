@@ -1,5 +1,5 @@
 ﻿/// <reference path="../../dist/dexie.js" />
-/// <reference path="../../addons/Dexie.Observable/Dexie.Observable.js" />
+/// <reference path="../../addons/Dexie.Observable/dist/dexie-observable.js" />
 /// <reference path="https://code.jquery.com/jquery-2.1.1.js" />
 
 function DBMonitor(searchBox, tbody) {
