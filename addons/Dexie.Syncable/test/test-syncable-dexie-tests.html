@@ -10,14 +10,17 @@
         <div id="qunit-fixture"></div>
         <script>
             // Hack for making the WebWorker test behave also here...
-            window.workerImports = ["../dist/dexie.js", "../addons/Dexie.Observable/Dexie.Observable.js", "../addons/Dexie.Syncable/Dexie.Syncable.js"];
             window.workerSource = "../../../test/worker.js";
+            window.workerImports = [
+                "../dist/dexie.js",
+                "../addons/Dexie.Observable/dist/dexie-observable.js",
+                "../addons/Dexie.Syncable/dist/dexie-syncable.js"
+            ];
         </script>
         <script src="../../../test/qunit.js"></script>
         <script src="../../../dist/dexie.js"></script>
-        <script src="../../Dexie.Observable/Dexie.Observable.js"></script>
-        <script src="../Dexie.Syncable.js"></script>
-        <script src="../../../test/dexie-unittest-utils.js"></script>
+        <script src="../../Dexie.Observable/dist/dexie-observable.js"></script>
+        <script src="../dist/dexie-syncable.js"></script>
         <script>
             Dexie.Syncable.registerSyncProtocol("logger", {
                 sync: function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
@@ -79,14 +82,6 @@
                 });
             });
         </script>
-        <script src="../../../test/tests-extendability.js"></script>
-        <script src="../../../test/tests-table.js"></script>
-        <script src="../../../test/tests-open.js"></script>
-        <script src="../../../test/tests-collection.js"></script>
-        <script src="../../../test/tests-whereclause.js"></script>
-        <script src="../../../test/tests-exception-handling.js"></script>
-        <script src="../../../test/tests-upgrading.js"></script>
-        <script src="../../../test/tests-transaction.js"></script>
-        <script src="../../../test/tests-performance.js"></script>
+        <script src="../../../test/bundle.js"></script>
     </body>
 </html>

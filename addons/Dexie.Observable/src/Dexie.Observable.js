@@ -809,4 +809,5 @@ if (global.addEventListener) {
     global.addEventListener("beforeunload", Observable._onBeforeUnload);
 }
 // Register addon:
+Dexie.Observable = Observable;
 Dexie.addons.push(Observable);
