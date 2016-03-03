@@ -1,4 +1,4 @@
-﻿///<reference path="require.js" />
+﻿
 define(function () {
 
     function Console() {

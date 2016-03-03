@@ -1,4 +1,4 @@
-﻿///<reference path="app.js" />
+﻿
 define(['./db'], function (db) {
     
     function Contact(id, first, last) {

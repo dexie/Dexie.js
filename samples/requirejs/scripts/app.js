@@ -1,7 +1,7 @@
-﻿/// <reference path="require.js" />
+﻿
 require.config({
     paths: {
-        "dexie": "../../../dist/dexie"
+        "dexie": "../../../dist/dexie.min"
     }
 });
 

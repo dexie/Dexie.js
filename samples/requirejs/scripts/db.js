@@ -1,5 +1,5 @@
-﻿///<reference path="app.js" />
-define(['Dexie'], function (Dexie) {
+﻿
+define(['dexie'], function (Dexie) {
     
     // Declare Dexie instance
     var db = new Dexie("appdb");

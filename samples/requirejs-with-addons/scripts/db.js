@@ -1,5 +1,5 @@
-﻿///<reference path="app.js" />
-define(['Dexie', 'Dexie.Observable', './console'], function (Dexie, DexieObservable, console) {
+﻿
+define(['dexie', 'dexie-observable', './console'], function (Dexie, DexieObservable, console) {
 
     // Declare Dexie instance and explicitely apply the addon:
     var db = new Dexie("appdb2", { addons: [DexieObservable] });

@@ -4,12 +4,12 @@
   "description": "Sample on how to use Dexie.js with browserify",
   "main": "scripts/main.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1",
-    "build": "browserify scripts/main.js -o bundle.js"
+    "build": "browserify scripts/main.js -o bundle.js",
+    "test": "http-server . -a localhost -p 8081"
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dfahlander/Dexie.js.git"
+    "url": "https://github.com/dfahlander/Dexie.js.git"
   },
   "keywords": [
     "dexie",
