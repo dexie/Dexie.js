@@ -1,96 +1,15 @@
 (function e(t,n,r){function s(o,u){if(!n[o]){if(!t[o]){var a=typeof require=="function"&&require;if(!u&&a)return a(o,!0);if(i)return i(o,!0);var f=new Error("Cannot find module '"+o+"'");throw f.code="MODULE_NOT_FOUND",f}var l=n[o]={exports:{}};t[o][0].call(l.exports,function(e){var n=t[o][1][e];return s(n?n:e)},l,l.exports,e,t,n,r)}return n[o].exports}var i=typeof require=="function"&&require;for(var o=0;o<r.length;o++)s(r[o]);return s})({1:[function(require,module,exports){
-function Console() {
-    this.textarea = document.createElement('textarea');
-    this.log = function (txt, type) {
-        if (type) this.textarea.value += type + " ";
-        this.textarea.value += txt + "\n";
-    }
-    this.error = function (txt) {
-        this.log(txt, "ERROR!");
-    }
-}
-
-var console = new Console();
-
-document.getElementById('consoleArea').appendChild(console.textarea);
-
-module.exports = console;
-
-},{}],2:[function(require,module,exports){
-var db = require("./db");
-    
-function Contact(id, first, last) {
-    this.id = id;
-    this.first = first;
-    this.last = last;
-}
-    
-Contact.prototype.resolve = function () {
-    var contact = this;
-
-    return db.emails.where('contactId').equals(contact.id).toArray(function (emails) {
-
-        return db.phones.where('contactId').equals(contact.id).toArray(function (phones) {
-
-            return {
-                id: contact.id,
-                first: contact.first,
-                last: contact.last,
-                emails: emails,
-                phones: phones
-            };
-        });
-    });
-};
-
-db.contacts.mapToClass(Contact);
-
-module.exports = Contact;
-
-},{"./db":3}],3:[function(require,module,exports){
-var Dexie = require("dexie");
-
-// Declare Dexie instance
-var db = new Dexie("maindb");
-
-// Define database schema
-db.version(1).stores({
-    contacts: '++id,first,last',
-    emails: '++id,contactId,type,email',
-    phones: '++id,contactId,type,phone',
-});
-
-// Populate ground data
-db.on('populate', function () {
-        
-    // Populate a contact
-    db.contacts.add({ first: 'Arnold', last: 'Fitzgerald' }).then(function (id) {
-
-        // Populate some emails and phone numbers for the contact
-        db.emails.add({ contactId: id, type: 'home', email: 'arnold@email.com' });
-        db.emails.add({ contactId: id, type: 'work', email: 'arnold@abc.com' });
-        db.phones.add({ contactId: id, type: 'home', phone: '12345678' });
-        db.phones.add({ contactId: id, type: 'work', phone: '987654321' });
-    });
-});
-
-// Open database
-db.open();
-
-module.exports = db;
-
-},{"dexie":4}],4:[function(require,module,exports){
 (function (global){
-/* Minimalistic IndexedDB Wrapper with Bullet Proof Transactions
-   =============================================================
+/* A Minimalistic Wrapper for IndexedDB
+   ====================================
 
    By David Fahlander, david.fahlander@gmail.com
 
-   Version 1.1.0 (alpha - not yet distributed) - DATE, YEAR.
+   Version 1.2.0 - September 22, 2015.
 
-   Tested successfully on Chrome, IE, Firefox and Opera.
+   Tested successfully on Chrome, Opera, Firefox, Edge, and IE.
 
-   Official Website: https://github.com/dfahlander/Dexie.js/wiki/Dexie.js
+   Official Website: www.dexie.com
 
    Licensed under the Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
 */
@@ -150,7 +69,7 @@ module.exports = db;
         var READONLY = "readonly", READWRITE = "readwrite";
         var db = this;
         var pausedResumeables = [];
-        var autoSchema = false;
+        var autoSchema = true;
         var hasNativeGetDatabaseNames = !!getNativeGetDatabaseNamesFn();
 
         function init() {
@@ -250,7 +169,7 @@ module.exports = db;
                         var indexes = parseIndexSyntax(stores[tableName]);
                         var primKey = indexes.shift();
                         if (primKey.multi) throw new Error("Primary key cannot be multi-valued");
-                        if (primKey.keyPath && primKey.auto) setByKeyPath(instanceTemplate, primKey.keyPath, 0);
+                        if (primKey.keyPath) setByKeyPath(instanceTemplate, primKey.keyPath, primKey.auto ? 0 : primKey.keyPath);
                         indexes.forEach(function (idx) {
                             if (idx.auto) throw new Error("Only primary key can be marked as autoIncrement (++)");
                             if (!idx.keyPath) throw new Error("Index must have a name and cannot be an empty string");
@@ -526,9 +445,8 @@ module.exports = db;
         }; 
 
         this._whenReady = function (fn) {
-            if (db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
+            if (!fake && db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
                 return new Promise(function (resolve, reject) {
-                    fakeAutoComplete(function () { new Promise(function () { fn(resolve, reject); }); });
                     pausedResumeables.push({
                         resume: function () {
                             fn(resolve, reject);
@@ -552,6 +470,7 @@ module.exports = db;
 
         this.open = function () {
             return new Promise(function (resolve, reject) {
+                if (fake) resolve(db);
                 if (idbdb || isBeingOpened) throw new Error("Database already opened or being opened");
                 var req, dbWasCreated = false;
                 function openError(err) {
@@ -577,9 +496,7 @@ module.exports = db;
                     isBeingOpened = true;
 
                     // Make sure caller has specified at least one version
-                    if (versions.length === 0) {
-                        autoSchema = true;
-                    }
+                    if (versions.length > 0) autoSchema = false;
 
                     // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE: 
                     // IE fails when deleting objectStore after reading from it.
@@ -587,6 +504,7 @@ module.exports = db;
                     // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
                     if (!indexedDB) throw new Error("indexedDB API not found. If using IE10+, make sure to run your code on a server URL (not locally). If using Safari, make sure to include indexedDB polyfill.");
                     req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
+                    if (!req) throw new Error("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134 
                     req.onerror = eventRejectHandler(openError, ["opening database", dbName]);
                     req.onblocked = function (ev) {
                         db.on("blocked").fire(ev);
@@ -651,7 +569,7 @@ module.exports = db;
                                     resumable.resume();
                                 });
                                 pausedResumeables = [];
-                                resolve();
+                                resolve(db);
                             }
                         });
                     }, openError);
@@ -833,7 +751,7 @@ module.exports = db;
                 // If this is a root-level transaction, wait til database is ready and then launch the transaction.
                 return db._whenReady(enterTransactionScope);
             }
-
+            
             function enterTransactionScope(resolve, reject) {
                 // Our transaction. To be set later.
                 var trans = null;
@@ -938,9 +856,10 @@ module.exports = db;
 
         this.table = function (tableName) {
             /// <returns type="WriteableTable"></returns>
-            if (!autoSchema && !allTables.hasOwnProperty(tableName)) { throw new Error("Table does not exist"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
+            if (fake && autoSchema) return new WriteableTable(tableName);
+            if (!allTables.hasOwnProperty(tableName)) { throw new Error("Table does not exist"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
             return allTables[tableName];
-        }; 
+        };
 
         //
         //
@@ -976,6 +895,7 @@ module.exports = db;
                     return this._tpf(mode, [this.name], fn, writeLocked);
                 },
                 _idbstore: function getIDBObjectStore(mode, fn, writeLocked) {
+                    if (fake) return new Promise(fn); // Simplify the work for Intellisense/Code completion.
                     var self = this;
                     return this._tpf(mode, [this.name], function (resolve, reject, trans) {
                         fn(resolve, reject, trans.idbtrans.objectStore(self.name), trans);
@@ -987,8 +907,8 @@ module.exports = db;
                 //
                 get: function (key, cb) {
                     var self = this;
-                    fakeAutoComplete(function () { cb(self.schema.instanceTemplate); });
                     return this._idbstore(READONLY, function (resolve, reject, idbstore) {
+                        fake && resolve(self.schema.instanceTemplate);
                         var req = idbstore.get(key);
                         req.onerror = eventRejectHandler(reject, ["getting", key, "from", self.name]);
                         req.onsuccess = function () {
@@ -1016,7 +936,7 @@ module.exports = db;
                 },
                 each: function (fn) {
                     var self = this;
-                    fakeAutoComplete(function () { fn(self.schema.instanceTemplate); });
+                    fake && fn(self.schema.instanceTemplate);
                     return this._idbstore(READONLY, function (resolve, reject, idbstore) {
                         var req = idbstore.openCursor();
                         req.onerror = eventRejectHandler(reject, ["calling", "Table.each()", "on", self.name]);
@@ -1025,8 +945,8 @@ module.exports = db;
                 },
                 toArray: function (cb) {
                     var self = this;
-                    fakeAutoComplete(function () { cb([self.schema.instanceTemplate]); });
                     return this._idbstore(READONLY, function (resolve, reject, idbstore) {
+                        fake && resolve([self.schema.instanceTemplate]);
                         var a = [];
                         var req = idbstore.openCursor();
                         req.onerror = eventRejectHandler(reject, ["calling", "Table.toArray()", "on", self.name]);
@@ -1051,12 +971,6 @@ module.exports = db;
                     /// know what type each member has. Example: {name: String, emailAddresses: [String], password}</param>
                     this.schema.mappedClass = constructor;
                     var instanceTemplate = Object.create(constructor.prototype);
-                    if (this.schema.primKey.keyPath) {
-                        // Make sure primary key is not part of prototype because add() and put() fails on Chrome if primKey template lies on prototype due to a bug in its implementation
-                        // of getByKeyPath(), that it accepts getting from prototype chain.
-                        setByKeyPath(instanceTemplate, this.schema.primKey.keyPath, this.schema.primKey.auto ? 0 : "");
-                        delByKeyPath(constructor.prototype, this.schema.primKey.keyPath);
-                    }
                     if (structure) {
                         // structure and instanceTemplate is for IDE code competion only while constructor.prototype is for actual inheritance.
                         applyStructure(instanceTemplate, structure);
@@ -1065,19 +979,14 @@ module.exports = db;
 
                     // Now, subscribe to the when("reading") event to make all objects that come out from this table inherit from given class
                     // no matter which method to use for reading (Table.get() or Table.where(...)... )
-                    var readHook = Object.setPrototypeOf ?
-                        function makeInherited(obj) {
-                            if (!obj) return obj; // No valid object. (Value is null). Return as is.
-                            // Object.setPrototypeOf() supported. Just change that pointer on the existing object. A little more efficient way.
-                            Object.setPrototypeOf(obj, constructor.prototype);
-                            return obj;
-                        } : function makeInherited(obj) {
-                            if (!obj) return obj; // No valid object. (Value is null). Return as is.
-                            // Object.setPrototypeOf not supported (IE10)- return a new object and clone the members from the old one.
-                            var res = Object.create(constructor.prototype);
-                            for (var m in obj) if (obj.hasOwnProperty(m)) res[m] = obj[m];
-                            return res;
-                        };
+                    var readHook = function (obj) {
+                        if (!obj) return obj; // No valid object. (Value is null). Return as is.
+                        // Create a new object that derives from constructor:
+                        var res = Object.create(constructor.prototype);
+                        // Clone members:
+                        for (var m in obj) if (obj.hasOwnProperty(m)) res[m] = obj[m];
+                        return res;
+                    };
 
                     if (this.schema.readHook) {
                         this.hook.reading.unsubscribe(this.schema.readHook);
@@ -1365,9 +1274,14 @@ module.exports = db;
                                     self.abort(); // Make sure transaction is aborted since we preventDefault.
                                 }; 
                                 idbtrans.onabort = function (e) {
+                                    // Workaround for issue #78 - low disk space on chrome.
+                                    // onabort is called but never onerror. Call onerror explicitely.
+                                    // Do this in a future tick so we allow default onerror to execute before doing the fallback.
+                                    asap(function () { self.on('error').fire(new Error("Transaction aborted for unknown reason")); });
+
                                     self.active = false;
                                     self.on("abort").fire(e);
-                                }; 
+                                };
                                 idbtrans.oncomplete = function (e) {
                                     self.active = false;
                                     self.on("complete").fire(e);
@@ -1622,6 +1536,94 @@ module.exports = db;
                         }
                     });
                     return c;
+                },
+
+                notEqual: function(value) {
+                    return this.below(value).or(this._ctx.index).above(value);
+                },
+
+                noneOf: function(valueArray) {
+                    var ctx = this._ctx,
+                        schema = ctx.table.schema;
+                    var idxSpec = ctx.index ? schema.idxByName[ctx.index] : schema.primKey;
+                    var isCompound = idxSpec && idxSpec.compound;
+                    var set = getSetArgs(arguments);
+                    if (set.length === 0) return new this._ctx.collClass(this); // Return entire collection.
+                    var compare = isCompound ? compoundCompare(ascending) : ascending;
+                    set.sort(compare);
+                    // Transform ["a","b","c"] to a set of ranges for between/above/below: [[null,"a"], ["a","b"], ["b","c"], ["c",null]]
+                    var ranges = set.reduce(function (res, val) { return res ? res.concat([[res[res.length - 1][1], val]]) : [[null, val]]; }, null);
+                    ranges.push([set[set.length - 1], null]);
+                    // Transform range-sets to a big or() expression between ranges:
+                    var thiz = this, index = ctx.index;
+                    return ranges.reduce(function(collection, range) {
+                        return collection ?
+                            range[1] === null ?
+                                collection.or(index).above(range[0]) :
+                                collection.or(index).between(range[0], range[1], false, false)
+                            : thiz.below(range[1]);
+                    }, null);
+                },
+
+                startsWithAnyOf: function (valueArray) {
+                    var ctx = this._ctx,
+                        set = getSetArgs(arguments);
+
+                    if (!set.every(function (s) { return typeof s === 'string'; })) {
+                        return fail(new ctx.collClass(this), new TypeError("startsWithAnyOf() only works with strings"));
+                    }
+                    if (set.length === 0) return new ctx.collClass(this, function () { return IDBKeyRange.only(""); }).limit(0); // Return an empty collection.
+
+                    var setEnds = set.map(function (s) { return s + String.fromCharCode(65535); });
+                    
+                    var sortDirection = ascending;
+                    set.sort(sortDirection);
+                    var i = 0;
+                    function keyIsBeyondCurrentEntry(key) { return key > setEnds[i]; }
+                    function keyIsBeforeCurrentEntry(key) { return key < set[i]; }
+                    var checkKey = keyIsBeyondCurrentEntry;
+
+                    var c = new ctx.collClass(this, function () {
+                        return IDBKeyRange.bound(set[0], set[set.length - 1] + String.fromCharCode(65535));
+                    });
+                    
+                    c._ondirectionchange = function (direction) {
+                        if (direction === "next") {
+                            checkKey = keyIsBeyondCurrentEntry;
+                            sortDirection = ascending;
+                        } else {
+                            checkKey = keyIsBeforeCurrentEntry;
+                            sortDirection = descending;
+                        }
+                        set.sort(sortDirection);
+                        setEnds.sort(sortDirection);
+                    };
+
+                    c._addAlgorithm(function (cursor, advance, resolve) {
+                        var key = cursor.key;
+                        while (checkKey(key)) {
+                            // The cursor has passed beyond this key. Check next.
+                            ++i;
+                            if (i === set.length) {
+                                // There is no next. Stop searching.
+                                advance(resolve);
+                                return false;
+                            }
+                        }
+                        if (key >= set[i] && key <= setEnds[i]) {
+                            // The current cursor value should be included and we should continue a single step in case next item has the same key or possibly our next key in set.
+                            advance(function () { cursor.continue(); });
+                            return true;
+                        } else {
+                            // cursor.key not yet at set[i]. Forward cursor to the next key to hunt for.
+                            advance(function() {
+                                if (sortDirection === ascending) cursor.continue(set[i]);
+                                else cursor.continue(setEnds[i]);
+                            });
+                            return false;
+                        }
+                    });
+                    return c;
                 }
             };
         });
@@ -1763,7 +1765,7 @@ module.exports = db;
                 each: function (fn) {
                     var ctx = this._ctx;
 
-                    fakeAutoComplete(function () { fn(getInstanceTemplate(ctx)); });
+                    fake && fn(getInstanceTemplate(ctx));
 
                     return this._read(function (resolve, reject, idbstore) {
                         iter(ctx, fn, resolve, reject, idbstore);
@@ -1771,7 +1773,7 @@ module.exports = db;
                 },
 
                 count: function (cb) {
-                    fakeAutoComplete(function () { cb(0); });
+                    if (fake) return Promise.resolve(0).then(cb);
                     var self = this,
                         ctx = this._ctx;
 
@@ -1797,7 +1799,6 @@ module.exports = db;
                 sortBy: function (keyPath, cb) {
                     /// <param name="keyPath" type="String"></param>
                     var ctx = this._ctx;
-                    fakeAutoComplete(function () { cb([getInstanceTemplate(ctx)]); });
                     var parts = keyPath.split('.').reverse(),
                         lastPart = parts[0],
                         lastIndex = parts.length - 1;
@@ -1819,10 +1820,8 @@ module.exports = db;
 
                 toArray: function (cb) {
                     var ctx = this._ctx;
-
-                    fakeAutoComplete(function () { cb([getInstanceTemplate(ctx)]); });
-
                     return this._read(function (resolve, reject, idbstore) {
+                        fake && resolve([getInstanceTemplate(ctx)]);
                         var a = [];
                         iter(ctx, function (item) { a.push(item); }, function arrayComplete() {
                             resolve(a);
@@ -1860,7 +1859,7 @@ module.exports = db;
 
                 until: function (filterFunction, bIncludeStopEntry) {
                     var ctx = this._ctx;
-                    fakeAutoComplete(function () { filterFunction(getInstanceTemplate(ctx)); });
+                    fake && filterFunction(getInstanceTemplate(ctx));
                     addFilter(this._ctx, function (cursor, advance, resolve) {
                         if (filterFunction(cursor.value)) {
                             advance(resolve);
@@ -1873,8 +1872,6 @@ module.exports = db;
                 },
 
                 first: function (cb) {
-                    var self = this;
-                    fakeAutoComplete(function () { cb(getInstanceTemplate(self._ctx)); });
                     return this.limit(1).toArray(function (a) { return a[0]; }).then(cb);
                 },
 
@@ -1884,8 +1881,7 @@ module.exports = db;
 
                 and: function (filterFunction) {
                     /// <param name="jsFunctionFilter" type="Function">function(val){return true/false}</param>
-                    var self = this;
-                    fakeAutoComplete(function () { filterFunction(getInstanceTemplate(self._ctx)); });
+                    fake && filterFunction(getInstanceTemplate(this._ctx));
                     addFilter(this._ctx, function (cursor) {
                         return filterFunction(cursor.value);
                     });
@@ -1908,8 +1904,8 @@ module.exports = db;
                 },
 
                 eachKey: function (cb) {
-                    var self = this, ctx = this._ctx;
-                    fakeAutoComplete(function () { cb(getInstanceTemplate(self._ctx)[self._ctx.index]); });
+                    var ctx = this._ctx;
+                    fake && cb(getByKeyPath(getInstanceTemplate(this._ctx), this._ctx.index ? this._ctx.table.schema.idxByName[this._ctx.index].keyPath : this._ctx.table.schema.primKey.keyPath));
                     if (!ctx.isPrimKey) ctx.op = "openKeyCursor"; // Need the check because IDBObjectStore does not have "openKeyCursor()" while IDBIndex has.
                     return this.each(function (val, cursor) { cb(cursor.key, cursor); });
                 },
@@ -1920,11 +1916,10 @@ module.exports = db;
                 },
 
                 keys: function (cb) {
-                    fakeAutoComplete(function () { cb([getInstanceTemplate(ctx)[self._ctx.index]]); });
-                    var self = this,
-                        ctx = this._ctx;
+                    var ctx = this._ctx;
                     if (!ctx.isPrimKey) ctx.op = "openKeyCursor"; // Need the check because IDBObjectStore does not have "openKeyCursor()" while IDBIndex has.
                     var a = [];
+                    if (fake) return new Promise(this.eachKey.bind(this)).then(function(x) { return [x]; }).then(cb);
                     return this.each(function (item, cursor) {
                         a.push(cursor.key);
                     }).then(function () {
@@ -1938,9 +1933,6 @@ module.exports = db;
                 },
 
                 firstKey: function (cb) {
-                    var self = this;
-                    //fakeAutoComplete(function () { cb(getInstanceTemplate(self._ctx)[self._ctx.index]); });
-                    //debugger;
                     return this.limit(1).keys(function (a) { return a[0]; }).then(cb);
                 },
 
@@ -1984,11 +1976,7 @@ module.exports = db;
                     updatingHook = hook.updating.fire,
                     deletingHook = hook.deleting.fire;
 
-                fakeAutoComplete(function () {
-                    if (typeof changes === 'function') {
-                        changes.call({ value: ctx.table.schema.instanceTemplate }, ctx.table.schema.instanceTemplate);
-                    }
-                });
+                fake && typeof changes === 'function' && changes.call({ value: ctx.table.schema.instanceTemplate }, ctx.table.schema.instanceTemplate);
 
                 return this._write(function (resolve, reject, idbstore, trans) {
                     var modifyer;
@@ -2236,7 +2224,6 @@ module.exports = db;
             };
         }
 
-
         function combine(filter1, filter2) {
             return filter1 ? filter2 ? function () { return filter1.apply(this, arguments) && filter2.apply(this, arguments); } : filter1 : filter2;
         }
@@ -2331,10 +2318,17 @@ module.exports = db;
 
         // The use of asap in handle() is remarked because we must NOT use setTimeout(fn,0) because it causes premature commit of indexedDB transactions - which is according to indexedDB specification.
         var _slice = [].slice;
-        var _asap = typeof (setImmediate) === 'undefined' ? function(fn, arg1, arg2, argN) {
+        var _asap = typeof setImmediate === 'undefined' ? function(fn, arg1, arg2, argN) {
             var args = arguments;
             setTimeout(function() { fn.apply(global, _slice.call(args, 1)); }, 0); // If not FF13 and earlier failed, we could use this call here instead: setTimeout.call(this, [fn, 0].concat(arguments));
         } : setImmediate; // IE10+ and node.
+
+        doFakeAutoComplete(function () {
+            // Simplify the job for VS Intellisense. This piece of code is one of the keys to the new marvellous intellisense support in Dexie.
+            _asap = asap = enqueueImmediate = function(fn) {
+                var args = arguments; setTimeout(function() { fn.apply(global, _slice.call(args, 1)); }, 0);
+            };
+        });
 
         var asap = _asap,
             isRootExecution = true;
@@ -2856,7 +2850,8 @@ module.exports = db;
         if (global.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
     }
 
-    var fakeAutoComplete = function() {};
+    var fakeAutoComplete = function () { };// Will never be changed. We just fake for the IDE that we change it (see doFakeAutoComplete())
+    var fake = false; // Will never be changed. We just fake for the IDE that we change it (see doFakeAutoComplete())
 
     function doFakeAutoComplete(fn) {
         var to = setTimeout(fn, 1000);
@@ -2923,7 +2918,12 @@ module.exports = db;
     }
 
     function delByKeyPath(obj, keyPath) {
-        setByKeyPath(obj, keyPath, undefined);
+        if (typeof keyPath === 'string')
+            setByKeyPath(obj, keyPath, undefined);
+        else if ('length' in keyPath)
+            [].map.call(keyPath, function(kp) {
+                 setByKeyPath(obj, kp, undefined);
+            });
     }
 
     function shallowClone(obj) {
@@ -3122,7 +3122,19 @@ module.exports = db;
             return this;
         };
         return promise;
-    }; 
+    };
+
+    //
+    // Static exists() method.
+    //
+    Dexie.exists = function(name) {
+        return new Dexie(name).open().then(function(db) {
+            db.close();
+            return true;
+        }, function() {
+            return false;
+        });
+    }
 
     //
     // Static method for retrieving a list of all existing databases at current host.
@@ -3157,9 +3169,8 @@ module.exports = db;
         function Class(properties) {
             /// <param name="properties" type="Object" optional="true">Properties to initialize object with.
             /// </param>
-            if (properties) extend(this, properties);
+            properties ? extend(this, properties) : fake && applyStructure(this, structure);
         }
-        applyStructure(Class.prototype, structure);
         return Class;
     }; 
 
@@ -3265,7 +3276,7 @@ module.exports = db;
     }; 
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-    Dexie.version = 1.10;
+    Dexie.version = 1.20;
 
     function getNativeGetDatabaseNamesFn() {
         var indexedDB = Dexie.dependencies.indexedDB;
@@ -3276,15 +3287,16 @@ module.exports = db;
     // Export Dexie to window or as a module depending on environment.
     publish("Dexie", Dexie);
 
-    // Fool IDE to improve autocomplete. Tested with Visual Studio 2013 but should work with 2012 and 2015 as well.
+    // Fool IDE to improve autocomplete. Tested with Visual Studio 2013 and 2015.
     doFakeAutoComplete(function() {
-        fakeAutoComplete = doFakeAutoComplete;
+        Dexie.fakeAutoComplete = fakeAutoComplete = doFakeAutoComplete;
+        Dexie.fake = fake = true;
     });
 }).apply(null,
 
     // AMD:
     typeof define === 'function' && define.amd ?
-    [self || window, function (name, value) { define(name, function () { return value; }); }] :
+    [self || window, function (name, value) { define(function () { return value; }); }] :
 
     // CommonJS:
     typeof global !== 'undefined' && typeof module !== 'undefined' && module.exports ?
@@ -3295,7 +3307,88 @@ module.exports = db;
 
 
 }).call(this,typeof global !== "undefined" ? global : typeof self !== "undefined" ? self : typeof window !== "undefined" ? window : {})
-},{}],5:[function(require,module,exports){
+},{}],2:[function(require,module,exports){
+function Console() {
+    this.textarea = document.createElement('textarea');
+    this.log = function (txt, type) {
+        if (type) this.textarea.value += type + " ";
+        this.textarea.value += txt + "\n";
+    }
+    this.error = function (txt) {
+        this.log(txt, "ERROR!");
+    }
+}
+
+var console = new Console();
+
+document.getElementById('consoleArea').appendChild(console.textarea);
+
+module.exports = console;
+
+},{}],3:[function(require,module,exports){
+var db = require("./db");
+    
+function Contact(id, first, last) {
+    this.id = id;
+    this.first = first;
+    this.last = last;
+}
+    
+Contact.prototype.resolve = function () {
+    var contact = this;
+
+    return db.emails.where('contactId').equals(contact.id).toArray(function (emails) {
+
+        return db.phones.where('contactId').equals(contact.id).toArray(function (phones) {
+
+            return {
+                id: contact.id,
+                first: contact.first,
+                last: contact.last,
+                emails: emails,
+                phones: phones
+            };
+        });
+    });
+};
+
+db.contacts.mapToClass(Contact);
+
+module.exports = Contact;
+
+},{"./db":4}],4:[function(require,module,exports){
+var Dexie = require("dexie");
+
+// Declare Dexie instance
+var db = new Dexie("maindb");
+
+// Define database schema
+db.version(1).stores({
+    contacts: '++id,first,last',
+    emails: '++id,contactId,type,email',
+    phones: '++id,contactId,type,phone',
+});
+
+// Populate ground data
+db.on('populate', function () {
+        
+    // Populate a contact
+    db.contacts.add({ first: 'Arnold', last: 'Fitzgerald' }).then(function (id) {
+
+        // Populate some emails and phone numbers for the contact
+        db.emails.add({ contactId: id, type: 'home', email: 'arnold@email.com' });
+        db.emails.add({ contactId: id, type: 'work', email: 'arnold@abc.com' });
+        db.phones.add({ contactId: id, type: 'home', phone: '12345678' });
+        db.phones.add({ contactId: id, type: 'work', phone: '987654321' });
+    });
+});
+
+// Open database
+db.open();
+
+module.exports = db;
+
+},{"dexie":1}],5:[function(require,module,exports){
 var Dexie = require("dexie"),
     console = require("./console"),
     db = require("./db"),
@@ -3326,4 +3419,4 @@ db.transaction('r', db.contacts, db.phones, db.emails, function () {
 
 });
 
-},{"./console":1,"./contact":2,"./db":3,"dexie":4}]},{},[5]);
+},{"./console":2,"./contact":3,"./db":4,"dexie":1}]},{},[5]);
