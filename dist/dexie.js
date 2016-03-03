@@ -10,7 +10,7 @@
     *
     * By David Fahlander, david.fahlander@gmail.com
     *
-    * Version 1.3.0, Wed Feb 24 2016
+    * Version 1.3.0, Thu Mar 03 2016
     * www.dexie.com
     * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
     */

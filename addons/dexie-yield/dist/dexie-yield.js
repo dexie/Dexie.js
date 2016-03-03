@@ -6,14 +6,34 @@
 
     Dexie = 'default' in Dexie ? Dexie['default'] : Dexie;
 
+    // Prefer standard promise, but fallback to Dexie Promise.
+    // The standard Promise will only be used in case the async function throws or returns value before yielding a thenable.
+    // If writing the async functions correctly, async() will adapt to the type of promise returned, such as Q, WinJS or Dexie.
+
+    var Promise = (typeof self === 'undefined' ? global : (self || window)).Promise || Dexie.Promise; 
+
     function async(generatorFn) {
         return function () {
-            return iterate(generatorFn.apply(this, arguments));
+            try {
+                var rv = iterate(generatorFn.apply(this, arguments));
+                if (!rv || typeof rv.then !== 'function')
+                    return Promise.resolve(rv);
+                return rv;
+            } catch (e) {
+                return Promise.reject(e);
+            }
         }
     }
 
-    function spawn(generatorFn, promiseImpl) {
-        return iterate(generatorFn());
+    function spawn(generatorFn, args, thiz) {
+        try {
+            var rv = iterate(generatorFn.apply(thiz, args || []));
+            if (!rv || typeof rv.then !== 'function')
+                return Dexie.Promise.resolve(rv);
+            return rv;
+        } catch (e) {
+            return Dexie.Promise.reject(e);
+        }
     }
 
     function iterate (iterable) {
@@ -61,9 +81,9 @@
                     return iterate(rv);
                 }
 
-                proxyScope.toString = function () {
-                    return scopeFunc.toString(); // Because original db.transaction may use fn.toString() when error occur.
-                }
+                proxyScope.toString =
+                    () => scopeFunc.toString(); // Because original db.transaction may use fn.toString() when error occur.
+                    
                 arguments[arguments.length - 1] = proxyScope;
                 return origDbTransaction.apply(this, arguments);
             }
