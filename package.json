@@ -22,8 +22,8 @@
   "scripts": {
     "build": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator build/build.js",
     "watch": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator build/watch.js",
-    "test": "node_modules/.bin/karma start karma.conf.js --single-run --browsers Chrome",
-    "test:debug": "node_modules/.bin/karma start karma.conf.js --browsers Chrome"
+    "test": "node_modules/.bin/karma start test/karma.conf.js --single-run --browsers Chrome",
+    "test:debug": "node_modules/.bin/karma start test/karma.conf.js --browsers Chrome"
   },
   "engines": {
     "node": ">=4.2 <5.0"

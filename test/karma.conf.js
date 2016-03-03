@@ -1,6 +1,6 @@
 module.exports = function(config) {
   const configuration = {
-    basePath: '',
+    basePath: '..',
 
     frameworks: [
       'qunit',

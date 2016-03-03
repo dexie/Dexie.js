@@ -6,6 +6,7 @@ const babel = require('babel-core');
 const zlib = promisifyAll(require('zlib'));
 const watch = require('node-watch');
 const path = require('path');
+const TMPDIR = `${path.parse(__dirname).name}/tmp/`;
 
 export async function build (optionsList) {
     let replacements = {
@@ -13,13 +14,13 @@ export async function build (optionsList) {
         "{date}": new Date().toDateString()
     };
     // Create tmp directory
-    await mkdir("tmp/");
+    await mkdir(TMPDIR);
     // Create sub dirs to tmp/
     await Promise.all(
         flatten(
             optionsList.map(options =>
                 options.dirs.map(dir =>
-                    mkdir("tmp/" + dir)))
+                    mkdir(TMPDIR + dir)))
         )
     );
 
@@ -47,7 +48,7 @@ export async function rebuildFiles(options, replacements, files) {
     /*await Promise.all(files
         .filter(file => ext(file) === ".js")
         .filter(file => exclusions.indexOf(file) === -1)
-        .map (file => babelTransform(file, "tmp/" + file)));*/
+        .map (file => babelTransform(file, TMPDIR + file)));*/
     files = files
         .filter(file => file.toLowerCase().endsWith(".js"))
         .filter(file => exclusions.map(x=>x.replace(/\\/g, '/'))
@@ -58,7 +59,7 @@ export async function rebuildFiles(options, replacements, files) {
 
     for (let file of files) {
         console.log(`Babel '${file}'`);
-        await babelTransform(file, `tmp/${file}`);
+        await babelTransform(file, `${TMPDIR}${file}`);
     }
 
     // Define bundles config
@@ -69,7 +70,7 @@ export async function rebuildFiles(options, replacements, files) {
         return {
             entry: entry,
             rollups: targets.filter(f=>ext(f) === '.js' || ext(f) === '.es6.js').map(f => ({
-                entry: `tmp/${entry}`,
+                entry: `${TMPDIR}${entry}`,
                 rollupCfg: {
                     format: ext(f) === '.js' ? 'umd' : 'es6',
                     dest: f,

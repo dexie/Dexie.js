@@ -23,7 +23,13 @@ build([{
             "test/bundle.js.map"
         ]
     },
-    excludes: ["test/worker.js", "test/karma-env.js", "test/require.js", "test/qunit.js"]
+    excludes: [
+        "test/worker.js",
+        "test/karma-env.js",
+        "test/karma.conf.js",
+        "test/require.js",
+        "test/qunit.js"
+    ]
 }]).then(()=> {
     console.log("All files successfully built.");
 }).catch(err => {

@@ -20,10 +20,12 @@
   "license": "Apache-2.0",
   "ignore": [
     "**/.*",
-    "addons/*/test",
-    "test",
-    "samples",
-    "dist/allversions/",
-    "src"
+    "src/",
+    "test/",
+    "samples/",
+    "build/",
+    "addons/",
+    "*.njsproj",
+    ".idea/"
   ]
 }
