@@ -6,11 +6,6 @@
 
     Dexie = 'default' in Dexie ? Dexie['default'] : Dexie;
 
-    /*
-     * Disclaimber: This addon is in alpha status meaning that
-     * its API and behavior may change.
-     */
-
     var global = self;
 
     /** class DatabaseChange
@@ -813,6 +808,7 @@
         global.addEventListener("beforeunload", Observable._onBeforeUnload);
     }
     // Register addon:
+    Dexie.Observable = Observable;
     Dexie.addons.push(Observable);
 
     return Observable;

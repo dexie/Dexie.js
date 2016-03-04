@@ -1,10 +1,5 @@
 import Dexie from 'dexie';
 
-/*
- * Disclaimber: This addon is in alpha status meaning that
- * its API and behavior may change.
- */
-
 var global = self;
 
 /** class DatabaseChange
@@ -807,6 +802,7 @@ if (global.addEventListener) {
     global.addEventListener("beforeunload", Observable._onBeforeUnload);
 }
 // Register addon:
+Dexie.Observable = Observable;
 Dexie.addons.push(Observable);
 
 export default Observable;
