@@ -1,0 +1,16 @@
+{
+    "compilerOptions": {
+        "module": "es6",
+        "target": "es6",
+        "noImplicitAny": false,
+        "removeComments": false,
+        "sourceMap": true,
+        "outDir": "out/ts",
+        "moduleResolution": "node"
+    },
+    "files": [
+        "src/console.ts",
+        "src/appdb.ts",
+        "src/app.ts"
+    ]
+}

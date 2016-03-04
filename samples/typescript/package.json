@@ -1,0 +1,38 @@
+{
+  "name": "dexie-sample-typescript",
+  "version": "1.0.0",
+  "description": "Sample on how to use Dexie.js with Typescript",
+  "scripts": {
+    "build": "npm run build:ts && npm run build:babel && npm run build:webpack",
+    "build:ts": "node node_modules/typescript/bin/tsc",
+    "build:babel": "node_modules/.bin/babel out/ts --out-dir out/babel",
+    "build:webpack": "node node_modules/webpack/bin/webpack -d -p out/babel/app.js out/bundle.js",
+    "clean": "rm -rf out",
+    "test": "http-server . -a localhost -p 8081"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dfahlander/Dexie.js.git"
+  },
+  "keywords": [
+    "dexie",
+    "samples"
+  ],
+  "author": "David Fahlander",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/dfahlander/Dexie.js/issues"
+  },
+  "homepage": "https://github.com/dfahlander/Dexie.js#readme",
+  "dependencies": {
+    "dexie": "1.x"
+  },
+  "devDependencies": {
+    "babel-cli": "^6.6.0",
+    "babel-core": "^6.1.4",
+    "babel-plugin-transform-runtime": "^6.6.0",
+    "babel-preset-es2015": "^6.1.4",
+    "typescript": "^1.8.7",
+    "webpack": "^1.12.14"
+  }
+}
