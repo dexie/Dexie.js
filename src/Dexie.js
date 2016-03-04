@@ -29,11 +29,9 @@ export default function Dexie(dbName, options) {
         // Resolve all external dependencies:
         var deps = Dexie.dependencies;
         var indexedDB = deps.indexedDB,
-            IDBKeyRange = deps.IDBKeyRange,
-            IDBTransaction = deps.IDBTransaction;
+            IDBKeyRange = deps.IDBKeyRange;
 
-        var DOMError = deps.DOMError,
-            TypeError = deps.TypeError,
+        var TypeError = deps.TypeError,
             Error = deps.Error;
 
         var globalSchema = this._dbSchema = {};
@@ -811,6 +809,10 @@ export default function Dexie(dbName, options) {
                         // Finally, call the scope function with our table and transaction arguments.
                         Promise._rootExec(function() {
                             returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
+                            if (returnValue && typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
+                                // scopeFunc returned an iterable. Handle yield as await.
+                                returnValue = awaitIterable(returnValue);
+                            }
                         });
                     });
                     if (!trans.idbtrans || (parentTransaction && uncompletedRequests === 0)) {
@@ -832,7 +834,7 @@ export default function Dexie(dbName, options) {
         this.table = function (tableName) {
             /// <returns type="WriteableTable"></returns>
             if (fake && autoSchema) return new WriteableTable(tableName);
-            if (!allTables.hasOwnProperty(tableName)) { throw new Error("Table does not exist"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
+            if (!allTables.hasOwnProperty(tableName)) { throw new Error("Table does not exist"); }
             return allTables[tableName];
         };
 
@@ -1406,7 +1408,7 @@ export default function Dexie(dbName, options) {
                 } catch (e) { }
             },
             table: function (name) {
-                if (!this.tables.hasOwnProperty(name)) { throw new Error("Table " + name + " not in transaction"); return { AN_UNKNOWN_TABLE_NAME_WAS_SPECIFIED: 1 }; }
+                if (!this.tables.hasOwnProperty(name)) { throw new Error("Table " + name + " not in transaction"); }
                 return this.tables[name];
             }
         });
@@ -1761,8 +1763,7 @@ export default function Dexie(dbName, options) {
                     return c;                    
                 },
                 startsWithAnyOf: function (valueArray) {
-                    var ctx = this._ctx,
-                        set = getSetArgs(arguments);
+                    var set = getSetArgs(arguments);
 
                     if (!set.every(function (s) { return typeof s === 'string'; })) {
                         return fail(this, "startsWithAnyOf() only works with strings");
@@ -1854,7 +1855,6 @@ export default function Dexie(dbName, options) {
                     (function () {
                         var filter = ctx.filter;
                         var set = {};
-                        var primKey = ctx.table.schema.primKey.keyPath;
                         var resolved = 0;
 
                         function resolveboth() {
@@ -1950,7 +1950,6 @@ export default function Dexie(dbName, options) {
 
                 sortBy: function (keyPath, cb) {
                     /// <param name="keyPath" type="String"></param>
-                    var ctx = this._ctx;
                     var parts = keyPath.split('.').reverse(),
                         lastPart = parts[0],
                         lastIndex = parts.length - 1;
@@ -2400,19 +2399,6 @@ export default function Dexie(dbName, options) {
 
         function simpleCompareReverse(a, b) {
             return a > b ? -1 : a === b ? 0 : 1;
-        }
-
-        function compoundCompare(itemCompare) {
-            return function (a, b) {
-                var i = 0;
-                while (true) {
-                    var result = itemCompare(a[i], b[i]);
-                    if (result !== 0) return result;
-                    ++i;
-                    if (i === a.length || i === b.length)
-                        return itemCompare(a.length, b.length);
-                }
-            };
         }
 
         function combine(filter1, filter2) {
@@ -3263,6 +3249,35 @@ export default function Dexie(dbName, options) {
         }
     }
 
+    function awaitIterable (iterable) {
+        var callNext = result => iterable.next(result),
+            doThrow = error => iterable.throw(error),
+            onSuccess = step(callNext),
+            onError = step(doThrow);
+
+        function step(getNext) {
+            return val => {
+                var next = getNext(val),
+                    value = next.value;
+
+                return next.done ? value :
+                    (!value || typeof value.then !== 'function' ?
+                        Array.isArray(value) ? awaitAll(value, 0) : onSuccess(value) :
+                        value.then(onSuccess, onError));
+            }
+        }
+
+        function awaitAll (values, i) {
+            if (i === values.length) return onSuccess(values);
+            var value = values[i];
+            return value.constructor && typeof value.constructor.all == 'function' ?
+                value.constructor.all(values).then(onSuccess, onError) :
+                awaitAll (values, i + 1);
+        }
+
+        return step(callNext)();
+    }
+
     //
     // IndexSpec struct
     //
@@ -3407,10 +3422,6 @@ export default function Dexie(dbName, options) {
             return scopeFunc();
         });
     };
-    Dexie.spawn = function () {
-        if (global.console) console.warn("Dexie.spawn() is deprecated. Use Dexie.ignoreTransaction() instead.");
-        return Dexie.ignoreTransaction.apply(this, arguments);
-    }
 
     Dexie.vip = function (fn) {
         // To be used by subscribers to the on('ready') event.
@@ -3425,7 +3436,31 @@ export default function Dexie(dbName, options) {
             Promise.PSD.letThrough = true; // Make sure we are let through if still blocking db due to onready is firing.
             return fn();
         });
-    }; 
+    };
+
+    Dexie.async = function (generatorFn) {
+        return function () {
+            try {
+                var rv = awaitIterable(generatorFn.apply(this, arguments));
+                if (!rv || typeof rv.then !== 'function')
+                    return Dexie.Promise.resolve(rv);
+                return rv;
+            } catch (e) {
+                return Dexie.Promise.reject(e);
+            }
+        }
+    };
+
+    Dexie.spawn = function (generatorFn, args, thiz) {
+        try {
+            var rv = awaitIterable(generatorFn.apply(thiz, args || []));
+            if (!rv || typeof rv.then !== 'function')
+                return Dexie.Promise.resolve(rv);
+            return rv;
+        } catch (e) {
+            return Dexie.Promise.reject(e);
+        }
+    };
 
     // Dexie.currentTransaction property. Only applicable for transactions entered using the new "transact()" method.
     Object.defineProperty(Dexie, "currentTransaction", {
@@ -3474,12 +3509,10 @@ export default function Dexie(dbName, options) {
         // NOTE: The "_"-prefixed versions are for prioritizing IDB-shim on IOS8 before the native IDB in case the shim was included.
         indexedDB: idbshim.shimIndexedDB || global.indexedDB || global.mozIndexedDB || global.webkitIndexedDB || global.msIndexedDB,
         IDBKeyRange: idbshim.IDBKeyRange || global.IDBKeyRange || global.webkitIDBKeyRange,
-        IDBTransaction: idbshim.IDBTransaction || global.IDBTransaction || global.webkitIDBTransaction,
         // Optional:
         Error: global.Error || String,
         SyntaxError: global.SyntaxError || String,
         TypeError: global.TypeError || String,
-        DOMError: global.DOMError || String,
         localStorage: ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : global.localStorage)
     }; 
 
