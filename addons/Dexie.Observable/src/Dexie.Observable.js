@@ -1,10 +1,17 @@
 /// <reference path="../../../dist/dexie.js" />
-import Dexie from 'dexie';
 
-/*
+/**
+ * Dexie.Observable.js
+ * ===================
+ * Dexie addon for observing database changes not just on local db instance but also on other instances and windows.
+ *
+ * version: {version} Alpha, {date}
+ *
  * Disclaimber: This addon is in alpha status meaning that
  * its API and behavior may change.
+ *
  */
+import Dexie from 'dexie';
 
 var global = self;
 

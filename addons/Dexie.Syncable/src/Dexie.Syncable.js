@@ -1,9 +1,16 @@
 /// <reference path="../../../dist/dexie.js" />
 /// <reference path="../../Dexie.Observable/dist/dexie-observable.js" />
 /// <reference path="../Dexie.Syncable.SyncProtocolAPI.js" />
-/*
+/**
+ * Dexie.Syncable.js
+ * ===================
+ * Dexie addon for syncing indexedDB with remote endpoints.
+ *
+ * version: {version} Alpha, {date}
+ *
  * Disclaimber: This addon is in alpha status meaning that
  * its API and behavior may change.
+ *
  */
 
 import Dexie from "dexie";
