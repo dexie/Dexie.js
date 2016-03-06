@@ -6,3 +6,6 @@ addons/
 *.njsproj
 .idea/
 .ntvs_analytics.dat
+.git
+.vs
+.vscode

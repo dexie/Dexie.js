@@ -13,6 +13,9 @@ build([{
             "dist/dexie.min.js.gz",
             "dist/dexie.es6.js",
             "dist/dexie.es6.js.map"
+        ],
+        "src/Dexie.d.ts": [
+            "dist/dexie.d.ts"
         ]
     }
 },{
