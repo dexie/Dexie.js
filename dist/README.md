@@ -1,8 +1,11 @@
 ## Can't find dexie.js?
-Since Dexie v1.3.0, dist files are no longer checked in to github. Dexie will only
-store the dist files in the npm registry.
+Dexie's dist files are no longer checked in to github except temporarily when tagging
+a release version (just so that bower will continue to work). The reason for this is because
+checking in dist files bloats the commit history and makes it error prone to contribute to the
+repo. To support bower though, we have to continue checking in dist files when releasing,
+but that is now handled by the release.sh script, who also removes them directly afterwards.
 
-If you still just want to download the simple script file to include in a test HTML page, go
+If you still just want to download dexie.js to include in a test HTML page, go
 to the following download site:
 
 ### Download

@@ -50,7 +50,7 @@ Forum
 
 Website
 -------
-[http://www.dexie.org](http://www.dexie.org)
+[http://dexie.org](http://dexie.org)
 
 Download
 --------

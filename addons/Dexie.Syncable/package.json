@@ -24,7 +24,7 @@
     "build": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator build/build.js",
     "watch": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator build/watch.js"
   },
-  "homepage": "http://www.dexie.org",
+  "homepage": "http://dexie.org",
   "dependencies": {
     "dexie": "^1.3.0"
   }

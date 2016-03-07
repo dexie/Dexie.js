@@ -28,7 +28,7 @@
   "engines": {
     "node": ">=4.2 <5.0"
   },
-  "homepage": "http://www.dexie.org",
+  "homepage": "http://dexie.org",
   "devDependencies": {
     "babel-cli": "^6.6.0",
     "babel-core": "^6.1.4",
