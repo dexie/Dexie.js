@@ -40,6 +40,7 @@ update_version 'package.json' $next_version
 git add -f dist/\*.js
 git add -f dist/\*.map
 git add -f dist/\*.ts
+git rm --cached dist/README.md
 
 git commit -am "Releasing v$next_version"
 
@@ -56,5 +57,6 @@ npm publish
 git rm --cached dist/\*.js
 git rm --cached dist/\*.map
 git rm --cached dist/\*.ts
+git add -f dist/README.md
 git commit --allow-empty -am "Post-publish: remove dist files. Just had them temporarly  in the release tag for the sake of bower."
 git push origin master
