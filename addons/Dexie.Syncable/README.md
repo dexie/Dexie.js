@@ -23,10 +23,10 @@ import 'dexie-syncable';
 ### Dependency Tree
 
  * **Dexie.Syncable.js**
-   * [Dexie.Observable.js](Dexie.Observable.js)
-     * [Dexie.js](Dexie.js)
+   * [Dexie.Observable.js](https://github.com/dfahlander/Dexie.js/wiki/Dexie.Observable.js)
+     * [Dexie.js](https://github.com/dfahlander/Dexie.js/wiki/Dexie.js)
        * [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
-   * _An implementation of [ISyncProtocol](Dexie.Syncable.ISyncProtocol)_
+   * _An implementation of [ISyncProtocol](https://github.com/dfahlander/Dexie.js/wiki/Dexie.Syncable.ISyncProtocol)_
  
 ### Tutorial
 
@@ -76,36 +76,36 @@ _NOTE: Transactions only provide the Atomicity part of the [ACID](http://en.wiki
 
 #### Static Members
 
-##### [Dexie.Syncable.registerSyncProtocol (name, protocolInstance)](Dexie.Syncable.registerSyncProtocol())
+##### [Dexie.Syncable.registerSyncProtocol (name, protocolInstance)](https://github.com/dfahlander/Dexie.js/wiki/Dexie.Syncable.registerSyncProtocol())
 Define how to replicate changes with your type of server.
 
-##### [Dexie.Syncable.Statuses](Dexie.Syncable.Statuses)
+##### [Dexie.Syncable.Statuses](https://github.com/dfahlander/Dexie.js/wiki/Dexie.Syncable.Statuses)
 Enum of possible sync statuses, such as OFFLINE, CONNECTING, ONLINE and ERROR.
 
-##### [Dexie.Syncable.StatusTexts](Dexie.Syncable.StatusTexts)
+##### [Dexie.Syncable.StatusTexts](https://github.com/dfahlander/Dexie.js/wiki/Dexie.Syncable.StatusTexts)
 Text lookup for status numbers
 
 #### Non-Static Methods and Events
 
-##### [db.syncable.connect (protocol, url, options)](db.syncable.connect())
+##### [db.syncable.connect (protocol, url, options)](https://github.com/dfahlander/Dexie.js/wiki/db.syncable.connect())
 Create a presistend a two-way sync connection with given URL.
 
-##### [db.syncable.disconnect (url)](db.syncable.disconnect())
+##### [db.syncable.disconnect (url)](https://github.com/dfahlander/Dexie.js/wiki/db.syncable.disconnect())
 Stop syncing with given URL but keep revision states until next connect.
 
-##### [db.syncable.delete(url)](db.syncable.delete())
+##### [db.syncable.delete(url)](https://github.com/dfahlander/Dexie.js/wiki/db.syncable.delete())
 Delete all states and change queue for given URL 
 
-##### [db.syncable.list()](db.syncable.list())
+##### [db.syncable.list()](https://github.com/dfahlander/Dexie.js/wiki/db.syncable.list())
 List the URLs of each remote node we have a state saved for.
 
-##### [db.syncable.on('statusChanged')](db.syncable.on('statusChanged'))
+##### [db.syncable.on('statusChanged')](https://github.com/dfahlander/Dexie.js/wiki/db.syncable.on('statusChanged'))
 Event triggered when sync status changes.
 
-##### [db.syncable.setFilter ([criteria], filter)](db.syncable.setFilter())
+##### [db.syncable.setFilter ([criteria], filter)](https://github.com/dfahlander/Dexie.js/wiki/db.syncable.setFilter())
 Ignore certain objects from being synced defined by given filter.
 
-##### [db.syncable.getStatus (url)](db.syncable.getStatus())
+##### [db.syncable.getStatus (url)](https://github.com/dfahlander/Dexie.js/wiki/db.syncable.getStatus())
 Get sync status for given URL.
 
 

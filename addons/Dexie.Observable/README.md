@@ -20,9 +20,9 @@ import 'dexie-observable';
 
 ### Dependency Tree
 
- * [Dexie.Syncable.js](Dexie.Syncable.js)
+ * [Dexie.Syncable.js](https://github.com/dfahlander/Dexie.js/wiki/Dexie.Syncable.js)
    * **Dexie.Observable.js**
-     * [Dexie.js](Dexie.js)
+     * [Dexie.js](https://github.com/dfahlander/Dexie.js/wiki/Dexie.js)
        * [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
 
 ### Source
@@ -33,14 +33,14 @@ import 'dexie-observable';
 
 Dexie.Observable is an add-on to Dexie.js makes it possible to listen for changes on the database even if the changes are made in a foreign window. The addon provides a "storage" event for IndexedDB, much like the storage event (onstorage) for localStorage.
 
-In contrary to the [Dexie CRUD hooks](Design#the-crud-hooks-create-read-update-delete), this event reacts not only on changes made on the current db instance but also on changes occurring on db instances in other browser windows. <u>This enables a Web Apps to react to database changes and update their views accordingly.</u>
+In contrary to the [Dexie CRUD hooks](https://github.com/dfahlander/Dexie.js/wiki/Design#the-crud-hooks-create-read-update-delete), this event reacts not only on changes made on the current db instance but also on changes occurring on db instances in other browser windows. <u>This enables a Web Apps to react to database changes and update their views accordingly.</u>
 
-Dexie.Observable is also the base of [Dexie.Syncable.js](Dexie.Syncable.js) - an add-on that enables two-way replication with a remote server.
+Dexie.Observable is also the base of [Dexie.Syncable.js](https://github.com/dfahlander/Dexie.js/wiki/Dexie.Syncable.js) - an add-on that enables two-way replication with a remote server.
 
 ### Extended Methods, Properties and Events
 
 #### UUID key generator
-When defining your stores in [Version.stores()](Version.stores()) you may use the $$ (double dollar) prefix to your primary key. This will make it auto-generated to a UUID string. See sample below.
+When defining your stores in [Version.stores()](https://github.com/dfahlander/Dexie.js/wiki/Version.stores()) you may use the $$ (double dollar) prefix to your primary key. This will make it auto-generated to a UUID string. See sample below.
 
 #### Dexie.Observable.createUUID()
 A static method added to Dexie that creates a UUID. This method is used internally when using the $$ prefix to primary keys. To change the format of $$ primary keys, just override Dexie.createUUID by setting it to your desired function instead.
