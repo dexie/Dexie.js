@@ -45,19 +45,15 @@ export async function rebuildFiles(options, replacements, files) {
     );
 
     // Run babel on each js file
-    /*await Promise.all(files
-        .filter(file => ext(file) === ".js")
-        .filter(file => exclusions.indexOf(file) === -1)
-        .map (file => babelTransform(file, TMPDIR + file)));*/
     files = files
-        .filter(file => file.toLowerCase().endsWith(".js"))
+        .filter(file => /\.(js|ts)$/i.test(file))
         .filter(file => exclusions.map(x=>x.replace(/\\/g, '/'))
             .indexOf(file.replace(/\\/g, '/')) === -1); // Insensitive to path separator style (WIN/UX)
 
     if (files.length === 0)
         return false;
 
-    for (let file of files) {
+    for (let file of files.filter(file => /\.js$/i.test(file))) {
         console.log(`Babel '${file}'`);
         await babelTransform(file, `${TMPDIR}${file}`);
     }
@@ -91,7 +87,6 @@ export async function rebuildFiles(options, replacements, files) {
     });
 
     // Execute bundling, minification, gzipping and copying of typings files
-    //await Promise.all(bundles.map(bundleInfo => makeBundle(bundleInfo, replacements)));
     for (let bundleInfo of bundles) {
         await makeBundle(bundleInfo, replacements);
     }
@@ -102,7 +97,6 @@ export async function rebuildFiles(options, replacements, files) {
 async function makeBundle (bundleInfo, replacements) {
 
     // Rollup (if anything to rollup)
-    //await Promise.all(bundleInfo.rollups.map(rollupInfo => rollupAndMinify(rollupInfo)));
     for (let rollupInfo of bundleInfo.rollups) {
         await rollupAndMinify(rollupInfo);
     }
@@ -115,7 +109,7 @@ async function makeBundle (bundleInfo, replacements) {
     // Replace version, date etc in targets
     if (replacements) {
         await Promise.all(bundleInfo.targets
-            .filter (file => file.toLowerCase().endsWith('.js') || file.toLowerCase().endsWith('.ts'))
+            .filter (file => /\.(js|ts)$/i.test(file))
             .map(file => replaceInFile(file, replacements)));
     }
 }
@@ -168,12 +162,12 @@ export async function buildAndWatch (optionsList) {
         let options = o;
         watch(options.dirs, throttle(50, async function (calls) {
             try {
-                var filenames = calls.map(args => args[0])
+                let filenames = calls.map(args => args[0])
                     .filter(filename => filename)
-                    .filter(filename => filename.toLowerCase().endsWith('.js') || filename.toLowerCase().endsWith('.ts'))
+                    .filter(filename => /\.(js|ts)$/i.test(filename))
                     .reduce((p, c) =>(p[c] = true, p), {});
 
-                var changedFiles = Object.keys(filenames);
+                let changedFiles = Object.keys(filenames);
                 if (changedFiles.length > 0) {
                     let anythingRebuilt = await rebuildFiles(options, {
                         "{version}": version,
@@ -181,7 +175,7 @@ export async function buildAndWatch (optionsList) {
                     }, changedFiles);
 
                     if (anythingRebuilt)
-                        console.log("Done rebuilding all bundles");
+                        console.log("Done. Still watching...");
                 }
             } catch (err) {
                 console.error("Failed rebuilding: " + err.stack);
@@ -198,7 +192,7 @@ export async function gzip(source, destination) {
 
 export function babelTransform(source, destination) {
     return new Promise((resolve, reject) => {
-        var options = {
+        let options = {
             compact: false,
             comments: true,
             babelrc: false,
@@ -242,25 +236,19 @@ export function babelTransform(source, destination) {
 export function copyFile(source, target) {
     console.log('Copying '+source+' => \t'+target);
     return new Promise(function (resolve, reject) {
-        var rd = fs.createReadStream(source);
+        let rd = fs.createReadStream(source);
         rd.on("error", function (err) {
             reject(err);
         });
-        var wr = fs.createWriteStream(target);
+        let wr = fs.createWriteStream(target);
         wr.on("error", function (err) {
             reject(err);
         });
-        wr.on("close", function (ex) {
+        wr.on("close", function () {
             resolve();
         });
         rd.pipe(wr);
     });
-}
-
-export function copyFiles (sourcesAndTargets) {
-    return Promise.all(
-        Object.keys(sourcesAndTargets)
-            .map(source => copyFile(source, sourcesAndTargets[source])));
 }
 
 export function readFile(filename) {
@@ -278,7 +266,7 @@ export function parsePackageVersion() {
 function replace(content, replacements) {
     return Object.keys(replacements)
         .reduce((data, needle) =>{
-            var replaced = data;
+            let replaced = data;
             while (replaced.indexOf(needle) !== -1)
                 replaced = replaced.replace(needle, replacements[needle]);
             return replaced;
@@ -318,7 +306,7 @@ function ext(filename) {
 }
 
 function minName (jsFile) {
-    if (!jsFile.toLowerCase().endsWith(".js"))
+    if (!/\.js$/i.test(jsFile))
         throw new Error ("Not a JS file");
 
     return jsFile.substr(0, jsFile.length - ".js".length) + ".min.js";
@@ -334,14 +322,14 @@ function getUmdModuleName(filepath) {
 }
 
 function throttle(millisecs, cb) {
-    var tHandle = null;
-    var calls = [];
-    var ongoingCallback = false;
+    let tHandle = null;
+    let calls = [];
+    let ongoingCallback = false;
 
     function onTimeout() {
         tHandle = null;
         ongoingCallback = false;
-        var callsClone = calls.slice(0);
+        let callsClone = calls.slice(0);
         calls = [];
         if (callsClone.length === 0) {
             return;
@@ -353,7 +341,7 @@ function throttle(millisecs, cb) {
             .then(onTimeout); // Re-check if events occurred during the execution of the callback
     }
     return function () {
-        var args = [].slice.call(arguments);
+        let args = [].slice.call(arguments);
         calls.push(args);
         if (!ongoingCallback) {
             if (tHandle) clearTimeout(tHandle);

@@ -9,6 +9,9 @@ buildAndWatch([{
         "src/Dexie.js": [
             "dist/dexie.js",
             "dist/dexie.js.map"
+        ],
+        "src/Dexie.d.ts": [
+            "dist/dexie.d.ts"
         ]
     }
 
