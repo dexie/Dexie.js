@@ -3,9 +3,7 @@ test/
 samples/
 build/
 addons/
+dist/README.md
+bower.json
 *.njsproj
-.idea/
-.ntvs_analytics.dat
-.git
-.vs
-.vscode
+.*
