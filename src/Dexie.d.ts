@@ -1,4 +1,5 @@
-﻿// Type definitions for Dexie {version} {date}
+﻿// Type definitions for Dexie {version}
+// Date {date}
 // Project: https://github.com/dfahlander/Dexie.js
 // Definitions by: David Fahlander <http://github.com/dfahlander>
 
