@@ -104,12 +104,18 @@ declare module Dexie {
         then<U>(onFulfilled: (value: R) => U, onRejected: (error: any) => Thenable<U>): Promise<U>;
 
         then<U>(onFulfilled?: (value: R) => U, onRejected?: (error: any) => U): Promise<U>;
-
-        catch<U>(onRejected: (error: any) => Promise<U>): Promise<U>;
-
+        
+        catch<U>(onRejected: (error: any) => Thenable<U>): Promise<U>;
+        
+        catch<U>(onRejected: (error: any) => U): Promise<U>;
+        
         catch<U>(ExceptionType: Function, onRejected: (error: any) => Promise<U>): Promise<U>;
 
+        catch<U>(ExceptionType: Function, onRejected: (error: any) => U): Promise<U>;
+
         catch<U>(errorName: string, onRejected: (error: any) => Promise<U>): Promise<U>;
+
+        catch<U>(errorName: string, onRejected: (error: any) => U): Promise<U>;
 
         finally<R>(onFinally: () => any): Promise<R>;
 
