@@ -1,6 +1,6 @@
 {
   "name": "dexie-syncable",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Addon to Dexie that makes it possible to sync indexeDB with remote databases.",
   "main": "dist/dexie-syncable.js",
   "jsnext:main": "dist/dexie-syncable.es6.js",
