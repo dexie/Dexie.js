@@ -51,7 +51,7 @@ Subscribe to any database changes no matter if they occur locally or in other br
 Parameters to your callback:
 
 <table>
-<tr><td>changes : Array&lt;<a href="Dexie.Observable.DatabaseChange">DatabaseChange</a>&gt;</td><td>Array of changes that have occured in database (locally or in other window) since last time event was triggered, or the time of starting subscribing to changes.</td></tr>
+<tr><td>changes : Array&lt;<a href="https://github.com/dfahlander/Dexie.js/wiki/Dexie.Observable.DatabaseChange">DatabaseChange</a>&gt;</td><td>Array of changes that have occured in database (locally or in other window) since last time event was triggered, or the time of starting subscribing to changes.</td></tr>
 <tr><td>partial: Boolean</td><td>True in case the array does not contain all changes. In this case, your callback will soon be called again with the additional changes and partial=false when all changes are delivered.</td></tr>
 </table>
 
