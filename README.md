@@ -54,7 +54,7 @@ Website
 -------
 [http://dexie.org](http://dexie.org)
 
-Install from NPM
+Install over npm
 ----------------
 ```
 npm install dexie
@@ -62,11 +62,15 @@ npm install dexie
 
 Build
 -----
+```
 npm run build
+```
 
 Test
 ----
+```
 npm test
+```
 
 Download
 --------
