@@ -42,7 +42,9 @@ Documentation
 
 Samples
 -------
-[https://github.com/dfahlander/Dexie.js/wiki/Samples](https://github.com/dfahlander/Dexie.js/wiki/Samples)
+https://github.com/dfahlander/Dexie.js/wiki/Samples
+
+https://github.com/dfahlander/Dexie.js/tree/master/samples
 
 Forum
 -----
@@ -54,12 +56,10 @@ Website
 
 Download
 --------
-[https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.js](https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.js)
-[https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.min.js]([https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.min.js)
-[https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.min.js.map]([https://raw.githubusercontent.com/dfahlander/Dexie.js/master/dist/latest/Dexie.min.js.map)
-[https://raw.githubusercontent.com/dfahlander/Dexie.js/master/src/Dexie.d.ts]([https://raw.githubusercontent.com/dfahlander/Dexie.js/master/src/Dexie.d.ts)
+https://npmcdn.com/dexie/dist/dexie.min.js
+https://npmcdn.com/dexie/dist/dexie.min.js.map
+https://npmcdn.com/dexie/dist/dexie.d.ts
 
 [npm-image]: https://img.shields.io/npm/v/dexie.svg?style=flat
 [npm-url]: https://npmjs.org/package/dexie
-
 
