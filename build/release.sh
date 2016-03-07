@@ -46,15 +46,15 @@ git commit -am "Releasing v$next_version"
 git tag $next_ref
 git tag latest -f
 
-printf "#git push origin master"
-printf "#git push origin $next_ref"
-printf "#git push origin latest -f"
+git push origin master
+git push origin $next_ref
+git push origin latest -f
 
-printf "#npm publish"
+npm publish
 
 # Remove dist files from git
 git rm --cached dist/\*.js
 git rm --cached dist/\*.map
 git rm --cached dist/\*.ts
 git commit --allow-empty -am "Post-publish: remove dist files. Just had them temporarly  in the release tag for the sake of bower."
-printf "#git push origin master"
+git push origin master
