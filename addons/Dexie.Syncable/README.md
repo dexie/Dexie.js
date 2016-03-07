@@ -6,7 +6,9 @@ Enables two-way synchronization with remote database.
 
 ### Install
 ```
-npm install dexie-syncable
+npm install dexie --save
+npm install dexie-observable --save
+npm install dexie-syncable --save
 ```
 
 ### Use
