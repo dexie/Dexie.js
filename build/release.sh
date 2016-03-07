@@ -41,7 +41,7 @@ git add -f dist/\*.js
 git add -f dist/\*.map
 git add -f dist/\*.ts
 
-git commit --allow-empty -am "Releasing v$next_version"
+git commit -am "Releasing v$next_version"
 
 git tag $next_ref
 git tag latest -f
