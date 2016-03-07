@@ -54,11 +54,33 @@ Website
 -------
 [http://dexie.org](http://dexie.org)
 
+Install over npm
+----------------
+```
+npm install dexie
+```
+
+Build
+-----
+```
+npm run build
+```
+
+Test
+----
+```
+npm test
+```
+
 Download
 --------
 https://npmcdn.com/dexie/dist/dexie.min.js
+
 https://npmcdn.com/dexie/dist/dexie.min.js.map
+
 https://npmcdn.com/dexie/dist/dexie.d.ts
+
+
 
 [npm-image]: https://img.shields.io/npm/v/dexie.svg?style=flat
 [npm-url]: https://npmjs.org/package/dexie
