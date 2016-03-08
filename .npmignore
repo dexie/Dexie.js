@@ -1,9 +1,5 @@
-src/
-test/
 samples/
-build/
 addons/
 dist/README.md
-bower.json
 *.njsproj
 .*
