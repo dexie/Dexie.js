@@ -15,15 +15,18 @@ Dexie solves three main issues with the native IndexedDB API:
 
 Dexie.js solves these limitations and provides a neat database API. Dexie.js aims to be the first-hand choice of a IDB Wrapper Library due to its well thought-through API design, robust error handling, extendability, change tracking awareness and its extended KeyRange support (case insensitive search, set matches and OR operations).
 
-#### Please Show me a Hello World Example
+#### Hello World
 
-```js
+```html
+<html>
+<head>
+<script src="https://npmcdn.com/dexie/dist/dexie.min.js"></script>
+<script>
 //
 // Declare Database
 //
 var db = new Dexie("FriendDatabase");
 db.version(1).stores({ friends: "++id,name,age" });
-db.open();
 
 //
 // Manipulate and Query Database
@@ -31,10 +34,70 @@ db.open();
 db.friends.add({name: "Josephine", age: 21}).then(function() {
     return db.friends.where("age").below(25).toArray();
 }).then(function (youngFriends) {
-    console.log("My young friends: " + JSON.stringify(youngFriends));
+    alert ("My young friends: " + JSON.stringify(youngFriends));
 });
+</script>
+</head>
+</html>
 ```
 
+#### Hello ES6
+```js
+import Dexie from 'dexie';
+
+//
+// Declare Database
+//
+var db = new Dexie("FriendDatabase");
+db.version(1).stores({ friends: "++id,name,age" });
+
+//
+// Manipulate and Query Database
+//
+Dexie.spawn(function*(){
+
+    // Dexie.spawn gives you the possibility to use yield.
+    // Use yield like async works in Typescript / ES7
+    
+    // Add to database
+    yield db.friends.add({name: "Josephine", age: 21});
+    
+    // Query database
+    let youngFriends = yield db.friends.where("age").below(25).toArray();
+    
+    alert ("My young friends: " + JSON.stringify(youngFriends));
+    
+}).catch(e => alert("error: " + e);
+```
+
+#### Hello Typescript / ES7
+```ts
+import Dexie from 'dexie';
+
+//
+// Declare Database
+//
+var db = new Dexie("FriendDatabase");
+db.version(1).stores({ friends: "++id,name,age" });
+
+//
+// Manipulate and Query Database
+//
+(async function()=>{
+
+    // Dexie.spawn gives you the possibility to use yield.
+    // Use yield like async works in Typescript / ES7
+    
+    // Add to database
+    await db.friends.add({name: "Josephine", age: 21});
+    
+    // Query database
+    let youngFriends = await db.friends.where("age").below(25).toArray();
+    
+    alert ("My young friends: " + JSON.stringify(youngFriends));
+    
+})().catch(e => alert("error: " + e);
+```
 
 Documentation
 -------------
