@@ -163,7 +163,7 @@ Then CD to your app directory and write:
 ```
 npm link dexie
 ```
-Your app's node_modules/dexie/ is now sym-linked to the Dexie.js clone on your hard drive so any change you do there will propagate to your app. Build dexie.js using ´npm run build` or `npm run watch`. The latter will react on any source file change and rebuild the dist files.
+Your app's node_modules/dexie/ is now sym-linked to the Dexie.js clone on your hard drive so any change you do there will propagate to your app. Build dexie.js using `npm run build` or `npm run watch`. The latter will react on any source file change and rebuild the dist files.
 
 That's it.
 Now you're up and running to test and commit changes to Dexie.js that will instantly affect the app you are developing.
