@@ -43,7 +43,7 @@ Dexie.js solves these limitations and provides a neat database API. Dexie.js aim
 </html>
 ```
 
-#### Hello ES6
+#### Hello World (ES6)
 ```js
 import Dexie from 'dexie';
 
@@ -74,7 +74,7 @@ Dexie.spawn(function*(){
 });
 ```
 
-#### Hello Typescript / ES7
+#### Hello World (Typescript / ES7)
 ```ts
 import Dexie from 'dexie';
 
