@@ -1,5 +1,8 @@
-samples/
 addons/
+build/
+test/
+samples/
+src/
 dist/README.md
 *.njsproj
 .*

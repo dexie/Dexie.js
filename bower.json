@@ -1,6 +1,6 @@
 {
   "name": "dexie",
-  "homepage": "https://github.com/dfahlander/Dexie.js",
+  "homepage": "http://dexie.org",
   "authors": [
     "David Fahlander"
   ],
@@ -25,7 +25,6 @@
     "samples/",
     "build/",
     "addons/",
-    "*.njsproj",
-    ".idea/"
+    "*.njsproj"
   ]
 }
