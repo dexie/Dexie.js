@@ -35,6 +35,8 @@ Dexie.js solves these limitations and provides a neat database API. Dexie.js aim
        return db.friends.where("age").below(25).toArray();
    }).then(function (youngFriends) {
        alert ("My young friends: " + JSON.stringify(youngFriends));
+   }).catch(function (e) {
+       alert ("Error: " + e);
    });
   </script>
  </head>
