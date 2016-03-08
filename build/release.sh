@@ -17,13 +17,6 @@ validate_semver() {
   fi
 }
 
-# clean
-rm -rf build/tmp
-# build
-npm run build
-# test
-npm test
-
 current_version=$(node -p "require('./package').version")
 
 # Next version?
@@ -36,27 +29,38 @@ next_ref="v$next_version"
 
 update_version 'package.json' $next_version
 
-# Force adding dist files
-git add -f dist/\*.js
-git add -f dist/\*.map
-git add -f dist/\*.ts
+#
+# Merge last release output here before rebuilding
+#
+git merge --no-edit -s ours origin/releases
+
+#
+# Rebuild
+#
+
+# clean
+rm -rf build/tmp
+# build
+npm run build
+# test
+npm test
+
+# Update package.json
+git commit --allow-empty -am "Releasing v$next_version"
+git push origin master
+
+# Force adding new dist files
+git add -A --no-ignore-removal -f dist/ 2>/dev/null
+# Dont include the README because it tells us about missing files (which is not missing now)
 git rm --cached dist/README.md
+# Commit all changes (still locally)
+git commit --amend -am "Releasing v$next_version" 2>/dev/null
+# Now, push the changes to the releases branch
+git push origin master:releases
 
-git commit -am "Releasing v$next_version"
+#npm publish
 
-git tag $next_ref
-git tag latest -f
+printf "Resetting to origin/master"
+git reset --hard origin/master
 
-git push origin master
-git push origin $next_ref
-git push origin latest -f
-
-npm publish
-
-# Remove dist files from git
-git rm --cached dist/\*.js
-git rm --cached dist/\*.map
-git rm --cached dist/\*.ts
-git add -f dist/README.md
-git commit --allow-empty -am "Post-publish: remove dist files. Just had them temporarly  in the release tag for the sake of bower."
-git push origin master
+printf "Done."
