@@ -19,25 +19,25 @@ Dexie.js solves these limitations and provides a neat database API. Dexie.js aim
 
 ```html
 <html>
-<head>
-<script src="https://npmcdn.com/dexie/dist/dexie.min.js"></script>
-<script>
-//
-// Declare Database
-//
-var db = new Dexie("FriendDatabase");
-db.version(1).stores({ friends: "++id,name,age" });
-
-//
-// Manipulate and Query Database
-//
-db.friends.add({name: "Josephine", age: 21}).then(function() {
-    return db.friends.where("age").below(25).toArray();
-}).then(function (youngFriends) {
-    alert ("My young friends: " + JSON.stringify(youngFriends));
-});
-</script>
-</head>
+ <head>
+  <script src="https://npmcdn.com/dexie/dist/dexie.min.js"></script>
+  <script>
+  //
+  // Declare Database
+  //
+  var db = new Dexie("FriendDatabase");
+  db.version(1).stores({ friends: "++id,name,age" });
+  
+  //
+  // Manipulate and Query Database
+  //
+  db.friends.add({name: "Josephine", age: 21}).then(function() {
+      return db.friends.where("age").below(25).toArray();
+  }).then(function (youngFriends) {
+      alert ("My young friends: " + JSON.stringify(youngFriends));
+  });
+  </script>
+ </head>
 </html>
 ```
 
