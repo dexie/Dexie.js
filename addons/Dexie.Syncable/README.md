@@ -14,7 +14,7 @@ npm install dexie-syncable --save
 ### Use
 ```js
 import Dexie from 'dexie';
-import 'dexie-syncable';
+import 'dexie-syncable'; // will import dexie-observable as well.
 
 // Use Dexie as normally - but you can also register your sync protocols though
 // Dexie.Syncable.registerSyncProtocol() api as well as using the db.syncable api
