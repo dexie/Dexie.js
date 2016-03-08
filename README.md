@@ -150,23 +150,26 @@ npm install dexie
 
 Contributing
 ============
-Here is a little cheat-sheet for how to symlink your app's node_modules/dexie to a place where you can edit the source, version control your changes and create pull requests back to Dexie. Assuming you've already ran `npm install dexie --save` for the app your are developing. Fork Dexie.js from the web gui on github. Now, cd to a neutral place (like ~repos/, c:\repos or whatever) and type:
+Here is a little cheat-sheet for how to symlink your app's node_modules/dexie to a place where you can edit the source, version control your changes and create pull requests back to Dexie. Assuming you've already ran `npm install dexie --save` for the app your are developing.
 
-```
-git clone https://github.com/YOUR-USERNAME/Dexie.js.git
-cd Dexie.js
-npm install
-npm run build
-npm link
-```
-Then CD to your app directory and write:
-```
-npm link dexie
-```
+1. Fork Dexie.js from the web gui on github
+2. Clone your fork locally by launching a shell/command window and cd to a neutral place (like ~repos/, c:\repos or whatever) and type:
+
+    ```
+    git clone https://github.com/YOUR-USERNAME/Dexie.js.git
+    cd Dexie.js
+    npm install
+    npm run build
+    npm link
+    ```
+3. cd to your app directory and write:
+    ```
+    npm link dexie
+    ```
+
 Your app's node_modules/dexie/ is now sym-linked to the Dexie.js clone on your hard drive so any change you do there will propagate to your app. Build dexie.js using `npm run build` or `npm run watch`. The latter will react on any source file change and rebuild the dist files.
 
-That's it.
-Now you're up and running to test and commit changes to Dexie.js that will instantly affect the app you are developing.
+That's it. Now you're up and running to test and commit changes to Dexie.js that will instantly affect the app you are developing.
 
 Pull requests are more than welcome. Some advices are:
 
