@@ -195,7 +195,9 @@ npm run watch
 ```
 
 Download
---------
+========
+For those who don't like package managers, and only have 3 minutes. Here's the download links:
+
 https://npmcdn.com/dexie/dist/dexie.min.js
 
 https://npmcdn.com/dexie/dist/dexie.min.js.map
