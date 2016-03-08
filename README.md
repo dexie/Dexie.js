@@ -169,6 +169,7 @@ That's it.
 Now you're up and running to test and commit changes to Dexie.js that will instantly affect the app you are developing.
 
 Pull requests are more than welcome. Some advices are:
+
 1. Run npm test before making a pull request.
 2. If you have the time, please add a new unit test that reproduces the issue.
 
