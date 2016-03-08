@@ -74,15 +74,25 @@ Dexie.spawn(function*(){
 });
 ```
 
-#### Hello World (Typescript / ES7)
+#### Hello World (Typescript)
 ```ts
 import Dexie from 'dexie';
 
 //
 // Declare Database
 //
-var db = new Dexie("FriendDatabase");
-db.version(1).stores({ friends: "++id,name,age" });
+class FriendDatabase extends Dexie {
+    friends: Dexie.Table<IFriend,number>;
+    
+    constructor() {
+        super("FriendsDatabase");
+        this.version(1).stores({
+            friends: "++id,name,age"
+        });
+    }
+}
+
+var db = new FriendDatabase();
 
 //
 // Manipulate and Query Database
