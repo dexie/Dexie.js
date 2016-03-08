@@ -1,4 +1,4 @@
-﻿// TODO: Config import loaders to use local qunit.js and not global.
+﻿import "./tests-misc";
 import "./tests-yield";
 import "./tests-whereclause.js";
 import "./tests-collection.js";

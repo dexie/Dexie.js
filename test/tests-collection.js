@@ -548,11 +548,3 @@ asyncTest("Promise chain from within each() operation", 2, function () {
     }).finally(start);
 });
 
-asyncTest("Issue #102 Passing an empty array to anyOf throws exception", function() {
-    db.users.where("username").anyOf([]).count(function(count) {
-        equal(count, 0, "Zarro items matched the query anyOf([])");
-    }).catch(function(err) {
-        ok(false, "Error when calling anyOf([]): " + err);
-    }).finally(start);
-});
-

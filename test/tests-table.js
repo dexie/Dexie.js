@@ -4,8 +4,7 @@ import {resetDatabase} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBTable");
 db.version(1).stores({
-    users: "++id,first,last,&username,*&email,*pets",
-    keyless: ",name"
+    users: "++id,first,last,&username,*&email,*pets"
 });
 
 var User = db.users.defineClass({
@@ -329,25 +328,6 @@ asyncTest("clear", function () {
         db.users.count(function (count) {
             equal(count, 0, "There are 0 items in database after it has been cleared");
         });
-    }).catch(function (e) {
-        ok(false, e);
-    }).finally(start);
-});
-asyncTest("Adding object with falsy keys", function () {
-    db.keyless.add({ name: "foo" }, 1).then(function (id) {
-        equal(id, 1, "Normal case ok - Object with key 1 was successfully added.")
-        return db.keyless.add({ name: "bar" }, 0);
-    }).then(function (id) {
-        equal(id, 0, "Could add a numeric falsy value (0)");
-        return db.keyless.add({ name: "foobar" }, "");
-    }).then(function (id) {
-        equal(id, "", "Could add a string falsy value ('')");
-        return db.keyless.put({ name: "bar2" }, 0);
-    }).then(function (id) {
-        equal(id, 0, "Could put a numeric falsy value (0)");
-        return db.keyless.put({ name: "foobar2" }, "");
-    }).then(function (id) {
-        equal(id, "", "Could put a string falsy value ('')");
     }).catch(function (e) {
         ok(false, e);
     }).finally(start);
