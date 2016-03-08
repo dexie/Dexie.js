@@ -150,7 +150,7 @@ npm install dexie
 
 Contributing
 ============
-Contributions are welcome! Here is a little cheat-sheet for how to get started. Assuming you've already ran `npm install dexie --save` for the app your are developing.
+Contributions are welcome! Here is a little cheat-sheet for how to get started. Assuming you've already ran `npm install dexie --save` for the app your are developing. Now, cd to a neutral place (like ~repos/, c:\repos or whatever) and type:
 
 ```
 git clone https://github.com/dfahlander/Dexie.js.git
@@ -158,13 +158,13 @@ cd Dexie.js
 npm install
 npm run build
 npm link
-npm run watch
 ```
-Source code is now watching for changes to Dexie.js/src directory. Let this shell be active in the background.
 Then CD to your app directory and write:
 ```
 npm link dexie
 ```
+Your app's node_modules/dexie/ is now sym-linked to the Dexie.js clone on your hard drive so any change you do there will propagate to your app. Still any change to dexie's source files has to be rebuilt using `npm run build` or `npm run watch`. The latter will react on any source file change and rebuild the dist files. 
+
 That's it.
 Now you're up and running to test and commit changes to Dexie.js that will instantly affect the app you are developing.
 
