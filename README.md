@@ -36,7 +36,7 @@ Dexie.js solves these limitations and provides a neat database API. Dexie.js aim
    }).then(function (youngFriends) {
        alert ("My young friends: " + JSON.stringify(youngFriends));
    }).catch(function (e) {
-       alert ("Error: " + e);
+       alert ("Error: " + e.stack || e);
    });
   </script>
  </head>
@@ -69,7 +69,7 @@ Dexie.spawn(function*(){
     
     alert ("My young friends: " + JSON.stringify(youngFriends));
     
-}).catch(e => alert("error: " + e);
+}).catch(e => alert("error: " + e.stack || e);
 ```
 
 #### Hello Typescript / ES7
@@ -98,7 +98,7 @@ db.version(1).stores({ friends: "++id,name,age" });
     
     alert ("My young friends: " + JSON.stringify(youngFriends));
     
-})().catch(e => alert("error: " + e);
+})().catch(e => alert("error: " + e.stack || e);
 ```
 
 Documentation
