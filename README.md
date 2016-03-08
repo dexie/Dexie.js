@@ -132,9 +132,9 @@ Install over npm
 npm install dexie
 ```
 
-Contribute
-==========
-Contributions are very welcome! Here is a little cheat-sheet for how to get started. Assuming you've already ran `npm install dexie --save` for the app your are developing.
+Contributing
+============
+Contributions are welcome! Here is a little cheat-sheet for how to get started. Assuming you've already ran `npm install dexie --save` for the app your are developing.
 
 ```
 git clone https://github.com/dfahlander/Dexie.js.git
@@ -151,6 +151,8 @@ npm link dexie
 ```
 That's it.
 Now you're up and running to test and commit changes to Dexie.js that will instantly affect the app you are developing.
+
+DISCLAIMBER: Before you pull-request, please make sure to run npm test first.
 
 Build
 -----
