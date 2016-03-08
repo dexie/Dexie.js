@@ -152,7 +152,7 @@ npm link dexie
 That's it.
 Now you're up and running to test and commit changes to Dexie.js that will instantly affect the app you are developing.
 
-DISCLAIMBER: Before you pull-request, please make sure to run npm test first.
+*DISCLAIMBER: Before you pull-request, please make sure to run npm test first.*
 
 Build
 -----
