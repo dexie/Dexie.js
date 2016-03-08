@@ -170,8 +170,8 @@ Now you're up and running to test and commit changes to Dexie.js that will insta
 
 Pull requests are more than welcome. Some advices are:
 
-1. Run npm test before making a pull request.
-2. If you have the time, please add a new unit test that reproduces the issue.
+* Run npm test before making a pull request.
+* If you find an issue, a unit test that reproduces it is lovely ;). If you don't know where to put it, put it in test/tests-misc.js. We use qunit. Just look at existing tests in tests-misc.js to see how they should be written. Tests are transpiled in the build script so you can use ES6 if you like.
 
 Build
 -----
