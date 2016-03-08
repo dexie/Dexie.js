@@ -69,7 +69,9 @@ Dexie.spawn(function*(){
     
     alert ("My young friends: " + JSON.stringify(youngFriends));
     
-}).catch(e => alert("error: " + e.stack || e);
+}).catch(e => {
+    alert("error: " + e.stack || e);
+});
 ```
 
 #### Hello Typescript / ES7
@@ -85,7 +87,7 @@ db.version(1).stores({ friends: "++id,name,age" });
 //
 // Manipulate and Query Database
 //
-(async function()=>{
+async function helloWorld () {
 
     // Dexie.spawn gives you the possibility to use yield.
     // Use yield like async works in Typescript / ES7
@@ -98,7 +100,12 @@ db.version(1).stores({ friends: "++id,name,age" });
     
     alert ("My young friends: " + JSON.stringify(youngFriends));
     
-})().catch(e => alert("error: " + e.stack || e);
+});
+
+helloWorld().catch(e => {
+    alert("error: " + e.stack || e);
+});
+
 ```
 
 Documentation
