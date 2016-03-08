@@ -1,0 +1,28 @@
+{
+  "name": "dexie-syncable",
+  "homepage": "https://dexie.org",
+  "authors": [
+    "David Fahlander"
+  ],
+  "description": "Addon to Dexie that makes it possible to sync indexeDB with remote databases.",
+  "main": "dist/dexie-syncable.js",
+  "esnext:main": "dist/dexie-syncable.es6.js",
+  "moduleType": [
+    "es6",
+    "amd",
+    "node",
+    "globals"
+  ],
+  "keywords": [
+    "indexeddb",
+    "dexie",
+    "addon"
+  ],
+  "license": "Apache-2.0",
+  "ignore": [
+    "**/.*",
+    "src/",
+    "test/",
+    "build/"
+  ]
+}

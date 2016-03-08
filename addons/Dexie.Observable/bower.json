@@ -1,0 +1,28 @@
+{
+  "name": "dexie-observable",
+  "homepage": "https://dexie.org",
+  "authors": [
+    "David Fahlander"
+  ],
+  "description": "Addon to Dexie that makes it possible to observe database changes no matter if they occur on other db instance or other window.",
+  "main": "dist/dexie-observable.js",
+  "esnext:main": "dist/dexie-observable.es6.js",
+  "moduleType": [
+    "es6",
+    "amd",
+    "node",
+    "globals"
+  ],
+  "keywords": [
+    "indexeddb",
+    "dexie",
+    "addon"
+  ],
+  "license": "Apache-2.0",
+  "ignore": [
+    "**/.*",
+    "src/",
+    "test/",
+    "build/"
+  ]
+}
