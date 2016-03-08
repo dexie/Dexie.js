@@ -4,7 +4,7 @@ Dexie.js
 [![NPM Version][npm-image]][npm-url]
 
 #### What is Dexie.js?
-Dexie.js is a wrapper library for indexedDB.
+Dexie.js is a wrapper library for indexedDB - the standard database in the browser.
 
 #### Why is Dexie.js needed?
 Dexie solves three main issues with the native IndexedDB API:
@@ -15,26 +15,114 @@ Dexie solves three main issues with the native IndexedDB API:
 
 Dexie.js solves these limitations and provides a neat database API. Dexie.js aims to be the first-hand choice of a IDB Wrapper Library due to its well thought-through API design, robust error handling, extendability, change tracking awareness and its extended KeyRange support (case insensitive search, set matches and OR operations).
 
-#### Please Show me a Hello World Example
+#### Hello World
 
+```html
+<html>
+ <head>
+  <script src="https://npmcdn.com/dexie/dist/dexie.min.js"></script>
+  <script>
+   //
+   // Declare Database
+   //
+   var db = new Dexie("FriendDatabase");
+   db.version(1).stores({ friends: "++id,name,age" });
+   
+   //
+   // Manipulate and Query Database
+   //
+   db.friends.add({name: "Josephine", age: 21}).then(function() {
+       return db.friends.where("age").below(25).toArray();
+   }).then(function (youngFriends) {
+       alert ("My young friends: " + JSON.stringify(youngFriends));
+   }).catch(function (e) {
+       alert ("Error: " + e.stack || e);
+   });
+  </script>
+ </head>
+</html>
+```
+
+#### Hello World (ES6)
 ```js
+import Dexie from 'dexie';
+
 //
 // Declare Database
 //
 var db = new Dexie("FriendDatabase");
 db.version(1).stores({ friends: "++id,name,age" });
-db.open();
 
 //
 // Manipulate and Query Database
 //
-db.friends.add({name: "Josephine", age: 21}).then(function() {
-    return db.friends.where("age").below(25).toArray();
-}).then(function (youngFriends) {
-    console.log("My young friends: " + JSON.stringify(youngFriends));
+Dexie.spawn(function*(){
+
+    // Dexie.spawn gives you the possibility to use yield.
+    // Use yield like async works in Typescript / ES7
+    
+    // Add to database
+    yield db.friends.add({name: "Josephine", age: 21});
+    
+    // Query database
+    let youngFriends = yield db.friends.where("age").below(25).toArray();
+    
+    alert ("My young friends: " + JSON.stringify(youngFriends));
+    
+}).catch(e => {
+    alert("error: " + e.stack || e);
 });
 ```
 
+#### Hello World (Typescript)
+```ts
+import Dexie from 'dexie';
+
+interface IFriend {
+    id?: number;
+    name?: string;
+    age?: number;
+}
+
+//
+// Declare Database
+//
+class FriendDatabase extends Dexie {
+    friends: Dexie.Table<IFriend,number>;
+    
+    constructor() {
+        super("FriendsDatabase");
+        this.version(1).stores({
+            friends: "++id,name,age"
+        });
+    }
+}
+
+var db = new FriendDatabase();
+
+//
+// Manipulate and Query Database
+//
+async function helloWorld () {
+
+    // Dexie.spawn gives you the possibility to use yield.
+    // Use yield like async works in Typescript / ES7
+    
+    // Add to database
+    await db.friends.add({name: "Josephine", age: 21});
+    
+    // Query database
+    let youngFriends = await db.friends.where("age").below(25).toArray();
+    
+    alert ("My young friends: " + JSON.stringify(youngFriends));
+    
+});
+
+helloWorld().catch(e => {
+    alert("error: " + e.stack || e);
+});
+
+```
 
 Documentation
 -------------
@@ -60,6 +148,31 @@ Install over npm
 npm install dexie
 ```
 
+Contributing
+============
+Here is a little cheat-sheet for how to symlink your app's node_modules/dexie to a place where you can edit the source, version control your changes and create pull requests back to Dexie. Assuming you've already ran `npm install dexie --save` for the app your are developing. Fork Dexie.js from the web gui on github. Now, cd to a neutral place (like ~repos/, c:\repos or whatever) and type:
+
+```
+git clone https://github.com/YOUR-USERNAME/Dexie.js.git
+cd Dexie.js
+npm install
+npm run build
+npm link
+```
+Then CD to your app directory and write:
+```
+npm link dexie
+```
+Your app's node_modules/dexie/ is now sym-linked to the Dexie.js clone on your hard drive so any change you do there will propagate to your app. Build dexie.js using `npm run build` or `npm run watch`. The latter will react on any source file change and rebuild the dist files.
+
+That's it.
+Now you're up and running to test and commit changes to Dexie.js that will instantly affect the app you are developing.
+
+Pull requests are more than welcome. Some advices are:
+
+1. Run npm test before making a pull request.
+2. If you have the time, please add a new unit test that reproduces the issue.
+
 Build
 -----
 ```
@@ -70,6 +183,12 @@ Test
 ----
 ```
 npm test
+```
+
+Watch
+-----
+```
+npm run watch
 ```
 
 Download
