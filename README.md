@@ -4,7 +4,7 @@ Dexie.js
 [![NPM Version][npm-image]][npm-url]
 
 #### What is Dexie.js?
-Dexie.js is a wrapper library for indexedDB.
+Dexie.js is a wrapper library for indexedDB - the standard database in the browser.
 
 #### Why is Dexie.js needed?
 Dexie solves three main issues with the native IndexedDB API:
