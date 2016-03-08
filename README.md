@@ -148,6 +148,17 @@ Install over npm
 npm install dexie
 ```
 
+Download
+--------
+For those who don't like package managers, here's the download links:
+
+https://npmcdn.com/dexie/dist/dexie.min.js
+
+https://npmcdn.com/dexie/dist/dexie.min.js.map
+
+https://npmcdn.com/dexie/dist/dexie.d.ts
+
+
 Contributing
 ============
 Here is a little cheat-sheet for how to symlink your app's node_modules/dexie to a place where you can edit the source, version control your changes and create pull requests back to Dexie. Assuming you've already ran `npm install dexie --save` for the app your are developing.
@@ -194,18 +205,6 @@ Watch
 npm run watch
 ```
 
-Download
-========
-For those who don't like package managers, here's the download links:
-
-https://npmcdn.com/dexie/dist/dexie.min.js
-
-https://npmcdn.com/dexie/dist/dexie.min.js.map
-
-https://npmcdn.com/dexie/dist/dexie.d.ts
-
-
 
 [npm-image]: https://img.shields.io/npm/v/dexie.svg?style=flat
 [npm-url]: https://npmjs.org/package/dexie
-
