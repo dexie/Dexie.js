@@ -5,6 +5,10 @@
   "main": "dist/dexie.js",
   "jsnext:main": "dist/dexie.es6.js",
   "typings": "dist/dexie.d.ts",
+  "jspm": {
+    "main": "dist/dexie.es6.js",
+    "files": ["dist/dexie.es6.js"]
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/dfahlander/Dexie.js.git"
