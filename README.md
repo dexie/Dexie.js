@@ -78,6 +78,12 @@ Dexie.spawn(function*(){
 ```ts
 import Dexie from 'dexie';
 
+interface IFriend {
+    id?: number;
+    name?: string;
+    age?: number;
+}
+
 //
 // Declare Database
 //
