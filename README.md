@@ -134,11 +134,8 @@ npm install dexie
 
 Contribute
 ==========
-Contributions are welcome. Here is a little cheat-sheet for how to get started to contribute to Dexie.js.
-First, we assume you are developing an app where you need dexie. Assuming you are using `npm install dexie` to
-install the package.
+Contributions are welcome. Here is a little cheat-sheet for how to get started. Assuming you've already ran `npm install dexie` for the app your are developing.
 
-Now to get access to changing the source, do:
 ```
 git clone https://github.com/dfahlander/Dexie.js.git
 cd Dexie.js
