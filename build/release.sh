@@ -29,6 +29,11 @@ next_ref="v$next_version"
 
 update_version 'package.json' $next_version
 
+# Commit package.json change
+git commit package.json --allow-empty -m "Releasing v$next_version" 2>/dev/null
+# Save this SHA to cherry pick later
+master_release_commit=$(git rev-parse HEAD)
+
 #
 # Merge last release output here before rebuilding
 #
@@ -40,27 +45,34 @@ git merge --no-edit -s ours origin/releases
 
 # clean
 rm -rf build/tmp
+rm -rf dist/*
 # build
 npm run build
 # test
 npm test
 
-# Update package.json
-git commit --allow-empty -am "Releasing v$next_version"
-git push origin master
-
-# Force adding new dist files
+# Force adding/removing dist files
 git add -A --no-ignore-removal -f dist/ 2>/dev/null
-# Dont include the README because it tells us about missing files (which is not missing now)
-git rm --cached dist/README.md
+
 # Commit all changes (still locally)
-git commit --amend -am "Releasing v$next_version" 2>/dev/null
+git commit -am "Build output" 2>/dev/null
+# Tag the release
+git tag -a -m "$next_ref" $next_ref
+#git tag -a -m "$next_ref" latest -f
 # Now, push the changes to the releases branch
-git push origin master:releases
+git push origin master:releases --follow-tags
 
-#npm publish
+printf "Successful push to master:releases\n\n"
 
-printf "Resetting to origin/master"
+npm publish
+
+printf "Successful publish to npm.\n\n"
+
+# Push the update of package.json to master
+printf "Pushing Release-commit to master (with updated version in package.json)\n"
+git push origin $master_release_commit:master
+
+printf "Resetting to origin/master\n"
 git reset --hard origin/master
 
 printf "Done."
