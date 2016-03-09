@@ -4,6 +4,9 @@
   "description": "Addon to Dexie that makes it possible to observe database changes no matter if they occur on other db instance or other window.",
   "main": "dist/dexie-observable.js",
   "jsnext:main": "dist/dexie-observable.es6.js",
+  "jspm": {
+    "main": "dist/dexie-observable.es6.js"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/dfahlander/Dexie.js.git"

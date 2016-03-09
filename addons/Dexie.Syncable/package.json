@@ -4,6 +4,9 @@
   "description": "Addon to Dexie that makes it possible to sync indexeDB with remote databases.",
   "main": "dist/dexie-syncable.js",
   "jsnext:main": "dist/dexie-syncable.es6.js",
+  "jspm": {
+    "main": "dist/dexie-syncable.es6.js"
+  },
   "repository": {
     "type": "git",
     "url": "https://github.com/dfahlander/Dexie.js.git"
