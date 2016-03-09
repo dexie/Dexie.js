@@ -6,6 +6,15 @@
   ],
   "description": "Addon to Dexie that makes it possible to sync indexeDB with remote databases.",
   "main": "dist/dexie-syncable.js",
+  "files": [
+      "Dexie.Syncable.SyncProtocolAPI.js",
+      "dist/dexie-syncable.js",
+      "dist/dexie-syncable.js.map",
+      "dist/dexie-syncable.min.js",
+      "dist/dexie-syncable.min.js.map",
+      "dist/dexie-syncable.es6.js",
+      "dist/dexie-syncable.es6.js.map"
+  ],
   "esnext:main": "dist/dexie-syncable.es6.js",
   "moduleType": [
     "es6",
