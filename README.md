@@ -75,6 +75,19 @@ Dexie.spawn(function*(){
 ```
 
 #### Hello World (Typescript)
+
+tsconfig.json:
+```json
+{
+    "compilerOptions": {
+        "module": "es6",
+        "target": "es6",
+        "moduleResolution": "node"
+    }
+}
+```
+
+app.ts
 ```ts
 import Dexie from 'dexie';
 
