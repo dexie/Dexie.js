@@ -136,6 +136,12 @@ helloWorld().catch(e => {
 });
 
 ```
+Build:
+```
+tsc --out app.es6.js app.ts
+babel --presets es2015 --plugins transform-runtime app.es6.js --out-file app.js
+webpack app.js bundle.js
+```
 
 Documentation
 -------------
