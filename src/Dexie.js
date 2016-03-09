@@ -3533,3 +3533,9 @@ export default function Dexie(dbName, options) {
         Dexie.fakeAutoComplete = fakeAutoComplete = doFakeAutoComplete;
         Dexie.fake = fake = true;
     });
+
+    // https://github.com/dfahlander/Dexie.js/issues/186
+    // typescript compiler tsc in mode ts-->es5 & commonJS, will expect require() to return
+    // x.default. Workaround: Set Dexie.default = Dexie.
+    Dexie.default = Dexie;
+    
