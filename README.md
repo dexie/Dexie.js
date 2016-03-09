@@ -75,6 +75,19 @@ Dexie.spawn(function*(){
 ```
 
 #### Hello World (Typescript)
+
+tsconfig.json:
+```json
+{
+    "compilerOptions": {
+        "module": "es6",
+        "target": "es6",
+        "moduleResolution": "node"
+    }
+}
+```
+
+app.ts
 ```ts
 import Dexie from 'dexie';
 
@@ -122,6 +135,12 @@ helloWorld().catch(e => {
     alert("error: " + e.stack || e);
 });
 
+```
+Build:
+```
+tsc --out app.es6.js app.ts
+babel --presets es2015 --plugins transform-runtime app.es6.js --out-file app.js
+webpack app.js bundle.js
 ```
 
 Documentation
