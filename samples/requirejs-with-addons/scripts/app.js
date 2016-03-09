@@ -1,8 +1,8 @@
 ﻿
 require.config({
     paths: {
-        "dexie": "../../../dist/dexie.min",
-        "dexie-observable": "../../../addons/Dexie.Observable/dist/dexie-observable.min"
+        "dexie": "https://npmcdn.com/dexie/dist/dexie",
+        "dexie-observable": "https://npmcdn.com/dexie-observable/dist/dexie-observable"
     }
 });
 

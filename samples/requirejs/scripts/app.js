@@ -1,7 +1,7 @@
 ﻿
 require.config({
     paths: {
-        "dexie": "../../../dist/dexie.min"
+        "dexie": "https://npmcdn.com/dexie/dist/dexie"
     }
 });
 
