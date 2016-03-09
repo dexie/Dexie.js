@@ -76,18 +76,8 @@ Dexie.spawn(function*(){
 
 #### Hello World (Typescript)
 
-tsconfig.json:
-```json
-{
-    "compilerOptions": {
-        "module": "es6",
-        "target": "es6",
-        "moduleResolution": "node"
-    }
-}
-```
+Here's the simples typescript sample from Dexie.js/samples/typescript-simple:
 
-app.ts
 ```ts
 import Dexie from 'dexie';
 
@@ -116,32 +106,24 @@ var db = new FriendDatabase();
 //
 // Manipulate and Query Database
 //
-async function helloWorld () {
-
-    // Dexie.spawn gives you the possibility to use yield.
-    // Use yield like async works in Typescript / ES7
-    
-    // Add to database
-    await db.friends.add({name: "Josephine", age: 21});
-    
-    // Query database
-    let youngFriends = await db.friends.where("age").below(25).toArray();
-    
+db.friends.add({name: "Josephine", age: 21}).then(()=>{
+    return db.friends.where("age").below(25).toArray();
+}).then(youngFriends => {
     alert ("My young friends: " + JSON.stringify(youngFriends));
-    
-});
-
-helloWorld().catch(e => {
+}).catch(e => {
     alert("error: " + e.stack || e);
 });
 
 ```
-Build:
+To see this in action, clone Dexie and cd to samples/typescript-simple. Then type:
+
 ```
-tsc --out app.es6.js app.ts
-babel --presets es2015 --plugins transform-runtime app.es6.js --out-file app.js
-webpack app.js bundle.js
-```
+npm install
+npm run build
+num run start
+``` 
+... and launch web browser to http://localhost:8081
+
 
 Documentation
 -------------
