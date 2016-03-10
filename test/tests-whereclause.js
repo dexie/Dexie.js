@@ -476,14 +476,16 @@ asyncTest("above, aboveOrEqual, below, belowOrEqual, between", 32, function () {
 
 asyncTest("Erratic behavior of between #190", ()=>{
 	db.transaction("rw", db.chart, function() {
-		for (var r=1; r<=20; r++) {
+        var chart = [];
+		for (var r=1; r<=2; r++) {
 			for (var c=1; c<=150; c++) {
-				db.chart.add({patno: 1,
+				chart.push({patno: 1,
 							  row: r,
 							  col: c,
 							  sym: 1});
 			}
 		}
+        db.chart.bulkAdd(chart);
 	}).then(function () {
         var grid = [],
 		    x1 = 91,
