@@ -2,12 +2,15 @@
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
 import {resetDatabase} from './dexie-unittest-utils';
 
+const async = Dexie.async;
+
 var db = new Dexie("TestDBWhereClause");
 db.version(1).stores({
     folders: "++id,&path",
     files: "++id,filename,extension,[filename+extension],folderId",
     people: "[name+number],name,number",
-    friends: "++id,name,age"
+    friends: "++id,name,age",
+    chart: '[patno+row+col], patno'
 });
 
 var Folder = db.folders.defineClass({
@@ -32,6 +35,16 @@ File.prototype.getFullPath = function () {
 
 Folder.prototype.getFiles = function () {
     return db.files.where('folderId').equals(this.id).toArray();
+}
+
+var Chart = db.chart.defineClass({
+    patno: Number,
+    row: Number,
+    col: Number,
+    sym: Number
+});
+Chart.prototype.save = function() {
+    return db.chart.put(this);
 }
 
 var firstFolderId = 0,
@@ -458,6 +471,31 @@ asyncTest("above, aboveOrEqual, below, belowOrEqual, between", 32, function () {
         });
     }).catch(function (err) {
         ok(false, err.stack || err);
+    }).finally(start);
+});
+
+asyncTest("Erratic behavior of between #190", ()=>{
+	db.transaction("rw", db.chart, function() {
+		for (var r=1; r<=20; r++) {
+			for (var c=1; c<=150; c++) {
+				db.chart.add({patno: 1,
+							  row: r,
+							  col: c,
+							  sym: 1});
+			}
+		}
+	}).then(function () {
+        var grid = [],
+		    x1 = 91,
+		    x2 = 130;
+		return db.chart.where("[patno+row+col]").between([1, 1, x1], [1, 1, x2], true, true).each(cell => {
+			grid.push(cell.sym);
+		}).then(function() {
+            equal(grid.length, 40, "Should find 40 cells");
+			//console.log("range " + x1 + "-" + x2 + " found " + grid.length);
+		});
+	}).catch(e => {
+        ok(false, "Error: " + e + " (Will fail in IE and Edge due to lack of compound primary keys)");
     }).finally(start);
 });
 
