@@ -1131,7 +1131,7 @@ export default function Dexie(dbName, options) {
                     return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
                         var thisCtx = {onsuccess:null, onerror:null};
                         if (creatingHook !== nop) {
-                            var effectiveKey = key || (idbstore.keyPath ? getByKeyPath(obj, idbstore.keyPath) : undefined);
+                            var effectiveKey = (key !== undefined) ? key : (idbstore.keyPath ? getByKeyPath(obj, idbstore.keyPath) : undefined);
                             var keyToUse = creatingHook.call(thisCtx, effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
                             if (effectiveKey === undefined && keyToUse !== undefined) {
                                 if (idbstore.keyPath)
@@ -1178,7 +1178,7 @@ export default function Dexie(dbName, options) {
                         //
                         return this._trans(READWRITE, function (resolve, reject, trans) {
                             // Since key is optional, make sure we get it from obj if not provided
-                            var effectiveKey = key || (self.schema.primKey.keyPath && getByKeyPath(obj, self.schema.primKey.keyPath));
+                            var effectiveKey = (key !== undefined) ? key : (self.schema.primKey.keyPath && getByKeyPath(obj, self.schema.primKey.keyPath));
                             if (effectiveKey === undefined) {
                                 // No primary key. Must use add().
                                 trans.tables[self.name].add(obj).then(resolve, reject);
