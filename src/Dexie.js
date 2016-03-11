@@ -12,6 +12,7 @@
  */
 
 import { keys, isArray, extend, derive, slice, override } from './utils';
+import { DexieError, ModifyError, errnames, exceptions, fullNameExceptions, exceptionMap } from './errors';
 
 if (typeof global === 'undefined') {
     var global = self || window; 
@@ -21,7 +22,8 @@ var maxString = String.fromCharCode(65535),
     // maxKey is an Array<Array> if indexedDB implementations supports array keys (not supported by IE,Edge or Safari at the moment)
     // Otherwise maxKey is maxString. This is handy when needing an open upper border without limit.
     maxKey = (function(){try {IDBKeyRange.only([[]]);return [[]];}catch(e){return maxString;}})(),
-    INVALID_KEY_ARGUMENT = "Invalid key provided. Keys must be of type string, number, Date or Array<string | number | Date>.";
+    INVALID_KEY_ARGUMENT = "Invalid key provided. Keys must be of type string, number, Date or Array<string | number | Date>.",
+    STRING_EXPECTED = "String expected.";
 
 export default function Dexie(dbName, options) {
         /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
@@ -30,9 +32,6 @@ export default function Dexie(dbName, options) {
         var deps = Dexie.dependencies;
         var indexedDB = deps.indexedDB,
             IDBKeyRange = deps.IDBKeyRange;
-
-        var TypeError = deps.TypeError,
-            Error = deps.Error;
 
         var globalSchema = this._dbSchema = {};
         var versions = [];
@@ -48,6 +47,7 @@ export default function Dexie(dbName, options) {
         var db = this;
         var pausedResumeables = [];
         var autoSchema = true;
+        var autoOpen = options && 'autoOpen' in options ? options.autoOpen : true;
         var hasNativeGetDatabaseNames = !!getNativeGetDatabaseNamesFn();
 
         function init() {
@@ -57,10 +57,13 @@ export default function Dexie(dbName, options) {
                 // Caller can override this behavior by doing db.on("versionchange", function(){ return false; });
                 // Let's not block the other window from making it's delete() or open() call.
                 db.close();
-                db.on('error').fire(new Error("Database version changed by other database connection."));
+                db.on('error').fire(new exceptions.VersionChange());
                 // In many web applications, it would be recommended to force window.reload()
                 // when this event occurs. Do do that, subscribe to the versionchange event
                 // and call window.location.reload(true);
+                // The reason for this is that your current web app obviously has old schema code that needs
+                // to be updated. Another window got a newer version of the app and needs to upgrade DB but
+                // your window is blocking it unless we close it here.
             });
         }
 
@@ -75,7 +78,7 @@ export default function Dexie(dbName, options) {
         this.version = function (versionNumber) {
             /// <param name="versionNumber" type="Number"></param>
             /// <returns type="Version"></returns>
-            if (idbdb) throw new Error("Cannot add version when database is open");
+            if (idbdb || isBeingOpened) throw new exceptions.Schema("Cannot add version when database is open");
             this.verno = Math.max(this.verno, versionNumber);
             var versionInstance = versions.filter(function (v) { return v._cfg.version === versionNumber; })[0];
             if (versionInstance) return versionInstance;
@@ -146,11 +149,11 @@ export default function Dexie(dbName, options) {
                         var instanceTemplate = {};
                         var indexes = parseIndexSyntax(stores[tableName]);
                         var primKey = indexes.shift();
-                        if (primKey.multi) throw new Error("Primary key cannot be multi-valued");
+                        if (primKey.multi) throw new exceptions.Schema("Primary key cannot be multi-valued");
                         if (primKey.keyPath) setByKeyPath(instanceTemplate, primKey.keyPath, primKey.auto ? 0 : primKey.keyPath);
                         indexes.forEach(function (idx) {
-                            if (idx.auto) throw new Error("Only primary key can be marked as autoIncrement (++)");
-                            if (!idx.keyPath) throw new Error("Index must have a name and cannot be an empty string");
+                            if (idx.auto) throw new exceptions.Schema("Only primary key can be marked as autoIncrement (++)");
+                            if (!idx.keyPath) throw new exceptions.Schema("Index must have a name and cannot be an empty string");
                             setByKeyPath(instanceTemplate, idx.keyPath, idx.compound ? idx.keyPath.map(function () { return ""; }) : "");
                         });
                         outSchema[tableName] = new TableSchema(tableName, primKey, indexes, instanceTemplate);
@@ -187,7 +190,7 @@ export default function Dexie(dbName, options) {
                 // Each transaction object will contain the table set that was current in that version (but also not-yet-deleted tables from its previous version)
                 var queue = [];
                 var oldVersionStruct = versions.filter(function (version) { return version._cfg.version === oldVersion; })[0];
-                if (!oldVersionStruct) throw new Error("Dexie specification of currently installed DB version is missing");
+                if (!oldVersionStruct) throw new exceptions.Upgrade("Dexie specification of currently installed DB version is missing");
                 globalSchema = db._dbSchema = oldVersionStruct._cfg.dbschema;
                 var anyContentUpgraderHasRun = false;
 
@@ -209,7 +212,7 @@ export default function Dexie(dbName, options) {
                         });
                         diff.change.forEach(function (change) {
                             if (change.recreate) {
-                                throw new Error("Not yet support for changing primary key");
+                                throw new exceptions.Upgrade("Not yet support for changing primary key");
                             } else {
                                 queue.push(function (idbtrans, cb) {
                                     var store = idbtrans.objectStore(change.name);
@@ -379,13 +382,22 @@ export default function Dexie(dbName, options) {
         }; 
 
         function tableNotInTransaction(mode, storeNames) {
-            throw new Error("Table " + storeNames[0] + " not part of transaction. Original Scope Function Source: " + Dexie.Promise.PSD.trans.scopeFunc.toString());
+            throw new exceptions.InvalidTable(
+                "Table " + storeNames[0] +
+                " not part of transaction. Original Scope Function Source: " +
+                Dexie.Promise.PSD.trans.scopeFunc.toString());
         }
 
         this._transPromiseFactory = function transactionPromiseFactory(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
             if (db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
                 // Database is paused. Wait til resumed.
-                if (!isBeingOpened) db.open(); // Force open if not being opened.
+                if (!isBeingOpened) {
+                    if (autoOpen) {
+                        db.open();
+                    } else {
+                        return fail(new exceptions.DatabaseClosed());
+                    }
+                }
                 var blockedPromise = new Promise(function (resolve, reject) {
                     pausedResumeables.push({
                         resume: function () {
@@ -428,7 +440,13 @@ export default function Dexie(dbName, options) {
 
         this._whenReady = function (fn) {
             if (!fake && db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
-                if (!isBeingOpened) db.open(); // Force open if not being opened.
+                if (!isBeingOpened) {
+                    if (autoOpen) {
+                        db.open();
+                    } else {
+                        return fail(new exceptions.DatabaseClosed());
+                    }
+                }
                 return new Promise(function (resolve, reject) {
                     pausedResumeables.push({
                         resume: function () {
@@ -452,10 +470,14 @@ export default function Dexie(dbName, options) {
         this.verno = 0;
 
         this.open = function () {
+            if (idbdb) return Promise.resolve(db);
+            if (isBeingOpened)
+                return new Promise((resolve, reject) => db._whenReady(function () { resolve(db); }, function (e) { reject(e); }));
+            dbOpenError = null;
+            isBeingOpened = true;
+            db_is_blocked = true;
             return new Promise(function (resolve, reject) {
                 if (fake) resolve(db);
-                if (idbdb) { resolve(db); return;}
-                if (isBeingOpened) { db._whenReady(function () { resolve(db); }, function (e) { reject(e); }); return;}
                 var req, dbWasCreated = false;
                 function openError(err) {
                     try { req.transaction.abort(); } catch (e) { }
@@ -472,9 +494,6 @@ export default function Dexie(dbName, options) {
                     pausedResumeables = [];
                 }
                 try {
-                    dbOpenError = null;
-                    isBeingOpened = true;
-
                     // Make sure caller has specified at least one version
                     if (versions.length > 0) autoSchema = false;
 
@@ -482,9 +501,11 @@ export default function Dexie(dbName, options) {
                     // IE fails when deleting objectStore after reading from it.
                     // A future version of Dexie.js will stopover an intermediate version to workaround this.
                     // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
-                    if (!indexedDB) throw new Error("indexedDB API not found. If using IE10+, make sure to run your code on a server URL (not locally). If using Safari, make sure to include indexedDB polyfill.");
+                    if (!indexedDB) throw new exceptions.MissingAPI(
+                        "indexedDB API not found. If using IE10+, make sure to run your code on a server URL "+
+                        "(not locally). If using Safari, make sure to include indexedDB polyfill.");
                     req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
-                    if (!req) throw new Error("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134 
+                    if (!req) throw new exceptions.MissingAPI("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
                     req.onerror = eventRejectHandler(openError, ["opening database", dbName]);
                     req.onblocked = function (ev) {
                         db.on("blocked").fire(ev);
@@ -500,7 +521,7 @@ export default function Dexie(dbName, options) {
                             req.result.close();
                             var delreq = indexedDB.deleteDatabase(dbName); // The upgrade transaction is atomic, and javascript is single threaded - meaning that there is no risk that we delete someone elses database here!
                             delreq.onsuccess = delreq.onerror = function () {
-                                openError(new Error("Database '" + dbName + "' doesnt exist"));
+                                openError(new exceptions.NoSuchDatabase(`Database ${dbName} doesnt exist`));
                             }; 
                         } else {
                             if (e.oldVersion === 0) dbWasCreated = true;
@@ -569,15 +590,25 @@ export default function Dexie(dbName, options) {
             if (idbdb) {
                 idbdb.close();
                 idbdb = null;
-                db_is_blocked = true;
-                dbOpenError = null;
+                autoOpen = false;
+                if (db_is_blocked) {
+                    pausedResumeables.forEach(function (resumable) {
+                        // Resume all stalled operations. They will fail once they wake up.
+                        resumable.resume();
+                    });
+                    pausedResumeables = [];
+                }
+                db_is_blocked = false;
+                dbOpenError = new exceptions.DatabaseClosed();
+            } else if (isBeingOpened) {
+                db.on('ready', ()=> Promise.reject(new exceptions.DatabaseClosed()));
             }
-        }; 
+        };
 
         this.delete = function () {
             var args = arguments;
             return new Promise(function (resolve, reject) {
-                if (args.length > 0) throw new Error("Arguments not allowed in db.delete()");
+                if (args.length > 0) throw new exceptions.InvalidArgument("Arguments not allowed in db.delete()");
                 function doDelete() {
                     db.close();
                     var req = indexedDB.deleteDatabase(dbName);
@@ -698,20 +729,20 @@ export default function Dexie(dbName, options) {
             else if (mode == "rw" || mode == READWRITE)
                 mode = READWRITE;
             else
-                error = new Error("Invalid transaction mode: " + mode);
+                error = new exceptions.InvalidArgument("Invalid transaction mode: " + mode);
 
             if (parentTransaction) {
                 // Basic checks
                 if (!error) {
                     if (parentTransaction && parentTransaction.mode === READONLY && mode === READWRITE) {
                         if (onlyIfCompatible) parentTransaction = null; // Spawn new transaction instead.
-                        else error = error || new Error("Cannot enter a sub-transaction with READWRITE mode when parent transaction is READONLY");
+                        else error = error || new exceptions.SubTransaction("Cannot enter a sub-transaction with READWRITE mode when parent transaction is READONLY");
                     }
                     if (parentTransaction) {
                         storeNames.forEach(function (storeName) {
                             if (!parentTransaction.tables.hasOwnProperty(storeName)) {
                                 if (onlyIfCompatible) parentTransaction = null; // Spawn new transaction instead.
-                                else error = error || new Error("Table " + storeName + " not included in parent transaction. Parent Transaction function: " + parentTransaction.scopeFunc.toString());
+                                else error = error || new exceptions.SubTransaction("Table " + storeName + " not included in parent transaction. Parent Transaction function: " + parentTransaction.scopeFunc.toString());
                             }
                         });
                     }
@@ -834,7 +865,7 @@ export default function Dexie(dbName, options) {
         this.table = function (tableName) {
             /// <returns type="WriteableTable"></returns>
             if (fake && autoSchema) return new WriteableTable(tableName);
-            if (!allTables.hasOwnProperty(tableName)) { throw new Error("Table does not exist"); }
+            if (!allTables.hasOwnProperty(tableName)) { throw new exceptions.InvalidTable(`Table ${tableName} does not exist`); }
             return allTables[tableName];
         };
 
@@ -861,7 +892,10 @@ export default function Dexie(dbName, options) {
 
         extend(Table.prototype, function () {
             function failReadonly() {
-                throw new Error("Current Transaction is READONLY");
+                // It's ok to throw here because this can only happen within a transaction,
+                // and will always be caught by the transaction scope and returned as a
+                // failed promise.
+                throw new exceptions.ReadOnly("Current Transaction is READONLY");
             }
             return {
                 //
@@ -1034,7 +1068,7 @@ export default function Dexie(dbName, options) {
                     var self = this,
                         creatingHook = this.hook.creating.fire;
                     return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
-                        if (!idbstore.keyPath) throw new Error("bulkAdd() only support inbound keys");
+                        if (!idbstore.keyPath) throw new exceptions.Unsupported("bulkAdd() only support inbound keys");
                         if (objects.length === 0) return resolve([]); // Caller provided empty list.
                         var req,
                             errorList = [],
@@ -1219,14 +1253,17 @@ export default function Dexie(dbName, options) {
                 },
 
                 update: function (keyOrObject, modifications) {
-                    if (typeof modifications !== 'object' || isArray(modifications)) throw new Error("db.update(keyOrObject, modifications). modifications must be an object.");
+                    if (typeof modifications !== 'object' || isArray(modifications))
+                        throw new exceptions.InvalidArgument(
+                            "db.update(keyOrObject, modifications). modifications must be an object.");
                     if (typeof keyOrObject === 'object' && !isArray(keyOrObject)) {
                         // object to modify. Also modify given object with the modifications:
                         keys(modifications).forEach(function (keyPath) {
                             setByKeyPath(keyOrObject, keyPath, modifications[keyPath]);
                         });
                         var key = getByKeyPath(keyOrObject, this.schema.primKey.keyPath);
-                        if (key === undefined) Promise.reject(new Error("Object does not contain its primary key"));
+                        if (key === undefined) Promise.reject(new exceptions.InvalidArgument(
+                            "Given object does not contain its primary key"));
                         return this.where(":id").equals(key).modify(modifications);
                     } else {
                         // key to modify
@@ -1329,7 +1366,10 @@ export default function Dexie(dbName, options) {
                     if (!self._locked()) {
                         p = self.active ? new Promise(function (resolve, reject) {
                             if (!self.idbtrans && mode) {
-                                if (!idbdb) throw dbOpenError ? new Error("Database not open. Following error in populate, ready or upgrade function made Dexie.open() fail: " + dbOpenError) : new Error("Database not open");
+                                if (!idbdb) throw dbOpenError ? dbOpenError instanceof exceptions.DatabaseClosed ?
+                                    dbOpenError :
+                                    new exceptions.OpenFailed(dbOpenError) :
+                                    new exceptions.DatabaseClosed();
                                 var idbtrans = self.idbtrans = idbdb.transaction(safariMultiStoreFix(self.storeNames), self.mode);
                                 idbtrans.onerror = function (e) {
                                     self.on("error").fire(e && e.target.error);
@@ -1340,7 +1380,7 @@ export default function Dexie(dbName, options) {
                                     // Workaround for issue #78 - low disk space on chrome.
                                     // onabort is called but never onerror. Call onerror explicitely.
                                     // Do this in a future tick so we allow default onerror to execute before doing the fallback.
-                                    asap(function () { self.on('error').fire(new Error("Transaction aborted for unknown reason")); });
+                                    asap(function () { self.on('error').fire(new exceptions.Abort("Transaction aborted for unknown reason")); });
 
                                     self.active = false;
                                     self.on("abort").fire(e);
@@ -1360,16 +1400,18 @@ export default function Dexie(dbName, options) {
                                 // whether the caller is about to catch() the error or not. Have to make
                                 // transaction fail. Catching such an error wont stop transaction from failing.
                                 // This is a limitation we have to live with.
+                                if (!(e instanceof DexieError) && e.name && exceptionMap[e.name]) {
+                                    // Handle IDB exceptions in a nicer way - include call stack and correct type.
+                                    try {throw new exceptionMap[e.name](e.message, e);} catch(e2) {
+                                        e = e2;
+                                    }
+                                }
                                 Dexie.ignoreTransaction(function() { self.on('error').fire(e); });
                                 self.abort();
-                                // Make sure to include a call stack in the exception. Needed in IE and Edge.
-                                try {
-                                    throw new Error(e);
-                                } catch (e2) {
-                                    reject(e2);
-                                }
+                                reject(e);
                             }
-                        }) : Promise.reject(stack(new Error("Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
+                        }) : Promise.reject(stack(new exceptions.TransactionInactive(
+                            "Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
                         if (self.active && bWriteLock) p.finally(function () {
                             self._unlock();
                         });
@@ -1404,11 +1446,11 @@ export default function Dexie(dbName, options) {
                 if (this.idbtrans && this.active) try { // TODO: if !this.idbtrans, enqueue an abort() operation.
                     this.active = false;
                     this.idbtrans.abort();
-                    this.on.error.fire(new Error("Transaction Aborted"));
+                    this.on.error.fire(new exceptions.Abort("Transaction Aborted"));
                 } catch (e) { }
             },
             table: function (name) {
-                if (!this.tables.hasOwnProperty(name)) { throw new Error("Table " + name + " not in transaction"); }
+                if (!this.tables.hasOwnProperty(name)) { throw new exceptions.InvalidTable("Table " + name + " not in transaction"); }
                 return this.tables[name];
             }
         });
@@ -1437,7 +1479,7 @@ export default function Dexie(dbName, options) {
             // WhereClause private methods
 
             function fail(c, err, T) {
-                var collection = c instanceof WhereClause ? new c._ctx.collClass(c) : c; 
+                var collection = c instanceof WhereClause ? new c._ctx.collClass(c) : c;
                 try { throw (T ? new T(err) : new TypeError(err)); } catch (e) {
                     collection._ctx.error = e;
                 }
@@ -1578,18 +1620,18 @@ export default function Dexie(dbName, options) {
                 },
                 startsWith: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof str !== 'string') return fail(this, "String expected");
+                    if (typeof str !== 'string') return fail(this, STRING_EXPECTED);
                     return this.between(str, str + maxString, true, true);
                 },
                 startsWithIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof str !== 'string') return fail(this, "String expected");
+                    if (typeof str !== 'string') return fail(this, STRING_EXPECTED);
                     if (str === "") return this.startsWith(str);
                     return addIgnoreCaseAlgorithm(this, function (x, a) { return x.indexOf(a[0]) === 0; }, [str], maxString);
                 },
                 equalsIgnoreCase: function (str) {
                     /// <param name="str" type="String"></param>
-                    if (typeof str !== 'string') return fail(this, "String expected");
+                    if (typeof str !== 'string') return fail(this, STRING_EXPECTED);
                     return addIgnoreCaseAlgorithm(this, function (x, a) { return x === a[0]; }, [str], "");
                 },
                 anyOfIgnoreCase: function (stringsToFind) {
@@ -1604,7 +1646,7 @@ export default function Dexie(dbName, options) {
                     var set = getSetArgs(arguments);
                     if (set.length === 0) return emptyCollection(this);
                     if (!set.every(function (s) { return typeof s === 'string'; })) {
-                        return fail(this, "anyOfIgnoreCase() only works with strings");
+                        return fail(this, "startsWithAnyOfIgnoreCase() only works with strings");
                     }
                     return addIgnoreCaseAlgorithm(this, function (x, a) {
                         return a.some(function(n){
@@ -1672,7 +1714,7 @@ export default function Dexie(dbName, options) {
                     var ctx = this._ctx;
                     if (ranges.length === 0) return emptyCollection(this);
                     if (!ranges.every(function (range) { return range[0] !== undefined && range[1] !== undefined && ascending(range[0], range[1]) <= 0;})) {
-                        return fail(this, "First argument to inAnyRange() must be an Array of two-value Arrays [lower,upper] where upper must not be lower than lower", Error);
+                        return fail(this, "First argument to inAnyRange() must be an Array of two-value Arrays [lower,upper] where upper must not be lower than lower", exceptions.InvalidArgument);
                     }
                     var includeLowers = !options || options.includeLowers !== false;   // Default to true
                     var includeUppers = options && options.includeUppers === true;    // Default to false
@@ -1797,10 +1839,12 @@ export default function Dexie(dbName, options) {
             if (keyRangeGenerator) try {
                 keyRange = keyRangeGenerator();
             } catch (ex) {
-                try {
-                    throw new Error(ex); // Rethrowing to get a callstack with the error. Needed in IE and Edge.
-                } catch (ex2) {
-                    error = ex2;
+                error = ex;
+                if (!(ex instanceof DexieError) && ex.name && exceptionMap[ex.name]) {
+                    // Handle IDB exceptions in a nicer way - include call stack and correct type.
+                    try {throw new exceptionMap[ex.name](ex.message, ex);} catch(e2) {
+                        error = e2;
+                    }
                 }
             }
 
@@ -1840,7 +1884,7 @@ export default function Dexie(dbName, options) {
             function getIndexOrStore(ctx, store) {
                 if (ctx.isPrimKey) return store;
                 var indexSpec = ctx.table.schema.idxByName[ctx.index];
-                if (!indexSpec) throw new Error("KeyPath " + ctx.index + " on object store " + store.name + " is not indexed");
+                if (!indexSpec) throw new exceptions.Schema("KeyPath " + ctx.index + " on object store " + store.name + " is not indexed");
                 return ctx.isPrimKey ? store : store.index(indexSpec.name);
             }
 
@@ -3000,7 +3044,7 @@ export default function Dexie(dbName, options) {
                         var idxOfFn = context.subscribers.indexOf(fn);
                         if (idxOfFn !== -1) context.subscribers.splice(idxOfFn, 1);
                     }; 
-                } else throw new Error("Invalid event config");
+                } else throw new exceptions.InvalidArgument("Invalid event config");
             });
         }
 
@@ -3024,7 +3068,7 @@ export default function Dexie(dbName, options) {
     }
 
     function assert(b) {
-        if (!b) throw new Error("Assertion failed");
+        if (!b) throw new exceptions.Internal("Assertion failed");
     }
 
     function asap(fn) {
@@ -3058,6 +3102,13 @@ export default function Dexie(dbName, options) {
             fn();
         } catch (ex) {
             onerror(ex);
+        }
+    }
+
+    function fail(err) {
+        // Get the call stack and return a rejected promise.
+        try { throw err; } catch (e) {
+            return Promise.reject(err);
         }
     }
 
@@ -3188,7 +3239,7 @@ export default function Dexie(dbName, options) {
 
     function eventRejectHandler(reject, sentance) {
         return function (event) {
-            var errObj = (event && event.target.error) || new Error();
+            var errObj = (event && event.target.error) || new Error("");
             if (sentance) {
                 var occurredWhen = " occurred when " + sentance.map(function (word) {
                     switch (typeof (word)) {
@@ -3197,16 +3248,16 @@ export default function Dexie(dbName, options) {
                         default: return JSON.stringify(word);
                     }
                 }).join(" ");
+                if (errObj.message && errObj.message != errObj.name)
+                    occurredWhen += ". " + errObj.message;
+                var stack = errObj.stack; // If some browser would put a stack in error events in future.
                 if (errObj.name) {
-                    errObj.toString = function toString() {
-                        return errObj.name + occurredWhen + (errObj.message ? ". " + errObj.message : "");
-                        // Code below works for stacked exceptions, BUT! stack is never present in event errors (not in any of the browsers). So it's no use to include it!
-                        /*delete this.toString; // Prohibiting endless recursiveness in IE.
-                        if (errObj.stack) rv += (errObj.stack ? ". Stack: " + errObj.stack : "");
-                        this.toString = toString;
-                        return rv;*/
-                    };
+                    if (exceptionMap[errObj.name]) {
+                        errObj = new exceptionMap[errObj.name](errObj.name + occurredWhen, errObj);
+                        if (stack) errObj.stack = stack;
+                    }
                 } else {
+                    // Non-standard exceptions from IndexedDBPolyfill
                     errObj = errObj + occurredWhen;
                 }
             };
@@ -3320,18 +3371,6 @@ export default function Dexie(dbName, options) {
     }
 
     //
-    // ModifyError Class (extends Error)
-    //
-    function ModifyError(msg, failures, successCount, failedKeys) {
-        this.name = "ModifyError";
-        this.failures = failures;
-        this.failedKeys = failedKeys;
-        this.successCount = successCount;
-        this.message = failures.join('\n');
-    }
-    derive(ModifyError).from(Error);
-
-    //
     // Static delete() method.
     //
     Dexie.delete = function (databaseName) {
@@ -3348,12 +3387,10 @@ export default function Dexie(dbName, options) {
     // Static exists() method.
     //
     Dexie.exists = function(name) {
-        return new Dexie(name).open().then(function(db) {
+        return new Dexie(name).open().then(db=>{
             db.close();
             return true;
-        }, function() {
-            return false;
-        });
+        }).catch(Dexie.NoSuchDatabaseError, () => false);
     }
 
     //
@@ -3482,6 +3519,7 @@ export default function Dexie(dbName, options) {
     Dexie.override = override;
     // Export our events() function - can be handy as a toolkit
     Dexie.events = events;
+    // Utilities
     Dexie.getByKeyPath = getByKeyPath;
     Dexie.setByKeyPath = setByKeyPath;
     Dexie.delByKeyPath = delByKeyPath;
@@ -3490,12 +3528,17 @@ export default function Dexie(dbName, options) {
     Dexie.addons = [];
     Dexie.fakeAutoComplete = fakeAutoComplete;
     Dexie.asap = asap;
-    // Export our static classes
-    Dexie.ModifyError = ModifyError;
-    Dexie.MultiModifyError = ModifyError; // Backward compatibility pre 0.9.8
+    Dexie.maxKey = maxKey;
+    
+    // Export Error classes
+    extend(Dexie, fullNameExceptions); // Dexie.XXXError = class XXXError {...};
+    Dexie.MultiModifyError = Dexie.ModifyError; // Backward compatibility 0.9.8
+    Dexie.errnames = errnames;
+
+    // Export other static classes
     Dexie.IndexSpec = IndexSpec;
     Dexie.TableSchema = TableSchema;
-    Dexie.MaxKey = maxKey;
+
     //
     // Dependencies
     //
