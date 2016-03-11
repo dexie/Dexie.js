@@ -1,6 +1,8 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
 
+const async = Dexie.async;
+
 module("open", {
     setup: function () {
         stop();
@@ -76,7 +78,7 @@ asyncTest("test-if-database-exists", 3, function () {
         // Could open database without specifying any version. An existing database was opened.
         ok(false, "Expected database not to exist but it existed indeed");
         db.close();
-    }).catch(function (err) {
+    }).catch(Dexie.NoSuchDatabaseError, function (err) {
         // An error happened. Database did not exist.
         ok(true, "Database did not exist");
         db = new Dexie("TestDB");
@@ -327,4 +329,59 @@ asyncTest("Dexie.exists", function () {
     }).catch(function(e) {
         ok(false, "Error: " + e);
     }).finally(start);
+});
+
+asyncTest("No auto-open", ()=> {
+    let db = new Dexie("TestDB", {autoOpen: false});
+    db.version(1).stores({foo: "id"});
+    db.foo.toArray(res => {
+        ok(false, "Should not get result. Should have failed.");
+    }).catch(e => {
+        ok(e instanceof Dexie.DatabaseClosedError, "Should catch DatabaseClosedError");
+    }).then(() => {
+        db.open();
+        return db.foo.toArray();
+    }).then(res => {
+        equal(res.length, 0, "Got an answer now when opened.");
+        db.close();
+        let openPromise = db.open().then(()=>{
+            debugger;
+            ok(false, "Should not succeed to open because we closed it during the open sequence.")
+        }).catch(e=> {
+            ok(e instanceof Dexie.DatabaseClosedError, "Got DatabaseClosedError from the db.open() call.");
+        });
+        let queryPromise = db.foo.toArray().then(()=>{
+            ok(false, "Should not succeed to query because we closed it during the open sequence.")
+        }).catch(e=> {
+            ok(e instanceof Dexie.DatabaseClosedError, "Got DatabaseClosedError when querying: " + e);
+        });
+        db.close();
+        return Promise.all([openPromise, queryPromise]);
+    }).catch(e => {
+        ok(e instanceof Dexie.OpenFailedError);
+    }).catch(e => {
+        ok(false, e);
+    }).finally(start);
+});
+
+asyncTest("db.close", ()=> {
+    let db = new Dexie("TestDB");
+    db.version(1).stores({foo: "id"});
+    db.foo.toArray(res => {
+        equal(res.length, 0, "Database auto-opened and I got a result from my query");
+    }).then(() => {
+        db.close();
+        return db.foo.toArray();
+    }).catch(e => {
+        ok(e instanceof Dexie.DatabaseClosedError, "Should catch DatabaseClosedError");
+        return db.open();
+    }).then(()=>{
+        return db.foo.toArray();
+    }).then(res => {
+        equal(res.length, 0, "Database re-opened and I got a result from my query");
+    }).catch(e => {
+        ok(false, e);
+    }).finally(()=>{
+        db.delete().catch(e=>console.error(e)).finally(start);
+    });
 });
