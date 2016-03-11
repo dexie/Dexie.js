@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase} from './dexie-unittest-utils';
+import {resetDatabase, supports} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBCollection");
 db.version(1).stores({ users: "id,first,last,&username,*&email,*pets" });
@@ -213,20 +213,22 @@ asyncTest("reverse", function () {
     }).finally(start);
 });
 
-asyncTest("distinct", function () {
-    db.transaction("r", db.users, function () {
+if (supports("multiEntry")) {
+    asyncTest("distinct", function () {
+        db.transaction("r", db.users, function () {
 
-        db.users.where("email").startsWithIgnoreCase("d").toArray(function (a) {
-            equal(a.length, 2, "Got two duplicates of David since he has two email addresses starting with 'd' (Fails on IE10, IE11 due to not supporting multivalued array indexes)");
-        });
-        db.users.where("email").startsWithIgnoreCase("d").distinct().toArray(function (a) {
-            equal(a.length, 1, "Got single instance of David since we used the distinct() method. (Fails on IE10, IE11 due to not supporting multivalued array indexes)");
-        });
+            db.users.where("email").startsWithIgnoreCase("d").toArray(function (a) {
+                equal(a.length, 2, "Got two duplicates of David since he has two email addresses starting with 'd' (Fails on IE10, IE11 due to not supporting multivalued array indexes)");
+            });
+            db.users.where("email").startsWithIgnoreCase("d").distinct().toArray(function (a) {
+                equal(a.length, 1, "Got single instance of David since we used the distinct() method. (Fails on IE10, IE11 due to not supporting multivalued array indexes)");
+            });
 
-    }).catch(function (e) {
-        ok(false, e);
-    }).finally(start);
-});
+        }).catch(function (e) {
+            ok(false, e);
+        }).finally(start);
+    });
+}
 
 asyncTest("modify", function () {
     db.transaction("rw", db.users, function () {

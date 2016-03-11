@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase} from './dexie-unittest-utils';
+import {resetDatabase, supports} from './dexie-unittest-utils';
 
 const async = Dexie.async;
 
@@ -367,49 +367,78 @@ asyncTest("queryingNonExistingObj", function () {
     }).finally(start);
 });
 
-asyncTest("compount-index", 2, function () {
-    db.transaction("r", db.files, function () {
-        db.files.where("[filename+extension]").equals(["README", ".TXT"]).toArray(function (a) {
-            equal(a.length, 1, "Found one file by compound index search");
-            equal(a[0].filename, "README", "The found file was README.TXT");
-        });
-    }).catch(function (e) {
-        ok(false, e + ". Expected to fail on IE10/IE11 - no support compound indexs.");
-    }).finally(start);
-});
+if (supports("compound")) {
+    asyncTest("compount-index", 2, function () {
+        db.transaction("r", db.files, function () {
+            db.files.where("[filename+extension]").equals(["README", ".TXT"]).toArray(function (a) {
+                equal(a.length, 1, "Found one file by compound index search");
+                equal(a[0].filename, "README", "The found file was README.TXT");
+            });
+        }).catch(function (e) {
+            ok(false, e + ". Expected to fail on IE10/IE11 - no support compound indexs.");
+        }).finally(start);
+    });
 
-asyncTest("compound-primkey (Issue #37)", function() {
-    db.transaction('rw', db.people, function() {
-        db.people.add({ name: "Santaclaus", number: 123 });
-        db.people.add({ name: "Santaclaus", number: 124 });
-        db.people.add({ name: "Santaclaus2", number: 1 });
-        return db.people.get(["Santaclaus", 123]);
-    }).then(function(santa) {
-        ok(!!santa, "Got santa");
-        equal(santa.name, "Santaclaus", "Santa's name is correct");
-        equal(santa.number, 123, "Santa's number is correct");
+    asyncTest("compound-primkey (Issue #37)", function () {
+        db.transaction('rw', db.people, function () {
+            db.people.add({name: "Santaclaus", number: 123});
+            db.people.add({name: "Santaclaus", number: 124});
+            db.people.add({name: "Santaclaus2", number: 1});
+            return db.people.get(["Santaclaus", 123]);
+        }).then(function (santa) {
+            ok(!!santa, "Got santa");
+            equal(santa.name, "Santaclaus", "Santa's name is correct");
+            equal(santa.number, 123, "Santa's number is correct");
 
-        return db.people.where("[name+number]").between(["Santaclaus", 1], ["Santaclaus", 200]).toArray();
-    }).then(function(santas) {
-        equal(santas.length, 2, "Got two santas");
-    }).catch(function (e) {
-        ok(false, "Failed (will fail in IE without polyfill):" + e);
-    }).finally(start);
-});
-
-asyncTest("Issue #31 - Compound Index with anyOf", function() {
-    db.files
-        .where("[filename+extension]")
-        .anyOf([["hello", ".exe"], ["README", ".TXT"]])
-        .toArray(function (a) {
-            equal(a.length, 2, "Should find two files");
-            equal(a[0].filename, "README", "First comes the uppercase README.TXT");
-            equal(a[1].filename, "hello", "Second comes the lowercase hello.exe");
-
-        }).catch(function(e) {
+            return db.people.where("[name+number]").between(["Santaclaus", 1], ["Santaclaus", 200]).toArray();
+        }).then(function (santas) {
+            equal(santas.length, 2, "Got two santas");
+        }).catch(function (e) {
             ok(false, "Failed (will fail in IE without polyfill):" + e);
         }).finally(start);
-});
+    });
+
+    asyncTest("Issue #31 - Compound Index with anyOf", function () {
+        db.files
+            .where("[filename+extension]")
+            .anyOf([["hello", ".exe"], ["README", ".TXT"]])
+            .toArray(function (a) {
+                equal(a.length, 2, "Should find two files");
+                equal(a[0].filename, "README", "First comes the uppercase README.TXT");
+                equal(a[1].filename, "hello", "Second comes the lowercase hello.exe");
+
+            }).catch(function (e) {
+            ok(false, "Failed (will fail in IE without polyfill):" + e);
+        }).finally(start);
+    });
+
+    asyncTest("Erratic behavior of between #190", ()=>{
+        db.transaction("rw", db.chart, function() {
+            var chart = [];
+            for (var r=1; r<=2; r++) {
+                for (var c=1; c<=150; c++) {
+                    chart.push({patno: 1,
+                        row: r,
+                        col: c,
+                        sym: 1});
+                }
+            }
+            db.chart.bulkAdd(chart);
+        }).then(function () {
+            var grid = [],
+                x1 = 91,
+                x2 = 130;
+            return db.chart.where("[patno+row+col]").between([1, 1, x1], [1, 1, x2], true, true).each(cell => {
+                grid.push(cell.sym);
+            }).then(function() {
+                equal(grid.length, 40, "Should find 40 cells");
+                //console.log("range " + x1 + "-" + x2 + " found " + grid.length);
+            });
+        }).catch(e => {
+            ok(false, "Error: " + e + " (Will fail in IE and Edge due to lack of compound primary keys)");
+        }).finally(start);
+    });
+}
 
 asyncTest("above, aboveOrEqual, below, belowOrEqual, between", 32, function () {
     db.folders.where('id').above(firstFolderId + 4).toArray(function (a) {
@@ -471,33 +500,6 @@ asyncTest("above, aboveOrEqual, below, belowOrEqual, between", 32, function () {
         });
     }).catch(function (err) {
         ok(false, err.stack || err);
-    }).finally(start);
-});
-
-asyncTest("Erratic behavior of between #190", ()=>{
-	db.transaction("rw", db.chart, function() {
-        var chart = [];
-		for (var r=1; r<=2; r++) {
-			for (var c=1; c<=150; c++) {
-				chart.push({patno: 1,
-							  row: r,
-							  col: c,
-							  sym: 1});
-			}
-		}
-        db.chart.bulkAdd(chart);
-	}).then(function () {
-        var grid = [],
-		    x1 = 91,
-		    x2 = 130;
-		return db.chart.where("[patno+row+col]").between([1, 1, x1], [1, 1, x2], true, true).each(cell => {
-			grid.push(cell.sym);
-		}).then(function() {
-            equal(grid.length, 40, "Should find 40 cells");
-			//console.log("range " + x1 + "-" + x2 + " found " + grid.length);
-		});
-	}).catch(e => {
-        ok(false, "Error: " + e + " (Will fail in IE and Edge due to lack of compound primary keys)");
     }).finally(start);
 });
 

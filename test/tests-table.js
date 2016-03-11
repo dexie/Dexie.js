@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase} from './dexie-unittest-utils';
+import {resetDatabase, supports} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBTable");
 db.version(1).stores({
@@ -119,12 +119,14 @@ asyncTest("where", function () {
             equal(a.length, 1, "in() returned expected number of items");
         });
 
-        db.users.where("email").equals("david@awarica.com").toArray(function (a) { // Fails in IE with 0 due to that IE is not implementing to index string arrays.
-            equal(a.length, 1, "Finding items from array members. Expect to fail on IE10/IE11.");
-        });
-        db.users.where("email").startsWith("da").distinct().toArray(function (a) { // Fails on IE with 0
-            equal(a.length, 2, "Found both because both have emails starting with 'da'. Expect to fail on IE10/IE11.");
-        });
+        if (supports("multiEntry")) {
+            db.users.where("email").equals("david@awarica.com").toArray(function (a) { // Fails in IE with 0 due to that IE is not implementing to index string arrays.
+                equal(a.length, 1, "Finding items from array members. Expect to fail on IE10/IE11.");
+            });
+            db.users.where("email").startsWith("da").distinct().toArray(function (a) { // Fails on IE with 0
+                equal(a.length, 2, "Found both because both have emails starting with 'da'. Expect to fail on IE10/IE11.");
+            });
+        }
     }).catch(function (e) {
         ok(false, "Transaction failed: " + e);
     }).finally(function () {
