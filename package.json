@@ -12,9 +12,7 @@
   },
   "jspm": {
     "main": "dist/dexie.es6.js",
-    "files": [
-      "dist/dexie.es6.js"
-    ]
+    "format": "esm"
   },
   "repository": {
     "type": "git",
