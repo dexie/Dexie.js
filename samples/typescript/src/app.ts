@@ -3,8 +3,9 @@ import Dexie from 'dexie';
 import Console from './console';
 import {db,Contact} from './appdb';
 
-const all = Dexie.Promise.all;
-const console = new Console(); // So that you dont have to press F12...
+const Promise = Dexie.Promise, // KEEP! (or loose transaction safety in await calls!)
+      all = Promise.all,
+      console = new Console(); // So that you dont have to press F12...
 
 document.addEventListener('DOMContentLoaded', async function () {
     

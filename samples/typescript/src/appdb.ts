@@ -1,5 +1,7 @@
 ﻿import Dexie from 'dexie';
-const all = Dexie.Promise.all;
+
+const Promise = Dexie.Promise; // KEEP! (or loose transaction safety in await calls!)
+const all = Promise.all;
 
 export class AppDatabase extends Dexie {
 
@@ -82,17 +84,17 @@ export class Contact {
 
     save() {
         return db.transaction('rw', db.contacts, db.emails, db.phones, async () => {
-            
+          
             let [emailIds, phoneIds] = await all (
                 // Save existing arrays
                 all(this.emails.map(email => db.emails.put(email))),
                 all(this.phones.map(phone => db.phones.put(phone))));
-                
+                            
             // Remove items from DB that is was not saved here:
             await db.emails.where('contactId').equals(this.id)
                 .and(email => emailIds.indexOf(email.id) === -1)
                 .delete();
-
+            
             await db.phones.where('contactId').equals(this.id)
                 .and(phone => phoneIds.indexOf(phone.id) === -1)
                 .delete();
