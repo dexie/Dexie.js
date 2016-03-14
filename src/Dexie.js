@@ -2186,7 +2186,7 @@ export default function Dexie(dbName, options) {
                             // and call the hooks accordingly!
                             modifyer = function (item) {
                                 var origItem = deepClone(item); // Clone the item first so we can compare laters.
-                                if (changes.call(this, item) === false) return false; // Call the real modifyer function (If it returns false explicitely, it means it dont want to modify anyting on this object)
+                                if (changes.call(this, item, this) === false) return false; // Call the real modifyer function (If it returns false explicitely, it means it dont want to modify anyting on this object)
                                 if (!this.hasOwnProperty("value")) {
                                     // The real modifyer function requests a deletion of the object. Inform the deletingHook that a deletion is taking place.
                                     deletingHook.call(this, this.primKey, item, trans);
@@ -2268,7 +2268,7 @@ export default function Dexie(dbName, options) {
                             return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
                         }
 
-                        if (modifyer.call(thisContext, item) !== false) { // If a callback explicitely returns false, do not perform the update!
+                        if (modifyer.call(thisContext, item, thisContext) !== false) { // If a callback explicitely returns false, do not perform the update!
                             var bDelete = !thisContext.hasOwnProperty("value");
                             ++count;
                             miniTryCatch(function () {
@@ -3553,11 +3553,8 @@ export default function Dexie(dbName, options) {
         indexedDB: idbshim.shimIndexedDB || global.indexedDB || global.mozIndexedDB || global.webkitIndexedDB || global.msIndexedDB,
         IDBKeyRange: idbshim.IDBKeyRange || global.IDBKeyRange || global.webkitIDBKeyRange,
         // Optional:
-        Error: global.Error || String,
-        SyntaxError: global.SyntaxError || String,
-        TypeError: global.TypeError || String,
         localStorage: ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : global.localStorage)
-    }; 
+    };
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
     Dexie.semVer = "{version}";
