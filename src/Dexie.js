@@ -3101,7 +3101,7 @@ export default function Dexie(dbName, options) {
         try {
             fn();
         } catch (ex) {
-            onerror(ex);
+            onerror && onerror(ex);
         }
     }
 
@@ -3551,10 +3551,14 @@ export default function Dexie(dbName, options) {
         // Required:
         // NOTE: The "_"-prefixed versions are for prioritizing IDB-shim on IOS8 before the native IDB in case the shim was included.
         indexedDB: idbshim.shimIndexedDB || global.indexedDB || global.mozIndexedDB || global.webkitIndexedDB || global.msIndexedDB,
-        IDBKeyRange: idbshim.IDBKeyRange || global.IDBKeyRange || global.webkitIDBKeyRange,
-        // Optional:
-        localStorage: ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : global.localStorage)
+        IDBKeyRange: idbshim.IDBKeyRange || global.IDBKeyRange || global.webkitIDBKeyRange
     };
+    // Optional dependencies
+    miniTryCatch(()=>{
+        // localStorage
+        Dexie.dependencies.localStorage =
+            ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : global.localStorage) 
+    });
 
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
     Dexie.semVer = "{version}";
