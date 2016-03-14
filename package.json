@@ -5,11 +5,6 @@
   "main": "dist/dexie.js",
   "jsnext:main": "dist/dexie.es6.js",
   "typings": "dist/dexie.d.ts",
-  "typescript": {
-    "definitions": [
-      "dist/dexie.d.ts"
-    ]
-  },
   "jspm": {
     "main": "dist/dexie.es6.js",
     "format": "esm"
