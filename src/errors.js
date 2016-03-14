@@ -75,8 +75,8 @@ derive(ModifyError).from(DexieError);
 //
 //
 
-// Map of {ErrorName + "Error" -> ErrorName + "Error"}
-export var errnames = errorList.reduce((obj,name)=>(obj[name+"Error"]=name+"Error",obj),{});
+// Map of {ErrorName -> ErrorName + "Error"}
+export var errnames = errorList.reduce((obj,name)=>(obj[name]=name+"Error",obj),{});
 
 // Need an alias for DexieError because we're gonna create subclasses with the same name.
 const BaseException = DexieError;
