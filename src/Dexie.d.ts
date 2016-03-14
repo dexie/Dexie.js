@@ -13,9 +13,10 @@ interface Thenable<R> {
 declare type IndexableType = string | number | Date | Array<string | number | Date>;
 
 declare class Dexie {
-    constructor(databaseName: string);
-
-    constructor(databaseName: string, options: { addons: Array<(db: Dexie) => void> });
+    constructor(databaseName: string, options?: {
+        addons?: Array<(db: Dexie) => void>,
+        autoOpen?: boolean
+    });
 
     name: string;
     tables: Dexie.Table<any, any>[];
@@ -23,6 +24,8 @@ declare class Dexie {
 
     static addons: Array<(db: Dexie) => void>;
     static version: number;
+    static semVer: string;
+    static currentTransaction: Dexie.Transaction;
 
     static getDatabaseNames(): Dexie.Promise<Array<string>>;
 
@@ -30,21 +33,39 @@ declare class Dexie {
 
     static getDatabaseNames<U>(onFulfilled: (value: Array<string>) => U): Dexie.Promise<U>;
 
+    static override<F> (origFunc:F, overridedFactory: (fn:any)=>any) : F;
+    
     static getByKeyPath(obj: Object, keyPath: string): any;
 
     static setByKeyPath(obj: Object, keyPath: string, value: any): void;
 
     static delByKeyPath(obj: Object, keyPath: string): void;
 
-    static shallowClone(obj: Object): Object;
+    static shallowClone<T> (obj: T): T;
 
-    static deepClone(obj: Object): Object;
-
-    version(versionNumber: Number): Dexie.Version
+    static deepClone<T>(obj: T): T;
+    
+    static asap(fn: Function) : void;
+    
+    static maxKey: Array<string>;
+    
+    static dependencies: {
+        indexedDB: IDBFactory,
+        IDBKeyRange: IDBKeyRange,
+        localStorage?: Storage
+    };
+        
+    static default: Dexie;
+    
+    version(versionNumber: Number): Dexie.Version;
 
     on: {
-        (eventName: string, subscriber: () => any): void;
-        (eventName: string, subscriber: () => any, bSticky: boolean): void;
+        (eventName: string, subscriber: Function, ...args : any[]): void;
+        (eventName: 'ready', subscriber: () => any, bSticky: boolean): void;
+        (eventName: 'error', subscriber: (error: any) => any): void;
+        (eventName: 'populate', subscriber: () => any): void;
+        (eventName: 'blocked', subscriber: () => any): void;
+        (eventName: 'versionchange', subscriber: (event: IDBVersionChangeEvent) => any): void;
         ready: Dexie.DexieOnReadyEvent;
         error: Dexie.DexieErrorEvent;
         populate: Dexie.DexieEvent;
@@ -89,6 +110,16 @@ declare class Dexie {
     backendDB(): IDBDatabase;
 
     vip<U>(scopeFunction: () => U): U;
+    
+    // Make it possible to touch physical class constructors where they reside - as properties on db instance.
+    // For example, checking if (x instanceof db.Table). Can't do (x instanceof Dexie.Table because it's just a virtual interface)
+    Table : new()=>Dexie.Table<any,any>;
+    WhereClause: new()=>Dexie.WhereClause<any,any>;
+    Version: new()=>Dexie.Version;
+    WriteableTable: new()=>Dexie.Table<any,any>;
+    Transaction: new()=>Dexie.Transaction;
+    Collection: new()=>Dexie.Collection<any,any>;
+    WriteableCollection: new()=>Dexie.Collection<any,any>;    
 }
 
 declare module Dexie {
@@ -110,13 +141,13 @@ declare module Dexie {
         
         catch<U>(onRejected: (error: any) => U): Promise<U>;
         
-        catch<U>(ExceptionType: Function, onRejected: (error: any) => Promise<U>): Promise<U>;
+        catch<U,ET>(ExceptionType: (new() => ET), onRejected: (error: ET) => Promise<U>): Promise<U>;
 
-        catch<U>(ExceptionType: Function, onRejected: (error: any) => U): Promise<U>;
+        catch<U,ET>(ExceptionType: (new() => ET), onRejected: (error: ET) => U): Promise<U>;
 
-        catch<U>(errorName: string, onRejected: (error: any) => Promise<U>): Promise<U>;
+        catch<U>(errorName: string, onRejected: (error: {name: string}) => Promise<U>): Promise<U>;
 
-        catch<U>(errorName: string, onRejected: (error: any) => U): Promise<U>;
+        catch<U>(errorName: string, onRejected: (error: {name: string}) => U): Promise<U>;
 
         finally<R>(onFinally: () => any): Promise<R>;
 
@@ -141,7 +172,8 @@ declare module Dexie {
         var PSD: any;
 
         var on: {
-            (eventName: string, subscriber: (...args: any[]) => any): void;
+            (eventName: string, subscriber: Function): void;
+            (eventName: 'error', subscriber: (error: any) => any): void;
             error: DexieErrorEvent;
         }
     }
@@ -161,6 +193,9 @@ declare module Dexie {
         storeNames: Array<string>;
         on: {
             (eventName: string, subscriber: () => any): void;
+            (eventName: 'complete', subscriber: () => any): void;
+            (eventName: 'abort', subscriber: () => any): void;
+            (eventName: 'error', subscriber: (error:any) => any): void;
             complete: DexieEvent;
             abort: DexieEvent;
             error: DexieEvent;
@@ -294,8 +329,8 @@ declare module Dexie {
         until(filter: (value: T) => boolean, includeStopEntry?: boolean): Collection<T, Key>;
         // WriteableCollection:
         delete(): Promise<number>;
-        modify(changes: { [keyPath: string]: any }): Promise<number>;
-        modify(changeCallback: (obj: T) => void): Promise<number>;
+        modify(changeCallback: (obj: T, ctx:{value: T}) => void): Promise<number>;
+        modify(changes: { [keyPath: string]: any } ): Promise<number>;
     }
 
     interface TableSchema {
@@ -307,14 +342,94 @@ declare module Dexie {
 
     interface IndexSpec {
         name: string;
-        keyPath: any; // string | Array<string>
+        keyPath: string | Array<string>;
         unique: boolean;
         multi: boolean;
         auto: boolean;
         compound: boolean;
         src: string;
     }
+    
+    // Make it possible to touch physical classes as they are 
+    var TableSchema: new()=>TableSchema,
+        IndexSpec: new()=>IndexSpec;
+    
+    // errnames - handy spellcheck in switch (error.name) {} cases.        
+    var errnames: {
+        // Error names generated by indexedDB:
+        Unknown: 'UnknownError';
+        Constraint: 'ConstraintError';
+        Data: 'DataError';
+        TransactionInactive: 'TransactionInactiveError';
+        ReadOnly: 'ReadOnlyError';
+        Version: 'VersionError';
+        NotFound: 'NotFoundError';
+        InvalidState: 'InvalidStateError';
+        InvalidAccess: 'InvalidAccessError';
+        Abort: 'AbortError';
+        Timeout: 'TimeoutError';
+        QuotaExceeded: 'QuotaExceededError';
+        Syntax: 'SyntaxError';
+        DataClone: 'DataCloneError';
+        
+        // Dexie-specific error names:
+        Modify: 'ModifyError';
+        OpenFailed: 'OpenFailedError';
+        VersionChange: 'VersionChangeError';
+        Schema: 'SchemaError';
+        Upgrade: 'UpgradeError';
+        InvalidTable: 'InvalidTableError';
+        MissingAPI: 'MissingAPIError';
+        NoSuchDatabase: 'NoSuchDatabaseError';
+        InvalidArgument: 'InvalidArgumentError';
+        SubTransaction: 'Error';
+        Unsupported: 'UnsupportedError';
+        Internal: 'InternalError';
+        DatabaseClosed: 'DatabaseClosedError';
+    };
+    
+    class DexieError extends Error {
+        name: string;
+        message: string;
+        stack: string;
+        inner: any;
+        constructor (name?:string, message?:string);
+        toString(): string;
+    }
+    
+    class ModifyError extends DexieError{
+        constructor (msg?:string, failures?: any[], successCount?: number, failedKeys?: IndexableType[]);
+        failures: Array<any>;
+        failedKeys: Array<IndexableType>;
+        successCount: number;
+    }
+    
+    class OpenFailedError extends DexieError {constructor (msg?: string, inner?: Object);constructor (inner: Object);}
+    class VersionChangeError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class SchemaError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class UpgradeError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class InvalidTableError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class MissingAPIError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class NoSuchDatabaseError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class InvalidArgumentError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class SubTransactionError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class UnsupportedError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class InternalError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class DatabaseClosedError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class UnknownError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class ConstraintError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class DataError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class TransactionInactiveError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class ReadOnlyError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class VersionError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class NotFoundError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class InvalidStateError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class InvalidAccessError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class AbortError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class TimeoutError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class QuotaExceededError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class SyntaxError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class DataCloneError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
 }
 
 export default Dexie;
-
