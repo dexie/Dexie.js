@@ -83,24 +83,33 @@ export class Contact {
     }
 
     save() {
-        return db.transaction('rw', db.contacts, db.emails, db.phones, async () => {
-          
-            let [emailIds, phoneIds] = await all (
-                // Save existing arrays
-                all(this.emails.map(email => db.emails.put(email))),
-                all(this.phones.map(phone => db.phones.put(phone))));
-                            
-            // Remove items from DB that is was not saved here:
-            await db.emails.where('contactId').equals(this.id)
-                .and(email => emailIds.indexOf(email.id) === -1)
-                .delete();
+        return db.transaction('rw', db.contacts, db.emails, db.phones, async() => {
             
-            await db.phones.where('contactId').equals(this.id)
-                .and(phone => phoneIds.indexOf(phone.id) === -1)
-                .delete();
+            // Add or update our selves. If add, record this.id.
+            this.id = await db.contacts.put(this);
 
-            // At last, save this Contact
-            return await db.contacts.put(this);
+            // Save all navigation properties (arrays of emails and phones)
+            // Some may be new and some may be updates of existing objects.
+            // put() will handle both cases.
+            // (record the result keys from the put() operations into emailIds and phoneIds
+            //  so that we can find local deletes)
+            let [emailIds, phoneIds] = await all ([
+                all(this.emails.map(email => db.emails.put(email))),
+                all(this.phones.map(phone => db.phones.put(phone)))
+            ]);
+                            
+            // Was any email or phone number deleted from out navigation properties?
+            // Delete any item in DB that reference us, but is not present
+            // in our navigation properties:
+            await all([
+                db.emails.where('contactId').equals(this.id) // references us
+                    .and(email => emailIds.indexOf(email.id) === -1) // Not anymore in our array
+                    .delete(),
+            
+                db.phones.where('contactId').equals(this.id)
+                    .and(phone => phoneIds.indexOf(phone.id) === -1)
+                    .delete()
+            ]);
         });
     }
 }
