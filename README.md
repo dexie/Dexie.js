@@ -20,7 +20,7 @@ Dexie.js solves these limitations and provides a neat database API. Dexie.js aim
 ```html
 <html>
  <head>
-  <script src="https://npmcdn.com/dexie/dist/dexie.min.js"></script>
+  <script src="https://npmcdn.com/dexie/dist/dexie.js"></script>
   <script>
    //
    // Declare Database
@@ -50,29 +50,63 @@ import Dexie from 'dexie';
 //
 // Declare Database
 //
-var db = new Dexie("FriendDatabase");
+let db = new Dexie("FriendDatabase");
 db.version(1).stores({ friends: "++id,name,age" });
 
 //
-// Manipulate and Query Database
+// Have Fun
 //
-Dexie.spawn(function*(){
+Dexie.spawn(function*() {
 
-    // Dexie.spawn gives you the possibility to use yield.
-    // Use yield like async works in Typescript / ES7
+    // Make sure we have something in DB:
+    if ((yield db.friends.where('name').equals('Josephine').count()) === 0) {
+        let id = yield db.friends.add({name: "Josephine", age: 21});
+        alert (`Addded friend with id ${id}`);
+    }
     
-    // Add to database
-    yield db.friends.add({name: "Josephine", age: 21});
-    
-    // Query database
+    // Query:
     let youngFriends = yield db.friends.where("age").below(25).toArray();
-    
+        
+    // Show result:
     alert ("My young friends: " + JSON.stringify(youngFriends));
     
 }).catch(e => {
-    alert("error: " + e.stack || e);
+    alert(e);
 });
 ```
+
+#### Hello World (ES7)
+```js
+import Dexie from 'dexie';
+let Promise = Dexie.Promise; // KEEP! (*1)
+
+//
+// Declare Database
+//
+var db = new Dexie("FriendDatabase");
+db.version(1).stores({ friends: "++id,name,age" });
+
+async function haveFun () {
+
+    // Make sure we have something in DB:
+    if ((await db.friends.where('name').equals('Josephine').count()) === 0) {
+        let id = await db.friends.add({name: "Josephine", age: 21});
+        alert (`Addded friend with id ${id}`);
+    }
+    
+    // Query:
+    let youngFriends = await db.friends.where("age").below(25).toArray();
+        
+    // Show result:
+    alert ("My young friends: " + JSON.stringify(youngFriends));
+}
+
+haveFun().catch(e => {
+    alert(e);
+});
+
+```
+_*1: Makes it safe to use async / await within transactions. This declaration needs only to be local to the scope where your async functions reside. If working with different promise implementations in the same module, declare your async functions in a block and put the declaration there `{ let Promise = Dexie.Promise; async function (){...} }` ._
 
 #### Hello World (Typescript)
 
@@ -80,6 +114,7 @@ Here's the simples typescript sample from Dexie.js/samples/typescript-simple:
 
 ```ts
 import Dexie from 'dexie';
+let Promise = Dexie.Promise; // KEEP! (See *1 of ES7 sample)
 
 interface IFriend {
     id?: number;
@@ -103,27 +138,25 @@ class FriendDatabase extends Dexie {
 
 var db = new FriendDatabase();
 
-//
-// Manipulate and Query Database
-//
-db.friends.add({name: "Josephine", age: 21}).then(()=>{
-    return db.friends.where("age").below(25).toArray();
-}).then(youngFriends => {
+async function haveFun () {
+
+    // Make sure we have something in DB:
+    if ((await db.friends.where('name').equals('Josephine').count()) === 0) {
+        let id = await db.friends.add({name: "Josephine", age: 21});
+        alert (`Addded friend with id ${id}`);
+    }
+    
+    // Query:
+    let youngFriends = await db.friends.where("age").below(25).toArray();
+        
+    // Show result:
     alert ("My young friends: " + JSON.stringify(youngFriends));
-}).catch(e => {
-    alert("error: " + e.stack || e);
+}
+
+haveFun().catch(e => {
+    alert(e);
 });
-
 ```
-To see this in action, clone Dexie and cd to samples/typescript-simple. Then type:
-
-```
-npm install
-npm run build
-num run start
-``` 
-... and launch web browser to http://localhost:8081
-
 
 Documentation
 -------------
