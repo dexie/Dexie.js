@@ -1,4 +1,5 @@
 import {_global, slice, isArray, doFakeAutoComplete} from './utils';
+import { nop } from './chaining-functions';
 import Events from './Events';
 
 //
