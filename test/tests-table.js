@@ -1,10 +1,11 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, supports} from './dexie-unittest-utils';
+import {resetDatabase, supports, spawnedTest} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBTable");
 db.version(1).stores({
-    users: "++id,first,last,&username,*&email,*pets"
+    users: "++id,first,last,&username,*&email,*pets",
+    folks: "++,first,last"
 });
 
 var User = db.users.defineClass({
@@ -274,6 +275,18 @@ asyncTest("bulkAdd", function() {
         ok(false, "Error: " + e);
     }).finally(start);
 });
+
+spawnedTest("bulkAdd-non-inbound-autoincrement", function*(){
+    yield db.folks.bulkAdd([
+        { first: "Foo", last: "Bar"},
+        { first: "Foo", last: "Bar2"},
+        { first: "Foo", last: "Bar3"},
+        { first: "Foo", last: "Bar4"}
+    ]);
+    equal (yield db.folks.where('first').equals('Foo').count(), 4, "Should be 4 Foos");
+    equal (yield db.folks.where('last').equals('Bar').count(), 1, "Shoudl be 1 Bar");
+});
+
 asyncTest("delete", function () {
     // Without transaction
     db.users.get(idOfFirstUser, function (user) {

@@ -1078,7 +1078,7 @@ export default function Dexie(dbName, options) {
                 var self = this,
                     creatingHook = this.hook.creating.fire;
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
-                    if (!idbstore.keyPath) throw new exceptions.Unsupported("bulkAdd() only support inbound keys");
+                    if (!idbstore.keyPath && !self.schema.primKey.auto) throw new exceptions.Unsupported("bulkAdd() only support inbound keys");
                     if (objects.length === 0) return resolve([]); // Caller provided empty list.
                     var req,
                         errorList = [],
