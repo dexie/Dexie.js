@@ -91,7 +91,7 @@ uniqueKeys(): Promise;
 until(filter: (value) => boolean, includeStopEntry?: boolean): Collection;
 update(key: Key, changes: { [keyPath: string]: any }): Promise;
 ```
-This is a mix of methods from [WhereClause](https://github.com/dfahlander/Dexie.js/wiki/WhereClause), [Table](https://github.com/dfahlander/Dexie.js/wiki/WriteableTable) and [Collection](https://github.com/dfahlander/Dexie.js/wiki/WriteableCollection). To dive into the API, refer to [API reference](https://github.com/dfahlander/Dexie.js/wiki/API-Reference).
+This is a mix of methods from [WhereClause](https://github.com/dfahlander/Dexie.js/wiki/WhereClause), [Table](https://github.com/dfahlander/Dexie.js/wiki/Table) and [Collection](https://github.com/dfahlander/Dexie.js/wiki/Collection). To dive into the API, refer to [API reference](https://github.com/dfahlander/Dexie.js/wiki/API-Reference).
 
 #### Hello World (ES2015 / ES6)
 
