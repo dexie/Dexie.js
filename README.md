@@ -61,7 +61,7 @@ db.version(1).stores({ friends: "++id,name,age" });
 //
 // Have Fun
 //
-Dexie.spawn(function*() {
+db.transaction('rw', db.friends, function*() {
 
     // Make sure we have something in DB:
     if ((yield db.friends.where('name').equals('Josephine').count()) === 0) {
