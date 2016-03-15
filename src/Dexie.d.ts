@@ -353,17 +353,7 @@ declare module Dexie {
     // Make it possible to touch physical classes as they are 
     var TableSchema: new()=>TableSchema,
         IndexSpec: new()=>IndexSpec,
-        Events: (ctx:any, ...eventNames:Array<string | Array<string> | {[eventName:string]:[Function,Function] | 'asap'}>)=>
-            {
-                (eventName: string, subscriber:Function) : any;
-                addEventType (evenNameOrSpec:any,chainFunction?:Function,defaultFunction?:Function):any;
-                [eventName:string]:{
-                    subscribers: Function[],
-                    fire: Function,
-                    subscribe(cb:Function):void;
-                    unsubscribe(cb:Function):void;
-                } | Function;
-            };
+        Events: any; // Too complex to define correctly right now.
     
     // errnames - handy spellcheck in switch (error.name) {} cases.        
     var errnames: {
