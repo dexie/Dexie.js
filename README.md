@@ -47,7 +47,7 @@ Dexie.js solves these limitations and provides a neat database API. Dexie.js aim
 
 This sample shows how to use Dexie with ES6 compliant environments and npm module resolution. With ES6, the `yield` keyword can be  used instead of calling `.then()` on every database operation. The `yield` keyword and generator functions are already supported today (March 2016) in Chrome, Firefox, Edge and Opera without a transpiler (though this example also uses import statements which still needs transpilation).
 
-Read more about this: [Simplify with yield](https://github.com/dfahlander/Dexie.js/wiki/Simplify-with-yield).
+More info on how to use `yield` with Dexie: [Simplify with yield](https://github.com/dfahlander/Dexie.js/wiki/Simplify-with-yield).
 
 ```js
 import Dexie from 'dexie';
