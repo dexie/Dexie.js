@@ -264,11 +264,11 @@ asyncTest("bulkAdd", function() {
             { first: "Åke3", last: "Persbrant3", username: "aper3", email: ["aper3@persbrant.net"] }
         ];
         db.users.bulkAdd(newUsers).then(function(errors) {
-            equal(errors.length, 1, "One error due to a duplicate username");
+            equal(errors.length, 1, "One error due to a duplicate username: " + errors[0]);
         });
 
         db.users.where("username").startsWith("aper").count(function(count) {
-            equal(count, 3);
+            equal(count, 3, "Got three matches now when users are bulk-added");
         });
     }).catch(function (e) {
         ok(false, "Error: " + e);
