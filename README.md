@@ -110,8 +110,6 @@ _*1: Makes it safe to use async / await within transactions. ES7 async keyword w
 
 #### Hello World (Typescript)
 
-Here's the simples typescript sample from Dexie.js/samples/typescript-simple:
-
 ```js
 import Dexie from 'dexie';
 let Promise = Dexie.Promise; // KEEP! (See *1 of ES7 sample)
