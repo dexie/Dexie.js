@@ -11,6 +11,10 @@
 
 export var keys = Object.keys;
 export var isArray = Array.isArray;
+export var _global =
+    typeof self !== 'undefined' ? self :
+    typeof window !== 'undefined' ? window :
+    global;
 
 export function extend(obj, extension) {
     if (typeof extension !== 'object') extension = extension(); // Allow to supply a function returning the extension. Useful for simplifying private scopes.
@@ -41,4 +45,9 @@ export function slice(args, start, end) {
 
 export function override(origFunc, overridedFactory) {
     return overridedFactory(origFunc);
+}
+
+export function doFakeAutoComplete(fn) {
+    var to = setTimeout(fn, 1000);
+    clearTimeout(to);
 }
