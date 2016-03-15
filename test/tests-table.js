@@ -256,24 +256,102 @@ asyncTest("add", function () {
         ok(false, "Error: " + e);
     }).finally(start);
 });
-asyncTest("bulkAdd", function() {
-    db.transaction("rw", db.users, function() {
+
+spawnedTest("bulkAdd", function*(){
+    var highestKey = yield db.users.add({username: "fsdkljfd", email: ["fjkljslk"]});
+    ok(true, "Highest key was: " + highestKey);
+    // Delete test item.
+    yield db.users.delete(highestKey);
+    ok(true, "Deleted test item");
+    var result = yield db.users.bulkAdd([
+        { first: "Åke1", last: "Persbrant1", username: "aper1", email: ["aper1@persbrant.net"] },
+        { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] }
+    ]);
+    equal (result, highestKey + 2, "Result of bulkAdd() operation was equal to highestKey + 2");
+});
+
+spawnedTest("bulkAdd-catching errors", function*() {
+    yield db.transaction("rw", db.users, function() {
         var newUsers = [
             { first: "Åke1", last: "Persbrant1", username: "aper1", email: ["aper1@persbrant.net"] },
             { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] },
             { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] }, // Should fail
             { first: "Åke3", last: "Persbrant3", username: "aper3", email: ["aper3@persbrant.net"] }
         ];
-        db.users.bulkAdd(newUsers).then(function(errors) {
-            equal(errors.length, 1, "One error due to a duplicate username: " + errors[0]);
+        db.users.bulkAdd(newUsers).then(()=> {
+            ok(false, "Should not resolve when one operation failed");
+        }).catch(Dexie.BulkError, e=>{
+            ok(true, "Got BulkError: " + e.message);
+            equal(e.failures.length, 1, "One error due to a duplicate username: " + e.failures[0]);
         });
 
+        // Now, since we catched the error, the transaction should continue living.
         db.users.where("username").startsWith("aper").count(function(count) {
             equal(count, 3, "Got three matches now when users are bulk-added");
         });
-    }).catch(function (e) {
-        ok(false, "Error: " + e);
-    }).finally(start);
+    });
+
+    equal(yield db.users.where("username").startsWith('aper').count(), 3, "Previous transaction committed");
+
+    var newUsersX = [
+        {first: "Xke1", last: "Persbrant1", username: "xper1", email: ["xper1@persbrant.net"]},
+        {first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"]},
+        {first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"]}, // Should fail
+        {first: "Xke3", last: "Persbrant3", username: "xper3", email: ["xper3@persbrant.net"]}
+    ];
+    try {
+        yield db.transaction("rw", db.users, () => {
+            db.users.bulkAdd(newUsersX).then(()=> {
+                ok(false, "Should not resolve");
+            });
+        });
+        ok(false, "Should not come here");
+    } catch (e) {
+        ok(true, "Got: " + e);
+    }
+
+    equal(yield db.users.where('username').startsWith('xper').count(), 0, "0 users! Good, means that previous transaction did not commit");
+
+    yield db.users.bulkAdd(newUsersX).catch(e => {
+        ok(true, "Got error. Catching it should make the successors work.")
+    });
+
+    equal(yield db.users.where('username').startsWith('xper').count(), 3, "3 users! Good - means that previous operation catched and therefore committed");
+
+    var newUsersY = [
+        {first: "Yke1", last: "Persbrant1", username: "yper1", email: ["yper1@persbrant.net"]},
+        {first: "Yke2", last: "Persbrant2", username: "yper2", email: ["yper2@persbrant.net"]},
+        {first: "Yke2", last: "Persbrant2", username: "yper2", email: ["yper2@persbrant.net"]}, // Should fail
+        {first: "Yke3", last: "Persbrant3", username: "yper3", email: ["yper3@persbrant.net"]}
+    ];
+
+    // Now check that catching the operation via try..catch should also make it succeed.
+    try {
+        yield db.users.bulkAdd(newUsersY);
+    } catch (e) {
+        ok(true, "Got: " + e);
+    }
+    equal(yield db.users.where('username').startsWith('yper').count(), 3, "3 users! Good - means that previous operation catched (via try..yield..catch this time, and therefore committed");
+
+    // Now check that catching and rethrowing should indeed make it fail
+    var newUsersZ = [
+        {first: "Zke1", last: "Persbrant1", username: "zper1", email: ["zper1@persbrant.net"]},
+        {first: "Zke2", last: "Persbrant2", username: "zper2", email: ["zper2@persbrant.net"]},
+        {first: "Zke2", last: "Persbrant2", username: "zper2", email: ["zper2@persbrant.net"]}, // Should fail
+        {first: "Zke3", last: "Persbrant3", username: "zper3", email: ["zper3@persbrant.net"]}
+    ];
+
+    yield db.transaction('rw', db.users, function*() {
+        try {
+            yield db.users.bulkAdd(newUsersZ);
+        } catch (e) {
+            throw e;
+        }
+    }).catch(Dexie.BulkError, e => {
+        ok(true, "Got rethrown BulkError: " + e.stack);
+    });
+
+    equal(yield db.users.where('username').startsWith('zper').count(), 0, "0 users! Good - means that previous operation rethrown (via try..yield..catch--throw this time, and therefore not committed");
 });
 
 spawnedTest("bulkAdd-non-inbound-autoincrement", function*(){

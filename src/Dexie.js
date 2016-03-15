@@ -12,7 +12,7 @@
  */
 
 import { keys, isArray, extend, derive, slice, override, _global, doFakeAutoComplete } from './utils';
-import { DexieError, ModifyError, errnames, exceptions, fullNameExceptions, exceptionMap } from './errors';
+import { DexieError, ModifyError, BulkError, errnames, exceptions, fullNameExceptions, exceptionMap } from './errors';
 import Promise from './Promise';
 import Events from './Events';
 import {
@@ -1046,7 +1046,7 @@ export default function Dexie(dbName, options) {
 
     derive(WriteableTable).from(Table).extend(function () {
 
-        function BulkErrorHandler(errorList, resolve, hookCtx, transaction) {
+        function BulkErrorHandler(errorList, done, hookCtx, transaction) {
             return function(ev) {
                 if (ev.stopPropagation) ev.stopPropagation();
                 if (ev.preventDefault) ev.preventDefault();
@@ -1057,19 +1057,19 @@ export default function Dexie(dbName, options) {
                         hookCtx.onerror(ev.target.error);
                     });
                 }
-                if (resolve) resolve(errorList); // Only done in last request.
+                if (done) done(); // Only done in last request.
             }
         }
 
-        function BulkSuccessHandler(errorList, resolve, hookCtx, transaction) {
+        function BulkSuccessHandler(done, hookCtx, transaction) {
             return hookCtx ? function(ev) {
                 hookCtx.onsuccess && Promise.newPSD(function () {
                     Promise.PSD.trans = transaction;
                     hookCtx.onsuccess(ev.target.result);
                 });
-                if (resolve) resolve(errorList);
-            } : function() {
-                resolve(errorList);
+                if (done) done(ev.target.result);
+            } : function(ev) {
+                done(ev.target.result);
             };
         }
 
@@ -1079,11 +1079,16 @@ export default function Dexie(dbName, options) {
                     creatingHook = this.hook.creating.fire;
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
                     if (!idbstore.keyPath && !self.schema.primKey.auto) throw new exceptions.Unsupported("bulkAdd() only support inbound keys");
-                    if (objects.length === 0) return resolve([]); // Caller provided empty list.
+                    if (objects.length === 0) return resolve(); // Caller provided empty list.
+                    function done(result) {
+                        if (errorList.length === 0) resolve(result);
+                        else reject(new BulkError(`${self.name}.bulkAdd(): ${errorList.length} of ${numObjs} operations failed`, errorList));
+                    }
                     var req,
                         errorList = [],
                         errorHandler,
-                        successHandler;
+                        successHandler,
+                        numObjs = objects.length;
                     if (creatingHook !== nop) {
                         //
                         // There are subscribers to hook('creating')
@@ -1092,7 +1097,7 @@ export default function Dexie(dbName, options) {
                         var keyPath = idbstore.keyPath,
                             hookCtx = { onerror: null, onsuccess: null };
                         errorHandler = BulkErrorHandler(errorList, null, hookCtx, trans);
-                        successHandler = BulkSuccessHandler(errorList, null, hookCtx, trans);
+                        successHandler = BulkSuccessHandler(null, hookCtx, trans);
                         for (var i = 0, l = objects.length; i < l; ++i) {
                             var obj = objects[i],
                                 effectiveKey = getByKeyPath(obj, keyPath),
@@ -1112,8 +1117,8 @@ export default function Dexie(dbName, options) {
                                 hookCtx.onsuccess = null;
                             }
                         }
-                        req.onerror = BulkErrorHandler(errorList, resolve, hookCtx, trans);
-                        req.onsuccess = BulkSuccessHandler(errorList, resolve, hookCtx, trans);
+                        req.onerror = BulkErrorHandler(errorList, done, hookCtx, trans);
+                        req.onsuccess = BulkSuccessHandler(done, hookCtx, trans);
                     } else {
                         //
                         // Standard Bulk (no 'creating' hook to care about)
@@ -1125,8 +1130,8 @@ export default function Dexie(dbName, options) {
                         }
                         // Only need to catch success or error on the last operation
                         // according to the IDB spec.
-                        req.onerror = BulkErrorHandler(errorList, resolve);
-                        req.onsuccess = BulkSuccessHandler(errorList, resolve);
+                        req.onerror = BulkErrorHandler(errorList, done);
+                        req.onsuccess = BulkSuccessHandler(done);
                     }
                 });
             },

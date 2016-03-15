@@ -2,6 +2,7 @@ import { derive } from './utils';
 
 var dexieErrorNames = [
     'Modify',
+    'Bulk',
     'OpenFailed',
     'VersionChange',
     'Schema',
@@ -55,6 +56,12 @@ export function DexieError (name, msg) {
 }
 derive(DexieError).from(Error);
 
+function getMultiErrorMessage (msg, failures) {
+    return msg + ". Errors: " + failures
+        .map(f=>f.toString())
+        .filter((v,i,s)=>s.indexOf(v)===i) // Only unique error strings
+        .join('\n');
+}
 //
 // ModifyError - thrown in WriteableCollection.modify()
 // Specific constructor because it contains members failures and failedKeys.
@@ -64,9 +71,16 @@ export function ModifyError (msg, failures, successCount, failedKeys) {
     this.failures = failures;
     this.failedKeys = failedKeys;
     this.successCount = successCount;
-    this.message = failures.join('\n');
+    this.message = getMultiErrorMessage(msg, failures);
 }
 derive(ModifyError).from(DexieError);
+
+export function BulkError (msg, failures) {
+    this.name = "BulkError";
+    this.failures = failures;
+    this.message = getMultiErrorMessage(msg, failures);
+}
+derive(BulkError).from(DexieError);
 
 //
 //
@@ -124,3 +138,4 @@ export var fullNameExceptions = errorList.reduce((obj, name)=>{
 
 fullNameExceptions.ModifyError = ModifyError;
 fullNameExceptions.DexieError = DexieError;
+fullNameExceptions.BulkError = BulkError;
