@@ -77,6 +77,7 @@ db.transaction('rw', db.friends, function*() {
     alert(e);
 });
 ```
+*NOTE: db.transaction() will consume generator functions as if they intend to use `yield` for consuming promises. To use yield outside a transaction, use Dexie.async() or Dexie.spawn().*
 
 #### Hello World (ES2016 / ES7)
 ```js
