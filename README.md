@@ -91,6 +91,7 @@ uniqueKeys(): Promise;
 until(filter: (value) => boolean, includeStopEntry?: boolean): Collection;
 update(key: Key, changes: { [keyPath: string]: any }): Promise;
 ```
+View the full [API reference](https://github.com/dfahlander/Dexie.js/wiki/API-Reference)
 
 #### Hello World (ES2015 / ES6)
 
