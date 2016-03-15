@@ -106,7 +106,7 @@ haveFun().catch(e => {
 });
 
 ```
-_*1: Makes it safe to use async / await within transactions. Code will work without it, but indexedDB transactions will commit prematurely and bad things could happen. This declaration needs only to be local to the scope where your async functions reside. If working with different promise implementations in the same module, declare your async functions in a block and put the declaration there `{ let Promise = Dexie.Promise; async function (){...} }` ._
+_*1: Makes it safe to use async / await within transactions. ES7 async keyword will take the Promise implementation of the current scope. Dexie.Promise can track transaction scopes, which is not possible with the standard Promise. This declaration needs only to be local to the scope where your async functions reside. If working with different promise implementations in the same module, declare your async functions in a block and put the declaration there `{ let Promise = Dexie.Promise; async function (){...} }` ._
 
 #### Hello World (Typescript)
 
