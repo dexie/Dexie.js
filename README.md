@@ -43,6 +43,55 @@ Dexie.js solves these limitations and provides a neat database API. Dexie.js aim
 </html>
 ```
 
+#### Supported operations
+```js
+above(key): Collection;
+aboveOrEqual(key): Collection;
+add(item, key?): Promise;
+and(filter: (x) => boolean): Collection;
+anyOf(keys[]): Collection;
+anyOfIgnoreCase(keys: string[]): Collection;
+below(key): Collection;
+belowOrEqual(key): Collection;
+between(lower, upper, includeLower?, includeUpper?): Collection;
+bulkAdd(items: Array): Promise;
+clear(): Promise;
+count(): Promise;
+delete(key): Promise;
+distinct(): Collection;
+each(callback: (obj) => any): Promise;
+eachKey(callback: (key) => any): Promise;
+eachUniqueKey(callback: (key) => any): Promise;
+equals(key): Collection;
+equalsIgnoreCase(key): Collection;
+filter(fn: (obj) => boolean): Collection;
+first(): Promise;
+get(key): Promise;
+inAnyRange(ranges): Collection;
+keys(): Promise;
+last(): Promise;
+limit(n: number): Collection;
+modify(changeCallback: (obj: T, ctx:{value: T}) => void): Promise;
+modify(changes: { [keyPath: string]: any } ): Promise;
+noneOf(keys: Array): Collection;
+notEqual(key): Collection;
+offset(n: number): Collection;
+or(indexOrPrimayKey: string): WhereClause;
+orderBy(index: string): Collection;
+put(item: T, key?: Key): Promise;
+reverse(): Collection;
+sortBy(keyPath: string): Promise;
+startsWith(key: string): Collection;
+startsWithAnyOf(prefixes: string[]): Collection;
+startsWithAnyOfIgnoreCase(prefixes: string[]): Collection;
+startsWithIgnoreCase(key: string): Collection;
+toArray(): Promise;
+toCollection(): Collection;
+uniqueKeys(): Promise;
+until(filter: (value) => boolean, includeStopEntry?: boolean): Collection;
+update(key: Key, changes: { [keyPath: string]: any }): Promise;
+```
+
 #### Hello World (ES2015 / ES6)
 
 This sample shows how to use Dexie with ES6 compliant environments and npm module resolution. With ES6, the `yield` keyword can be  used instead of calling `.then()` on every database operation. The `yield` keyword and generator functions are already supported today (March 2016) in Chrome, Firefox, Edge and Opera without a transpiler (though this example also uses import statements which still needs transpilation). Dive into this? Read **[SIMPLIFY WITH YIELD](https://github.com/dfahlander/Dexie.js/wiki/Simplify-with-yield)**!
