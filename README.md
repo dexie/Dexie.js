@@ -49,7 +49,7 @@ This sample shows how to use Dexie with ES6 compliant environments and npm modul
 
 More info on how to use `yield` with Dexie:
 
-        [Simplify with yield](https://github.com/dfahlander/Dexie.js/wiki/Simplify-with-yield).
+[Simplify with yield](https://github.com/dfahlander/Dexie.js/wiki/Simplify-with-yield).
 
 ```js
 import Dexie from 'dexie';
