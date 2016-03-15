@@ -1,4 +1,6 @@
 ﻿import Dexie from 'dexie';
+import {ok, start, asyncTest} from 'QUnit';
+
 
 var no_optimize = window.no_optimize || window.location.search.indexOf('dontoptimize=true') != -1;
 
@@ -98,4 +100,21 @@ export function supports (features) {
         return hasPolyfillIE || (!isIE && !isEdge);
     if (/multiEntry/.test(features))
         return hasPolyfillIE || (!isIE && !isEdge);
+}
+
+export function spawnedTest (name, num, promiseGenerator) {
+    if (!promiseGenerator) {
+        promiseGenerator = num;
+        asyncTest(name, function(){
+            Dexie.spawn(promiseGenerator)
+                .catch(e => ok(false, e.stack || e))
+                .finally(start);
+        });
+    } else {
+        asyncTest(name, num, function(){
+            Dexie.spawn(promiseGenerator)
+                .catch(e => ok(false, e.stack || e))
+                .finally(start);
+        });
+    }
 }
