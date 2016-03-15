@@ -91,7 +91,7 @@ let Promise = Dexie.Promise; // KEEP! (*1)
 var db = new Dexie("FriendDatabase");
 db.version(1).stores({ friends: "++id,name,age" });
 
-async function haveFun () {
+db.transaction('rw', db.friends, async() => {
 
     // Make sure we have something in DB:
     if ((await db.friends.where('name').equals('Josephine').count()) === 0) {
@@ -104,9 +104,8 @@ async function haveFun () {
         
     // Show result:
     alert ("My young friends: " + JSON.stringify(youngFriends));
-}
-
-haveFun().catch(e => {
+    
+}).catch(e => {
     alert(e);
 });
 
@@ -141,7 +140,7 @@ class FriendDatabase extends Dexie {
 
 var db = new FriendDatabase();
 
-async function haveFun () {
+db.transaction('rw', db.friends, async() => {
 
     // Make sure we have something in DB:
     if ((await db.friends.where('name').equals('Josephine').count()) === 0) {
@@ -154,9 +153,8 @@ async function haveFun () {
         
     // Show result:
     alert ("My young friends: " + JSON.stringify(youngFriends));
-}
-
-haveFun().catch(e => {
+    
+}).catch(e => {
     alert(e);
 });
 ```
