@@ -6,8 +6,8 @@
   "jsnext:main": "dist/dexie.es6.js",
   "typings": "dist/dexie.d.ts",
   "jspm": {
-    "main": "dist/dexie.es6.js",
-    "format": "esm"
+    "format": "cjs",
+    "ignore": ["dist/dexie.es6.js"]
   },
   "repository": {
     "type": "git",

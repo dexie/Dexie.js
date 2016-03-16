@@ -5,8 +5,8 @@
   "main": "dist/dexie-syncable.js",
   "jsnext:main": "dist/dexie-syncable.es6.js",
   "jspm": {
-    "main": "dist/dexie-syncable.es6.js",
-    "format": "esm"
+    "format": "cjs",
+    "ignore": ["dist/dexie-syncable.es6.js"]
   },
   "repository": {
     "type": "git",

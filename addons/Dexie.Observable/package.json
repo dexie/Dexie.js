@@ -5,8 +5,8 @@
   "main": "dist/dexie-observable.js",
   "jsnext:main": "dist/dexie-observable.es6.js",
   "jspm": {
-    "main": "dist/dexie-observable.es6.js",
-    "format": "esm"
+    "format": "cjs",
+    "ignore": ["dist/dexie-observable.es6.js"]
   },
   "repository": {
     "type": "git",
