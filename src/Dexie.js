@@ -12,7 +12,7 @@
  */
 
 import { keys, isArray, extend, derive, slice, override, _global, doFakeAutoComplete } from './utils';
-import { DexieError, ModifyError, BulkError, errnames, exceptions, fullNameExceptions, exceptionMap } from './errors';
+import { DexieError, ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError, stack } from './errors';
 import Promise from './Promise';
 import Events from './Events';
 import {
@@ -1415,15 +1415,10 @@ export default function Dexie(dbName, options) {
                             // whether the caller is about to catch() the error or not. Have to make
                             // transaction fail. Catching such an error wont stop transaction from failing.
                             // This is a limitation we have to live with.
-                            if (!(e instanceof DexieError) && e.name && exceptionMap[e.name]) {
-                                // Handle IDB exceptions in a nicer way - include call stack and correct type.
-                                try {throw new exceptionMap[e.name](e.message, e);} catch(e2) {
-                                    e = e2;
-                                }
-                            }
-                            Dexie.ignoreTransaction(function() { self.on('error').fire(e); });
+                            let e2 = stack(mapError(e));
+                            Dexie.ignoreTransaction(function() { self.on('error').fire(e2); });
                             self.abort();
-                            reject(e);
+                            reject(e2);
                         }
                     }) : Promise.reject(stack(new exceptions.TransactionInactive(
                         "Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
@@ -1854,13 +1849,7 @@ export default function Dexie(dbName, options) {
         if (keyRangeGenerator) try {
             keyRange = keyRangeGenerator();
         } catch (ex) {
-            error = ex;
-            if (!(ex instanceof DexieError) && ex.name && exceptionMap[ex.name]) {
-                // Handle IDB exceptions in a nicer way - include call stack and correct type.
-                try {throw new exceptionMap[ex.name](ex.message, ex);} catch(e2) {
-                    error = e2;
-                }
-            }
+            error = stack(mapError(ex));
         }
 
         var whereCtx = whereClause._ctx;
@@ -2716,12 +2705,8 @@ function eventRejectHandler(reject, sentance) {
             }).join(" ");
             if (errObj.message && errObj.message != errObj.name)
                 occurredWhen += ". " + errObj.message;
-            var stack = errObj.stack; // If some browser would put a stack in error events in future.
             if (errObj.name) {
-                if (exceptionMap[errObj.name]) {
-                    errObj = new exceptionMap[errObj.name](errObj.name + occurredWhen, errObj);
-                    if (stack) errObj.stack = stack;
-                }
+                errObj = mapError(errObj, errObj.name + occurredWhen);
             } else {
                 // Non-standard exceptions from IndexedDBPolyfill
                 errObj = errObj + occurredWhen;
@@ -2741,13 +2726,6 @@ function eventRejectHandler(reject, sentance) {
     };
 }
 
-function stack(error) {
-    try {
-        throw error;
-    } catch (e) {
-        return e;
-    }
-}
 function preventDefault(e) {
     e.preventDefault();
 }

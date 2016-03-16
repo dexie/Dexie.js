@@ -130,6 +130,25 @@ export var exceptionMap = idbDomErrorNames.reduce((obj, name)=>{
     return obj;
 }, {});
 
+export function mapError (domError, message) {
+    let rv = domError;
+    if (!(domError instanceof DexieError) && domError.name && exceptionMap[domError.name]) {
+        rv = new exceptionMap[domError.name](message || domError.message, domError);
+        if (domError.stack) rv.stack = domError.stack;
+    }
+    return rv;
+}
+
+export function stack(error) {
+    if (error.stack) return error;
+    try {
+        throw new Error();
+    } catch (e) {
+        error.stack = e.stack;
+    }
+    return error;
+}
+
 export var fullNameExceptions = errorList.reduce((obj, name)=>{
     if (["Syntax","Type","Range"].indexOf(name) === -1)
         obj[name + "Error"] = exceptions[name];
