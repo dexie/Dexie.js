@@ -709,7 +709,7 @@ asyncTest("Issue #137 db.table() does not respect current transaction", function
     }).finally(start);
 });
 
-asyncTest("Dexie.currentTransaction in CRUD hooks", 59, function () {
+asyncTest("Dexie.currentTransaction in CRUD hooks", 63, function () {
 
     function CurrentTransChecker(scope, trans) {
         return function() {
@@ -755,7 +755,12 @@ asyncTest("Dexie.currentTransaction in CRUD hooks", 59, function () {
         }); // Trigger creating.onerror
         // Test bulkAdd as well:
         ok(true, "Testing bulkAdd");
-        db.users.bulkAdd([{ username: "monkey1" }, { username: "monkey2" }]);
+        db.users.bulkAdd([{ username: "monkey1" }, { username: "monkey2" }])
+            .then(()=>ok(false, "Should get error on one of the adds"))
+            .catch(Dexie.BulkError, e=>{
+                ok(true, "Got BulkError");
+                ok(e.failures.length === 1, "One error out of two: " + e);
+            });
         db.users.where("username").equals("monkey1").modify({
             name: "Monkey 1"
         });

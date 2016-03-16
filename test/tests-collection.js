@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
-import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, supports} from './dexie-unittest-utils';
+import {module, stop, start, test, asyncTest, equal, ok} from 'QUnit';
+import {resetDatabase, supports, spawnedTest} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBCollection");
 db.version(1).stores({ users: "id,first,last,&username,*&email,*pets" });
@@ -213,7 +213,9 @@ asyncTest("reverse", function () {
     }).finally(start);
 });
 
-if (supports("multiEntry")) {
+if (!supports("multiEntry")) {
+    test("distinct", ()=>ok(true, "SKIPPED - MULTIENTRY UNSUPPORTED"));
+} else {
     asyncTest("distinct", function () {
         db.transaction("r", db.users, function () {
 

@@ -220,150 +220,152 @@ asyncTest("upgrade", function () {
 
 });
 
-if (supports("compound")) {
-    asyncTest("Issue #30 - Problem with existing db", function () {
-        ///<var type="Dexie" />
-        var db; // Will be used as a migrated version of the db.
+asyncTest("Issue #30 - Problem with existing db", function () {
+    if (!supports("compound+multiEntry")) {
+        ok(true, "SKIPPED - COMPOUND + MULTIENTRY UNSUPPORTED");
+        return start();
+    }
+    ///<var type="Dexie" />
+    var db; // Will be used as a migrated version of the db.
 
-        // Start by deleting the db if it exists:
-        Dexie.delete("raw-db").then(function () {
+    // Start by deleting the db if it exists:
+    Dexie.delete("raw-db").then(function () {
 
-            // Create a bare-bone indexedDB database with custom indexes of various kinds.
-            return new Dexie.Promise(function (resolve, reject) {
-                var indexedDB = Dexie.dependencies.indexedDB;
-                var rawdb, req;
+        // Create a bare-bone indexedDB database with custom indexes of various kinds.
+        return new Dexie.Promise(function (resolve, reject) {
+            var indexedDB = Dexie.dependencies.indexedDB;
+            var rawdb, req;
 
-                function error(e) {
-                    if (rawdb) rawdb.close();
-                    reject(e.target.error);
-                }
+            function error(e) {
+                if (rawdb) rawdb.close();
+                reject(e.target.error);
+            }
 
-                req = indexedDB.open("raw-db", 2);
-                req.onupgradeneeded = function (ev) {
-                    try {
-                        console.log("onupgradeneeded called");
-                        rawdb = req.result;
-                        // Stores
-                        var people = rawdb.createObjectStore("people", {keyPath: "_id", autoIncrement: false});
-                        var messages = rawdb.createObjectStore("messages", {autoIncrement: true});
-                        var umbrellas = rawdb.createObjectStore("umbrellas", {keyPath: ["date", "time"]});
-                        // Indexes:
-                        messages.createIndex("text_index", "text", {unique: false, multiEntry: false});
-                        messages.createIndex("words_index", "words", {unique: false, multiEntry: true});
-                        messages.createIndex("id_index", "id", {unique: true, multiEntry: false});
-                        umbrellas.createIndex("size_color_index", ["size", "color"], {
-                            unique: false,
-                            multiEntry: false
-                        });
-                        // Data:
-                        people.add({_id: "9AF56447-66CE-470A-A70F-674A32EF2D51", name: "Kalle"});
-                        messages.add({text: "Here is a text", words: ["here", "is", "a", "text"], id: 1});
-                        umbrellas.add({
-                            date: "2014-11-20",
-                            time: "22:18",
-                            size: 98,
-                            color: "pink",
-                            name: "My Fine Umbrella!"
-                        });
-                    } catch (ex) {
-                        if (rawdb) rawdb.close();
-                        reject(ex);
-                    }
-                }
-                req.onsuccess = function () {
-                    console.log("onsuccess called");
+            req = indexedDB.open("raw-db", 2);
+            req.onupgradeneeded = function (ev) {
+                try {
+                    console.log("onupgradeneeded called");
                     rawdb = req.result;
+                    // Stores
+                    var people = rawdb.createObjectStore("people", {keyPath: "_id", autoIncrement: false});
+                    var messages = rawdb.createObjectStore("messages", {autoIncrement: true});
+                    var umbrellas = rawdb.createObjectStore("umbrellas", {keyPath: ["date", "time"]});
+                    // Indexes:
+                    messages.createIndex("text_index", "text", {unique: false, multiEntry: false});
+                    messages.createIndex("words_index", "words", {unique: false, multiEntry: true});
+                    messages.createIndex("id_index", "id", {unique: true, multiEntry: false});
+                    umbrellas.createIndex("size_color_index", ["size", "color"], {
+                        unique: false,
+                        multiEntry: false
+                    });
+                    // Data:
+                    people.add({_id: "9AF56447-66CE-470A-A70F-674A32EF2D51", name: "Kalle"});
+                    messages.add({text: "Here is a text", words: ["here", "is", "a", "text"], id: 1});
+                    umbrellas.add({
+                        date: "2014-11-20",
+                        time: "22:18",
+                        size: 98,
+                        color: "pink",
+                        name: "My Fine Umbrella!"
+                    });
+                } catch (ex) {
+                    if (rawdb) rawdb.close();
+                    reject(ex);
+                }
+            }
+            req.onsuccess = function () {
+                console.log("onsuccess called");
+                rawdb = req.result;
 
-                    rawdb.close();
+                rawdb.close();
 
-                    resolve();
-                };
-                req.onerror = error;
-            });
-        }).then(function () {
-            // Try open the database using Dexie:
-            db = new Dexie("raw-db", {addons: []}); // Explicitely don't use addons here. Syncable would fail to open an existing db.
-            db.version(0.2).stores({
-                people: "_id",
-                messages: "++,text,words,id,[size+color]",
-                umbrellas: "[date+time],[size+color]"
-            });
-            return db.open();
-        }).then(function () {
-            // Verify "people" data
-            return db.people.toArray(function (people) {
-                equal(people.length, 1, "One person in people");
-                equal(people[0].name, "Kalle", "The persons' name is Kalle");
-            });
-        }).then(function () {
-            // Verify "messages" data
-            return db.messages.toArray(function (messages) {
-                equal(messages.length, 1, "One message in messages");
-                equal(messages[0].text, "Here is a text", "The message has the correct text");
-                equal(messages[0].words.length, 4, "The message has 4 words");
-            });
-        }).then(function () {
-            // Verify "umbrellas" data
-            return db.umbrellas.toArray(function (umbrellas) {
-                equal(umbrellas.length, 1, "One umbrella in umbrellas");
-                equal(umbrellas[0].name, "My Fine Umbrella!", "The umbrella has the correct name");
-                equal(umbrellas[0].date, "2014-11-20", "The umbrella has the correct date");
-                equal(umbrellas[0].time, "22:18", "The umbrella has the correct time");
-                equal(umbrellas[0].size, 98, "The umbrella has the currect size");
-                equal(umbrellas[0].color, "pink", "The umbrella has the correct color");
-            });
-        }).then(function () {
-            // Test messages indexes
-            return db.messages.orderBy("text").first(function (message) {
-                ok(!!message, "Could find a message when iterating the 'text' index");
-            });
-        }).then(function () {
-            // Test words index
-            return db.messages.where("words").equals("is").first(function (message) {
-                ok(!!message, "Could find a message when querying the 'words' index");
-            });
-        }).then(function () {
-            // Test id index
-            return db.messages.where("id").equals(1).count(function (count) {
-                equal(count, 1, "Could count id's");
-            });
-        }).then(function () {
-            // Test umbrella compound primary key
-            return db.umbrellas.get(["2014-11-20", "22:18"], function (umbrella) {
-                ok(!!umbrella, "Umbrella was found by compound primary key");
-                equal(umbrella.color, "pink", "Umbrella has the correct color");
-            });
-        }).then(function () {
-            // Test umbrella compound index
-            return db.umbrellas.where("[size+color]").above([98, "pina"]).count(function (count) {
-                equal(count, 1, "Could count umbrellas based on a query on compound index");
-            });
-        }).then(function () {
-            // Now, let's upgrade the migrated database
-            db.close();
-            db = new Dexie("raw-db");
-            // First, as required with Dexie so far, specify the existing stores:
-            db.version(0.2).stores({
-                people: "_id",
-                messages: "++,text,words,id,[size+color]",
-                umbrellas: "[date+time],[size+color]"
-            });
-            // Then, add the 'name' index to people:
-            db.version(3).stores({
-                people: "_id,name"
-            });
-            return db.open();
-        }).then(function () {
-            // Now test the new name index:
-            return db.people.where("name").equalsIgnoreCase("kalle").first();
-        }).then(function (kalle) {
-            ok(!!kalle, "Could find at least one object by its name index");
-            equal(kalle.name, "Kalle", "The found object was Kalle indeed");
-        }).catch(function (err) {
-            ok(false, "Error (expected in IE10/IE11 without iegap polyfill because we are testing compound indexes): " + err);
-        }).finally(function () {
-            if (db) db.close();
-            Dexie.delete("raw-db").then(start);
+                resolve();
+            };
+            req.onerror = error;
         });
+    }).then(function () {
+        // Try open the database using Dexie:
+        db = new Dexie("raw-db", {addons: []}); // Explicitely don't use addons here. Syncable would fail to open an existing db.
+        db.version(0.2).stores({
+            people: "_id",
+            messages: "++,text,words,id,[size+color]",
+            umbrellas: "[date+time],[size+color]"
+        });
+        return db.open();
+    }).then(function () {
+        // Verify "people" data
+        return db.people.toArray(function (people) {
+            equal(people.length, 1, "One person in people");
+            equal(people[0].name, "Kalle", "The persons' name is Kalle");
+        });
+    }).then(function () {
+        // Verify "messages" data
+        return db.messages.toArray(function (messages) {
+            equal(messages.length, 1, "One message in messages");
+            equal(messages[0].text, "Here is a text", "The message has the correct text");
+            equal(messages[0].words.length, 4, "The message has 4 words");
+        });
+    }).then(function () {
+        // Verify "umbrellas" data
+        return db.umbrellas.toArray(function (umbrellas) {
+            equal(umbrellas.length, 1, "One umbrella in umbrellas");
+            equal(umbrellas[0].name, "My Fine Umbrella!", "The umbrella has the correct name");
+            equal(umbrellas[0].date, "2014-11-20", "The umbrella has the correct date");
+            equal(umbrellas[0].time, "22:18", "The umbrella has the correct time");
+            equal(umbrellas[0].size, 98, "The umbrella has the currect size");
+            equal(umbrellas[0].color, "pink", "The umbrella has the correct color");
+        });
+    }).then(function () {
+        // Test messages indexes
+        return db.messages.orderBy("text").first(function (message) {
+            ok(!!message, "Could find a message when iterating the 'text' index");
+        });
+    }).then(function () {
+        // Test words index
+        return db.messages.where("words").equals("is").first(function (message) {
+            ok(!!message, "Could find a message when querying the 'words' index");
+        });
+    }).then(function () {
+        // Test id index
+        return db.messages.where("id").equals(1).count(function (count) {
+            equal(count, 1, "Could count id's");
+        });
+    }).then(function () {
+        // Test umbrella compound primary key
+        return db.umbrellas.get(["2014-11-20", "22:18"], function (umbrella) {
+            ok(!!umbrella, "Umbrella was found by compound primary key");
+            equal(umbrella.color, "pink", "Umbrella has the correct color");
+        });
+    }).then(function () {
+        // Test umbrella compound index
+        return db.umbrellas.where("[size+color]").above([98, "pina"]).count(function (count) {
+            equal(count, 1, "Could count umbrellas based on a query on compound index");
+        });
+    }).then(function () {
+        // Now, let's upgrade the migrated database
+        db.close();
+        db = new Dexie("raw-db");
+        // First, as required with Dexie so far, specify the existing stores:
+        db.version(0.2).stores({
+            people: "_id",
+            messages: "++,text,words,id,[size+color]",
+            umbrellas: "[date+time],[size+color]"
+        });
+        // Then, add the 'name' index to people:
+        db.version(3).stores({
+            people: "_id,name"
+        });
+        return db.open();
+    }).then(function () {
+        // Now test the new name index:
+        return db.people.where("name").equalsIgnoreCase("kalle").first();
+    }).then(function (kalle) {
+        ok(!!kalle, "Could find at least one object by its name index");
+        equal(kalle.name, "Kalle", "The found object was Kalle indeed");
+    }).catch(function (err) {
+        ok(false, "Error: " + err);
+    }).finally(function () {
+        if (db) db.close();
+        Dexie.delete("raw-db").then(start);
     });
-}
+});

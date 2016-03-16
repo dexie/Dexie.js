@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
-import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, supports} from './dexie-unittest-utils';
+import {module, stop, start, test, asyncTest, equal, ok} from 'QUnit';
+import {resetDatabase, supports, spawnedTest} from './dexie-unittest-utils';
 
 const async = Dexie.async;
 
@@ -367,8 +367,13 @@ asyncTest("queryingNonExistingObj", function () {
     }).finally(start);
 });
 
-if (supports("compound")) {
-    asyncTest("compount-index", 2, function () {
+if (!supports("compound")) {
+    test("compound-index", ()=>ok(true, "SKIPPED - COMPOUND UNSUPPORTED"));
+    test("compound-primkey (Issue #37)", ()=>ok(true, "SKIPPED - COMPOUND UNSUPPORTED"));
+    test("Issue #31 - Compound Index with anyOf", ()=>ok(true, "SKIPPED - COMPOUND UNSUPPORTED"));
+    test("Erratic behavior of between #190", ()=>ok(true, "SKIPPED - COMPOUND UNSUPPORTED"));
+} else {
+    asyncTest("compound-index", 2, function () {
         db.transaction("r", db.files, function () {
             db.files.where("[filename+extension]").equals(["README", ".TXT"]).toArray(function (a) {
                 equal(a.length, 1, "Found one file by compound index search");

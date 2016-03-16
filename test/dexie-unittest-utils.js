@@ -96,10 +96,16 @@ var hasPolyfillIE = [].slice.call(document.getElementsByTagName("script")).some(
     s => s.src.indexOf("idb-iegap") !== -1);
 
 export function supports (features) {
-    if (/compound/.test(features))
-        return hasPolyfillIE || (!isIE && !isEdge);
-    if (/multiEntry/.test(features))
-        return hasPolyfillIE || (!isIE && !isEdge);
+    return features.split('+').reduce((result,feature)=>{
+        switch (feature.toLowerCase()) {
+            case "compound":
+                return result && (hasPolyfillIE || (!isIE && !isEdge));
+            case "multientry":
+                return result && (hasPolyfillIE || (!isIE && !isEdge));
+            default:
+                throw new Error ("Unknown feature: " + feature);
+        }
+    }, true);
 }
 
 export function spawnedTest (name, num, promiseGenerator) {

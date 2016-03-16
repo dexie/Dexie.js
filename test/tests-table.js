@@ -127,6 +127,9 @@ asyncTest("where", function () {
             db.users.where("email").startsWith("da").distinct().toArray(function (a) { // Fails on IE with 0
                 equal(a.length, 2, "Found both because both have emails starting with 'da'. Expect to fail on IE10/IE11.");
             });
+        } else {
+            ok(true, "SKIPPED - MULTIENTRY UNSUPPORTED");
+            ok(true, "SKIPPED - MULTIENTRY UNSUPPORTED");
         }
     }).catch(function (e) {
         ok(false, "Transaction failed: " + e);
