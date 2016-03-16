@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase} from './dexie-unittest-utils';
+import {resetDatabase, spawnedTest} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBException");
 db.version(1).stores({ users: "id,first,last,&username,&*email,*pets" });
@@ -22,6 +22,31 @@ module("exception-handling", {
     },
     teardown: function () {
     }
+});
+
+spawnedTest("transaction should abort on collection error", function*(){
+    yield db.transaction("rw", db.users, function*() {
+        let id = yield db.users.add({id: 3, first: "Foo", last: "Bar", username: "foobar"});
+        equal (id, 3);
+        yield db.users.where('id').equals(null).toArray();
+        ok(false, "Should not come here");
+    }).catch(e => {
+        ok(true, "Got error because WhereClause.equals(null) should throw DataError: " + e);
+    });
+    equal (yield db.users.where('first').equals("Foo").count(), 0, "Should not have succeeded to add when transaction was aborted");
+
+    yield db.transaction("rw", db.users, function() {
+        db.users.add({id: 3, first: "Foo", last: "Bar", username: "foobar"});
+        db.users.where('id').equals(null).toArray(res=> {
+            ok(false, "Not possible to query null");
+        });
+    }).then(()=>{
+        ok(false, "Transaction shouldnt commit");
+    }).catch(e => {
+        ok(true, "Got error because WhereClause.equals(null) should throw TypeError");
+    });
+
+    equal (yield db.users.where('first').equals("Foo").count(), 0, "Should not have succeeded to add when transaction was aborted");
 });
 
 asyncTest("eventError-transaction-catch", function () {
