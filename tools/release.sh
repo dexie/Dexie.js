@@ -1,7 +1,7 @@
 #!/bin/bash -e
 
-if ! [ -e build/release.sh ]; then
-  echo >&2 "Please run build/release.sh from the repo root"
+if ! [ -e tools/release.sh ]; then
+  echo >&2 "Please run tools/release.sh from the repo root"
   exit 1
 fi
 
@@ -25,6 +25,14 @@ read next_version
 
 validate_semver $next_version
 
+if echo "$next_version" | grep -q "-"; then
+	NPMTAG="$next_version"
+    echo "Will use: npm publish --tag $NPMTAG"
+else
+	NPMTAG="latest"
+    echo "Will use: npm publish without any tag (pruction publish)"
+fi
+
 next_ref="v$next_version"
 
 update_version 'package.json' $next_version
@@ -44,8 +52,9 @@ git merge --no-edit -s ours origin/releases
 #
 
 # clean
-rm -rf build/tmp
+rm -rf tools/tmp
 rm -rf dist/*
+rm -rf addons/*/tools/tmp
 rm -rf addons/*/dist/*
 
 # build
@@ -78,7 +87,11 @@ git push origin master:releases --follow-tags
 
 printf "Successful push to master:releases\n\n"
 
-npm publish
+if [ "$TAG" = "latest" ]; then
+	npm publish
+else
+    npm publish --tag $NPMTAG
+fi
 
 printf "Successful publish to npm.\n\n"
 
