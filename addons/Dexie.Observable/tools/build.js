@@ -1,21 +1,19 @@
-﻿import {buildAndWatch} from '../../../build/build-utils';
+﻿import {build} from '../../../tools/build-utils';
 
 console.log("Building...");
 
-buildAndWatch([{
+build([{
     dirs: ["src/"],
     bundles: {
         "src/Dexie.Observable.js": [
             "dist/dexie-observable.js",
             "dist/dexie-observable.js.map",
             "dist/dexie-observable.min.js",
-            "dist/dexie-observable.min.js.map",
-            "dist/dexie-observable.es6.js",
-            "dist/dexie-observable.es6.js.map"
+            "dist/dexie-observable.min.js.map"
         ]
     }
 }]).then(()=> {
-    console.log("All files successfully built. Now watching...");
+    console.log("All files successfully built.");
 }).catch(err => {
     console.error(err);
 });

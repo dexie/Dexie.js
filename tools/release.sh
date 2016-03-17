@@ -54,6 +54,7 @@ npm test
 # Force adding/removing dist files
 git add -A --no-ignore-removal -f dist/ 2>/dev/null
 
+
 # Commit all changes (still locally)
 git commit -am "Build output" 2>/dev/null
 # Tag the release
