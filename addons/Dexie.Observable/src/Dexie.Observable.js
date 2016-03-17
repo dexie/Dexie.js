@@ -747,7 +747,7 @@ function promisableChain(f1, f2) {
 // 
 
 Observable.latestRevision = {}; // Latest revision PER DATABASE. Example: Observable.latestRevision.FriendsDB = 37;
-Observable.on = Dexie.Events(null, "latestRevisionIncremented", "suicideNurseCall", "intercomm", "beforeunload"); // fire(dbname, value);
+Observable.on = Dexie.events(null, "latestRevisionIncremented", "suicideNurseCall", "intercomm", "beforeunload"); // fire(dbname, value);
 Observable.createUUID = function() {
     // Decent solution from http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript
     var d = Date.now();
