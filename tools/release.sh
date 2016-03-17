@@ -26,11 +26,11 @@ read next_version
 validate_semver $next_version
 
 if echo "$next_version" | grep -q "-"; then
-	NPMTAG="$next_version"
+	NPMTAG=`echo $next_version | cut -d'-' -f 2`
     echo "Will use: npm publish --tag $NPMTAG"
 else
 	NPMTAG="latest"
-    echo "Will use: npm publish without any tag (pruction publish)"
+    echo "Will use: npm publish without any tag (production publish)"
 fi
 
 next_ref="v$next_version"
