@@ -1,4 +1,4 @@
-import {slice, keys, isArray} from './utils';
+import {slice, keys, isArray, asap, _global} from './utils';
 import {nop, stoppableEventChain} from './chaining-functions';
 import {exceptions} from './errors';
 

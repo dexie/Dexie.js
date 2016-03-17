@@ -20,11 +20,9 @@
   "license": "Apache-2.0",
   "ignore": [
     "**/.*",
-    "src/",
-    "test/",
+    "**/tmp/",
+    "addons/*/bower.json",
     "samples/",
-    "build/",
-    "addons/",
     "*.njsproj"
   ]
 }

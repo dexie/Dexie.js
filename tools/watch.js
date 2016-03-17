@@ -1,18 +1,14 @@
-import {build} from './build-utils';
+﻿import {buildAndWatch} from './build-utils';
 
 console.log("Building...");
 
-build([{
+buildAndWatch([{
+
     dirs: ["src/"],
     bundles: {
         "src/Dexie.js": [
             "dist/dexie.js",
-            "dist/dexie.js.map",
-            "dist/dexie.min.js",
-            "dist/dexie.min.js.map",
-            "dist/dexie.min.js.gz",
-            "dist/dexie.es6.js",
-            "dist/dexie.es6.js.map"
+            "dist/dexie.js.map"
         ],
         "src/Dexie.d.ts": [
             "dist/dexie.d.ts"
@@ -33,8 +29,9 @@ build([{
         "test/require.js",
         "test/qunit.js"
     ]
-}]).then(()=> {
-    console.log("All files successfully built.");
+
+}]).then(()=>{
+    console.log("Done building. Now watching...")
 }).catch(err => {
     console.error(err);
 });

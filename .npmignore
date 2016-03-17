@@ -1,8 +1,5 @@
-addons/
-build/
-test/
+**/tmp/
 samples/
-src/
-dist/README.md
+addons/
 *.njsproj
 .*
