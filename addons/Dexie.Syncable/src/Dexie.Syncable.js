@@ -115,7 +115,7 @@ export default function Syncable (db) {
         });
     };
 
-    db.syncable.on = Dexie.Events(db, { statusChanged: "asap" });
+    db.syncable.on = Dexie.events(db, { statusChanged: "asap" });
 
     db.syncable.disconnect = function(url) {
         if (db._localSyncNode && db._localSyncNode.isMaster) {
@@ -228,7 +228,7 @@ export default function Syncable (db) {
             url: url,
             status: Statuses.OFFLINE,
             connectPromise: connectPromise,
-            on: Dexie.Events(null, "disconnect"),
+            on: Dexie.events(null, "disconnect"),
             disconnect: function(newStatus, error) {
                 if (!disconnected) {
                     activePeer.on.disconnect.fire(newStatus, error);
