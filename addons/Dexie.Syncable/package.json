@@ -29,8 +29,8 @@
     "watch": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator tools/watch.js"
   },
   "homepage": "http://dexie.org",
-  "dependencies": {
+  "peerDependencies": {
     "dexie": "1.x",
-    "dexie-observable": "~0.1.3"
+    "dexie-observable": "^0.1.3"
   }
 }
