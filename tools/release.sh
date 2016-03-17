@@ -63,6 +63,7 @@ done
 npm test
 
 # Force adding/removing dist files
+rm -rf dist/*.gz
 git add -A --no-ignore-removal -f dist/ 2>/dev/null
 git add -A --no-ignore-removal -f addons/*/dist/ 2>/dev/null
 
