@@ -26,7 +26,7 @@ read next_version
 validate_semver $next_version
 
 if echo "$next_version" | grep -q "-"; then
-	NPMTAG=`echo $next_version | cut -d'-' -f 2`
+	NPMTAG="beta"
     echo "Will use: npm publish --tag $NPMTAG"
 else
 	NPMTAG="latest"
