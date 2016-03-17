@@ -1,4 +1,2 @@
-src/
-test/
-build/
+tools/tmp
 .*

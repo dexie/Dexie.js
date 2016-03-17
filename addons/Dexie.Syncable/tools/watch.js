@@ -1,8 +1,8 @@
-﻿import {build} from '../../../build/build-utils';
+﻿import {buildAndWatch} from '../../../tools/build-utils';
 
 console.log("Building...");
 
-build([{
+buildAndWatch([{
     dirs: ["src/"],
     bundles: {
         "src/Dexie.Syncable.js": [
@@ -15,7 +15,7 @@ build([{
         ]
     }
 }]).then(()=> {
-    console.log("All files successfully built.");
+    console.log("All files successfully built. Now watching...");
 }).catch(err => {
     console.error(err);
 });

@@ -46,13 +46,25 @@ git merge --no-edit -s ours origin/releases
 # clean
 rm -rf build/tmp
 rm -rf dist/*
+rm -rf addons/*/dist/*
+
 # build
 npm run build
+# build addons (for bower packages)
+for dir in addons/*/
+do
+    cd ${dir}
+    npm run build
+    # npm test
+    cd -
+done
+
 # test
 npm test
 
 # Force adding/removing dist files
 git add -A --no-ignore-removal -f dist/ 2>/dev/null
+git add -A --no-ignore-removal -f addons/*/dist/ 2>/dev/null
 
 # Commit all changes (still locally)
 git commit -am "Build output" 2>/dev/null

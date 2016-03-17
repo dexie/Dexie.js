@@ -25,8 +25,8 @@
     "url": "https://github.com/dfahlander/Dexie.js/issues"
   },
   "scripts": {
-    "build": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator build/build.js",
-    "watch": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator build/watch.js"
+    "build": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator tools/build.js",
+    "watch": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator tools/watch.js"
   },
   "homepage": "http://dexie.org",
   "dependencies": {
