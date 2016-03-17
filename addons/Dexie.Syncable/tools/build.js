@@ -9,9 +9,7 @@ build([{
             "dist/dexie-syncable.js",
             "dist/dexie-syncable.js.map",
             "dist/dexie-syncable.min.js",
-            "dist/dexie-syncable.min.js.map",
-            "dist/dexie-syncable.es6.js",
-            "dist/dexie-syncable.es6.js.map"
+            "dist/dexie-syncable.min.js.map"
         ]
     }
 }]).then(()=> {
