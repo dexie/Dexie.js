@@ -133,7 +133,7 @@ function _rootExec(fn) {
     isRootExecution = false;
     asap = enqueueImmediate;
     try {
-        fn();
+        return fn();
     } finally {
         if (isRootExec) {
             do {
