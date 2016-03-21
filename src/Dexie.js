@@ -57,11 +57,18 @@ var maxString = String.fromCharCode(65535),
 
 export default function Dexie(dbName, options) {
     /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
-    var addons = (options && options.addons) || Dexie.addons;
-    // Resolve all external dependencies:
-    var deps = Dexie.dependencies;
-    var indexedDB = deps.indexedDB,
-        IDBKeyRange = deps.IDBKeyRange;
+    let deps = Dexie.dependencies;
+    let opts = extend({
+        // Default Options
+        addons: Dexie.addons,           // Pick statically registered addons by default
+        autoOpen: true,                 // Don't require db.open() explicitely.
+        indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to IDBShim or browser env.
+        IDBKeyRange: deps.IDBKeyRange   // Backend IDBKeyRange api. Default to IDBShim or browser env.
+    }, options || {});
+    var addons = opts.addons,
+        autoOpen = opts.autoOpen,
+        indexedDB = opts.indexedDB,
+        IDBKeyRange = opts.IDBKeyRange;
 
     var globalSchema = this._dbSchema = {};
     var versions = [];
@@ -77,8 +84,7 @@ export default function Dexie(dbName, options) {
     var db = this;
     var pausedResumeables = [];
     var autoSchema = true;
-    var autoOpen = options && 'autoOpen' in options ? options.autoOpen : true;
-    var hasNativeGetDatabaseNames = !!getNativeGetDatabaseNamesFn();
+    var hasNativeGetDatabaseNames = !!getNativeGetDatabaseNamesFn(indexedDB);
 
     function init() {
         // If browser (not node.js or other), subscribe to versionchange event and reload page
@@ -391,6 +397,13 @@ export default function Dexie(dbName, options) {
         store.createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multi });
     }
 
+    function executePausedResumeables() {
+        pausedResumeables.forEach(function (resumable) {
+            // Resume all stalled operations. They will fail once they wake up.
+            resumable.resume();
+        });
+    }
+
     //
     //
     //      Dexie Protected API
@@ -421,12 +434,8 @@ export default function Dexie(dbName, options) {
     this._transPromiseFactory = function transactionPromiseFactory(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
         if (db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
             // Database is paused. Wait til resumed.
-            if (!isBeingOpened) {
-                if (autoOpen) {
-                    db.open();
-                } else {
-                    return fail(new exceptions.DatabaseClosed());
-                }
+            if (!isBeingOpened && !autoOpen) {
+                return fail(new exceptions.DatabaseClosed());
             }
             var blockedPromise = new Promise(function (resolve, reject) {
                 pausedResumeables.push({
@@ -437,6 +446,9 @@ export default function Dexie(dbName, options) {
                     }
                 });
             });
+            if (autoOpen && !isBeingOpened) {
+                db.open();
+            }
             return blockedPromise;
         } else {
             var trans = db._createTransaction(mode, storeNames, globalSchema);
@@ -517,11 +529,7 @@ export default function Dexie(dbName, options) {
                 dbOpenError = err;
                 db_is_blocked = false;
                 reject(dbOpenError);
-                pausedResumeables.forEach(function (resumable) {
-                    // Resume all stalled operations. They will fail once they wake up.
-                    resumable.resume();
-                });
-                pausedResumeables = [];
+                executePausedResumeables();
             }
             try {
                 // Make sure caller has specified at least one version
@@ -601,11 +609,7 @@ export default function Dexie(dbName, options) {
 
                         function resume() {
                             db_is_blocked = false;
-                            pausedResumeables.forEach(function (resumable) {
-                                // If anyone has made operations on a table instance before the db was opened, the operations will start executing now.
-                                resumable.resume();
-                            });
-                            pausedResumeables = [];
+                            executePausedResumeables();
                             resolve(db);
                         }
                     });
@@ -622,11 +626,7 @@ export default function Dexie(dbName, options) {
             idbdb = null;
             autoOpen = false;
             if (db_is_blocked) {
-                pausedResumeables.forEach(function (resumable) {
-                    // Resume all stalled operations. They will fail once they wake up.
-                    resumable.resume();
-                });
-                pausedResumeables = [];
+                executePausedResumeables();
             }
             db_is_blocked = false;
             dbOpenError = new exceptions.DatabaseClosed();
@@ -1401,10 +1401,10 @@ export default function Dexie(dbName, options) {
                 if (!self._locked()) {
                     p = self.active ? new Promise(function (resolve, reject) {
                         if (!self.idbtrans && mode) {
-                            if (!idbdb) throw dbOpenError ? dbOpenError instanceof exceptions.DatabaseClosed ?
-                                dbOpenError :
-                                new exceptions.OpenFailed(dbOpenError) :
-                                new exceptions.DatabaseClosed();
+                            if (!idbdb) throw (!dbOpenError) || ["DatabaseClosedError","MissingAPIError"].indexOf(dbOpenError.name) >= 0 ?
+                                dbOpenError : // Errors where it is no difference whether it was caused by the user operation or an earlier call to db.open()
+                                new exceptions.OpenFailed(dbOpenError); // Make it clear that the user operation was not what caused the error - the error had occurred earlier on db.open()!
+
                             var idbtrans = self.idbtrans = idbdb.transaction(safariMultiStoreFix(self.storeNames), self.mode);
                             idbtrans.onerror = function (e) {
                                 self.on("error").fire(e && e.target.error);
@@ -2730,7 +2730,7 @@ Dexie.exists = function(name) {
 //
 Dexie.getDatabaseNames = function (cb) {
     return new Promise(function (resolve, reject) {
-        var getDatabaseNames = getNativeGetDatabaseNamesFn();
+        var getDatabaseNames = getNativeGetDatabaseNamesFn(indexedDB);
         if (getDatabaseNames) { // In case getDatabaseNames() becomes standard, let's prepare to support it:
             var req = getDatabaseNames();
             req.onsuccess = function (event) {
@@ -2881,12 +2881,11 @@ Dexie.TableSchema = TableSchema;
 var idbshim = _global.idbModules && _global.idbModules.shimIndexedDB ? _global.idbModules : {};
 Dexie.dependencies = {
     // Required:
-    // NOTE: The "_"-prefixed versions are for prioritizing IDB-shim on IOS8 before the native IDB in case the shim was included.
     indexedDB: idbshim.shimIndexedDB || _global.indexedDB || _global.mozIndexedDB || _global.webkitIndexedDB || _global.msIndexedDB,
     IDBKeyRange: idbshim.IDBKeyRange || _global.IDBKeyRange || _global.webkitIDBKeyRange
 };
-// Optional dependencies
 miniTryCatch(()=>{
+    // Optional dependencies
     // localStorage
     Dexie.dependencies.localStorage =
         ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : _global.localStorage)
@@ -2898,8 +2897,7 @@ Dexie.version = Dexie.semVer.split('.')
     .map(n => parseInt(n))
     .reduce((p,c,i) => p + (c/Math.pow(10,i*2)));
 
-function getNativeGetDatabaseNamesFn() {
-    var indexedDB = Dexie.dependencies.indexedDB;
+function getNativeGetDatabaseNamesFn(indexedDB) {
     var fn = indexedDB && (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
     return fn && fn.bind(indexedDB);
 }
