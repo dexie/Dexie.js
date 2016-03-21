@@ -1,5 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
+import {spawnedTest} from './dexie-unittest-utils';
 
 const async = Dexie.async;
 
@@ -15,6 +16,26 @@ module("open", {
     teardown: function () {
         stop(); Dexie.delete("TestDB").then(start);
     }
+});
+
+spawnedTest("Using db on node should be rejected with MissingAPIError", function*(){
+    let db = new Dexie('TestDB', {
+        indexedDB: undefined,
+        IDBKeyRange: undefined
+    });
+    db.version(1).stores({foo: 'bar'});
+    try {
+        yield db.foo.toArray();
+        ok(false, "Should not get any result because API is missing.");
+    } catch (e) {
+        ok(e instanceof Dexie.MissingAPIError, "Should get MissingAPIError. Got: " + e.name);
+    }
+    try {
+        yield db.open();
+    } catch (e) {
+        ok(e instanceof Dexie.MissingAPIError, "Should get MissingAPIError. Got: " + e.name);
+    }
+
 });
 
 asyncTest("open, add and query data without transaction", 6, function () {
