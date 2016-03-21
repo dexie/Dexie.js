@@ -180,7 +180,7 @@ class FriendDatabase extends Dexie {
     friends: Dexie.Table<IFriend,number>;
     
     constructor() {
-        super("FriendsDatabase");
+        super("FriendDatabase");
         this.version(1).stores({
             friends: "++id,name,age"
         });
