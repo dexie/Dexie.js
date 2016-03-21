@@ -102,14 +102,15 @@ export var exceptions = errorList.reduce((obj,name)=>{
     // and we cannot change Function.name programatically without
     // dynamically create a Function object, which would be considered
     // 'eval-evil'.
+    let fullName = name + "Error";
     function DexieError (msgOrInner, inner){
-        this.name = name + "Error";
+        this.name = fullName;
         if (typeof msgOrInner === 'string') {
             this.message = msgOrInner;
-            this.inner = null;
+            this.inner = inner || null;
         } else if (typeof msgOrInner === 'object') {
-            this.message = msgOrInner.message;
-            this.inner = inner;
+            this.message = `${msgOrInner.name} ${msgOrInner.message}`;
+            this.inner = msgOrInner;
         } else {
             this.message = defaultTexts[name];
             this.inner = null;
