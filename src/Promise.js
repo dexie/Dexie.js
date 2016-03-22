@@ -149,7 +149,7 @@ function _rootExec(fn) {
 
 function setCatched(promise) {
     promise._catched = true;
-    if (promise._parent) setCatched(promise._parent);
+    if (promise._parent && !promise._parent._catched) setCatched(promise._parent);
 }
 
 function resolve(promise, newValue) {
