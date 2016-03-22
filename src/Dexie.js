@@ -526,7 +526,7 @@ export default function Dexie(dbName, options) {
                 if (idbdb) try { idbdb.close(); } catch (e) { }
                 idbdb = null;
                 isBeingOpened = false;
-                dbOpenError = err;
+                dbOpenError = mapError(err);
                 db_is_blocked = false;
                 reject(dbOpenError);
                 executePausedResumeables();
