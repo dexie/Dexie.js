@@ -107,13 +107,7 @@ function handle(self, deferred) {
         if (!self._state && (!ret || typeof ret.then !== 'function' || ret._state !== false)) setCatched(self); // Caller did 'return Promise.reject(err);' - don't regard it as catched!
         deferred.resolve(ret);
     } catch (e) {
-        var catched = deferred.reject(e);
-        if (!catched && self.onuncatched) {
-            try {
-                self.onuncatched(e);
-            } catch (e) {
-            }
-        }
+        deferred.reject(e);
     } finally {
         Promise.PSD = outerPSD;
         if (isRootExec) {
@@ -159,6 +153,12 @@ function resolve(promise, newValue) {
         if (newValue === promise) throw new TypeError('A promise cannot be resolved with itself.');
         if (newValue && (typeof newValue === 'object' || typeof newValue === 'function')) {
             if (typeof newValue.then === 'function') {
+                if (newValue instanceof Promise && newValue._state !== null) {
+                    promise._state = newValue._state;
+                    promise._value = newValue._value;
+                    finale.call(promise);
+                    return;
+                }
                 doResolve(promise, function (resolve, reject) {
                     //newValue instanceof Promise ? newValue._then(resolve, reject) : newValue.then(resolve, reject);
                     newValue.then(resolve, reject);
@@ -185,11 +185,12 @@ function reject(promise, newValue) {
     promise._value = newValue;
 
     finale.call(promise);
-    if (!promise._catched) {
+    if (!promise._catched ) {
         try {
             if (promise.onuncatched)
                 promise.onuncatched(promise._value);
-            Promise.on.error.fire(promise._value);
+            else
+                Promise.on.error.fire(promise._value);
         } catch (e) {
         }
     }
@@ -234,8 +235,6 @@ function doResolve(promise, fn, onFulfilled, onRejected) {
         return onRejected(ex);
     }
 }
-
-Promise.on = Events(null, "error");
 
 Promise.all = function () {
     var args = slice(arguments.length === 1 && isArray(arguments[0]) ? arguments[0] : arguments);
@@ -355,3 +354,13 @@ Promise._tickFinalize = function(callback) {
     if (isRootExecution) throw new Error("Not in a virtual tick");
     tickFinalizers.push(callback);
 };
+
+Promise.on = Events(null, {"error": [
+    (f1,f2)=>f2, // Only use the most recent handler (only allow one handler at a time).
+    defaultErrorHandler] // Default to defaultErrorHandler
+});
+
+// By default, log uncaught errors to the console
+function defaultErrorHandler(e) {
+    console.error(`Uncaught Promise: ${e.stack || e}`);
+}

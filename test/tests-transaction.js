@@ -229,10 +229,12 @@ asyncTest("Three-level sub transactions", function () {
 
 
 asyncTest("Table not in main transactions", function () {
-    db.transaction('rw', db.users, function () {
-        db.users.add({ username: "bertil" });
-        db.transaction('rw', db.users, db.pets, function () {
-            db.pets.add({ kind: "cat" });
+    Dexie.Promise.resolve().then(()=>{
+        return db.transaction('rw', db.users, function () {
+            db.users.add({username: "bertil"});
+            db.transaction('rw', db.users, db.pets, function () {
+                db.pets.add({kind: "cat"});
+            });
         });
     }).then(function () {
         ok(false, "Shouldnt work");
