@@ -1902,7 +1902,7 @@ export default function Dexie(dbName, options) {
             if (ctx.isPrimKey) return store;
             var indexSpec = ctx.table.schema.idxByName[ctx.index];
             if (!indexSpec) throw new exceptions.Schema("KeyPath " + ctx.index + " on object store " + store.name + " is not indexed");
-            return ctx.isPrimKey ? store : store.index(indexSpec.name);
+            return store.index(indexSpec.name);
         }
 
         function openCursor(ctx, store) {
@@ -2332,6 +2332,26 @@ export default function Dexie(dbName, options) {
         },
 
         'delete': function () {
+            let ctx = this._ctx,
+                range = ctx.range;
+            if ((!range || ctx.isPrimKey) && ctx.table.hook.deleting.fire === nop && !ctx.or && !ctx.algorithm && !ctx.filter) {
+                // May use IDBObjectStore.delete(IDBKeyRange) in this case (Issue #208)
+
+                return this._write((resolve, reject, idbstore) => {
+                    // Our API contract is to return a count of deleted items, so we have to count() before delete().
+                    let onerror = eventRejectHandler(reject, ["deleting range from", ctx.table.name]);
+                    let countReq = (range ? idbstore.count(range) : idbstore.count());
+                    countReq.onerror = onerror;
+                    countReq.onsuccess = () => {
+                        let count = countReq.result;
+                        miniTryCatch(()=> {
+                            let delReq = (range ? idbstore.delete(range) : idbstore.clear());
+                            delReq.onerror = onerror;
+                            delReq.onsuccess = () => resolve(count);
+                        }, err => reject(mapError(err)));
+                    };
+                });
+            }
             return this.modify(function () { delete this.value; });
         }
     });
