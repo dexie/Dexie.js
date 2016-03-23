@@ -2467,8 +2467,9 @@ export default function Dexie(dbName, options) {
     }
 
     function hasIEDeleteObjectStoreBug() {
-        // Assume bug is present in IE10 and IE11 but dont expect it in next version of IE (IE12)
-        return navigator.userAgent.indexOf("Trident") >= 0 || navigator.userAgent.indexOf("MSIE") >= 0;
+        // Assume bug is present in IE10, IE11 and Edge
+        return typeof navigator !== 'undefined' &&
+            /(MSIE|Trident|Edge)/.test(navigator.userAgent);
     }
 
     function readGlobalSchema() {
