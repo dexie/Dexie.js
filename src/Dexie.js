@@ -982,23 +982,10 @@ export default function Dexie(dbName, options) {
                 return this.toCollection().and(filterFunction);
             },
             each: function (fn) {
-                var self = this;
-                fake && fn(self.schema.instanceTemplate);
-                return this._idbstore(READONLY, function (resolve, reject, idbstore) {
-                    var req = idbstore.openCursor();
-                    req.onerror = eventRejectHandler(reject, ["calling", "Table.each()", "on", self.name]);
-                    iterate(req, null, fn, resolve, reject, self.hook.reading.fire);
-                });
+                return this.toCollection().each(fn);
             },
             toArray: function (cb) {
-                var self = this;
-                return this._idbstore(READONLY, function (resolve, reject, idbstore) {
-                    fake && resolve([self.schema.instanceTemplate]);
-                    var a = [];
-                    var req = idbstore.openCursor();
-                    req.onerror = eventRejectHandler(reject, ["calling", "Table.toArray()", "on", self.name]);
-                    iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject, self.hook.reading.fire);
-                }).then(cb);
+                return this.toCollection().toArray(cb);
             },
             orderBy: function (index) {
                 return new this._collClass(new WhereClause(this, index));
