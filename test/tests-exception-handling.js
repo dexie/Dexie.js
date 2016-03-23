@@ -247,9 +247,13 @@ asyncTest("catch-all with db.on('error')", 3, function () {
     ourDB.on("error", function (e) {
         ok(errorCount < 3, "Uncatched error successfully bubbled to ourDB.on('error'): " + e);
         if (++errorCount == 3) {
+            Dexie.Promise.on('error').unsubscribe(swallowPromiseOnError);
             ourDB.delete().then(start);
         }
     });
+    function swallowPromiseOnError(e){
+    }
+    Dexie.Promise.on('error', swallowPromiseOnError); // Just to get rid of default error logs for not catching.
 
     ourDB.open();
 

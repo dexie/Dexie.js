@@ -447,7 +447,7 @@ export default function Dexie(dbName, options) {
                 });
             });
             if (autoOpen && !isBeingOpened) {
-                db.open();
+                db.open().catch(nop); // catching to get rid of error logging of uncaught Promise. dbOpenError will be returned again as a rejected Promise.
             }
             return blockedPromise;
         } else {
@@ -484,7 +484,7 @@ export default function Dexie(dbName, options) {
         if (!fake && db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
             if (!isBeingOpened) {
                 if (autoOpen) {
-                    db.open();
+                    db.open().catch(nop); // catching to get rid of error logging of uncaught Promise. dbOpenError will be returned again as a rejected Promise.
                 } else {
                     return fail(new exceptions.DatabaseClosed());
                 }
@@ -789,6 +789,7 @@ export default function Dexie(dbName, options) {
         function enterTransactionScope(resolve, reject) {
             // Our transaction. To be set later.
             var trans = null;
+            var isConstructing = true;
 
             try {
                 // Throw any error if any of the above checks failed.
@@ -861,9 +862,13 @@ export default function Dexie(dbName, options) {
                             parentTransaction.active = false;
                             parentTransaction.on.error.fire(e); // Bubble to parent transaction
                         }
-                        var catched = reject(e);
-                        if (!parentTransaction && !catched) {
-                            db.on.error.fire(e);// If not catched, bubble error to db.on("error").
+
+                        if (isConstructing) asap(doReject); else doReject();
+                        function doReject() {
+                            var catched = reject(e);
+                            if (!parentTransaction && !catched) {
+                                db.on.error.fire(e);// If not catched, bubble error to db.on("error").
+                            }
                         }
                     });
 
@@ -889,6 +894,7 @@ export default function Dexie(dbName, options) {
                     if (!reject(e)) db.on("error").fire(e); // If not catched, bubble exception to db.on("error");
                 });
             }
+            isConstructing = false;
         }
     };
 
@@ -976,23 +982,10 @@ export default function Dexie(dbName, options) {
                 return this.toCollection().and(filterFunction);
             },
             each: function (fn) {
-                var self = this;
-                fake && fn(self.schema.instanceTemplate);
-                return this._idbstore(READONLY, function (resolve, reject, idbstore) {
-                    var req = idbstore.openCursor();
-                    req.onerror = eventRejectHandler(reject, ["calling", "Table.each()", "on", self.name]);
-                    iterate(req, null, fn, resolve, reject, self.hook.reading.fire);
-                });
+                return this.toCollection().each(fn);
             },
             toArray: function (cb) {
-                var self = this;
-                return this._idbstore(READONLY, function (resolve, reject, idbstore) {
-                    fake && resolve([self.schema.instanceTemplate]);
-                    var a = [];
-                    var req = idbstore.openCursor();
-                    req.onerror = eventRejectHandler(reject, ["calling", "Table.toArray()", "on", self.name]);
-                    iterate(req, null, function (item) { a.push(item); }, function () { resolve(a); }, reject, self.hook.reading.fire);
-                }).then(cb);
+                return this.toCollection().toArray(cb);
             },
             orderBy: function (index) {
                 return new this._collClass(new WhereClause(this, index));

@@ -293,7 +293,7 @@ asyncTest("modify-causing-error", 2, function () {
 asyncTest("delete", 2, function () {
     db.users.orderBy("id").delete().then(function (count) {
         equal(count, 2, "All two records deleted");
-        db.users.count(function (count) {
+        return db.users.count(function (count) {
             equal(count, 0, "No users in collection anymore");
         });
     }).catch(function (e) {

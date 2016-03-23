@@ -35,7 +35,6 @@ spawnedTest("Using db on node should be rejected with MissingAPIError", function
     } catch (e) {
         ok(e instanceof Dexie.MissingAPIError, "Should get MissingAPIError. Got: " + e.name);
     }
-
 });
 
 asyncTest("open, add and query data without transaction", 6, function () {
