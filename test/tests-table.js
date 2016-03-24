@@ -368,6 +368,28 @@ spawnedTest("bulkAdd-non-inbound-autoincrement", function*(){
     equal (yield db.folks.where('last').equals('Bar').count(), 1, "Shoudl be 1 Bar");
 });
 
+spawnedTest("bulkAdd-catch sub transaction", function*(){
+    yield db.transaction('rw', db.users, ()=>{
+        var newUsers = [
+            { first: "Åke1", last: "Persbrant1", username: "aper1", email: ["aper1@persbrant.net"] },
+            { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] },
+            { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] }, // Should fail
+            { first: "Åke3", last: "Persbrant3", username: "aper3", email: ["aper3@persbrant.net"] }
+        ];
+        db.transaction('rw', db.users, ()=>{
+            db.users.bulkAdd(newUsers);
+        }).then(()=>{
+            ok(false, "Should not succeed with all these operations");
+        }).catch(e => {
+            equal(e.failures.length, 1, "Should get one failure");
+        });
+    }).catch(e => {
+        ok(true, "Outer transaction aborted due to inner transaction abort. This is ok: " + e);
+    });
+
+    equal(yield db.users.where('username').startsWith('aper').count(), 0, "0 users! Good, means that inner transaction did not commit");
+});
+
 asyncTest("delete", function () {
     // Without transaction
     db.users.get(idOfFirstUser, function (user) {
