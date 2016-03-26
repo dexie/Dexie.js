@@ -99,9 +99,11 @@ export function supports (features) {
     return features.split('+').reduce((result,feature)=>{
         switch (feature.toLowerCase()) {
             case "compound":
-                return result && (hasPolyfillIE || (!isIE && !isEdge));
+                return result && (hasPolyfillIE || (!isIE && !isEdge)); // Should add Safari to
             case "multientry":
-                return result && (hasPolyfillIE || (!isIE && !isEdge));
+                return result && (hasPolyfillIE || (!isIE && !isEdge)); // Should add Safari to
+            case "versionchange": return true;
+                //return result && (!isIE && !isEdge); // Should add Safari to
             default:
                 throw new Error ("Unknown feature: " + feature);
         }

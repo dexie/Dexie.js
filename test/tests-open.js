@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {spawnedTest} from './dexie-unittest-utils';
+import {spawnedTest, supports} from './dexie-unittest-utils';
 
 const async = Dexie.async;
 
@@ -15,6 +15,37 @@ module("open", {
     },
     teardown: function () {
         stop(); Dexie.delete("TestDB").then(start);
+    }
+});
+
+let timeout = async(function* (promise, ms) {
+    yield Promise.race([promise, new Promise((resolve,reject)=>setTimeout(()=>reject("timeout"), ms))]);
+});
+
+spawnedTest("multiple db should not block each other", function*(){
+    if (!supports("versionchange")) {
+        ok(true, "SKIPPED - versionchange UNSUPPORTED");
+        return;
+    }
+    let db1 = new Dexie("TestDB"),
+       db2 = new Dexie("TestDB");
+    db1.version(1).stores({
+        foo: 'bar'
+    });
+    db2.version(1).stores({
+        foo: 'bar'
+    });
+    yield db1.open();
+    ok(true, "db1 should open");
+    yield db2.open();
+    ok(true, "db2 should open");
+    try {
+        yield timeout(db1.delete(), 1500);
+        ok(true, "Succeeded to delete db1 while db2 was open");
+    } catch (e) {
+        db1.close();
+        db2.close();
+        ok(false, "Could not delete db1 - " + e);
     }
 });
 

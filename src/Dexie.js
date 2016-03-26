@@ -53,7 +53,8 @@ var maxString = String.fromCharCode(65535),
     // Otherwise maxKey is maxString. This is handy when needing an open upper border without limit.
     maxKey = (function(){try {IDBKeyRange.only([[]]);return [[]];}catch(e){return maxString;}})(),
     INVALID_KEY_ARGUMENT = "Invalid key provided. Keys must be of type string, number, Date or Array<string | number | Date>.",
-    STRING_EXPECTED = "String expected.";
+    STRING_EXPECTED = "String expected.",
+    connections = [];
 
 export default function Dexie(dbName, options) {
     /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
@@ -87,19 +88,31 @@ export default function Dexie(dbName, options) {
     var hasNativeGetDatabaseNames = !!getNativeGetDatabaseNamesFn(indexedDB);
 
     function init() {
-        // If browser (not node.js or other), subscribe to versionchange event and reload page
+        // Default subscribers to "versionchange" and "blocked".
+        // Can be overridden by custom handlers. If custom handlers return false, these default
+        // behaviours will be prevented.
         db.on("versionchange", function (ev) {
             // Default behavior for versionchange event is to close database connection.
             // Caller can override this behavior by doing db.on("versionchange", function(){ return false; });
             // Let's not block the other window from making it's delete() or open() call.
+            // NOTE! This event is never fired in IE,Edge or Safari.
+            if (ev.newVersion > 0)
+                console.warn(`Another connection wants to upgrade database '${db.name}'. Closing db now to resume the upgrade.`);
+            else
+                console.warn(`Another connection wants to delete database '${db.name}'. Closing db now to resume the delete request.`)
             db.close();
-            db.on('error').fire(new exceptions.VersionChange());
             // In many web applications, it would be recommended to force window.reload()
-            // when this event occurs. Do do that, subscribe to the versionchange event
-            // and call window.location.reload(true);
+            // when this event occurs. To do that, subscribe to the versionchange event
+            // and call window.location.reload(true) if ev.newVersion > 0 (not a deletion)
             // The reason for this is that your current web app obviously has old schema code that needs
             // to be updated. Another window got a newer version of the app and needs to upgrade DB but
             // your window is blocking it unless we close it here.
+        });
+        db.on("blocked", ev => {
+            if (!ev.newVersion || ev.newVersion < ev.oldVersion)
+                console.warn(`Dexie.delete('${db.name}') was blocked`);
+            else
+                console.warn(`Upgrade '${db.name}' blocked by other connection holding version ${ev.oldVersion/10}`);
         });
     }
 
@@ -519,7 +532,7 @@ export default function Dexie(dbName, options) {
         isBeingOpened = true;
         db_is_blocked = true;
         return new Promise(function (resolve, reject) {
-            if (fake) resolve(db);
+            if (fake) resolve();
             var req, dbWasCreated = false;
             function openError(err) {
                 try { req.transaction.abort(); } catch (e) { }
@@ -545,9 +558,7 @@ export default function Dexie(dbName, options) {
                 req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
                 if (!req) throw new exceptions.MissingAPI("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
                 req.onerror = eventRejectHandler(openError, ["opening database", dbName]);
-                req.onblocked = function (ev) {
-                    db.on("blocked").fire(ev);
-                };
+                req.onblocked = fireOnBlocked;
                 req.onupgradeneeded = trycatch (function (e) {
                     if (autoSchema && !db._allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
                         // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
@@ -580,7 +591,10 @@ export default function Dexie(dbName, options) {
                         }
                     }
 
-                    idbdb.onversionchange = db.on("versionchange").fire; // Not firing it here, just setting the function callback to any registered subscriber.
+                    idbdb.onversionchange = ev=>{
+                        db._vcFired = true; // detect implementations that not support versionchange (IE/Edge/Safari)
+                        db.on("versionchange").fire(ev);
+                    }
                     if (!hasNativeGetDatabaseNames) {
                         // Update localStorage with list of database names
                         globalDatabaseList(function (databaseNames) {
@@ -610,17 +624,22 @@ export default function Dexie(dbName, options) {
                         function resume() {
                             db_is_blocked = false;
                             executePausedResumeables();
-                            resolve(db);
+                            resolve();
                         }
                     });
                 }, openError);
             } catch (err) {
                 openError(err);
             }
+        }).then(function (){
+            connections.push(db);
+            return db;
         });
     };
 
     this.close = function () {
+        let idx = connections.indexOf(db);
+        if (idx >= 0) connections.splice(idx, 1);
         if (idbdb) {
             idbdb.close();
             idbdb = null;
@@ -652,9 +671,7 @@ export default function Dexie(dbName, options) {
                     resolve();
                 };
                 req.onerror = eventRejectHandler(reject, ["deleting", dbName]);
-                req.onblocked = function() {
-                    db.on("blocked").fire();
-                };
+                req.onblocked = fireOnBlocked;
             }
             if (isBeingOpened) {
                 pausedResumeables.push({ resume: doDelete });
@@ -695,7 +712,7 @@ export default function Dexie(dbName, options) {
     //
     // Events
     //
-    this.on = Events(this, "error", "populate", "blocked", { "ready": [promisableChain, nop], "versionchange": [reverseStoppableEventChain, nop] });
+    this.on = Events(this, "error", "populate", { blocked: [reverseStoppableEventChain, nop], "ready": [promisableChain, nop], "versionchange": [reverseStoppableEventChain, nop] });
 
     // Handle on('ready') specifically: If DB is already open, trigger the event immediately. Also, default to unsubscribe immediately after being triggered.
     this.on.ready.subscribe = override(this.on.ready.subscribe, function (origSubscribe) {
@@ -2538,6 +2555,14 @@ export default function Dexie(dbName, options) {
         }
     }
 
+    function fireOnBlocked(ev) {
+        db.on("blocked").fire(ev);
+        // Workaround (not fully*) for missing "versionchange" event in IE,Edge and Safari:
+        connections
+            .filter(c=>c.name === db.name && c !== db && !c._vcFired)
+            .map(c => c.on("versionchange").fire(ev));
+    }
+
     extend(this, {
         Collection: Collection,
         Table: Table,
@@ -2875,6 +2900,7 @@ Dexie.addons = [];
 Dexie.fakeAutoComplete = fakeAutoComplete;
 Dexie.asap = asap;
 Dexie.maxKey = maxKey;
+Dexie.connections = connections;
 
 // Export Error classes
 extend(Dexie, fullNameExceptions); // Dexie.XXXError = class XXXError {...};
