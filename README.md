@@ -26,7 +26,9 @@ Dexie.js solves these limitations and provides a neat database API. Dexie.js aim
    // Declare Database
    //
    var db = new Dexie("FriendDatabase");
-   db.version(1).stores({ friends: "++id,name,age" });
+   db.version(1).stores({
+     friends: "++id,name,age"
+   });
    
    //
    // Manipulate and Query Database
