@@ -12,12 +12,16 @@ Start a root / admin shell and write:
 sudo npm install  (on windows, run "npm install" as admin in this directory)
 
 ## Build
+```
 npm run build
+```
 
 ## Run
+```
 npm install -g http-server
 http-server . -a localhost -p 8081
 Surf to http://localhost:8081/app.html
+```
 
 # The app
 The application stores a simple contact database using a relational database model, where each contact can have
