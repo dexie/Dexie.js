@@ -2267,8 +2267,10 @@ export default function Dexie(dbName, options) {
                 return this.reverse().firstKey(cb);
             },
 
-
             distinct: function () {
+                let ctx = this._ctx,
+                    idx = ctx.index && ctx.table.schema.idxByName[ctx.index];
+                if (!idx || !idx.multi) return this; // distinct() only makes differencies on multiEntry indexes.
                 var set = {};
                 addFilter(this._ctx, function (cursor) {
                     var strKey = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
@@ -2494,6 +2496,7 @@ export default function Dexie(dbName, options) {
                 // Clone collection and change its table and set a limit of CHUNKSIZE on the cloned Collection instance.
                 let collection = this
                     .clone({table: table, keysOnly: !hasDeleteHook})
+                    .distinct()
                     .limit(CHUNKSIZE);
 
                 let keysOrTuples = [];
