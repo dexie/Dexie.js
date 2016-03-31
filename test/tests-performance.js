@@ -31,7 +31,7 @@ spawnedTest("Collection.delete()", function* () {
         storage: "id",
     });
 
-    const MAX = 10000;
+    const MAX = 100000;
     var data = [];
     for(let i = 0; i<MAX; i++) {
         data.push({id: i});

@@ -1197,14 +1197,19 @@ export default function Dexie(dbName, options) {
 
                         miniTryCatch(() => {
                             for (var i=0, l = objects.length; i < l; ++i) {
+                                var key = keys && keys[i];
                                 var obj = objects[i],
-                                    effectiveKey = keys ? keys[i] : getByKeyPath(obj, keyPath),
+                                    effectiveKey = keys ? key : keyPath ? getByKeyPath(obj, keyPath) : undefined,
                                     keyToUse = creatingHook.call(hookCtx, effectiveKey, obj, trans);
-                                if (keyPath && effectiveKey === undefined && keyToUse !== undefined) {
-                                    obj = deepClone(obj);
-                                    setByKeyPath(obj, keyPath, keyToUse);
+                                if (effectiveKey == null && keyToUse != null) {
+                                    if (keyPath) {
+                                        obj = deepClone(obj);
+                                        setByKeyPath(obj, keyPath, keyToUse);
+                                    } else {
+                                        key = keyToUse;
+                                    }
                                 }
-                                req = keys ? idbstore.add(obj, effectiveKey) : idbstore.add(obj);
+                                req = key != null ? idbstore.add(obj, key) : idbstore.add(obj);
                                 if (hookCtx.onerror) req._err = hookCtx.onerror;
                                 if (hookCtx.onsuccess) req._suc = hookCtx.onsuccess;
                                 if (i < l - 1) {
@@ -1250,16 +1255,16 @@ export default function Dexie(dbName, options) {
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
                     var thisCtx = {onsuccess:null, onerror:null};
                     if (creatingHook !== nop) {
-                        var effectiveKey = (key !== undefined) ? key : (idbstore.keyPath ? getByKeyPath(obj, idbstore.keyPath) : undefined);
+                        var effectiveKey = (key != null) ? key : (idbstore.keyPath ? getByKeyPath(obj, idbstore.keyPath) : undefined);
                         var keyToUse = creatingHook.call(thisCtx, effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
-                        if (effectiveKey === undefined && keyToUse !== undefined) {
+                        if (effectiveKey == null && keyToUse != null) { // Using "==" and "!=" to check for either null or undefined!
                             if (idbstore.keyPath)
                                 setByKeyPath(obj, idbstore.keyPath, keyToUse);
                             else
                                 key = keyToUse;
                         }
                     }
-                    var req = key !== undefined ? idbstore.add(obj, key) : idbstore.add(obj);
+                    var req = key != null ? idbstore.add(obj, key) : idbstore.add(obj);
                     req.onerror = eventRejectHandler(function (e) {
                         if (thisCtx.onerror)
                             Promise.newPSD(function () {
@@ -1298,7 +1303,7 @@ export default function Dexie(dbName, options) {
                     return this._trans(READWRITE, function (resolve, reject, trans) {
                         // Since key is optional, make sure we get it from obj if not provided
                         var effectiveKey = (key !== undefined) ? key : (self.schema.primKey.keyPath && getByKeyPath(obj, self.schema.primKey.keyPath));
-                        if (effectiveKey === undefined) {
+                        if (effectiveKey == null) { // "== null" means checking for either null or undefined.
                             // No primary key. Must use add().
                             trans.tables[self.name].add(obj).then(resolve, reject);
                         } else {
