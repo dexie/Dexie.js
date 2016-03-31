@@ -36,20 +36,16 @@ spawnedTest("Collection.delete()", function* () {
     for(let i = 0; i<MAX; i++) {
         data.push({id: i});
     }
-    function insertData() {
-        return db.transaction("rw", [db.storage], () => {
-            data.forEach(d => db.storage.put(d));
-        });
-    };
 
     try {
         log("Deleting db");
         yield db.delete();
         log("Inserting data:");
-        yield insertData();
+        yield db.storage.bulkAdd(data);
         log("done. Deleting data with dexie");
         yield db.storage.where("id").between(100, MAX - 100).delete();
         log("done");
+        equal (yield db.storage.count(), 200, "Should be just 200 items left now after deletion");
     } catch (e) {
         ok(false, "Uh oh ERROR: " + e);
     } finally {

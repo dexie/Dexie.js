@@ -1124,15 +1124,16 @@ export default function Dexie(dbName, options) {
         };
     }
 
-    function bulkDelete(idbstore, trans, keys, hasDeleteHook, deletingHook) {
+    function bulkDelete(idbstore, trans, keysOrTuples, hasDeleteHook, deletingHook) {
+        // If hasDeleteHook, keysOrTuples must be an array of tuples: [[key1, value2],[key2,value2],...],
+        // else keysOrTuples must be just an array of keys: [key1, key2, ...].
         return new Promise((resolve, reject)=>{
-            // bulkDelete all found primaryKeys
-            var len = keys.length,
+            var len = keysOrTuples.length,
                 lastItem = len - 1;
             if (len === 0) return resolve();
             if (!hasDeleteHook) {
                 for (var i=0; i < len; ++i) {
-                    var req = idbstore.delete(keys[i]);
+                    var req = idbstore.delete(keysOrTuples[i]);
                     req.onerror = ev => reject(ev.target.error);
                     if (i === lastItem) req.onsuccess = ()=>resolve();
                 }
@@ -1142,9 +1143,9 @@ export default function Dexie(dbName, options) {
                     successHandler = BulkSuccessHandler(null, true);
                 miniTryCatch(()=> {
                     for (var i = 0; i < len; ++i) {
-                        var tuple = keys[i];
-                        deletingHook.call(hookCtx, tuple.key, tuple.value, trans);
-                        var req = idbstore.delete(tuple.key);
+                        let tuple = keysOrTuples[i];
+                        deletingHook.call(hookCtx, tuple[0], tuple[1], trans);
+                        var req = idbstore.delete(tuple[0]);
                         if (hookCtx.onerror) req._err = hookCtx.onerror;
                         if (hookCtx.onsuccess) req._suc = hookCtx.onsuccess;
                         req.onerror = errorHandler;
@@ -2477,43 +2478,51 @@ export default function Dexie(dbName, options) {
                 });
             }
 
-            // Default version to use when collection is not a vanilla KeyRange on the primary key.
-            // Divide into chunks to not starve browser. Also if called without transaction,
-            // this will divide the deletes in separate transactions so that we give some air to
-            // other database operations during a long running delete.
-            // If called without transaction, we could use a quite small chunk size so that other db operations
-            // get some air every now and then. If within a transaction, transaction will be locked during the
-            // entire operation anyway so we could use a quite high chunk size. Just not so high so that the
-            // browser could hang or memory usage goes wild.
-            const chunkSize = Dexie.currentTransaction ? 10000 : 1000; // If in transaction, use a larger chunk
-            let totalCount = 0;
-            let collection = this.clone().limit(chunkSize);
-            const nextChunk = () => this._write((resolve, reject, idbstore, trans) => {
-                let keys = [];
+            // Default version to use when collection is not a vanilla IDBKeyRange on the primary key.
+            // Divide into chunks to not starve RAM.
+            // If has delete hook, we will have to collect not just keys but also objects, so it will use
+            // more memory and need lower chunk size.
+            const CHUNKSIZE = hasDeleteHook ? 2000 : 10000;
+
+            return this._write((resolve, reject, idbstore, trans) => {
+                let totalCount = 0;
+                // Clone table and change the way transaction promises are generated.
+                // This is to be able to call other Collection methods within the same
+                // transaction even if the caller calls us without a transaction.
                 let table = Object.create(ctx.table);
                 table._tpf = trans._tpf; // Enable us to keep same transaction even if called without transaction.
-                let coll = collection.clone({table: table});
-                (!hasDeleteHook ? coll.eachKey((key, cursor) => {
-                    // Collect all primary keys
-                    keys.push(cursor.primaryKey);
-                }) : coll.each((value, cursor) => {
-                    // Collect primary keys and values (to call hook with)
-                    keys.push({key: cursor.primaryKey, value: value});
-                })).then(() => {
+                // Clone collection and change its table and set a limit of CHUNKSIZE on the cloned Collection instance.
+                let collection = this
+                    .clone({table: table, keysOnly: !hasDeleteHook})
+                    .limit(CHUNKSIZE);
+
+                let keysOrTuples = [];
+
+                // We're gonna do things on as many chunks that are needed.
+                // Use recursion of nextChunk function:
+                const nextChunk = () => collection.each(hasDeleteHook ? (val, cursor) => {
+                    // Somebody subscribes to hook('deleting'). Collect all primary keys and their values,
+                    // so that the hook can be called with its values in bulkDelete().
+                    keysOrTuples.push([cursor.primaryKey, cursor.value])
+                } : (val, cursor) => {
+                    // No one subscribes to hook('deleting'). Collect only primary keys:
+                    keysOrTuples.push(cursor.primaryKey);
+                }).then(() => {
                     // Chromium deletes faster when doing it in sort order.
                     hasDeleteHook ?
-                        keys.sort((a, b)=>ascending(a.key, b.key)) :
-                        keys.sort(ascending);
-                    return bulkDelete(idbstore, trans, keys, hasDeleteHook, deletingHook);
-                }).then(()=> {
-                    return keys.length;}, reject
-                ).then(resolve, reject);
-            }).then(count => {
-                totalCount += count;
-                return count < chunkSize ? count :  nextChunk();
-            });
+                        keysOrTuples.sort((a, b)=>ascending(a[0], b[0])) :
+                        keysOrTuples.sort(ascending);
+                    return bulkDelete(idbstore, trans, keysOrTuples, hasDeleteHook, deletingHook);
 
-            return nextChunk().then(()=>totalCount);
+                }).then(()=> {
+                    let count = keysOrTuples.length;
+                    totalCount += count;
+                    keysOrTuples = [];
+                    return count < CHUNKSIZE ? totalCount : nextChunk();
+                });
+
+                resolve (nextChunk());
+            });
         }
     });
 
