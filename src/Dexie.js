@@ -54,7 +54,10 @@ var maxString = String.fromCharCode(65535),
     maxKey = (function(){try {IDBKeyRange.only([[]]);return [[]];}catch(e){return maxString;}})(),
     INVALID_KEY_ARGUMENT = "Invalid key provided. Keys must be of type string, number, Date or Array<string | number | Date>.",
     STRING_EXPECTED = "String expected.",
-    connections = [];
+    connections = [],
+    isIEOrEdge = typeof navigator !== 'undefined' && /(MSIE|Trident|Edge)/.test(navigator.userAgent),
+    hasIEDeleteObjectStoreBug = isIEOrEdge,
+    hangsOnDeleteLargeKeyRange = isIEOrEdge;
 
 export default function Dexie(dbName, options) {
     /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
@@ -307,7 +310,7 @@ export default function Dexie(dbName, options) {
                             if (uncompletedRequests === 0) cb(); // contentUpgrade() didnt call any db operations at all.
                         });
                     }
-                    if (!anyContentUpgraderHasRun || !hasIEDeleteObjectStoreBug()) { // Dont delete old tables if ieBug is present and a content upgrader has run. Let tables be left in DB so far. This needs to be taken care of.
+                    if (!anyContentUpgraderHasRun || hasIEDeleteObjectStoreBug) { // Dont delete old tables if ieBug is present and a content upgrader has run. Let tables be left in DB so far. This needs to be taken care of.
                         queue.push(function (idbtrans, cb) {
                             // Delete old tables
                             deleteRemovedTables(newSchema, idbtrans);
@@ -1074,41 +1077,103 @@ export default function Dexie(dbName, options) {
         Table.call(this, name, transactionPromiseFactory, tableSchema, collClass || WriteableCollection);
     }
 
-    derive(WriteableTable).from(Table).extend(function () {
-
-        function BulkErrorHandler(errorList, done, hookCtx, transaction) {
-            return function(ev) {
+    function BulkErrorHandlerCatchAll(errorList, done) {
+        let psd = Promise.PSD;
+        return function(ev) {
+            try {
                 if (ev.stopPropagation) ev.stopPropagation();
                 if (ev.preventDefault) ev.preventDefault();
-                errorList.push(ev.target.error);
-                if (hookCtx && hookCtx.onerror) {
-                    Promise.newPSD(function () {
-                        Promise.PSD.trans = transaction;
-                        hookCtx.onerror(ev.target.error);
-                    });
+                let err = ev.target.error;
+                errorList.push(err);
+                if (ev.target._err) {
+                    Promise.usePSD(psd, ev.target._err.bind(null, err));
                 }
-                if (done) done(); // Only done in last request.
+            } finally {
+                if (done) done();
             }
         }
+    }
 
-        function BulkSuccessHandler(done, hookCtx, transaction) {
-            return hookCtx ? function(ev) {
-                hookCtx.onsuccess && Promise.newPSD(function () {
-                    Promise.PSD.trans = transaction;
-                    hookCtx.onsuccess(ev.target.result);
-                });
-                if (done) done(ev.target.result);
-            } : function(ev) {
-                done(ev.target.result);
-            };
+    function BulkErrorHandler(done) {
+        let psd = Promise.PSD;
+        return function(ev) {
+            let err;
+            try {
+                err = ev.target.error;
+                if (ev.target._err) {
+                    Promise.usePSD(psd, ev.target._err.bind(null, err));
+                }
+            } finally {
+                done(err);
+            }
         }
+    }
+
+    function BulkSuccessHandler(done, hookListener) {
+        let psd = Promise.PSD;
+        return hookListener ? function(ev) {
+            let res;
+            try {
+                res = ev.target.result;
+                ev.target._suc && Promise.usePSD(psd, ev.target._suc.bind(null, res));
+            } finally {
+                if (done) done(res);
+            }
+        } : function(ev) {
+            done(ev.target.result);
+        };
+    }
+
+    function bulkDelete(idbstore, trans, keys, hasDeleteHook, deletingHook) {
+        return new Promise((resolve, reject)=>{
+            // bulkDelete all found primaryKeys
+            var len = keys.length,
+                lastItem = len - 1;
+            if (len === 0) return resolve();
+            if (!hasDeleteHook) {
+                for (var i=0; i < len; ++i) {
+                    var req = idbstore.delete(keys[i]);
+                    req.onerror = ev => reject(ev.target.error);
+                    if (i === lastItem) req.onsuccess = ()=>resolve();
+                }
+            } else {
+                let hookCtx = {onsuccess: null, onerror: null},
+                    errorHandler = BulkErrorHandler(reject),
+                    successHandler = BulkSuccessHandler(null, true);
+                miniTryCatch(()=> {
+                    for (var i = 0; i < len; ++i) {
+                        var tuple = keys[i];
+                        deletingHook.call(hookCtx, tuple.key, tuple.value, trans);
+                        var req = idbstore.delete(tuple.key);
+                        if (hookCtx.onerror) req._err = hookCtx.onerror;
+                        if (hookCtx.onsuccess) req._suc = hookCtx.onsuccess;
+                        req.onerror = errorHandler;
+                        if (i === lastItem)
+                            req.onsuccess = BulkSuccessHandler(resolve, true);
+                        else
+                            req.onsuccess = successHandler;
+                        hookCtx.onsuccess = null;
+                        hookCtx.onerror = null;
+                    }
+                }, err=>{
+                    hookCtx.onerror && hookCtx.onerror(err);
+                    throw err;
+                });
+            }
+        });
+    }
+
+    derive(WriteableTable).from(Table).extend(function () {
 
         return {
-            bulkAdd: function(objects) {
+            bulkAdd: function(objects, keys) {
                 var self = this,
                     creatingHook = this.hook.creating.fire;
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
-                    if (!idbstore.keyPath && !self.schema.primKey.auto) throw new exceptions.Unsupported("bulkAdd() only support inbound keys");
+                    if (!idbstore.keyPath && !self.schema.primKey.auto && !keys)
+                        throw new exceptions.InvalidArgument("bulkAdd() with non-inbound keys requires keys array in second argument");
+                    if (idbstore.keyPath && keys)
+                        throw new exceptions.InvalidArgument("bulkAdd(): keys argument invalid on tables with inbound keys");
                     if (objects.length === 0) return resolve(); // Caller provided empty list.
                     function done(result) {
                         if (errorList.length === 0) resolve(result);
@@ -1126,41 +1191,49 @@ export default function Dexie(dbName, options) {
                         //
                         var keyPath = idbstore.keyPath,
                             hookCtx = { onerror: null, onsuccess: null };
-                        errorHandler = BulkErrorHandler(errorList, null, hookCtx, trans);
-                        successHandler = BulkSuccessHandler(null, hookCtx, trans);
-                        for (var i = 0, l = objects.length; i < l; ++i) {
-                            var obj = objects[i],
-                                effectiveKey = getByKeyPath(obj, keyPath),
-                                keyToUse = creatingHook.call(hookCtx, effectiveKey, obj, trans);
-                            if (effectiveKey === undefined && keyToUse !== undefined) {
-                                obj = deepClone(obj);
-                                setByKeyPath(obj, keyPath, keyToUse);
-                            }
+                        errorHandler = BulkErrorHandlerCatchAll(errorList, null);
+                        successHandler = BulkSuccessHandler(null, true);
 
-                            req = idbstore.add(obj);
-                            if (i < l - 1) {
-                                req.onerror = errorHandler;
-                                if (hookCtx.onsuccess)
-                                    req.onsuccess = successHandler;
-                                // Reset event listeners for next iteration.
-                                hookCtx.onerror = null;
-                                hookCtx.onsuccess = null;
+                        miniTryCatch(() => {
+                            for (var i=0, l = objects.length; i < l; ++i) {
+                                var obj = objects[i],
+                                    effectiveKey = keys ? keys[i] : getByKeyPath(obj, keyPath),
+                                    keyToUse = creatingHook.call(hookCtx, effectiveKey, obj, trans);
+                                if (keyPath && effectiveKey === undefined && keyToUse !== undefined) {
+                                    obj = deepClone(obj);
+                                    setByKeyPath(obj, keyPath, keyToUse);
+                                }
+                                req = keys ? idbstore.add(obj, effectiveKey) : idbstore.add(obj);
+                                if (hookCtx.onerror) req._err = hookCtx.onerror;
+                                if (hookCtx.onsuccess) req._suc = hookCtx.onsuccess;
+                                if (i < l - 1) {
+                                    req.onerror = errorHandler;
+                                    if (hookCtx.onsuccess)
+                                        req.onsuccess = successHandler;
+                                    // Reset event listeners for next iteration.
+                                    hookCtx.onerror = null;
+                                    hookCtx.onsuccess = null;
+                                }
                             }
-                        }
-                        req.onerror = BulkErrorHandler(errorList, done, hookCtx, trans);
-                        req.onsuccess = BulkSuccessHandler(done, hookCtx, trans);
+                        }, err => {
+                            hookCtx.onerror && hookCtx.onerror(e);
+                            throw err;
+                        });
+
+                        req.onerror = BulkErrorHandlerCatchAll(errorList, done);
+                        req.onsuccess = BulkSuccessHandler(done, true);
                     } else {
                         //
                         // Standard Bulk (no 'creating' hook to care about)
                         //
-                        errorHandler = BulkErrorHandler(errorList);
+                        errorHandler = BulkErrorHandlerCatchAll(errorList);
                         for (var i = 0, l = objects.length; i < l; ++i) {
-                            req = idbstore.add(objects[i]);
+                            req = keys ? idbstore.add(objects[i], keys[i]) : idbstore.add(objects[i]);
                             req.onerror = errorHandler;
                         }
                         // Only need to catch success or error on the last operation
                         // according to the IDB spec.
-                        req.onerror = BulkErrorHandler(errorList, done);
+                        req.onerror = BulkErrorHandlerCatchAll(errorList, done);
                         req.onsuccess = BulkSuccessHandler(done);
                     }
                 });
@@ -1888,11 +1961,12 @@ export default function Dexie(dbName, options) {
             index: whereCtx.index,
             isPrimKey: (!whereCtx.index || (whereCtx.table.schema.primKey.keyPath && whereCtx.index === whereCtx.table.schema.primKey.name)),
             range: keyRange,
-            op: "openCursor",
+            keysOnly: false,
             dir: "next",
             unique: "",
             algorithm: null,
             filter: null,
+            replayFilter: null,
             isMatch: null,
             offset: 0,
             limit: Infinity,
@@ -1911,6 +1985,11 @@ export default function Dexie(dbName, options) {
             ctx.filter = combine(ctx.filter, fn);
         }
 
+        function addReplayFilter (ctx, factory) {
+            let curr = ctx.replayFilter;
+            ctx.replayFilter = curr ? ()=>combine(curr(), factory()) : factory;
+        }
+
         function addMatchFilter(ctx, fn) {
             ctx.isMatch = combine(ctx.isMatch, fn);
         }
@@ -1923,15 +2002,18 @@ export default function Dexie(dbName, options) {
         }
 
         function openCursor(ctx, store) {
-            return getIndexOrStore(ctx, store)[ctx.op](ctx.range || null, ctx.dir + ctx.unique);
+            let idxOrStore = getIndexOrStore(ctx, store);
+            return ctx.keysOnly && 'openKeyCursor' in idxOrStore ?
+                idxOrStore.openKeyCursor(ctx.range || null, ctx.dir + ctx.unique) :
+                idxOrStore.openCursor(ctx.range || null, ctx.dir + ctx.unique);
         }
 
         function iter(ctx, fn, resolve, reject, idbstore) {
+            let filter = ctx.replayFilter ? combine(ctx.filter, ctx.replayFilter()) : ctx.filter;
             if (!ctx.or) {
-                iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, ctx.filter), fn, resolve, reject, ctx.table.hook.reading.fire);
+                iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, ctx.table.hook.reading.fire);
             } else {
                 (function () {
-                    var filter = ctx.filter;
                     var set = {};
                     var resolved = 0;
 
@@ -1988,6 +2070,14 @@ export default function Dexie(dbName, options) {
                 return iter(this._ctx, fn, resolve, reject, idbstore);
             },
 
+            clone: function (props) {
+                let rv = Object.create(this.constructor.prototype),
+                    ctx = Object.create(this._ctx);
+                if (props) extend(ctx, props);
+                rv._ctx = ctx;
+                return rv;
+            },
+
             //
             // Collection Public methods
             //
@@ -2007,7 +2097,7 @@ export default function Dexie(dbName, options) {
                 var self = this,
                     ctx = this._ctx;
 
-                if (ctx.filter || ctx.algorithm || ctx.or) {
+                if (ctx.filter || ctx.algorithm || ctx.or || ctx.replayFilter) {
                     // When filters are applied or 'ored' collections are used, we must count manually
                     var count = 0;
                     return this._read(function (resolve, reject, idbstore) {
@@ -2020,7 +2110,7 @@ export default function Dexie(dbName, options) {
                         var req = (ctx.range ? idx.count(ctx.range) : idx.count());
                         req.onerror = eventRejectHandler(reject, ["calling", "count()", "on", self.name]);
                         req.onsuccess = function (e) {
-                            resolve(Math.min(e.target.result, Math.max(0, ctx.limit - ctx.offset)));
+                            resolve(e.target.result);
                         };
                     }, cb);
                 }
@@ -2062,16 +2152,20 @@ export default function Dexie(dbName, options) {
                 var ctx = this._ctx;
                 if (offset <= 0) return this;
                 ctx.offset += offset; // For count()
-                if (!ctx.or && !ctx.algorithm && !ctx.filter) {
-                    addFilter(ctx, function offsetFilter(cursor, advance, resolve) {
-                        if (offset === 0) return true;
-                        if (offset === 1) { --offset; return false; }
-                        advance(function () { cursor.advance(offset); offset = 0; });
-                        return false;
+                if (!ctx.or && !ctx.algorithm && !ctx.filter && !ctx.replayFilter) {
+                    addReplayFilter(ctx, ()=> {
+                        let offsetLeft = offset;
+                        return function offsetFilter(cursor, advance, resolve) {
+                            if (offsetLeft === 0) return true;
+                            if (offsetLeft === 1) { --offsetLeft; return false; }
+                            advance(function () { cursor.advance(offsetLeft); offsetLeft = 0; });
+                            return false;
+                        };
                     });
                 } else {
-                    addFilter(ctx, function offsetFilter(cursor, advance, resolve) {
-                        return (--offset < 0);
+                    addReplayFilter(ctx, ()=> {
+                        let offsetLeft = offset;
+                        return () => (--offsetLeft < 0);
                     });
                 }
                 return this;
@@ -2079,9 +2173,12 @@ export default function Dexie(dbName, options) {
 
             limit: function (numRows) {
                 this._ctx.limit = Math.min(this._ctx.limit, numRows); // For count()
-                addFilter(this._ctx, function (cursor, advance, resolve) {
-                    if (--numRows <= 0) advance(resolve); // Stop after this item has been included
-                    return numRows >= 0; // If numRows is already below 0, return false because then 0 was passed to numRows initially. Otherwise we wouldnt come here.
+                addReplayFilter(this._ctx, ()=> {
+                    let rowsLeft = numRows;
+                    return function (cursor, advance, resolve) {
+                        if (--rowsLeft <= 0) advance(resolve); // Stop after this item has been included
+                        return rowsLeft >= 0; // If numRows is already below 0, return false because then 0 was passed to numRows initially. Otherwise we wouldnt come here.
+                    };
                 });
                 return this;
             },
@@ -2135,7 +2232,7 @@ export default function Dexie(dbName, options) {
             eachKey: function (cb) {
                 var ctx = this._ctx;
                 fake && cb(getByKeyPath(getInstanceTemplate(this._ctx), this._ctx.index ? this._ctx.table.schema.idxByName[this._ctx.index].keyPath : this._ctx.table.schema.primKey.keyPath));
-                if (!ctx.isPrimKey) ctx.op = "openKeyCursor"; // Need the check because IDBObjectStore does not have "openKeyCursor()" while IDBIndex has.
+                ctx.keysOnly = true;
                 return this.each(function (val, cursor) { cb(cursor.key, cursor); });
             },
 
@@ -2146,7 +2243,7 @@ export default function Dexie(dbName, options) {
 
             keys: function (cb) {
                 var ctx = this._ctx;
-                if (!ctx.isPrimKey) ctx.op = "openKeyCursor"; // Need the check because IDBObjectStore does not have "openKeyCursor()" while IDBIndex has.
+                ctx.keysOnly = true;
                 var a = [];
                 if (fake) return new Promise(this.eachKey.bind(this)).then(function(x) { return [x]; }).then(cb);
                 return this.each(function (item, cursor) {
@@ -2350,10 +2447,20 @@ export default function Dexie(dbName, options) {
 
         'delete': function () {
             let ctx = this._ctx,
-                range = ctx.range;
-            if ((!range || ctx.isPrimKey) && ctx.table.hook.deleting.fire === nop && !ctx.or && !ctx.algorithm && !ctx.filter) {
+                range = ctx.range,
+                deletingHook = ctx.table.hook.deleting.fire,
+                hasDeleteHook = deletingHook !== nop;
+            if (!hasDeleteHook &&
+                !ctx.or &&
+                !ctx.algorithm &&
+                !ctx.filter &&
+                !ctx.replayFilter &&
+                ((ctx.isPrimKey && !hangsOnDeleteLargeKeyRange) || !range)) // if no range, we'll use clear().
+            {
                 // May use IDBObjectStore.delete(IDBKeyRange) in this case (Issue #208)
-
+                // For chromium, this is the way most optimized version.
+                // For IE/Edge, this could hang the indexedDB engine and make operating system instable
+                // (https://gist.github.com/dfahlander/5a39328f029de18222cf2125d56c38f7)
                 return this._write((resolve, reject, idbstore) => {
                     // Our API contract is to return a count of deleted items, so we have to count() before delete().
                     let onerror = eventRejectHandler(reject, ["deleting range from", ctx.table.name]);
@@ -2369,7 +2476,44 @@ export default function Dexie(dbName, options) {
                     };
                 });
             }
-            return this.modify(function () { delete this.value; });
+
+            // Default version to use when collection is not a vanilla KeyRange on the primary key.
+            // Divide into chunks to not starve browser. Also if called without transaction,
+            // this will divide the deletes in separate transactions so that we give some air to
+            // other database operations during a long running delete.
+            // If called without transaction, we could use a quite small chunk size so that other db operations
+            // get some air every now and then. If within a transaction, transaction will be locked during the
+            // entire operation anyway so we could use a quite high chunk size. Just not so high so that the
+            // browser could hang or memory usage goes wild.
+            const chunkSize = Dexie.currentTransaction ? 10000 : 1000; // If in transaction, use a larger chunk
+            let totalCount = 0;
+            let collection = this.clone().limit(chunkSize);
+            const nextChunk = () => this._write((resolve, reject, idbstore, trans) => {
+                let keys = [];
+                let table = Object.create(ctx.table);
+                table._tpf = trans._tpf; // Enable us to keep same transaction even if called without transaction.
+                let coll = collection.clone({table: table});
+                (!hasDeleteHook ? coll.eachKey((key, cursor) => {
+                    // Collect all primary keys
+                    keys.push(cursor.primaryKey);
+                }) : coll.each((value, cursor) => {
+                    // Collect primary keys and values (to call hook with)
+                    keys.push({key: cursor.primaryKey, value: value});
+                })).then(() => {
+                    // Chromium deletes faster when doing it in sort order.
+                    hasDeleteHook ?
+                        keys.sort((a, b)=>ascending(a.key, b.key)) :
+                        keys.sort(ascending);
+                    return bulkDelete(idbstore, trans, keys, hasDeleteHook, deletingHook);
+                }).then(()=> {
+                    return keys.length;}, reject
+                ).then(resolve, reject);
+            }).then(count => {
+                totalCount += count;
+                return count < chunkSize ? count :  nextChunk();
+            });
+
+            return nextChunk().then(()=>totalCount);
         }
     });
 
@@ -2420,7 +2564,6 @@ export default function Dexie(dbName, options) {
     }
 
     function iterate(req, filter, fn, resolve, reject, readingHook) {
-        var psd = Promise.PSD;
         readingHook = readingHook || mirror;
         if (!req.onerror) req.onerror = eventRejectHandler(reject);
         if (filter) {
@@ -2434,7 +2577,7 @@ export default function Dexie(dbName, options) {
                 } else {
                     resolve();
                 }
-            }, reject, psd);
+            }, reject);
         } else {
             req.onsuccess = trycatch(function filter_record(e) {
                 var cursor = req.result;
@@ -2445,7 +2588,7 @@ export default function Dexie(dbName, options) {
                 } else {
                     resolve();
                 }
-            }, reject, psd);
+            }, reject);
         }
     }
 
@@ -2500,13 +2643,11 @@ export default function Dexie(dbName, options) {
     }
 
     function combine(filter1, filter2) {
-        return filter1 ? filter2 ? function () { return filter1.apply(this, arguments) && filter2.apply(this, arguments); } : filter1 : filter2;
-    }
-
-    function hasIEDeleteObjectStoreBug() {
-        // Assume bug is present in IE10, IE11 and Edge
-        return typeof navigator !== 'undefined' &&
-            /(MSIE|Trident|Edge)/.test(navigator.userAgent);
+        return filter1 ?
+            filter2 ?
+                function () { return filter1.apply(this, arguments) && filter2.apply(this, arguments); } :
+                filter1 :
+            filter2;
     }
 
     function readGlobalSchema() {
@@ -2583,7 +2724,8 @@ export default function Dexie(dbName, options) {
 var fakeAutoComplete = function () { };// Will never be changed. We just fake for the IDE that we change it (see doFakeAutoComplete())
 var fake = false; // Will never be changed. We just fake for the IDE that we change it (see doFakeAutoComplete())
 
-function trycatch(fn, reject, psd) {
+function trycatch(fn, reject) {
+    var psd = Promise.PSD;
     return function () {
         var outerPSD = Promise.PSD; // Support Promise-specific data (PSD) in callback calls
         Promise.PSD = psd;

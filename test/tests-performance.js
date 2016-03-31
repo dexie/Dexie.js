@@ -1,5 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
+import {spawnedTest} from './dexie-unittest-utils';
 
 module("performance", {
     setup: function () {
@@ -12,6 +13,47 @@ module("performance", {
         }).finally(function () {
             start();
         });
+    }
+});
+
+var tick = 0,lastPerf=false;
+function log(txt, noPerf) {
+    let logstr = (tick && lastPerf ? "took " + (Date.now()-tick) + "ms\n" :"") + txt + (noPerf?"\n":"... ");
+    ok(true, logstr);
+    tick = Date.now();
+    lastPerf = !noPerf;
+}
+
+spawnedTest("Collection.delete()", function* () {
+    const db = new Dexie("dedatabase");
+    const Promise = Dexie.Promise;
+    db.version(1).stores({
+        storage: "id",
+    });
+
+    const MAX = 10000;
+    var data = [];
+    for(let i = 0; i<MAX; i++) {
+        data.push({id: i});
+    }
+    function insertData() {
+        return db.transaction("rw", [db.storage], () => {
+            data.forEach(d => db.storage.put(d));
+        });
+    };
+
+    try {
+        log("Deleting db");
+        yield db.delete();
+        log("Inserting data:");
+        yield insertData();
+        log("done. Deleting data with dexie");
+        yield db.storage.where("id").between(100, MAX - 100).delete();
+        log("done");
+    } catch (e) {
+        ok(false, "Uh oh ERROR: " + e);
+    } finally {
+        yield db.delete();
     }
 });
 

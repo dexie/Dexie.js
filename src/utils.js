@@ -178,3 +178,11 @@ export function getObjectDiff(a, b) {
     }
     return rv;
 }
+
+export function idbp(idbOperation) {
+    return new Promise((resolve,reject) => {
+        let req = idbOperation();
+        req.onerror = reject;
+        req.onsuccess = resolve;
+    });
+}

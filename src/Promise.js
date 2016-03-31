@@ -349,6 +349,16 @@ Promise.newPSD = function (fn) {
     }
 };
 
+Promise.usePSD = function (psd, fn) {
+    var outerScope = Promise.PSD;
+    Promise.PSD = psd;
+    try {
+        return fn();
+    } finally {
+        Promise.PSD = outerScope;
+    }
+}
+
 Promise._rootExec = _rootExec;
 Promise._tickFinalize = function(callback) {
     if (isRootExecution) throw new Error("Not in a virtual tick");
