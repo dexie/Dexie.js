@@ -297,6 +297,7 @@ declare module Dexie {
 
     interface Collection<T, Key> {
         and(filter: (x: T) => boolean): Collection<T, Key>;
+        clone(props?: Object): Collection<T, Key>;
         count(): Promise<number>;
         count<U>(onFulfilled: (value: number) => Thenable<U>): Promise<U>;
         count<U>(onFulfilled: (value: number) => U): Promise<U>;
@@ -316,6 +317,7 @@ declare module Dexie {
         limit(n: number): Collection<T, Key>;
         offset(n: number): Collection<T, Key>;
         or(indexOrPrimayKey: string): WhereClause<T, Key>;
+        raw(): Collection<T, Key>;
         reverse(): Collection<T, Key>;
         sortBy(keyPath: string): Promise<T[]>;
         sortBy<U>(keyPath: string, onFulfilled: (value: T[]) => Thenable<U>): Promise<U>;
