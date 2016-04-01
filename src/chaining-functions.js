@@ -1,3 +1,5 @@
+import {extend} from './utils';
+
 export function nop() { }
 export function mirror(val) { return val; }
 export function pureFunctionChain(f1, f2) {

@@ -141,8 +141,8 @@ function updating1 (modifications, primKey, obj, transaction) {
     let op = {
         op: "update",
         key: primKey,
+        obj: Dexie.deepClone(obj),
         mods: Dexie.shallowClone(modifications),
-        value: Dexie.deepClone(obj)
     };
     opLog.push(op);
 
@@ -167,8 +167,8 @@ function updating2 (modifications, primKey, obj, transaction) {
     let op = {
         op: "update",
         key: primKey,
-        mods: Dexie.shallowClone(modifications),
-        value: Dexie.deepClone(obj)
+        obj: Dexie.deepClone(obj),
+        mods: Dexie.shallowClone(modifications)
     };
     opLog2.push(op);
 
@@ -281,8 +281,15 @@ const expect = async (function* (expected, modifyer) {
         yield modifyer();
         expected.forEach((x, i) => {
            if (x.op === "update") {
-               ok("someProp.someSubProp" in opLog2[i].modifications, "oplog2 got first hook's modifications");
-               equal(opLog2[i].value.someProp.someSubProp, "someValue", "oplog2 got first hook's mods into its value");
+               equal(
+                   JSON.stringify(opLog[i].obj),
+                   JSON.stringify(opLog2[i].obj),
+                   "Object has not yet been changed in hook2");
+               ok(Object.keys(opLog[i].mods).every(prop =>
+                    JSON.stringify(opLog[i].mods[prop]) ===
+                    JSON.stringify(opLog2[i].mods[prop])),
+                   "All mods that were originally sent to hook1, are also sent to hook2");
+               ok("someProp.someSubProp" in opLog2[i].mods, "oplog2 got first hook's additional modifications");
            }
         });
     }
@@ -310,11 +317,15 @@ const verifyErrorFlows = async (function* (modifyer) {
 //
 //
 
+//
+// CREATING hook tests...
+//
+// Ways to produce CREATEs:
+//  Table.add()
+//  Table.put()
+//  Table.bulkAdd()
+//
 spawnedTest("creating using Table.add()", function*() {
-    // Ways to produce CREATEs:
-    //  Table.add()
-    //  Table.put()
-    //  Table.bulkAdd()
 
     yield expect([{
         op: "create",
@@ -416,7 +427,7 @@ spawnedTest("creating using Table.bulkAdd()", function*(){
     },{
         op: "create",
         value: {idx: 14.2}
-    }], () => db.transaction('rw', db.tables, ()=> {
+    }], () => db.transaction('rw', db.tables, function* () {
         db.table1.bulkAdd([{id: 1, idx: 11},{id: 1.2, idx: 11.2}]);
         db.table2.bulkAdd([{idx: 12},{idx: 12.2}], [2, 2.2]);
         db.table3.bulkAdd([{idx: 13},{idx: 13.2}]);
@@ -432,11 +443,34 @@ spawnedTest("creating using Table.bulkAdd()", function*(){
     }).catch(nop));
 });
 
-/*spawnedTest("updating", function*(){
-    // Ways to produce UPDATEs:
-    //  Table.put()
-    //  Table.update()
-    //  Collection.modify()
+//
+// UPDATING hooks test
+// Ways to produce UPDATEs:
+//  Table.put()
+//  Table.update()
+//  Collection.modify()
+
+spawnedTest("updating using Table.put()", function*(){
+    yield expect ([{
+        op: "create",
+        key: 1,
+        value: {id:1, address: {city: 'A'}}
+    },{
+        op: "update",
+        key: 1,
+        obj: {id:1, address: {city: 'A'}},
+        mods: {"address.city": "B"},
+    }], ()=>db.transaction('rw', db.tables, function* (){
+        db.table1.put({id:1, address: {city: 'A'}}); // create
+        db.table1.put({id:1, address: {city: 'B'}}); // update
+    }));
+});
+
+/*spawnedTest("updating using Table.update()", function*(){
+
+});
+spawnedTest("updating using Collection.modify()", function*(){
+
 });
 
 spawnedTest("deleting", function*(){
