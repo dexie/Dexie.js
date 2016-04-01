@@ -1264,25 +1264,25 @@ export default function Dexie(dbName, options) {
                                 key = keyToUse;
                         }
                     }
-                    var req = key != null ? idbstore.add(obj, key) : idbstore.add(obj);
-                    req.onerror = eventRejectHandler(function (e) {
-                        if (thisCtx.onerror)
-                            Promise.newPSD(function () {
-                                Promise.PSD.trans = trans;
-                                thisCtx.onerror(e);
-                            });
-                        return reject(e);
-                    }, ["adding", obj, "into", self.name]);
-                    req.onsuccess = function (ev) {
-                        var keyPath = idbstore.keyPath;
-                        if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
-                        if (thisCtx.onsuccess)
-                            Promise.newPSD(function () {
-                                Promise.PSD.trans = trans;
-                                thisCtx.onsuccess(ev.target.result);
-                            });
-                        resolve(req.result);
-                    };
+                    try {
+                        var req = key != null ? idbstore.add(obj, key) : idbstore.add(obj),
+                            psd = Promise.PSD;
+                        req.onerror = eventRejectHandler(function (e) {
+                            if (thisCtx.onerror)
+                               Promise.usePSD(psd, thisCtx.onerror.bind(thisCtx, e));
+                            return reject(e);
+                        }, ["adding", obj, "into", self.name]);
+                        req.onsuccess = function (ev) {
+                            var keyPath = idbstore.keyPath;
+                            if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
+                            if (thisCtx.onsuccess)
+                                Promise.usePSD(psd, thisCtx.onsuccess.bind(thisCtx, ev.target.result));
+                            resolve(req.result);
+                        };
+                    } catch (e) {
+                        if (thisCtx.onerror) thisCtx.onerror(e);
+                        throw e;
+                    }
                 });
             },
 

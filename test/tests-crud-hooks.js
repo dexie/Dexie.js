@@ -13,9 +13,9 @@ let Promise = Dexie.Promise,
 var db = new Dexie("TestDBCrudHooks");
 db.version(1).stores({
     table1: "id,idx",
-    table2: ",idx",
-    table3: "++id,idx",
-    table4: "++,idx"
+    table2: ",&idx",
+    table3: "++id,&idx",
+    table4: "++,&idx"
 });
 
 var opLog = [],
@@ -23,13 +23,14 @@ var opLog = [],
     errorLog = [],
     watchSuccess = false,
     watchError = false,
-    deliverKey = null,
+    deliverKeys = [],
     deliverModifications = null,
-    deliverKey2 = null,
+    deliverKeys2 = [],
     deliverModifications2 = null,
     opLog2 = [],
     successLog2 = [],
-    errorLog2 = [];
+    errorLog2 = [],
+    transLog = [];
 
 function unsubscribeHooks() {
     db.tables.forEach(table => {
@@ -61,14 +62,26 @@ const reset = async(function* reset () {
     errorLog = [];
     watchSuccess = false;
     watchError = false;
-    deliverKey = null;
+    deliverKeys = [];
     deliverModifications = null;
-    deliverKey2 = null;
+    deliverKeys2 = [];
     deliverModifications2 = null;
     opLog2 = [];
     successLog2 = [];
     errorLog2 = [];
+    transLog = [];
 });
+
+/*function stack() {
+    if (Error.captureStackTrace) {
+        let obj = {};
+        Error.captureStackTrace(obj, stack);
+        return obj.stack;
+    }
+    var e = new Error("");
+    if (e.stack) return e.stack;
+    try{throw e}catch(ex){return ex.stack || "";}
+}*/
 
 function creating1 (primKey, obj, transaction) {
     // You may do additional database operations using given transaction object.
@@ -76,7 +89,7 @@ function creating1 (primKey, obj, transaction) {
     // You may set this.onsuccess = function (primKey){}. Called when autoincremented key is known.
     // You may set this.onerror = callback if create operation fails.
     // If returning any value other than undefined, the returned value will be used as primary key
-    ok(transaction && transaction === Dexie.currentTransaction, "creating: Dexie.currentTransaction points correctly");
+    transLog.push({trans: transaction, current: Dexie.currentTransaction});
     let op = {
         op: "create",
         key: primKey,
@@ -90,8 +103,8 @@ function creating1 (primKey, obj, transaction) {
     if (watchError) {
         this.onerror = e => errorLog.push(e);
     }
-    if (deliverKey !== null)
-        return deliverKey;
+    if (deliverKeys[opLog.length-1])
+        return deliverKeys[opLog.length-1];
 }
 
 
@@ -110,8 +123,8 @@ function creating2 (primKey, obj, transaction) {
     if (watchError) {
         this.onerror = e => errorLog2.push(e);
     }
-    if (deliverKey2 !== null)
-        return deliverKey2;
+    if (deliverKeys2[opLog2.length-1])
+        return deliverKeys2[opLog2.length-1];
 }
 
 function updating1 (modifications, primKey, obj, transaction) {
@@ -122,7 +135,7 @@ function updating1 (modifications, primKey, obj, transaction) {
     // If you want to make additional modifications, return another modifications object
     // containing the additional or overridden modifications to make. Any returned
     // object will be merged to the given modifications object.
-    ok(transaction && transaction === Dexie.currentTransaction, "updating: Dexie.currentTransaction points correctly");
+    transLog.push({trans: transaction, current: Dexie.currentTransaction});
     let op = {
         op: "update",
         key: primKey,
@@ -173,7 +186,7 @@ function deleting1 (primKey, obj, transaction) {
     // Any modification to obj is ignored.
     // Any return value is ignored.
     // throwing exception will make the db operation fail.
-    ok(transaction && transaction === Dexie.currentTransaction, "deleting: Dexie.currentTransaction points correctly");
+    transLog.push({trans: transaction, current: Dexie.currentTransaction});
     let op = {
         op: "delete",
         key: primKey,
@@ -226,9 +239,12 @@ const expect = async (function* (expected, modifyer) {
     yield reset();
     yield modifyer();
     equal(JSON.stringify(opLog, null, 2), JSON.stringify(expected, null, 2), "Expected oplog: " + JSON.stringify(expected));
+    ok(transLog.every(x => x.trans && x.current === x.trans), "transaction argument is valid and same as Dexie.currentTransaction");
     yield reset();
     watchSuccess = true;
+    watchError = true;
     yield modifyer();
+    equal (errorLog.length + errorLog2.length, 0, "No errors should have been registered");
     equal (successLog.length, expected.length, "First hook got success events");
     equal (successLog2.length, expected.length, "Second hook got success events");
     expected.forEach((x, i) => {
@@ -241,16 +257,18 @@ const expect = async (function* (expected, modifyer) {
     if (expected.some(x => x.op === "create" && x.key === undefined)) {
         // Test to deliver prim key from both hooks and expect the second hook's key to win.
         yield reset();
-        deliverKey = Math.random();
-        deliverKey2 = Math.random();
+        deliverKeys = expected.map((x,i)=>"Hook1Key"+ i);
+        deliverKeys2 = expected.map((x,i)=>"Hook2Key"+ i);
         watchSuccess = true;
+        watchError = true;
         yield modifyer();
+        equal (errorLog.length + errorLog2.length, 0, "No errors should have been registered");
         expected.forEach((x, i) => {
             if (x.op === "create" && x.key === undefined) {
                 equal(opLog[i].key, expected[i].key, "First hook got expected key delivered");
-                equal(opLog2[i].key, deliverKey, "Second hook got key delivered from first hook");
-                equal(successLog[i], deliverKey2, "Success event got delivered key from hook2");
-                equal(successLog2[i], deliverKey2, "Success event got delivered key from hook2 (2)");
+                equal(opLog2[i].key, deliverKeys[i], "Second hook got key delivered from first hook");
+                equal(successLog[i], deliverKeys2[i], "Success event got delivered key from hook2");
+                equal(successLog2[i], deliverKeys2[i], "Success event got delivered key from hook2 (2)");
             }
         });
     }
@@ -268,32 +286,62 @@ const expect = async (function* (expected, modifyer) {
     }
 });
 
-spawnedTest("creating using Table.add()", function*(){
+const verifyErrorFlows = async (function* (modifyer) {
+    yield reset();
+    watchSuccess = true;
+    watchError = true;
+    yield modifyer();
+    equal (opLog.length, opLog2.length, "Number of ops same for hook1 and hook2: " + opLog.length);
+    equal (successLog.length + errorLog.length, opLog.length, "Either onerror or onsuccess must have been called for every op. onerror: " +
+        errorLog.length + ". onsuccess: " + successLog.length);
+    equal (successLog2.length + errorLog2.length, opLog.length, "Either onerror or onsuccess must have been called for every op (hook2). onerror: " +
+        errorLog2.length + ". onsuccess: " + successLog2.length);
+});
+
+
+
+
+
+//
+//
+//   Tests goes here...
+//
+//
+
+spawnedTest("creating using Table.add()", function*() {
     // Ways to produce CREATEs:
     //  Table.add()
     //  Table.put()
     //  Table.bulkAdd()
 
-    yield expect ([{
+    yield expect([{
         op: "create",
         key: 1,
         value: {id: 1, idx: 11}
-    },{
+    }, {
         op: "create",
         key: 2,
         value: {idx: 12}
-    },{
+    }, {
         op: "create",
         value: {idx: 13}
-    },{
+    }, {
         op: "create",
         value: {idx: 14}
-    }], () => db.transaction('rw', db.tables, ()=>{
-        db.table1.add({id:1, idx:11});
-        db.table2.add({idx:12}, 2);
-        db.table3.add({idx:13});
-        db.table4.add({idx:14});
+    }], () => db.transaction('rw', db.tables, ()=> {
+        db.table1.add({id: 1, idx: 11});
+        db.table2.add({idx: 12}, 2);
+        db.table3.add({idx: 13});
+        db.table4.add({idx: 14});
     }));
+
+    yield verifyErrorFlows(()=>db.transaction('rw', db.tables, ()=>all([
+        db.table1.add({id:1}), // success
+        db.table1.add({id:1}).catch(()=>{}), // Trigger error event (constraint)
+        db.table2.add({}, 1), // sucesss
+        db.table2.add({}, 1), // Trigger error event (constraint)
+        db.table1.add({id:{}})// Trigger direct exception (invalid key type)
+    ])).catch(()=>{}));
 });
 
 spawnedTest("creating using Table.put()", function*(){
@@ -322,6 +370,14 @@ spawnedTest("creating using Table.put()", function*(){
         db.table3.put({idx:13});
         db.table4.put({idx:14});
     }));
+
+    yield verifyErrorFlows(()=>db.transaction('rw', db.tables, ()=>all([
+        db.table3.put({idx:1}), // success
+        db.table3.put({idx:1}).catch(()=>{}), // Trigger error event (constraint)
+        db.table2.put({}, 1), // sucesss
+        db.table2.put({}, 1), // Trigger error event (constraint)
+        db.table3.put({id:{}})// Trigger direct exception (invalid key type)
+    ])).catch(()=>{}));
 });
 
 spawnedTest("creating using Table.bulkAdd()", function*(){
@@ -336,19 +392,33 @@ spawnedTest("creating using Table.bulkAdd()", function*(){
         value: {id: 1, idx: 11}
     },{
         op: "create",
+        key: 1.2,
+        value: {id: 1.2, idx: 11.2}
+    },{
+        op: "create",
         key: 2,
         value: {idx: 12}
+    },{
+        op: "create",
+        key: 2.2,
+        value: {idx: 12.2}
     },{
         op: "create",
         value: {idx: 13}
     },{
         op: "create",
+        value: {idx: 13.2}
+    },{
+        op: "create",
         value: {idx: 14}
+    },{
+        op: "create",
+        value: {idx: 14.2}
     }], () => db.transaction('rw', db.tables, ()=> {
-        db.table1.bulkAdd([{id: 1, idx: 11}]);
-        db.table2.bulkAdd([{idx: 12}], [2]);
-        db.table3.bulkAdd([{idx: 13}]);
-        db.table4.bulkAdd([{idx: 14}]);
+        db.table1.bulkAdd([{id: 1, idx: 11},{id: 1.2, idx: 11.2}]);
+        db.table2.bulkAdd([{idx: 12},{idx: 12.2}], [2, 2.2]);
+        db.table3.bulkAdd([{idx: 13},{idx: 13.2}]);
+        db.table4.bulkAdd([{idx: 14},{idx: 14.2}]);
     }));
 });
 
