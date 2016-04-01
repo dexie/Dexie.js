@@ -1313,7 +1313,11 @@ export default function Dexie(dbName, options) {
                             trans._lock(); // Needed because operation is splitted into modify() and add().
                             // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
                             obj = deepClone(obj);
-                            trans.tables[self.name].where(":id").equals(effectiveKey).modify(function (value) {
+                            trans.tables[self.name]
+                                .where(":id")
+                                .equals(effectiveKey)
+                                .raw()
+                                .modify(function (value) {
                                 // Replace extisting value with our object
                                 // CRUD event firing handled in WriteableCollection.modify()
                                 this.value = obj;
@@ -1963,11 +1967,12 @@ export default function Dexie(dbName, options) {
             error = stack(mapError(ex));
         }
 
-        var whereCtx = whereClause._ctx;
+        var whereCtx = whereClause._ctx,
+            table = whereCtx.table;
         this._ctx = {
-            table: whereCtx.table,
+            table: table,
             index: whereCtx.index,
-            isPrimKey: (!whereCtx.index || (whereCtx.table.schema.primKey.keyPath && whereCtx.index === whereCtx.table.schema.primKey.name)),
+            isPrimKey: (!whereCtx.index || (table.schema.primKey.keyPath && whereCtx.index === table.schema.primKey.name)),
             range: keyRange,
             keysOnly: false,
             dir: "next",
@@ -1979,7 +1984,8 @@ export default function Dexie(dbName, options) {
             offset: 0,
             limit: Infinity,
             error: error, // If set, any promise must be rejected with this error
-            or: whereCtx.or
+            or: whereCtx.or,
+            valueFilter: table.hook.reading.fire
         };
     }
 
@@ -2019,7 +2025,7 @@ export default function Dexie(dbName, options) {
         function iter(ctx, fn, resolve, reject, idbstore) {
             let filter = ctx.replayFilter ? combine(ctx.filter, ctx.replayFilter()) : ctx.filter;
             if (!ctx.or) {
-                iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, ctx.table.hook.reading.fire);
+                iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, ctx.valueFilter);
             } else {
                 (function () {
                     var set = {};
@@ -2040,7 +2046,7 @@ export default function Dexie(dbName, options) {
                     }
 
                     ctx.or._iterate(union, resolveboth, reject, idbstore);
-                    iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, ctx.table.hook.reading.fire);
+                    iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, ctx.valueFilter);
                 })();
             }
         }
@@ -2084,6 +2090,11 @@ export default function Dexie(dbName, options) {
                 if (props) extend(ctx, props);
                 rv._ctx = ctx;
                 return rv;
+            },
+
+            raw: function () {
+                this._ctx.valueFilter = null;
+                return this;
             },
 
             //
@@ -2502,9 +2513,13 @@ export default function Dexie(dbName, options) {
                 table._tpf = trans._tpf; // Enable us to keep same transaction even if called without transaction.
                 // Clone collection and change its table and set a limit of CHUNKSIZE on the cloned Collection instance.
                 let collection = this
-                    .clone({table: table, keysOnly: !hasDeleteHook})
-                    .distinct()
-                    .limit(CHUNKSIZE);
+                    .clone({
+                        table: table,   // Execute in same transaction
+                        keysOnly: !hasDeleteHook}) // load just keys (unless deleteHook has subscribers)
+                    .distinct() // In case multiEntry is used, never delete same key twice because resulting count
+                                // would become larger than actual delete count.
+                    .limit(CHUNKSIZE)
+                    .raw(); // Don't filter through reading-hooks (like mapped classes etc)
 
                 let keysOrTuples = [];
 
@@ -2582,8 +2597,8 @@ export default function Dexie(dbName, options) {
         });
     }
 
-    function iterate(req, filter, fn, resolve, reject, readingHook) {
-        readingHook = readingHook || mirror;
+    function iterate(req, filter, fn, resolve, reject, valueFilter) {
+        valueFilter = valueFilter || mirror;
         if (!req.onerror) req.onerror = eventRejectHandler(reject);
         if (filter) {
             req.onsuccess = trycatch(function filter_record(e) {
@@ -2591,7 +2606,7 @@ export default function Dexie(dbName, options) {
                 if (cursor) {
                     var c = function () { cursor.continue(); };
                     if (filter(cursor, function (advancer) { c = advancer; }, resolve, reject))
-                        fn(readingHook(cursor.value), cursor, function (advancer) { c = advancer; });
+                        fn(valueFilter(cursor.value), cursor, function (advancer) { c = advancer; });
                     c();
                 } else {
                     resolve();
@@ -2602,7 +2617,7 @@ export default function Dexie(dbName, options) {
                 var cursor = req.result;
                 if (cursor) {
                     var c = function () { cursor.continue(); };
-                    fn(readingHook(cursor.value), cursor, function (advancer) { c = advancer; });
+                    fn(valueFilter(cursor.value), cursor, function (advancer) { c = advancer; });
                     c();
                 } else {
                     resolve();

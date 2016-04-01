@@ -15,7 +15,8 @@ db.version(1).stores({
     table1: "id,idx",
     table2: ",&idx",
     table3: "++id,&idx",
-    table4: "++,&idx"
+    table4: "++,&idx",
+    table5: ""
 });
 
 var opLog = [],
@@ -36,6 +37,8 @@ function unsubscribeHooks() {
     db.tables.forEach(table => {
         table.hook('creating').unsubscribe(creating2);
         table.hook('creating').unsubscribe(creating1);
+        table.hook('reading').unsubscribe(reading1);
+        table.hook('reading').unsubscribe(reading2);
         table.hook('updating').unsubscribe(updating1);
         table.hook('updating').unsubscribe(updating2);
         table.hook('deleting').unsubscribe(deleting2);
@@ -47,6 +50,8 @@ function subscrubeHooks() {
     db.tables.forEach(table => {
         table.hook('creating', creating1);
         table.hook('creating', creating2);
+        table.hook('reading', reading1);
+        table.hook('reading', reading2);
         table.hook('updating', updating1);
         table.hook('updating', updating2);
         table.hook('deleting', deleting1);
@@ -127,6 +132,22 @@ function creating2 (primKey, obj, transaction) {
     }
     if (deliverKeys2[opLog2.length-1])
         return deliverKeys2[opLog2.length-1];
+}
+
+function reading1 (obj) {
+    opLog.push({
+        op: "read",
+        obj: Dexie.deepClone(obj)
+    });
+    return {theObject: obj};
+}
+
+function reading2 (obj) {
+    opLog2.push({
+        op: "read",
+        obj: Dexie.deepClone(obj)
+    });
+    return obj.theObject;
 }
 
 function updating1 (modifications, primKey, obj, transaction) {
@@ -247,8 +268,8 @@ const expect = async (function* (expected, modifyer) {
     watchError = true;
     yield modifyer();
     equal (errorLog.length + errorLog2.length, 0, "No errors should have been registered");
-    equal (successLog.length, expected.length, "First hook got success events");
-    equal (successLog2.length, expected.length, "Second hook got success events");
+    equal (successLog.length, expected.filter(op => op.op !== 'read').length, "First hook got success events");
+    equal (successLog2.length, expected.filter(op => op.op !== 'read').length, "Second hook got success events");
     expected.forEach((x, i) => {
         if (x.op === "create" && x.key !== undefined) {
             equal(successLog[i], x.key, "Success events got the correct key");
@@ -302,9 +323,9 @@ const verifyErrorFlows = async (function* (modifyer) {
     yield modifyer();
     equal (opLog.length, opLog2.length, "Number of ops same for hook1 and hook2: " + opLog.length);
     equal (successLog.length + errorLog.length, opLog.length, "Either onerror or onsuccess must have been called for every op. onerror: " +
-        errorLog.length + ". onsuccess: " + successLog.length);
-    equal (successLog2.length + errorLog2.length, opLog.length, "Either onerror or onsuccess must have been called for every op (hook2). onerror: " +
-        errorLog2.length + ". onsuccess: " + successLog2.length);
+        errorLog.length + ". onsuccess: " + successLog.length + ". opLog: " + JSON.stringify(opLog));
+    equal (successLog2.length + errorLog2.length, opLog2.length, "Either onerror or onsuccess must have been called for every op (hook2). onerror: " +
+        errorLog2.length + ". onsuccess: " + successLog2.length+ ". opLog: " + JSON.stringify(opLog2));
 });
 
 
@@ -441,6 +462,62 @@ spawnedTest("creating using Table.bulkAdd()", function*(){
         yield db.table2.bulkAdd([{}, {}, {}], [2,2,3]).catch(nop); // 1. success, 2. error event. 3. success.
         yield db.table1.bulkAdd([{id:{}}]).catch(nop);// Trigger direct exception (invalid key type)
     }).catch(nop));
+});
+
+//
+// READING hooks test
+// Ways to produce READs:
+//  Table.get()
+//  Collection.toArray()
+//  Collection.each()
+//  Collection.first()
+//  Collection.last()
+// But not:
+//  Table.filter() / Collection.and()
+
+spawnedTest("reading tests", function* (){
+    yield expect([{
+        op: "create",
+        key: 1,
+        value: {foo: "bar"}
+    },{
+        op: "create",
+        key: 2,
+        value: {fee: "bore"}
+    },{
+        op: "read", // toArray() (1)
+        obj: {foo: "bar"}
+    },{
+        op: "read", // toArray() (2)
+        obj: {fee: "bore"}
+    },{
+        op: "read", // reverse.each() (1)
+        obj: {fee: "bore"}
+    },{
+        op: "read", // reverse.each() (2)
+        obj: {foo: "bar"}
+    },{
+        op: "read", // first()
+        obj: {foo: "bar"}
+    },{
+        op: "read", // last()
+        obj: {fee: "bore"}
+    }], ()=> db.transaction('rw', 'table5', function*(){
+        yield db.table5.bulkAdd([{foo: "bar"}, {fee: "bore"}], [1, 2]);
+        yield db.table5.toArray();
+        yield db.table5.reverse().each(x => {});
+        yield db.table5.orderBy(':id').first();
+        yield db.table5.orderBy(':id').last();
+        yield db.table5.filter(x => false).toArray();
+    }));
+
+    let readOps = opLog.filter(o => o.op === 'read'),
+        readOps2 = opLog2.filter(o => o.op === 'read');
+
+    ok (readOps.every ((o,i)=>
+        JSON.stringify(readOps2[i].obj.theObject) === JSON.stringify(o.obj)),
+        "hook2 should have got hook1's return value");
+    
 });
 
 //

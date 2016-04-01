@@ -711,7 +711,7 @@ asyncTest("Issue #137 db.table() does not respect current transaction", function
     }).finally(start);
 });
 
-asyncTest("Dexie.currentTransaction in CRUD hooks", 63, function () {
+asyncTest("Dexie.currentTransaction in CRUD hooks", 59, function () {
 
     function CurrentTransChecker(scope, trans) {
         return function() {

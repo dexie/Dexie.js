@@ -5,7 +5,7 @@ export function mirror(val) { return val; }
 export function pureFunctionChain(f1, f2) {
     // Enables chained events that takes ONE argument and returns it to the next function in chain.
     // This pattern is used in the hook("reading") event.
-    if (f1 === mirror) return f2;
+    if (f1 == null || f1 === mirror) return f2;
     return function (val) {
         return f2(f1(val));
     };
