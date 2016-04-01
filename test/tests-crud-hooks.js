@@ -83,6 +83,8 @@ const reset = async(function* reset () {
     try{throw e}catch(ex){return ex.stack || "";}
 }*/
 
+function nop(){}
+
 function creating1 (primKey, obj, transaction) {
     // You may do additional database operations using given transaction object.
     // You may also modify given obj
@@ -337,11 +339,11 @@ spawnedTest("creating using Table.add()", function*() {
 
     yield verifyErrorFlows(()=>db.transaction('rw', db.tables, ()=>all([
         db.table1.add({id:1}), // success
-        db.table1.add({id:1}).catch(()=>{}), // Trigger error event (constraint)
+        db.table1.add({id:1}).catch(nop), // Trigger error event (constraint)
         db.table2.add({}, 1), // sucesss
-        db.table2.add({}, 1), // Trigger error event (constraint)
-        db.table1.add({id:{}})// Trigger direct exception (invalid key type)
-    ])).catch(()=>{}));
+        db.table2.add({}, 1).catch(nop), // Trigger error event (constraint)
+        db.table1.add({id:{}}).catch(nop)// Trigger direct exception (invalid key type)
+    ])).catch(nop));
 });
 
 spawnedTest("creating using Table.put()", function*(){
@@ -373,11 +375,11 @@ spawnedTest("creating using Table.put()", function*(){
 
     yield verifyErrorFlows(()=>db.transaction('rw', db.tables, ()=>all([
         db.table3.put({idx:1}), // success
-        db.table3.put({idx:1}).catch(()=>{}), // Trigger error event (constraint)
+        db.table3.put({idx:1}).catch(nop), // Trigger error event (constraint)
         db.table2.put({}, 1), // sucesss
-        db.table2.put({}, 1), // Trigger error event (constraint)
-        db.table3.put({id:{}})// Trigger direct exception (invalid key type)
-    ])).catch(()=>{}));
+        db.table2.put({}, 1).catch(nop), // Trigger error event (constraint)
+        db.table3.put({id:{}}).catch(nop)// Trigger direct exception (invalid key type)
+    ])).catch(nop));
 });
 
 spawnedTest("creating using Table.bulkAdd()", function*(){
@@ -420,6 +422,14 @@ spawnedTest("creating using Table.bulkAdd()", function*(){
         db.table3.bulkAdd([{idx: 13},{idx: 13.2}]);
         db.table4.bulkAdd([{idx: 14},{idx: 14.2}]);
     }));
+
+    yield verifyErrorFlows(()=>db.transaction('rw', db.tables, function* () {
+        yield db.table1.bulkAdd([{id:1},{id:1}]).catch(nop); // 1. success, 2. error event.
+        yield db.table1.bulkAdd([{id:2},{id:2},{id:3}]).catch(nop); // 1. success, 2. error event., 3. success
+        yield db.table2.bulkAdd([{}, {}], [1,1]).catch(nop); // 1. success, 2. error event.
+        yield db.table2.bulkAdd([{}, {}, {}], [2,2,3]).catch(nop); // 1. success, 2. error event. 3. success.
+        yield db.table1.bulkAdd([{id:{}}]).catch(nop);// Trigger direct exception (invalid key type)
+    }).catch(nop));
 });
 
 /*spawnedTest("updating", function*(){

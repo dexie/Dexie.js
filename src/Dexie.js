@@ -1175,6 +1175,8 @@ export default function Dexie(dbName, options) {
                         throw new exceptions.InvalidArgument("bulkAdd() with non-inbound keys requires keys array in second argument");
                     if (idbstore.keyPath && keys)
                         throw new exceptions.InvalidArgument("bulkAdd(): keys argument invalid on tables with inbound keys");
+                    if (keys && keys.length !== objects.length)
+                        throw new exceptions.InvalidArgument("Arguments objects and keys must have the same length");
                     if (objects.length === 0) return resolve(); // Caller provided empty list.
                     function done(result) {
                         if (errorList.length === 0) resolve(result);
@@ -1222,7 +1224,7 @@ export default function Dexie(dbName, options) {
                                 }
                             }
                         }, err => {
-                            hookCtx.onerror && hookCtx.onerror(e);
+                            hookCtx.onerror && hookCtx.onerror(err);
                             throw err;
                         });
 
