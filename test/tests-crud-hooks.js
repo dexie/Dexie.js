@@ -318,6 +318,7 @@ const expect = async (function* (expected, modifyer) {
 
 const verifyErrorFlows = async (function* (modifyer) {
     yield reset();
+    ok(true, "Verifying ERROR flows");
     watchSuccess = true;
     watchError = true;
     yield modifyer();
@@ -517,7 +518,7 @@ spawnedTest("reading tests", function* (){
     ok (readOps.every ((o,i)=>
         JSON.stringify(readOps2[i].obj.theObject) === JSON.stringify(o.obj)),
         "hook2 should have got hook1's return value");
-    
+
 });
 
 //
@@ -541,15 +542,59 @@ spawnedTest("updating using Table.put()", function*(){
         db.table1.put({id:1, address: {city: 'A'}}); // create
         db.table1.put({id:1, address: {city: 'B'}}); // update
     }));
+
+    yield verifyErrorFlows(()=>db.transaction('rw', db.tables, function* () {
+        yield db.table3.add({id:1, idx:1});
+        yield db.table3.put({id:2, idx:1}).catch(nop); // error event (constraint)
+        yield db.table3.put({id:{}}).catch(nop); // Trigger direct exception (invalid key type)
+    }).catch(nop));
 });
 
-/*spawnedTest("updating using Table.update()", function*(){
+spawnedTest("updating using Table.update()", function*(){
+    yield expect ([{
+        op: "create",
+        key: 1,
+        value: {id:1, address: {city: 'A'}}
+    },{
+        op: "update",
+        key: 1,
+        obj: {id:1, address: {city: 'A'}},
+        mods: {"address.city": "B"},
+    }], ()=>db.transaction('rw', db.tables, function* (){
+        yield db.table1.add({id:1, address: {city: 'A'}}); // create
+        yield db.table1.update(1, {"address.city": "B"}); // update
+    }));
 
+    yield verifyErrorFlows(()=>db.transaction('rw', db.tables, function* () {
+        yield db.table3.bulkAdd([{id:1, idx:1},{id:2, idx:2}]);
+        yield db.table3.update(1, {idx:2}).catch(nop); // error event (constraint)
+        yield db.table3.update(1, 3).catch(nop); // Trigger direct exception?
+    }).catch(nop));
 });
+
 spawnedTest("updating using Collection.modify()", function*(){
+    yield expect ([{
+        op: "create",
+        key: 1,
+        value: {id:1, address: {city: 'A'}}
+    },{
+        op: "update",
+        key: 1,
+        obj: {id:1, address: {city: 'A'}},
+        mods: {"address.city": "B"},
+    }], ()=>db.transaction('rw', db.tables, function* (){
+        yield db.table1.add({id:1, address: {city: 'A'}}); // create
+        yield db.table1.where('id').equals(1).modify({"address.city": "B"}); // update
+    }));
 
+    yield verifyErrorFlows(()=>db.transaction('rw', db.tables, function* () {
+        yield db.table3.bulkAdd([{id:1, idx:1},{id:2, idx:2}]);
+        yield db.table3.where('id').equals(1).modify({idx: 2}).catch(nop); // error event (constraint)
+        yield db.table3.where('id').equals(1).modify(()=>{throw "apa";}).catch(nop); // Trigger direct exception
+    }).catch(nop));
 });
 
+/*
 spawnedTest("deleting", function*(){
     // Ways to produce DELETEs:
     //  Table.delete()

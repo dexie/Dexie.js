@@ -1316,7 +1316,6 @@ export default function Dexie(dbName, options) {
                             trans.tables[self.name]
                                 .where(":id")
                                 .equals(effectiveKey)
-                                .raw()
                                 .modify(function (value) {
                                 // Replace extisting value with our object
                                 // CRUD event firing handled in WriteableCollection.modify()
@@ -2025,7 +2024,7 @@ export default function Dexie(dbName, options) {
         function iter(ctx, fn, resolve, reject, idbstore) {
             let filter = ctx.replayFilter ? combine(ctx.filter, ctx.replayFilter()) : ctx.filter;
             if (!ctx.or) {
-                iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, ctx.valueFilter);
+                iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, !ctx.keysOnly && ctx.valueFilter);
             } else {
                 (function () {
                     var set = {};
@@ -2046,7 +2045,7 @@ export default function Dexie(dbName, options) {
                     }
 
                     ctx.or._iterate(union, resolveboth, reject, idbstore);
-                    iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, ctx.valueFilter);
+                    iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, !ctx.keysOnly && ctx.valueFilter);
                 })();
             }
         }
@@ -2459,7 +2458,7 @@ export default function Dexie(dbName, options) {
                             resolve(successCount);
                     }
                 }
-                self._iterate(modifyItem, function () {
+                self.clone().raw()._iterate(modifyItem, function () {
                     iterationComplete = true;
                     checkFinished();
                 }, doReject, idbstore);
