@@ -396,26 +396,47 @@ spawnedTest("bulkPut", function*(){
     // Delete test item.
     yield db.users.delete(highestKey);
     ok(true, "Deleted test item");
+    let existingFirstUserToReplace = yield db.users.get(idOfFirstUser);
+    equal (existingFirstUserToReplace.username, "dfahlander", "Existing user should be dfahlander");
     var result = yield db.users.bulkPut([
         { first: "Åke1", last: "Persbrant1", username: "aper1", email: ["aper1@persbrant.net"] },
-        { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] }
+        { id: idOfFirstUser, first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] },
+        { first: "Åke3", last: "Persbrant3", username: "aper3", email: ["aper3@persbrant.net"] }
     ]);
     equal (result, highestKey + 2, "Result of bulkPut() operation was equal to highestKey + 2");
+    let ourAddedUsers = yield db.users.where('username').startsWith("aper").toArray();
+    equal(ourAddedUsers.length, 3, "Should have put 3 users there (two additions and one replaced");
+    let replacedDfahlander = yield db.users.get(idOfFirstUser);
+    equal(replacedDfahlander.username, "aper2", "dfahlander Should now be aper2 instead");
+});
+
+spawnedTest("bulkPut with overlapping objects", function*(){
+    yield db.users.bulkPut([{
+        id: "sdjls83",
+        first: "Daveious"
+    },{
+        id: "sdjls83",
+        last: "Olvono"
+    }]);
+    let theOne = yield db.users.get("sdjls83");
+    equal (theOne.last, "Olvono", "Last item is the one inserted");
+    ok (theOne.first === undefined, "Object doesnt have a first property");
 });
 
 spawnedTest("bulkPut-catching errors", function*() {
     yield db.transaction("rw", db.users, function() {
         var newUsers = [
             { first: "Åke1", last: "Persbrant1", username: "aper1", email: ["aper1@persbrant.net"] },
-            { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] },
-            { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] }, // Should fail
+            { id: idOfLastUser, first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] }, // update success
+            { id: idOfFirstUser, first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] }, // update should fail
+            { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] }, // Add should fail
             { first: "Åke3", last: "Persbrant3", username: "aper3", email: ["aper3@persbrant.net"] }
         ];
         db.users.bulkPut(newUsers).then(()=> {
             ok(false, "Should not resolve when one operation failed");
         }).catch(Dexie.BulkError, e=>{
             ok(true, "Got BulkError: " + e.message);
-            equal(e.failures.length, 1, "One error due to a duplicate username: " + e.failures[0]);
+            equal(e.failures.length, 2, "Two errors due to a duplicate username: " + e.failures[0]);
         });
 
         // Now, since we catched the error, the transaction should continue living.
@@ -428,8 +449,9 @@ spawnedTest("bulkPut-catching errors", function*() {
 
     var newUsersX = [
         {first: "Xke1", last: "Persbrant1", username: "xper1", email: ["xper1@persbrant.net"]},
-        {first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"]},
-        {first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"]}, // Should fail
+        {id: idOfLastUser, first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"]},
+        {first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"]}, // Should fail (add)
+        {id: idOfFirstUser, first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"]}, // Should fail (update)
         {first: "Xke3", last: "Persbrant3", username: "xper3", email: ["xper3@persbrant.net"]}
     ];
     try {
@@ -455,6 +477,7 @@ spawnedTest("bulkPut-catching errors", function*() {
     var newUsersY = [
         {first: "Yke1", last: "Persbrant1", username: "yper1", email: ["yper1@persbrant.net"]},
         {first: "Yke2", last: "Persbrant2", username: "yper2", email: ["yper2@persbrant.net"]},
+        {id: idOfFirstUser, first: "Yke2", last: "Persbrant2", username: "yper2", email: ["yper2@persbrant.net"]}, // Should fail
         {first: "Yke2", last: "Persbrant2", username: "yper2", email: ["yper2@persbrant.net"]}, // Should fail
         {first: "Yke3", last: "Persbrant3", username: "yper3", email: ["yper3@persbrant.net"]}
     ];
@@ -473,6 +496,7 @@ spawnedTest("bulkPut-catching errors", function*() {
         {first: "Zke1", last: "Persbrant1", username: "zper1", email: ["zper1@persbrant.net"]},
         {first: "Zke2", last: "Persbrant2", username: "zper2", email: ["zper2@persbrant.net"]},
         {first: "Zke2", last: "Persbrant2", username: "zper2", email: ["zper2@persbrant.net"]}, // Should fail
+        {id: idOfLastUser, first: "Zke2", last: "Persbrant2", username: "zper2", email: ["zper2@persbrant.net"]}, // Should fail
         {first: "Zke3", last: "Persbrant3", username: "zper3", email: ["zper3@persbrant.net"]}
     ];
 
@@ -490,14 +514,31 @@ spawnedTest("bulkPut-catching errors", function*() {
 });
 
 spawnedTest("bulkPut-non-inbound-autoincrement", function*(){
-    yield db.folks.bulkPut([
+    let lastId = yield db.folks.bulkPut([
         { first: "Foo", last: "Bar"},
         { first: "Foo", last: "Bar2"},
         { first: "Foo", last: "Bar3"},
         { first: "Foo", last: "Bar4"}
     ]);
     equal (yield db.folks.where('first').equals('Foo').count(), 4, "Should be 4 Foos");
-    equal (yield db.folks.where('last').equals('Bar').count(), 1, "Shoudl be 1 Bar");
+    equal (yield db.folks.where('last').equals('Bar').count(), 1, "Should be 1 Bar");
+    let newLastId = yield db.folks.bulkPut([
+        { first: "Foo2", last: "BarA"},
+        { first: "Foo2", last: "BarB"},
+        { first: "Foo2", last: "BarC"},
+        { first: "Foo2", last: "BarD"}
+    ],  [lastId - 3,
+        null,
+        lastId - 1,
+        null]);
+    equal (newLastId, lastId + 2, "Should have incremented last ID twice now");
+    equal (yield db.folks.where('first').equals('Foo').count(), 2, "Should be 2 Foos now");
+    equal (yield db.folks.where('first').equals('Foo2').count(), 4, "Should be 4 Foo2s now");
+    let foo2s = yield db.folks.where('first').equals('Foo2').toArray();
+    equal (foo2s[0].last, "BarA", "BarA should be first (updated previous ID)");
+    equal (foo2s[1].last, "BarC", "BarC should be second (updated previous ID");
+    equal (foo2s[2].last, "BarB", "BarB should be third (got new key)");
+    equal (foo2s[3].last, "BarD", "BarD should be forth (got new key)");
 });
 
 spawnedTest("bulkPut-catch sub transaction", function*(){

@@ -1214,42 +1214,54 @@ export default function Dexie(dbName, options) {
                         req.onerror = BulkErrorHandlerCatchAll(errorList, done);
                         req.onsuccess = BulkSuccessHandler(done);
                     } else {
-                        let effectiveKeys = keys || idbstore.keyPath && objects.map(o=>getByKeyPath(o, idbstore.keyPath));
-                        let objectLookup = effectiveKeys && effectiveKeys.reduce((res, key, i)=> {
+                        var effectiveKeys = keys || idbstore.keyPath && objects.map(o=>getByKeyPath(o, idbstore.keyPath));
+                        var objectLookup = effectiveKeys && effectiveKeys.reduce((res, key, i)=> {
                                 if (key != null) res[key] = objects[i];
                                 return res;
                             }, {}); // Generates map of {[key]: object}
 
-                        let promise = !effectiveKeys ?
+                        var promise = !effectiveKeys ?
 
                             // Auto-incremented key-less objects only without any keys argument.
                             table.bulkAdd(objects) :
 
                             // Keys provided. Either as inbound in provided objects, or as a keys argument.
                             // Begin with updating those that exists in DB:
-                            table.where(':id').anyOf(Object.keys(objectLookup)).modify(function () {
+                            table.where(':id').anyOf(effectiveKeys.filter(key => key != null)).modify(function () {
                                 this.value = objectLookup[this.primKey];
                                 objectLookup[this.primKey] = null; // Mark as "don't add this"
+                            }).catch(ModifyError, e => {
+                                errorList = e.failures; // No need to concat here. These are the first errors added.
                             }).then(()=> {
                                 // Now, let's examine which items didnt exist so we can add them:
-                                let objsToAdd = [],
+                                var objsToAdd = [],
                                     keysToAdd = keys && [];
-                                effectiveKeys.forEach((key, i) => {
+                                // Iterate backwards. Why? Because if same key was used twice, just add the last one.
+                                for (var i=effectiveKeys.length-1; i>=0; --i) {
+                                    var key = effectiveKeys[i];
                                     if (key == null || objectLookup[key]) {
                                         objsToAdd.push(objects[i]);
                                         keys && keysToAdd.push(key);
+                                        if (key != null) objectLookup[key] = null; // Mark as "dont add again"
                                     }
-                                });
+                                }
+                                // The items are in reverse order so reverse them before adding.
+                                // Could be important in order to get auto-incremented keys the way the caller
+                                // would expect. Could have used unshift instead of push()/reverse(),
+                                // but: http://jsperf.com/unshift-vs-reverse
+                                objsToAdd.reverse();
+                                keys && keysToAdd.reverse();
                                 return table.bulkAdd(objsToAdd, keysToAdd);
                             }).then(lastAddedKey => {
                                 // Resolve with key of the last object in given arguments to bulkPut():
-                                let lastEffectiveKey = effectiveKeys[effectiveKeys.length - 1]; // Key was provided.
+                                var lastEffectiveKey = effectiveKeys[effectiveKeys.length - 1]; // Key was provided.
                                 return lastEffectiveKey != null ? lastEffectiveKey : lastAddedKey;
                             });
 
-                        promise.then(resolve).catch(ModifyError, e => {
-                            // Map ModifyError to BulkError
-                            reject(new BulkError(e.msg, e.failures))
+                        promise.then(done).catch(BulkError, e => {
+                            // Concat failure from ModifyError and reject using our 'done' method.
+                            errorList = errorList.concat(e.failures);
+                            done();
                         }).catch(reject);
                     }
                 }, "locked"); // If called from transaction scope, lock transaction til all steps are done.
