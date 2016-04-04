@@ -42,6 +42,7 @@ import {
     callBoth,
     hookCreatingChain,
     hookUpdatingChain,
+    hookDeletingChain,
     nonStoppableEventChain,
     promisableChain,
     reverseStoppableEventChain,
@@ -940,7 +941,7 @@ export default function Dexie(dbName, options) {
             "creating": [hookCreatingChain, nop],
             "reading": [pureFunctionChain, mirror],
             "updating": [hookUpdatingChain, nop],
-            "deleting": [nonStoppableEventChain, nop]
+            "deleting": [hookDeletingChain, nop]
         });
         this._tpf = transactionPromiseFactory;
         this._collClass = collClass || Collection;

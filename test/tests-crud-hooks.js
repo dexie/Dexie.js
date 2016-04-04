@@ -213,7 +213,7 @@ function deleting1 (primKey, obj, transaction) {
     let op = {
         op: "delete",
         key: primKey,
-        value: obj
+        obj: obj
     };
     opLog.push(op);
     if (watchSuccess) {
@@ -235,7 +235,7 @@ function deleting2 (primKey, obj, transaction) {
     let op = {
         op: "delete",
         key: primKey,
-        value: obj
+        obj: obj
     };
     opLog2.push(op);
     if (watchSuccess) {
@@ -594,12 +594,75 @@ spawnedTest("updating using Collection.modify()", function*(){
     }).catch(nop));
 });
 
-/*
-spawnedTest("deleting", function*(){
-    // Ways to produce DELETEs:
-    //  Table.delete()
-    //  Table.clear()
-    //  Collection.modify()
-    //  Collection.delete()
+//
+// DELETING hook tests
+//
+// Ways to produce DELETEs:
+//  Table.delete(key)
+//  Table.clear()
+//  Collection.modify()
+//  Collection.delete()
+
+spawnedTest("deleting using Table.delete(key)", function*(){
+    yield expect ([{
+        op: "create",
+        key: 1,
+        value: {id:1}
+    },{
+        op: "delete",
+        key: 1,
+        obj: {id:1}
+    }], ()=>db.transaction('rw', db.tables, function* (){
+        yield db.table1.add({id:1}); // create
+        yield db.table1.delete(1); // delete
+    }));
+
+    // No error flows to verify. If anything is ever found, there's no way to make a deletion of it fail.
 });
-*/
+
+spawnedTest("deleting using Table.clear()", function*(){
+    yield expect ([{
+        op: "create",
+        key: 1,
+        value: {id:1}
+    },{
+        op: "delete",
+        key: 1,
+        obj: {id:1}
+    }], ()=>db.transaction('rw', db.tables, function* (){
+        yield db.table1.add({id:1}); // create
+        yield db.table1.clear(); // delete
+    }));
+});
+
+spawnedTest("deleting using Table.modify()", function*(){
+    yield expect ([{
+        op: "create",
+        key: 1,
+        value: {id:1}
+    },{
+        op: "delete",
+        key: 1,
+        obj: {id:1}
+    }], ()=>db.transaction('rw', db.tables, function* (){
+        yield db.table1.add({id:1}); // create
+        yield db.table1.where('id').between(0,2).modify(function (){
+            delete this.value;
+        }); // delete
+    }));
+});
+
+spawnedTest("deleting using Collection.delete()", function*(){
+    yield expect ([{
+        op: "create",
+        key: 1,
+        value: {id:1}
+    },{
+        op: "delete",
+        key: 1,
+        obj: {id:1}
+    }], ()=>db.transaction('rw', db.tables, function* (){
+        yield db.table1.add({id:1}); // create
+        yield db.table1.where('id').between(0,2).delete(); // delete
+    }));
+});

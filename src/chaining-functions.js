@@ -36,6 +36,19 @@ export function hookCreatingChain(f1, f2) {
     };
 }
 
+export function hookDeletingChain(f1, f2) {
+    if (f1 === nop) return f2;
+    return function () {
+        f1.apply(this, arguments);
+        var onsuccess = this.onsuccess, // In case event listener has set this.onsuccess
+            onerror = this.onerror;     // In case event listener has set this.onerror
+        this.onsuccess = this.onerror = null;
+        f2.apply(this, arguments);
+        if (onsuccess) this.onsuccess = this.onsuccess ? callBoth(onsuccess, this.onsuccess) : onsuccess;
+        if (onerror) this.onerror = this.onerror ? callBoth(onerror, this.onerror) : onerror;
+    };
+}
+
 export function hookUpdatingChain(f1, f2) {
     if (f1 === nop) return f2;
     return function () {
