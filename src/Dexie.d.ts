@@ -265,11 +265,13 @@ declare module Dexie {
         reverse(): Collection<T, Key>;
         mapToClass(constructor: Function): Function;
         add(item: T, key?: Key): Promise<Key>;
-        bulkAdd(items: T[]): Promise<void>;
         update(key: Key, changes: { [keyPath: string]: any }): Promise<number>;
         put(item: T, key?: Key): Promise<Key>;
         delete(key: Key): Promise<void>;
         clear(): Promise<void>;
+        bulkAdd(items: T[], keys?: IndexableType[]): Promise<Key>;
+        bulkPut(items: T[], keys?: IndexableType[]): Promise<Key>;
+        bulkDelete(keys: IndexableType[]) : Promise<void>;
     }
 
     interface WhereClause<T, Key> {
