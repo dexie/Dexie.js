@@ -348,7 +348,8 @@ const verifyErrorFlows = async (function* (modifyer) {
 //  Table.add()
 //  Table.put()
 //  Table.bulkAdd()
-//
+//  Table.bulkPut()
+
 spawnedTest("creating using Table.add()", function*() {
 
     yield expect([{
@@ -382,11 +383,6 @@ spawnedTest("creating using Table.add()", function*() {
 });
 
 spawnedTest("creating using Table.put()", function*(){
-    // Ways to produce CREATEs:
-    //  Table.add()
-    //  Table.put()
-    //  Table.bulkAdd()
-
     yield expect ([{
         op: "create",
         key: 1,
@@ -418,11 +414,6 @@ spawnedTest("creating using Table.put()", function*(){
 });
 
 spawnedTest("creating using Table.bulkAdd()", function*(){
-    // Ways to produce CREATEs:
-    //  Table.add()
-    //  Table.put()
-    //  Table.bulkAdd()
-
     yield expect ([{
         op: "create",
         key: 1,
@@ -464,6 +455,49 @@ spawnedTest("creating using Table.bulkAdd()", function*(){
         yield db.table2.bulkAdd([{}, {}], [1,1]).catch(nop); // 1. success, 2. error event.
         yield db.table2.bulkAdd([{}, {}, {}], [2,2,3]).catch(nop); // 1. success, 2. error event. 3. success.
         yield db.table1.bulkAdd([{id:{}}]).catch(nop);// Trigger direct exception (invalid key type)
+    }).catch(nop));
+});
+
+spawnedTest("creating using Table.bulkPut()", function*(){
+    yield expect ([{
+        op: "create",
+        key: 1,
+        value: {id: 1, idx: 11}
+    },{
+        op: "create",
+        key: 1.2,
+        value: {id: 1.2, idx: 11.2}
+    },{
+        op: "create",
+        key: 2,
+        value: {idx: 12}
+    },{
+        op: "create",
+        key: 2.2,
+        value: {idx: 12.2}
+    },{
+        op: "create",
+        value: {idx: 13}
+    },{
+        op: "create",
+        value: {idx: 13.2}
+    },{
+        op: "create",
+        value: {idx: 14}
+    },{
+        op: "create",
+        value: {idx: 14.2}
+    }], () => db.transaction('rw', db.tables, function* () {
+        yield db.table1.bulkPut([{id: 1, idx: 11},{id: 1.2, idx: 11.2}]);
+        yield db.table2.bulkPut([{idx: 12},{idx: 12.2}], [2, 2.2]);
+        yield db.table3.bulkPut([{idx: 13},{idx: 13.2}]);
+        yield db.table4.bulkPut([{idx: 14},{idx: 14.2}]);
+    }));
+
+    yield verifyErrorFlows(()=>db.transaction('rw', db.tables, function* () {
+        yield db.table3.bulkPut([{idx:1},{idx:1}]).catch(nop); // 1. success, 2. error event.
+        yield db.table3.bulkPut([{idx:2},{idx:2},{idx:3}]).catch(nop); // 1. success, 2. error event., 3. success
+        yield db.table1.bulkPut([{id:{}}]).catch(nop);// Trigger direct exception (invalid key type)
     }).catch(nop));
 });
 
@@ -527,6 +561,7 @@ spawnedTest("reading tests", function* (){
 // UPDATING hooks test
 // Ways to produce UPDATEs:
 //  Table.put()
+//  Table.bulkPut()
 //  Table.update()
 //  Collection.modify()
 
@@ -549,6 +584,28 @@ spawnedTest("updating using Table.put()", function*(){
         yield db.table3.add({id:1, idx:1});
         yield db.table3.put({id:2, idx:1}).catch(nop); // error event (constraint)
         yield db.table3.put({id:{}}).catch(nop); // Trigger direct exception (invalid key type)
+    }).catch(nop));
+});
+
+spawnedTest("updating using Table.bulkPut()", function*(){
+    yield expect ([{
+        op: "create",
+        key: 1,
+        value: {id:1, address: {city: 'A'}}
+    },{
+        op: "update",
+        key: 1,
+        obj: {id:1, address: {city: 'A'}},
+        mods: {"address.city": "B"},
+    }], ()=>db.transaction('rw', db.tables, function* (){
+        db.table1.put({id:1, address: {city: 'A'}}); // create
+        db.table1.put({id:1, address: {city: 'B'}}); // update
+    }));
+
+    yield verifyErrorFlows(()=>db.transaction('rw', db.tables, function* () {
+        yield db.table4.add({idx:1}, 1);
+        yield db.table4.bulkPut([{idx:1}], [2]).catch(nop); // error event (DataError)
+        yield db.table3.bulkPut([{}],[{}]).catch(nop); // Trigger direct exception (invalid key type)
     }).catch(nop));
 });
 
@@ -601,6 +658,7 @@ spawnedTest("updating using Collection.modify()", function*(){
 //
 // Ways to produce DELETEs:
 //  Table.delete(key)
+//  Table.bulkDetele(keys)
 //  Table.clear()
 //  Collection.modify()
 //  Collection.delete()
@@ -617,6 +675,23 @@ spawnedTest("deleting using Table.delete(key)", function*(){
     }], ()=>db.transaction('rw', db.tables, function* (){
         yield db.table1.add({id:1}); // create
         yield db.table1.delete(1); // delete
+    }));
+
+    // No error flows to verify. If anything is ever found, there's no way to make a deletion of it fail.
+});
+
+spawnedTest("deleting using Table.bulkDelete(key)", function*(){
+    yield expect ([{
+        op: "create",
+        key: 1,
+        value: {id:1}
+    },{
+        op: "delete",
+        key: 1,
+        obj: {id:1}
+    }], ()=>db.transaction('rw', db.tables, function* (){
+        yield db.table1.add({id:1}); // create
+        yield db.table1.bulkDelete([1]); // delete
     }));
 
     // No error flows to verify. If anything is ever found, there's no way to make a deletion of it fail.

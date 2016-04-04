@@ -390,6 +390,138 @@ spawnedTest("bulkAdd-catch sub transaction", function*(){
     equal(yield db.users.where('username').startsWith('aper').count(), 0, "0 users! Good, means that inner transaction did not commit");
 });
 
+spawnedTest("bulkPut", function*(){
+    var highestKey = yield db.users.add({username: "fsdkljfd", email: ["fjkljslk"]});
+    ok(true, "Highest key was: " + highestKey);
+    // Delete test item.
+    yield db.users.delete(highestKey);
+    ok(true, "Deleted test item");
+    var result = yield db.users.bulkPut([
+        { first: "Åke1", last: "Persbrant1", username: "aper1", email: ["aper1@persbrant.net"] },
+        { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] }
+    ]);
+    equal (result, highestKey + 2, "Result of bulkPut() operation was equal to highestKey + 2");
+});
+
+spawnedTest("bulkPut-catching errors", function*() {
+    yield db.transaction("rw", db.users, function() {
+        var newUsers = [
+            { first: "Åke1", last: "Persbrant1", username: "aper1", email: ["aper1@persbrant.net"] },
+            { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] },
+            { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] }, // Should fail
+            { first: "Åke3", last: "Persbrant3", username: "aper3", email: ["aper3@persbrant.net"] }
+        ];
+        db.users.bulkPut(newUsers).then(()=> {
+            ok(false, "Should not resolve when one operation failed");
+        }).catch(Dexie.BulkError, e=>{
+            ok(true, "Got BulkError: " + e.message);
+            equal(e.failures.length, 1, "One error due to a duplicate username: " + e.failures[0]);
+        });
+
+        // Now, since we catched the error, the transaction should continue living.
+        db.users.where("username").startsWith("aper").count(function(count) {
+            equal(count, 3, "Got three matches now when users are bulk-putted");
+        });
+    });
+
+    equal(yield db.users.where("username").startsWith('aper').count(), 3, "Previous transaction committed");
+
+    var newUsersX = [
+        {first: "Xke1", last: "Persbrant1", username: "xper1", email: ["xper1@persbrant.net"]},
+        {first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"]},
+        {first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"]}, // Should fail
+        {first: "Xke3", last: "Persbrant3", username: "xper3", email: ["xper3@persbrant.net"]}
+    ];
+    try {
+        yield db.transaction("rw", db.users, () => {
+            db.users.bulkPut(newUsersX).then(()=> {
+                ok(false, "Should not resolve");
+            });
+        });
+        ok(false, "Should not come here");
+    } catch (e) {
+        ok(true, "Got: " + e);
+    }
+
+    equal(yield db.users.where('username').startsWith('xper').count(), 0, "0 users! Good, means that previous transaction did not commit");
+
+    yield db.users.bulkPut(newUsersX).catch(e => {
+        ok(true, "Got error. Catching it should make the successors work.")
+    });
+
+    equal(yield db.users.where('username').startsWith('xper').count(), 3,
+        "Should count to 3 users because previous operation was catched and therefore should have been committed");
+
+    var newUsersY = [
+        {first: "Yke1", last: "Persbrant1", username: "yper1", email: ["yper1@persbrant.net"]},
+        {first: "Yke2", last: "Persbrant2", username: "yper2", email: ["yper2@persbrant.net"]},
+        {first: "Yke2", last: "Persbrant2", username: "yper2", email: ["yper2@persbrant.net"]}, // Should fail
+        {first: "Yke3", last: "Persbrant3", username: "yper3", email: ["yper3@persbrant.net"]}
+    ];
+
+    // Now check that catching the operation via try..catch should also make it succeed.
+    try {
+        yield db.users.bulkPut(newUsersY);
+    } catch (e) {
+        ok(true, "Got: " + e);
+    }
+    equal(yield db.users.where('username').startsWith('yper').count(), 3,
+        "Should count to 3 users because previous previous operation catched (via try..yield..catch this time, and therefore should have been committed");
+
+    // Now check that catching and rethrowing should indeed make it fail
+    var newUsersZ = [
+        {first: "Zke1", last: "Persbrant1", username: "zper1", email: ["zper1@persbrant.net"]},
+        {first: "Zke2", last: "Persbrant2", username: "zper2", email: ["zper2@persbrant.net"]},
+        {first: "Zke2", last: "Persbrant2", username: "zper2", email: ["zper2@persbrant.net"]}, // Should fail
+        {first: "Zke3", last: "Persbrant3", username: "zper3", email: ["zper3@persbrant.net"]}
+    ];
+
+    yield db.transaction('rw', db.users, function*() {
+        try {
+            yield db.users.bulkPut(newUsersZ);
+        } catch (e) {
+            throw e;
+        }
+    }).catch(Dexie.BulkError, e => {
+        ok(true, "Got rethrown BulkError: " + e.stack);
+    });
+
+    equal(yield db.users.where('username').startsWith('zper').count(), 0, "0 users! Good - means that previous operation rethrown (via try..yield..catch--throw this time, and therefore not committed");
+});
+
+spawnedTest("bulkPut-non-inbound-autoincrement", function*(){
+    yield db.folks.bulkPut([
+        { first: "Foo", last: "Bar"},
+        { first: "Foo", last: "Bar2"},
+        { first: "Foo", last: "Bar3"},
+        { first: "Foo", last: "Bar4"}
+    ]);
+    equal (yield db.folks.where('first').equals('Foo').count(), 4, "Should be 4 Foos");
+    equal (yield db.folks.where('last').equals('Bar').count(), 1, "Shoudl be 1 Bar");
+});
+
+spawnedTest("bulkPut-catch sub transaction", function*(){
+    yield db.transaction('rw', db.users, ()=>{
+        var newUsers = [
+            { first: "Åke1", last: "Persbrant1", username: "aper1", email: ["aper1@persbrant.net"] },
+            { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] },
+            { first: "Åke2", last: "Persbrant2", username: "aper2", email: ["aper2@persbrant.net"] }, // Should fail
+            { first: "Åke3", last: "Persbrant3", username: "aper3", email: ["aper3@persbrant.net"] }
+        ];
+        db.transaction('rw', db.users, ()=>{
+            db.users.bulkPut(newUsers);
+        }).then(()=>{
+            ok(false, "Should not succeed with all these operations");
+        }).catch(e => {
+            equal(e.failures.length, 1, "Should get one failure");
+        });
+    }).catch(e => {
+        ok(true, "Outer transaction aborted due to inner transaction abort. This is ok: " + e);
+    });
+
+    equal(yield db.users.where('username').startsWith('aper').count(), 0, "0 users! Good, means that inner transaction did not commit");
+});
+
 spawnedTest("bulkDelete", function*(){
     let userKeys = yield db.users.orderBy('id').keys();
     ok(userKeys.length > 0, "User keys found: " + userKeys.join(','));

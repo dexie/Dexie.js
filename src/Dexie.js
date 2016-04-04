@@ -1181,6 +1181,79 @@ export default function Dexie(dbName, options) {
                         .then(()=>{}); // Resolve with undefined.
                 }
             },
+            bulkPut: function(objects, keys) {
+                return this._idbstore(READWRITE, (resolve, reject, idbstore, trans) => {
+                    if (!idbstore.keyPath && !this.schema.primKey.auto && !keys)
+                        throw new exceptions.InvalidArgument("bulkPut() with non-inbound keys requires keys array in second argument");
+                    if (idbstore.keyPath && keys)
+                        throw new exceptions.InvalidArgument("bulkPut(): keys argument invalid on tables with inbound keys");
+                    if (keys && keys.length !== objects.length)
+                        throw new exceptions.InvalidArgument("Arguments objects and keys must have the same length");
+                    if (objects.length === 0) return resolve(); // Caller provided empty list.
+                    const done = result => {
+                        if (errorList.length === 0) resolve(result);
+                        else reject(new BulkError(`${this.name}.bulkPut(): ${errorList.length} of ${numObjs} operations failed`, errorList));
+                    }
+                    var req,
+                        errorList = [],
+                        errorHandler,
+                        successHandler,
+                        numObjs = objects.length,
+                        table = trans.tables[this.name]; // Enable us to do stuff in several steps with same transaction.
+                    if (this.hook.creating.fire === nop && this.hook.updating.fire === nop) {
+                        //
+                        // Standard Bulk (no 'creating' or 'updating' hooks to care about)
+                        //
+                        errorHandler = BulkErrorHandlerCatchAll(errorList);
+                        for (var i = 0, l = objects.length; i < l; ++i) {
+                            req = keys ? idbstore.put(objects[i], keys[i]) : idbstore.put(objects[i]);
+                            req.onerror = errorHandler;
+                        }
+                        // Only need to catch success or error on the last operation
+                        // according to the IDB spec.
+                        req.onerror = BulkErrorHandlerCatchAll(errorList, done);
+                        req.onsuccess = BulkSuccessHandler(done);
+                    } else {
+                        let effectiveKeys = keys || idbstore.keyPath && objects.map(o=>getByKeyPath(o, idbstore.keyPath));
+                        let objectLookup = effectiveKeys && effectiveKeys.reduce((res, key, i)=> {
+                                if (key != null) res[key] = objects[i];
+                                return res;
+                            }, {}); // Generates map of {[key]: object}
+
+                        let promise = !effectiveKeys ?
+
+                            // Auto-incremented key-less objects only without any keys argument.
+                            table.bulkAdd(objects) :
+
+                            // Keys provided. Either as inbound in provided objects, or as a keys argument.
+                            // Begin with updating those that exists in DB:
+                            table.where(':id').anyOf(Object.keys(objectLookup)).modify(function () {
+                                this.value = objectLookup[this.primKey];
+                                objectLookup[this.primKey] = null; // Mark as "don't add this"
+                            }).then(()=> {
+                                // Now, let's examine which items didnt exist so we can add them:
+                                let objsToAdd = [],
+                                    keysToAdd = keys && [];
+                                effectiveKeys.forEach((key, i) => {
+                                    if (key == null || objectLookup[key]) {
+                                        objsToAdd.push(objects[i]);
+                                        keys && keysToAdd.push(key);
+                                    }
+                                });
+                                return table.bulkAdd(objsToAdd, keysToAdd);
+                            }).then(lastAddedKey => {
+                                // Resolve with key of the last object in given arguments to bulkPut():
+                                let lastEffectiveKey = effectiveKeys[effectiveKeys.length - 1]; // Key was provided.
+                                return lastEffectiveKey != null ? lastEffectiveKey : lastAddedKey;
+                            });
+
+                        promise.then(resolve).catch(ModifyError, e => {
+                            // Map ModifyError to BulkError
+                            reject(new BulkError(e.msg, e.failures))
+                        }).catch(reject);
+                    }
+                }, "locked"); // If called from transaction scope, lock transaction til all steps are done.
+            },
             bulkAdd: function(objects, keys) {
                 var self = this,
                     creatingHook = this.hook.creating.fire;
