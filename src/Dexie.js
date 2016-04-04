@@ -1135,12 +1135,12 @@ export default function Dexie(dbName, options) {
             if (!hasDeleteHook) {
                 for (var i=0; i < len; ++i) {
                     var req = idbstore.delete(keysOrTuples[i]);
-                    req.onerror = ev => reject(ev.target.error);
+                    req.onerror = ev => reject(mapError(ev.target.error));
                     if (i === lastItem) req.onsuccess = ()=>resolve();
                 }
             } else {
                 let hookCtx = {onsuccess: null, onerror: null},
-                    errorHandler = BulkErrorHandler(reject),
+                    errorHandler = BulkErrorHandler(e => reject(mapError(e))),
                     successHandler = BulkSuccessHandler(null, true);
                 miniTryCatch(()=> {
                     for (var i = 0; i < len; ++i) {
@@ -1168,6 +1168,19 @@ export default function Dexie(dbName, options) {
     derive(WriteableTable).from(Table).extend(function () {
 
         return {
+            bulkDelete: function (keys) {
+                if (this.hook.deleting.fire === nop) {
+                    return this._idbstore(READWRITE, (resolve, reject, idbstore, trans) => {
+                        resolve (bulkDelete(idbstore, trans, keys, false, nop));
+                    });
+                } else {
+                    return this
+                        .where(':id')
+                        .anyOf(keys)
+                        .delete()
+                        .then(()=>{}); // Resolve with undefined.
+                }
+            },
             bulkAdd: function(objects, keys) {
                 var self = this,
                     creatingHook = this.hook.creating.fire;

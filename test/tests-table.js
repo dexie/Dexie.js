@@ -390,6 +390,30 @@ spawnedTest("bulkAdd-catch sub transaction", function*(){
     equal(yield db.users.where('username').startsWith('aper').count(), 0, "0 users! Good, means that inner transaction did not commit");
 });
 
+spawnedTest("bulkDelete", function*(){
+    let userKeys = yield db.users.orderBy('id').keys();
+    ok(userKeys.length > 0, "User keys found: " + userKeys.join(','));
+    yield db.users.bulkDelete(userKeys);
+    let userCount = yield db.users.count();
+    equal (userCount, 0, "Should be no users there now");
+});
+
+spawnedTest("bulkDelete - nonexisting keys", function*(){
+    let userKeys = ["nonexisting1", "nonexisting2", yield db.users.orderBy(':id').lastKey()];
+    yield db.users.bulkDelete(userKeys);
+    let userCount = yield db.users.count();
+    equal (userCount, 1, "Should be one user there now. (the other should have been deleted)");
+});
+
+spawnedTest("bulkDelete-faulty-key", function*(){
+    let userKeys = [{faulty: "ohyes"}];
+    yield db.users.bulkDelete(userKeys).then (()=>{
+        ok (false, "Should not succeed");
+    }).catch('DataError', e => {
+        ok (true, "Should get error: " + e);
+    });
+});
+
 asyncTest("delete", function () {
     // Without transaction
     db.users.get(idOfFirstUser, function (user) {
