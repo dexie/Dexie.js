@@ -93,32 +93,35 @@ module("WhereClause", {
 });
 
 spawnedTest('Issue#31 Compound Index with anyOf', function*(){
-   yield db.people.bulkAdd([{
+    if (!supports('compound'))
+        return ok(true, "SKIPPED - COMPOUND UNSUPPORTED");
+    
+    yield db.people.bulkAdd([{
        name: 0,
        number: 0,
        tag: "A"
-   },{
+    },{
        name: -1,
        number: 0,
        tag: "B"
-   },{
+    },{
        name: -2,
        number: 0,
        tag: "C"
-   }, {
+    }, {
        name: -3,
        number: 0,
        tag: "D"
-   }]);
-   
-   var items = yield db.people
+    }]);
+
+    var items = yield db.people
     .where('[name+number]')
     .anyOf([ [ -2, 0 ], [ -3, 0 ] ] ) // https://github.com/dfahlander/Dexie.js/issues/31
     .toArray();
-    
-   equal (items.length, 2, "It should contain 2 items.");
-   equal (items[0].tag, "D", "First we should get D");
-   equal (items[1].tag, "C", "then we should get C");
+
+    equal (items.length, 2, "It should contain 2 items.");
+    equal (items[0].tag, "D", "First we should get D");
+    equal (items[1].tag, "C", "then we should get C");
 });
 
 asyncTest("startsWithAnyOf()", function () {

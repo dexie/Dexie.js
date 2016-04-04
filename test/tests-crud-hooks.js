@@ -19,6 +19,8 @@ db.version(1).stores({
     table5: ""
 });
 
+var ourTables = [db.table1, db.table2, db.table3, db.table4, db.table5];
+
 var opLog = [],
     successLog = [],
     errorLog = [],
@@ -34,7 +36,7 @@ var opLog = [],
     transLog = [];
 
 function unsubscribeHooks() {
-    db.tables.forEach(table => {
+    ourTables.forEach(table => {
         table.hook('creating').unsubscribe(creating2);
         table.hook('creating').unsubscribe(creating1);
         table.hook('reading').unsubscribe(reading1);
@@ -47,7 +49,7 @@ function unsubscribeHooks() {
 }
 
 function subscrubeHooks() {
-    db.tables.forEach(table => {
+    ourTables.forEach(table => {
         table.hook('creating', creating1);
         table.hook('creating', creating2);
         table.hook('reading', reading1);
@@ -60,7 +62,7 @@ function subscrubeHooks() {
 }
 const reset = async(function* reset () {
     unsubscribeHooks();
-    yield all(db.tables.map(table => table.clear()));
+    yield all(ourTables.map(table => table.clear()));
     subscrubeHooks();
     opLog = [];
     successLog = [];
@@ -370,13 +372,13 @@ spawnedTest("creating using Table.add()", function*() {
         db.table4.add({idx: 14});
     }));
 
-    yield verifyErrorFlows(()=>db.transaction('rw', db.tables, ()=>all([
-        db.table1.add({id:1}), // success
-        db.table1.add({id:1}).catch(nop), // Trigger error event (constraint)
-        db.table2.add({}, 1), // sucesss
-        db.table2.add({}, 1).catch(nop), // Trigger error event (constraint)
-        db.table1.add({id:{}}).catch(nop)// Trigger direct exception (invalid key type)
-    ])).catch(nop));
+    yield verifyErrorFlows(()=>db.transaction('rw', db.tables, function* () {
+        yield db.table1.add({id: 1}); // success
+        yield db.table1.add({id: 1}).catch(nop); // Trigger error event (constraint)
+        yield db.table2.add({}, 1); // sucesss
+        yield db.table2.add({}, 1).catch(nop); // Trigger error event (constraint)
+        yield db.table1.add({id: {}}).catch(nop);// Trigger direct exception (invalid key type)
+    }).catch(nop));
 });
 
 spawnedTest("creating using Table.put()", function*(){
@@ -406,13 +408,13 @@ spawnedTest("creating using Table.put()", function*(){
         db.table4.put({idx:14});
     }));
 
-    yield verifyErrorFlows(()=>db.transaction('rw', db.tables, ()=>all([
-        db.table3.put({idx:1}), // success
-        db.table3.put({idx:1}).catch(nop), // Trigger error event (constraint)
-        db.table2.put({}, 1), // sucesss
-        db.table2.put({}, 1).catch(nop), // Trigger error event (constraint)
-        db.table3.put({id:{}}).catch(nop)// Trigger direct exception (invalid key type)
-    ])).catch(nop));
+    yield verifyErrorFlows(()=>db.transaction('rw', db.tables, function* () {
+        yield db.table3.put({idx: 1}); // success
+        yield db.table3.put({idx: 1}).catch(nop); // Trigger error event (constraint)
+        yield db.table2.put({}, 1); // sucesss
+        yield db.table2.put({}, 1).catch(nop); // Trigger error event (constraint)
+        yield db.table3.put({id: {}}).catch(nop);// Trigger direct exception (invalid key type)
+    }).catch(nop));
 });
 
 spawnedTest("creating using Table.bulkAdd()", function*(){
