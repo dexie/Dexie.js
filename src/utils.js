@@ -161,20 +161,35 @@ export function deepClone(any) {
     return rv;
 }
 
-export function getObjectDiff(a, b) {
+export function getObjectDiff(a, b, rv, prfx) {
     // This is a simplified version that will always return keypaths on the root level.
     // If for example a and b differs by: (a.somePropsObject.x != b.somePropsObject.x), we will return that "somePropsObject" is changed
     // and not "somePropsObject.x". This is acceptable and true but could be optimized to support nestled changes if that would give a
     // big optimization benefit.
-    var rv = {};
+    rv = rv || {};
+    prfx = prfx || '';
     for (var prop in a) if (a.hasOwnProperty(prop)) {
         if (!b.hasOwnProperty(prop))
-            rv[prop] = undefined; // Property removed
-        else if (a[prop] !== b[prop] && JSON.stringify(a[prop]) != JSON.stringify(b[prop]))
-            rv[prop] = b[prop]; // Property changed
+            rv[prfx+prop] = undefined; // Property removed
+        else {
+            let ap = a[prop],
+                bp = b[prop];
+            if (typeof ap === 'object' && typeof bp === 'object')
+                getObjectDiff(ap, bp, rv, prfx + prop + ".");
+            else if (ap !== bp)
+                rv[prfx + prop] = b[prop];// Primitive value changed
+        }
     }
     for (var prop in b) if (b.hasOwnProperty(prop) && !a.hasOwnProperty(prop)) {
-        rv[prop] = b[prop]; // Property added
+        rv[prfx+prop] = b[prop]; // Property added
     }
     return rv;
+}
+
+export function idbp(idbOperation) {
+    return new Promise((resolve,reject) => {
+        let req = idbOperation();
+        req.onerror = reject;
+        req.onsuccess = resolve;
+    });
 }

@@ -1,9 +1,11 @@
+import {extend} from './utils';
+
 export function nop() { }
 export function mirror(val) { return val; }
 export function pureFunctionChain(f1, f2) {
     // Enables chained events that takes ONE argument and returns it to the next function in chain.
     // This pattern is used in the hook("reading") event.
-    if (f1 === mirror) return f2;
+    if (f1 == null || f1 === mirror) return f2;
     return function (val) {
         return f2(f1(val));
     };
@@ -31,6 +33,19 @@ export function hookCreatingChain(f1, f2) {
         if (onsuccess) this.onsuccess = this.onsuccess ? callBoth(onsuccess, this.onsuccess) : onsuccess;
         if (onerror) this.onerror = this.onerror ? callBoth(onerror, this.onerror) : onerror;
         return res2 !== undefined ? res2 : res;
+    };
+}
+
+export function hookDeletingChain(f1, f2) {
+    if (f1 === nop) return f2;
+    return function () {
+        f1.apply(this, arguments);
+        var onsuccess = this.onsuccess, // In case event listener has set this.onsuccess
+            onerror = this.onerror;     // In case event listener has set this.onerror
+        this.onsuccess = this.onerror = null;
+        f2.apply(this, arguments);
+        if (onsuccess) this.onsuccess = this.onsuccess ? callBoth(onsuccess, this.onsuccess) : onsuccess;
+        if (onerror) this.onerror = this.onerror ? callBoth(onerror, this.onerror) : onerror;
     };
 }
 

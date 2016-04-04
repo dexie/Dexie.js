@@ -265,11 +265,13 @@ declare module Dexie {
         reverse(): Collection<T, Key>;
         mapToClass(constructor: Function): Function;
         add(item: T, key?: Key): Promise<Key>;
-        bulkAdd(items: T[]): Promise<void>;
         update(key: Key, changes: { [keyPath: string]: any }): Promise<number>;
         put(item: T, key?: Key): Promise<Key>;
         delete(key: Key): Promise<void>;
         clear(): Promise<void>;
+        bulkAdd(items: T[], keys?: IndexableType[]): Promise<Key>;
+        bulkPut(items: T[], keys?: IndexableType[]): Promise<Key>;
+        bulkDelete(keys: IndexableType[]) : Promise<void>;
     }
 
     interface WhereClause<T, Key> {
@@ -297,6 +299,7 @@ declare module Dexie {
 
     interface Collection<T, Key> {
         and(filter: (x: T) => boolean): Collection<T, Key>;
+        clone(props?: Object): Collection<T, Key>;
         count(): Promise<number>;
         count<U>(onFulfilled: (value: number) => Thenable<U>): Promise<U>;
         count<U>(onFulfilled: (value: number) => U): Promise<U>;
@@ -316,6 +319,7 @@ declare module Dexie {
         limit(n: number): Collection<T, Key>;
         offset(n: number): Collection<T, Key>;
         or(indexOrPrimayKey: string): WhereClause<T, Key>;
+        raw(): Collection<T, Key>;
         reverse(): Collection<T, Key>;
         sortBy(keyPath: string): Promise<T[]>;
         sortBy<U>(keyPath: string, onFulfilled: (value: T[]) => Thenable<U>): Promise<U>;
