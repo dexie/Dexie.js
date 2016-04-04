@@ -80,15 +80,15 @@ const reset = async(function* reset () {
 });
 
 /*function stack() {
-    if (Error.captureStackTrace) {
-        let obj = {};
-        Error.captureStackTrace(obj, stack);
-        return obj.stack;
-    }
-    var e = new Error("");
-    if (e.stack) return e.stack;
-    try{throw e}catch(ex){return ex.stack || "";}
-}*/
+ if (Error.captureStackTrace) {
+ let obj = {};
+ Error.captureStackTrace(obj, stack);
+ return obj.stack;
+ }
+ var e = new Error("");
+ if (e.stack) return e.stack;
+ try{throw e}catch(ex){return ex.stack || "";}
+ }*/
 
 function nop(){}
 
@@ -263,7 +263,17 @@ module("crud-hooks", {
 const expect = async (function* (expected, modifyer) {
     yield reset();
     yield modifyer();
-    equal(JSON.stringify(opLog, null, 2), JSON.stringify(expected, null, 2), "Expected oplog: " + JSON.stringify(expected));
+    let expectedJSONs = expected.map(JSON.stringify);
+    opLog.forEach(op => {
+        let i = expectedJSONs.indexOf(JSON.stringify(op));
+        ok(i !== -1, `Operation ${JSON.stringify(op)} was expected`);
+        expectedJSONs.splice(i, 1);
+    });
+    equal (expectedJSONs.join(',\n'), "", "All expected operations were present in oplog");
+    let expectedWithActualOrder = opLog.slice(); // We've already confirmed that extended and opLog is equal but may
+    // have different order. Henceforth, assume the actual order.
+
+    ok(expected.every(x => opLog.some(op => JSON.stringify(op) === JSON.stringify(x))), "All expected items present in actual oplog");
     ok(transLog.every(x => x.trans && x.current === x.trans), "transaction argument is valid and same as Dexie.currentTransaction");
     yield reset();
     watchSuccess = true;
@@ -272,7 +282,7 @@ const expect = async (function* (expected, modifyer) {
     equal (errorLog.length + errorLog2.length, 0, "No errors should have been registered");
     equal (successLog.length, expected.filter(op => op.op !== 'read').length, "First hook got success events");
     equal (successLog2.length, expected.filter(op => op.op !== 'read').length, "Second hook got success events");
-    expected.forEach((x, i) => {
+    expectedWithActualOrder.forEach((x, i) => {
         if (x.op === "create" && x.key !== undefined) {
             equal(successLog[i], x.key, "Success events got the correct key");
             equal(successLog2[i], x.key, "Success events got the correct key (2)");
@@ -288,9 +298,9 @@ const expect = async (function* (expected, modifyer) {
         watchError = true;
         yield modifyer();
         equal (errorLog.length + errorLog2.length, 0, "No errors should have been registered");
-        expected.forEach((x, i) => {
+        opLog.forEach((x, i) => {
             if (x.op === "create" && x.key === undefined) {
-                equal(opLog[i].key, expected[i].key, "First hook got expected key delivered");
+                equal(opLog[i].key, expectedWithActualOrder[i].key, "First hook got expected key delivered");
                 equal(opLog2[i].key, deliverKeys[i], "Second hook got key delivered from first hook");
                 equal(successLog[i], deliverKeys2[i], "Success event got delivered key from hook2");
                 equal(successLog2[i], deliverKeys2[i], "Success event got delivered key from hook2 (2)");
@@ -302,18 +312,18 @@ const expect = async (function* (expected, modifyer) {
         yield reset();
         deliverModifications = {"someProp.someSubProp": "someValue"};
         yield modifyer();
-        expected.forEach((x, i) => {
-           if (x.op === "update") {
-               equal(
-                   JSON.stringify(opLog[i].obj),
-                   JSON.stringify(opLog2[i].obj),
-                   "Object has not yet been changed in hook2");
-               ok(Object.keys(opLog[i].mods).every(prop =>
+        expectedWithActualOrder.forEach((x, i) => {
+            if (x.op === "update") {
+                equal(
+                    JSON.stringify(opLog[i].obj),
+                    JSON.stringify(opLog2[i].obj),
+                    "Object has not yet been changed in hook2");
+                ok(Object.keys(opLog[i].mods).every(prop =>
                     JSON.stringify(opLog[i].mods[prop]) ===
                     JSON.stringify(opLog2[i].mods[prop])),
-                   "All mods that were originally sent to hook1, are also sent to hook2");
-               ok("someProp.someSubProp" in opLog2[i].mods, "oplog2 got first hook's additional modifications");
-           }
+                    "All mods that were originally sent to hook1, are also sent to hook2");
+                ok("someProp.someSubProp" in opLog2[i].mods, "oplog2 got first hook's additional modifications");
+            }
         });
     }
 });
