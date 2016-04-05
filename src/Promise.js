@@ -42,7 +42,7 @@ var asap = _asap,
 
 var operationsQueue = [];
 var tickFinalizers = [];
-function enqueueImmediate(fn, args) {
+var enqueueImmediate = function (fn) {
     operationsQueue.push([fn, slice(arguments, 1)]);
 }
 
@@ -357,7 +357,7 @@ Promise.usePSD = function (psd, fn) {
     } finally {
         Promise.PSD = outerScope;
     }
-}
+};
 
 Promise._rootExec = _rootExec;
 Promise._tickFinalize = function(callback) {

@@ -2,7 +2,7 @@ import {slice, keys, isArray, asap, _global} from './utils';
 import {nop, stoppableEventChain} from './chaining-functions';
 import {exceptions} from './errors';
 
-export default function Events(ctx, eventNames) {
+export default function Events(ctx) {
     var args = arguments;
     var evs = {};
     var rv = function (eventName, subscriber) {

@@ -2,6 +2,8 @@ import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
 import {resetDatabase} from './dexie-unittest-utils';
 
+"use strict";
+
 var db = new Dexie("TestDBTrans");
 db.version(1).stores({
     users: "username",
@@ -18,6 +20,21 @@ module("transaction", {
     },
     teardown: function () {
     }
+});
+
+asyncTest("Transaction should fail if returning non-Dexie Promise in transaction scope", function(){
+    db.transaction('rw', db.users, function() {
+        return window.Promise.resolve().then(()=> {
+            ok(Dexie.currentTransaction == null, "Dexie.currentTransaction == null. If this assertion fails, don't weap. Rejoice and try to understand how the hell this could be possible.");
+            return db.users.add({ username: "foobar" });
+        }).then(()=>{
+            return db.users.add({ username: "barfoo" });
+        });
+    }).then (function(){
+        ok(false, "Transaction should not commit because we were using a non-Dexie promise");
+    }).catch ('IncompatiblePromiseError', function(e){
+        ok(true, "Good. Should fail with 'IncompatiblePromiseError': " + e);
+    }).finally(start);
 });
 
 asyncTest("empty transaction block", function () {
