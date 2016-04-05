@@ -528,9 +528,9 @@ spawnedTest("bulkPut-non-inbound-autoincrement", function*(){
         { first: "Foo2", last: "BarC"},
         { first: "Foo2", last: "BarD"}
     ],  [lastId - 3,
-        null,
+        void 0,
         lastId - 1,
-        null]);
+        void 0]);
     equal (newLastId, lastId + 2, "Should have incremented last ID twice now");
     equal (yield db.folks.where('first').equals('Foo').count(), 2, "Should be 2 Foos now");
     equal (yield db.folks.where('first').equals('Foo2').count(), 4, "Should be 4 Foo2s now");
