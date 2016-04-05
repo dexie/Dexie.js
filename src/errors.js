@@ -14,7 +14,8 @@ var dexieErrorNames = [
     'SubTransaction',
     'Unsupported',
     'Internal',
-    'DatabaseClosed'
+    'DatabaseClosed',
+    'IncompatiblePromise'
 ];
 
 var idbDomErrorNames = [
@@ -38,7 +39,8 @@ var errorList = dexieErrorNames.concat(idbDomErrorNames);
 
 var defaultTexts = {
     VersionChanged: "Database version changed by other database connection",
-    DatabaseClosed: "Database has been closed"
+    DatabaseClosed: "Database has been closed",
+    IncompatiblePromise: "Incompatible Promise used in transaction scope. See http://tinyurl.com/znyqjqc"
 };
 
 //

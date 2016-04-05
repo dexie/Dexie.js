@@ -892,9 +892,13 @@ export default function Dexie(dbName, options) {
                     // Finally, call the scope function with our table and transaction arguments.
                     Promise._rootExec(function() {
                         returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
-                        if (returnValue && typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
-                            // scopeFunc returned an iterable. Handle yield as await.
-                            returnValue = awaitIterable(returnValue);
+                        if (returnValue) {
+                            if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
+                                // scopeFunc returned an iterable. Handle yield as await.
+                                returnValue = awaitIterable(returnValue);
+                            } else if (typeof returnValue.then === 'function' && (!returnValue.hasOwnProperty('_PSD'))) {
+                                reject(stack(new exceptions.IncompatiblePromise()));
+                            }
                         }
                     });
                 });
