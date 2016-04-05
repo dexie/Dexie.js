@@ -102,7 +102,7 @@ export var exceptions = errorList.reduce((obj,name)=>{
     // and we cannot change Function.name programatically without
     // dynamically create a Function object, which would be considered
     // 'eval-evil'.
-    let fullName = name + "Error";
+    var fullName = name + "Error";
     function DexieError (msgOrInner, inner){
         this.name = fullName;
         if (typeof msgOrInner === 'string') {
@@ -132,7 +132,7 @@ export var exceptionMap = idbDomErrorNames.reduce((obj, name)=>{
 }, {});
 
 export function mapError (domError, message) {
-    let rv = domError;
+    var rv = domError;
     if (!(domError instanceof DexieError) && domError.name && exceptionMap[domError.name]) {
         rv = new exceptionMap[domError.name](message || domError.message, domError);
         if (domError.stack) rv.stack = domError.stack;

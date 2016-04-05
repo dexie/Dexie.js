@@ -62,8 +62,8 @@ var maxString = String.fromCharCode(65535),
 
 export default function Dexie(dbName, options) {
     /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
-    let deps = Dexie.dependencies;
-    let opts = extend({
+    var deps = Dexie.dependencies;
+    var opts = extend({
         // Default Options
         addons: Dexie.addons,           // Pick statically registered addons by default
         autoOpen: true,                 // Don't require db.open() explicitely.
@@ -642,7 +642,7 @@ export default function Dexie(dbName, options) {
     };
 
     this.close = function () {
-        let idx = connections.indexOf(db);
+        var idx = connections.indexOf(db);
         if (idx >= 0) connections.splice(idx, 1);
         if (idbdb) {
             idbdb.close();
@@ -1079,12 +1079,12 @@ export default function Dexie(dbName, options) {
     }
 
     function BulkErrorHandlerCatchAll(errorList, done) {
-        let psd = Promise.PSD;
+        var psd = Promise.PSD;
         return function(ev) {
             try {
                 if (ev.stopPropagation) ev.stopPropagation();
                 if (ev.preventDefault) ev.preventDefault();
-                let err = ev.target.error;
+                var err = ev.target.error;
                 errorList.push(err);
                 if (ev.target._err) {
                     Promise.usePSD(psd, ev.target._err.bind(null, err));
@@ -1096,9 +1096,9 @@ export default function Dexie(dbName, options) {
     }
 
     function BulkErrorHandler(done) {
-        let psd = Promise.PSD;
+        var psd = Promise.PSD;
         return function(ev) {
-            let err;
+            var err;
             try {
                 err = ev.target.error;
                 if (ev.target._err) {
@@ -1111,9 +1111,9 @@ export default function Dexie(dbName, options) {
     }
 
     function BulkSuccessHandler(done, hookListener) {
-        let psd = Promise.PSD;
+        var psd = Promise.PSD;
         return hookListener ? function(ev) {
-            let res;
+            var res;
             try {
                 res = ev.target.result;
                 ev.target._suc && Promise.usePSD(psd, ev.target._suc.bind(null, res));
@@ -1139,12 +1139,12 @@ export default function Dexie(dbName, options) {
                     if (i === lastItem) req.onsuccess = ()=>resolve();
                 }
             } else {
-                let hookCtx = {onsuccess: null, onerror: null},
+                var hookCtx = {onsuccess: null, onerror: null},
                     errorHandler = BulkErrorHandler(e => reject(mapError(e))),
                     successHandler = BulkSuccessHandler(null, true);
                 miniTryCatch(()=> {
                     for (var i = 0; i < len; ++i) {
-                        let tuple = keysOrTuples[i];
+                        var tuple = keysOrTuples[i];
                         deletingHook.call(hookCtx, tuple[0], tuple[1], trans);
                         var req = idbstore.delete(tuple[0]);
                         if (hookCtx.onerror) req._err = hookCtx.onerror;
@@ -1628,7 +1628,7 @@ export default function Dexie(dbName, options) {
                             // whether the caller is about to catch() the error or not. Have to make
                             // transaction fail. Catching such an error wont stop transaction from failing.
                             // This is a limitation we have to live with.
-                            let e2 = stack(mapError(e));
+                            var e2 = stack(mapError(e));
                             Dexie.ignoreTransaction(function() { self.on('error').fire(e2); });
                             self.abort();
                             reject(e2);
@@ -2098,7 +2098,7 @@ export default function Dexie(dbName, options) {
         }
 
         function addReplayFilter (ctx, factory) {
-            let curr = ctx.replayFilter;
+            var curr = ctx.replayFilter;
             ctx.replayFilter = curr ? ()=>combine(curr(), factory()) : factory;
         }
 
@@ -2114,14 +2114,14 @@ export default function Dexie(dbName, options) {
         }
 
         function openCursor(ctx, store) {
-            let idxOrStore = getIndexOrStore(ctx, store);
+            var idxOrStore = getIndexOrStore(ctx, store);
             return ctx.keysOnly && 'openKeyCursor' in idxOrStore ?
                 idxOrStore.openKeyCursor(ctx.range || null, ctx.dir + ctx.unique) :
                 idxOrStore.openCursor(ctx.range || null, ctx.dir + ctx.unique);
         }
 
         function iter(ctx, fn, resolve, reject, idbstore) {
-            let filter = ctx.replayFilter ? combine(ctx.filter, ctx.replayFilter()) : ctx.filter;
+            var filter = ctx.replayFilter ? combine(ctx.filter, ctx.replayFilter()) : ctx.filter;
             if (!ctx.or) {
                 iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, !ctx.keysOnly && ctx.valueFilter);
             } else {
@@ -2183,7 +2183,7 @@ export default function Dexie(dbName, options) {
             },
 
             clone: function (props) {
-                let rv = Object.create(this.constructor.prototype),
+                var rv = Object.create(this.constructor.prototype),
                     ctx = Object.create(this._ctx);
                 if (props) extend(ctx, props);
                 rv._ctx = ctx;
@@ -2271,7 +2271,7 @@ export default function Dexie(dbName, options) {
                 ctx.offset += offset; // For count()
                 if (!ctx.or && !ctx.algorithm && !ctx.filter && !ctx.replayFilter) {
                     addReplayFilter(ctx, ()=> {
-                        let offsetLeft = offset;
+                        var offsetLeft = offset;
                         return function offsetFilter(cursor, advance, resolve) {
                             if (offsetLeft === 0) return true;
                             if (offsetLeft === 1) { --offsetLeft; return false; }
@@ -2281,7 +2281,7 @@ export default function Dexie(dbName, options) {
                     });
                 } else {
                     addReplayFilter(ctx, ()=> {
-                        let offsetLeft = offset;
+                        var offsetLeft = offset;
                         return () => (--offsetLeft < 0);
                     });
                 }
@@ -2291,7 +2291,7 @@ export default function Dexie(dbName, options) {
             limit: function (numRows) {
                 this._ctx.limit = Math.min(this._ctx.limit, numRows); // For count()
                 addReplayFilter(this._ctx, ()=> {
-                    let rowsLeft = numRows;
+                    var rowsLeft = numRows;
                     return function (cursor, advance, resolve) {
                         if (--rowsLeft <= 0) advance(resolve); // Stop after this item has been included
                         return rowsLeft >= 0; // If numRows is already below 0, return false because then 0 was passed to numRows initially. Otherwise we wouldnt come here.
@@ -2384,7 +2384,7 @@ export default function Dexie(dbName, options) {
             },
 
             distinct: function () {
-                let ctx = this._ctx,
+                var ctx = this._ctx,
                     idx = ctx.index && ctx.table.schema.idxByName[ctx.index];
                 if (!idx || !idx.multi) return this; // distinct() only makes differencies on multiEntry indexes.
                 var set = {};
@@ -2565,7 +2565,7 @@ export default function Dexie(dbName, options) {
         },
 
         'delete': function () {
-            let ctx = this._ctx,
+            var ctx = this._ctx,
                 range = ctx.range,
                 deletingHook = ctx.table.hook.deleting.fire,
                 hasDeleteHook = deletingHook !== nop;
@@ -2582,13 +2582,13 @@ export default function Dexie(dbName, options) {
                 // (https://gist.github.com/dfahlander/5a39328f029de18222cf2125d56c38f7)
                 return this._write((resolve, reject, idbstore) => {
                     // Our API contract is to return a count of deleted items, so we have to count() before delete().
-                    let onerror = eventRejectHandler(reject, ["deleting range from", ctx.table.name]);
-                    let countReq = (range ? idbstore.count(range) : idbstore.count());
+                    var onerror = eventRejectHandler(reject, ["deleting range from", ctx.table.name]),
+                        countReq = (range ? idbstore.count(range) : idbstore.count());
                     countReq.onerror = onerror;
                     countReq.onsuccess = () => {
-                        let count = countReq.result;
+                        var count = countReq.result;
                         miniTryCatch(()=> {
-                            let delReq = (range ? idbstore.delete(range) : idbstore.clear());
+                            var delReq = (range ? idbstore.delete(range) : idbstore.clear());
                             delReq.onerror = onerror;
                             delReq.onsuccess = () => resolve(count);
                         }, err => reject(mapError(err)));
@@ -2603,14 +2603,14 @@ export default function Dexie(dbName, options) {
             const CHUNKSIZE = hasDeleteHook ? 2000 : 10000;
 
             return this._write((resolve, reject, idbstore, trans) => {
-                let totalCount = 0;
+                var totalCount = 0;
                 // Clone table and change the way transaction promises are generated.
                 // This is to be able to call other Collection methods within the same
                 // transaction even if the caller calls us without a transaction.
-                let table = Object.create(ctx.table);
+                var table = Object.create(ctx.table);
                 table._tpf = trans._tpf; // Enable us to keep same transaction even if called without transaction.
                 // Clone collection and change its table and set a limit of CHUNKSIZE on the cloned Collection instance.
-                let collection = this
+                var collection = this
                     .clone({
                         table: table,   // Execute in same transaction
                         keysOnly: !hasDeleteHook}) // load just keys (unless deleteHook has subscribers)
@@ -2619,7 +2619,7 @@ export default function Dexie(dbName, options) {
                     .limit(CHUNKSIZE)
                     .raw(); // Don't filter through reading-hooks (like mapped classes etc)
 
-                let keysOrTuples = [];
+                var keysOrTuples = [];
 
                 // We're gonna do things on as many chunks that are needed.
                 // Use recursion of nextChunk function:
@@ -2638,7 +2638,7 @@ export default function Dexie(dbName, options) {
                     return bulkDelete(idbstore, trans, keysOrTuples, hasDeleteHook, deletingHook);
 
                 }).then(()=> {
-                    let count = keysOrTuples.length;
+                    var count = keysOrTuples.length;
                     totalCount += count;
                     keysOrTuples = [];
                     return count < CHUNKSIZE ? totalCount : nextChunk();

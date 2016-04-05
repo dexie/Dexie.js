@@ -172,7 +172,7 @@ export function getObjectDiff(a, b, rv, prfx) {
         if (!b.hasOwnProperty(prop))
             rv[prfx+prop] = undefined; // Property removed
         else {
-            let ap = a[prop],
+            var ap = a[prop],
                 bp = b[prop];
             if (typeof ap === 'object' && typeof bp === 'object')
                 getObjectDiff(ap, bp, rv, prfx + prop + ".");
@@ -188,7 +188,7 @@ export function getObjectDiff(a, b, rv, prfx) {
 
 export function idbp(idbOperation) {
     return new Promise((resolve,reject) => {
-        let req = idbOperation();
+        var req = idbOperation();
         req.onerror = reject;
         req.onsuccess = resolve;
     });
