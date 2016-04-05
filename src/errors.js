@@ -14,8 +14,7 @@ var dexieErrorNames = [
     'SubTransaction',
     'Unsupported',
     'Internal',
-    'DatabaseClosed',
-
+    'DatabaseClosed'
 ];
 
 var idbDomErrorNames = [
@@ -40,7 +39,7 @@ var errorList = dexieErrorNames.concat(idbDomErrorNames);
 var defaultTexts = {
     VersionChanged: "Database version changed by other database connection",
     DatabaseClosed: "Database has been closed"
-}
+};
 
 //
 // DexieError - base class of all out exceptions.
@@ -138,16 +137,6 @@ export function mapError (domError, message) {
         if (domError.stack) rv.stack = domError.stack;
     }
     return rv;
-}
-
-export function stack(error) {
-    if (error.stack) return error;
-    try {
-        throw new Error();
-    } catch (e) {
-        error.stack = e.stack;
-    }
-    return error;
 }
 
 export var fullNameExceptions = errorList.reduce((obj, name)=>{

@@ -20,9 +20,9 @@ import {
     override,
     _global,
     doFakeAutoComplete,
-    assert,
     asap,
     miniTryCatch,
+    stack,
     fail,
     getByKeyPath,
     setByKeyPath,
@@ -32,21 +32,18 @@ import {
     getObjectDiff
 
 } from './utils';
-import { DexieError, ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError, stack } from './errors';
+import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
 import Promise from './Promise';
 import Events from './Events';
 import {
     nop,
     mirror,
     pureFunctionChain,
-    callBoth,
     hookCreatingChain,
     hookUpdatingChain,
     hookDeletingChain,
-    nonStoppableEventChain,
     promisableChain,
-    reverseStoppableEventChain,
-    stoppableEventChain
+    reverseStoppableEventChain
 } from './chaining-functions';
 
 var maxString = String.fromCharCode(65535),
@@ -103,7 +100,7 @@ export default function Dexie(dbName, options) {
             if (ev.newVersion > 0)
                 console.warn(`Another connection wants to upgrade database '${db.name}'. Closing db now to resume the upgrade.`);
             else
-                console.warn(`Another connection wants to delete database '${db.name}'. Closing db now to resume the delete request.`)
+                console.warn(`Another connection wants to delete database '${db.name}'. Closing db now to resume the delete request.`);
             db.close();
             // In many web applications, it would be recommended to force window.reload()
             // when this event occurs. To do that, subscribe to the versionchange event
@@ -296,9 +293,9 @@ export default function Dexie(dbName, options) {
                                         return function () {
                                             fn.apply(this, arguments);
                                             if (--uncompletedRequests === 0) cb(); // A called db operation has completed without starting a new operation. The flow is finished, now run next upgrader.
-                                        }
+                                        };
                                     }
-                                    return orig_promise.call(this, mode, function (resolve, reject, trans) {
+                                    return orig_promise.call(this, mode, function (resolve, reject) {
                                         arguments[0] = proxy(resolve);
                                         arguments[1] = proxy(reject);
                                         fn.apply(this, arguments);
@@ -348,7 +345,7 @@ export default function Dexie(dbName, options) {
         for (var table in oldSchema) {
             if (!newSchema[table]) diff.del.push(table);
         }
-        for (var table in newSchema) {
+        for (table in newSchema) {
             var oldDef = oldSchema[table],
                 newDef = newSchema[table];
             if (!oldDef) diff.add.push([table, newDef]);
@@ -371,7 +368,7 @@ export default function Dexie(dbName, options) {
                     for (var idxName in oldIndexes) {
                         if (!newIndexes[idxName]) change.del.push(idxName);
                     }
-                    for (var idxName in newIndexes) {
+                    for (idxName in newIndexes) {
                         var oldIdx = oldIndexes[idxName],
                             newIdx = newIndexes[idxName];
                         if (!oldIdx) change.add.push(newIdx);
@@ -537,7 +534,7 @@ export default function Dexie(dbName, options) {
         db_is_blocked = true;
         return new Promise(function (resolve, reject) {
             if (fake) resolve();
-            var req, dbWasCreated = false;
+            var req;
             function openError(err) {
                 try { req.transaction.abort(); } catch (e) { }
                 if (idbdb) try { idbdb.close(); } catch (e) { }
@@ -577,13 +574,12 @@ export default function Dexie(dbName, options) {
                             openError(new exceptions.NoSuchDatabase(`Database ${dbName} doesnt exist`));
                         };
                     } else {
-                        if (e.oldVersion === 0) dbWasCreated = true;
                         req.transaction.onerror = eventRejectHandler(openError);
                         var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
                         runUpgraders(oldVer / 10, req.transaction, openError, req);
                     }
                 }, openError);
-                req.onsuccess = trycatch(function (e) {
+                req.onsuccess = trycatch(function () {
                     isBeingOpened = false;
                     idbdb = req.result;
                     if (autoSchema) readGlobalSchema();
@@ -598,7 +594,7 @@ export default function Dexie(dbName, options) {
                     idbdb.onversionchange = ev=>{
                         db._vcFired = true; // detect implementations that not support versionchange (IE/Edge/Safari)
                         db.on("versionchange").fire(ev);
-                    }
+                    };
                     if (!hasNativeGetDatabaseNames) {
                         // Update localStorage with list of database names
                         globalDatabaseList(function (databaseNames) {
@@ -697,7 +693,7 @@ export default function Dexie(dbName, options) {
     };
     this.dynamicallyOpened = function() {
         return autoSchema;
-    }
+    };
 
     //
     // Properties
@@ -864,7 +860,7 @@ export default function Dexie(dbName, options) {
                                             });
                                         });
                                         return retval;
-                                    }
+                                    };
                                 }
                                 return orig.call(this, mode, function (resolve2, reject2, trans) {
                                     return fn(proxy(resolve2), proxy(reject2), trans);
@@ -1092,7 +1088,7 @@ export default function Dexie(dbName, options) {
             } finally {
                 if (done) done();
             }
-        }
+        };
     }
 
     function BulkErrorHandler(done) {
@@ -1107,7 +1103,7 @@ export default function Dexie(dbName, options) {
             } finally {
                 done(err);
             }
-        }
+        };
     }
 
     function BulkSuccessHandler(done, hookListener) {
@@ -1193,11 +1189,10 @@ export default function Dexie(dbName, options) {
                     const done = result => {
                         if (errorList.length === 0) resolve(result);
                         else reject(new BulkError(`${this.name}.bulkPut(): ${errorList.length} of ${numObjs} operations failed`, errorList));
-                    }
+                    };
                     var req,
                         errorList = [],
                         errorHandler,
-                        successHandler,
                         numObjs = objects.length,
                         table = trans.tables[this.name]; // Enable us to do stuff in several steps with same transaction.
                     if (this.hook.creating.fire === nop && this.hook.updating.fire === nop) {
@@ -1412,10 +1407,7 @@ export default function Dexie(dbName, options) {
                             trans._lock(); // Needed because operation is splitted into modify() and add().
                             // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
                             obj = deepClone(obj);
-                            trans.tables[self.name]
-                                .where(":id")
-                                .equals(effectiveKey)
-                                .modify(function (value) {
+                            trans.tables[self.name].where(":id").equals(effectiveKey).modify(function () {
                                 // Replace extisting value with our object
                                 // CRUD event firing handled in WriteableCollection.modify()
                                 this.value = obj;
@@ -1457,7 +1449,7 @@ export default function Dexie(dbName, options) {
                     return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
                         var req = idbstore.delete(key);
                         req.onerror = eventRejectHandler(reject, ["deleting", key, "from", idbstore.name]);
-                        req.onsuccess = function (ev) {
+                        req.onsuccess = function () {
                             resolve(req.result);
                         };
                     });
@@ -1473,7 +1465,7 @@ export default function Dexie(dbName, options) {
                     return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
                         var req = idbstore.clear();
                         req.onerror = eventRejectHandler(reject, ["clearing", idbstore.name]);
-                        req.onsuccess = function (ev) {
+                        req.onsuccess = function () {
                             resolve(req.result);
                         };
                     });
@@ -1497,7 +1489,7 @@ export default function Dexie(dbName, options) {
                     // key to modify
                     return this.where(":id").equals(keyOrObject).modify(modifications);
                 }
-            },
+            }
         };
     });
 
@@ -1857,7 +1849,7 @@ export default function Dexie(dbName, options) {
                 if (typeof str !== 'string') return fail(this, STRING_EXPECTED);
                 return addIgnoreCaseAlgorithm(this, function (x, a) { return x === a[0]; }, [str], "");
             },
-            anyOfIgnoreCase: function (stringsToFind) {
+            anyOfIgnoreCase: function () {
                 var set = getSetArgs(arguments);
                 if (set.length === 0) return emptyCollection(this);
                 if (!set.every(function (s) { return typeof s === 'string'; })) {
@@ -1865,7 +1857,7 @@ export default function Dexie(dbName, options) {
                 }
                 return addIgnoreCaseAlgorithm(this, function (x, a) { return a.indexOf(x) !== -1; }, set, "");
             },
-            startsWithAnyOfIgnoreCase: function (stringsToFind) {
+            startsWithAnyOfIgnoreCase: function () {
                 var set = getSetArgs(arguments);
                 if (set.length === 0) return emptyCollection(this);
                 if (!set.every(function (s) { return typeof s === 'string'; })) {
@@ -1876,7 +1868,7 @@ export default function Dexie(dbName, options) {
                         return x.indexOf(n) === 0;
                     });}, set, maxString);
             },
-            anyOf: function (valueArray) {
+            anyOf: function () {
                 var set = getSetArgs(arguments);
                 var compare = ascending;
                 try { set.sort(compare); } catch(e) { return fail(this, INVALID_KEY_ARGUMENT); }
@@ -1915,7 +1907,7 @@ export default function Dexie(dbName, options) {
                 return this.inAnyRange([[-Infinity, value],[value, maxKey]], {includeLowers: false, includeUppers: false});
             },
 
-            noneOf: function(valueArray) {
+            noneOf: function() {
                 var set = getSetArgs(arguments);
                 if (set.length === 0) return new this._ctx.collClass(this); // Return entire collection.
                 try { set.sort(ascending); } catch(e) { return fail(this, INVALID_KEY_ARGUMENT);}
@@ -2027,7 +2019,7 @@ export default function Dexie(dbName, options) {
                 });
                 return c;
             },
-            startsWithAnyOf: function (valueArray) {
+            startsWithAnyOf: function () {
                 var set = getSetArgs(arguments);
 
                 if (!set.every(function (s) { return typeof s === 'string'; })) {
@@ -2272,10 +2264,13 @@ export default function Dexie(dbName, options) {
                 if (!ctx.or && !ctx.algorithm && !ctx.filter && !ctx.replayFilter) {
                     addReplayFilter(ctx, ()=> {
                         var offsetLeft = offset;
-                        return function offsetFilter(cursor, advance, resolve) {
+                        return (cursor, advance) => {
                             if (offsetLeft === 0) return true;
                             if (offsetLeft === 1) { --offsetLeft; return false; }
-                            advance(function () { cursor.advance(offsetLeft); offsetLeft = 0; });
+                            advance(()=> {
+                                cursor.advance(offsetLeft);
+                                offsetLeft = 0;
+                            });
                             return false;
                         };
                     });
@@ -2497,7 +2492,7 @@ export default function Dexie(dbName, options) {
                 var failKeys = [];
                 var currentKey = null;
 
-                function modifyItem(item, cursor, advance) {
+                function modifyItem(item, cursor) {
                     currentKey = cursor.primaryKey;
                     var thisContext = {
                         primKey: cursor.primaryKey,
@@ -2525,7 +2520,7 @@ export default function Dexie(dbName, options) {
                             var req = (bDelete ? cursor.delete() : cursor.update(thisContext.value));
                             req.onerror = eventRejectHandler(onerror,
                                 bDelete ? ["deleting", item, "from", ctx.table.name] : ["modifying", item, "on", ctx.table.name]);
-                            req.onsuccess = function (ev) {
+                            req.onsuccess = function () {
                                 if (thisContext.onsuccess)
                                     Promise.newPSD(function () {
                                         Promise.PSD.trans = trans;
@@ -2626,7 +2621,7 @@ export default function Dexie(dbName, options) {
                 const nextChunk = () => collection.each(hasDeleteHook ? (val, cursor) => {
                     // Somebody subscribes to hook('deleting'). Collect all primary keys and their values,
                     // so that the hook can be called with its values in bulkDelete().
-                    keysOrTuples.push([cursor.primaryKey, cursor.value])
+                    keysOrTuples.push([cursor.primaryKey, cursor.value]);
                 } : (val, cursor) => {
                     // No one subscribes to hook('deleting'). Collect only primary keys:
                     keysOrTuples.push(cursor.primaryKey);
@@ -2699,7 +2694,7 @@ export default function Dexie(dbName, options) {
         valueFilter = valueFilter || mirror;
         if (!req.onerror) req.onerror = eventRejectHandler(reject);
         if (filter) {
-            req.onsuccess = trycatch(function filter_record(e) {
+            req.onsuccess = trycatch(function filter_record() {
                 var cursor = req.result;
                 if (cursor) {
                     var c = function () { cursor.continue(); };
@@ -2711,7 +2706,7 @@ export default function Dexie(dbName, options) {
                 }
             }, reject);
         } else {
-            req.onsuccess = trycatch(function filter_record(e) {
+            req.onsuccess = trycatch(function filter_record() {
                 var cursor = req.result;
                 if (cursor) {
                     var c = function () { cursor.continue(); };
@@ -2912,7 +2907,7 @@ function eventRejectHandler(reject, sentance) {
                 // Non-standard exceptions from IndexedDBPolyfill
                 errObj = errObj + occurredWhen;
             }
-        };
+        }
         reject(errObj);
 
         if (event) {// Old versions of IndexedDBShim doesnt provide an error event
@@ -2960,7 +2955,7 @@ function awaitIterable (iterable) {
                 (!value || typeof value.then !== 'function' ?
                     Array.isArray(value) ? awaitAll(value, 0) : onSuccess(value) :
                     value.then(onSuccess, onError));
-        }
+        };
     }
 
     function awaitAll (values, i) {
@@ -3036,7 +3031,7 @@ Dexie.exists = function(name) {
         db.close();
         return true;
     }).catch(Dexie.NoSuchDatabaseError, () => false);
-}
+};
 
 //
 // Static method for retrieving a list of all existing databases at current host.
@@ -3130,7 +3125,7 @@ Dexie.async = function (generatorFn) {
         } catch (e) {
             return Dexie.Promise.reject(e);
         }
-    }
+    };
 };
 
 Dexie.spawn = function (generatorFn, args, thiz) {
@@ -3202,7 +3197,7 @@ miniTryCatch(()=>{
     // Optional dependencies
     // localStorage
     Dexie.dependencies.localStorage =
-        ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : _global.localStorage)
+        ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : _global.localStorage);
 });
 
 // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.

@@ -9,6 +9,7 @@
  * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
  */
 import Promise from './Promise';
+import {exceptions} from './errors';
 
 export var keys = Object.keys;
 export var isArray = Array.isArray;
@@ -69,11 +70,22 @@ export function miniTryCatch(fn, onerror) {
     }
 }
 
+export function stack(error) {
+    if (error.stack) return error; // Provided error already has a stack
+    try {
+        var err = new Error(error.message || error); // In Chrome, stack is generated here.
+        if (err.stack) { error.stack = err.stack; return error; } // If stack was generated, set it.
+        // No stack. Other browsers only put the stack if we throw the error:
+        throw err;
+    } catch (e) {
+        error.stack = e.stack;
+    }
+    return error;
+}
+
 export function fail(err) {
     // Get the call stack and return a rejected promise.
-    try { throw err; } catch (e) {
-        return Promise.reject(err);
-    }
+    return Promise.reject(stack(err));
 }
 
 export function getByKeyPath(obj, keyPath) {
@@ -162,10 +174,7 @@ export function deepClone(any) {
 }
 
 export function getObjectDiff(a, b, rv, prfx) {
-    // This is a simplified version that will always return keypaths on the root level.
-    // If for example a and b differs by: (a.somePropsObject.x != b.somePropsObject.x), we will return that "somePropsObject" is changed
-    // and not "somePropsObject.x". This is acceptable and true but could be optimized to support nestled changes if that would give a
-    // big optimization benefit.
+    // Compares objects a and b and produces a diff object.
     rv = rv || {};
     prfx = prfx || '';
     for (var prop in a) if (a.hasOwnProperty(prop)) {
@@ -180,7 +189,7 @@ export function getObjectDiff(a, b, rv, prfx) {
                 rv[prfx + prop] = b[prop];// Primitive value changed
         }
     }
-    for (var prop in b) if (b.hasOwnProperty(prop) && !a.hasOwnProperty(prop)) {
+    for (prop in b) if (b.hasOwnProperty(prop) && !a.hasOwnProperty(prop)) {
         rv[prfx+prop] = b[prop]; // Property added
     }
     return rv;

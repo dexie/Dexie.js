@@ -514,7 +514,7 @@ spawnedTest("bulkPut-catching errors", function*() {
 });
 
 spawnedTest("bulkPut-non-inbound-autoincrement", function*(){
-    let lastId = yield db.folks.bulkPut([
+    yield db.folks.bulkPut([
         { first: "Foo", last: "Bar"},
         { first: "Foo", last: "Bar2"},
         { first: "Foo", last: "Bar3"},
@@ -522,19 +522,27 @@ spawnedTest("bulkPut-non-inbound-autoincrement", function*(){
     ]);
     equal (yield db.folks.where('first').equals('Foo').count(), 4, "Should be 4 Foos");
     equal (yield db.folks.where('last').equals('Bar').count(), 1, "Should be 1 Bar");
-    let newLastId = yield db.folks.bulkPut([
-        { first: "Foo2", last: "BarA"},
-        { first: "Foo2", last: "BarB"},
-        { first: "Foo2", last: "BarC"},
-        { first: "Foo2", last: "BarD"}
-    ],  [lastId - 3,
-        void 0,
-        lastId - 1,
-        void 0]);
+});
+
+spawnedTest("bulkPut - mixed inbound autoIncrement", function* () {
+    let lastId = yield db.users.bulkPut([
+        { first: "Foo", last: "Bar"},
+        { first: "Foo", last: "Bar2"},
+        { first: "Foo", last: "Bar3"},
+        { first: "Foo", last: "Bar4"}
+    ]);
+    equal (yield db.users.where('first').equals('Foo').count(), 4, "Should be 4 Foos");
+    equal (yield db.users.where('last').equals('Bar').count(), 1, "Should be 1 Bar");
+    let newLastId = yield db.users.bulkPut([
+        { id: lastId - 3, first: "Foo2", last: "BarA"}, // Will update "Foo Bar" to "Foo2 BarA"
+        { first: "Foo2", last: "BarB"}, // Will create
+        { id: lastId - 1, first: "Foo2", last: "BarC"}, // Will update "Foo Bar3" to "Foo2 BarC"
+        { first: "Foo2", last: "BarD"}  // Will create
+    ]);
     equal (newLastId, lastId + 2, "Should have incremented last ID twice now");
-    equal (yield db.folks.where('first').equals('Foo').count(), 2, "Should be 2 Foos now");
-    equal (yield db.folks.where('first').equals('Foo2').count(), 4, "Should be 4 Foo2s now");
-    let foo2s = yield db.folks.where('first').equals('Foo2').toArray();
+    equal (yield db.users.where('first').equals('Foo').count(), 2, "Should be 2 Foos now");
+    equal (yield db.users.where('first').equals('Foo2').count(), 4, "Should be 4 Foo2s now");
+    let foo2s = yield db.users.where('first').equals('Foo2').toArray();
     equal (foo2s[0].last, "BarA", "BarA should be first (updated previous ID)");
     equal (foo2s[1].last, "BarC", "BarC should be second (updated previous ID");
     equal (foo2s[2].last, "BarB", "BarB should be third (got new key)");
