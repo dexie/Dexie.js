@@ -6,9 +6,12 @@ module.exports = function(config) {
   };
   cfg.port = 19145;
   cfg.browserStack = {
-      username: process.env.BROWSERSTACK_USERNAME,
-      accessKey: process.env.BROWSERSTACK_KEY
+      username: process.env.BROWSER_STACK_USERNAME,
+      accessKey: process.env.BROWSER_STACK_ACCESS_KEY
   };
+  if (!cfg.browserStack.username)
+    throw new Error("You must provider username/key in the env variables BROWSER_STACK_USERNAME and BROWSER_STACK_ACCESS_KEY");
+
   cfg.customLaunchers = {
     bs_firefox: {
       base: 'BrowserStack',
