@@ -53,6 +53,7 @@ git merge --no-edit -s ours origin/releases
 #
 printf "Running eslint src\n"
 eslint src
+printf "eslint ok.\n"
 
 #
 # Rebuild
