@@ -45,7 +45,6 @@ module.exports = function(config) {
   cfg.plugins = [
       'karma-qunit',
       'karma-mocha-reporter',
-      'karma-chrome-launcher',
       'karma-browserstack-launcher'
   ];
 

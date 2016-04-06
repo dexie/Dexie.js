@@ -48,6 +48,7 @@
     "karma": "^0.13.19",
     "karma-browserstack-launcher": "^0.1.10",
     "karma-chrome-launcher": "^0.2.2",
+    "karma-firefox-launcher": "^0.1.7",
     "karma-mocha-reporter": "^1.1.5",
     "karma-qunit": "^0.1.9",
     "node-watch": "^0.3.5",
