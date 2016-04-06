@@ -10,4 +10,4 @@ import "./tests-transaction.js";
 import "./tests-open.js";
 import "./tests-exception-handling.js";
 import "./tests-upgrading.js";
-import "./tests-performance.js";
+//import "./tests-performance.js"; Not required. Should make other performance tests separately instead.

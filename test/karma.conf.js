@@ -34,13 +34,14 @@ module.exports = function(config) {
     //logLevel: config.LOG_DEBUG,
 
     browsers: [
-        'Chrome'
+        'Firefox'
     ],
 
     plugins: [
       'karma-qunit',
       'karma-mocha-reporter',
-      'karma-chrome-launcher',
+      //'karma-chrome-launcher',
+      'karma-firefox-launcher'
     ]
   };
 
