@@ -6,7 +6,8 @@
     }
   },
   "env": {
-    "browser": true
+    "browser": true,
+    "node": true
   },
   "rules": {
     "no-undef": ["error"]
