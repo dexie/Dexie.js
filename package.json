@@ -44,6 +44,7 @@
     "babel-preset-es2015": "^6.1.4",
     "es6-promisify": "^3.0.0",
     "es6-promisify-all": "^0.1.0",
+    "eslint": "^2.7.0",
     "karma": "^0.13.19",
     "karma-browserstack-launcher": "^0.1.10",
     "karma-chrome-launcher": "^0.2.2",

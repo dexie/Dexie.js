@@ -49,6 +49,12 @@ master_release_commit=$(git rev-parse HEAD)
 git merge --no-edit -s ours origin/releases
 
 #
+# eslint
+#
+printf "Running eslint src\n"
+eslint src
+
+#
 # Rebuild
 #
 
@@ -73,7 +79,9 @@ done
 printf "Testing on browserstack\n"
 echo . > karma-browserstack.log
 tail -f karma-browserstack.log &
+TAIL_PID=$!
 npm run test:bs > karma-browserstack.log
+kill $TAIL_PID
 
 printf "Browserstack tests passed.\n"
 
