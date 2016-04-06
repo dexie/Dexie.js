@@ -70,7 +70,12 @@ do
 done
 
 # test
-npm test
+printf "Testing on browserstack\n"
+echo . > karma-browserstack.log
+tail -f karma-browserstack.log &
+npm run test:bs > karma-browserstack.log
+
+printf "Browserstack tests passed.\n"
 
 # Force adding/removing dist files
 rm -rf dist/*.gz

@@ -53,7 +53,7 @@ export function hookUpdatingChain(f1, f2) {
     if (f1 === nop) return f2;
     return function () {
         var res = f1.apply(this, arguments);
-        if (res !== undefined) extend(arguments[0], res); // If f1 returns new modifications, extend caller's modifications with the result before calling next in chain.
+        extend(arguments[0], res); // If f1 returns new modifications, extend caller's modifications with the result before calling next in chain.
         var onsuccess = this.onsuccess, // In case event listener has set this.onsuccess
             onerror = this.onerror;     // In case event listener has set this.onerror
         this.onsuccess = null;
@@ -63,7 +63,7 @@ export function hookUpdatingChain(f1, f2) {
         if (onerror) this.onerror = this.onerror ? callBoth(onerror, this.onerror) : onerror;
         return res === undefined ?
             (res2 === undefined ? undefined : res2) :
-            (res2 === undefined ? res : extend(res, res2));
+            (extend(res, res2));
     };
 }
 

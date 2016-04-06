@@ -3,7 +3,7 @@ module.exports = function(config) {
     basePath: '..',
 
     frameworks: [
-      'qunit',
+      'qunit'
     ],
 
     reporters: [
@@ -24,19 +24,23 @@ module.exports = function(config) {
       { pattern: '**/*.map', watched: false, included: false, served: true}
     ],
 
-    port: 9876,
-    captureTimeout: 30 * 1000,
-    browserNoActivityTimeout: 10 * 60 * 1000,
+    port: 19144,
+    //captureTimeout: 30 * 1000,
+    //browserNoActivityTimeout: 10 * 60 * 1000,
     colors: true,
 
+    // level of logging
+    // possible values: config.LOG_DISABLE || config.LOG_ERROR || config.LOG_WARN || config.LOG_INFO || config.LOG_DEBUG
+    //logLevel: config.LOG_DEBUG,
+
     browsers: [
-      'Chrome'
+        'Chrome'
     ],
 
     plugins: [
       'karma-qunit',
       'karma-mocha-reporter',
-      'karma-chrome-launcher'
+      'karma-chrome-launcher',
     ]
   };
 

@@ -18,7 +18,7 @@ module("performance", {
 
 var tick = 0,lastPerf=false;
 function log(txt, noPerf) {
-    let logstr = (tick && lastPerf ? "took " + (Date.now()-tick) + "ms\n" :"") + txt + (noPerf?"\n":"... ");
+    let logstr = (tick && lastPerf ? "took " + (Date.now()-tick) + "ms.\n" :"") + txt + (noPerf?"\n":"");
     ok(true, logstr);
     tick = Date.now();
     lastPerf = !noPerf;
@@ -40,9 +40,9 @@ spawnedTest("Collection.delete()", function* () {
     try {
         log("Deleting db");
         yield db.delete();
-        log("Inserting data:");
+        log(`Inserting data (${MAX} items):`);
         yield db.storage.bulkAdd(data);
-        log("done. Deleting data with dexie");
+        log(`done. Deleting items using db.storage.where("id").between(100, ${MAX - 100}).delete()`);
         yield db.storage.where("id").between(100, MAX - 100).delete();
         log("done");
         equal (yield db.storage.count(), 200, "Should be just 200 items left now after deletion");
