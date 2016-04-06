@@ -13,8 +13,10 @@
 
 import {
     keys,
+    setProp,
     isArray,
     extend,
+    extendProto,
     derive,
     slice,
     override,
@@ -29,7 +31,8 @@ import {
     delByKeyPath,
     shallowClone,
     deepClone,
-    getObjectDiff
+    getObjectDiff,
+    messageAndStack
 
 } from './utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
@@ -66,7 +69,7 @@ export default function Dexie(dbName, options) {
         autoOpen: true,                 // Don't require db.open() explicitely.
         indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to IDBShim or browser env.
         IDBKeyRange: deps.IDBKeyRange   // Backend IDBKeyRange api. Default to IDBShim or browser env.
-    }, options || {});
+    }, options);
     var addons = opts.addons,
         autoOpen = opts.autoOpen,
         indexedDB = opts.indexedDB,
@@ -701,8 +704,7 @@ export default function Dexie(dbName, options) {
     this.name = dbName;
 
     // db.tables - an array of all Table instances.
-    // TODO: Change so that tables is a simple member and make sure to update it whenever allTables changes.
-    Object.defineProperty(this, "tables", {
+    setProp(this, "tables", {
         get: function () {
             /// <returns type="Array" elementType="WriteableTable" />
             return keys(allTables).map(function (name) { return allTables[name]; });
@@ -897,7 +899,7 @@ export default function Dexie(dbName, options) {
                                 // scopeFunc returned an iterable. Handle yield as await.
                                 returnValue = awaitIterable(returnValue);
                             } else if (typeof returnValue.then === 'function' && (!returnValue.hasOwnProperty('_PSD'))) {
-                                reject(stack(new exceptions.IncompatiblePromise()));
+                                throw new exceptions.IncompatiblePromise();
                             }
                         }
                     });
@@ -947,7 +949,7 @@ export default function Dexie(dbName, options) {
         this._collClass = collClass || Collection;
     }
 
-    extend(Table.prototype, function () {
+    extendProto(Table.prototype, function () {
         function failReadonly() {
             // It's ok to throw here because this can only happen within a transaction,
             // and will always be caught by the transaction scope and returned as a
@@ -1544,7 +1546,7 @@ export default function Dexie(dbName, options) {
         }
     }
 
-    extend(Transaction.prototype, {
+    extendProto(Transaction.prototype, {
         //
         // Transaction Protected Methods (not required by API users, but needed internally and eventually by dexie extensions)
         //
@@ -1693,7 +1695,7 @@ export default function Dexie(dbName, options) {
         };
     }
 
-    extend(WhereClause.prototype, function () {
+    extendProto(WhereClause.prototype, function () {
 
         // WhereClause private methods
 
@@ -2083,7 +2085,7 @@ export default function Dexie(dbName, options) {
         };
     }
 
-    extend(Collection.prototype, function () {
+    extendProto(Collection.prototype, function () {
 
         //
         // Collection Private Functions
@@ -2667,9 +2669,7 @@ export default function Dexie(dbName, options) {
             objs.forEach(function (obj) {
                 if (!obj[tableName]) {
                     if (enableProhibitedDB) {
-                        Object.defineProperty(obj, tableName, {
-                            configurable: true,
-                            enumerable: true,
+                        setProp(obj, tableName, {
                             get: function () {
                                 var currentTrans = Promise.PSD && Promise.PSD.trans;
                                 if (currentTrans && currentTrans.db === db) {
@@ -2677,7 +2677,7 @@ export default function Dexie(dbName, options) {
                                 }
                                 return tableInstance;
                             }
-                        });
+                        }, {enumerable: true});
                     } else {
                         obj[tableName] = tableInstance;
                     }
@@ -3144,7 +3144,7 @@ Dexie.spawn = function (generatorFn, args, thiz) {
 };
 
 // Dexie.currentTransaction property. Only applicable for transactions entered using the new "transact()" method.
-Object.defineProperty(Dexie, "currentTransaction", {
+setProp(Dexie, "currentTransaction", {
     get: function () {
         /// <returns type="Transaction"></returns>
         return Promise.PSD && Promise.PSD.trans || null;
@@ -3160,6 +3160,7 @@ Dexie.Promise = Promise;
 // Export our derive/extend/override methodology
 Dexie.derive = derive;
 Dexie.extend = extend;
+Dexie.extendProto = extendProto;
 Dexie.override = override;
 // Export our Events() function - can be handy as a toolkit
 Dexie.Events = Dexie.events = Events; // Backward compatible lowercase version.
@@ -3174,6 +3175,7 @@ Dexie.fakeAutoComplete = fakeAutoComplete;
 Dexie.asap = asap;
 Dexie.maxKey = maxKey;
 Dexie.connections = connections;
+Dexie.dump = messageAndStack;
 
 // Export Error classes
 extend(Dexie, fullNameExceptions); // Dexie.XXXError = class XXXError {...};

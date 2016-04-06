@@ -1,4 +1,4 @@
-import { derive } from './utils';
+import { derive, messageAndStack } from './utils';
 
 var dexieErrorNames = [
     'Modify',
@@ -55,7 +55,11 @@ export function DexieError (name, msg) {
     this.name = name;
     this.message = msg;
 }
-derive(DexieError).from(Error);
+derive(DexieError).from(Error).extend({
+    dump: function () {
+        return messageAndStack(this);
+    }
+});
 
 function getMultiErrorMessage (msg, failures) {
     return msg + ". Errors: " + failures

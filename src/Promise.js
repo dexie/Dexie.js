@@ -1,4 +1,4 @@
-import {_global, slice, isArray, doFakeAutoComplete} from './utils';
+import {_global, slice, isArray, doFakeAutoComplete, messageAndStack} from './utils';
 import { nop } from './chaining-functions';
 import Events from './Events';
 
@@ -372,5 +372,5 @@ Promise.on = Events(null, {"error": [
 
 // By default, log uncaught errors to the console
 function defaultErrorHandler(e) {
-    console.error(`Uncaught Promise: ${e.stack || e}`);
+    console.warn(`Uncaught Promise: ${messageAndStack(e)}`);
 }

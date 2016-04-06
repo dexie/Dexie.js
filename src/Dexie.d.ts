@@ -15,7 +15,9 @@ declare type IndexableType = string | number | Date | Array<string | number | Da
 declare class Dexie {
     constructor(databaseName: string, options?: {
         addons?: Array<(db: Dexie) => void>,
-        autoOpen?: boolean
+        autoOpen?: boolean,
+        indexedDB?: IDBDatabase,
+        IDBKeyRange?: IDBKeyRange
     });
 
     name: string;
@@ -48,6 +50,8 @@ declare class Dexie {
     static asap(fn: Function) : void;
     
     static maxKey: Array<string>;
+
+    static dump(error:any):string;
     
     static dependencies: {
         indexedDB: IDBFactory,
@@ -398,8 +402,10 @@ declare module Dexie {
         message: string;
         stack: string;
         inner: any;
+
         constructor (name?:string, message?:string);
         toString(): string;
+        dump(): string;
     }
     
     class ModifyError extends DexieError{
@@ -421,6 +427,7 @@ declare module Dexie {
     class UnsupportedError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class InternalError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class DatabaseClosedError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
+    class IncompatiblePromiseError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class UnknownError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class ConstraintError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class DataError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}

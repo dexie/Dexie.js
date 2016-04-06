@@ -19,22 +19,33 @@ export var _global =
     global;
 
 export function extend(obj, extension) {
-    if (typeof extension !== 'object') extension = extension(); // Allow to supply a function returning the extension. Useful for simplifying private scopes.
+    if (typeof extension !== 'object') return obj;
     keys(extension).forEach(function (key) {
         obj[key] = extension[key];
     });
     return obj;
 }
 
+export function extendProto (proto, extension) {
+    if (typeof extension === 'function') extension = extension(Object.getPrototypeOf(proto));
+    keys(extension).forEach(key => {
+        setProp(proto, key, extension[key]);
+    });
+}
+
+export function setProp(obj, prop, functionOrGetSet, options) {
+    Object.defineProperty(obj, prop, extend(typeof functionOrGetSet.get === 'function' ?
+        {get: functionOrGetSet.get, set: functionOrGetSet.set, configurable: true} :
+        {value: functionOrGetSet, configurable: true, writable: true}, options));
+}
+
 export function derive(Child) {
     return {
         from: function (Parent) {
             Child.prototype = Object.create(Parent.prototype);
-            Child.prototype.constructor = Child;
+            setProp(Child.prototype, "constructor", Child);
             return {
-                extend: function (extension) {
-                    extend(Child.prototype, typeof extension !== 'object' ? extension(Parent.prototype) : extension);
-                }
+                extend: extendProto.bind(null, Child.prototype)
             };
         }
     };
@@ -68,6 +79,15 @@ export function miniTryCatch(fn, onerror) {
     } catch (ex) {
         onerror && onerror(ex);
     }
+}
+
+export function messageAndStack (e) {
+    var stack = e && e.stack;
+    return stack ?
+        stack.indexOf(e+'') > 0 ?
+            stack :
+        e + ". " + stack :
+        e;
 }
 
 export function stack(error) {
