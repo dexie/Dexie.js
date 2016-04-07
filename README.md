@@ -1,7 +1,7 @@
 Dexie.js
 ========
 
-[![NPM Version][npm-image]][npm-url] [![Tested with Browserstack](http://dexie.org/assets/images/tested-with-browserstack2.png)](https://www.browserstack.com)
+[![NPM Version][npm-image]][npm-url] [![Build Status](https://travis-ci.org/dfahlander/Dexie.js.svg?branch=master)](https://travis-ci.org/dfahlander/Dexie.js)[![Tested with Browserstack](http://dexie.org/assets/images/tested-with-browserstack2.png)](https://www.browserstack.com)
 
 #### What is Dexie.js?
 Dexie.js is a wrapper library for indexedDB - the standard database in the browser.
