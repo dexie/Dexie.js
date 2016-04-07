@@ -2350,7 +2350,7 @@ export default function Dexie(dbName, options) {
             eachKey: function (cb) {
                 var ctx = this._ctx;
                 fake && cb(getByKeyPath(getInstanceTemplate(this._ctx), this._ctx.index ? this._ctx.table.schema.idxByName[this._ctx.index].keyPath : this._ctx.table.schema.primKey.keyPath));
-                ctx.keysOnly = true;
+                ctx.keysOnly = !ctx.isMatch;
                 return this.each(function (val, cursor) { cb(cursor.key, cursor); });
             },
 
@@ -2361,7 +2361,7 @@ export default function Dexie(dbName, options) {
 
             keys: function (cb) {
                 var ctx = this._ctx;
-                ctx.keysOnly = true;
+                ctx.keysOnly = !ctx.isMatch;
                 var a = [];
                 if (fake) return new Promise(this.eachKey.bind(this)).then(function(x) { return [x]; }).then(cb);
                 return this.each(function (item, cursor) {
@@ -2614,7 +2614,7 @@ export default function Dexie(dbName, options) {
                 var collection = this
                     .clone({
                         table: table,   // Execute in same transaction
-                        keysOnly: !hasDeleteHook}) // load just keys (unless deleteHook has subscribers)
+                        keysOnly: !ctx.isMatch && !hasDeleteHook}) // load just keys (unless filter() or and() or deleteHook has subscribers)
                     .distinct() // In case multiEntry is used, never delete same key twice because resulting count
                                 // would become larger than actual delete count.
                     .limit(CHUNKSIZE)

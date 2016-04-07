@@ -6,7 +6,7 @@
     "build": "npm run build:ts && npm run build:babel && npm run build:webpack",
     "build:ts": "node node_modules/typescript/bin/tsc",
     "build:babel": "node_modules/.bin/babel out/ts --out-dir out/babel",
-    "build:webpack": "node node_modules/webpack/bin/webpack -d -p out/babel/app.js out/bundle.js",
+    "build:webpack": "node node_modules/webpack/bin/webpack -d out/babel/app.js out/bundle.js",
     "clean": "rm -rf out",
     "test": "http-server . -a localhost -p 8081"
   },
