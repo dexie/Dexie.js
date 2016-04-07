@@ -30,6 +30,19 @@ module("collection", {
     }
 });
 
+spawnedTest("and with keys", function*(){
+    let keys = yield db.users.where("last").inAnyRange([["a","g"],["A","G"]])
+        .and(user => user.username === "dfahlander")
+        .keys();
+    equal (keys.length, 1, "Should find one user with given criteria");
+});
+
+spawnedTest("and with delete", function*() {
+    yield db.users.orderBy('username')
+        .and(u => ok(!!u, "User should exist here"))
+        .delete();
+});
+
 asyncTest("each", 3, function () {
     var array = [];
     db.users.orderBy("id").each(function (user) {
