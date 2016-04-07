@@ -41,4 +41,5 @@ build([{
     console.log("All files successfully built.");
 }).catch(err => {
     console.error(err);
+    process.exit(1);
 });
