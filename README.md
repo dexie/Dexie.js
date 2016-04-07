@@ -57,6 +57,8 @@ below(key): Collection;
 belowOrEqual(key): Collection;
 between(lower, upper, includeLower?, includeUpper?): Collection;
 bulkAdd(items: Array): Promise;
+bulkDelete(keys: Array): Promise;
+bulkPut(items: Array): Promise;
 clear(): Promise;
 count(): Promise;
 delete(key): Promise;
