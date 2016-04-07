@@ -28,7 +28,7 @@
   "scripts": {
     "build": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator tools/build.js",
     "watch": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator tools/watch.js",
-    "test": "npm run eslint && npm run build && npm run test:local",
+    "test": "npm run eslint && npm run test:local",
     "eslint": "eslint src",
     "test:local": "node_modules/.bin/karma start test/karma.conf.js --single-run",
     "test:bs": "node_modules/.bin/karma start test/karma.browserstack.conf.js --single-run",
