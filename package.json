@@ -31,7 +31,7 @@
     "test": "npm run eslint && npm run test:local",
     "eslint": "eslint src",
     "test:local": "node_modules/.bin/karma start test/karma.conf.js --single-run",
-    "test:bs": "node_modules/.bin/karma start test/karma.browserstack.conf.js --single-run",
+    "test:release": "node_modules/.bin/karma start test/karma.release.conf.js --single-run",
     "test:debug": "node_modules/.bin/karma start test/karma.conf.js --log-level debug"
   },
   "engines": {

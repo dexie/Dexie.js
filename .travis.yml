@@ -4,4 +4,4 @@ node_js:
 script:
   - eslint src
   - npm run build
-  - node_modules/.bin/karma start test/karma.browserstack.conf.js --single-run --browsers bs_firefox
+  - node_modules/.bin/karma start test/karma.travis.conf.js --single-run

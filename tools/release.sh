@@ -78,10 +78,10 @@ done
 
 # test
 printf "Testing on browserstack\n"
-echo . > karma-browserstack.log
-tail -f karma-browserstack.log &
+echo . > karma-release.log
+tail -f karma-release.log &
 TAIL_PID=$!
-npm run test:bs > karma-browserstack.log
+npm run test:release > karma-release.log
 kill $TAIL_PID
 
 printf "Browserstack tests passed.\n"
