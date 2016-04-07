@@ -311,6 +311,7 @@ declare module Dexie {
         each(callback: (obj: T, cursor: IDBCursor) => any): Promise<void>;
         eachKey(callback: (key: Key, cursor: IDBCursor) => any): Promise<void>;
         eachUniqueKey(callback: (key: Key, cursor: IDBCursor) => any): Promise<void>;
+        filter(filter: (x: T) => boolean): Collection<T, Key>;
         first(): Promise<T>;
         first<U>(onFulfilled: (value: T) => Thenable<U>): Promise<U>;
         first<U>(onFulfilled: (value: T) => U): Promise<U>;
