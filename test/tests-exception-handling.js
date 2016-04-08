@@ -9,9 +9,10 @@ db.on("populate", function (trans) {
     users.add({ id: 1, first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
     users.add({ id: 2, first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
 });
-db.on("error", function (e) {
+function dbOnErrorHandler (e) {
     ok(false, "An error bubbled out to the db.on('error'). Should not happen because all tests should catch their errors themselves. " + e);
-});
+}
+db.on("error", dbOnErrorHandler);
 
 module("exception-handling", {
     setup: function () {
@@ -22,6 +23,23 @@ module("exception-handling", {
     },
     teardown: function () {
     }
+});
+
+asyncTest("Uncaught promise should signal to Promise.on('error')", function(){
+    // We must not use finally or catch here because then we don't test what we should.
+    var onErrorSignals = 0;
+    function onerror(e) {
+        ++onErrorSignals;
+    }
+    Dexie.Promise.on('error', onerror);
+    db.on('error').unsubscribe(dbOnErrorHandler);
+    db.users.add({ id: 1 });
+    setTimeout(()=> {
+        equal(onErrorSignals, 1, "Promise.on('error') should have been signaled");
+        db.on("error", dbOnErrorHandler);
+        Dexie.Promise.on('error').unsubscribe(onerror);
+        start();
+    }, 100);
 });
 
 spawnedTest("transaction should abort on collection error", function*(){
