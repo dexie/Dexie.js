@@ -1592,9 +1592,9 @@ export default function Dexie(dbName, options) {
                 if (!self._locked()) {
                     p = self.active ? new Promise(function (resolve, reject) {
                         if (!self.idbtrans && mode) {
-                            if (!idbdb) throw (!dbOpenError) || ["DatabaseClosedError","MissingAPIError"].indexOf(dbOpenError.name) >= 0 ?
+                            if (!idbdb) {throw (dbOpenError && ["DatabaseClosedError","MissingAPIError"].indexOf(dbOpenError.name) >= 0 ?
                                 dbOpenError : // Errors where it is no difference whether it was caused by the user operation or an earlier call to db.open()
-                                new exceptions.OpenFailed(dbOpenError); // Make it clear that the user operation was not what caused the error - the error had occurred earlier on db.open()!
+                                new exceptions.OpenFailed(dbOpenError));} // Make it clear that the user operation was not what caused the error - the error had occurred earlier on db.open()!
 
                             var idbtrans = self.idbtrans = idbdb.transaction(safariMultiStoreFix(self.storeNames), self.mode);
                             idbtrans.onerror = function (e) {

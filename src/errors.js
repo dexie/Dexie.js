@@ -110,7 +110,10 @@ export var exceptions = errorList.reduce((obj,name)=>{
     var fullName = name + "Error";
     function DexieError (msgOrInner, inner){
         this.name = fullName;
-        if (typeof msgOrInner === 'string') {
+        if (!msgOrInner) {
+            this.message = "Unknown Error";
+            this.inner = null;
+        } else if (typeof msgOrInner === 'string') {
             this.message = msgOrInner;
             this.inner = inner || null;
         } else if (typeof msgOrInner === 'object') {
