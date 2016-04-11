@@ -34,7 +34,7 @@ export function extendProto (proto, extension) {
 }
 
 export function setProp(obj, prop, functionOrGetSet, options) {
-    Object.defineProperty(obj, prop, extend(typeof functionOrGetSet.get === 'function' ?
+    Object.defineProperty(obj, prop, extend(functionOrGetSet && typeof functionOrGetSet.get === 'function' ?
         {get: functionOrGetSet.get, set: functionOrGetSet.set, configurable: true} :
         {value: functionOrGetSet, configurable: true, writable: true}, options));
 }
