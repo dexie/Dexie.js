@@ -23,16 +23,15 @@ import {
     _global,
     doFakeAutoComplete,
     asap,
+    trycatch,
     miniTryCatch,
-    stack,
     fail,
     getByKeyPath,
     setByKeyPath,
     delByKeyPath,
     shallowClone,
     deepClone,
-    getObjectDiff,
-    messageAndStack
+    getObjectDiff
 
 } from './utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
@@ -118,6 +117,16 @@ export default function Dexie(dbName, options) {
             else
                 console.warn(`Upgrade '${db.name}' blocked by other connection holding version ${ev.oldVersion/10}`);
         });
+        // By default, log uncaught errors to the console
+        function defaultDbErrorHandler(e) {
+            console.warn(`Uncaught Promise: ${e.stack || e}`);
+        }
+        function defaultPromiseErrorHandler(e) {
+            db.on.error.fire(e);
+            return false; // Don't let Promise' default error handler warn to console. We're doing that.
+        }
+        Promise.on('error', defaultPromiseErrorHandler);
+        db.on('error', defaultDbErrorHandler);
     }
 
     //
@@ -469,12 +478,7 @@ export default function Dexie(dbName, options) {
             return blockedPromise;
         } else {
             var trans = db._createTransaction(mode, storeNames, globalSchema);
-            return trans._promise(mode, function (resolve, reject) {
-                // An uncatched operation will bubble to this anonymous transaction. Make sure
-                // to continue bubbling it up to db.on('error'):
-                trans.error(function (err) {
-                    db.on('error').fire(err);
-                });
+            var promise = trans._promise(mode, function (resolve, reject) {
                 Promise.newPSD(function () {
                     Promise.PSD.trans = trans;
                     fn(function(value) {
@@ -494,10 +498,16 @@ export default function Dexie(dbName, options) {
                     }, reject, trans);
                 });
             });
+            var origOnUnCatched = promise.onuncatched;
+            promise.onuncatched = e => {
+                origOnUnCatched(e);
+                return true; // Bubble if uncaught
+            }
+            return promise;
         }
     };
 
-    this._whenReady = function (fn) {
+    /*this._whenReady = function (fn) {
         if (!fake && db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
             if (!isBeingOpened) {
                 if (autoOpen) {
@@ -515,6 +525,31 @@ export default function Dexie(dbName, options) {
             });
         }
         return new Promise(fn);
+    };*/
+    
+    this._whenReady = function (fn) {
+        return this.ready().then(()=>{
+           return new Promise(fn);   
+        });
+    };
+    
+    this.ready = function (cb) {
+        return new Promise(resolve => {
+            if (!fake && db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
+                if (!isBeingOpened) {
+                    if (autoOpen) {
+                        resolve (db.open());
+                    } else {
+                        throw new exceptions.DatabaseClosed();
+                    }
+                }
+                pausedResumeables.push({
+                    resume: () => resolve(db.ready())
+                });
+            } else {
+                resolve(db);
+            }
+        }).then(cb);
     };
 
     //
@@ -531,7 +566,7 @@ export default function Dexie(dbName, options) {
     this.open = function () {
         if (idbdb) return Promise.resolve(db);
         if (isBeingOpened)
-            return new Promise((resolve, reject) => db._whenReady(function () { resolve(db); }, function (e) { reject(e); }));
+            return this.ready();
         dbOpenError = null;
         isBeingOpened = true;
         db_is_blocked = true;
@@ -607,7 +642,7 @@ export default function Dexie(dbName, options) {
                     // Now, let any subscribers to the on("ready") fire BEFORE any other db operations resume!
                     // If an the on("ready") subscriber returns a Promise, we will wait til promise completes or rejects before
                     Promise.newPSD(function () {
-                        Promise.PSD.letThrough = true; // Set a Promise-Specific Data property informing that onready is firing. This will make db._whenReady() let the subscribers use the DB but block all others (!). Quite cool ha?
+                        Promise.PSD.letThrough = true; // Set a Promise-Specific Data property informing that onready is firing. This will make db.ready() let the subscribers use the DB but block all others (!)
                         try {
                             var res = db.on.ready.fire();
                             if (res && typeof res.then === 'function') {
@@ -756,169 +791,154 @@ export default function Dexie(dbName, options) {
         if (!parentTransaction || parentTransaction.db !== db || mode.indexOf('!') !== -1) parentTransaction = null;
         var onlyIfCompatible = mode.indexOf('?') !== -1;
         mode = mode.replace('!', '').replace('?', '');
-        //
-        // Get storeNames from arguments. Either through given table instances, or through given table names.
-        //
-        var tables = isArray(tableInstances[0]) ? tableInstances.reduce(function (a, b) { return a.concat(b); }) : tableInstances;
-        var error = null;
-        var storeNames = tables.map(function (tableInstance) {
-            if (typeof tableInstance === "string") {
-                return tableInstance;
-            } else {
-                if (!(tableInstance instanceof Table)) error = error || new TypeError("Invalid type. Arguments following mode must be instances of Table or String");
-                return tableInstance.name;
-            }
-        });
+        var trans = null;
+        
+        try {
+            //
+            // Get storeNames from arguments. Either through given table instances, or through given table names.
+            //
+            var tables = isArray(tableInstances[0]) ? tableInstances.reduce(function (a, b) { return a.concat(b); }) : tableInstances;
+            var storeNames = tables.map(function (tableInstance) {
+                if (typeof tableInstance === "string") {
+                    return tableInstance;
+                } else {
+                    if (!(tableInstance instanceof Table)) throw new TypeError("Invalid table argument to Dexie.transaction(). Only Table or String are allowed");
+                    return tableInstance.name;
+                }
+            });
 
-        //
-        // Resolve mode. Allow shortcuts "r" and "rw".
-        //
-        if (mode == "r" || mode == READONLY)
-            mode = READONLY;
-        else if (mode == "rw" || mode == READWRITE)
-            mode = READWRITE;
-        else
-            error = new exceptions.InvalidArgument("Invalid transaction mode: " + mode);
+            //
+            // Resolve mode. Allow shortcuts "r" and "rw".
+            //
+            if (mode == "r" || mode == READONLY)
+                mode = READONLY;
+            else if (mode == "rw" || mode == READWRITE)
+                mode = READWRITE;
+            else
+                throw new exceptions.InvalidArgument("Invalid transaction mode: " + mode);
 
-        if (parentTransaction) {
-            // Basic checks
-            if (!error) {
-                if (parentTransaction && parentTransaction.mode === READONLY && mode === READWRITE) {
-                    if (onlyIfCompatible) parentTransaction = null; // Spawn new transaction instead.
-                    else error = error || new exceptions.SubTransaction("Cannot enter a sub-transaction with READWRITE mode when parent transaction is READONLY");
+            if (parentTransaction) {
+                // Basic checks
+                if (parentTransaction.mode === READONLY && mode === READWRITE) {
+                    if (onlyIfCompatible) {
+                        // Spawn new transaction instead.
+                        parentTransaction = null; 
+                    }
+                    else throw new exceptions.SubTransaction("Cannot enter a sub-transaction with READWRITE mode when parent transaction is READONLY");
                 }
                 if (parentTransaction) {
                     storeNames.forEach(function (storeName) {
                         if (!parentTransaction.tables.hasOwnProperty(storeName)) {
-                            if (onlyIfCompatible) parentTransaction = null; // Spawn new transaction instead.
-                            else error = error || new exceptions.SubTransaction("Table " + storeName + " not included in parent transaction. Parent Transaction function: " + parentTransaction.scopeFunc.toString());
+                            if (onlyIfCompatible) {
+                                // Spawn new transaction instead.
+                                parentTransaction = null; 
+                            }
+                            else throw new exceptions.SubTransaction("Table " + storeName +
+                                " not included in parent transaction. Parent Transaction function: " +
+                                parentTransaction.scopeFunc.toString());
                         }
                     });
                 }
             }
+        } catch (e) {
+            return parentTransaction ? parentTransaction._promise(null, (r,reject)=>reject(e)) :
+                fail(e);
         }
-        if (parentTransaction) {
-            // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
-            return parentTransaction._promise(mode, enterTransactionScope, "lock");
-        } else {
-            // If this is a root-level transaction, wait til database is ready and then launch the transaction.
-            return db._whenReady(enterTransactionScope);
-        }
+        
+        // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
+        var promise = (parentTransaction ? parentTransaction.wait(true) : this.ready()).then(() =>{
+            // Our transaction.
+            trans = db._createTransaction(mode, storeNames, globalSchema, parentTransaction);
 
-        function enterTransactionScope(resolve, reject) {
-            // Our transaction. To be set later.
-            var trans = null;
-            var isConstructing = true;
+            // Provide arguments to the scope function (for backward compatibility)
+            var tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
+            tableArgs.push(trans);
 
-            try {
-                // Throw any error if any of the above checks failed.
-                // Real error defined some lines up. We throw it here from within a Promise to reject Promise
-                // rather than make caller need to both use try..catch and promise catching. The reason we still
-                // throw here rather than do Promise.reject(error) is that we like to have the stack attached to the
-                // error. Also because there is a catch() clause bound to this try() that will bubble the error
-                // to the parent transaction.
-                if (error) throw error;
+            var uncompletedRequests = 0;
 
-                //
-                // Create Transaction instance
-                //
-                trans = db._createTransaction(mode, storeNames, globalSchema, parentTransaction);
+            // Create a new PSD frame to hold Promise.PSD.trans. Must not be bound to the current PSD frame since we want
+            // it to pop before then() callback is called of our returned Promise.
+            return Promise.newPSD(function () {
+                // Let the transaction instance be part of a Promise-specific data (PSD) value.
+                Promise.PSD.trans = trans;
+                trans.scopeFunc = scopeFunc; // For Error ("Table " + storeNames[0] + " not part of transaction") when it happens. This may help localizing the code that started a transaction used on another place.
 
-                // Provide arguments to the scope function (for backward compatibility)
-                var tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
-                tableArgs.push(trans);
-
-                // If transaction completes, resolve the Promise with the return value of scopeFunc.
-                var returnValue;
-                var uncompletedRequests = 0;
-
-                // Create a new PSD frame to hold Promise.PSD.trans. Must not be bound to the current PSD frame since we want
-                // it to pop before then() callback is called of our returned Promise.
-                Promise.newPSD(function () {
-                    // Let the transaction instance be part of a Promise-specific data (PSD) value.
-                    Promise.PSD.trans = trans;
-                    trans.scopeFunc = scopeFunc; // For Error ("Table " + storeNames[0] + " not part of transaction") when it happens. This may help localizing the code that started a transaction used on another place.
-
-                    if (parentTransaction) {
-                        // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
-                        trans.idbtrans = parentTransaction.idbtrans;
-                        trans._promise = override(trans._promise, function (orig) {
-                            return function (mode, fn, writeLock) {
-                                ++uncompletedRequests;
-                                function proxy(fn2) {
-                                    return function (val) {
-                                        var retval;
-                                        // _rootExec needed so that we do not loose any IDBTransaction in a setTimeout() call.
-                                        Promise._rootExec(function () {
-                                            retval = fn2(val);
-                                            // _tickFinalize makes sure to support lazy micro tasks executed in Promise._rootExec().
-                                            // We certainly do not want to copy the bad pattern from IndexedDB but instead allow
-                                            // execution of Promise.then() callbacks until the're all done.
-                                            Promise._tickFinalize(function () {
-                                                if (--uncompletedRequests === 0 && trans.active) {
-                                                    trans.active = false;
-                                                    trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
-                                                }
-                                            });
+                if (parentTransaction) {
+                    // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
+                    trans.idbtrans = parentTransaction.idbtrans;
+                    trans._promise = override(trans._promise, function (orig) {
+                        return function (mode, fn, writeLock) {
+                            ++uncompletedRequests;
+                            function proxy(fn2) {
+                                return function (val) {
+                                    var retval;
+                                    // _rootExec needed so that we do not loose any IDBTransaction in a setTimeout() call.
+                                    Promise._rootExec(function () {
+                                        retval = fn2(val);
+                                        // _tickFinalize makes sure to support lazy micro tasks executed in Promise._rootExec().
+                                        // We certainly do not want to copy the bad pattern from IndexedDB but instead allow
+                                        // execution of Promise.then() callbacks until the're all done.
+                                        Promise._tickFinalize(function () {
+                                            if (--uncompletedRequests === 0 && trans.active) {
+                                                trans.active = false;
+                                                trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
+                                            }
                                         });
-                                        return retval;
-                                    };
-                                }
-                                return orig.call(this, mode, function (resolve2, reject2, trans) {
-                                    return fn(proxy(resolve2), proxy(reject2), trans);
-                                }, writeLock);
-                            };
-                        });
-                    }
-                    trans.complete(function () {
-                        resolve(returnValue);
-                    });
-                    // If transaction fails, reject the Promise and bubble to db if noone catched this rejection.
-                    trans.error(function (e) {
-                        if (trans.idbtrans) trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
-                        try {trans.abort();} catch(e2){}
-                        if (parentTransaction) {
-                            parentTransaction.active = false;
-                            parentTransaction.on.error.fire(e); // Bubble to parent transaction
-                        }
-
-                        if (isConstructing) asap(doReject); else doReject();
-                        function doReject() {
-                            var catched = reject(e);
-                            if (!parentTransaction && !catched) {
-                                db.on.error.fire(e);// If not catched, bubble error to db.on("error").
+                                    });
+                                    return retval;
+                                };
                             }
-                        }
+                            return orig.call(this, mode, function (resolve2, reject2, trans) {
+                                return fn(proxy(resolve2), proxy(reject2), trans);
+                            }, writeLock);
+                        };
                     });
-
-                    // Finally, call the scope function with our table and transaction arguments.
-                    Promise._rootExec(function() {
-                        returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
-                        if (returnValue) {
-                            if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
-                                // scopeFunc returned an iterable. Handle yield as await.
-                                returnValue = awaitIterable(returnValue);
-                            } else if (typeof returnValue.then === 'function' && (!returnValue.hasOwnProperty('_PSD'))) {
-                                throw new exceptions.IncompatiblePromise();
-                            }
+                    ++uncompletedRequests;
+                    Promise._tickFinalize(function () {
+                        if (--uncompletedRequests === 0 && trans.active) {
+                            trans.active = false;
+                            trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
                         }
-                    });
-                });
-                if (!trans.idbtrans || (parentTransaction && uncompletedRequests === 0)) {
-                    trans._nop(); // Make sure transaction is being used so that it will resolve.
+                    });                    
+                } else {
+                    trans.create(); // Create the backend transaction so that complete() or error() will trigger even if no operation is made upon it.
                 }
-            } catch (e) {
-                // If exception occur, abort the transaction and reject Promise.
-                if (trans && trans.idbtrans) trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
-                if (trans) trans.abort();
-                if (parentTransaction) parentTransaction.on.error.fire(e);
-                asap(function () {
-                    // Need to use asap(=setImmediate/setTimeout) before calling reject because we are in the Promise constructor and reject() will always return false if so.
-                    if (!reject(e)) db.on("error").fire(e); // If not catched, bubble exception to db.on("error");
-                });
+                
+                var returnValue,
+                    promise = new Promise((resolve, reject) => {
+                        trans.complete(() => resolve(returnValue));
+                        trans.error(reject);
+                    });                
+                
+                // Finally, call the scope function with our table and transaction arguments.
+                returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
+                if (returnValue) {
+                    if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
+                        // scopeFunc returned an iterable. Handle yield as await.
+                        returnValue = awaitIterable(returnValue);
+                    } else if (typeof returnValue.then === 'function' && (!returnValue.hasOwnProperty('_PSD'))) {
+                        throw new exceptions.IncompatiblePromise();
+                    }
+                }
+                
+                // Finally return a promise that will resolve when transaction completes or fails.
+                // Force abort() and parent propagation handled in catch() below.
+                return promise;
+            });
+            
+        }).catch(e => {
+            // If exception occur, abort the transaction and reject Promise.
+            if (trans) {
+                if (trans.idbtrans) trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
+                trans.on.error.fire(e);
+                trans.abort();
             }
-            isConstructing = false;
-        }
+            if (parentTransaction) parentTransaction.on.error.fire(e);
+            return Promise.reject(e);
+        });
+        return promise.finally(()=>{
+            if (parentTransaction) parentTransaction._unlock();
+        });
     };
 
     this.table = function (tableName) {
@@ -1544,6 +1564,7 @@ export default function Dexie(dbName, options) {
             this.tables[name] = table;
             if (!this[name]) this[name] = table;
         }
+        this.on('error', e => {this._error = e;});
     }
 
     extendProto(Transaction.prototype, {
@@ -1580,9 +1601,49 @@ export default function Dexie(dbName, options) {
             // Promise.PSD.lockOwnerFor will point to current transaction object if the currently executing PSD scope owns the lock.
             return this._reculock && (!Promise.PSD || Promise.PSD.lockOwnerFor !== this);
         },
-        _nop: function (cb) {
-            // An asyncronic no-operation that may call given callback when done doing nothing. An alternative to asap() if we must not lose the transaction.
-            this.tables[this.storeNames[0]].get(0).then(cb);
+        create: function () {
+            var self = this;
+            if (!idbdb) {throw (dbOpenError && ["DatabaseClosedError","MissingAPIError"].indexOf(dbOpenError.name) >= 0 ?
+                dbOpenError : // Errors where it is no difference whether it was caused by the user operation or an earlier call to db.open()
+                new exceptions.OpenFailed(dbOpenError));} // Make it clear that the user operation was not what caused the error - the error had occurred earlier on db.open()!
+
+            var idbtrans = self.idbtrans = idbdb.transaction(safariMultiStoreFix(self.storeNames), self.mode);
+            idbtrans.onerror = function (e) {
+                self.on("error").fire(e && e.target.error);
+                e.preventDefault(); // Prohibit default bubbling to window.error
+                self.abort(); // Make sure transaction is aborted since we preventDefault.
+            };
+            idbtrans.onabort = function (e) {
+                // Workaround for issue #78 - low disk space on chrome.
+                // onabort is called but never onerror. Call onerror explicitely.
+                // Do this in a future tick so we allow default onerror to execute before doing the fallback.
+                asap(function () { self.on('error').fire(new exceptions.Abort()); });
+                self.active = false;
+                self.on("abort").fire(e);
+            };
+            idbtrans.oncomplete = function (e) {
+                self.active = false;
+                self.on("complete").fire(e);
+            };
+            return this;
+        },
+        wait: function (aquireLock) {
+            if (aquireLock) {
+                return Promise.newPSD(()=>{
+                    this._lock()
+                    return Promise.track(()=>{
+                        return this.wait(false);
+                    }).then(()=>this._unlock());
+                });
+            }
+            return new Promise((resolve, reject) =>{
+                if (!this._locked()) {
+                    if (!this.active) return reject(this._error || new exceptions.TransactionInactive());
+                    resolve();
+                } else {
+                    this._blockedFuncs.push(()=>this.wait().then(resolve, reject));                    
+                }
+            });
         },
         _promise: function (mode, fn, bWriteLock) {
             var self = this;
@@ -1591,31 +1652,8 @@ export default function Dexie(dbName, options) {
                 // Read lock always
                 if (!self._locked()) {
                     p = self.active ? new Promise(function (resolve, reject) {
-                        if (!self.idbtrans && mode) {
-                            if (!idbdb) {throw (dbOpenError && ["DatabaseClosedError","MissingAPIError"].indexOf(dbOpenError.name) >= 0 ?
-                                dbOpenError : // Errors where it is no difference whether it was caused by the user operation or an earlier call to db.open()
-                                new exceptions.OpenFailed(dbOpenError));} // Make it clear that the user operation was not what caused the error - the error had occurred earlier on db.open()!
+                        if (!self.idbtrans && mode) self.create();
 
-                            var idbtrans = self.idbtrans = idbdb.transaction(safariMultiStoreFix(self.storeNames), self.mode);
-                            idbtrans.onerror = function (e) {
-                                self.on("error").fire(e && e.target.error);
-                                e.preventDefault(); // Prohibit default bubbling to window.error
-                                self.abort(); // Make sure transaction is aborted since we preventDefault.
-                            };
-                            idbtrans.onabort = function (e) {
-                                // Workaround for issue #78 - low disk space on chrome.
-                                // onabort is called but never onerror. Call onerror explicitely.
-                                // Do this in a future tick so we allow default onerror to execute before doing the fallback.
-                                asap(function () { self.on('error').fire(new exceptions.Abort("Transaction aborted for unknown reason")); });
-
-                                self.active = false;
-                                self.on("abort").fire(e);
-                            };
-                            idbtrans.oncomplete = function (e) {
-                                self.active = false;
-                                self.on("complete").fire(e);
-                            };
-                        }
                         if (bWriteLock) self._lock(); // Write lock if write operation is requested
                         try {
                             fn(resolve, reject, self);
@@ -1626,13 +1664,12 @@ export default function Dexie(dbName, options) {
                             // whether the caller is about to catch() the error or not. Have to make
                             // transaction fail. Catching such an error wont stop transaction from failing.
                             // This is a limitation we have to live with.
-                            var e2 = stack(mapError(e));
+                            var e2 = mapError(e);
                             Dexie.ignoreTransaction(function() { self.on('error').fire(e2); });
-                            self.abort();
+                            //self.abort();
                             reject(e2);
                         }
-                    }) : Promise.reject(stack(new exceptions.TransactionInactive(
-                        "Transaction is inactive. Original Scope Function Source: " + self.scopeFunc.toString())));
+                    }) : Promise.reject(new exceptions.TransactionInactive());
                     if (self.active && bWriteLock) p.finally(function () {
                         self._unlock();
                     });
@@ -1645,9 +1682,8 @@ export default function Dexie(dbName, options) {
                     });
                 }
                 p.onuncatched = function (e) {
-                    // Bubble to transaction. Even though IDB does this internally, it would just do it for error events and not for caught exceptions.
-                    Dexie.ignoreTransaction(function () { self.on("error").fire(e); });
-                    self.abort();
+                    self.on.error.fire(e);
+                    //self.abort();
                 };
                 return p;
             });
@@ -1664,11 +1700,11 @@ export default function Dexie(dbName, options) {
             return this.on("error", cb);
         },
         abort: function () {
-            if (this.idbtrans && this.active) try { // TODO: if !this.idbtrans, enqueue an abort() operation.
+            if (this.idbtrans && this.active) {
                 this.active = false;
-                this.idbtrans.abort();
-                this.on.error.fire(new exceptions.Abort("Transaction Aborted"));
-            } catch (e) { }
+                try {this.idbtrans.abort();} catch(e){}
+                this.on.error.fire(new exceptions.Abort());
+            }  // TODO: if !this.idbtrans, enqueue an abort() operation.
         },
         table: function (name) {
             if (!this.tables.hasOwnProperty(name)) { throw new exceptions.InvalidTable("Table " + name + " not in transaction"); }
@@ -2060,7 +2096,7 @@ export default function Dexie(dbName, options) {
         if (keyRangeGenerator) try {
             keyRange = keyRangeGenerator();
         } catch (ex) {
-            error = stack(mapError(ex));
+            error = mapError(ex);
         }
 
         var whereCtx = whereClause._ctx,
@@ -2329,7 +2365,9 @@ export default function Dexie(dbName, options) {
                 addFilter(this._ctx, function (cursor) {
                     return filterFunction(cursor.value);
                 });
-                addMatchFilter(this._ctx, filterFunction); // match filters not used in Dexie.js but can be used by 3rd part libraries to test a collection for a match without querying DB. Used by Dexie.Observable.
+                // match filters not used in Dexie.js but can be used by 3rd part libraries to test a
+                // collection for a match without querying DB. Used by Dexie.Observable.
+                addMatchFilter(this._ctx, filterFunction); 
                 return this;
             },
             
@@ -2859,21 +2897,6 @@ export default function Dexie(dbName, options) {
 var fakeAutoComplete = function () { };// Will never be changed. We just fake for the IDE that we change it (see doFakeAutoComplete())
 var fake = false; // Will never be changed. We just fake for the IDE that we change it (see doFakeAutoComplete())
 
-function trycatch(fn, reject) {
-    var psd = Promise.PSD;
-    return function () {
-        var outerPSD = Promise.PSD; // Support Promise-specific data (PSD) in callback calls
-        Promise.PSD = psd;
-        try {
-            fn.apply(this, arguments);
-        } catch (e) {
-            reject(e);
-        } finally {
-            Promise.PSD = outerPSD;
-        }
-    };
-}
-
 function parseType(type) {
     if (typeof type === 'function') {
         return new type();
@@ -3179,7 +3202,7 @@ Dexie.fakeAutoComplete = fakeAutoComplete;
 Dexie.asap = asap;
 Dexie.maxKey = maxKey;
 Dexie.connections = connections;
-Dexie.dump = messageAndStack;
+Dexie.dump = e => e.stack || e;
 
 // Export Error classes
 extend(Dexie, fullNameExceptions); // Dexie.XXXError = class XXXError {...};

@@ -1,74 +1,104 @@
-import {_global, slice, isArray, doFakeAutoComplete, messageAndStack, miniTryCatch, extendProto} from './utils';
+import {slice, isArray, doFakeAutoComplete, miniTryCatch, extendProto, setProp, prettyStack} from './utils';
 import {reverseStoppableEventChain} from './chaining-functions';
 import Events from './Events';
 
 //
-// Promise Class
+// Promise Class for Dexie library
 //
-// A variant of promise-light (https://github.com/taylorhakes/promise-light) by https://github.com/taylorhakes - an A+ and ECMASCRIPT 6 compliant Promise implementation.
+// I started out writing this Promise class by copying promise-light (https://github.com/taylorhakes/promise-light) by
+// https://github.com/taylorhakes - an A+ and ECMASCRIPT 6 compliant Promise implementation.
 //
-// Modified by David Fahlander to be indexedDB compliant (See discussion: https://github.com/promises-aplus/promises-spec/issues/45) .
+// Modifications needed to be done to support indexedDB because it wont accept setTimeout()
+// (See discussion: https://github.com/promises-aplus/promises-spec/issues/45) .
+// This topic was also discussed in the following thread: https://github.com/promises-aplus/promises-spec/issues/45
+//
 // This implementation will not use setTimeout or setImmediate when it's not needed. The behavior is 100% Promise/A+ compliant since
-// the caller of new Promise() can be certain that the promise wont be triggered the lines after constructing the promise. We fix this by using the member variable constructing to check
-// whether the object is being constructed when reject or resolve is called. If so, the use setTimeout/setImmediate to fulfill the promise, otherwise, we know that it's not needed.
+// the caller of new Promise() can be certain that the promise wont be triggered the lines after constructing the promise.
 //
-// This topic was also discussed in the following thread: https://github.com/promises-aplus/promises-spec/issues/45 and this implementation solves that issue.
+// In previous versions this was fixed by not calling setTimeout when knowing that the resolve() or reject() came from another
+// tick. In Dexie v1.3.7+, I've rewritten the Promise class entirely. Just some fragments of promise-light is left. I use
+// another strategy now that simplifies everything a lot: to always execute callbacks in a new tick, but have an own microTick
+// engine that is used instead of setImmediate() or setTimeout().
+// Promise class has also been optimized a lot with inspiration from bluebird - to avoid closures as much as possible.
+// Also with inspiration from bluebird, asyncronic stacks in debug mode.
 //
-// Another feature with this Promise implementation is that reject will return false in case no one catched the reject call. This is used
-// to stopPropagation() on the IDBRequest error event in case it was catched but not otherwise.
+// Specific non-standard features of this Promise class:
+// * Async static context support (Promise.PSD)
+// * Event triggered when a rejection isn't handled (onuncatched and Promise.on('error'))
+// * Promise.track() method built upon PSD, that allows user to track all promises created from current stack frame
+//   and above + all promises that those promises starts in turn. 
 //
-// Also, the event new Promise().onuncatched is called in case no one catches a reject call. This is used for us to manually bubble any request
-// errors to the transaction. We must not rely on IndexedDB implementation to do this, because it only does so when the source of the rejection
-// is an error event on a request, not in case an ordinary exception is thrown.
+// David Fahlander, https://github.com/dfahlander
+//
 
-var _asap = (typeof setImmediate === 'undefined' ? function(fn, args) {
-    // BUGBUG: FF13 and earlier fails passing correct arguments to setTimout callback. TODO: Should safe up here and use closure and upgrade after successful test. 
-    setTimeout(function(fn, args){
-        isRootExecution = false;
-        asap = enqueueImmediate;
-        fn.apply(null, args);
-        endMicroTickScope();
-    }, 0, fn, args);
-} : function (fn, args) {
-    setImmediate(function(fn, args){
-        //try {
-        isRootExecution = false;
-        asap = enqueueImmediate;
-        fn.apply(null, args);
-        endMicroTickScope();
-        //} catch (e) {alert (e);}
-    }, fn, args);
-});
+/* The default "nextTick" function used only for the very first promise in a promise chain.
+   As soon as then promise is resolved or rejected, all next tasks will be executed in micro ticks
+   emulated in this module. For indexedDB compatibility, this means that every method needs to 
+   execute at least one promise before doing an indexedDB operation. Dexie will always call 
+   db.ready().then() for every operation to make sure the indexedDB event is started in an
+   emulated micro tick.
+*/
+var schedulePhysicalTick = (typeof setImmediate === 'undefined' ?
+    // No support for setImmediate. No worry, setTimeout is only called
+    // once time. Every tick that follows will be our emulated micro tick.
+    // Could have uses setTimeout.bind(null, 0, physicalTick) if it wasnt for that FF13 and below has a bug 
+    ()=>{setTimeout(physicalTick,0);} : 
+    // setImmediate supported. Modern platform. Also supports Function.bind().
+    setImmediate.bind(null, physicalTick));
+        
+        
+var isOutsideMicroTick = true, // True when NOT in a virtual microTick.
+    needsNewPhysicalTick = true, // True when a push to deferredCallbacks must also schedulePhysicalTick()
+    unhandledErrors = [], // Rejected promises that has occured. Used for firing Promise.on.error and promise.onuncatched.
+    unhandledErrorsNextTick = [], // Rejected promises with some may be catched in next physical tick.
+    // Private representation of public static Promise.debug.
+    // By default, it will be true only if platform is a web platform and its page is served from localhost.
+    // When debug = true, error's stacks will contain asyncronic long stacks.
+    debug = typeof location !== 'undefined' &&
+        // By default, use debug mode if served from localhost.
+        /^(http|https):\/\/(localhost|127\.0\.0\.1)/.test(location.href),
+    currentFulfiller = null; // To be able to have long stacks and follow async flow.
 
-doFakeAutoComplete(function () {
-    // Simplify the job for VS Intellisense. This piece of code is one of the keys to the new marvellous intellisense support in Dexie.
-    _asap = asap = enqueueImmediate = function(fn) {
-        var args = arguments; setTimeout(function() { fn.apply(_global, slice(args, 1)); }, 0);
-    };
-});
+// Just a pointer that only this module knows about.
+// Used in Promise constructor to emulate a private constructor.
+var INTERNAL = {};
 
-var asap = _asap,
-    isRootExecution = true,
-    tickErrors = [];
+// Async stacks (long stacks) must not grow infinitely.
+var LONG_STACKS_CLIP_LIMIT = 100,
+    // When calling error.stack or promise.stack, limit the number of asyncronic stacks to print out. 
+    MAX_LONG_STACKS = 20;
 
-var operationsQueue = [];
-var tickFinalizers = [];
-var enqueueImmediate = function (fn, args) {
-    operationsQueue.push([fn, args]);
-}
+var deferredCallbacks = []; // Callbacks to call in this tick.
+var tickFinalizers = []; // Finalizers to call after all microticks are executed.
 
-export default function Promise(fn) {
-    if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');
-    if (typeof fn !== 'function') throw new TypeError('not a function');
+export default function Promise(fn, _internalState, _internalValue) {
+    if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');    
+    this._deferreds = [];
+    var psd = (this._PSD = Promise.PSD);
+    this.onuncatched = null; // Optional event triggered if promise is rejected but no one listened.
+
+    if (debug) {
+        this._e = new Error();
+        this._prev = null;
+        this._numPrev = 0;
+    }
+    
+    if (typeof fn !== 'function') {
+        if (fn !== INTERNAL) throw new TypeError('not a function');
+        // Private constructor (INTERNAL, state, value).
+        // Used internally by Promise.resolve() and Promise.reject().
+        this._state = _internalState;
+        this._value = _internalValue;
+        debug && linkToPreviousPromise(this);
+        return;
+    }
+    
     this._state = null; // null (=pending), false (=rejected) or true (=resolved)
     this._value = null; // error or result
-    this._deferreds = [];//new Array(1); // Normally there will only be one deferred. Optimize for this.
-    this._catched = false; // for onuncatched
-    this._PSD = Promise.PSD;
-
+    psd && psd.oncreate && psd.oncreate.call(null, this);
     this._doResolve(fn);
+    this._constructed = true;
 }
-
 
 extendProto(Promise.prototype, {
     /**
@@ -80,49 +110,53 @@ extendProto(Promise.prototype, {
     _doResolve: function (fn) {
         // Promise Resolution Procedure:
         // https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
-        var done = false;
         try {
             fn(value => {
-                if (done) return;
-                this._state = true;
-                this._value = value;
+                if (this._state !== null) return;
                 if (value === this) throw new TypeError('A promise cannot be resolved with itself.');
                 if (value && (typeof value === 'object' || typeof value === 'function')) {
                     if (typeof value.then === 'function') {
                         this._doResolve((resolve, reject) => {
-                            value.then(resolve, reject);
+                            value instanceof Promise ?
+                                handle(value, new Deferred(null, null, resolve, reject)) :
+                                value.then(resolve, reject);
                         });
                         return;
                     }
                 }
-                done = true;
+                this._state = true;
+                this._value = value;
                 this._finale();
-            }, reason => {
-                if (done) return;
-                done = true;
-                this._state = false;
-                this._value = reason;
-                this._finale();
-            });
+            }, this._reject.bind(this)); // If Function.bind is not supported. Exception is thrown here
         } catch (ex) {
-            if (done) return;
-            done = true;
-            this._state = false;
-            this._value = ex;
-            this._finale();
+            this._reject(ex);
         }
+    },
+    
+    _reject: function (reason) {
+        if (this._state !== null) return;
+        this._state = false;
+        this._value = reason;
+        debug && reason !== null && typeof(reason) === 'object' && miniTryCatch(()=>setProp(reason, "stack", {
+            get: function (){
+                return this.stack;
+            }
+        }));
+        this._finale();
     },
 
     _finale: function () {
+        debug && linkToPreviousPromise(this);
         var wasRootExec = beginMicroTickScope();
-        for (var i = 0, len = this._deferreds.length; i < len; i++) {
+        // If this is a failure, add the failure to a list of possibly uncaught errors
+        !this._state && addPossiblyUnhandledError(this);
+        for (var i = 0, len = this._deferreds.length; i < len; ++i) {
             handle(this, this._deferreds[i]);
         }
         this._deferreds = [];
-        if (wasRootExec) endMicroTickScope();
-        else if (this._state === false) {
-            addTickError(this);
-        }
+        var onfulfilled;
+        this._PSD && (onfulfilled = this._PSD.onfulfilled) && onfulfilled(this);
+        wasRootExec && endMicroTickScope();
     },
     
     then: function (onFulfilled, onRejected) {
@@ -131,11 +165,11 @@ extendProto(Promise.prototype, {
         });
         p._PSD = this._PSD;
         p.onuncatched = this.onuncatched; // Needed when exception occurs in a then() clause of a successful parent promise. Want onuncatched to be called even in callbacks of callbacks of the original promise.
-        p._parent = this; // Used for recursively calling setCatched() on self and all parents.
+        p._parent = this; // Used for recursively calling markErrorAsHandled() on self and all parents.
         return p;
     },
 
-    'catch': function (onRejected) {
+    catch: function (onRejected) {
         if (arguments.length === 1) return this.then(null, onRejected);
         // First argument is the Error type to catch
         var type = arguments[0], callback = arguments[1];
@@ -152,7 +186,7 @@ extendProto(Promise.prototype, {
         });
     },
 
-    'finally': function (onFinally) {
+    finally: function (onFinally) {
         return this.then(function (value) {
             onFinally();
             return value;
@@ -161,8 +195,38 @@ extendProto(Promise.prototype, {
             return Promise.reject(err);
         });
     },
-
-    onuncatched: null // Optional event triggered if promise is rejected but no one listened.
+    
+    _recuStacks: function (stacks, limit) {
+        if (stacks.length === limit) return stacks;
+        if (this._state === false) {
+            var failure = this._value,
+                error,
+                message;
+            
+            if (failure != null) {
+                error = failure.name || "Error";
+                message = failure.message || failure;
+            } else {
+                error = failure; // If error is undefined or null, show that.
+                message = ""
+            }
+            stacks.push(error + (message ? ": \n" + message : "\n") + prettyStack(failure));
+        }
+        if (debug) {
+            var stack = prettyStack(this._e);
+            if (stack) stacks.push(stack);
+            if (this._prev) this._prev._recuStacks(stacks, limit);
+        }
+        return stacks;
+    },
+    
+    stack: {
+        get: function() {
+            if (this._stack) return this._stack;
+            var stacks = this._recuStacks ([], MAX_LONG_STACKS);
+            return (this._stack = stacks.join("From previous:\n"));
+        }
+    }
 });
 
 function handle(promise, deferred) {
@@ -176,23 +240,37 @@ function handle(promise, deferred) {
         // This Deferred doesnt have a listener for the event being triggered (onFulfilled or onReject) so lets forward the event to any eventual listeners on the Promise instance returned by then() or catch()
         return (promise._state ? deferred.resolve : deferred.reject)(promise._value);
     }
-    asap(call, [promise, cb, deferred]);
+    deferredCallbacks.push([cb, promise, deferred]);
+    if (needsNewPhysicalTick) {
+        schedulePhysicalTick();
+        needsNewPhysicalTick = false;
+    }
 }
 
-function call (promise, cb, deferred) {
+function call (cb, promise, deferred) {
     var outerPSD = Promise.PSD;
     try {
         Promise.PSD = promise._PSD;
+        // We're gonna call the catcher here. Mark it as catched.
+        // Even if the catcher throws or returns Promise.reject(e),
+        // this will work because then another promise is resolved with the
+        // rejection and addPossiblyUnhandledError() is called again.
+        if (!promise._state) markErrorAsHandled (promise);
+        
+        // Set static variable currentFulfiller to the promise that is being fullfilled,
+        // so that we connect the chain of promises.
+        currentFulfiller = promise;
+        
+        // Call callback and resolve our deferred with it's return value.
         var ret = cb(promise._value);
-        if (!promise._state && (!ret ||
-              typeof ret.then !== 'function' ||
-              ret._state !== false)) // If 'return Promise.reject(err);' - don't regard it as catched!
-            setCatched(promise); 
         deferred.resolve(ret);
     } catch (e) {
+        // Exception thrown in callback. Reject our deferred.
         deferred.reject(e);
     } finally {
+        // Restore Promise.PSD and currentFulfiller.
         Promise.PSD = outerPSD;
+        currentFulfiller = null;
     }
 }
 
@@ -235,17 +313,11 @@ extendProto(Promise, {
     
     resolve: value => {
         if (value && typeof value.then === 'function') return value;
-        var p = new Promise(function () { });
-        p._state = true;
-        p._value = value;
-        return p;
+        return new Promise(INTERNAL, true, value);
     },
     
     reject: reason => {
-        var p = new Promise(function () { });
-        p._state = false;
-        p._value = reason;
-        return p;
+        return new Promise(INTERNAL, false, reason);
     },
     
     race: values => new Promise((resolve, reject) => {
@@ -254,86 +326,134 @@ extendProto(Promise, {
     
     PSD: null,// Promise Specific Data - a TLS Pattern (Thread Local Storage) for Promises.
     
-    newPSD: fn => {
+    newPSD: (fn,arg) => {
         // Create new PSD scope (Promise Specific Data)
         var outerScope = Promise.PSD;
         Promise.PSD = outerScope ? Object.create(outerScope) : {};
         try {
-            return fn();
+            return fn(arg);
         } finally {
             Promise.PSD = outerScope;
         }
     },
-
-    usePSD: (psd, fn) => {
-        var outerScope = Promise.PSD;
-        Promise.PSD = psd;
-        try {
-            return fn();
-        } finally {
-            Promise.PSD = outerScope;
-        }
-    },
-
-    _rootExec: _rootExec,
     
-    _tickFinalize: callback => {
-        if (isRootExecution) throw new Error("Not in a virtual tick");
-        tickFinalizers.push(callback);
+    usePSD: usePSD,
+    
+    track: (fn, tracker) => {
+        // This closure is used: fn, tracker. Ok. Happens only on track() which is not frequent.
+        return new Promise(resolve => {
+            return Promise.newPSD(resolve=>{
+                // This closure is useed: refCount, parentOnCreate, parentOnFulfilled.
+                // Ok. Happens only on track() which is not frequent.
+                var psd = Promise.PSD;
+                var refCount = 0;
+                function tickFinalizer() {
+                    if (refCount === 0) {
+                        tickFinalizers.splice(tickFinalizers.indexOf(tickFinalizer), 1);
+                        resolve();
+                    }
+                }
+                tickFinalizers.push(tickFinalizer);
+                var parentOnCreate = psd.oncreate,
+                    parentOnFulfilled = psd.onfulfilled;
+                
+                psd.oncreate = p => {
+                    // THIS CLOSURE HAPPENS FOR EACH PROMISE. OPTIMIZE AWAY ALL ITS CLOSURES!
+                    // Support chaining oncreate hooks, by calling already registered hook.
+                    parentOnCreate && parentOnCreate(p);
+                    ++refCount;
+                    tracker && tracker.oncreate && tracker.oncreate(p);
+                };
+                
+                psd.onfulfilled = p => {
+                    parentOnFulfilled && parentOnFulfilled(p);
+                    --refCount;
+                    tracker && (p._state ?
+                        tracker.onresolve && tracker.onresolve(p, p._value) :
+                        tracker.onreject && tracker.onreject(p, p._value));                        
+                }
+                fn(tracker);
+            }, resolve);
+        });
     },
+
+    // TODO: Remove!
+    _rootExec: _rootExec,
     
     on: Events(null, {"error": [
         reverseStoppableEventChain,
         defaultErrorHandler] // Default to defaultErrorHandler
     }),
     
-    _isRootExec: {get: ()=> isRootExecution}
+    _isRootExec: {get: ()=> isOutsideMicroTick},
+    
+    debug: {get: ()=>debug, set: val => debug = val}
 });
 
-function addTickError(promise) {
-    // If this error was already added, replace it with given promise, because
-    // parents are added later and the topmost parent promise is the interesting one.
-    // Else push p to tickErrors.
-    if (!tickErrors.some((p,i) =>
-        p._value === promise._value && (tickErrors[i] = promise) 
-    )) tickErrors.push(promise);
-}
-
-function beginMicroTickScope() {
-    var isRootExec = isRootExecution;
-    isRootExecution = false;
-    asap = enqueueImmediate;
-    return isRootExec;
-}
-
-function endMicroTickScope() {
-    var queue, i, l;
-    do {
-        while (operationsQueue.length > 0) {
-            queue = operationsQueue;
-            operationsQueue = [];
-            l = queue.length;
-            for (i = 0; i < l; ++i) {
-                var item = queue[i];
-                item[0].apply(null, item[1]);
-            }
-        }
-        var finalizer = tickFinalizers.pop();
-        if (finalizer) try { finalizer(); } catch (e) { }
-    } while (tickFinalizers.length > 0 || operationsQueue.length > 0);
-    asap = _asap;
-    isRootExecution = true;
-    if (tickErrors.length) {
-        tickErrors.forEach(p => {
-            if (!p._catched) miniTryCatch(()=>{
-                (!p.onuncatched || p.onuncatched(p._value))
-                && Promise.on.error.fire(p._value, p);
-            });
-        });
-        tickErrors = [];
+function linkToPreviousPromise(promise) {
+    // Support long stacks by linking to previous completed promise.
+    var prev = currentFulfiller,
+        numPrev = prev ? prev._numPrev + 1 : 0;
+    if (numPrev < LONG_STACKS_CLIP_LIMIT) { // Prohibit infinite Promise loops to get an infinite long memory consuming "tail".
+        promise._prev = prev;
+        promise._numPrev = numPrev;
     }
 }
 
+function usePSD (psd, fn, arg) {
+    var outerScope = Promise.PSD;
+    Promise.PSD = psd;
+    try {
+        return fn(arg);
+    } finally {
+        Promise.PSD = outerScope;
+    }
+}
+
+/* The callback to schedule with setImmediate() or setTimeout().
+   It runs a virtual microtick and executes any callback registered in deferredCallbacks.
+ */
+function physicalTick() {
+    beginMicroTickScope() && endMicroTickScope();
+}
+
+function beginMicroTickScope() {
+    var wasRootExec = isOutsideMicroTick;
+    isOutsideMicroTick = false;
+    needsNewPhysicalTick = false;
+    if (wasRootExec) {
+        unhandledErrors = unhandledErrorsNextTick;
+        unhandledErrorsNextTick = [];
+    }
+    return wasRootExec;
+}
+
+function endMicroTickScope() {
+    var callbacks, i, l;
+    do {
+        while (deferredCallbacks.length > 0) {
+            callbacks = deferredCallbacks;
+            deferredCallbacks = [];
+            l = callbacks.length;
+            for (i = 0; i < l; ++i) {
+                var item = callbacks[i];
+                call (item[0], item[1], item[2]);
+            }
+        }
+        unhandledErrors.forEach(p => {
+            try {
+                (!p.onuncatched || p.onuncatched(p._value)) &&
+                Promise.on.error.fire(p._value, p);
+            } catch (e){}
+        });
+        unhandledErrors = [];
+        tickFinalizers.forEach(tf => tf());
+    } while (deferredCallbacks.length > 0);
+    isOutsideMicroTick = true;
+    needsNewPhysicalTick = true;
+}
+
+// TODO: Remove!
 function _rootExec(fn) {
     var isRootExec = beginMicroTickScope();
     try {
@@ -343,12 +463,54 @@ function _rootExec(fn) {
     }
 }
 
-function setCatched(promise) {
-    promise._catched = true;
-    if (promise._parent && !promise._parent._catched) setCatched(promise._parent);
+function addPossiblyUnhandledError(promise, wasRootExec) {
+    // If promise is still being constructed outside a virtual microtick,
+    // we know that there will not be any then handlers attatched to this
+    // promise during current virtual tick. So we should defer uncaught-checking
+    // til next physical tick.
+    var list = wasRootExec && !promise._constructed ?
+        unhandledErrorsNextTick : unhandledErrors;
+
+    // Only add to list if not already there. The first one to add to this list
+    // will be upon the first rejection so that the root cause (first promise in the
+    // rejection chain) is the one listed.
+    if (!list.some(p => p._value === promise._value))
+        list.push(promise);
+}
+
+function markErrorAsHandled(promise) {
+    // Called when a reject handled is actually being called.
+    // Search in unhandledErrors for any promise whos _value is this promise_value (list
+    // contains only rejected promises, and only one item per error)
+    var i = unhandledErrors.length;
+    do {
+        if (unhandledErrors[--i]._value === promise._value) {
+            // Found a promise that failed with this same error object pointer,
+            // Remove that since there is a listener that actually takes care of it.
+            unhandledErrors.splice(i, 1);
+            return;
+            // But? What if the callback throws or returns Promise.reject(e) again? Shouldn't
+            // we set it as unhandled again then?! Yes! But that will be done automatically;
+            // Review the code in call(). It will then:
+            //   1. deferred.reject(ex) (or deferred.resolve(rejectedPromise))
+            //   [defered.reject/resolve points leads to one of the callbacks in _doResolve() ]
+            //   2. _reject will be called (directly or indirectly via resolve...then...reject)
+            //   3. _finale will be called and see its state as false, and call addPossiblyUnhandledError()
+            //      again!. Now pointing to THAT promise instead. And it's true our promise WAS handled in
+            //      a way that rejected another Promise.
+            //      Long stack will show the path all the way on how rejection happened.
+        }
+    } while (i);
 }
 
 // By default, log uncaught errors to the console
 function defaultErrorHandler(e) {
-    console.warn(`Uncaught Promise: ${messageAndStack(e)}`);
+    console.warn(`Uncaught Promise: ${e.stack || e}`);
 }
+
+doFakeAutoComplete(() => {
+    // Simplify the job for VS Intellisense. This piece of code is one of the keys to the new marvellous intellisense support in Dexie.
+    schedulePhysicalTick = () => {
+        setTimeout(physicalTick, 0);
+    };
+});

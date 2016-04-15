@@ -23,6 +23,7 @@
     "window": false,
     "global": false,
     "navigator": false,
+    "location": false,
     "chrome": false
   }
 }

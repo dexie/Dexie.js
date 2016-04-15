@@ -1,4 +1,4 @@
-import { derive, messageAndStack } from './utils';
+import { derive } from './utils';
 
 var dexieErrorNames = [
     'Modify',
@@ -40,7 +40,9 @@ var errorList = dexieErrorNames.concat(idbDomErrorNames);
 var defaultTexts = {
     VersionChanged: "Database version changed by other database connection",
     DatabaseClosed: "Database has been closed",
-    IncompatiblePromise: "Incompatible Promise used in transaction scope. See http://tinyurl.com/znyqjqc"
+    IncompatiblePromise: "Incompatible Promise used in transaction scope. See http://tinyurl.com/znyqjqc",
+    Abort: "Transaction aborted",
+    TransactionInactive: "Transaction has already completed or failed"
 };
 
 //
@@ -55,11 +57,7 @@ export function DexieError (name, msg) {
     this.name = name;
     this.message = msg;
 }
-derive(DexieError).from(Error).extend({
-    dump: function () {
-        return messageAndStack(this);
-    }
-});
+derive(DexieError).from(Error);
 
 function getMultiErrorMessage (msg, failures) {
     return msg + ". Errors: " + failures
@@ -67,6 +65,7 @@ function getMultiErrorMessage (msg, failures) {
         .filter((v,i,s)=>s.indexOf(v)===i) // Only unique error strings
         .join('\n');
 }
+
 //
 // ModifyError - thrown in WriteableCollection.modify()
 // Specific constructor because it contains members failures and failedKeys.
@@ -111,7 +110,7 @@ export var exceptions = errorList.reduce((obj,name)=>{
     function DexieError (msgOrInner, inner){
         this.name = fullName;
         if (!msgOrInner) {
-            this.message = "Unknown Error";
+            this.message = defaultTexts[name] || fullName;
             this.inner = null;
         } else if (typeof msgOrInner === 'string') {
             this.message = msgOrInner;
@@ -119,9 +118,6 @@ export var exceptions = errorList.reduce((obj,name)=>{
         } else if (typeof msgOrInner === 'object') {
             this.message = `${msgOrInner.name} ${msgOrInner.message}`;
             this.inner = msgOrInner;
-        } else {
-            this.message = defaultTexts[name];
-            this.inner = null;
         }
     }
     derive(DexieError).from(BaseException);
@@ -143,7 +139,6 @@ export function mapError (domError, message) {
     var rv = domError;
     if (!(domError instanceof DexieError) && domError.name && exceptionMap[domError.name]) {
         rv = new exceptionMap[domError.name](message || domError.message, domError);
-        if (domError.stack) rv.stack = domError.stack;
     }
     return rv;
 }

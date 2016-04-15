@@ -73,24 +73,48 @@ export function asap(fn) {
     if (_global.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
 }
 
-export function miniTryCatch(fn, onerror) {
+export function trycatch(fn, reject) {
+    var psd = Promise.PSD;
+    return function () {
+        var outerPSD = Promise.PSD; // Support Promise-specific data (PSD) in callback calls
+        Promise.PSD = psd;
+        try {
+            fn.apply(this, arguments);
+        } catch (e) {
+            reject(e);
+        } finally {
+            Promise.PSD = outerPSD;
+        }
+    };
+}
+
+export function miniTryCatch(fn, onerror, args) {
     try {
-        fn();
+        fn.apply(null, args);
     } catch (ex) {
         onerror && onerror(ex);
     }
 }
 
-export function messageAndStack (e) {
+/*export function messageAndStack (e) {
     var stack = e && e.stack;
     return stack ?
         stack.indexOf(e+'') > 0 ?
             stack :
         e + ". " + stack :
         e;
+}*/
+
+export function prettyStack(e) {
+    var stack = e.stack;
+    if (!stack) return "";
+    return stack.split('\n')
+        .filter(frame => !/(^Error|dexie\.js|dexie\.min\.js)/.test(frame))
+        .map(frame => "\n" + frame)
+        .join('');
 }
 
-export function stack(error) {
+/*export function stack(error) {
     if (error.stack) return error; // Provided error already has a stack
     try {
         var err = new Error(error.message || error); // In Chrome, stack is generated here.
@@ -101,11 +125,11 @@ export function stack(error) {
         error.stack = e.stack;
     }
     return error;
-}
+}*/
 
 export function fail(err) {
     // Get the call stack and return a rejected promise.
-    return Promise.reject(stack(err));
+    return Promise.reject(err);
 }
 
 export function getByKeyPath(obj, keyPath) {

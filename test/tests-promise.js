@@ -9,10 +9,115 @@ function createDirectlyResolvedPromise() {
     });
 }
 
+asyncTest("Promise basics", ()=>{
+   new Dexie.Promise(resolve => resolve("value"))
+   .then(value => {
+      equal(value, "value", "Promise should be resolved with 'value'");
+   }).then(()=>{
+      start(); 
+   });
+});
+
+asyncTest("return Promise.resolve() from Promise.then(...)", ()=>{
+    new Dexie.Promise(resolve => resolve("value"))
+    .then (value => {
+        return Dexie.Promise.resolve(value);
+    }).then (value => {
+        equal (value, "value", "returning Dexie.Promise.resolve() from then handler should work");
+        start();
+    })
+});
+
+asyncTest("return unresolved Promise from Promise.then(...)", ()=>{
+    new Dexie.Promise(resolve => resolve("value"))
+    .then (value => {
+        return new Dexie.Promise(resolve => setTimeout(resolve, 0, "value"));
+    }).then (value => {
+        equal (value, "value", "When unresolved promise is resolved, this promise should resolve with its value");
+        start();
+    })
+});
+
+asyncTest("Compatibility with other promises", ()=>{
+    Dexie.Promise.resolve().then(()=>{
+       return window.Promise.resolve(3); 
+    }).then(x => {
+        equal(x, 3, "returning a window.Promise should be ok");
+        start();
+    })
+});
+
+asyncTest("Promise.track", ()=>{
+    var Promise = Dexie.Promise;
+    class Tracker {
+        constructor() {
+            this.counter = 0;
+        }
+        
+        oncreate (promise) {
+            promise.ID = ++this.counter;
+            ok(true, `Promise ${promise.ID} created: ${promise.stack}`);
+        }
+        onresolve (promise, value) {
+            ok(true, `Promise ${promise.ID} resolved to ${value}`);
+        }
+        onreject (promise, reason) {
+            ok(true, `Promise ${promise.ID} rejected with ${reason}`);
+        }
+    }
+    
+    var tracker = new Tracker();
+    
+    Promise.track(() => {
+        Promise.resolve("test")
+            .then(x => x + ":")
+            .then(x => Promise.reject("rejection"))
+            .then(()=>ok(false, "Should not come here"))
+            .catch(e => equal(e, "rejection", "Should catch rejection"));
+    }, tracker).then(()=>ok(true, "Scope ended"))
+      .then(start);
+});
+
+asyncTest ("Promise.track chained", ()=>{
+    var Promise = Dexie.Promise;
+    var createdPromises = 0,
+        createdPromises2 = 0,
+        resolvedPromises = 0,
+        resolvedPromises2 = 0,
+        rejectedPromises = 0,
+        rejectedPromises2 = 0;
+        
+    Promise.track(()=>{
+        new Promise(resolve => resolve())
+            .then(()=>Promise.track(()=>{
+                new Promise(resolve => resolve())
+                    .then(x => 3)
+                    .then(null, e => "catched")
+                    .then(x => {}) 
+                }, {
+                    oncreate: p => ++createdPromises2,
+                    onresolve: p => ++resolvedPromises2,
+                    onreject: p => ++rejectedPromises2
+                })
+        );
+    }, {
+        oncreate: p => (p.ID = ++createdPromises) &&
+            ok(true, `Promise ${p.ID} created: ${p.stack}`),
+        onresolve: p => ++resolvedPromises,
+        onreject: p => ++rejectedPromises
+    }).then(()=>{
+        equal(createdPromises2, 4, "Should be 4 promises in inner scope");
+        equal(createdPromises2, rejectedPromises2 + resolvedPromises2, "created and rejected/resolved must be same");
+        equal(createdPromises, 7, "Should be 7 promises in outmost scope");
+        start();
+    });
+});
+
 asyncTest("Promise.on.error should propagate once", 1, function(){
     var Promise = Dexie.Promise;
     function logErr (e) {
         ok(true, e);
+        return false;
     }
     Promise.on('error', logErr);
     var p = new Promise((resolve, reject)=>{
