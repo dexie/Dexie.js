@@ -80,6 +80,7 @@ asyncTest("Promise.track", ()=>{
 
 asyncTest ("Promise.track chained", ()=>{
     var Promise = Dexie.Promise;
+    //Promise._rootExec(()=>{
     var createdPromises = 0,
         createdPromises2 = 0,
         resolvedPromises = 0,
@@ -90,6 +91,7 @@ asyncTest ("Promise.track chained", ()=>{
     Promise.track(()=>{
         new Promise(resolve => resolve())
             .then(()=>Promise.track(()=>{
+                Promise.PSD.inner = true;
                 new Promise(resolve => resolve())
                     .then(x => 3)
                     .then(null, e => "catched")
@@ -107,10 +109,12 @@ asyncTest ("Promise.track chained", ()=>{
         onreject: p => ++rejectedPromises
     }).then(()=>{
         equal(createdPromises2, 4, "Should be 4 promises in inner scope");
-        equal(createdPromises2, rejectedPromises2 + resolvedPromises2, "created and rejected/resolved must be same");
+        equal(resolvedPromises2, 4, "Should be 4 resolved promises in inner scope");
+        equal(rejectedPromises2 + resolvedPromises2, createdPromises2, "created and (rejected + resolved) must be same");
         equal(createdPromises, 7, "Should be 7 promises in outmost scope");
         start();
     });
+    //});
 });
 
 asyncTest("Promise.on.error should propagate once", 1, function(){

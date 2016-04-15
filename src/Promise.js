@@ -154,9 +154,9 @@ extendProto(Promise.prototype, {
             handle(this, this._deferreds[i]);
         }
         this._deferreds = [];
+        wasRootExec && endMicroTickScope();
         var onfulfilled;
         this._PSD && (onfulfilled = this._PSD.onfulfilled) && onfulfilled(this);
-        wasRootExec && endMicroTickScope();
     },
     
     then: function (onFulfilled, onRejected) {
@@ -447,7 +447,9 @@ function endMicroTickScope() {
             } catch (e){}
         });
         unhandledErrors = [];
-        tickFinalizers.forEach(tf => tf());
+        var finalizers = tickFinalizers.slice(0); // Clone first because finalizer may remove itself from list.
+        i = finalizers.length;
+        while (i) finalizers[--i]();
     } while (deferredCallbacks.length > 0);
     isOutsideMicroTick = true;
     needsNewPhysicalTick = true;
@@ -483,24 +485,22 @@ function markErrorAsHandled(promise) {
     // Search in unhandledErrors for any promise whos _value is this promise_value (list
     // contains only rejected promises, and only one item per error)
     var i = unhandledErrors.length;
-    do {
-        if (unhandledErrors[--i]._value === promise._value) {
-            // Found a promise that failed with this same error object pointer,
-            // Remove that since there is a listener that actually takes care of it.
-            unhandledErrors.splice(i, 1);
-            return;
-            // But? What if the callback throws or returns Promise.reject(e) again? Shouldn't
-            // we set it as unhandled again then?! Yes! But that will be done automatically;
-            // Review the code in call(). It will then:
-            //   1. deferred.reject(ex) (or deferred.resolve(rejectedPromise))
-            //   [defered.reject/resolve points leads to one of the callbacks in _doResolve() ]
-            //   2. _reject will be called (directly or indirectly via resolve...then...reject)
-            //   3. _finale will be called and see its state as false, and call addPossiblyUnhandledError()
-            //      again!. Now pointing to THAT promise instead. And it's true our promise WAS handled in
-            //      a way that rejected another Promise.
-            //      Long stack will show the path all the way on how rejection happened.
-        }
-    } while (i);
+    while (i) if (unhandledErrors[--i]._value === promise._value) {
+        // Found a promise that failed with this same error object pointer,
+        // Remove that since there is a listener that actually takes care of it.
+        unhandledErrors.splice(i, 1);
+        return;
+        // But? What if the callback throws or returns Promise.reject(e) again? Shouldn't
+        // we set it as unhandled again then?! Yes! But that will be done automatically;
+        // Review the code in call(). It will then:
+        //   1. deferred.reject(ex) (or deferred.resolve(rejectedPromise))
+        //   [defered.reject/resolve points leads to one of the callbacks in _doResolve() ]
+        //   2. _reject will be called (directly or indirectly via resolve...then...reject)
+        //   3. _finale will be called and see its state as false, and call addPossiblyUnhandledError()
+        //      again!. Now pointing to THAT promise instead. And it's true our promise WAS handled in
+        //      a way that rejected another Promise.
+        //      Long stack will show the path all the way on how rejection happened.
+    }
 }
 
 // By default, log uncaught errors to the console
