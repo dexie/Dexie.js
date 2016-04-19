@@ -47,6 +47,7 @@ import {
     promisableChain,
     reverseStoppableEventChain
 } from './chaining-functions';
+import * as Debug from './debug';
 
 var maxString = String.fromCharCode(65535),
     // maxKey is an Array<Array> if indexedDB implementations supports array keys (not supported by IE,Edge or Safari at the moment)
@@ -57,7 +58,10 @@ var maxString = String.fromCharCode(65535),
     connections = [],
     isIEOrEdge = typeof navigator !== 'undefined' && /(MSIE|Trident|Edge)/.test(navigator.userAgent),
     hasIEDeleteObjectStoreBug = isIEOrEdge,
-    hangsOnDeleteLargeKeyRange = isIEOrEdge;
+    hangsOnDeleteLargeKeyRange = isIEOrEdge,
+    dexieStackFrameFilter = frame => !/(dexie\.js|dexie\.min\.js)/.test(frame);
+
+Debug.setDebug(Debug.debug, dexieStackFrameFilter);
 
 export default function Dexie(dbName, options) {
     /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
@@ -119,7 +123,7 @@ export default function Dexie(dbName, options) {
         });
         // By default, log uncaught errors to the console
         function defaultDbErrorHandler(e) {
-            console.warn(`Uncaught Promise: ${e.stack || e}`);
+            console.warn(`Unhandled rejection: ${e.stack || e}`);
         }
         function defaultPromiseErrorHandler(e) {
             db.on.error.fire(e);
@@ -507,7 +511,7 @@ export default function Dexie(dbName, options) {
         }
     };
 
-    /*this._whenReady = function (fn) {
+    this._whenReady = function (fn) {
         if (!fake && db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
             if (!isBeingOpened) {
                 if (autoOpen) {
@@ -519,19 +523,19 @@ export default function Dexie(dbName, options) {
             return new Promise(function (resolve, reject) {
                 pausedResumeables.push({
                     resume: function () {
-                        fn(resolve, reject);
+                        fn().then(resolve, reject);
                     }
                 });
             });
         }
         return new Promise(fn);
-    };*/
+    };
     
-    this._whenReady = function (fn) {
+    /*this._whenReady = function (fn) {
         return this.ready().then(()=>{
            return new Promise(fn);   
         });
-    };
+    };*/
     
     this.ready = function (cb) {
         return new Promise(resolve => {
@@ -3184,6 +3188,16 @@ function safariMultiStoreFix(storeNames) {
 
 // Export our Promise implementation since it can be handy as a standalone Promise implementation
 Dexie.Promise = Promise;
+// Dexie.debug proptery:
+// Dexie.debug = false
+// Dexie.debug = true
+// Dexie.debug = "dexie" - don't hide dexie's stack frames.
+setProp(Dexie, "debug", {
+    get: ()=>Debug.debug,
+    set: value => {
+        Debug.setDebug(value, value === 'dexie' ? ()=>true : dexieStackFrameFilter);
+    }
+});
 // Export our derive/extend/override methodology
 Dexie.derive = derive;
 Dexie.extend = extend;

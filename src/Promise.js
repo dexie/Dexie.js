@@ -1,7 +1,7 @@
-import {slice, isArray, doFakeAutoComplete, miniTryCatch, extendProto, setProp, prettyStack} from './utils';
+import {slice, isArray, doFakeAutoComplete, miniTryCatch, extendProto, setProp, _global} from './utils';
 import {reverseStoppableEventChain} from './chaining-functions';
 import Events from './Events';
-
+import {debug, prettyStack} from './debug';
 //
 // Promise Class for Dexie library
 //
@@ -16,7 +16,7 @@ import Events from './Events';
 // the caller of new Promise() can be certain that the promise wont be triggered the lines after constructing the promise.
 //
 // In previous versions this was fixed by not calling setTimeout when knowing that the resolve() or reject() came from another
-// tick. In Dexie v1.3.7+, I've rewritten the Promise class entirely. Just some fragments of promise-light is left. I use
+// tick. In Dexie v1.4.0, I've rewritten the Promise class entirely. Just some fragments of promise-light is left. I use
 // another strategy now that simplifies everything a lot: to always execute callbacks in a new tick, but have an own microTick
 // engine that is used instead of setImmediate() or setTimeout().
 // Promise class has also been optimized a lot with inspiration from bluebird - to avoid closures as much as possible.
@@ -30,6 +30,16 @@ import Events from './Events';
 //
 // David Fahlander, https://github.com/dfahlander
 //
+
+// Just a pointer that only this module knows about.
+// Used in Promise constructor to emulate a private constructor.
+var INTERNAL = {};
+
+// Async stacks (long stacks) must not grow infinitely.
+var LONG_STACKS_CLIP_LIMIT = 100,
+    // When calling error.stack or promise.stack, limit the number of asyncronic stacks to print out. 
+    MAX_LONG_STACKS = 20,
+    stack_being_generated = false;
 
 /* The default "nextTick" function used only for the very first promise in a promise chain.
    As soon as then promise is resolved or rejected, all next tasks will be executed in micro ticks
@@ -46,35 +56,51 @@ var schedulePhysicalTick = (typeof setImmediate === 'undefined' ?
     // setImmediate supported. Modern platform. Also supports Function.bind().
     setImmediate.bind(null, physicalTick));
         
-        
+// Confifurable through Promise.scheduler.
+var asap = function (callback, args) {
+    deferredCallbacks.push([callback, args]);
+    if (needsNewPhysicalTick) {
+        schedulePhysicalTick();
+        needsNewPhysicalTick = false;
+    }
+}
+
 var isOutsideMicroTick = true, // True when NOT in a virtual microTick.
     needsNewPhysicalTick = true, // True when a push to deferredCallbacks must also schedulePhysicalTick()
     unhandledErrors = [], // Rejected promises that has occured. Used for firing Promise.on.error and promise.onuncatched.
-    unhandledErrorsNextTick = [], // Rejected promises with some may be catched in next physical tick.
-    // Private representation of public static Promise.debug.
-    // By default, it will be true only if platform is a web platform and its page is served from localhost.
-    // When debug = true, error's stacks will contain asyncronic long stacks.
-    debug = typeof location !== 'undefined' &&
-        // By default, use debug mode if served from localhost.
-        /^(http|https):\/\/(localhost|127\.0\.0\.1)/.test(location.href),
-    currentFulfiller = null; // To be able to have long stacks and follow async flow.
+    currentFulfiller = null;
+    
+export var PSD = null;
+export var deferredCallbacks = []; // Callbacks to call in this tick.
+export var numScheduledCalls = 0;
+export var flowFinalizers = []; // Finalizers to call when there are no more async calls scheduled.
 
-// Just a pointer that only this module knows about.
-// Used in Promise constructor to emulate a private constructor.
-var INTERNAL = {};
+export var wrapperDefaults = [];
+export var wrappers = (() => {
+    var wrappers = [];
 
-// Async stacks (long stacks) must not grow infinitely.
-var LONG_STACKS_CLIP_LIMIT = 100,
-    // When calling error.stack or promise.stack, limit the number of asyncronic stacks to print out. 
-    MAX_LONG_STACKS = 20;
-
-var deferredCallbacks = []; // Callbacks to call in this tick.
-var tickFinalizers = []; // Finalizers to call after all microticks are executed.
+    return {
+        read: () => {
+            var i = wrappers.length,
+                result = new Array(i);
+            while (i--) result[i] = wrappers[i].read();
+            return result;
+        },
+        write: values => {
+            var i = wrappers.length;
+            while (i--) wrappers[i].write(values[i]);
+        },
+        fork: () => wrappers.map(w => w.fork()),
+        add: wrapper => {
+            wrappers.push(wrapper);
+        }
+    };
+})();
 
 export default function Promise(fn, _internalState, _internalValue) {
     if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');    
     this._deferreds = [];
-    var psd = (this._PSD = Promise.PSD);
+    var psd = (this._PSD = PSD);
     this.onuncatched = null; // Optional event triggered if promise is rejected but no one listened.
 
     if (debug) {
@@ -95,7 +121,9 @@ export default function Promise(fn, _internalState, _internalValue) {
     
     this._state = null; // null (=pending), false (=rejected) or true (=resolved)
     this._value = null; // error or result
-    psd && psd.oncreate && psd.oncreate.call(null, this);
+    //psd && ++psd.refcount && console.log("constructor() ++refcount: " + psd.refcount);
+    //psd && psd.oncreate && psd.oncreate.call(null, this);
+    psd && psd.onbeforetask && psd.onbeforetask(this);
     this._doResolve(fn);
     this._constructed = true;
 }
@@ -118,7 +146,7 @@ extendProto(Promise.prototype, {
                     if (typeof value.then === 'function') {
                         this._doResolve((resolve, reject) => {
                             value instanceof Promise ?
-                                handle(value, new Deferred(null, null, resolve, reject)) :
+                                handle(value, new Listener(null, null, resolve, reject, this)) :
                                 value.then(resolve, reject);
                         });
                         return;
@@ -137,36 +165,55 @@ extendProto(Promise.prototype, {
         if (this._state !== null) return;
         this._state = false;
         this._value = reason;
-        debug && reason !== null && typeof(reason) === 'object' && miniTryCatch(()=>setProp(reason, "stack", {
-            get: function (){
-                return this.stack;
-            }
-        }));
+        var promise = this;
+        debug && reason !== null && typeof(reason) === 'object' && miniTryCatch(()=>{
+            var origProp =
+                Object.getOwnPropertyDescriptor(reason, "stack") ||
+                Object.getOwnPropertyDescriptor(Object.getPrototypeOf(reason), "stack");
+                
+            setProp(reason, "stack", {
+                get: () =>
+                    stack_being_generated ?
+                        origProp && (origProp.get ?
+                                    origProp.get.apply(reason) :
+                                    origProp.value) :
+                        promise.stack
+            });
+        });
         this._finale();
     },
 
     _finale: function () {
         debug && linkToPreviousPromise(this);
-        var wasRootExec = beginMicroTickScope();
+        //var wasRootExec = beginMicroTickScope();
         // If this is a failure, add the failure to a list of possibly uncaught errors
         !this._state && addPossiblyUnhandledError(this);
         for (var i = 0, len = this._deferreds.length; i < len; ++i) {
             handle(this, this._deferreds[i]);
         }
         this._deferreds = [];
-        wasRootExec && endMicroTickScope();
-        var onfulfilled;
-        this._PSD && (onfulfilled = this._PSD.onfulfilled) && onfulfilled(this);
+        //wasRootExec && endMicroTickScope(); // TODO: Remove. Istället, gör en wrap() metod och använd på alla IDB events.
+        var psd = this._PSD;//, onfullfill;
+        //psd && (onfullfill = psd.onfullfill) && onfullfill(this);
+        //psd && (--psd.refcount,1) && (console.log("finale --refcount: " + psd.refcount),1) && psd.refcount === 0 && psd.oncomplete && psd.oncomplete();
+        psd && psd.onaftertask && psd.onaftertask(this);
+        if (numScheduledCalls === 0) {
+            // If numScheduledCalls is 0, it means that our stack is not in a callback of a scheduled call,
+            // and that no deferreds where listening to this rejection or success.
+            // Since there is a risk that our stack can contain application code that may
+            // do stuff after this code is finished that may generate new calls, we cannot
+            // call finalizers here.
+            ++numScheduledCalls;
+            asap(()=>{
+                if (--numScheduledCalls === 0) finalize();                
+            }, []);
+        }
     },
     
     then: function (onFulfilled, onRejected) {
-        var p = new Promise((resolve, reject) => {
-            handle(this, new Deferred(onFulfilled, onRejected, resolve, reject));
+        return new Promise((resolve, reject) => {
+            handle(this, new Listener(onFulfilled, onRejected, resolve, reject, this));
         });
-        p._PSD = this._PSD;
-        p.onuncatched = this.onuncatched; // Needed when exception occurs in a then() clause of a successful parent promise. Want onuncatched to be called even in callbacks of callbacks of the original promise.
-        p._parent = this; // Used for recursively calling markErrorAsHandled() on self and all parents.
-        return p;
     },
 
     catch: function (onRejected) {
@@ -196,89 +243,129 @@ extendProto(Promise.prototype, {
         });
     },
     
-    _recuStacks: function (stacks, limit) {
-        if (stacks.length === limit) return stacks;
-        if (this._state === false) {
-            var failure = this._value,
-                error,
-                message;
-            
-            if (failure != null) {
-                error = failure.name || "Error";
-                message = failure.message || failure;
-            } else {
-                error = failure; // If error is undefined or null, show that.
-                message = ""
-            }
-            stacks.push(error + (message ? ": \n" + message : "\n") + prettyStack(failure));
-        }
-        if (debug) {
-            var stack = prettyStack(this._e);
-            if (stack) stacks.push(stack);
-            if (this._prev) this._prev._recuStacks(stacks, limit);
-        }
-        return stacks;
-    },
-    
     stack: {
         get: function() {
             if (this._stack) return this._stack;
-            var stacks = this._recuStacks ([], MAX_LONG_STACKS);
-            return (this._stack = stacks.join("From previous:\n"));
+            try {
+                stack_being_generated = true;
+                var stacks = this._getStack ([], MAX_LONG_STACKS);
+                var stack = stacks.join("\nFrom previous:");
+                if (this._state !== null) this._stack = stack; // Stack may be updated on reject.
+                return stack;
+            } finally {
+                stack_being_generated = false;
+            }
         }
+    },
+    
+    _getStack: function (stacks, limit) {
+        if (stacks.length === limit) return stacks;
+        var stack = "";
+        if (this._state === false) {
+            var failure = this._value,
+                errorName,
+                message;
+            
+            if (failure != null) {
+                errorName = failure.name || "Error";
+                message = failure.message || failure;
+                stack = prettyStack(failure);
+            } else {
+                errorName = failure; // If error is undefined or null, show that.
+                message = ""
+            }
+            stacks.push(errorName + (message ? ": " + message : "") + stack);
+        }
+        if (debug) {
+            stack = prettyStack(this._e);
+            if (stack && stacks.indexOf(stack) === -1) stacks.push(stack);
+            if (this._prev) this._prev._getStack(stacks, limit);
+        }
+        return stacks;
     }
 });
 
-function handle(promise, deferred) {
+function handle(promise, listener) {
     if (promise._state === null) {
-        promise._deferreds.push(deferred);
+        promise._deferreds.push(listener);
         return;
     }
 
-    var cb = promise._state ? deferred.onFulfilled : deferred.onRejected;
+    var cb = promise._state ? listener.onFulfilled : listener.onRejected;
     if (cb === null) {
-        // This Deferred doesnt have a listener for the event being triggered (onFulfilled or onReject) so lets forward the event to any eventual listeners on the Promise instance returned by then() or catch()
-        return (promise._state ? deferred.resolve : deferred.reject)(promise._value);
+        // This Listener doesnt have a listener for the event being triggered (onFulfilled or onReject) so lets forward the event to any eventual listeners on the Promise instance returned by then() or catch()
+        return (promise._state ? listener.resolve : listener.reject)(promise._value);
     }
-    deferredCallbacks.push([cb, promise, deferred]);
-    if (needsNewPhysicalTick) {
-        schedulePhysicalTick();
-        needsNewPhysicalTick = false;
-    }
+    var psd;
+    (psd = listener.psd) && psd.onbeforetask && psd.onbeforetask(listener);
+    ++numScheduledCalls;
+    asap (call, [cb, promise, listener]);
 }
 
-function call (cb, promise, deferred) {
-    var outerPSD = Promise.PSD;
+function call (cb, promise, listener) {
+    var outerScope = PSD;
+    var valuesToRestore;
+    var psd = listener.psd;
     try {
-        Promise.PSD = promise._PSD;
-        // We're gonna call the catcher here. Mark it as catched.
-        // Even if the catcher throws or returns Promise.reject(e),
-        // this will work because then another promise is resolved with the
-        // rejection and addPossiblyUnhandledError() is called again.
-        if (!promise._state) markErrorAsHandled (promise);
+        if (psd !== outerScope) {
+            PSD = psd;
+            valuesToRestore = wrappers.read();
+            if (!outerScope) wrapperDefaults = valuesToRestore;
+            wrappers.write(psd ? psd.wrappedValues : wrapperDefaults);
+        }
         
         // Set static variable currentFulfiller to the promise that is being fullfilled,
         // so that we connect the chain of promises.
         currentFulfiller = promise;
         
-        // Call callback and resolve our deferred with it's return value.
+        // Call callback and resolve our listener with it's return value.
         var ret = cb(promise._value);
-        deferred.resolve(ret);
+        if (!promise._state && (                // This was a rejection and...
+                !ret ||                         // handler didn't return something that could be a Promise
+                !(ret instanceof Promise) ||    // handler didnt return a Promise
+                ret._state !== false ||         // handler returned promise that didnt fail (yet at least)
+                ret._value !== promise._value)) // handler didn't return a promise with same error as the one being rejected
+            markErrorAsHandled (promise);       // If all above criterias are true, mark error as resolved.
+
+        listener.resolve(ret);
     } catch (e) {
-        // Exception thrown in callback. Reject our deferred.
-        deferred.reject(e);
+        // Exception thrown in callback. Reject our listener.
+        listener.reject(e);
     } finally {
-        // Restore Promise.PSD and currentFulfiller.
-        Promise.PSD = outerPSD;
+        // Restore PSD, wrappedValues and currentFulfiller.
+        if (psd !== outerScope) {
+            wrappers.write(valuesToRestore);
+            PSD = outerScope;
+        }
         currentFulfiller = null;
+        psd && psd.onaftertask && psd.onaftertask(listener);
+        if (--numScheduledCalls === 0) finalize();
     }
 }
 
-function Deferred(onFulfilled, onRejected, resolve, reject) {
+function finalize() {
+    unhandledErrors.forEach(p => {
+        try {
+            var psd = p._PSD,
+                onunhandled;
+            if (!psd || !(onunhandled = psd.onunhandled) || onunhandled(p._value, p) !== false)
+                Promise.on.error.fire(p._value, p); // TODO: Deprecated and use same global handler as bluebird.
+        } catch (e) {}
+    });
+    unhandledErrors = [];
+    var finalizers = flowFinalizers.slice(0); // Clone first because finalizer may remove itself from list.
+    var i = finalizers.length;
+    while (i) finalizers[--i]();    
+}
+
+
+function Listener(onFulfilled, onRejected, resolve, reject, promise) {
     this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
     this.onRejected = typeof onRejected === 'function' ? onRejected : null;
     this.resolve = resolve;
     this.reject = reject;
+    this.psd = PSD;
+    this.p = promise;
 }
 
 extendProto(Promise, {
@@ -324,60 +411,64 @@ extendProto(Promise, {
         values.map(value => Promise.resolve(value).then(resolve, reject));
     }),
     
-    PSD: null,// Promise Specific Data - a TLS Pattern (Thread Local Storage) for Promises.
-    
-    newPSD: (fn,arg) => {
-        // Create new PSD scope (Promise Specific Data)
-        var outerScope = Promise.PSD;
-        Promise.PSD = outerScope ? Object.create(outerScope) : {};
-        try {
-            return fn(arg);
-        } finally {
-            Promise.PSD = outerScope;
-        }
+    PSD: {
+        get: ()=>PSD,
+        set: value => PSD = value
     },
+    
+    newPSD: newScope,
     
     usePSD: usePSD,
     
+    scheduler: {
+        get: () => asap,
+        set: value => {asap = value}
+    },
+            
     track: (fn, tracker) => {
         // This closure is used: fn, tracker. Ok. Happens only on track() which is not frequent.
         return new Promise(resolve => {
-            return Promise.newPSD(resolve=>{
+            return newScope(resolve=>{
                 // This closure is useed: refCount, parentOnCreate, parentOnFulfilled.
                 // Ok. Happens only on track() which is not frequent.
-                var psd = Promise.PSD;
+                var psd = PSD;
                 var refCount = 0;
-                function tickFinalizer() {
+                function finalizer() {
                     if (refCount === 0) {
-                        tickFinalizers.splice(tickFinalizers.indexOf(tickFinalizer), 1);
+                        flowFinalizers.splice(flowFinalizers.indexOf(finalizer), 1);
                         resolve();
                     }
                 }
-                tickFinalizers.push(tickFinalizer);
-                var parentOnCreate = psd.oncreate,
-                    parentOnFulfilled = psd.onfulfilled;
+                flowFinalizers.push(finalizer);
                 
-                psd.oncreate = p => {
-                    // THIS CLOSURE HAPPENS FOR EACH PROMISE. OPTIMIZE AWAY ALL ITS CLOSURES!
-                    // Support chaining oncreate hooks, by calling already registered hook.
-                    parentOnCreate && parentOnCreate(p);
+                var parentOnUnhandled = psd.onunhandled,
+                    parentOnBeforeTask = psd.onbeforetask,
+                    parentOnAfterTask = psd.onaftertask;
+                    
+                psd.onbeforetask = function(t) {
                     ++refCount;
-                    tracker && tracker.oncreate && tracker.oncreate(p);
+                    parentOnBeforeTask && parentOnBeforeTask(t);
+                    tracker && tracker.onbeforetask && tracker.onbeforetask(t);
+                }
+                psd.onaftertask = function (t) {
+                    parentOnAfterTask && parentOnAfterTask(t);
+                    tracker && tracker.onaftertask && tracker.onaftertask(t);
+                    --refCount;
+                }
+                                
+                if (tracker && tracker.onunhandled) psd.onunhandled = (err,p) => {
+                    var handled = false;
+                    try {handled = tracker.onunhandled(err,p) === false;} catch(e){}
+                    if (!handled) handled = parentOnUnhandled && parentOnUnhandled(err,p) === false;
+                    return !handled;
                 };
                 
-                psd.onfulfilled = p => {
-                    parentOnFulfilled && parentOnFulfilled(p);
-                    --refCount;
-                    tracker && (p._state ?
-                        tracker.onresolve && tracker.onresolve(p, p._value) :
-                        tracker.onreject && tracker.onreject(p, p._value));                        
-                }
                 fn(tracker);
+                
             }, resolve);
         });
     },
 
-    // TODO: Remove!
     _rootExec: _rootExec,
     
     on: Events(null, {"error": [
@@ -385,9 +476,10 @@ extendProto(Promise, {
         defaultErrorHandler] // Default to defaultErrorHandler
     }),
     
-    _isRootExec: {get: ()=> isOutsideMicroTick},
+    // TODO: Remove!
+    _isRootExec: {get: ()=> isOutsideMicroTick}
     
-    debug: {get: ()=>debug, set: val => debug = val}
+    //debug: {get: ()=>debug.de, set: val => debug = val},
 });
 
 function linkToPreviousPromise(promise) {
@@ -397,16 +489,6 @@ function linkToPreviousPromise(promise) {
     if (numPrev < LONG_STACKS_CLIP_LIMIT) { // Prohibit infinite Promise loops to get an infinite long memory consuming "tail".
         promise._prev = prev;
         promise._numPrev = numPrev;
-    }
-}
-
-function usePSD (psd, fn, arg) {
-    var outerScope = Promise.PSD;
-    Promise.PSD = psd;
-    try {
-        return fn(arg);
-    } finally {
-        Promise.PSD = outerScope;
     }
 }
 
@@ -421,10 +503,6 @@ function beginMicroTickScope() {
     var wasRootExec = isOutsideMicroTick;
     isOutsideMicroTick = false;
     needsNewPhysicalTick = false;
-    if (wasRootExec) {
-        unhandledErrors = unhandledErrorsNextTick;
-        unhandledErrorsNextTick = [];
-    }
     return wasRootExec;
 }
 
@@ -437,19 +515,9 @@ function endMicroTickScope() {
             l = callbacks.length;
             for (i = 0; i < l; ++i) {
                 var item = callbacks[i];
-                call (item[0], item[1], item[2]);
+                item[0].apply(null, item[1]);
             }
         }
-        unhandledErrors.forEach(p => {
-            try {
-                (!p.onuncatched || p.onuncatched(p._value)) &&
-                Promise.on.error.fire(p._value, p);
-            } catch (e){}
-        });
-        unhandledErrors = [];
-        var finalizers = tickFinalizers.slice(0); // Clone first because finalizer may remove itself from list.
-        i = finalizers.length;
-        while (i) finalizers[--i]();
     } while (deferredCallbacks.length > 0);
     isOutsideMicroTick = true;
     needsNewPhysicalTick = true;
@@ -465,19 +533,12 @@ function _rootExec(fn) {
     }
 }
 
-function addPossiblyUnhandledError(promise, wasRootExec) {
-    // If promise is still being constructed outside a virtual microtick,
-    // we know that there will not be any then handlers attatched to this
-    // promise during current virtual tick. So we should defer uncaught-checking
-    // til next physical tick.
-    var list = wasRootExec && !promise._constructed ?
-        unhandledErrorsNextTick : unhandledErrors;
-
-    // Only add to list if not already there. The first one to add to this list
+function addPossiblyUnhandledError(promise) {
+    // Only add to unhandledErrors if not already there. The first one to add to this list
     // will be upon the first rejection so that the root cause (first promise in the
     // rejection chain) is the one listed.
-    if (!list.some(p => p._value === promise._value))
-        list.push(promise);
+    if (!unhandledErrors.some(p => p._value === promise._value))
+        unhandledErrors.push(promise);
 }
 
 function markErrorAsHandled(promise) {
@@ -490,16 +551,6 @@ function markErrorAsHandled(promise) {
         // Remove that since there is a listener that actually takes care of it.
         unhandledErrors.splice(i, 1);
         return;
-        // But? What if the callback throws or returns Promise.reject(e) again? Shouldn't
-        // we set it as unhandled again then?! Yes! But that will be done automatically;
-        // Review the code in call(). It will then:
-        //   1. deferred.reject(ex) (or deferred.resolve(rejectedPromise))
-        //   [defered.reject/resolve points leads to one of the callbacks in _doResolve() ]
-        //   2. _reject will be called (directly or indirectly via resolve...then...reject)
-        //   3. _finale will be called and see its state as false, and call addPossiblyUnhandledError()
-        //      again!. Now pointing to THAT promise instead. And it's true our promise WAS handled in
-        //      a way that rejected another Promise.
-        //      Long stack will show the path all the way on how rejection happened.
     }
 }
 
@@ -507,6 +558,87 @@ function markErrorAsHandled(promise) {
 function defaultErrorHandler(e) {
     console.warn(`Uncaught Promise: ${e.stack || e}`);
 }
+
+export function wrap (fn) {
+    return _wrap(fn, PSD, wrappers.read());
+}
+
+function _wrap (fn, psd, wrappedValues) {
+    return function() {
+        var wasRootExec = beginMicroTickScope(),
+            valuesToRestore,
+            outerScope = PSD;
+                
+        try {
+            if (outerScope !== psd) {
+                PSD = psd;
+                valuesToRestore = wrappers.read();
+                if (!outerScope) wrapperDefaults = valuesToRestore;
+                wrappers.write(wrappedValues);
+            }
+            return fn.apply(this, arguments);
+        } finally {
+            if (outerScope !== psd) {
+                wrappers.write(valuesToRestore);
+                PSD = outerScope;
+            }
+            if (wasRootExec) endMicroTickScope();
+        }
+    };
+}
+    
+export function newScope (fn, a1, a2, a3) {
+    var psd = PSD ? Object.create(PSD) : {};
+    psd.wrappedValues = wrappers.fork(psd);
+    return usePSD (fn, psd, a1, a2, a3);
+}
+
+export function usePSD (fn, psd, a1, a2, a3) {
+    var outerScope = PSD;
+    var valuesToRestore;
+    try {
+        if (psd !== outerScope) {
+            PSD = psd;
+            valuesToRestore = wrappers.read();
+            if (!outerScope) wrapperDefaults = valuesToRestore;
+            wrappers.write(psd ? psd.wrappedValues : wrapperDefaults);
+        }
+        return fn(a1, a2, a3);
+    } finally {
+        if (psd !== outerScope) {
+            wrappers.write(valuesToRestore);
+            PSD = outerScope;
+        }
+    }
+}
+
+export function wrapPromise(PromiseClass) {
+    var proto = PromiseClass.prototype;
+    var origThen = proto.then;
+    
+    wrappers.add({
+        read: () => proto.then,
+        write: value => {proto.then = value;},
+        fork: () => patchedThen
+    });
+    
+    function patchedThen (onFulfilled, onRejected) {
+        var task = this; // Just need an object to pass as task. Use this Promise instance.
+        var onFulfilledProxy = wrap(function(){
+            PSD && PSD.onaftertask && PSD.onaftertask(task);
+            onFulfilled && onFulfilled.apply(this, arguments);
+        });
+        var onRejectedProxy = wrap(function(){
+            PSD && PSD.onaftertask && PSD.onaftertask(task);
+            onRejected && onRejected.apply(this, arguments);
+        });
+        PSD && PSD.onbeforetask && PSD.onbeforetask(task);
+        return origThen.call(this, onFulfilledProxy, onRejectedProxy);
+    }
+}
+
+// Global Promise wrapper
+if (_global.Promise) wrapPromise(_global.Promise);
 
 doFakeAutoComplete(() => {
     // Simplify the job for VS Intellisense. This piece of code is one of the keys to the new marvellous intellisense support in Dexie.

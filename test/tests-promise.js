@@ -3,6 +3,8 @@ import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
 
 module("promise");
 
+//Dexie.debug = "dexie";
+
 function createDirectlyResolvedPromise() {
     return new Dexie.Promise(function(resolve) {
         resolve();
@@ -47,6 +49,26 @@ asyncTest("Compatibility with other promises", ()=>{
     })
 });
 
+asyncTest("When to promise resolve", ()=>{
+    var Promise = Dexie.Promise;
+    var res = [];
+    Promise.track(()=>{
+        new Promise (resolve => resolve()).then(()=>res.push("B1"));
+        res.push("A1");
+        new Promise (resolve => resolve()).then(()=>res.push("B2"));
+        res.push("A2");
+    }).then(()=>{
+        equal(JSON.stringify(res), JSON.stringify([
+            "A1",
+            "A2",
+            "B1",
+            "B2"
+        ]), "Resolves come in expected order.");
+    }).catch(e => {
+        ok(false, e.stack || e);
+    }).then(start);
+});
+
 asyncTest("Promise.track", ()=>{
     var Promise = Dexie.Promise;
     class Tracker {
@@ -54,15 +76,8 @@ asyncTest("Promise.track", ()=>{
             this.counter = 0;
         }
         
-        oncreate (promise) {
-            promise.ID = ++this.counter;
-            ok(true, `Promise ${promise.ID} created: ${promise.stack}`);
-        }
-        onresolve (promise, value) {
-            ok(true, `Promise ${promise.ID} resolved to ${value}`);
-        }
-        onreject (promise, reason) {
-            ok(true, `Promise ${promise.ID} rejected with ${reason}`);
+        onunhandled (promise) {
+            ok(false, `Promise was unhandled: ${promise.stack}`);
         }
     }
     
@@ -81,37 +96,55 @@ asyncTest("Promise.track", ()=>{
 asyncTest ("Promise.track chained", ()=>{
     var Promise = Dexie.Promise;
     //Promise._rootExec(()=>{
-    var createdPromises = 0,
-        createdPromises2 = 0,
-        resolvedPromises = 0,
-        resolvedPromises2 = 0,
-        rejectedPromises = 0,
-        rejectedPromises2 = 0;
+    var createdTasks = 0,
+        createdTasks2 = 0,
+        completedTasks = 0,
+        completedTasks2 = 0,
+        unhandleds = [],
+        unhandleds2 = [];
+        
         
     Promise.track(()=>{
         new Promise(resolve => resolve())
             .then(()=>Promise.track(()=>{
                 Promise.PSD.inner = true;
+                // Unresolved rejection, where error is undefined
+                new Promise((_,reject)=>reject(undefined));
+                
+                // Chains and rejection
                 new Promise(resolve => resolve())
                     .then(x => 3)
                     .then(null, e => "catched")
                     .then(x => {}) 
+                    .then(()=>{throw new TypeError("oops");})
                 }, {
-                    oncreate: p => ++createdPromises2,
-                    onresolve: p => ++resolvedPromises2,
-                    onreject: p => ++rejectedPromises2
+                    onbeforetask: task => ++createdTasks2,
+                    onaftertask: task => ++completedTasks2,
+                    onunhandled: (error, promise) => {
+                        unhandleds2.push(promise);
+                        if (error === undefined) {
+                            ok(true, `undefined was unhandled (inner scope): ${promise.stack} `);
+                            return false; // Returning false should prevent bubbling to outer scope
+                        } else {
+                            ok(true, `Promise was unhandled (inner scope): ${error.stack} `);
+                            // Don't return - bubble to outer scope.
+                        }
+                    }
                 })
         );
     }, {
-        oncreate: p => (p.ID = ++createdPromises) &&
-            ok(true, `Promise ${p.ID} created: ${p.stack}`),
-        onresolve: p => ++resolvedPromises,
-        onreject: p => ++rejectedPromises
+        onbeforetask: task => (task.ID = ++createdTasks) &&
+            ok(true, `Task ${task.ID} created: ${task.stack || task.p.stack}`),
+        onaftertask: task => ++completedTasks &&
+            ok(true, `Task ${task.ID} completed: ${task.stack || task.p.stack}`),
+        onunhandled: (err,promise) => {
+            unhandleds.push(promise);
+            ok(true, `Promise was unhandled (outer scope): ${err.stack}`);
+            return false; // Returning false should prevent from bubbling to Promise.on.error.
+        }
     }).then(()=>{
-        equal(createdPromises2, 4, "Should be 4 promises in inner scope");
-        equal(resolvedPromises2, 4, "Should be 4 resolved promises in inner scope");
-        equal(rejectedPromises2 + resolvedPromises2, createdPromises2, "created and (rejected + resolved) must be same");
-        equal(createdPromises, 7, "Should be 7 promises in outmost scope");
+        equal(unhandleds.length, 1, "Should be on unhandled at outer scope");
+        equal(unhandleds2.length, 2, "SHould be 2 unhandleds at inner scope");
         start();
     });
     //});

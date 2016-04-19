@@ -73,6 +73,10 @@ export function asap(fn) {
     if (_global.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
 }
 
+export function getUniqueArray(a) {
+    return a.filter((value, index, self) => self.indexOf(value) === index);
+}
+
 export function trycatch(fn, reject) {
     var psd = Promise.PSD;
     return function () {
@@ -95,37 +99,6 @@ export function miniTryCatch(fn, onerror, args) {
         onerror && onerror(ex);
     }
 }
-
-/*export function messageAndStack (e) {
-    var stack = e && e.stack;
-    return stack ?
-        stack.indexOf(e+'') > 0 ?
-            stack :
-        e + ". " + stack :
-        e;
-}*/
-
-export function prettyStack(e) {
-    var stack = e.stack;
-    if (!stack) return "";
-    return stack.split('\n')
-        .filter(frame => !/(^Error|dexie\.js|dexie\.min\.js)/.test(frame))
-        .map(frame => "\n" + frame)
-        .join('');
-}
-
-/*export function stack(error) {
-    if (error.stack) return error; // Provided error already has a stack
-    try {
-        var err = new Error(error.message || error); // In Chrome, stack is generated here.
-        if (err.stack) { error.stack = err.stack; return error; } // If stack was generated, set it.
-        // No stack. Other browsers only put the stack if we throw the error:
-        throw err;
-    } catch (e) {
-        error.stack = e.stack;
-    }
-    return error;
-}*/
 
 export function fail(err) {
     // Get the call stack and return a rejected promise.
@@ -187,7 +160,7 @@ export function delByKeyPath(obj, keyPath) {
         });
 }
 
-    export function shallowClone(obj) {
+export function shallowClone(obj) {
     var rv = {};
     for (var m in obj) {
         if (obj.hasOwnProperty(m)) rv[m] = obj[m];

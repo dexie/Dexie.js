@@ -54,10 +54,14 @@ export function DexieError (name, msg) {
     // 2. It doesn't give us much in this case.
     // 3. It would require sub classes to call super(), which
     //    is not needed when deriving from Error.
+    this._e = new Error(msg); // For stack generation.
     this.name = name;
     this.message = msg;
 }
-derive(DexieError).from(Error);
+derive(DexieError).from(Error).extend({
+    stack: {get: function(){ return this._e.stack.replace("Error:", this.name + ":")}},
+    toString: function(){ return this.name + ": " + this.message; }
+});
 
 function getMultiErrorMessage (msg, failures) {
     return msg + ". Errors: " + failures
