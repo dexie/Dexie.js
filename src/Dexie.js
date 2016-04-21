@@ -16,7 +16,7 @@ import {
     setProp,
     isArray,
     extend,
-    extendProto,
+    setProps,
     derive,
     slice,
     override,
@@ -35,7 +35,7 @@ import {
 
 } from './utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
-import Promise from './Promise';
+import Promise, {wrap} from './Promise';
 import Events from './Events';
 import {
     nop,
@@ -455,14 +455,11 @@ export default function Dexie(dbName, options) {
     };
 
     function tableNotInTransaction(mode, storeNames) {
-        throw new exceptions.InvalidTable(
-            "Table " + storeNames[0] +
-            " not part of transaction. Original Scope Function Source: " +
-            Dexie.Promise.PSD.trans.scopeFunc.toString());
+        throw new exceptions.InvalidTable("Table " + storeNames[0] + " not part of transaction.");
     }
 
     this._transPromiseFactory = function transactionPromiseFactory(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
-        if (db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
+        if (db_is_blocked && (!Promise.PSD.letThrough)) {
             // Database is paused. Wait til resumed.
             if (!isBeingOpened && !autoOpen) {
                 return fail(new exceptions.DatabaseClosed());
@@ -512,7 +509,7 @@ export default function Dexie(dbName, options) {
     };
 
     this._whenReady = function (fn) {
-        if (!fake && db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
+        if (!fake && db_is_blocked && !Promise.PSD.letThrough) {
             if (!isBeingOpened) {
                 if (autoOpen) {
                     db.open().catch(nop); // catching to get rid of error logging of uncaught Promise. dbOpenError will be returned again as a rejected Promise.
@@ -523,7 +520,7 @@ export default function Dexie(dbName, options) {
             return new Promise(function (resolve, reject) {
                 pausedResumeables.push({
                     resume: function () {
-                        fn().then(resolve, reject);
+                        fn(resolve, reject);
                     }
                 });
             });
@@ -537,7 +534,7 @@ export default function Dexie(dbName, options) {
         });
     };*/
     
-    this.ready = function (cb) {
+    /*this.ready = function (cb) {
         return new Promise(resolve => {
             if (!fake && db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
                 if (!isBeingOpened) {
@@ -554,7 +551,7 @@ export default function Dexie(dbName, options) {
                 resolve(db);
             }
         }).then(cb);
-    };
+    };*/
 
     //
     //
@@ -790,12 +787,11 @@ export default function Dexie(dbName, options) {
         tableInstances = slice(arguments, 1, arguments.length - 1);
         // Let scopeFunc be the last argument
         scopeFunc = arguments[arguments.length - 1];
-        var parentTransaction = Promise.PSD && Promise.PSD.trans;
+        var parentTransaction = Promise.PSD.trans;
         // Check if parent transactions is bound to this db instance, and if caller wants to reuse it
         if (!parentTransaction || parentTransaction.db !== db || mode.indexOf('!') !== -1) parentTransaction = null;
         var onlyIfCompatible = mode.indexOf('?') !== -1;
         mode = mode.replace('!', '').replace('?', '');
-        var trans = null;
         
         try {
             //
@@ -848,9 +844,23 @@ export default function Dexie(dbName, options) {
             return parentTransaction ? parentTransaction._promise(null, (r,reject)=>reject(e)) :
                 fail(e);
         }
-        
+        var trans;
         // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
-        var promise = (parentTransaction ? parentTransaction.wait(true) : this.ready()).then(() =>{
+        return (parentTransaction ?
+            parentTransaction._promise(mode, enterTransactionScope, "lock") :
+            db._whenReady (enterTransactionScope))
+            .catch(e => {
+                // If exception occur, abort the transaction and reject Promise.
+                if (trans) {
+                    if (trans.idbtrans) trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
+                    trans.on.error.fire(e);
+                    trans.abort();
+                }
+                if (parentTransaction) parentTransaction.on.error.fire(e);
+                return Promise.reject(e);
+            });
+            
+        function enterTransactionScope(resolve, reject) {
             // Our transaction.
             trans = db._createTransaction(mode, storeNames, globalSchema, parentTransaction);
 
@@ -860,61 +870,25 @@ export default function Dexie(dbName, options) {
 
             var uncompletedRequests = 0;
 
-            // Create a new PSD frame to hold Promise.PSD.trans. Must not be bound to the current PSD frame since we want
-            // it to pop before then() callback is called of our returned Promise.
-            return Promise.newPSD(function () {
-                // Let the transaction instance be part of a Promise-specific data (PSD) value.
-                Promise.PSD.trans = trans;
-                trans.scopeFunc = scopeFunc; // For Error ("Table " + storeNames[0] + " not part of transaction") when it happens. This may help localizing the code that started a transaction used on another place.
+            // Let the transaction instance be part of a Promise-specific data (PSD) value.
+            Promise.PSD.trans = trans;
+            trans.scopeFunc = scopeFunc; // For Error ("Table " + storeNames[0] + " not part of transaction") when it happens. This may help localizing the code that started a transaction used on another place.
 
-                if (parentTransaction) {
-                    // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
-                    trans.idbtrans = parentTransaction.idbtrans;
-                    trans._promise = override(trans._promise, function (orig) {
-                        return function (mode, fn, writeLock) {
-                            ++uncompletedRequests;
-                            function proxy(fn2) {
-                                return function (val) {
-                                    var retval;
-                                    // _rootExec needed so that we do not loose any IDBTransaction in a setTimeout() call.
-                                    Promise._rootExec(function () {
-                                        retval = fn2(val);
-                                        // _tickFinalize makes sure to support lazy micro tasks executed in Promise._rootExec().
-                                        // We certainly do not want to copy the bad pattern from IndexedDB but instead allow
-                                        // execution of Promise.then() callbacks until the're all done.
-                                        Promise._tickFinalize(function () {
-                                            if (--uncompletedRequests === 0 && trans.active) {
-                                                trans.active = false;
-                                                trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
-                                            }
-                                        });
-                                    });
-                                    return retval;
-                                };
-                            }
-                            return orig.call(this, mode, function (resolve2, reject2, trans) {
-                                return fn(proxy(resolve2), proxy(reject2), trans);
-                            }, writeLock);
-                        };
-                    });
-                    ++uncompletedRequests;
-                    Promise._tickFinalize(function () {
-                        if (--uncompletedRequests === 0 && trans.active) {
-                            trans.active = false;
-                            trans.on.complete.fire(); // A called db operation has completed without starting a new operation. The flow is finished
-                        }
-                    });                    
-                } else {
-                    trans.create(); // Create the backend transaction so that complete() or error() will trigger even if no operation is made upon it.
-                }
-                
-                var returnValue,
-                    promise = new Promise((resolve, reject) => {
-                        trans.complete(() => resolve(returnValue));
-                        trans.error(reject);
-                    });                
-                
-                // Finally, call the scope function with our table and transaction arguments.
+            if (parentTransaction) {
+                // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
+                trans.idbtrans = parentTransaction.idbtrans;
+            } else {
+                trans.create(); // Create the backend transaction so that complete() or error() will trigger even if no operation is made upon it.
+            }
+            
+            
+            
+            //trans.complete(()=>resolve(returnValue));
+            //trans.error(reject);
+            
+            // Finally, call the scope function with our table and transaction arguments.
+            var returnValue;
+            Promise.follow(()=>{
                 returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
                 if (returnValue) {
                     if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
@@ -923,26 +897,16 @@ export default function Dexie(dbName, options) {
                     } else if (typeof returnValue.then === 'function' && (!returnValue.hasOwnProperty('_PSD'))) {
                         throw new exceptions.IncompatiblePromise();
                     }
-                }
-                
-                // Finally return a promise that will resolve when transaction completes or fails.
-                // Force abort() and parent propagation handled in catch() below.
-                return promise;
-            });
-            
-        }).catch(e => {
-            // If exception occur, abort the transaction and reject Promise.
-            if (trans) {
-                if (trans.idbtrans) trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
-                trans.on.error.fire(e);
+                }            
+            }).then(()=>{
+                trans.on.complete.fire();
+                resolve(returnValue);
+            }).catch(err => {
+                trans.on.error.fire(err);
                 trans.abort();
-            }
-            if (parentTransaction) parentTransaction.on.error.fire(e);
-            return Promise.reject(e);
-        });
-        return promise.finally(()=>{
-            if (parentTransaction) parentTransaction._unlock();
-        });
+                reject(err);
+            });
+        }
     };
 
     this.table = function (tableName) {
@@ -973,7 +937,7 @@ export default function Dexie(dbName, options) {
         this._collClass = collClass || Collection;
     }
 
-    extendProto(Table.prototype, function () {
+    setProps(Table.prototype, function () {
         function failReadonly() {
             // It's ok to throw here because this can only happen within a transaction,
             // and will always be caught by the transaction scope and returned as a
@@ -1571,7 +1535,7 @@ export default function Dexie(dbName, options) {
         this.on('error', e => {this._error = e;});
     }
 
-    extendProto(Transaction.prototype, {
+    setProps(Transaction.prototype, {
         //
         // Transaction Protected Methods (not required by API users, but needed internally and eventually by dexie extensions)
         //
@@ -1579,7 +1543,7 @@ export default function Dexie(dbName, options) {
         _lock: function () {
             // Temporary set all requests into a pending queue if they are called before database is ready.
             ++this._reculock; // Recursive read/write lock pattern using PSD (Promise Specific Data) instead of TLS (Thread Local Storage)
-            if (this._reculock === 1 && Promise.PSD) Promise.PSD.lockOwnerFor = this;
+            if (this._reculock === 1 && !Promise.PSD.global) Promise.PSD.lockOwnerFor = this;
             return this;
         },
         _unlock: function () {
@@ -1603,7 +1567,7 @@ export default function Dexie(dbName, options) {
             // If creating a new independant Promise instance from within a Promise call stack, the new Promise will derive the PSD from the call stack of the parent Promise.
             // Derivation is done so that the inner PSD __proto__ points to the outer PSD.
             // Promise.PSD.lockOwnerFor will point to current transaction object if the currently executing PSD scope owns the lock.
-            return this._reculock && (!Promise.PSD || Promise.PSD.lockOwnerFor !== this);
+            return this._reculock && Promise.PSD.lockOwnerFor !== this;
         },
         create: function () {
             var self = this;
@@ -1631,24 +1595,6 @@ export default function Dexie(dbName, options) {
             };
             return this;
         },
-        wait: function (aquireLock) {
-            if (aquireLock) {
-                return Promise.newPSD(()=>{
-                    this._lock()
-                    return Promise.track(()=>{
-                        return this.wait(false);
-                    }).then(()=>this._unlock());
-                });
-            }
-            return new Promise((resolve, reject) =>{
-                if (!this._locked()) {
-                    if (!this.active) return reject(this._error || new exceptions.TransactionInactive());
-                    resolve();
-                } else {
-                    this._blockedFuncs.push(()=>this.wait().then(resolve, reject));                    
-                }
-            });
-        },
         _promise: function (mode, fn, bWriteLock) {
             var self = this;
             return Promise.newPSD(function() {
@@ -1657,22 +1603,8 @@ export default function Dexie(dbName, options) {
                 if (!self._locked()) {
                     p = self.active ? new Promise(function (resolve, reject) {
                         if (!self.idbtrans && mode) self.create();
-
                         if (bWriteLock) self._lock(); // Write lock if write operation is requested
-                        try {
-                            fn(resolve, reject, self);
-                        } catch (e) {
-                            // Direct exception happened when doing operation.
-                            // We must immediately fire the error and abort the transaction.
-                            // When this happens we are still constructing the Promise so we don't yet know
-                            // whether the caller is about to catch() the error or not. Have to make
-                            // transaction fail. Catching such an error wont stop transaction from failing.
-                            // This is a limitation we have to live with.
-                            var e2 = mapError(e);
-                            Dexie.ignoreTransaction(function() { self.on('error').fire(e2); });
-                            //self.abort();
-                            reject(e2);
-                        }
+                        fn(resolve, reject, self);
                     }) : Promise.reject(new exceptions.TransactionInactive());
                     if (self.active && bWriteLock) p.finally(function () {
                         self._unlock();
@@ -1685,10 +1617,7 @@ export default function Dexie(dbName, options) {
                         });
                     });
                 }
-                p.onuncatched = function (e) {
-                    self.on.error.fire(e);
-                    //self.abort();
-                };
+                p._lib = true;
                 return p;
             });
         },
@@ -1735,7 +1664,7 @@ export default function Dexie(dbName, options) {
         };
     }
 
-    extendProto(WhereClause.prototype, function () {
+    setProps(WhereClause.prototype, function () {
 
         // WhereClause private methods
 
@@ -2125,7 +2054,7 @@ export default function Dexie(dbName, options) {
         };
     }
 
-    extendProto(Collection.prototype, function () {
+    setProps(Collection.prototype, function () {
 
         //
         // Collection Private Functions
@@ -2717,7 +2646,7 @@ export default function Dexie(dbName, options) {
                     if (enableProhibitedDB) {
                         setProp(obj, tableName, {
                             get: function () {
-                                var currentTrans = Promise.PSD && Promise.PSD.trans;
+                                var currentTrans = Promise.PSD.trans;
                                 if (currentTrans && currentTrans.db === db) {
                                     return currentTrans.tables[tableName];
                                 }
@@ -3178,7 +3107,7 @@ Dexie.spawn = function (generatorFn, args, thiz) {
 setProp(Dexie, "currentTransaction", {
     get: function () {
         /// <returns type="Transaction"></returns>
-        return Promise.PSD && Promise.PSD.trans || null;
+        return Promise.PSD.trans || null;
     }
 });
 
@@ -3201,7 +3130,7 @@ setProp(Dexie, "debug", {
 // Export our derive/extend/override methodology
 Dexie.derive = derive;
 Dexie.extend = extend;
-Dexie.extendProto = extendProto;
+Dexie.setProps = setProps;
 Dexie.override = override;
 // Export our Events() function - can be handy as a toolkit
 Dexie.Events = Dexie.events = Events; // Backward compatible lowercase version.
