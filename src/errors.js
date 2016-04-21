@@ -1,4 +1,4 @@
-import { derive } from './utils';
+import { derive, setProp } from './utils';
 
 var dexieErrorNames = [
     'Modify',
@@ -140,9 +140,16 @@ export var exceptionMap = idbDomErrorNames.reduce((obj, name)=>{
 }, {});
 
 export function mapError (domError, message) {
+    if (!domError) return domError;
     var rv = domError;
     if (!(domError instanceof DexieError) && domError.name && exceptionMap[domError.name]) {
         rv = new exceptionMap[domError.name](message || domError.message, domError);
+        if (!("stack" in domError)) {
+            // Derive stack from inner exception if it has a stack
+            setProp(rv, "stack", {get: function(){
+                return this.inner.stack;
+            }});
+        }
     }
     return rv;
 }

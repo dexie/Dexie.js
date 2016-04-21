@@ -1,5 +1,5 @@
 import {slice, isArray, doFakeAutoComplete, miniTryCatch, setProps, setProp, _global} from './utils';
-import {reverseStoppableEventChain, nop, callBoth} from './chaining-functions';
+import {reverseStoppableEventChain, nop, callBoth, mirror} from './chaining-functions';
 import Events from './Events';
 import {debug, prettyStack, NEEDS_THROW_FOR_STACK} from './debug';
 
@@ -111,24 +111,18 @@ export var wrappers = (() => {
     };
 })();
 
-export default
-function Promise(fn, _internalState, _internalValue) {
+export default function Promise(fn) {
     if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');    
     this._listeners = [];
     
-    // Support for cheating with the A+ spec and call then-handlers directly:
-    //
     // A library may set `promise._lib = true;` after promise is created to make resolve() or reject()
-    // execute the microtask engine implicitely.
+    // execute the microtask engine implicitely within the call to resolve() or reject().
     // To remain A+ compliant, a library must only set `_lib=true` if it can guarantee that the stack
     // only contains library code when calling resolve() or reject().
-    // For example if an event callback is triggered and the lib calls resolve(ev.target.result). Then it is
-    // certain that the stack only contains library code since the event handler is the root of the stack.
-    // If an exception occur while constructing the promise, it could not be guaranteed to have a clean stack
-    // becuase reject() would be called immedieately. Luckily though, _lib can only be set after promise
-    // construction is finished.
-    this._lib = false; 
-    
+    // RULE OF THUMB: ONLY set _lib = true for promises explicitely resolving/rejecting directly from
+    // global scope (event handler, timer etc)!
+    this._lib = false;
+    // Current async scope
     var psd = (this._PSD = PSD);
 
     if (debug) {
@@ -149,21 +143,22 @@ function Promise(fn, _internalState, _internalValue) {
     }
     
     if (typeof fn !== 'function') {
-        if (fn !== INTERNAL) throw new TypeError('not a function');
+        if (fn !== INTERNAL) throw new TypeError('Not a function');
         // Private constructor (INTERNAL, state, value).
         // Used internally by Promise.resolve() and Promise.reject().
-        this._state = _internalState;
-        this._value = _internalValue;
+        this._state = arguments[1];
+        this._value = arguments[2];
         return;
     }
     
     this._state = null; // null (=pending), false (=rejected) or true (=resolved)
     this._value = null; // error or result
-    ++psd.ref;
+    ++psd.ref; // Refcounting current scope
     executePromiseTask(this, fn);
 }
 
 setProps(Promise.prototype, {
+
     then: function (onFulfilled, onRejected) {
         var rv = new Promise((resolve, reject) => {
             propagateToListener(this, new Listener(onFulfilled, onRejected, resolve, reject));
@@ -279,6 +274,8 @@ setProps (Promise, {
         get: () => asap,
         set: value => {asap = value}
     },
+    
+    rejectionMapper: mirror, // Map reject failures
             
     follow: fn => {
         return new Promise((resolve, reject) => {
@@ -351,6 +348,7 @@ function executePromiseTask (promise, fn) {
 function handleRejection (promise, reason) {
     if (promise._state !== null) return;
     var shouldExecuteTick = promise._lib && beginMicroTickScope();
+    reason = Promise.rejectionMapper(reason);
     promise._state = false;
     promise._value = reason;
     debug && reason !== null && !reason._promise && typeof reason === 'object' && miniTryCatch(()=>{
@@ -590,7 +588,7 @@ export function wrap (fn, errorCatcher) {
             }
             return fn.apply(this, arguments);
         } catch (e) {
-            errorCatcher(e);
+            errorCatcher && errorCatcher(e);
         } finally {
             if (outerScope !== psd) {
                 PSD = outerScope;
@@ -616,12 +614,12 @@ export function newScope (fn, a1, a2, a3) {
     psd.finalize = function () {
         --this.parent.ref || this.parent.finalize();
     }
-    var rv = usePSD (fn, psd, a1, a2, a3);
+    var rv = usePSD (psd, fn, a1, a2, a3);
     if (psd.ref === 0) psd.finalize();
     return rv;
 }
 
-export function usePSD (fn, psd, a1, a2, a3) {
+export function usePSD (psd, fn, a1, a2, a3) {
     var outerScope = PSD;
     try {
         if (psd !== outerScope) {
