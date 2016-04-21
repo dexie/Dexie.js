@@ -11,20 +11,14 @@ export function setDebug(value, filter) {
 
 export var libraryFilter = ()=>true;
 
-export function prettyStack(e) {
-    var stack = e.stack;
+export const NEEDS_THROW_FOR_STACK = !new Error("").stack;
+
+export function prettyStack(exception, numIgnoredLines) {
+    var stack = exception.stack;
     if (!stack) return "";
-    //var frames = stack.split('\n');
-    //if (frames.length && frames[0].indexOf(e.name) === 0)
-    //if (stack.indexOf(e.name) === 0) stack = stack.substr(e.name.length);
     return stack.split('\n')
-        //.filter(frame => !/^Error/.test(frame))
-        .filter(frame => frame.indexOf(''+e.name) != 0) // First line: "Error: message\n"
+        .slice(numIgnoredLines || 0)
         .filter(libraryFilter)
-                //(!libraryFilter || prettyStack.filter(frame)))
-                /*(debug === 'dexie' ||                   // If debug
-                !/(dexie\.js|dexie\.min\.js)/.test(frame))) // Ignore frames from dexie lib - focus on application
-        //.slice(0, 3)*/
         .map(frame => "\n" + frame)
         .join('');
 }

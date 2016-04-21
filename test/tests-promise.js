@@ -52,7 +52,7 @@ asyncTest("Compatibility with other promises", ()=>{
 asyncTest("When to promise resolve", ()=>{
     var Promise = Dexie.Promise;
     var res = [];
-    Promise.track(()=>{
+    Promise.follow(()=>{
         new Promise (resolve => resolve()).then(()=>res.push("B1"));
         res.push("A1");
         new Promise (resolve => resolve()).then(()=>res.push("B2"));
@@ -69,82 +69,61 @@ asyncTest("When to promise resolve", ()=>{
     }).then(start);
 });
 
-asyncTest("Promise.track", ()=>{
+asyncTest("Promise.follow()", ()=>{
     var Promise = Dexie.Promise;
-    class Tracker {
-        constructor() {
-            this.counter = 0;
-        }
-        
-        onunhandled (promise) {
-            ok(false, `Promise was unhandled: ${promise.stack}`);
-        }
-    }
-    
-    var tracker = new Tracker();
-    
-    Promise.track(() => {
+    Promise.follow(() => {
         Promise.resolve("test")
             .then(x => x + ":")
             .then(x => Promise.reject("rejection"))
             .then(()=>ok(false, "Should not come here"))
             .catch(e => equal(e, "rejection", "Should catch rejection"));
-    }, tracker).then(()=>ok(true, "Scope ended"))
+    }).then(()=>ok(true, "Scope ended"))
+      .catch(e => ok(false, "Error: " + e.stack))
       .then(start);
 });
 
-asyncTest ("Promise.track chained", ()=>{
+asyncTest("Promise.follow() 2", ()=>{
     var Promise = Dexie.Promise;
-    //Promise._rootExec(()=>{
-    var createdTasks = 0,
-        createdTasks2 = 0,
-        completedTasks = 0,
-        completedTasks2 = 0,
-        unhandleds = [],
-        unhandleds2 = [];
+    Promise.follow(() => {
+        Promise.resolve("test")
+            .then(x => x + ":")
+            .then(x => Promise.reject("rejection"))
+            .then(()=>ok(false, "Should not come here"))
+    }).then(()=>ok(false, "Scope should not resolve"))
+      .catch(e => ok(true, "Got error: " + e.stack))
+      .then(start);
+});
+
+asyncTest("Promise.follow() 3 (empty)", ()=>{
+    Dexie.Promise.follow(()=>{})
+        .then(()=>ok(true, "Promise resolved when nothing was done"))
+        .then(start); 
+});
+
+asyncTest ("Promise.follow chained", ()=>{
+    var Promise = Dexie.Promise;
+    //Promise._rootExec(()=>{        
+    //Promise.scheduler = (fn, args) => setTimeout(fn, 0, args[0], args[1], args[2]);
         
-        
-    Promise.track(()=>{
-        new Promise(resolve => resolve())
-            .then(()=>Promise.track(()=>{
-                Promise.PSD.inner = true;
-                // Unresolved rejection, where error is undefined
-                new Promise((_,reject)=>reject(undefined));
-                
-                // Chains and rejection
-                new Promise(resolve => resolve())
-                    .then(x => 3)
-                    .then(null, e => "catched")
-                    .then(x => {}) 
-                    .then(()=>{throw new TypeError("oops");})
-                }, {
-                    onbeforetask: task => ++createdTasks2,
-                    onaftertask: task => ++completedTasks2,
-                    onunhandled: (error, promise) => {
-                        unhandleds2.push(promise);
-                        if (error === undefined) {
-                            ok(true, `undefined was unhandled (inner scope): ${promise.stack} `);
-                            return false; // Returning false should prevent bubbling to outer scope
-                        } else {
-                            ok(true, `Promise was unhandled (inner scope): ${error.stack} `);
-                            // Don't return - bubble to outer scope.
-                        }
-                    }
-                })
-        );
-    }, {
-        onbeforetask: task => (task.ID = ++createdTasks) &&
-            ok(true, `Task ${task.ID} created: ${task.stack || task.p.stack}`),
-        onaftertask: task => ++completedTasks &&
-            ok(true, `Task ${task.ID} completed: ${task.stack || task.p.stack}`),
-        onunhandled: (err,promise) => {
-            unhandleds.push(promise);
-            ok(true, `Promise was unhandled (outer scope): ${err.stack}`);
-            return false; // Returning false should prevent from bubbling to Promise.on.error.
-        }
+    Promise.follow(()=>{
+        new Promise(resolve => resolve()).then(()=>Promise.follow(()=>{
+            Promise.PSD.inner = true;
+            
+            // Chains and rejection
+            new Promise(resolve => resolve())
+                .then(x => 3)
+                .then(null, e => "catched")
+                .then(x => {}) 
+                .then(()=>{throw new TypeError("oops");})
+            }).then(()=>ok(false, "Promise.follow() should not resolve since an unhandled rejection should have been detected"))
+        ).then(()=>ok(false, "Promise.follow() should not resolve since an unhandled rejection should have been detected"))
+        .catch (TypeError, err => {
+            ok(true, "Got TypeError: " + err.stack);
+        });
+    }).then (()=> ok(true, "Outer Promise.follow() should resolve because inner was catched"))
+    .catch (err => {
+        ok(false, "Should have catched TypeError: " + err.stack);
     }).then(()=>{
-        equal(unhandleds.length, 1, "Should be on unhandled at outer scope");
-        equal(unhandleds2.length, 2, "SHould be 2 unhandleds at inner scope");
         start();
     });
     //});

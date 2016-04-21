@@ -26,7 +26,7 @@ export function extend(obj, extension) {
     return obj;
 }
 
-export function extendProto (proto, extension) {
+export function setProps (proto, extension) {
     if (typeof extension === 'function') extension = extension(Object.getPrototypeOf(proto));
     keys(extension).forEach(key => {
         setProp(proto, key, extension[key]);
@@ -45,7 +45,7 @@ export function derive(Child) {
             Child.prototype = Object.create(Parent.prototype);
             setProp(Child.prototype, "constructor", Child);
             return {
-                extend: extendProto.bind(null, Child.prototype)
+                extend: setProps.bind(null, Child.prototype)
             };
         }
     };

@@ -1,6 +1,7 @@
 ﻿import Dexie from 'dexie';
 import {ok, start, asyncTest} from 'QUnit';
 
+//Dexie.debug = "dexie";
 
 var no_optimize = window.no_optimize || window.location.search.indexOf('dontoptimize=true') != -1;
 
