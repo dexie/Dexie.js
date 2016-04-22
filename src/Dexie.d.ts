@@ -416,6 +416,11 @@ declare module Dexie {
         successCount: number;
     }
     
+    class BulkError extends DexieError{
+        constructor (msg?:string, failures?: any[]);
+        failures: Array<any>;
+    }
+    
     class OpenFailedError extends DexieError {constructor (msg?: string, inner?: Object);constructor (inner: Object);}
     class VersionChangeError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class SchemaError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
