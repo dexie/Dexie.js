@@ -23,8 +23,8 @@ import {
     _global,
     doFakeAutoComplete,
     asap,
-    trycatch,
-    miniTryCatch,
+    trycatcher,
+    tryCatch,
     fail,
     getByKeyPath,
     setByKeyPath,
@@ -36,7 +36,7 @@ import {
 
 } from './utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
-import Promise, {wrap} from './Promise';
+import Promise, {wrap, PSD, newScope, usePSD} from './Promise';
 import Events from './Events';
 import {
     nop,
@@ -241,8 +241,8 @@ export default function Dexie(dbName, options) {
             t.idbtrans = idbtrans;
             t.idbtrans.onerror = eventRejectHandler(reject);
             t.on('error').subscribe(reject);
-            Promise.newPSD(function () {
-                Promise.PSD.trans = t;
+            newScope(function () {
+                PSD.trans = t;
                 try {
                     db.on("populate").fire(t);
                 } catch (err) {
@@ -460,7 +460,7 @@ export default function Dexie(dbName, options) {
     }
 
     this._transPromiseFactory = function transactionPromiseFactory(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
-        if (db_is_blocked && (!Promise.PSD.letThrough)) {
+        if (db_is_blocked && (!PSD.letThrough)) {
             // Database is paused. Wait til resumed.
             if (!isBeingOpened && !autoOpen) {
                 return fail(new exceptions.DatabaseClosed());
@@ -480,8 +480,8 @@ export default function Dexie(dbName, options) {
         } else {
             var trans = db._createTransaction(mode, storeNames, globalSchema);
             return trans._promise(mode, function (resolve, reject) {
-                Promise.newPSD(function () {
-                    Promise.PSD.trans = trans;
+                newScope(function () {
+                    PSD.trans = trans;
                     fn(resolve, reject, trans);
                 });
             }).then(result => {
@@ -501,7 +501,7 @@ export default function Dexie(dbName, options) {
     };
 
     this._whenReady = function (fn) {
-        if (!fake && db_is_blocked && !Promise.PSD.letThrough) {
+        if (!fake && db_is_blocked && !PSD.letThrough) {
             if (!isBeingOpened) {
                 if (autoOpen) {
                     db.open().catch(nop); // catching to get rid of error logging of uncaught Promise. dbOpenError will be returned again as a rejected Promise.
@@ -520,31 +520,6 @@ export default function Dexie(dbName, options) {
         return new Promise(fn);
     };
     
-    /*this._whenReady = function (fn) {
-        return this.ready().then(()=>{
-           return new Promise(fn);   
-        });
-    };*/
-    
-    /*this.ready = function (cb) {
-        return new Promise(resolve => {
-            if (!fake && db_is_blocked && (!Promise.PSD || !Promise.PSD.letThrough)) {
-                if (!isBeingOpened) {
-                    if (autoOpen) {
-                        resolve (db.open());
-                    } else {
-                        throw new exceptions.DatabaseClosed();
-                    }
-                }
-                pausedResumeables.push({
-                    resume: () => resolve(db.ready())
-                });
-            } else {
-                resolve(db);
-            }
-        }).then(cb);
-    };*/
-
     //
     //
     //
@@ -591,7 +566,7 @@ export default function Dexie(dbName, options) {
                 if (!req) throw new exceptions.MissingAPI("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
                 req.onerror = eventRejectHandler(openError);
                 req.onblocked = fireOnBlocked;
-                req.onupgradeneeded = trycatch (function (e) {
+                req.onupgradeneeded = wrap (function (e) {
                     if (autoSchema && !db._allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
                         // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
                         // If onupgradeneeded is called it means database did not exist. Reject the open() promise and make sure that we
@@ -610,7 +585,7 @@ export default function Dexie(dbName, options) {
                         runUpgraders(oldVer / 10, req.transaction, openError, req);
                     }
                 }, openError);
-                req.onsuccess = trycatch(function () {
+                req.onsuccess = wrap (function () {
                     isBeingOpened = false;
                     idbdb = req.result;
                     if (autoSchema) readGlobalSchema();
@@ -634,8 +609,8 @@ export default function Dexie(dbName, options) {
                     }
                     // Now, let any subscribers to the on("ready") fire BEFORE any other db operations resume!
                     // If an the on("ready") subscriber returns a Promise, we will wait til promise completes or rejects before
-                    Promise.newPSD(function () {
-                        Promise.PSD.letThrough = true; // Set a Promise-Specific Data property informing that onready is firing. This will make db.ready() let the subscribers use the DB but block all others (!)
+                    newScope(function () {
+                        PSD.letThrough = true; // Set a Promise-Specific Data property informing that onready is firing. This will make db.ready() let the subscribers use the DB but block all others (!)
                         try {
                             var res = db.on.ready.fire();
                             if (res && typeof res.then === 'function') {
@@ -779,7 +754,7 @@ export default function Dexie(dbName, options) {
         tableInstances = slice(arguments, 1, arguments.length - 1);
         // Let scopeFunc be the last argument
         scopeFunc = arguments[arguments.length - 1];
-        var parentTransaction = Promise.PSD.trans;
+        var parentTransaction = PSD.trans;
         // Check if parent transactions is bound to this db instance, and if caller wants to reuse it
         if (!parentTransaction || parentTransaction.db !== db || mode.indexOf('!') !== -1) parentTransaction = null;
         var onlyIfCompatible = mode.indexOf('?') !== -1;
@@ -862,7 +837,7 @@ export default function Dexie(dbName, options) {
             var returnValue;
             Promise.follow(()=>{
                 // Let the transaction instance be part of a Promise-specific data (PSD) value.
-                Promise.PSD.trans = trans;
+                PSD.trans = trans;
 
                 if (parentTransaction) {
                     // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
@@ -1077,23 +1052,21 @@ export default function Dexie(dbName, options) {
                     if (i === lastItem) req.onsuccess = wrap(()=>resolve());
                 }
             } else {
-                var hookCtx = {onsuccess: null, onerror: null},
+                var hookCtx,
                     errorHandler = hookedEventRejectHandler(reject),
                     successHandler = hookedEventSuccessHandler(null);
-                miniTryCatch(()=> {
+                tryCatch(()=> {
                     for (var i = 0; i < len; ++i) {
+                        hookCtx = {onsuccess: null, onerror: null};
                         var tuple = keysOrTuples[i];
                         deletingHook.call(hookCtx, tuple[0], tuple[1], trans);
                         var req = idbstore.delete(tuple[0]);
-                        if (hookCtx.onerror) req._err = hookCtx.onerror;
-                        if (hookCtx.onsuccess) req._suc = hookCtx.onsuccess;
+                        req._hookCtx = hookCtx;
                         req.onerror = errorHandler;
                         if (i === lastItem)
                             req.onsuccess = hookedEventSuccessHandler(resolve);
                         else
                             req.onsuccess = successHandler;
-                        hookCtx.onsuccess = null;
-                        hookCtx.onerror = null;
                     }
                 }, err=>{
                     hookCtx.onerror && hookCtx.onerror(err);
@@ -1229,12 +1202,13 @@ export default function Dexie(dbName, options) {
                         // Must behave as documented.
                         //
                         var keyPath = idbstore.keyPath,
-                            hookCtx = { onerror: null, onsuccess: null };
+                            hookCtx;
                         errorHandler = BulkErrorHandlerCatchAll(errorList, null, true);
                         successHandler = hookedEventSuccessHandler(null);
 
-                        miniTryCatch(() => {
+                        tryCatch(() => {
                             for (var i=0, l = objects.length; i < l; ++i) {
+                                hookCtx = { onerror: null, onsuccess: null };
                                 var key = keys && keys[i];
                                 var obj = objects[i],
                                     effectiveKey = keys ? key : keyPath ? getByKeyPath(obj, keyPath) : undefined,
@@ -1248,15 +1222,11 @@ export default function Dexie(dbName, options) {
                                     }
                                 }
                                 req = key != null ? idbstore.add(obj, key) : idbstore.add(obj);
-                                if (hookCtx.onerror) req._err = hookCtx.onerror;
-                                if (hookCtx.onsuccess) req._suc = hookCtx.onsuccess;
+                                req._hookCtx = hookCtx;
                                 if (i < l - 1) {
                                     req.onerror = errorHandler;
                                     if (hookCtx.onsuccess)
                                         req.onsuccess = successHandler;
-                                    // Reset event listeners for next iteration.
-                                    hookCtx.onerror = null;
-                                    hookCtx.onsuccess = null;
                                 }
                             }
                         }, err => {
@@ -1291,10 +1261,10 @@ export default function Dexie(dbName, options) {
                 var self = this,
                     creatingHook = this.hook.creating.fire;
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
-                    var thisCtx = {onsuccess:null, onerror:null};
+                    var hookCtx = {onsuccess: null, onerror: null};
                     if (creatingHook !== nop) {
                         var effectiveKey = (key != null) ? key : (idbstore.keyPath ? getByKeyPath(obj, idbstore.keyPath) : undefined);
-                        var keyToUse = creatingHook.call(thisCtx, effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
+                        var keyToUse = creatingHook.call(hookCtx, effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
                         if (effectiveKey == null && keyToUse != null) { // Using "==" and "!=" to check for either null or undefined!
                             if (idbstore.keyPath)
                                 setByKeyPath(obj, idbstore.keyPath, keyToUse);
@@ -1303,22 +1273,18 @@ export default function Dexie(dbName, options) {
                         }
                     }
                     try {
-                        var req = key != null ? idbstore.add(obj, key) : idbstore.add(obj),
-                            psd = Promise.PSD;
-                        req.onerror = eventRejectHandler(function (e) {
-                            if (thisCtx.onerror)
-                               Promise.usePSD(psd, thisCtx.onerror.bind(thisCtx, e));
-                            return reject(e);
-                        });
-                        req.onsuccess = function (ev) {
+                        var req = key != null ? idbstore.add(obj, key) : idbstore.add(obj);
+                        req._hookCtx = hookCtx;
+                        req.onerror = hookedEventRejectHandler(reject);
+                        req.onsuccess = hookedEventSuccessHandler(function (result) {
+                            // TODO: Remove these two lines in next major release (2.0?)
+                            // It's no good practice to have side effects on provided parameters
                             var keyPath = idbstore.keyPath;
-                            if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
-                            if (thisCtx.onsuccess)
-                                Promise.usePSD(psd, thisCtx.onsuccess.bind(thisCtx, ev.target.result));
-                            resolve(req.result);
-                        };
+                            if (keyPath) setByKeyPath(obj, keyPath, result);
+                            resolve(result);
+                        });
                     } catch (e) {
-                        if (thisCtx.onerror) thisCtx.onerror(e);
+                        if (hookCtx.onerror) hookCtx.onerror(e);
                         throw e;
                     }
                 });
@@ -1496,14 +1462,16 @@ export default function Dexie(dbName, options) {
         //
 
         _lock: function () {
+            assert (!PSD.global); // Locking and unlocking reuires to be within a PSD scope.
             // Temporary set all requests into a pending queue if they are called before database is ready.
             ++this._reculock; // Recursive read/write lock pattern using PSD (Promise Specific Data) instead of TLS (Thread Local Storage)
-            if (this._reculock === 1 && !Promise.PSD.global) Promise.PSD.lockOwnerFor = this;
+            if (this._reculock === 1 && !PSD.global) PSD.lockOwnerFor = this;
             return this;
         },
         _unlock: function () {
+            assert (!PSD.global); // Locking and unlocking reuires to be within a PSD scope.
             if (--this._reculock === 0) {
-                if (Promise.PSD) Promise.PSD.lockOwnerFor = null;
+                if (!PSD.global) PSD.lockOwnerFor = null;
                 while (this._blockedFuncs.length > 0 && !this._locked()) {
                     var fn = this._blockedFuncs.shift();
                     try { fn(); } catch (e) { }
@@ -1516,13 +1484,13 @@ export default function Dexie(dbName, options) {
             // To simplify the Dexie API for extension implementations, we support recursive locks.
             // This is accomplished by using "Promise Specific Data" (PSD).
             // PSD data is bound to a Promise and any child Promise emitted through then() or resolve( new Promise() ).
-            // Promise.PSD is local to code executing on top of the call stacks of any of any code executed by Promise():
+            // PSD is local to code executing on top of the call stacks of any of any code executed by Promise():
             //         * callback given to the Promise() constructor  (function (resolve, reject){...})
             //         * callbacks given to then()/catch()/finally() methods (function (value){...})
             // If creating a new independant Promise instance from within a Promise call stack, the new Promise will derive the PSD from the call stack of the parent Promise.
             // Derivation is done so that the inner PSD __proto__ points to the outer PSD.
-            // Promise.PSD.lockOwnerFor will point to current transaction object if the currently executing PSD scope owns the lock.
-            return this._reculock && Promise.PSD.lockOwnerFor !== this;
+            // PSD.lockOwnerFor will point to current transaction object if the currently executing PSD scope owns the lock.
+            return this._reculock && PSD.lockOwnerFor !== this;
         },
         create: function () {
             if (!idbdb) {throw (dbOpenError && ["DatabaseClosedError","MissingAPIError"].indexOf(dbOpenError.name) >= 0 ?
@@ -1555,7 +1523,7 @@ export default function Dexie(dbName, options) {
         },
         _promise: function (mode, fn, bWriteLock) {
             var self = this;
-            return Promise.newPSD(function() {
+            return newScope(function() {
                 var p;
                 // Read lock always
                 if (!self._locked()) {
@@ -2008,7 +1976,7 @@ export default function Dexie(dbName, options) {
             limit: Infinity,
             error: error, // If set, any promise must be rejected with this error
             or: whereCtx.or,
-            valueFilter: table.hook.reading.fire
+            valueMapper: table.hook.reading.fire
         };
     }
 
@@ -2047,8 +2015,9 @@ export default function Dexie(dbName, options) {
 
         function iter(ctx, fn, resolve, reject, idbstore) {
             var filter = ctx.replayFilter ? combine(ctx.filter, ctx.replayFilter()) : ctx.filter;
+            var wrappedFn = wrap(fn);
             if (!ctx.or) {
-                iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, !ctx.keysOnly && ctx.valueFilter);
+                iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), wrappedFn, resolve, reject, !ctx.keysOnly && ctx.valueMapper);
             } else {
                 (function () {
                     var set = {};
@@ -2063,13 +2032,13 @@ export default function Dexie(dbName, options) {
                             var key = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
                             if (!set.hasOwnProperty(key)) {
                                 set[key] = true;
-                                fn(item, cursor, advance);
+                                wrappedFn(item, cursor, advance);
                             }
                         }
                     }
 
                     ctx.or._iterate(union, resolveboth, reject, idbstore);
-                    iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, !ctx.keysOnly && ctx.valueFilter);
+                    iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, !ctx.keysOnly && ctx.valueMapper);
                 })();
             }
         }
@@ -2116,7 +2085,7 @@ export default function Dexie(dbName, options) {
             },
 
             raw: function () {
-                this._ctx.valueFilter = null;
+                this._ctx.valueMapper = null;
                 return this;
             },
 
@@ -2443,11 +2412,6 @@ export default function Dexie(dbName, options) {
                     function onerror(e) {
                         failures.push(e);
                         failKeys.push(thisContext.primKey);
-                        if (thisContext.onerror)
-                            Promise.newPSD(function () {
-                                Promise.PSD.trans = trans;
-                                thisContext.onerror(e);
-                            });
                         checkFinished();
                         return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
                     }
@@ -2455,18 +2419,14 @@ export default function Dexie(dbName, options) {
                     if (modifyer.call(thisContext, item, thisContext) !== false) { // If a callback explicitely returns false, do not perform the update!
                         var bDelete = !thisContext.hasOwnProperty("value");
                         ++count;
-                        miniTryCatch(function () {
+                        tryCatch(function () {
                             var req = (bDelete ? cursor.delete() : cursor.update(thisContext.value));
-                            req.onerror = eventRejectHandler(onerror);
-                            req.onsuccess = function () {
-                                if (thisContext.onsuccess)
-                                    Promise.newPSD(function () {
-                                        Promise.PSD.trans = trans;
-                                        thisContext.onsuccess(thisContext.value);
-                                    });
+                            req._hookCtx = thisContext;
+                            req.onerror = hookedEventRejectHandler(onerror);
+                            req.onsuccess = hookedEventSuccessHandler(function () {
                                 ++successCount;
                                 checkFinished();
-                            };
+                            });
                         }, onerror);
                     } else if (thisContext.onsuccess) {
                         // Hook will expect either onerror or onsuccess to always be called!
@@ -2520,7 +2480,7 @@ export default function Dexie(dbName, options) {
                     countReq.onerror = onerror;
                     countReq.onsuccess = () => {
                         var count = countReq.result;
-                        miniTryCatch(()=> {
+                        tryCatch(()=> {
                             var delReq = (range ? idbstore.delete(range) : idbstore.clear());
                             delReq.onerror = onerror;
                             delReq.onsuccess = () => resolve(count);
@@ -2603,7 +2563,7 @@ export default function Dexie(dbName, options) {
                     if (enableProhibitedDB) {
                         setProp(obj, tableName, {
                             get: function () {
-                                var currentTrans = Promise.PSD.trans;
+                                var currentTrans = PSD.trans;
                                 if (currentTrans && currentTrans.db === db) {
                                     return currentTrans.tables[tableName];
                                 }
@@ -2626,27 +2586,27 @@ export default function Dexie(dbName, options) {
         });
     }
 
-    function iterate(req, filter, fn, resolve, reject, valueFilter) {
-        valueFilter = valueFilter || mirror;
+    function iterate(req, filter, fn, resolve, reject, valueMapper) {
+        valueMapper = valueMapper || mirror;
         if (!req.onerror) req.onerror = eventRejectHandler(reject);
         if (filter) {
-            req.onsuccess = trycatch(function filter_record() {
+            req.onsuccess = trycatcher(function filter_record() {
                 var cursor = req.result;
                 if (cursor) {
                     var c = function () { cursor.continue(); };
                     if (filter(cursor, function (advancer) { c = advancer; }, resolve, reject))
-                        fn(valueFilter(cursor.value), cursor, function (advancer) { c = advancer; });
+                        fn(valueMapper(cursor.value), cursor, function (advancer) { c = advancer; });
                     c();
                 } else {
                     resolve();
                 }
             }, reject);
         } else {
-            req.onsuccess = trycatch(function filter_record() {
+            req.onsuccess = trycatcher(function filter_record() {
                 var cursor = req.result;
                 if (cursor) {
                     var c = function () { cursor.continue(); };
-                    fn(valueFilter(cursor.value), cursor, function (advancer) { c = advancer; });
+                    fn(valueMapper(cursor.value), cursor, function (advancer) { c = advancer; });
                     c();
                 } else {
                     resolve();
@@ -2815,7 +2775,7 @@ function eventSuccessHandler(done) {
     }
 }
 
-function hookedEventSuccessHandler(done) {
+function hookedEventSuccessHandler(resolve) {
     // wrap() is needed when calling hooks because the rare scenario of:
     //  * hook does a db operation that fails immediately (IDB throws exception)
     //    For calling db operations on correct transaction, wrap makes sure to set PSD correctly.
@@ -2825,12 +2785,14 @@ function hookedEventSuccessHandler(done) {
     //    and the transaction will have committed already.
     // If no hook, the virtual tick will be executed in the reject()/resolve of the final promise,
     // because it is always marked with _lib = true when created using Transaction._promise().
-    return wrap(function(ev) {
-        var res = ev.target.result;
-        var hookSuccessHandler = ev.target._suc;
-        hookSuccessHandler && hookSuccessHandler(res);
-        done && done(res);
-    }, done);
+    return wrap(function(event) {
+        var req = event.target,
+            result = req.result,
+            ctx = req._hookCtx,// Contains the hook error handler. Put here instead of closure to boost performance.
+            hookSuccessHandler = ctx && ctx.onsuccess;
+        hookSuccessHandler && hookSuccessHandler(result);
+        resolve && resolve(result);
+    }, resolve);
 }
 
 function eventRejectHandler(reject) {
@@ -2845,8 +2807,10 @@ function hookedEventRejectHandler (reject) {
     return wrap(function (event) {
         // See comment on hookedEventSuccessHandler() why wrap() is needed only when supporting hooks.
         
-        var err = event.target.error;
-        var hookErrorHandler = event.target._err; // Contains the hook error handler. Put here instead of closure to boost performance.
+        var req = event.target,
+            err = req.error,
+            ctx = req._hookCtx,// Contains the hook error handler. Put here instead of closure to boost performance.
+            hookErrorHandler = ctx && ctx.onerror;
         hookErrorHandler && hookErrorHandler(err);
         preventDefault(event);
         reject (err);
@@ -3029,8 +2993,8 @@ Dexie.ignoreTransaction = function (scopeFunc) {
     //  1) The intention of writing the statement could be unclear if using setImmediate() or setTimeout().
     //  2) setTimeout() would wait unnescessary until firing. This is however not the case with setImmediate().
     //  3) setImmediate() is not supported in the ES standard.
-    return Promise.newPSD(function () {
-        Promise.PSD.trans = null;
+    return newScope(function () {
+        PSD.trans = null;
         return scopeFunc();
     });
 };
@@ -3044,8 +3008,8 @@ Dexie.vip = function (fn) {
     // Note that this method is only useful for on('ready') subscribers that is returning a Promise from the event. If not using vip()
     // the database could deadlock since it wont open until the returned Promise is resolved, and any non-VIPed operation started by
     // the caller will not resolve until database is opened.
-    return Promise.newPSD(function () {
-        Promise.PSD.letThrough = true; // Make sure we are let through if still blocking db due to onready is firing.
+    return newScope(function () {
+        PSD.letThrough = true; // Make sure we are let through if still blocking db due to onready is firing.
         return fn();
     });
 };
@@ -3078,7 +3042,7 @@ Dexie.spawn = function (generatorFn, args, thiz) {
 setProp(Dexie, "currentTransaction", {
     get: function () {
         /// <returns type="Transaction"></returns>
-        return Promise.PSD.trans || null;
+        return PSD.trans || null;
     }
 });
 
@@ -3141,7 +3105,7 @@ Dexie.dependencies = {
     indexedDB: idbshim.shimIndexedDB || _global.indexedDB || _global.mozIndexedDB || _global.webkitIndexedDB || _global.msIndexedDB,
     IDBKeyRange: idbshim.IDBKeyRange || _global.IDBKeyRange || _global.webkitIDBKeyRange
 };
-miniTryCatch(()=>{
+tryCatch(()=>{
     // Optional dependencies
     // localStorage
     Dexie.dependencies.localStorage =

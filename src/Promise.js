@@ -1,4 +1,4 @@
-import {slice, isArray, doFakeAutoComplete, miniTryCatch, setProps, setProp, _global} from './utils';
+import {slice, isArray, doFakeAutoComplete, tryCatch, setProps, setProp, _global} from './utils';
 import {reverseStoppableEventChain, nop, callBoth, mirror} from './chaining-functions';
 import Events from './Events';
 import {debug, prettyStack, NEEDS_THROW_FOR_STACK} from './debug';
@@ -351,7 +351,7 @@ function handleRejection (promise, reason) {
     reason = Promise.rejectionMapper(reason);
     promise._state = false;
     promise._value = reason;
-    debug && reason !== null && !reason._promise && typeof reason === 'object' && miniTryCatch(()=>{
+    debug && reason !== null && !reason._promise && typeof reason === 'object' && tryCatch(()=>{
         var origProp =
             Object.getOwnPropertyDescriptor(reason, "stack") ||
             Object.getOwnPropertyDescriptor(Object.getPrototypeOf(reason), "stack");

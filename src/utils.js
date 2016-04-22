@@ -77,22 +77,17 @@ export function getUniqueArray(a) {
     return a.filter((value, index, self) => self.indexOf(value) === index);
 }
 
-export function trycatch(fn, reject) {
-    var psd = Promise.PSD;
+export function trycatcher(fn, reject) {
     return function () {
-        var outerPSD = Promise.PSD; // Support Promise-specific data (PSD) in callback calls
-        Promise.PSD = psd;
         try {
             fn.apply(this, arguments);
         } catch (e) {
             reject(e);
-        } finally {
-            Promise.PSD = outerPSD;
         }
     };
 }
 
-export function miniTryCatch(fn, onerror, args) {
+export function tryCatch(fn, onerror, args) {
     try {
         fn.apply(null, args);
     } catch (ex) {
