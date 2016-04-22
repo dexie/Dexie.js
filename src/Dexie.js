@@ -814,30 +814,21 @@ export default function Dexie(dbName, options) {
         // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
         return (parentTransaction ?
             parentTransaction._promise(mode, enterTransactionScope, "lock") :
-            db._whenReady (enterTransactionScope))
-            .catch(e => {
-                // If exception occur, abort the transaction and reject Promise.
-                if (trans) {
-                    if (trans.idbtrans) trans.idbtrans.onerror = preventDefault; // Prohibit AbortError from firing.
-                    trans.on.error.fire(e);
-                    trans.abort();
-                }
-                if (parentTransaction) parentTransaction.on.error.fire(e);
-                return Promise.reject(e);
-            });
+            db._whenReady (enterTransactionScope));
             
         function enterTransactionScope(resolve, reject) {
-            // Our transaction.
-            trans = db._createTransaction(mode, storeNames, globalSchema, parentTransaction);
-
-            // Provide arguments to the scope function (for backward compatibility)
-            var tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
-            tableArgs.push(trans);
-
-            var returnValue;
-            Promise.follow(()=>{
+            newScope(()=>{
+                // Our transaction.
+                trans = db._createTransaction(mode, storeNames, globalSchema, parentTransaction);
                 // Let the transaction instance be part of a Promise-specific data (PSD) value.
                 PSD.trans = trans;
+                // If direct exception occur, a physical tick may be required to reject the
+                // promise. Such physical tick would make transaction commit even though it
+                // should be aborted. And if such operation is catched, transaction should not
+                // be aborted. So to make this work, tell Promise scheduler to use a transaction-
+                // keeping scheduler if required. Note: This is a rare scenario that only may happen
+                // then an exception is thrown during the construction of a promise.
+                PSD.macroScheduler = trans._macroScheduler;
 
                 if (parentTransaction) {
                     // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
@@ -846,28 +837,31 @@ export default function Dexie(dbName, options) {
                     trans.create(); // Create the backend transaction so that complete() or error() will trigger even if no operation is made upon it.
                 }
                 
-                
-                //trans.complete(()=>resolve(returnValue));
-                //trans.error(reject);
-                
-                // Finally, call the scope function with our table and transaction arguments.
-                returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
-                if (returnValue) {
-                    if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
-                        // scopeFunc returned an iterable. Handle yield as await.
-                        returnValue = awaitIterable(returnValue);
-                    } else if (typeof returnValue.then === 'function' && (!returnValue.hasOwnProperty('_PSD'))) {
-                        throw new exceptions.IncompatiblePromise();
+                // Provide arguments to the scope function (for backward compatibility)
+                var tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
+                tableArgs.push(trans);
+
+                var returnValue;
+                Promise.follow(()=>{
+                    // Finally, call the scope function with our table and transaction arguments.
+                    returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
+                    if (returnValue) {
+                        if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
+                            // scopeFunc returned an iterable. Handle yield as await.
+                            returnValue = awaitIterable(returnValue);
+                        } else if (typeof returnValue.then === 'function' && (!returnValue.hasOwnProperty('_PSD'))) {
+                            throw new exceptions.IncompatiblePromise();
+                        }
                     }
-                }
-            }).then(()=>{
-                if (parentTransaction) trans._resolve(); // sub transactions don't react to idbtrans.oncomplete. We must trigger a acompletion.
-                return trans._completion; // Even if WE believe everything is fine. Await IDBTransaction's oncomplete or onerror as well.
-            }).then(()=>{
-                resolve(returnValue);
-            }).catch (e => {
-                trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
-                reject(e);
+                }).then(()=>{
+                    if (parentTransaction) trans._resolve(); // sub transactions don't react to idbtrans.oncomplete. We must trigger a acompletion.
+                    return trans._completion; // Even if WE believe everything is fine. Await IDBTransaction's oncomplete or onerror as well.
+                }).then(()=>{
+                    resolve(returnValue);
+                }).catch (e => {
+                    reject(e);
+                    trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
+                });
             });
         }
     };
@@ -1415,27 +1409,68 @@ export default function Dexie(dbName, options) {
         /// <param name="mode" type="String">Any of "readwrite" or "readonly"</param>
         /// <param name="storeNames" type="Array">Array of table names to operate on</param>
         var self = this;
+        
         this.db = db;
         this.mode = mode;
         this.storeNames = storeNames;
         this.idbtrans = null;
         this.on = Events(this, ["complete", "error"], "abort");
+        this.parent = parent || null;
+        this.active = true;
+        this.tables = Object.create(notInTransFallbackTables); // ...so that all non-included tables exists as instances (possible to call table.name for example) but will fail as soon as trying to execute a query on it.
+        
         this._reculock = 0;
         this._blockedFuncs = [];
         this._psd = null;
-        this.active = true;
         this._dbschema = dbschema;
-        if (parent) this.parent = parent;
         this._tpf = transactionPromiseFactory;
-        this.tables = Object.create(notInTransFallbackTables); // ...so that all non-included tables exists as instances (possible to call table.name for example) but will fail as soon as trying to execute a query on it.
         this._resolve = null;
         this._reject = null;
         this._completion = new Promise ((resolve, reject) => {
             this._resolve = resolve;
             this._reject = reject;
         });
-        this._completion._lib = true;
-        this._completion.then(()=>{this.on.complete.fire()}, e => {this.on.error.fire(e)});
+        
+        this._macroScheduler = (()=>{
+            // An alternative to asap() if we must not lose the transaction.
+            // Used in rare conditions only - direct exceptions thrown while a promise
+            // is being created, while at the same time executing outside Promise' virtual
+            // microtick engine.
+            var scheduled = false;
+            
+            return physicalTickFn => {
+                if (scheduled) return true; // Already scheduled
+                if (!this.idbtrans)
+                    // No transaction to loose. Let Promise use its defualt scheduler.
+                    return false; 
+                try {
+                    // Query a dummy operation and then callback.
+                    debugger;
+                    var req = this.idbtrans.objectStore(this.storeNames[0]).get(0);
+                    req.onsuccess = req.onerror = () => {
+                        debugger;
+                        physicalTickFn();
+                        scheduled = false; // Reset scheduled to false if a new schedule request comes in.      
+                    };
+                    scheduled = true; // Mark that we don't need to schedule another one in this tick.
+                    return true;
+                } catch (e){
+                    // We were'nt able to schedule. Maybe transaction is inactive.
+                    // Let Promise use its default scheduler.
+                    return false;
+                }
+            };
+        })();
+
+        this._completion.then(
+            ()=> {this.on.complete.fire();},
+            e => {
+                debugger;
+                this.on.error.fire(e);
+                this.parent ?
+                    this.parent._reject(e) :
+                    this.active && this.idbtrans && this.idbtrans.abort();
+            });
 
         function transactionPromiseFactory(mode, storeNames, fn, writeLocked) {
             // Creates a Promise instance and calls fn (resolve, reject, trans) where trans is the instance of this transaction object.
@@ -1497,28 +1532,24 @@ export default function Dexie(dbName, options) {
                 dbOpenError : // Errors where it is no difference whether it was caused by the user operation or an earlier call to db.open()
                 new exceptions.OpenFailed(dbOpenError));} // Make it clear that the user operation was not what caused the error - the error had occurred earlier on db.open()!
             assert(!idbtrans);
+            if (!this.active) throw new exceptions.TransactionInactive();
+            assert(this._completion._state === null);
 
             var idbtrans = this.idbtrans = idbdb.transaction(safariMultiStoreFix(this.storeNames), this.mode);
-            idbtrans.onerror = ev => {
-                this.active = false;
-                try {
-                    ev.preventDefault && ev.preventDefault(); // Prohibit default bubbling to window.error
-                    idbtrans.abort(); // Since we prevent default, we must explicitely abort transaction.
-                } catch (e) {}
+            idbtrans.onerror = wrap(ev => {
+                preventDefault(ev);// Prohibit default bubbling to window.error
                 this._reject(idbtrans.error);
-            };
-            idbtrans.onabort = ev => {
+            });
+            idbtrans.onabort = wrap(ev => {
+                preventDefault(ev);
                 this.active = false;
-                try {
-                    ev.preventDefault();
-                    this._reject(new exceptions.Abort());
-                    this.on("abort").fire(ev);
-                } catch (e) {}
-            };
-            idbtrans.oncomplete = ev => {
+                this._reject(new exceptions.Abort());
+                this.on("abort").fire(ev);
+            });
+            idbtrans.oncomplete = wrap(ev => {
                 this.active = false;
-                this._resolve(idbtrans.result)
-            };
+                this._resolve(idbtrans.result);
+            });
             return this;
         },
         _promise: function (mode, fn, bWriteLock) {
@@ -1559,11 +1590,7 @@ export default function Dexie(dbName, options) {
             return this.on("error", cb);
         },
         abort: function () {
-            if (this.idbtrans && this.active) {
-                this.active = false;
-                try {this.idbtrans.abort();} catch(e){}
-                this.on.error.fire(new exceptions.Abort());
-            }  // TODO: if !this.idbtrans, enqueue an abort() operation.
+            this._reject(new exceptions.Abort());
         },
         table: function (name) {
             if (!this.tables.hasOwnProperty(name)) { throw new exceptions.InvalidTable("Table " + name + " not in transaction"); }
@@ -2015,9 +2042,8 @@ export default function Dexie(dbName, options) {
 
         function iter(ctx, fn, resolve, reject, idbstore) {
             var filter = ctx.replayFilter ? combine(ctx.filter, ctx.replayFilter()) : ctx.filter;
-            var wrappedFn = wrap(fn);
             if (!ctx.or) {
-                iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), wrappedFn, resolve, reject, !ctx.keysOnly && ctx.valueMapper);
+                iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, !ctx.keysOnly && ctx.valueMapper);
             } else {
                 (function () {
                     var set = {};
@@ -2032,7 +2058,7 @@ export default function Dexie(dbName, options) {
                             var key = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
                             if (!set.hasOwnProperty(key)) {
                                 set[key] = true;
-                                wrappedFn(item, cursor, advance);
+                                fn(item, cursor, advance);
                             }
                         }
                     }
@@ -2587,7 +2613,12 @@ export default function Dexie(dbName, options) {
     }
 
     function iterate(req, filter, fn, resolve, reject, valueMapper) {
-        valueMapper = valueMapper || mirror;
+        
+        // Apply valueMapper (hook('reading') or mappped class)
+        var mappedFn = valueMapper ? x => fn(valueMapper(x)) : fn;
+        // Wrap fn with PSD and microtick stuff from Promise.
+        var wrappedFn = wrap(mappedFn);
+        
         if (!req.onerror) req.onerror = eventRejectHandler(reject);
         if (filter) {
             req.onsuccess = trycatcher(function filter_record() {
@@ -2595,7 +2626,7 @@ export default function Dexie(dbName, options) {
                 if (cursor) {
                     var c = function () { cursor.continue(); };
                     if (filter(cursor, function (advancer) { c = advancer; }, resolve, reject))
-                        fn(valueMapper(cursor.value), cursor, function (advancer) { c = advancer; });
+                        wrappedFn(cursor.value, cursor, function (advancer) { c = advancer; });
                     c();
                 } else {
                     resolve();
@@ -2606,7 +2637,7 @@ export default function Dexie(dbName, options) {
                 var cursor = req.result;
                 if (cursor) {
                     var c = function () { cursor.continue(); };
-                    fn(valueMapper(cursor.value), cursor, function (advancer) { c = advancer; });
+                    wrappedFn(cursor.value, cursor, function (advancer) { c = advancer; });
                     c();
                 } else {
                     resolve();

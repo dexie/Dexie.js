@@ -56,13 +56,17 @@ var schedulePhysicalTick = (typeof setImmediate === 'undefined' ?
     ()=>{setTimeout(physicalTick,0);} : 
     // setImmediate supported. Modern platform. Also supports Function.bind().
     setImmediate.bind(null, physicalTick));
-        
+
 // Confifurable through Promise.scheduler.
-var asap = function (callback, args) {
+var asap = function (callback, args, macroScheduler) {
     deferredCallbacks.push([callback, args]);
-    if (needsNewPhysicalTick) {
-        schedulePhysicalTick();
-        needsNewPhysicalTick = false;
+    if (isOutsideMicroTick) {
+        if (macroScheduler && macroScheduler(physicalTick)) {
+            needsNewPhysicalTick = false;
+        } else if (needsNewPhysicalTick) {
+            schedulePhysicalTick();
+            needsNewPhysicalTick = false;
+        }
     }
 }
 
@@ -289,7 +293,7 @@ setProps (Promise, {
                     // will trigger directly through psd.onunhandled
                     run_at_end_of_this_or_next_physical_tick(()=>{
                         this.unhandleds.length === 0 ? resolve() : reject(this.unhandleds[0]);
-                    });
+                    }, this.macroScheduler);
                 }, psd.finalize);
                 fn();
             }, resolve, reject);
@@ -389,7 +393,7 @@ function propagateAllListeners (promise) {
         ++numScheduledCalls;
         asap(()=>{
             if (--numScheduledCalls === 0) finalizePhysicalTick(); // Will detect unhandled errors
-        }, []);
+        }, [], psd.macroScheduler);
     }
 }
     
@@ -407,7 +411,7 @@ function propagateToListener(promise, listener) {
     var psd = listener.psd;
     ++psd.ref;
     ++numScheduledCalls;
-    asap (callListener, [cb, promise, listener]);
+    asap (callListener, [cb, promise, listener], psd.macroScheduler);
 }
 
 function callListener (cb, promise, listener) {
@@ -526,7 +530,7 @@ function finalizePhysicalTick() {
     while (i) finalizers[--i]();    
 }
 
-function run_at_end_of_this_or_next_physical_tick (fn) {
+function run_at_end_of_this_or_next_physical_tick (fn, macroScheduler) {
     function finalizer() {
         fn();
         tickFinalizers.splice(tickFinalizers.indexOf(finalizer), 1);
@@ -535,7 +539,7 @@ function run_at_end_of_this_or_next_physical_tick (fn) {
     ++numScheduledCalls;
     asap(()=>{
         if (--numScheduledCalls === 0) finalizePhysicalTick();
-    }, []);
+    }, [], macroScheduler);
 }
 
 // TODO: Remove!

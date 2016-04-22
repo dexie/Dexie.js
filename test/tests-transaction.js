@@ -189,6 +189,7 @@ asyncTest("sub-transactions", function () {
         });
     }).then(function (retval) {
         equal(retval, "hello...", "Return value went all the way down to transaction resolvance");
+        ok(Dexie.currentTransaction == null, "Dexie.currentTransaction is null");
         db.users.count(function (count) { // Transaction-less operation!
             equal(count, 5, "There are five users in db");
         });
@@ -217,6 +218,8 @@ asyncTest("sub-transactions", function () {
             });
             //});
         }).catch("ConstraintError", function (err) {
+            // Yes, it should fail beause of limited rollback support on nested transactions:
+            // https://github.com/dfahlander/Dexie.js/wiki/Dexie.transaction()#limitations-with-nested-transactions
             ok(true, "Got constraint error on outer transaction as well");
         });
     }).catch(function (err) {
