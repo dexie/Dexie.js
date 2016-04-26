@@ -334,8 +334,10 @@ asyncTest("'!' mode: Transaction bound to different db instance", function () {
         pets: "++id,kind",
         petsPerUser: "++,user,pet"
     });
-    db2.open();
-    db.transaction('rw', "users", "pets", function () {
+    
+    db2.delete()
+    .then(()=>db2.open())
+    .then(()=>db.transaction('rw', "users", "pets", function () {
         db2.transaction('rw!', "users", "pets", function () {
             ok(true, "Possible to enter a transaction in db2");
         }).catch(function (err) {
@@ -344,7 +346,7 @@ asyncTest("'!' mode: Transaction bound to different db instance", function () {
             if (++counter == 2) db2.delete().then(start);
             console.log("finally() in db2.transaction(). counter == " + counter);
         });
-    }).finally(function () {
+    })).finally(function () {
         if (++counter == 2) db2.delete().then(start);
         console.log("finally() in db.transaction(). counter == " + counter);
     });

@@ -51,9 +51,9 @@ export function hookDeletingChain(f1, f2) {
 
 export function hookUpdatingChain(f1, f2) {
     if (f1 === nop) return f2;
-    return function () {
+    return function (modifications) {
         var res = f1.apply(this, arguments);
-        extend(arguments[0], res); // If f1 returns new modifications, extend caller's modifications with the result before calling next in chain.
+        extend(modifications, res); // If f1 returns new modifications, extend caller's modifications with the result before calling next in chain.
         var onsuccess = this.onsuccess, // In case event listener has set this.onsuccess
             onerror = this.onerror;     // In case event listener has set this.onerror
         this.onsuccess = null;
@@ -64,15 +64,6 @@ export function hookUpdatingChain(f1, f2) {
         return res === undefined ?
             (res2 === undefined ? undefined : res2) :
             (extend(res, res2));
-    };
-}
-
-export function stoppableEventChain(f1, f2) {
-    // Enables chained events that may return false to stop the event chain.
-    if (f1 === nop) return f2;
-    return function () {
-        if (f1.apply(this, arguments) === false) return false;
-        return f2.apply(this, arguments);
     };
 }
 
@@ -97,7 +88,10 @@ export function promisableChain(f1, f2) {
     return function () {
         var res = f1.apply(this, arguments);
         if (res && typeof res.then === 'function') {
-            var thiz = this, args = arguments;
+            var thiz = this,
+                i = arguments.length,
+                args = new Array(i);
+            while (i--) args[i] = arguments[i];
             return res.then(function () {
                 return f2.apply(thiz, args);
             });

@@ -283,3 +283,87 @@ asyncTest("Issue #97 A transaction may be lost after calling Dexie.Promise.resol
     });
 });
 
+/*asyncTest("setTimeout vs setImmediate", ()=>{
+    var log=[];
+    setImmediate(()=>{
+        log.push("setImmediate");
+        if (log.length == 2) end();
+    });
+    setTimeout(()=>{
+        log.push("setTimeout");
+        if (log.length == 2) end();
+    }, 40);
+    function end() {
+        equal(log[0], "setImmediate", "setImmediate first");
+        equal(log[1], "setTimeout", "setTimeout second");
+        start();
+    }
+});*/
+
+asyncTest("Promise.on.error", ()=> {
+    var errors = [];
+    function onError(e, p) {
+        errors.push(e);
+        return false;
+    }
+    Dexie.Promise.on('error', onError);
+    
+    new Dexie.Promise((resolve, reject) => {
+        reject ("error");
+    });
+    setTimeout(()=>{
+        equal(errors.length, 1, "Should be one error there");
+        equal(errors[0], "error", "Should be our error there");
+        Dexie.Promise.on.error.unsubscribe(onError);
+        start();
+    }, 40);
+});
+
+asyncTest("Promise.on.error2", ()=> {
+    var errors = [];
+    function onError(e, p) {
+        errors.push(e);
+        return false;
+    }
+    Dexie.Promise.on('error', onError);
+    
+    new Dexie.Promise((resolve, reject) => {
+        new Dexie.Promise((resolve2, reject2) => {
+            reject2 ("error");
+        }).then(resolve, e => {
+            reject(e);
+            //return Dexie.Promise.reject(e);
+        });
+    });
+    
+    setTimeout(()=>{
+        equal(errors.length, 1, "Should be one error there");
+        equal(errors[0], "error", "Should be our error there");
+        Dexie.Promise.on.error.unsubscribe(onError);
+        start();
+    }, 40);
+});
+
+asyncTest("Promise.on.error3", ()=> {
+    var errors = [];
+    function onError(e, p) {
+        errors.push(e);
+        return false;
+    }
+    Dexie.Promise.on('error', onError);
+    
+    new Dexie.Promise((resolve, reject) => {
+        new Dexie.Promise((resolve2, reject2) => {
+            reject2 ("error");
+        }).then(resolve, e => {
+            reject(e);
+            //return Dexie.Promise.reject(e);
+        });
+    }).catch(()=>{});
+    
+    setTimeout(()=>{
+        equal(errors.length, 0, "Should be zarro errors there");
+        Dexie.Promise.on.error.unsubscribe(onError);
+        start();
+    }, 40);
+});

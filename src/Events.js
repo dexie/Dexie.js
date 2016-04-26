@@ -1,5 +1,5 @@
 import {slice, keys, isArray, asap, _global} from './utils';
-import {nop, stoppableEventChain} from './chaining-functions';
+import {nop, reverseStoppableEventChain} from './chaining-functions';
 import {exceptions} from './errors';
 
 export default function Events(ctx) {
@@ -22,7 +22,7 @@ export default function Events(ctx) {
     function add(eventName, chainFunction, defaultFunction) {
         if (isArray(eventName)) return addEventGroup(eventName);
         if (typeof eventName === 'object') return addConfiguredEvents(eventName);
-        if (!chainFunction) chainFunction = stoppableEventChain;
+        if (!chainFunction) chainFunction = reverseStoppableEventChain;
         if (!defaultFunction) defaultFunction = nop;
 
         var context = {

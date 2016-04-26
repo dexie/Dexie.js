@@ -1,4 +1,4 @@
-import {slice, isArray, doFakeAutoComplete, tryCatch, setProps, setProp, _global} from './utils';
+import {slice, isArray, doFakeAutoComplete, tryCatch, props, setProp, _global} from './utils';
 import {reverseStoppableEventChain, nop, callBoth, mirror} from './chaining-functions';
 import Events from './Events';
 import {debug, prettyStack, NEEDS_THROW_FOR_STACK} from './debug';
@@ -73,7 +73,8 @@ var asap = function (callback, args, macroScheduler) {
 var isOutsideMicroTick = true, // True when NOT in a virtual microTick.
     needsNewPhysicalTick = true, // True when a push to deferredCallbacks must also schedulePhysicalTick()
     unhandledErrors = [], // Rejected promises that has occured. Used for firing Promise.on.error and promise.onuncatched.
-    currentFulfiller = null;
+    currentFulfiller = null,
+    rejectionMapper = mirror;
     
 export var PSD = {
     global: true,
@@ -118,6 +119,7 @@ export var wrappers = (() => {
 export default function Promise(fn) {
     if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');    
     this._listeners = [];
+    this.onuncatched = nop;
     
     // A library may set `promise._lib = true;` after promise is created to make resolve() or reject()
     // execute the microtask engine implicitely within the call to resolve() or reject().
@@ -152,6 +154,8 @@ export default function Promise(fn) {
         // Used internally by Promise.resolve() and Promise.reject().
         this._state = arguments[1];
         this._value = arguments[2];
+        if (this._state === false)
+            handleRejection(this, this._value); // Map error, set stack and addPossiblyUnhandledError().
         return;
     }
     
@@ -161,13 +165,13 @@ export default function Promise(fn) {
     executePromiseTask(this, fn);
 }
 
-setProps(Promise.prototype, {
+props(Promise.prototype, {
 
     then: function (onFulfilled, onRejected) {
         var rv = new Promise((resolve, reject) => {
             propagateToListener(this, new Listener(onFulfilled, onRejected, resolve, reject));
         });
-        debug && linkToPreviousPromise(rv, this);
+        debug && (!this._prev || this._state === null) && linkToPreviousPromise(rv, this);
         return rv;
     },
 
@@ -178,13 +182,13 @@ setProps(Promise.prototype, {
         if (typeof type === 'function') return this.then(null, function (e) {
             // Catching errors by its constructor type (similar to java / c++ / c#)
             // Sample: promise.catch(TypeError, function (e) { ... });
-            if (e instanceof type) return callback(e); else return Promise.reject(e);
+            if (e instanceof type) return callback(e); else return PromiseReject(e);
         });
         else return this.then(null, function (e) {
             // Catching errors by the error.name property. Makes sense for indexedDB where error type
             // is always DOMError but where e.name tells the actual error type.
             // Sample: promise.catch('ConstraintError', function (e) { ... });
-            if (e && e.name === type) return callback(e); else return Promise.reject(e);
+            if (e && e.name === type) return callback(e); else return PromiseReject(e);
         });
     },
 
@@ -194,9 +198,26 @@ setProps(Promise.prototype, {
             return value;
         }, function (err) {
             onFinally();
-            return Promise.reject(err);
+            return PromiseReject(err);
         });
     },
+        
+    uncaught: function (uncaughtHandler) {
+        // Be backward compatible and use "onuncatched" as the event name on this.
+        // Handle multiple subscribers through reverseStoppableEventChain(). If a handler returns `false`, bubbling stops.
+        this.onuncatched = reverseStoppableEventChain(this.onuncatched, uncaughtHandler);
+        // In case caller does this on an already rejected promise, assume caller wants to point out the error to this promise and not
+        // a previous promise. Reason: the prevous promise may lack onuncatched handler. 
+        if (this._state === false && unhandledErrors.indexOf(this) === -1) {
+            // Replace unhandled error's destinaion promise with this one!
+            unhandledErrors.some((p,i,l) => p._value === this._value && (l[i] = this));
+            // Actually we do this shit because we need to support db.on.error() correctly during db.open(). If we deprecate db.on.error, we could
+            // take away this piece of code as well as the onuncatched and uncaught() method.
+        }
+        return this;
+    },
+    
+    //pending: {get: function () {return this._state === null;}},
     
     stack: {
         get: function() {
@@ -204,14 +225,14 @@ setProps(Promise.prototype, {
             try {
                 stack_being_generated = true;
                 var stacks = getStack (this, [], MAX_LONG_STACKS);
-                var stack = stacks.join("\nFrom previous:");
+                var stack = stacks.join("\nFrom previous: ");
                 if (this._state !== null) this._stack = stack; // Stack may be updated on reject.
                 return stack;
             } finally {
                 stack_being_generated = false;
             }
         }
-    }    
+    }
 });
 
 function Listener(onFulfilled, onRejected, resolve, reject) {
@@ -222,7 +243,7 @@ function Listener(onFulfilled, onRejected, resolve, reject) {
     this.psd = PSD;
 }
 
-setProps (Promise, {
+props (Promise, {
     all: function () {
         var args = slice(arguments.length === 1 && isArray(arguments[0]) ? arguments[0] : arguments);
 
@@ -257,9 +278,7 @@ setProps (Promise, {
         return new Promise(INTERNAL, true, value);
     },
     
-    reject: reason => {
-        return new Promise(INTERNAL, false, reason);
-    },
+    reject: PromiseReject,
     
     race: values => new Promise((resolve, reject) => {
         values.map(value => Promise.resolve(value).then(resolve, reject));
@@ -279,7 +298,10 @@ setProps (Promise, {
         set: value => {asap = value}
     },
     
-    rejectionMapper: mirror, // Map reject failures
+    rejectionMapper: {
+        get: () => rejectionMapper,
+        set: value => {rejectionMapper = value;} // Map reject failures
+    },
             
     follow: fn => {
         return new Promise((resolve, reject) => {
@@ -349,10 +371,13 @@ function executePromiseTask (promise, fn) {
     }
 }
 
+var rejectingErrors = [];
+
 function handleRejection (promise, reason) {
+    rejectingErrors.push(reason);
     if (promise._state !== null) return;
     var shouldExecuteTick = promise._lib && beginMicroTickScope();
-    reason = Promise.rejectionMapper(reason);
+    reason = rejectionMapper(reason);
     promise._state = false;
     promise._value = reason;
     debug && reason !== null && !reason._promise && typeof reason === 'object' && tryCatch(()=>{
@@ -378,10 +403,11 @@ function handleRejection (promise, reason) {
 
 function propagateAllListeners (promise) {
     //debug && linkToPreviousPromise(promise);
-    for (var i = 0, len = promise._listeners.length; i < len; ++i) {
-        propagateToListener(promise, promise._listeners[i]);
-    }
+    var listeners = promise._listeners;
     promise._listeners = [];
+    for (var i = 0, len = listeners.length; i < len; ++i) {
+        propagateToListener(promise, listeners[i]);
+    }
     var psd = promise._PSD;
     --psd.ref || psd.finalize(); // if psd.ref reaches zero, call psd.finalize();
     if (numScheduledCalls === 0) {
@@ -406,7 +432,7 @@ function propagateToListener(promise, listener) {
     var cb = promise._state ? listener.onFulfilled : listener.onRejected;
     if (cb === null) {
         // This Listener doesnt have a listener for the event being triggered (onFulfilled or onReject) so lets forward the event to any eventual listeners on the Promise instance returned by then() or catch()
-        return (promise._state ? listener.resolve : listener.reject)(promise._value);
+        return (promise._state ? listener.resolve : listener.reject) (promise._value);
     }
     var psd = listener.psd;
     ++psd.ref;
@@ -429,14 +455,25 @@ function callListener (cb, promise, listener) {
         currentFulfiller = promise;
         
         // Call callback and resolve our listener with it's return value.
-        var ret = cb(promise._value);
-        if (!promise._state && (                // This was a rejection and...
-                !ret ||                         // handler didn't return something that could be a Promise
-                !(ret instanceof Promise) ||    // handler didnt return a Promise
-                ret._state !== false ||         // handler returned promise that didnt fail (yet at least)
-                ret._value !== promise._value)) // handler didn't return a promise with same error as the one being rejected
+        var value = promise._value,
+            ret;
+        if (promise._state) {
+            ret = cb (value);
+        } else {
+            if (rejectingErrors.length) rejectingErrors = [];
+            ret = cb(value);
+            if (rejectingErrors.indexOf(value) === -1)
+                markErrorAsHandled(promise); // Callback didnt do Promise.reject(err) nor reject(err) onto another promise.
+        }
+        /*var ret = cb(promise._value);
+        if (!promise._state && (                // This was a rejection and any of the following are true:
+                !ret ||                         // ...handler didn't return something that could be a Promise
+                !(ret instanceof Promise) ||    // ...handler didnt return a Promise
+                ret._state !== false ||         // ...handler returned promise that didnt fail (yet at least)
+                ret._value !== promise._value)) // ...handler didn't return a promise with same error as the one being rejected
             markErrorAsHandled (promise);       // If all above criterias are true, mark error as handled.
-
+                                                // What I want to say is: If `Promise.reject(promise._value)` was returned - don't mark it as handled!
+        */
         listener.resolve(ret);
     } catch (e) {
         // Exception thrown in callback. Reject our listener.
@@ -521,10 +558,11 @@ function endMicroTickScope() {
 }
 
 function finalizePhysicalTick() {
-    unhandledErrors.forEach(p => {
+    var unhandledErrs = unhandledErrors;
+    unhandledErrors = [];
+    unhandledErrs.forEach(p => {
         p._PSD.onunhandled.call(null, p._value, p);
     });
-    unhandledErrors = [];
     var finalizers = tickFinalizers.slice(0); // Clone first because finalizer may remove itself from list.
     var i = finalizers.length;
     while (i) finalizers[--i]();    
@@ -575,7 +613,11 @@ function markErrorAsHandled(promise) {
 
 // By default, log uncaught errors to the console
 function defaultErrorHandler(e) {
-    console.warn(`Uncaught Promise: ${e.stack || e}`);
+    console.warn(`Unhandled rejection: ${e.stack || e}`);
+}
+
+function PromiseReject (reason) {
+    return new Promise(INTERNAL, false, reason);
 }
 
 export function wrap (fn, errorCatcher) {
@@ -641,7 +683,11 @@ export function usePSD (psd, fn, a1, a2, a3) {
 }
 
 function globalError(err, promise) {
+    var rv;
     try {
+        rv = promise.onuncatched(err);
+    } catch (e) {}
+    if (rv !== false) try {
         Promise.on.error.fire(err, promise); // TODO: Deprecated and use same global handler as bluebird.
     } catch (e) {}
 }
@@ -701,7 +747,7 @@ if (_global.Promise) wrapPromise(_global.Promise);
 
 doFakeAutoComplete(() => {
     // Simplify the job for VS Intellisense. This piece of code is one of the keys to the new marvellous intellisense support in Dexie.
-    schedulePhysicalTick = () => {
-        setTimeout(physicalTick, 0);
+    asap = (fn, args) => {
+        setTimeout(()=>{fn.apply(null, args);}, 0);
     };
 });

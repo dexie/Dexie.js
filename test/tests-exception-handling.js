@@ -128,9 +128,10 @@ asyncTest("exceptionThrown-request-catch", function () {
 });
 
 asyncTest("exceptionThrown-iteration-should-abort-when-using-hook", function () {
-    db.users.hook('deleting', function () {
+    function deletingHook () {
         // Testing with 
-    })
+    };
+    db.users.hook('deleting', deletingHook);
     db.transaction('rw', db.users, function () {
 
         function deleteKarls() {
@@ -147,7 +148,10 @@ asyncTest("exceptionThrown-iteration-should-abort-when-using-hook", function () 
         ok(false, "Transaction should not complete!");
     }).catch(function (err) {
         ok(true, "Transaction aborted");
-    }).finally(start);
+    }).finally(()=>{
+        db.users.hook('deleting').unsubscribe(deletingHook);
+        start();
+    });
 });
 
 asyncTest("exceptionThrown-iteration-should-not-abort-when-using-hook", function () {
@@ -248,7 +252,7 @@ asyncTest("exception in on('populate')", function () {
 });
 
 
-asyncTest("catch-all with db.on('error')", 3, function () {
+asyncTest("catch-all with db.on('error')", 6, function () {
     if (typeof idbModules !== 'undefined' && Dexie.dependencies.indexedDB === idbModules.shimIndexedDB) {
         // Using indexedDBShim.
         ok(false, "This test would hang with IndexedDBShim as of 2015-05-07");
@@ -263,40 +267,56 @@ asyncTest("catch-all with db.on('error')", 3, function () {
     });
     var errorCount = 0;
     ourDB.on("error", function (e) {
-        ok(errorCount < 3, "Uncatched error successfully bubbled to ourDB.on('error'): " + e);
-        if (++errorCount == 3) {
-            Dexie.Promise.on('error').unsubscribe(swallowPromiseOnError);
-            ourDB.delete().then(start);
+        ok(errorCount < 5, "Uncatched error successfully bubbled to ourDB.on('error'): " + e);
+        if (++errorCount == 5) {
+            ourDB.delete().then(()=>{
+                Dexie.Promise.on('error').unsubscribe(swallowPromiseOnError);
+                start();
+            });
         }
     });
     function swallowPromiseOnError(e){
+        return false;
     }
     Dexie.Promise.on('error', swallowPromiseOnError); // Just to get rid of default error logs for not catching.
 
-    ourDB.open();
+    ourDB.delete()
+    .then(()=>ourDB.open())
+    .then(()=>{
 
-    ourDB.transaction("rw", ourDB.users, function () {
-        ourDB.users.add({ username: "dfahlenius" }).then(function () {
-            ok(false, "Should not be able to add two users with same username");
+        ourDB.transaction("rw", ourDB.users, function () {
+            ourDB.users.add({ username: "dfahlenius" }).then(function () {
+                ok(false, "Should not be able to add two users with same username");
+            });
+        }).then(function () {
+            ok(false, "Transaction should not complete since errors wasnt catched");
         });
-    }).then(function () {
-        ok(false, "Transaction should not complete since errors wasnt catched");
-    });
-    ourDB.transaction("rw", ourDB.users, function () {
-        ourDB.users.add({ username: "dfahlenius" }).then(function () {
-            ok(false, "Should not be able to add two users with same username");
+        ourDB.transaction("rw", ourDB.users, function () {
+            ourDB.users.add({ username: "dfahlenius" }).then(function () {
+                ok(false, "Should not be able to add two users with same username");
+            });
+        }).then(function () {
+            ok(false, "Transaction should not complete since errors wasnt catched");
         });
-    }).then(function () {
-        ok(false, "Transaction should not complete since errors wasnt catched");
-    });
-    ourDB.transaction("rw", ourDB.users, function () {
-        ourDB.users.add({ username: "dfahlenius" }).then(function () {
-            ok(false, "Should not be able to add two users with same username");
-        });
-    }).then(function () {
-        ok(false, "Transaction should not complete since errors wasnt catched");
-    });
+        ourDB.transaction("rw", ourDB.users, function () {
+            ourDB.users.add({ id: {} }).then(function () {
+                ok(false, "Should not be able to add user with faulty key");
+            });
+        }).then(function () {
+            ok(false, "Transaction should not complete since errors wasnt catched");
+        }).catch(err => {
+            ok(true, "Got error: " + err.stack);
+            return Dexie.Promise.reject(err); // Returning failed promise to bubble to db.on.error.
+        })
 
+        // And outside transactions:        
+        ourDB.users.add({ username: "dfahlenius" }).then(function () {
+            ok(false, "Should not be able to add two users with same username");
+        });
+        ourDB.users.add({ id: {} }).then(function () {
+            ok(false, "Should not be able to add user with faulty key");
+        });
+    });
 });
 
 asyncTest("Issue #32: db.on('error') doesnt catch 'not found index' DOMExceptions", function () {
@@ -535,7 +555,7 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
             db.open().then(function() {
                 console.log("before");
                 throw "FOO"; // Here a generic error is thrown (not a DB error)
-                console.log("after");
+                //console.log("after");
             });
             db.delete().finally(function() {
                 equal(errorList.length, 5, "THere should be 4 global errors triggered");

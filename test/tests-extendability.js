@@ -29,20 +29,23 @@ asyncTest("recursive-pause", function () {
         activities.add({ Oid: "A3", Task: "T2", Tick: 200, Tock: 210, Type: 2 });
     });
 
-    db.delete().then(function () { db.open(); });
+    db.delete().then(()=>{
+        return db.open();
+    }).then(()=>{
         
-    db.transaction("rw", db.activities, db.tasks, function () {
-        Dexie.Promise.newPSD(function () {
-            Dexie.currentTransaction._lock();
-            db.activities.where("Type").equals(2).modify({ Flags: 2 }).finally(function () {
-                Dexie.currentTransaction._unlock();
+        return db.transaction("rw", db.activities, db.tasks, function () {
+            Dexie.Promise.newPSD(function () {
+                Dexie.currentTransaction._lock();
+                db.activities.where("Type").equals(2).modify({ Flags: 2 }).finally(function () {
+                    Dexie.currentTransaction._unlock();
+                });
             });
-        });
-        db.activities.where("Flags").equals(2).count(function (count) {
-            equal(count, 1, "Should have put one entry there now");
-        });
-        db.activities.where("Flags").equals(2).each(function (act) {
-            equal(act.Type, 2, "The entry is correct");
+            db.activities.where("Flags").equals(2).count(function (count) {
+                equal(count, 1, "Should have put one entry there now");
+            });
+            db.activities.where("Flags").equals(2).each(function (act) {
+                equal(act.Type, 2, "The entry is correct");
+            });
         });
 
     }).catch(function (e) {

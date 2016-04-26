@@ -396,7 +396,7 @@ asyncTest("No auto-open", ()=> {
         equal(res.length, 0, "Got an answer now when opened.");
         db.close();
         let openPromise = db.open().then(()=>{
-            debugger;
+            //console.log("Why are we here? " + Dexie.Promise.reject().stack);
             ok(false, "Should not succeed to open because we closed it during the open sequence.")
         }).catch(e=> {
             ok(e instanceof Dexie.DatabaseClosedError, "Got DatabaseClosedError from the db.open() call.");
@@ -408,8 +408,6 @@ asyncTest("No auto-open", ()=> {
         });
         db.close();
         return Promise.all([openPromise, queryPromise]);
-    }).catch(e => {
-        ok(e instanceof Dexie.OpenFailedError);
     }).catch(e => {
         ok(false, e);
     }).finally(start);

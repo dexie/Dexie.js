@@ -16,7 +16,7 @@ import {
     setProp,
     isArray,
     extend,
-    setProps,
+    props,
     derive,
     slice,
     override,
@@ -25,7 +25,7 @@ import {
     asap,
     trycatcher,
     tryCatch,
-    fail,
+    rejection,
     getByKeyPath,
     setByKeyPath,
     delByKeyPath,
@@ -36,7 +36,7 @@ import {
 
 } from './utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
-import Promise, {wrap, PSD, newScope, usePSD} from './Promise';
+import Promise, {wrap, PSD, newScope} from './Promise';
 import Events from './Events';
 import {
     nop,
@@ -45,8 +45,7 @@ import {
     hookCreatingChain,
     hookUpdatingChain,
     hookDeletingChain,
-    promisableChain,
-    reverseStoppableEventChain
+    promisableChain
 } from './chaining-functions';
 import * as Debug from './debug';
 
@@ -86,11 +85,19 @@ export default function Dexie(dbName, options) {
     var notInTransFallbackTables = {};
     ///<var type="IDBDatabase" />
     var idbdb = null; // Instance of IDBDatabase
-    var db_is_blocked = true;
     var dbOpenError = null;
     var isBeingOpened = false;
+    var openComplete = false;
     var READONLY = "readonly", READWRITE = "readwrite";
     var db = this;
+    var dbReadyResolve,
+        dbReadyPromise = new Promise(resolve => {
+            dbReadyResolve = resolve;
+        }),
+        cancelOpen,
+        openCanceller = new Promise((_, reject) => {
+            cancelOpen = reject;
+        });
     var pausedResumeables = [];
     var autoSchema = true;
     var hasNativeGetDatabaseNames = !!getNativeGetDatabaseNamesFn(indexedDB);
@@ -122,16 +129,6 @@ export default function Dexie(dbName, options) {
             else
                 console.warn(`Upgrade '${db.name}' blocked by other connection holding version ${ev.oldVersion/10}`);
         });
-        // By default, log uncaught errors to the console
-        function defaultDbErrorHandler(e) {
-            console.warn(`Unhandled rejection: ${e.stack || e}`);
-        }
-        function defaultPromiseErrorHandler(e) {
-            db.on.error.fire(e);
-            return false; // Don't let Promise' default error handler warn to console. We're doing that.
-        }
-        Promise.on('error', defaultPromiseErrorHandler);
-        db.on('error', defaultDbErrorHandler);
     }
 
     //
@@ -243,6 +240,7 @@ export default function Dexie(dbName, options) {
             t.on('error').subscribe(reject);
             newScope(function () {
                 PSD.trans = t;
+                // TODO: Use Promise.follow() here! First, need to change how runUpgraders work. Also need to set transaction nop.
                 try {
                     db.on("populate").fire(t);
                 } catch (err) {
@@ -434,6 +432,10 @@ export default function Dexie(dbName, options) {
             resumable.resume();
         });
     }
+    
+    function dbUncaught(err) {
+        return db.on.error.fire(err);
+    }
 
     //
     //
@@ -460,27 +462,17 @@ export default function Dexie(dbName, options) {
     }
 
     this._transPromiseFactory = function transactionPromiseFactory(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
-        if (db_is_blocked && (!PSD.letThrough)) {
-            // Database is paused. Wait til resumed.
-            if (!isBeingOpened && !autoOpen) {
-                return fail(new exceptions.DatabaseClosed());
+        if (!openComplete && (!PSD.letThrough)) {
+            if (!isBeingOpened) {
+                if (!autoOpen)
+                    return rejection(new exceptions.DatabaseClosed(), dbUncaught);
+                db.open().catch(nop); // Open in background. If if fails, it will be catched by the final promise anyway.
             }
-            var blockedPromise = new Promise(function (resolve, reject) {
-                pausedResumeables.push({
-                    resume: function () {
-                        var p = db._transPromiseFactory(mode, storeNames, fn);
-                        p.then(resolve, reject);
-                    }
-                });
-            });
-            if (autoOpen && !isBeingOpened) {
-                db.open().catch(nop); // catching to get rid of error logging of uncaught Promise. dbOpenError will be returned again as a rejected Promise.
-            }
-            return blockedPromise;
+            return dbReadyPromise.then(()=>db._transPromiseFactory(mode, storeNames, fn));
         } else {
             var trans = db._createTransaction(mode, storeNames, globalSchema);
             return trans._promise(mode, function (resolve, reject) {
-                newScope(function () {
+                newScope(function () { // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
                     PSD.trans = trans;
                     fn(resolve, reject, trans);
                 });
@@ -501,23 +493,18 @@ export default function Dexie(dbName, options) {
     };
 
     this._whenReady = function (fn) {
-        if (!fake && db_is_blocked && !PSD.letThrough) {
+        return new Promise (fake || openComplete || PSD.letThrough ? fn : (resolve, reject) => {
             if (!isBeingOpened) {
-                if (autoOpen) {
-                    db.open().catch(nop); // catching to get rid of error logging of uncaught Promise. dbOpenError will be returned again as a rejected Promise.
-                } else {
-                    return fail(new exceptions.DatabaseClosed());
+                if (!autoOpen) {
+                    reject(new exceptions.DatabaseClosed());
+                    return;
                 }
+                db.open().catch(nop); // Open in background. If if fails, it will be catched by the final promise anyway.
             }
-            return new Promise(function (resolve, reject) {
-                pausedResumeables.push({
-                    resume: function () {
-                        fn(resolve, reject);
-                    }
-                });
+            dbReadyPromise.then(()=>{
+                fn(resolve, reject);
             });
-        }
-        return new Promise(fn);
+        }).uncaught(dbUncaught);
     };
     
     //
@@ -532,142 +519,145 @@ export default function Dexie(dbName, options) {
     this.verno = 0;
 
     this.open = function () {
-        if (idbdb) return Promise.resolve(db);
-        if (isBeingOpened)
-            return this.ready();
-        dbOpenError = null;
+        if (isBeingOpened || idbdb) return dbReadyPromise;
         isBeingOpened = true;
-        db_is_blocked = true;
-        return new Promise(function (resolve, reject) {
-            if (fake) resolve();
-            var req;
-            function openError(err) {
-                try { req.transaction.abort(); } catch (e) { }
-                if (idbdb) try { idbdb.close(); } catch (e) { }
-                idbdb = null;
-                isBeingOpened = false;
-                dbOpenError = err;
-                db_is_blocked = false;
-                reject(dbOpenError);
-                executePausedResumeables();
-            }
-            try {
-                // Make sure caller has specified at least one version
-                if (versions.length > 0) autoSchema = false;
-
-                // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
-                // IE fails when deleting objectStore after reading from it.
-                // A future version of Dexie.js will stopover an intermediate version to workaround this.
-                // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
-                if (!indexedDB) throw new exceptions.MissingAPI(
-                    "indexedDB API not found. If using IE10+, make sure to run your code on a server URL "+
-                    "(not locally). If using Safari, make sure to include indexedDB polyfill.");
-                req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
-                if (!req) throw new exceptions.MissingAPI("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
-                req.onerror = eventRejectHandler(openError);
-                req.onblocked = fireOnBlocked;
-                req.onupgradeneeded = wrap (function (e) {
-                    if (autoSchema && !db._allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
-                        // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
-                        // If onupgradeneeded is called it means database did not exist. Reject the open() promise and make sure that we
-                        // do not create a new database by accident here.
-                        req.onerror = function (event) { event.preventDefault(); }; // Prohibit onabort error from firing before we're done!
-                        req.transaction.abort(); // Abort transaction (would hope that this would make DB disappear but it doesnt.)
-                        // Close database and delete it.
-                        req.result.close();
-                        var delreq = indexedDB.deleteDatabase(dbName); // The upgrade transaction is atomic, and javascript is single threaded - meaning that there is no risk that we delete someone elses database here!
-                        delreq.onsuccess = delreq.onerror = function () {
-                            openError(new exceptions.NoSuchDatabase(`Database ${dbName} doesnt exist`));
-                        };
-                    } else {
-                        req.transaction.onerror = eventRejectHandler(openError);
-                        var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
-                        runUpgraders(oldVer / 10, req.transaction, openError, req);
-                    }
-                }, openError);
-                req.onsuccess = wrap (function () {
-                    isBeingOpened = false;
-                    idbdb = req.result;
-                    if (autoSchema) readGlobalSchema();
-                    else if (idbdb.objectStoreNames.length > 0) {
-                        try {
-                            adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
-                        } catch (e) {
-                            // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
-                        }
-                    }
-
-                    idbdb.onversionchange = ev=>{
-                        db._vcFired = true; // detect implementations that not support versionchange (IE/Edge/Safari)
-                        db.on("versionchange").fire(ev);
-                    };
-                    if (!hasNativeGetDatabaseNames) {
-                        // Update localStorage with list of database names
-                        globalDatabaseList(function (databaseNames) {
-                            if (databaseNames.indexOf(dbName) === -1) return databaseNames.push(dbName);
-                        });
-                    }
-                    // Now, let any subscribers to the on("ready") fire BEFORE any other db operations resume!
-                    // If an the on("ready") subscriber returns a Promise, we will wait til promise completes or rejects before
-                    newScope(function () {
-                        PSD.letThrough = true; // Set a Promise-Specific Data property informing that onready is firing. This will make db.ready() let the subscribers use the DB but block all others (!)
-                        try {
-                            var res = db.on.ready.fire();
-                            if (res && typeof res.then === 'function') {
-                                // If on('ready') returns a promise, wait for it to complete and then resume any pending operations.
-                                res.then(resume, function (err) {
-                                    idbdb.close();
-                                    idbdb = null;
-                                    openError(err);
-                                });
-                            } else {
-                                asap(resume); // Cannot call resume directly because then the pauseResumables would inherit from our PSD scope.
-                            }
-                        } catch (e) {
-                            openError(e);
-                        }
-
-                        function resume() {
-                            db_is_blocked = false;
-                            executePausedResumeables();
-                            resolve();
-                        }
+        dbOpenError = null;
+        openComplete = false;
+        
+        // Function pointers to call when the core opening process completes.
+        var resolveDbReady = dbReadyResolve,
+            // upgradeTransaction to abort on failure.
+            upgradeTransaction = null;
+        
+        return Promise.race([openCanceller, new Promise((resolve, reject) => {
+            doFakeAutoComplete(()=>resolve());
+            
+            // Make sure caller has specified at least one version
+            if (versions.length > 0) autoSchema = false;
+            
+            // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
+            // IE fails when deleting objectStore after reading from it.
+            // A future version of Dexie.js will stopover an intermediate version to workaround this.
+            // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
+            
+            // If no API, throw!
+            if (!indexedDB) throw new exceptions.MissingAPI(
+                "indexedDB API not found. If using IE10+, make sure to run your code on a server URL "+
+                "(not locally). If using Safari, make sure to include indexedDB polyfill.");
+            
+            var req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
+            if (!req) throw new exceptions.MissingAPI("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
+            req.onerror = wrap(eventRejectHandler(reject));
+            req.onblocked = wrap(fireOnBlocked);
+            req.onupgradeneeded = wrap (function (e) {
+                upgradeTransaction = req.transaction;
+                if (autoSchema && !db._allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
+                    // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
+                    // If onupgradeneeded is called it means database did not exist. Reject the open() promise and make sure that we
+                    // do not create a new database by accident here.
+                    req.onerror = preventDefault; // Prohibit onabort error from firing before we're done!
+                    upgradeTransaction.abort(); // Abort transaction (would hope that this would make DB disappear but it doesnt.)
+                    // Close database and delete it.
+                    req.result.close();
+                    var delreq = indexedDB.deleteDatabase(dbName); // The upgrade transaction is atomic, and javascript is single threaded - meaning that there is no risk that we delete someone elses database here!
+                    delreq.onsuccess = delreq.onerror = wrap(function () {
+                        reject (new exceptions.NoSuchDatabase(`Database ${dbName} doesnt exist`));
                     });
-                }, openError);
-            } catch (err) {
-                openError(err);
-            }
-        }).then(function (){
-            connections.push(db);
+                } else {
+                    upgradeTransaction.onerror = wrap(eventRejectHandler(reject));
+                    var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
+                    runUpgraders(oldVer / 10, upgradeTransaction, reject, req);
+                }
+            }, reject);
+            
+            req.onsuccess = wrap (function () {
+                // Core opening procedure complete. Now let's just record some stuff.
+                upgradeTransaction = null;
+                idbdb = req.result;
+                connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.
+
+                if (autoSchema) readGlobalSchema();
+                else if (idbdb.objectStoreNames.length > 0) {
+                    try {
+                        adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
+                    } catch (e) {
+                        // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
+                    }
+                }
+                
+                idbdb.onversionchange = wrap(ev => {
+                    db._vcFired = true; // detect implementations that not support versionchange (IE/Edge/Safari)
+                    db.on("versionchange").fire(ev);
+                });
+                
+                if (!hasNativeGetDatabaseNames) {
+                    // Update localStorage with list of database names
+                    globalDatabaseList(function (databaseNames) {
+                        if (databaseNames.indexOf(dbName) === -1) return databaseNames.push(dbName);
+                    });
+                }
+                
+                resolve();
+
+            }, reject);
+        })]).then(()=>{
+            // Before finally resolving the dbReadyPromise and this promise,
+            // call and await all on('ready') subscribers:
+            // Dexie.vip() makes subscribers able to use the database while being opened.
+            // This is a must since these subscribers take part of the opening procedure.
+            return Dexie.vip(db.on.ready.fire);
+        }).then(()=>{
+            // Resolve the db.open() with the db instance.
             return db;
+        }).catch(err => {
+            try {
+                // Did we fail within onupgradeneeded? Make sure to abort the upgrade transaction so it doesnt commit.
+                upgradeTransaction && upgradeTransaction.abort();
+            } catch (e) { }
+            db.close(); // Closes and resets idbdb, removes connections, resets dbReadyPromise and openCanceller so that a later db.open() is fresh.
+            // A call to db.close() may have made on-ready subscribers fail. Use dbOpenError if set, since err could be a follow-up error on that.
+            dbOpenError = err; // Record the error. It will be used to reject further promises of db operations.
+            return rejection(dbOpenError, dbUncaught); // dbUncaught will make sure any error that happened in any operation before will now bubble to db.on.error() thanks to the special handling in Promise.uncaught().
+        }).finally(()=>{
+            isBeingOpened = false;
+            openComplete = true;
+            resolveDbReady(); // dbReadyPromise is resolved no matter if open() rejects or resolved. It's just to wake up waiters.
         });
     };
-
+    
     this.close = function () {
         var idx = connections.indexOf(db);
-        if (idx >= 0) connections.splice(idx, 1);
+        if (idx >= 0) connections.splice(idx, 1);        
         if (idbdb) {
-            idbdb.close();
+            try {idbdb.close();} catch(e){}
             idbdb = null;
-            autoOpen = false;
-            if (db_is_blocked) {
-                executePausedResumeables();
-            }
-            db_is_blocked = false;
-            dbOpenError = new exceptions.DatabaseClosed();
-        } else if (isBeingOpened) {
-            db.on('ready', ()=> Promise.reject(new exceptions.DatabaseClosed()));
         }
+        autoOpen = false;
+        dbOpenError = new exceptions.DatabaseClosed();
+        if (isBeingOpened)
+            cancelOpen(dbOpenError);
+        // Reset dbReadyPromise promise:
+        dbReadyPromise = new Promise(resolve => {
+            dbReadyResolve = resolve;
+        });
+        openCanceller = new Promise((_, reject) => {
+            cancelOpen = reject;
+        });
     };
-
+    
     this.delete = function () {
-        var args = arguments;
+        var hasArguments = arguments.length > 0;
         return new Promise(function (resolve, reject) {
-            if (args.length > 0) throw new exceptions.InvalidArgument("Arguments not allowed in db.delete()");
+            if (hasArguments) throw new exceptions.InvalidArgument("Arguments not allowed in db.delete()");
+            if (isBeingOpened) {
+                dbReadyPromise.then(doDelete);
+            } else {
+                doDelete();
+            }
             function doDelete() {
                 db.close();
                 var req = indexedDB.deleteDatabase(dbName);
-                req.onsuccess = function () {
+                req.onsuccess = wrap(function () {
                     if (!hasNativeGetDatabaseNames) {
                         globalDatabaseList(function(databaseNames) {
                             var pos = databaseNames.indexOf(dbName);
@@ -675,16 +665,11 @@ export default function Dexie(dbName, options) {
                         });
                     }
                     resolve();
-                };
-                req.onerror = eventRejectHandler(reject);
+                });
+                req.onerror = wrap(eventRejectHandler(reject));
                 req.onblocked = fireOnBlocked;
             }
-            if (isBeingOpened) {
-                pausedResumeables.push({ resume: doDelete });
-            } else {
-                doDelete();
-            }
-        });
+        }).uncaught(dbUncaught);
     };
 
     this.backendDB = function () {
@@ -717,24 +702,18 @@ export default function Dexie(dbName, options) {
     //
     // Events
     //
-    this.on = Events(this, "error", "populate", { blocked: [reverseStoppableEventChain, nop], "ready": [promisableChain, nop], "versionchange": [reverseStoppableEventChain, nop] });
+    this.on = Events(this, "error", "populate", "blocked", "versionchange", {ready: [promisableChain, nop]});
 
-    // Handle on('ready') specifically: If DB is already open, trigger the event immediately. Also, default to unsubscribe immediately after being triggered.
-    this.on.ready.subscribe = override(this.on.ready.subscribe, function (origSubscribe) {
-        return function (subscriber, bSticky) {
-            function proxy () {
-                if (!bSticky) db.on.ready.unsubscribe(proxy);
-                return subscriber.apply(this, arguments);
-            }
-            origSubscribe.call(this, proxy);
-            if (db.isOpen()) {
-                if (db_is_blocked) {
-                    pausedResumeables.push({ resume: proxy });
-                } else {
-                    proxy();
-                }
-            }
-        };
+    this.on.ready.subscribe = override (this.on.ready.subscribe, function (subscribe) {
+        return (subscriber, bSticky) => {
+            Dexie.vip(()=>{
+                subscribe(subscriber);
+                if (!bSticky) subscribe(function unsubscribe() {
+                    db.on.ready.unsubscribe(subscriber);
+                    db.on.ready.unsubscribe(unsubscribe);
+                });
+            });
+        }
     });
 
     fakeAutoComplete(function () {
@@ -807,8 +786,9 @@ export default function Dexie(dbName, options) {
                 }
             }
         } catch (e) {
-            return parentTransaction ? parentTransaction._promise(null, (r,reject)=>reject(e)) :
-                fail(e);
+            return parentTransaction ?
+                parentTransaction._promise(null, (_, reject) => {reject(e);}) :
+                rejection (e, dbUncaught);
         }
         var trans;
         // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
@@ -853,7 +833,7 @@ export default function Dexie(dbName, options) {
                             throw new exceptions.IncompatiblePromise();
                         }
                     }
-                }).then(()=>{
+                }).uncaught(dbUncaught).then(()=>{
                     if (parentTransaction) trans._resolve(); // sub transactions don't react to idbtrans.oncomplete. We must trigger a acompletion.
                     return trans._completion; // Even if WE believe everything is fine. Await IDBTransaction's oncomplete or onerror as well.
                 }).then(()=>{
@@ -861,6 +841,7 @@ export default function Dexie(dbName, options) {
                 }).catch (e => {
                     reject(e);
                     trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
+                    //return rejection(e);
                 });
             });
         }
@@ -894,7 +875,7 @@ export default function Dexie(dbName, options) {
         this._collClass = collClass || Collection;
     }
 
-    setProps(Table.prototype, function () {
+    props(Table.prototype, function () {
         function failReadonly() {
             // It's ok to throw here because this can only happen within a transaction,
             // and will always be caught by the transaction scope and returned as a
@@ -1067,7 +1048,7 @@ export default function Dexie(dbName, options) {
                     throw err;
                 });
             }
-        });
+        }).uncaught(dbUncaught);
     }
 
     derive(WriteableTable).from(Table).extend(function () {
@@ -1252,8 +1233,7 @@ export default function Dexie(dbName, options) {
                 /// </summary>
                 /// <param name="obj" type="Object">A javascript object to insert</param>
                 /// <param name="key" optional="true">Primary key</param>
-                var self = this,
-                    creatingHook = this.hook.creating.fire;
+                var creatingHook = this.hook.creating.fire;
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
                     var hookCtx = {onsuccess: null, onerror: null};
                     if (creatingHook !== nop) {
@@ -1376,16 +1356,15 @@ export default function Dexie(dbName, options) {
 
             update: function (keyOrObject, modifications) {
                 if (typeof modifications !== 'object' || isArray(modifications))
-                    throw new exceptions.InvalidArgument(
-                        "db.update(keyOrObject, modifications). modifications must be an object.");
+                    throw new exceptions.InvalidArgument("Modifications must be an object.");
                 if (typeof keyOrObject === 'object' && !isArray(keyOrObject)) {
                     // object to modify. Also modify given object with the modifications:
                     keys(modifications).forEach(function (keyPath) {
                         setByKeyPath(keyOrObject, keyPath, modifications[keyPath]);
                     });
                     var key = getByKeyPath(keyOrObject, this.schema.primKey.keyPath);
-                    if (key === undefined) Promise.reject(new exceptions.InvalidArgument(
-                        "Given object does not contain its primary key"));
+                    if (key === undefined) return rejection(new exceptions.InvalidArgument(
+                        "Given object does not contain its primary key"), dbUncaught);
                     return this.where(":id").equals(key).modify(modifications);
                 } else {
                     // key to modify
@@ -1429,7 +1408,7 @@ export default function Dexie(dbName, options) {
         this._completion = new Promise ((resolve, reject) => {
             this._resolve = resolve;
             this._reject = reject;
-        });
+        }).uncaught(dbUncaught);
         
         this._macroScheduler = (()=>{
             // An alternative to asap() if we must not lose the transaction.
@@ -1445,10 +1424,8 @@ export default function Dexie(dbName, options) {
                     return false; 
                 try {
                     // Query a dummy operation and then callback.
-                    debugger;
                     var req = this.idbtrans.objectStore(this.storeNames[0]).get(0);
                     req.onsuccess = req.onerror = () => {
-                        debugger;
                         physicalTickFn();
                         scheduled = false; // Reset scheduled to false if a new schedule request comes in.      
                     };
@@ -1465,11 +1442,11 @@ export default function Dexie(dbName, options) {
         this._completion.then(
             ()=> {this.on.complete.fire();},
             e => {
-                debugger;
                 this.on.error.fire(e);
                 this.parent ?
                     this.parent._reject(e) :
                     this.active && this.idbtrans && this.idbtrans.abort();
+                return rejection(e); // Indicate we actually DO NOT catch this error.
             });
 
         function transactionPromiseFactory(mode, storeNames, fn, writeLocked) {
@@ -1491,7 +1468,7 @@ export default function Dexie(dbName, options) {
         }
     }
 
-    setProps(Transaction.prototype, {
+    props(Transaction.prototype, {
         //
         // Transaction Protected Methods (not required by API users, but needed internally and eventually by dexie extensions)
         //
@@ -1546,9 +1523,9 @@ export default function Dexie(dbName, options) {
                 this._reject(new exceptions.Abort());
                 this.on("abort").fire(ev);
             });
-            idbtrans.oncomplete = wrap(ev => {
+            idbtrans.oncomplete = wrap(() => {
                 this.active = false;
-                this._resolve(idbtrans.result);
+                this._resolve();
             });
             return this;
         },
@@ -1562,7 +1539,7 @@ export default function Dexie(dbName, options) {
                         if (!self.idbtrans && mode) self.create();
                         if (bWriteLock) self._lock(); // Write lock if write operation is requested
                         fn(resolve, reject, self);
-                    }) : Promise.reject(new exceptions.TransactionInactive());
+                    }) : rejection(new exceptions.TransactionInactive());
                     if (self.active && bWriteLock) p.finally(function () {
                         self._unlock();
                     });
@@ -1575,7 +1552,7 @@ export default function Dexie(dbName, options) {
                     });
                 }
                 p._lib = true;
-                return p;
+                return p.uncaught(dbUncaught);
             });
         },
 
@@ -1617,15 +1594,16 @@ export default function Dexie(dbName, options) {
         };
     }
 
-    setProps(WhereClause.prototype, function () {
+    props(WhereClause.prototype, function () {
 
         // WhereClause private methods
 
-        function fail(c, err, T) {
-            var collection = c instanceof WhereClause ? new c._ctx.collClass(c) : c;
-            try { throw (T ? new T(err) : new TypeError(err)); } catch (e) {
-                collection._ctx.error = e;
-            }
+        function fail(collectionOrWhereClause, err, T) {
+            var collection = collectionOrWhereClause instanceof WhereClause ?
+                new collectionOrWhereClause._ctx.collClass(collectionOrWhereClause) :
+                collectionOrWhereClause;
+                
+            collection._ctx.error = T ? new T(err) : new TypeError(err);
             return collection;
         }
 
@@ -2007,7 +1985,7 @@ export default function Dexie(dbName, options) {
         };
     }
 
-    setProps(Collection.prototype, function () {
+    props(Collection.prototype, function () {
 
         //
         // Collection Private Functions
@@ -2131,8 +2109,7 @@ export default function Dexie(dbName, options) {
 
             count: function (cb) {
                 if (fake) return Promise.resolve(0).then(cb);
-                var self = this,
-                    ctx = this._ctx;
+                var ctx = this._ctx;
 
                 if (ctx.filter || ctx.algorithm || ctx.or || ctx.replayFilter) {
                     // When filters are applied or 'ored' collections are used, we must count manually
@@ -2615,9 +2592,9 @@ export default function Dexie(dbName, options) {
     function iterate(req, filter, fn, resolve, reject, valueMapper) {
         
         // Apply valueMapper (hook('reading') or mappped class)
-        var mappedFn = valueMapper ? x => fn(valueMapper(x)) : fn;
+        var mappedFn = valueMapper ? (x,c,a) => fn(valueMapper(x),c,a) : fn;
         // Wrap fn with PSD and microtick stuff from Promise.
-        var wrappedFn = wrap(mappedFn);
+        var wrappedFn = wrap(mappedFn, reject);
         
         if (!req.onerror) req.onerror = eventRejectHandler(reject);
         if (filter) {
@@ -3050,10 +3027,10 @@ Dexie.async = function (generatorFn) {
         try {
             var rv = awaitIterable(generatorFn.apply(this, arguments));
             if (!rv || typeof rv.then !== 'function')
-                return Dexie.Promise.resolve(rv);
+                return Promise.resolve(rv);
             return rv;
         } catch (e) {
-            return Dexie.Promise.reject(e);
+            return rejection (e);
         }
     };
 };
@@ -3062,10 +3039,10 @@ Dexie.spawn = function (generatorFn, args, thiz) {
     try {
         var rv = awaitIterable(generatorFn.apply(thiz, args || []));
         if (!rv || typeof rv.then !== 'function')
-            return Dexie.Promise.resolve(rv);
+            return Promise.resolve(rv);
         return rv;
     } catch (e) {
-        return Dexie.Promise.reject(e);
+        return rejection(e);
     }
 };
 
@@ -3097,7 +3074,7 @@ Promise.rejectionMapper = mapError;
 // Export our derive/extend/override methodology
 Dexie.derive = derive;
 Dexie.extend = extend;
-Dexie.setProps = setProps;
+Dexie.props = props;
 Dexie.override = override;
 // Export our Events() function - can be handy as a toolkit
 Dexie.Events = Dexie.events = Events; // Backward compatible lowercase version.

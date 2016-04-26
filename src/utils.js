@@ -26,7 +26,7 @@ export function extend(obj, extension) {
     return obj;
 }
 
-export function setProps (proto, extension) {
+export function props (proto, extension) {
     if (typeof extension === 'function') extension = extension(Object.getPrototypeOf(proto));
     keys(extension).forEach(key => {
         setProp(proto, key, extension[key]);
@@ -45,7 +45,7 @@ export function derive(Child) {
             Child.prototype = Object.create(Parent.prototype);
             setProp(Child.prototype, "constructor", Child);
             return {
-                extend: setProps.bind(null, Child.prototype)
+                extend: props.bind(null, Child.prototype)
             };
         }
     };
@@ -95,9 +95,10 @@ export function tryCatch(fn, onerror, args) {
     }
 }
 
-export function fail(err) {
+export function rejection (err, uncaughtHandler) {
     // Get the call stack and return a rejected promise.
-    return Promise.reject(err);
+    var rv = Promise.reject(err);
+    return uncaughtHandler ? rv.uncaught(uncaughtHandler) : rv;
 }
 
 export function getByKeyPath(obj, keyPath) {

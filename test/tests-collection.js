@@ -30,6 +30,13 @@ module("collection", {
     }
 });
 
+spawnedTest("and with values", function*(){
+    let array = yield db.users.where("last").inAnyRange([["a","g"],["A","G"]])
+        .and(user => user.username === "dfahlander")
+        .toArray();
+    equal (array.length, 1, "Should find one user with given criteria");
+});
+
 spawnedTest("and with keys", function*(){
     let keys = yield db.users.where("last").inAnyRange([["a","g"],["A","G"]])
         .and(user => user.username === "dfahlander")
@@ -459,7 +466,7 @@ asyncTest("or-issue#15-test", function () {
 
         }).catch(function (err) {
 
-            ok(false, "error:" + err);
+            ok(false, "error:" + err.stack);
 
         }).finally(function () {
             if (--numRuns == 0) {
