@@ -50,8 +50,6 @@ declare class Dexie {
     static asap(fn: Function) : void;
     
     static maxKey: Array<string>;
-
-    static dump(error:any):string;
     
     static dependencies: {
         indexedDB: IDBFactory,
@@ -406,7 +404,6 @@ declare module Dexie {
 
         constructor (name?:string, message?:string);
         toString(): string;
-        dump(): string;
     }
     
     class ModifyError extends DexieError{

@@ -73,6 +73,7 @@ var asap = function (callback, args, macroScheduler) {
 var isOutsideMicroTick = true, // True when NOT in a virtual microTick.
     needsNewPhysicalTick = true, // True when a push to deferredCallbacks must also schedulePhysicalTick()
     unhandledErrors = [], // Rejected promises that has occured. Used for firing Promise.on.error and promise.onuncatched.
+    rejectingErrors = [], // Tracks if errors are being re-rejected during onRejected callback.
     currentFulfiller = null,
     rejectionMapper = mirror;
     
@@ -370,8 +371,6 @@ function executePromiseTask (promise, fn) {
         handleRejection(promise, ex);
     }
 }
-
-var rejectingErrors = [];
 
 function handleRejection (promise, reason) {
     rejectingErrors.push(reason);

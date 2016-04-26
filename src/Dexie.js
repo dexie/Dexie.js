@@ -98,7 +98,6 @@ export default function Dexie(dbName, options) {
         openCanceller = new Promise((_, reject) => {
             cancelOpen = reject;
         });
-    var pausedResumeables = [];
     var autoSchema = true;
     var hasNativeGetDatabaseNames = !!getNativeGetDatabaseNamesFn(indexedDB);
 
@@ -225,130 +224,93 @@ export default function Dexie(dbName, options) {
             });
         }
     });
+    
+    function runUpgraders (oldVersion, idbtrans, reject) {
+        var trans = db._createTransaction(READWRITE, dbStoreNames, globalSchema);
+        trans.create(idbtrans);
+        trans.on('error').subscribe(reject);
+        newScope(function () {
+            PSD.trans = trans;
+            if (oldVersion === 0) {
+                // Create tables:
+                keys(globalSchema).forEach(function (tableName) {
+                    createTable(idbtrans, tableName, globalSchema[tableName].primKey, globalSchema[tableName].indexes);
+                });
+                Promise.follow(()=>db.on.populate.fire(trans)).catch(reject);
+            } else
+                updateTablesAndIndexes(oldVersion, trans, idbtrans).catch(reject);
+        });
+    }
 
-    function runUpgraders(oldVersion, idbtrans, reject, openReq) {
-        if (oldVersion === 0) {
-            //globalSchema = versions[versions.length - 1]._cfg.dbschema;
-            // Create tables:
-            keys(globalSchema).forEach(function (tableName) {
-                createTable(idbtrans, tableName, globalSchema[tableName].primKey, globalSchema[tableName].indexes);
-            });
-            // Populate data
-            var t = db._createTransaction(READWRITE, dbStoreNames, globalSchema);
-            t.idbtrans = idbtrans;
-            t.idbtrans.onerror = eventRejectHandler(reject);
-            t.on('error').subscribe(reject);
-            newScope(function () {
-                PSD.trans = t;
-                // TODO: Use Promise.follow() here! First, need to change how runUpgraders work. Also need to set transaction nop.
-                try {
-                    db.on("populate").fire(t);
-                } catch (err) {
-                    openReq.onerror = idbtrans.onerror = function (ev) { ev.preventDefault(); };  // Prohibit AbortError fire on db.on("error") in Firefox.
-                    try { idbtrans.abort(); } catch (e) { }
-                    idbtrans.db.close();
-                    reject(err);
-                }
-            });
-        } else {
-            // Upgrade version to version, step-by-step from oldest to newest version.
-            // Each transaction object will contain the table set that was current in that version (but also not-yet-deleted tables from its previous version)
-            var queue = [];
-            var oldVersionStruct = versions.filter(function (version) { return version._cfg.version === oldVersion; })[0];
-            if (!oldVersionStruct) throw new exceptions.Upgrade("Dexie specification of currently installed DB version is missing");
-            globalSchema = db._dbSchema = oldVersionStruct._cfg.dbschema;
-            var anyContentUpgraderHasRun = false;
+    function updateTablesAndIndexes (oldVersion, trans, idbtrans) {
+        // Upgrade version to version, step-by-step from oldest to newest version.
+        // Each transaction object will contain the table set that was current in that version (but also not-yet-deleted tables from its previous version)
+        var queue = [];
+        var oldVersionStruct = versions.filter(version => version._cfg.version === oldVersion)[0];
+        if (!oldVersionStruct) throw new exceptions.Upgrade("Dexie specification of currently installed DB version is missing");
+        globalSchema = db._dbSchema = oldVersionStruct._cfg.dbschema;
+        var anyContentUpgraderHasRun = false;
 
-            var versToRun = versions.filter(function (v) { return v._cfg.version > oldVersion; });
-            versToRun.forEach(function (version) {
-                /// <param name="version" type="Version"></param>
+        var versToRun = versions.filter(v => v._cfg.version > oldVersion);
+        versToRun.forEach(function (version) {
+            /// <param name="version" type="Version"></param>
+            queue.push(()=>{
                 var oldSchema = globalSchema;
                 var newSchema = version._cfg.dbschema;
                 adjustToExistingIndexNames(oldSchema, idbtrans);
                 adjustToExistingIndexNames(newSchema, idbtrans);
                 globalSchema = db._dbSchema = newSchema;
-                {
-                    var diff = getSchemaDiff(oldSchema, newSchema);
-                    diff.add.forEach(function (tuple) {
-                        queue.push(function (idbtrans, cb) {
-                            createTable(idbtrans, tuple[0], tuple[1].primKey, tuple[1].indexes);
-                            cb();
+                var diff = getSchemaDiff(oldSchema, newSchema);     
+                // Add tables           
+                diff.add.forEach(function (tuple) {
+                    createTable(idbtrans, tuple[0], tuple[1].primKey, tuple[1].indexes);
+                });
+                // Change tables
+                diff.change.forEach(function (change) {
+                    if (change.recreate) {
+                        throw new exceptions.Upgrade("Not yet support for changing primary key");
+                    } else {
+                        var store = idbtrans.objectStore(change.name);
+                        // Add indexes
+                        change.add.forEach(function (idx) {
+                            addIndex(store, idx);
                         });
-                    });
-                    diff.change.forEach(function (change) {
-                        if (change.recreate) {
-                            throw new exceptions.Upgrade("Not yet support for changing primary key");
-                        } else {
-                            queue.push(function (idbtrans, cb) {
-                                var store = idbtrans.objectStore(change.name);
-                                change.add.forEach(function (idx) {
-                                    addIndex(store, idx);
-                                });
-                                change.change.forEach(function (idx) {
-                                    store.deleteIndex(idx.name);
-                                    addIndex(store, idx);
-                                });
-                                change.del.forEach(function (idxName) {
-                                    store.deleteIndex(idxName);
-                                });
-                                cb();
-                            });
-                        }
-                    });
-                    if (version._cfg.contentUpgrade) {
-                        queue.push(function (idbtrans, cb) {
-                            anyContentUpgraderHasRun = true;
-                            var t = db._createTransaction(READWRITE, slice(idbtrans.db.objectStoreNames), newSchema);
-                            t.idbtrans = idbtrans;
-                            var uncompletedRequests = 0;
-                            t._promise = override(t._promise, function (orig_promise) {
-                                return function (mode, fn, writeLock) {
-                                    ++uncompletedRequests;
-                                    function proxy(fn) {
-                                        return function () {
-                                            fn.apply(this, arguments);
-                                            if (--uncompletedRequests === 0) cb(); // A called db operation has completed without starting a new operation. The flow is finished, now run next upgrader.
-                                        };
-                                    }
-                                    return orig_promise.call(this, mode, function (resolve, reject) {
-                                        arguments[0] = proxy(resolve);
-                                        arguments[1] = proxy(reject);
-                                        fn.apply(this, arguments);
-                                    }, writeLock);
-                                };
-                            });
-                            idbtrans.onerror = eventRejectHandler(reject);
-                            t.on('error').subscribe(reject);
-                            version._cfg.contentUpgrade(t);
-                            if (uncompletedRequests === 0) cb(); // contentUpgrade() didnt call any db operations at all.
+                        // Update indexes
+                        change.change.forEach(function (idx) {
+                            store.deleteIndex(idx.name);
+                            addIndex(store, idx);
+                        });
+                        // Delete indexes
+                        change.del.forEach(function (idxName) {
+                            store.deleteIndex(idxName);
                         });
                     }
-                    if (!anyContentUpgraderHasRun || hasIEDeleteObjectStoreBug) { // Dont delete old tables if ieBug is present and a content upgrader has run. Let tables be left in DB so far. This needs to be taken care of.
-                        queue.push(function (idbtrans, cb) {
-                            // Delete old tables
-                            deleteRemovedTables(newSchema, idbtrans);
-                            cb();
-                        });
-                    }
+                });
+                if (version._cfg.contentUpgrade) {
+                    anyContentUpgraderHasRun = true;
+                    return Promise.follow(()=>{
+                        version._cfg.contentUpgrade(trans);
+                    });
                 }
             });
-
-            // Now, create a queue execution engine
-            var runNextQueuedFunction = function () {
-                try {
-                    if (queue.length)
-                        queue.shift()(idbtrans, runNextQueuedFunction);
-                    else
-                        createMissingTables(globalSchema, idbtrans); // At last, make sure to create any missing tables. (Needed by addons that add stores to DB without specifying version)
-                } catch (err) {
-                    openReq.onerror = idbtrans.onerror = function (ev) { ev.preventDefault(); };  // Prohibit AbortError fire on db.on("error") in Firefox.
-                    try { idbtrans.abort(); } catch(e) {}
-                    idbtrans.db.close();
-                    reject(err);
+            queue.push(function (idbtrans) {
+                if (anyContentUpgraderHasRun && !hasIEDeleteObjectStoreBug) { // Dont delete old tables if ieBug is present and a content upgrader has run. Let tables be left in DB so far. This needs to be taken care of.
+                    var newSchema = version._cfg.dbschema;
+                    // Delete old tables
+                    deleteRemovedTables(newSchema, idbtrans);
                 }
-            };
-            runNextQueuedFunction();
+            });
+        });
+
+        // Now, create a queue execution engine
+        function runQueue () {
+            return queue.length ? Promise.resolve(queue.shift()(trans.idbtrans)).then(runQueue) :
+                Promise.resolve();
         }
+        
+        return runQueue().then(()=>{
+            createMissingTables(globalSchema, idbtrans); // At last, make sure to create any missing tables. (Needed by addons that add stores to DB without specifying version)
+        });
     }
 
     function getSchemaDiff(oldSchema, newSchema) {
@@ -416,7 +378,7 @@ export default function Dexie(dbName, options) {
     function deleteRemovedTables(newSchema, idbtrans) {
         for (var i = 0; i < idbtrans.db.objectStoreNames.length; ++i) {
             var storeName = idbtrans.db.objectStoreNames[i];
-            if (newSchema[storeName] === null || newSchema[storeName] === undefined) {
+            if (newSchema[storeName] == null) {
                 idbtrans.db.deleteObjectStore(storeName);
             }
         }
@@ -426,13 +388,6 @@ export default function Dexie(dbName, options) {
         store.createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multi });
     }
 
-    function executePausedResumeables() {
-        pausedResumeables.forEach(function (resumable) {
-            // Resume all stalled operations. They will fail once they wake up.
-            resumable.resume();
-        });
-    }
-    
     function dbUncaught(err) {
         return db.on.error.fire(err);
     }
@@ -1504,15 +1459,15 @@ export default function Dexie(dbName, options) {
             // PSD.lockOwnerFor will point to current transaction object if the currently executing PSD scope owns the lock.
             return this._reculock && PSD.lockOwnerFor !== this;
         },
-        create: function () {
-            if (!idbdb) {throw (dbOpenError && ["DatabaseClosedError","MissingAPIError"].indexOf(dbOpenError.name) >= 0 ?
+        create: function (idbtrans) {
+            assert(!this.idbtrans);
+            if (!idbtrans && !idbdb) {throw (dbOpenError && ["DatabaseClosedError","MissingAPIError"].indexOf(dbOpenError.name) >= 0 ?
                 dbOpenError : // Errors where it is no difference whether it was caused by the user operation or an earlier call to db.open()
                 new exceptions.OpenFailed(dbOpenError));} // Make it clear that the user operation was not what caused the error - the error had occurred earlier on db.open()!
-            assert(!idbtrans);
             if (!this.active) throw new exceptions.TransactionInactive();
             assert(this._completion._state === null);
 
-            var idbtrans = this.idbtrans = idbdb.transaction(safariMultiStoreFix(this.storeNames), this.mode);
+            idbtrans = this.idbtrans = idbtrans || idbdb.transaction(safariMultiStoreFix(this.storeNames), this.mode);
             idbtrans.onerror = wrap(ev => {
                 preventDefault(ev);// Prohibit default bubbling to window.error
                 this._reject(idbtrans.error);
@@ -3089,7 +3044,6 @@ Dexie.fakeAutoComplete = fakeAutoComplete;
 Dexie.asap = asap;
 Dexie.maxKey = maxKey;
 Dexie.connections = connections;
-Dexie.dump = e => e.stack || e;
 
 // Export Error classes
 extend(Dexie, fullNameExceptions); // Dexie.XXXError = class XXXError {...};
