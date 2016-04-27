@@ -2323,7 +2323,7 @@ export default function Dexie(dbName, options) {
                 return this.reverse().first(cb);
             },
 
-            and: function (filterFunction) {
+            filter: function (filterFunction) {
                 /// <param name="jsFunctionFilter" type="Function">function(val){return true/false}</param>
                 fake && filterFunction(getInstanceTemplate(this._ctx));
                 addFilter(this._ctx, function (cursor) {
@@ -2331,6 +2331,10 @@ export default function Dexie(dbName, options) {
                 });
                 addMatchFilter(this._ctx, filterFunction); // match filters not used in Dexie.js but can be used by 3rd part libraries to test a collection for a match without querying DB. Used by Dexie.Observable.
                 return this;
+            },
+            
+            and: function (filterFunction) {
+                return this.filter(filterFunction);
             },
 
             or: function (indexName) {
