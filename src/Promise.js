@@ -175,6 +175,10 @@ props(Promise.prototype, {
         debug && (!this._prev || this._state === null) && linkToPreviousPromise(rv, this);
         return rv;
     },
+    
+    _then: function (onFulfilled, onRejected) {
+        propagateToListener(this, new Listener(null, null, onFulfilled, onRejected));        
+    },
 
     catch: function (onRejected) {
         if (arguments.length === 1) return this.then(null, onRejected);
@@ -355,7 +359,7 @@ function executePromiseTask (promise, fn) {
                 if (typeof value.then === 'function') {
                     executePromiseTask(promise, (resolve, reject) => {
                         value instanceof Promise ?
-                            propagateToListener(value, new Listener(null, null, resolve, reject)) :
+                            value._then(resolve, reject) :
                             value.then(resolve, reject);
                     });
                     if (shouldExecuteTick) endMicroTickScope();
