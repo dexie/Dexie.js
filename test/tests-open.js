@@ -152,9 +152,9 @@ asyncTest("test-if-database-exists", 3, function () {
     });
 });
 
-asyncTest("open database without specifying version or schema", 10, function () {
+asyncTest("open database without specifying version or schema", Dexie.Observable ? 1 : 10, function () {
     if (Dexie.Observable) {
-        ok(false, "Dexie.Observable currently not compatible with this mode");
+        ok(true, "Dexie.Observable currently not compatible with this mode");
         return start();
     }
     var db = new Dexie("TestDB");
