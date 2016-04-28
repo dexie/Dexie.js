@@ -1,7 +1,7 @@
-import {slice, isArray, doFakeAutoComplete, tryCatch, props, setProp, _global} from './utils';
+import {slice, isArray, doFakeAutoComplete, tryCatch, props, setProp, _global, getPropertyDescriptor} from './utils';
 import {reverseStoppableEventChain, nop, callBoth, mirror} from './chaining-functions';
 import Events from './Events';
-import {debug, prettyStack, NEEDS_THROW_FOR_STACK} from './debug';
+import {debug, prettyStack, getErrorWithStack} from './debug';
 
 //
 // Promise Class for Dexie library
@@ -77,7 +77,7 @@ var isOutsideMicroTick = true, // True when NOT in a virtual microTick.
     currentFulfiller = null,
     rejectionMapper = mirror;
     
-export var PSD = {
+export var globalPSD = {
     global: true,
     ref: 0,
     unhandleds: [],
@@ -91,6 +91,8 @@ export var PSD = {
         });
     }
 };
+
+export var PSD = globalPSD;
 
 export var deferredCallbacks = []; // Callbacks to call in this or next physical tick.
 export var numScheduledCalls = 0; // Number of listener-calls left to do in this physical tick.
@@ -133,17 +135,7 @@ export default function Promise(fn) {
     var psd = (this._PSD = PSD);
 
     if (debug) {
-        if (NEEDS_THROW_FOR_STACK) try {
-            // Doing something naughty in strict mode here to trigger a specific error
-            // that can be explicitely ignored in debugger's exception settings.
-            // If we'd just throw new Error() here, IE's debugger's exception settings
-            // wouldn't let us explicitely ignore those errors.
-            Promise.arguments;
-        } catch(e) {
-            this._stackHolder = e;
-        } else {
-            this._stackHolder = new Error();
-        }
+        this._stackHolder = getErrorWithStack();
         this._prev = null;
         this._numPrev = 0; // Number of previous promises.
         linkToPreviousPromise(this, currentFulfiller);
@@ -384,10 +376,7 @@ function handleRejection (promise, reason) {
     promise._state = false;
     promise._value = reason;
     debug && reason !== null && !reason._promise && typeof reason === 'object' && tryCatch(()=>{
-        var origProp =
-            Object.getOwnPropertyDescriptor(reason, "stack") ||
-            Object.getOwnPropertyDescriptor(Object.getPrototypeOf(reason), "stack");
-        
+        var origProp = getPropertyDescriptor(reason, "stack");        
         reason._promise = promise;    
         setProp(reason, "stack", {
             get: () =>
@@ -504,7 +493,7 @@ function getStack (promise, stacks, limit) {
         if (failure != null) {
             errorName = failure.name || "Error";
             message = failure.message || failure;
-            stack = prettyStack(failure, 1);
+            stack = prettyStack(failure, 0);
         } else {
             errorName = failure; // If error is undefined or null, show that.
             message = ""
@@ -521,7 +510,6 @@ function getStack (promise, stacks, limit) {
 
 function linkToPreviousPromise(promise, prev) {
     // Support long stacks by linking to previous completed promise.
-    //console.log("linkPrev: " + prettyStack(promise._stackHolder, 2));
     var numPrev = prev ? prev._numPrev + 1 : 0;
     if (numPrev < LONG_STACKS_CLIP_LIMIT) { // Prohibit infinite Promise loops to get an infinite long memory consuming "tail".
         promise._prev = prev;

@@ -15,7 +15,7 @@ module("transaction", {
     setup: function () {
         stop();
         resetDatabase(db).catch(function (e) {
-            ok(false, "Error resetting database: " + e);
+            ok(false, "Error resetting database: " + e.stack);
         }).finally(start);
     },
     teardown: function () {
@@ -26,9 +26,9 @@ asyncTest("Transaction should fail if returning non-Dexie Promise in transaction
     db.transaction('rw', db.users, function() {
         return window.Promise.resolve().then(()=> {
             ok(Dexie.currentTransaction == null, "Dexie.currentTransaction == null. If this assertion fails, don't weap. Rejoice and try to understand how the hell this could be possible.");
-            return db.users.add({ username: "foobar" });
+            //return db.users.add({ username: "foobar" });
         }).then(()=>{
-            return db.users.add({ username: "barfoo" });
+            //return db.users.add({ username: "barfoo" });
         });
     }).then (function(){
         ok(false, "Transaction should not commit because we were using a non-Dexie promise");
@@ -449,19 +449,20 @@ asyncTest("Transactions in multiple databases", function () {
 	logDb.version(1).stores({
 		log: "++,time,type,message"
 	});
-	logDb.open();
 	var lastLogAddPromise;
-	db.transaction('rw', db.pets, function () {
-		// Test that a non-transactional add in the other DB can coexist with
-		// the current transaction on db:
-		logDb.log.add({time: new Date(), type: "info", message: "Now adding a dog"});
-		db.pets.add({kind: "dog"}).then(function(petId){
-			// Test that a transactional add in the other DB can coexist with
-			// the current transaction on db:
-			lastLogAddPromise = logDb.transaction('rw!', logDb.log, function (){
-				logDb.log.add({time: new Date(), type: "info", message: "Added dog got key " + petId});
-			});
-		});
+	logDb.open().then(()=>{
+	    return db.transaction('rw', db.pets, function () {
+            // Test that a non-transactional add in the other DB can coexist with
+            // the current transaction on db:
+            logDb.log.add({time: new Date(), type: "info", message: "Now adding a dog"});
+            db.pets.add({kind: "dog"}).then(function(petId){
+                // Test that a transactional add in the other DB can coexist with
+                // the current transaction on db:
+                lastLogAddPromise = logDb.transaction('rw!', logDb.log, function (){
+                    logDb.log.add({time: new Date(), type: "info", message: "Added dog got key " + petId});
+                });
+            });
+        });
 	}).then(function() {
 		return lastLogAddPromise; // Need to wait for the transaction of the other database to complete as well.
 	}).then(function(){
@@ -521,13 +522,13 @@ asyncTest("Issue #91 Promise.resolve() from within parent transaction", function
 	        equal(result.username, "Gunnar", "Got the Gunnar we expected");
 	        return Dexie.Promise.resolve(result);
 	    }).catch(function(e) {
-	        ok(false, "Error: " + e);
+	        ok(false, "Error: " + e.stack);
 	    });
 	}).then(function(result) {
 	    ok(!!result, "Got result");
 	    equal(result.username, "Gunnar", "Got the Gunnar we expected");
 	}).catch(function(e) {
-	    ok(false, "Error at root scope: " + e);
+	    ok(false, "Error at root scope: " + e.stack);
 	}).finally(start);
 });
 
@@ -682,7 +683,7 @@ asyncTest("Issue #91 / #95 with Dexie.Promise.resolve() mixed in here and there.
         ok(!Dexie.currentTransaction, "No ongoing transaction now");
         ok(true, "done");
     }).catch(function(error) {
-        ok(false, error);
+        ok(false, error.stack);
     }).finally(start);
     ok(!Dexie.currentTransaction, "After main transaction scope: Still no ongoing transaction at this scope");
 });

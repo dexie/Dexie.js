@@ -268,7 +268,7 @@ asyncTest("Issue #76 Dexie inside Web Worker", function () {
         }).then(function () {
             ok(true, "Transaction committed");
         }).catch(function(err) {
-            ok(false, "Transaction failed");
+            ok(false, "Transaction failed: " + err.stack);
         }).finally(done);
     }
 

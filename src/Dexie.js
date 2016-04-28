@@ -36,7 +36,7 @@ import {
 
 } from './utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
-import Promise, {wrap, PSD, newScope} from './Promise';
+import Promise, {wrap, PSD, newScope, usePSD} from './Promise';
 import Events from './Events';
 import {
     nop,
@@ -443,7 +443,10 @@ export default function Dexie(dbName, options) {
                 //   });
                 //
                 return trans._completion.then(()=>result);
-            });
+            });/*.catch(err => { // Don't do this as of now. If would affect bulk- and modify methods in a way that could be more intuitive. But wait! Maybe change in next major.
+                trans._reject(err);
+                return rejection(err);
+            });*/
         }
     };
 
@@ -745,25 +748,22 @@ export default function Dexie(dbName, options) {
                 parentTransaction._promise(null, (_, reject) => {reject(e);}) :
                 rejection (e, dbUncaught);
         }
-        var trans;
         // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
         return (parentTransaction ?
             parentTransaction._promise(mode, enterTransactionScope, "lock") :
             db._whenReady (enterTransactionScope));
             
-        function enterTransactionScope(resolve, reject) {
-            newScope(()=>{
+        function enterTransactionScope(resolve) {
+            var parentPSD = PSD;
+            resolve(Promise.resolve().then(()=>newScope(()=>{
+                // Keep a pointer to last non-transactional PSD to use if someone calls Dexie.ignoreTransaction().
+                PSD.transless = PSD.transless || parentPSD;
                 // Our transaction.
-                trans = db._createTransaction(mode, storeNames, globalSchema, parentTransaction);
+                //return new Promise((resolve, reject) => {
+                var trans = db._createTransaction(mode, storeNames, globalSchema, parentTransaction);
                 // Let the transaction instance be part of a Promise-specific data (PSD) value.
                 PSD.trans = trans;
-                // If direct exception occur, a physical tick may be required to reject the
-                // promise. Such physical tick would make transaction commit even though it
-                // should be aborted. And if such operation is catched, transaction should not
-                // be aborted. So to make this work, tell Promise scheduler to use a transaction-
-                // keeping scheduler if required. Note: This is a rare scenario that only may happen
-                // then an exception is thrown during the construction of a promise.
-                PSD.macroScheduler = trans._macroScheduler;
+                
 
                 if (parentTransaction) {
                     // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
@@ -777,7 +777,7 @@ export default function Dexie(dbName, options) {
                 tableArgs.push(trans);
 
                 var returnValue;
-                Promise.follow(()=>{
+                return Promise.follow(()=>{
                     // Finally, call the scope function with our table and transaction arguments.
                     returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
                     if (returnValue) {
@@ -785,20 +785,21 @@ export default function Dexie(dbName, options) {
                             // scopeFunc returned an iterable. Handle yield as await.
                             returnValue = awaitIterable(returnValue);
                         } else if (typeof returnValue.then === 'function' && (!returnValue.hasOwnProperty('_PSD'))) {
-                            throw new exceptions.IncompatiblePromise();
+                            throw new exceptions.IncompatiblePromise("Incompatible Promise returned from transaction scope (read more at http://tinyurl.com/znyqjqc). Transaction scope: " + scopeFunc.toString());
                         }
                     }
                 }).uncaught(dbUncaught).then(()=>{
                     if (parentTransaction) trans._resolve(); // sub transactions don't react to idbtrans.oncomplete. We must trigger a acompletion.
                     return trans._completion; // Even if WE believe everything is fine. Await IDBTransaction's oncomplete or onerror as well.
                 }).then(()=>{
-                    resolve(returnValue);
+                    return returnValue;
                 }).catch (e => {
-                    reject(e);
+                    //reject(e);
                     trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
-                    //return rejection(e);
+                    return rejection(e);
                 });
-            });
+                //});
+            })));
         }
     };
 
@@ -1365,35 +1366,6 @@ export default function Dexie(dbName, options) {
             this._reject = reject;
         }).uncaught(dbUncaught);
         
-        this._macroScheduler = (()=>{
-            // An alternative to asap() if we must not lose the transaction.
-            // Used in rare conditions only - direct exceptions thrown while a promise
-            // is being created, while at the same time executing outside Promise' virtual
-            // microtick engine.
-            var scheduled = false;
-            
-            return physicalTickFn => {
-                if (scheduled) return true; // Already scheduled
-                if (!this.idbtrans)
-                    // No transaction to loose. Let Promise use its defualt scheduler.
-                    return false; 
-                try {
-                    // Query a dummy operation and then callback.
-                    var req = this.idbtrans.objectStore(this.storeNames[0]).get(0);
-                    req.onsuccess = req.onerror = () => {
-                        physicalTickFn();
-                        scheduled = false; // Reset scheduled to false if a new schedule request comes in.      
-                    };
-                    scheduled = true; // Mark that we don't need to schedule another one in this tick.
-                    return true;
-                } catch (e){
-                    // We were'nt able to schedule. Maybe transaction is inactive.
-                    // Let Promise use its default scheduler.
-                    return false;
-                }
-            };
-        })();
-
         this._completion.then(
             ()=> {this.on.complete.fire();},
             e => {
@@ -1461,9 +1433,19 @@ export default function Dexie(dbName, options) {
         },
         create: function (idbtrans) {
             assert(!this.idbtrans);
-            if (!idbtrans && !idbdb) {throw (dbOpenError && ["DatabaseClosedError","MissingAPIError"].indexOf(dbOpenError.name) >= 0 ?
-                dbOpenError : // Errors where it is no difference whether it was caused by the user operation or an earlier call to db.open()
-                new exceptions.OpenFailed(dbOpenError));} // Make it clear that the user operation was not what caused the error - the error had occurred earlier on db.open()!
+            if (!idbtrans && !idbdb) {
+                switch (dbOpenError && dbOpenError.name) {
+                    case "DatabaseClosedError":
+                        // Errors where it is no difference whether it was caused by the user operation or an earlier call to db.open()
+                        throw new exceptions.DatabaseClosed(dbOpenError);
+                    case "MissingAPIError":
+                        // Errors where it is no difference whether it was caused by the user operation or an earlier call to db.open()
+                        throw new exceptions.MissingAPI(dbOpenError);
+                    default:
+                        // Make it clear that the user operation was not what caused the error - the error had occurred earlier on db.open()!
+                        throw new exceptions.OpenFailed(dbOpenError);
+                }
+            }
             if (!this.active) throw new exceptions.TransactionInactive();
             assert(this._completion._state === null);
 
@@ -2956,10 +2938,10 @@ Dexie.ignoreTransaction = function (scopeFunc) {
     //  1) The intention of writing the statement could be unclear if using setImmediate() or setTimeout().
     //  2) setTimeout() would wait unnescessary until firing. This is however not the case with setImmediate().
     //  3) setImmediate() is not supported in the ES standard.
-    return newScope(function () {
-        PSD.trans = null;
-        return scopeFunc();
-    });
+    //  4) You might want to keep other PSD state that was set in a parent PSD, such as PSD.letThrough.
+    return PSD.trans ?
+        usePSD(PSD.transless, scopeFunc) : // Use the closest parent that was non-transactional.
+        scopeFunc(); // No need to change scope because there is no ongoing transaction.
 };
 
 Dexie.vip = function (fn) {

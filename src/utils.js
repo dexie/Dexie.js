@@ -26,8 +26,10 @@ export function extend(obj, extension) {
     return obj;
 }
 
+export const getProto = Object.getPrototypeOf;
+
 export function props (proto, extension) {
-    if (typeof extension === 'function') extension = extension(Object.getPrototypeOf(proto));
+    if (typeof extension === 'function') extension = extension(getProto(proto));
     keys(extension).forEach(key => {
         setProp(proto, key, extension[key]);
     });
@@ -49,6 +51,14 @@ export function derive(Child) {
             };
         }
     };
+}
+
+export const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+
+export function getPropertyDescriptor(obj, prop) {
+    var pd = getOwnPropertyDescriptor(obj, prop),
+        proto;
+    return pd || (proto = getProto(obj)) && getPropertyDescriptor (proto, prop);
 }
 
 var _slice = [].slice;

@@ -267,7 +267,7 @@ asyncTest("catch-all with db.on('error')", 6, function () {
     });
     var errorCount = 0;
     ourDB.on("error", function (e) {
-        ok(errorCount < 5, "Uncatched error successfully bubbled to ourDB.on('error'): " + e);
+        ok(errorCount < 5, "Uncatched error successfully bubbled to ourDB.on('error'): " + e.stack);
         if (++errorCount == 5) {
             ourDB.delete().then(()=>{
                 Dexie.Promise.on('error').unsubscribe(swallowPromiseOnError);

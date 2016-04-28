@@ -13,11 +13,29 @@ export var libraryFilter = ()=>true;
 
 export const NEEDS_THROW_FOR_STACK = !new Error("").stack;
 
-export function prettyStack(exception, numIgnoredLines) {
+export function getErrorWithStack() {
+    "use strict";
+    if (NEEDS_THROW_FOR_STACK) try {
+        // Doing something naughty in strict mode here to trigger a specific error
+        // that can be explicitely ignored in debugger's exception settings.
+        // If we'd just throw new Error() here, IE's debugger's exception settings
+        // wouldn't let us explicitely ignore those errors.
+        getErrorWithStack.arguments;
+    } catch(e) {
+        return e;
+    } else {
+        return new Error();
+    }
+}
+
+export function prettyStack(exception, numIgnoredFrames) {
     var stack = exception.stack;
     if (!stack) return "";
+    numIgnoredFrames = (numIgnoredFrames || 0);
+    if (stack.indexOf(exception.name) === 0)
+        numIgnoredFrames += (exception.name + exception.message).split('\n').length;
     return stack.split('\n')
-        .slice(numIgnoredLines || 0)
+        .slice(numIgnoredFrames)
         .filter(libraryFilter)
         .map(frame => "\n" + frame)
         .join('');
