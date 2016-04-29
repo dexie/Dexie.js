@@ -1562,6 +1562,9 @@ export default function Dexie(dbName, options) {
             /// <param name="needles" type="Array" elementType="String"></param>
             var upper, lower, compare, upperNeedles, lowerNeedles, direction, nextKeySuffix,
                 needlesLen = needles.length;
+            if (!needles.every(s => typeof s === 'string')) {
+                return fail(whereClause, STRING_EXPECTED);
+            }
             function initDirection(dir) {
                 upper = upperFactory(dir);
                 lower = lowerFactory(dir);
@@ -1665,29 +1668,21 @@ export default function Dexie(dbName, options) {
             },
             startsWithIgnoreCase: function (str) {
                 /// <param name="str" type="String"></param>
-                if (typeof str !== 'string') return fail(this, STRING_EXPECTED);
                 if (str === "") return this.startsWith(str);
                 return addIgnoreCaseAlgorithm(this, function (x, a) { return x.indexOf(a[0]) === 0; }, [str], maxString);
             },
             equalsIgnoreCase: function (str) {
                 /// <param name="str" type="String"></param>
-                if (typeof str !== 'string') return fail(this, STRING_EXPECTED);
                 return addIgnoreCaseAlgorithm(this, function (x, a) { return x === a[0]; }, [str], "");
             },
             anyOfIgnoreCase: function () {
                 var set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
                 if (set.length === 0) return emptyCollection(this);
-                if (!set.every(function (s) { return typeof s === 'string'; })) {
-                    return fail(this, "anyOfIgnoreCase() only works with strings");
-                }
                 return addIgnoreCaseAlgorithm(this, function (x, a) { return a.indexOf(x) !== -1; }, set, "");
             },
             startsWithAnyOfIgnoreCase: function () {
                 var set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
                 if (set.length === 0) return emptyCollection(this);
-                if (!set.every(function (s) { return typeof s === 'string'; })) {
-                    return fail(this, "startsWithAnyOfIgnoreCase() only works with strings");
-                }
                 return addIgnoreCaseAlgorithm(this, function (x, a) {
                     return a.some(function(n){
                         return x.indexOf(n) === 0;
@@ -2528,17 +2523,18 @@ export default function Dexie(dbName, options) {
         var rv = [];
         indexes.split(',').forEach(function (index) {
             index = index.trim();
-            var name = index.replace("&", "").replace("++", "").replace("*", "");
-            var keyPath = (name.indexOf('[') !== 0 ? name : index.substring(index.indexOf('[') + 1, index.indexOf(']')).split('+'));
+            var name = index.replace(/([&*]|\+\+)/g, ""); // Remove "&", "++" and "*"
+            // Let keyPath of "[a+b]" be ["a","b"]:
+            var keyPath = /^\[/.test(name) ? name.match(/^\[(.*)\]$/)[1].split('+') : name;
 
             rv.push(new IndexSpec(
                 name,
                 keyPath || null,
-                index.indexOf('&') !== -1,
-                index.indexOf('*') !== -1,
-                index.indexOf("++") !== -1,
+                /\&/.test(index),
+                /\*/.test(index),
+                /\+\+/.test(index),
                 isArray(keyPath),
-                keyPath.indexOf('.') !== -1
+                /\./.test(index)
             ));
         });
         return rv;
