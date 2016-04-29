@@ -70,7 +70,7 @@ asyncTest("Table not in transaction", function () {
         }).then(function () {
             ok(false, "Transaction should not commit because I made an error");
         }).catch(function (err) {
-            ok(true, "Got error since we tried using a table not in transaction: " + err);
+            ok(true, "Got error since we tried using a table not in transaction: " + err.stack);
         });
     }).finally(start);
 });
@@ -81,7 +81,7 @@ asyncTest("Table not in transaction 2", function () {
     }).then(function () {
     ok(false, "Transaction should not commit because I made an error");
     }).catch(function (err) {
-    ok(true, "Got error since we tried using a table not in transaction: " + err);
+    ok(true, "Got error since we tried using a table not in transaction: " + err.stack);
     }).finally(start);
 });
 
@@ -93,7 +93,7 @@ asyncTest("Write into readonly transaction", function () {
     }).then(function () {
         ok(false, "Transaction should not commit because I made an error");
     }).catch(function (err) {
-        ok(true, "Got error since we tried to write to users when in a readonly transaction: " + err);
+        ok(true, "Got error since we tried to write to users when in a readonly transaction: " + err.stack);
     }).finally(start);
 });
 
@@ -119,7 +119,7 @@ asyncTest("Inactive transaction", function () {
     }).then(function () {
         ok(false, "Should not be able to get a here transaction has become inactive");
     }).catch(function (err) {
-        ok(true, "Got error because the transaction has already committed: " + err);
+        ok(true, "Got error because the transaction has already committed: " + err.stack);
     }).finally(start);
 });
 
@@ -145,7 +145,7 @@ asyncTest("Inactive transaction 2", function () {
     }).then(function () {
         ok(false, "Should not be able to get a here transaction has become inactive");
     }).catch(function (err) {
-        ok(true, "Got error because the transaction has already committed: " + err);
+        ok(true, "Got error because the transaction has already committed: " + err.stack);
     }).finally(start);
 });
 

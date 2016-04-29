@@ -658,7 +658,7 @@ asyncTest("clear", function () {
 
 spawnedTest("failReadonly", function*(){
     db.transaction('r', 'users', function*() {
-        yield db.users.bulkAdd([]);
+        yield db.users.bulkAdd([{first: "Foo", last: "Bar"}]);
     }).then(()=>{
         ok(false, "Should not happen");
     }).catch ('ReadOnlyError', e => {

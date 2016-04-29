@@ -86,7 +86,6 @@ export default function Dexie(dbName, options) {
     var versions = [];
     var dbStoreNames = [];
     var allTables = {};
-    var notInTransFallbackTables = {};
     ///<var type="IDBDatabase" />
     var idbdb = null; // Instance of IDBDatabase
     var dbOpenError = null;
@@ -195,9 +194,8 @@ export default function Dexie(dbName, options) {
             // Update the latest schema to this version
             // Update API
             globalSchema = db._dbSchema = dbschema;
-            removeTablesApi([allTables, db, notInTransFallbackTables]);
-            setApiOnPlace([notInTransFallbackTables], tableNotInTransaction, keys(dbschema), READWRITE, dbschema);
-            setApiOnPlace([allTables, db, this._cfg.tables], db._transPromiseFactory, keys(dbschema), READWRITE, dbschema, true);
+            removeTablesApi([allTables, db, Transaction.prototype]);
+            setApiOnPlace([allTables, db, Transaction.prototype, this._cfg.tables], keys(dbschema), READWRITE, dbschema);
             dbStoreNames = keys(dbschema);
             return this;
         },
@@ -405,30 +403,28 @@ export default function Dexie(dbName, options) {
 
     this._allTables = allTables;
 
-    this._tableFactory = function createTable(mode, tableSchema, transactionPromiseFactory) {
+    this._tableFactory = function createTable(mode, tableSchema) {
         /// <param name="tableSchema" type="TableSchema"></param>
         if (mode === READONLY)
-            return new Table(tableSchema.name, transactionPromiseFactory, tableSchema, Collection);
+            return new Table(tableSchema.name, tableSchema, Collection);
         else
-            return new WriteableTable(tableSchema.name, transactionPromiseFactory, tableSchema);
+            return new WriteableTable(tableSchema.name, tableSchema);
     };
 
     this._createTransaction = function (mode, storeNames, dbschema, parentTransaction) {
         return new Transaction(mode, storeNames, dbschema, parentTransaction);
     };
 
-    function tableNotInTransaction(mode, storeNames) {
-        throw new exceptions.InvalidTable("Table " + storeNames[0] + " not part of transaction.");
-    }
-
-    this._transPromiseFactory = function transactionPromiseFactory(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
+    /* Generate a temporary transaction when db operations are done outside a transactino scope.
+    */
+    function tempTransaction(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
         if (!openComplete && (!PSD.letThrough)) {
             if (!isBeingOpened) {
                 if (!autoOpen)
                     return rejection(new exceptions.DatabaseClosed(), dbUncaught);
                 db.open().catch(nop); // Open in background. If if fails, it will be catched by the final promise anyway.
             }
-            return dbReadyPromise.then(()=>db._transPromiseFactory(mode, storeNames, fn));
+            return dbReadyPromise.then(()=>tempTransaction(mode, storeNames, fn));
         } else {
             var trans = db._createTransaction(mode, storeNames, globalSchema);
             return trans._promise(mode, function (resolve, reject) {
@@ -453,7 +449,7 @@ export default function Dexie(dbName, options) {
                 return rejection(err);
             });*/
         }
-    };
+    }
 
     this._whenReady = function (fn) {
         return new Promise (fake || openComplete || PSD.letThrough ? fn : (resolve, reject) => {
@@ -828,7 +824,7 @@ export default function Dexie(dbName, options) {
     //
     //
     //
-    function Table(name, transactionPromiseFactory, tableSchema, collClass) {
+    function Table(name, tableSchema, collClass) {
         /// <param name="name" type="String"></param>
         this.name = name;
         this.schema = tableSchema;
@@ -838,7 +834,6 @@ export default function Dexie(dbName, options) {
             "updating": [hookUpdatingChain, nop],
             "deleting": [hookDeletingChain, nop]
         });
-        this._tpf = transactionPromiseFactory;
         this._collClass = collClass || Collection;
     }
 
@@ -849,14 +844,21 @@ export default function Dexie(dbName, options) {
         //
 
         _trans: function getTransaction(mode, fn, writeLocked) {
-            return this._tpf(mode, [this.name], fn, writeLocked);
+            var trans = PSD.trans;
+            return trans && trans.db === db ?
+                trans._promise (mode, fn, writeLocked) :
+                tempTransaction (mode, [this.name], fn);
         },
         _idbstore: function getIDBObjectStore(mode, fn, writeLocked) {
             if (fake) return new Promise(fn); // Simplify the work for Intellisense/Code completion.
-            var self = this;
-            return this._tpf(mode, [this.name], function (resolve, reject, trans) {
-                fn(resolve, reject, trans.idbtrans.objectStore(self.name), trans);
-            }, writeLocked);
+            var trans = PSD.trans,
+                tableName = this.name;
+            function supplyIdbStore (resolve, reject, trans) {
+                fn(resolve, reject, trans.idbtrans.objectStore(tableName), trans);
+            }
+            return trans && trans.db === db ?
+                trans._promise (mode, supplyIdbStore, writeLocked) :
+                tempTransaction (mode, [this.name], supplyIdbStore);
         },
 
         //
@@ -957,8 +959,8 @@ export default function Dexie(dbName, options) {
     //
     //
     //
-    function WriteableTable(name, transactionPromiseFactory, tableSchema, collClass) {
-        Table.call(this, name, transactionPromiseFactory, tableSchema, collClass || WriteableCollection);
+    function WriteableTable(name, tableSchema, collClass) {
+        Table.call(this, name, tableSchema, collClass || WriteableCollection);
     }
 
     function BulkErrorHandlerCatchAll(errorList, done, supportHooks) {
@@ -1037,7 +1039,7 @@ export default function Dexie(dbName, options) {
                     errorList = [],
                     errorHandler,
                     numObjs = objects.length,
-                    table = trans.tables[this.name]; // Enable us to do stuff in several steps with same transaction.
+                    table = this;
                 if (this.hook.creating.fire === nop && this.hook.updating.fire === nop) {
                     //
                     // Standard Bulk (no 'creating' or 'updating' hooks to care about)
@@ -1326,16 +1328,6 @@ export default function Dexie(dbName, options) {
         }
     });
     
-    // For each method in WriteableTable that is not present in Table, make sure it puts it there with the failReadonly function.
-    var TableProto = Table.prototype;
-    Object.getOwnPropertyNames(WriteableTable.prototype)
-        .forEach(method => method in TableProto || setProp(TableProto, method, () => {
-            // It's ok to throw here because this can only happen within a transaction,
-            // and will always be caught by the transaction scope and returned as a
-            // failed promise.
-            throw new exceptions.ReadOnly("Current Transaction is READONLY");
-        }));
-
     //
     //
     //
@@ -1358,13 +1350,11 @@ export default function Dexie(dbName, options) {
         this.on = Events(this, "complete", "error", "abort");
         this.parent = parent || null;
         this.active = true;
-        this.tables = Object.create(notInTransFallbackTables); // ...so that all non-included tables exists as instances (possible to call table.name for example) but will fail as soon as trying to execute a query on it.
-        
+        this._tables = null;
         this._reculock = 0;
         this._blockedFuncs = [];
         this._psd = null;
         this._dbschema = dbschema;
-        this._tpf = transactionPromiseFactory;
         this._resolve = null;
         this._reject = null;
         this._completion = new Promise ((resolve, reject) => {
@@ -1382,30 +1372,18 @@ export default function Dexie(dbName, options) {
                 this.active = false;
                 return rejection(e); // Indicate we actually DO NOT catch this error.
             });
-
-        function transactionPromiseFactory(mode, storeNames, fn, writeLocked) {
-            // Creates a Promise instance and calls fn (resolve, reject, trans) where trans is the instance of this transaction object.
-            // Support for write-locking the transaction during the promise life time from creation to success/failure.
-            // This is actually not needed when just using single operations on IDB, since IDB implements this internally.
-            // However, when implementing a write operation as a series of operations on top of IDB(collection.delete() and collection.modify() for example),
-            // lock is indeed needed if Dexie APIshould behave in a consistent manner for the API user.
-            // Another example of this is if we want to support create/update/delete events,
-            // we need to implement put() using a series of other IDB operations but still need to lock the transaction all the way.
-            return self._promise(mode, fn, writeLocked);
-        }
-
-        for (var i = storeNames.length - 1; i !== -1; --i) {
-            var name = storeNames[i];
-            var table = db._tableFactory(mode, dbschema[name], transactionPromiseFactory);
-            this.tables[name] = table;
-            if (!this[name]) this[name] = table;
-        }
     }
 
     props(Transaction.prototype, {
         //
         // Transaction Protected Methods (not required by API users, but needed internally and eventually by dexie extensions)
         //
+        tables: {
+            get: function () {
+                if (this._tables) return this._tables;
+                return this._tables = this.storeNames.reduce((result, name)=>((result[name] = allTables[name]),result), {});
+            }
+        },
 
         _lock: function () {
             assert (!PSD.global); // Locking and unlocking reuires to be within a PSD scope.
@@ -2441,15 +2419,9 @@ export default function Dexie(dbName, options) {
 
             return this._write((resolve, reject, idbstore, trans) => {
                 var totalCount = 0;
-                // Clone table and change the way transaction promises are generated.
-                // This is to be able to call other Collection methods within the same
-                // transaction even if the caller calls us without a transaction.
-                var table = Object.create(ctx.table);
-                table._tpf = trans._tpf; // Enable us to keep same transaction even if called without transaction.
                 // Clone collection and change its table and set a limit of CHUNKSIZE on the cloned Collection instance.
                 var collection = this
                     .clone({
-                        table: table,   // Execute in same transaction
                         keysOnly: !ctx.isMatch && !hasDeleteHook}) // load just keys (unless filter() or and() or deleteHook has subscribers)
                     .distinct() // In case multiEntry is used, never delete same key twice because resulting count
                                 // would become larger than actual delete count.
@@ -2499,25 +2471,11 @@ export default function Dexie(dbName, options) {
         return a._cfg.version - b._cfg.version;
     }
 
-    function setApiOnPlace(objs, transactionPromiseFactory, tableNames, mode, dbschema, enableProhibitedDB) {
+    function setApiOnPlace(objs, tableNames, mode, dbschema) {
         tableNames.forEach(function (tableName) {
-            var tableInstance = db._tableFactory(mode, dbschema[tableName], transactionPromiseFactory);
+            var tableInstance = db._tableFactory(mode, dbschema[tableName]);
             objs.forEach(function (obj) {
-                if (!obj[tableName]) {
-                    if (enableProhibitedDB) {
-                        setProp(obj, tableName, {
-                            get: function () {
-                                var currentTrans = PSD.trans;
-                                if (currentTrans && currentTrans.db === db) {
-                                    return currentTrans.tables[tableName];
-                                }
-                                return tableInstance;
-                            }
-                        }, {enumerable: true});
-                    } else {
-                        obj[tableName] = tableInstance;
-                    }
-                }
+                tableName in obj || (obj[tableName] = tableInstance);
             });
         });
     }
@@ -2643,7 +2601,7 @@ export default function Dexie(dbName, options) {
             }
             globalSchema[storeName] = new TableSchema(storeName, primKey, indexes, {});
         });
-        setApiOnPlace([allTables], db._transPromiseFactory, keys(globalSchema), READWRITE, globalSchema);
+        setApiOnPlace([allTables, Transaction.prototype], keys(globalSchema), READWRITE, globalSchema);
     }
 
     function adjustToExistingIndexNames(schema, idbtrans) {
