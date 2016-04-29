@@ -1,4 +1,5 @@
-import {slice, isArray, doFakeAutoComplete, tryCatch, props, setProp, _global, getPropertyDescriptor} from './utils';
+import {doFakeAutoComplete, tryCatch, props,
+        setProp, _global, getPropertyDescriptor, getArrayOf} from './utils';
 import {reverseStoppableEventChain, nop, callBoth, mirror} from './chaining-functions';
 import Events from './Events';
 import {debug, prettyStack, getErrorWithStack} from './debug';
@@ -58,31 +59,31 @@ var schedulePhysicalTick = (typeof setImmediate === 'undefined' ?
     setImmediate.bind(null, physicalTick));
 
 // Confifurable through Promise.scheduler.
-var asap = function (callback, args, macroScheduler) {
-    deferredCallbacks.push([callback, args]);
-    if (isOutsideMicroTick) {
-        if (macroScheduler && macroScheduler(physicalTick)) {
-            needsNewPhysicalTick = false;
-        } else if (needsNewPhysicalTick) {
-            schedulePhysicalTick();
-            needsNewPhysicalTick = false;
-        }
+// Don't export because it would be unsafe to let unknown
+// code call it unless they do try..catch within their callback.
+// This function can be retrieved through getter of Promise.scheduler though,
+// but users must not do Promise.scheduler (myFuncThatThrows exception)!
+var asap = function (callback, args) {
+    microtickQueue.push([callback, args]);
+    if (needsNewPhysicalTick) {
+        schedulePhysicalTick();
+        needsNewPhysicalTick = false;
     }
 }
 
 var isOutsideMicroTick = true, // True when NOT in a virtual microTick.
-    needsNewPhysicalTick = true, // True when a push to deferredCallbacks must also schedulePhysicalTick()
+    needsNewPhysicalTick = true, // True when a push to microtickQueue must also schedulePhysicalTick()
     unhandledErrors = [], // Rejected promises that has occured. Used for firing Promise.on.error and promise.onuncatched.
     rejectingErrors = [], // Tracks if errors are being re-rejected during onRejected callback.
     currentFulfiller = null,
-    rejectionMapper = mirror;
+    rejectionMapper = mirror; // Remove in next major when removing error mapping of DOMErrors and DOMExceptions
     
 export var globalPSD = {
     global: true,
     ref: 0,
     unhandleds: [],
     onunhandled: globalError,
-    env: null, // Will be set whenever leaving a scope using wrappers.snapshot()
+    //env: null, // Will be set whenever leaving a scope using wrappers.snapshot()
     finalize: function () {
         this.unhandleds.forEach(uh => {
             try {
@@ -94,11 +95,13 @@ export var globalPSD = {
 
 export var PSD = globalPSD;
 
-export var deferredCallbacks = []; // Callbacks to call in this or next physical tick.
+export var microtickQueue = []; // Callbacks to call in this or next physical tick.
 export var numScheduledCalls = 0; // Number of listener-calls left to do in this physical tick.
 export var tickFinalizers = []; // Finalizers to call when there are no more async calls scheduled within current physical tick.
 
-export var wrappers = (() => {
+// Wrappers are not being used yet. Their framework is functioning and can be used
+// to replace environment during a PSD scope (a.k.a. 'zone').
+/* **KEEP** export var wrappers = (() => {
     var wrappers = [];
 
     return {
@@ -118,11 +121,12 @@ export var wrappers = (() => {
         }
     };
 })();
+*/
 
 export default function Promise(fn) {
     if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');    
     this._listeners = [];
-    this.onuncatched = nop;
+    this.onuncatched = nop; // Deprecate in next major. Not needed. Better to use global error handler.
     
     // A library may set `promise._lib = true;` after promise is created to make resolve() or reject()
     // execute the microtask engine implicitely within the call to resolve() or reject().
@@ -137,7 +141,7 @@ export default function Promise(fn) {
     if (debug) {
         this._stackHolder = getErrorWithStack();
         this._prev = null;
-        this._numPrev = 0; // Number of previous promises.
+        this._numPrev = 0; // Number of previous promises (for long stacks)
         linkToPreviousPromise(this, currentFulfiller);
     }
     
@@ -169,36 +173,37 @@ props(Promise.prototype, {
     },
     
     _then: function (onFulfilled, onRejected) {
+        // A little tinier version of then() that don't have to create a resulting promise.
         propagateToListener(this, new Listener(null, null, onFulfilled, onRejected));        
     },
 
     catch: function (onRejected) {
         if (arguments.length === 1) return this.then(null, onRejected);
         // First argument is the Error type to catch
-        var type = arguments[0], callback = arguments[1];
-        if (typeof type === 'function') return this.then(null, function (e) {
+        var type = arguments[0],
+            handler = arguments[1];
+        return typeof type === 'function' ? this.then(null, err =>
             // Catching errors by its constructor type (similar to java / c++ / c#)
             // Sample: promise.catch(TypeError, function (e) { ... });
-            if (e instanceof type) return callback(e); else return PromiseReject(e);
-        });
-        else return this.then(null, function (e) {
+            err instanceof type ? handler(err) : PromiseReject(err))
+        : this.then(null, err =>
             // Catching errors by the error.name property. Makes sense for indexedDB where error type
             // is always DOMError but where e.name tells the actual error type.
             // Sample: promise.catch('ConstraintError', function (e) { ... });
-            if (e && e.name === type) return callback(e); else return PromiseReject(e);
-        });
+            err && err.name === type ? handler(err) : PromiseReject(err));
     },
 
     finally: function (onFinally) {
-        return this.then(function (value) {
+        return this.then(value => {
             onFinally();
             return value;
-        }, function (err) {
+        }, err => {
             onFinally();
             return PromiseReject(err);
         });
     },
-        
+    
+    // Deprecate in next major. Needed only for db.on.error.
     uncaught: function (uncaughtHandler) {
         // Be backward compatible and use "onuncatched" as the event name on this.
         // Handle multiple subscribers through reverseStoppableEventChain(). If a handler returns `false`, bubbling stops.
@@ -213,9 +218,7 @@ props(Promise.prototype, {
         }
         return this;
     },
-    
-    //pending: {get: function () {return this._state === null;}},
-    
+        
     stack: {
         get: function() {
             if (this._stack) return this._stack;
@@ -240,33 +243,17 @@ function Listener(onFulfilled, onRejected, resolve, reject) {
     this.psd = PSD;
 }
 
+// Promise Static Properties
 props (Promise, {
     all: function () {
-        var args = slice(arguments.length === 1 && isArray(arguments[0]) ? arguments[0] : arguments);
-
+        var values = getArrayOf.apply(null, arguments); // Supports iterables, implicit arguments and array-like.
         return new Promise(function (resolve, reject) {
-            if (args.length === 0) return resolve([]);
-            var remaining = args.length;
-            function res(i, val) {
-                try {
-                    if (val && (typeof val === 'object' || typeof val === 'function')) {
-                        var then = val.then;
-                        if (typeof then === 'function') {
-                            then.call(val, function (val) { res(i, val); }, reject);
-                            return;
-                        }
-                    }
-                    args[i] = val;
-                    if (--remaining === 0) {
-                        resolve(args);
-                    }
-                } catch (ex) {
-                    reject(ex);
-                }
-            }
-            for (var i = 0; i < args.length; i++) {
-                res(i, args[i]);
-            }
+            if (values.length === 0) resolve([]);
+            var remaining = values.length;
+            values.forEach((a,i) => Promise.resolve(a).then(x => {
+                values[i] = x;
+                if (!--remaining) resolve(values);
+            }, reject));
         });
     },
     
@@ -277,9 +264,12 @@ props (Promise, {
     
     reject: PromiseReject,
     
-    race: values => new Promise((resolve, reject) => {
-        values.map(value => Promise.resolve(value).then(resolve, reject));
-    }),
+    race: function () {
+        var values = getArrayOf.apply(null, arguments);
+        return new Promise((resolve, reject) => {
+            values.map(value => Promise.resolve(value).then(resolve, reject));
+        });
+    },
     
     PSD: {
         get: ()=>PSD,
@@ -312,25 +302,18 @@ props (Promise, {
                     // will trigger directly through psd.onunhandled
                     run_at_end_of_this_or_next_physical_tick(()=>{
                         this.unhandleds.length === 0 ? resolve() : reject(this.unhandleds[0]);
-                    }, this.macroScheduler);
+                    });
                 }, psd.finalize);
                 fn();
             }, resolve, reject);
         });
     },
 
-    // TODO: Remove:
-    _rootExec: _rootExec,
-    
     on: Events(null, {"error": [
         reverseStoppableEventChain,
         defaultErrorHandler] // Default to defaultErrorHandler
-    }),
+    })
     
-    // TODO: Remove!
-    _isRootExec: {get: ()=> isOutsideMicroTick}
-    
-    //debug: {get: ()=>debug.de, set: val => debug = val},
 });
 
 /**
@@ -347,22 +330,19 @@ function executePromiseTask (promise, fn) {
             if (promise._state !== null) return;
             if (value === promise) throw new TypeError('A promise cannot be resolved with itself.');
             var shouldExecuteTick = promise._lib && beginMicroTickScope();
-            if (value && (typeof value === 'object' || typeof value === 'function')) {
-                if (typeof value.then === 'function') {
-                    executePromiseTask(promise, (resolve, reject) => {
-                        value instanceof Promise ?
-                            value._then(resolve, reject) :
-                            value.then(resolve, reject);
-                    });
-                    if (shouldExecuteTick) endMicroTickScope();
-                    return;
-                }
+            if (value && typeof value.then === 'function') {
+                executePromiseTask(promise, (resolve, reject) => {
+                    value instanceof Promise ?
+                        value._then(resolve, reject) :
+                        value.then(resolve, reject);
+                });
+            } else {
+                promise._state = true;
+                promise._value = value;
+                propagateAllListeners(promise);
             }
-            promise._state = true;
-            promise._value = value;
-            propagateAllListeners(promise);
             if (shouldExecuteTick) endMicroTickScope();
-        }, handleRejection.bind(null, promise)); // If Function.bind is not supported. Exception is thrown here
+        }, handleRejection.bind(null, promise)); // If Function.bind is not supported. Exception is handled in catch below
     } catch (ex) {
         handleRejection(promise, ex);
     }
@@ -411,10 +391,10 @@ function propagateAllListeners (promise) {
         ++numScheduledCalls;
         asap(()=>{
             if (--numScheduledCalls === 0) finalizePhysicalTick(); // Will detect unhandled errors
-        }, [], psd.macroScheduler);
+        }, []);
     }
 }
-    
+
 function propagateToListener(promise, listener) {
     if (promise._state === null) {
         promise._listeners.push(listener);
@@ -429,7 +409,7 @@ function propagateToListener(promise, listener) {
     var psd = listener.psd;
     ++psd.ref;
     ++numScheduledCalls;
-    asap (callListener, [cb, promise, listener], psd.macroScheduler);
+    asap (callListener, [cb, promise, listener]);
 }
 
 function callListener (cb, promise, listener) {
@@ -437,13 +417,13 @@ function callListener (cb, promise, listener) {
     var psd = listener.psd;
     try {
         if (psd !== outerScope) {
-            outerScope.env = wrappers.snapshot(); // Snapshot outerScope's environment.
+            // **KEEP** outerScope.env = wrappers.snapshot(); // Snapshot outerScope's environment.
             PSD = psd;
-            wrappers.restore(psd.env); // Restore PSD's environment.
+            // **KEEP** wrappers.restore(psd.env); // Restore PSD's environment.
         }
         
         // Set static variable currentFulfiller to the promise that is being fullfilled,
-        // so that we connect the chain of promises.
+        // so that we connect the chain of promises (for long stacks support)
         currentFulfiller = promise;
         
         // Call callback and resolve our listener with it's return value.
@@ -457,15 +437,6 @@ function callListener (cb, promise, listener) {
             if (rejectingErrors.indexOf(value) === -1)
                 markErrorAsHandled(promise); // Callback didnt do Promise.reject(err) nor reject(err) onto another promise.
         }
-        /*var ret = cb(promise._value);
-        if (!promise._state && (                // This was a rejection and any of the following are true:
-                !ret ||                         // ...handler didn't return something that could be a Promise
-                !(ret instanceof Promise) ||    // ...handler didnt return a Promise
-                ret._state !== false ||         // ...handler returned promise that didnt fail (yet at least)
-                ret._value !== promise._value)) // ...handler didn't return a promise with same error as the one being rejected
-            markErrorAsHandled (promise);       // If all above criterias are true, mark error as handled.
-                                                // What I want to say is: If `Promise.reject(promise._value)` was returned - don't mark it as handled!
-        */
         listener.resolve(ret);
     } catch (e) {
         // Exception thrown in callback. Reject our listener.
@@ -474,7 +445,7 @@ function callListener (cb, promise, listener) {
         // Restore PSD, env and currentFulfiller.
         if (psd !== outerScope) {
             PSD = outerScope;
-            wrappers.restore(outerScope.env); // Restore outerScope's environment
+            // **KEEP** wrappers.restore(outerScope.env); // Restore outerScope's environment
         }
         currentFulfiller = null;
         if (--numScheduledCalls === 0) finalizePhysicalTick();
@@ -518,7 +489,7 @@ function linkToPreviousPromise(promise, prev) {
 }
 
 /* The callback to schedule with setImmediate() or setTimeout().
-   It runs a virtual microtick and executes any callback registered in deferredCallbacks.
+   It runs a virtual microtick and executes any callback registered in microtickQueue.
  */
 function physicalTick() {
     beginMicroTickScope() && endMicroTickScope();
@@ -531,19 +502,27 @@ function beginMicroTickScope() {
     return wasRootExec;
 }
 
+/* Executes micro-ticks without doing try..catch.
+   This can be possible because we only use this internally and
+   the registered functions are exception-safe (they do try..catch
+   internally before calling any external method). If registering
+   functions in the microtickQueue that are not exception-safe, this
+   would destroy the framework and make it instable. So we don't export
+   our asap method.
+*/
 function endMicroTickScope() {
     var callbacks, i, l;
     do {
-        while (deferredCallbacks.length > 0) {
-            callbacks = deferredCallbacks;
-            deferredCallbacks = [];
+        while (microtickQueue.length > 0) {
+            callbacks = microtickQueue;
+            microtickQueue = [];
             l = callbacks.length;
             for (i = 0; i < l; ++i) {
                 var item = callbacks[i];
                 item[0].apply(null, item[1]);
             }
         }
-    } while (deferredCallbacks.length > 0);
+    } while (microtickQueue.length > 0);
     isOutsideMicroTick = true;
     needsNewPhysicalTick = true;
 }
@@ -559,7 +538,7 @@ function finalizePhysicalTick() {
     while (i) finalizers[--i]();    
 }
 
-function run_at_end_of_this_or_next_physical_tick (fn, macroScheduler) {
+function run_at_end_of_this_or_next_physical_tick (fn) {
     function finalizer() {
         fn();
         tickFinalizers.splice(tickFinalizers.indexOf(finalizer), 1);
@@ -568,17 +547,7 @@ function run_at_end_of_this_or_next_physical_tick (fn, macroScheduler) {
     ++numScheduledCalls;
     asap(()=>{
         if (--numScheduledCalls === 0) finalizePhysicalTick();
-    }, [], macroScheduler);
-}
-
-// TODO: Remove!
-function _rootExec(fn) {
-    var isRootExec = beginMicroTickScope();
-    try {
-        return fn();
-    } finally {
-        if (isRootExec) endMicroTickScope();
-    }
+    }, []);
 }
 
 function addPossiblyUnhandledError(promise) {
@@ -619,9 +588,9 @@ export function wrap (fn, errorCatcher) {
 
         try {
             if (outerScope !== psd) {
-                outerScope.env = wrappers.snapshot(); // Snapshot outerScope's environment
+                // **KEEP** outerScope.env = wrappers.snapshot(); // Snapshot outerScope's environment
                 PSD = psd;
-                wrappers.restore(psd.env); // Restore PSD's environment.
+                // **KEEP** wrappers.restore(psd.env); // Restore PSD's environment.
             }
             return fn.apply(this, arguments);
         } catch (e) {
@@ -629,7 +598,7 @@ export function wrap (fn, errorCatcher) {
         } finally {
             if (outerScope !== psd) {
                 PSD = outerScope;
-                wrappers.restore(outerScope.env); // Restore outerScope's environment
+                // **KEEP** wrappers.restore(outerScope.env); // Restore outerScope's environment
             }
             if (wasRootExec) endMicroTickScope();
         }
@@ -642,7 +611,8 @@ export function newScope (fn, a1, a2, a3) {
     psd.parent = parent;
     psd.ref = 0;
     psd.global = false;
-    psd.env = wrappers.wrap(psd);
+    // **KEEP** psd.env = wrappers.wrap(psd);
+    
     // unhandleds and onunhandled should not be specifically set here.
     // Leave them on parent prototype.
     // unhandleds.push(err) will push to parent's prototype
@@ -660,15 +630,15 @@ export function usePSD (psd, fn, a1, a2, a3) {
     var outerScope = PSD;
     try {
         if (psd !== outerScope) {
-            outerScope.env = wrappers.snapshot(); // snapshot outerScope's environment.
+            // **KEEP** outerScope.env = wrappers.snapshot(); // snapshot outerScope's environment.
             PSD = psd;
-            wrappers.restore(psd.env); // Restore PSD's environment.
+            // **KEEP** wrappers.restore(psd.env); // Restore PSD's environment.
         }
         return fn(a1, a2, a3);
     } finally {
         if (psd !== outerScope) {
             PSD = outerScope;
-            wrappers.restore(outerScope.env); // Restore outerScope's environment.
+            // **KEEP** wrappers.restore(outerScope.env); // Restore outerScope's environment.
         }
     }
 }
@@ -683,7 +653,7 @@ function globalError(err, promise) {
     } catch (e) {}
 }
 
-/*
+/* **KEEP** 
 
 export function wrapPromise(PromiseClass) {
     var proto = PromiseClass.prototype;

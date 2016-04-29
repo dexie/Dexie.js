@@ -27,6 +27,10 @@ export function extend(obj, extension) {
 }
 
 export const getProto = Object.getPrototypeOf;
+export const _hasOwn = {}.hasOwnProperty;
+export function hasOwn(obj, prop) {
+    return _hasOwn.call(obj, prop);
+}
 
 export function props (proto, extension) {
     if (typeof extension === 'function') extension = extension(getProto(proto));
@@ -113,7 +117,7 @@ export function rejection (err, uncaughtHandler) {
 
 export function getByKeyPath(obj, keyPath) {
     // http://www.w3.org/TR/IndexedDB/#steps-for-extracting-a-key-from-a-value-using-a-key-path
-    if (obj.hasOwnProperty(keyPath)) return obj[keyPath]; // This line is moved from last to first for optimization purpose.
+    if (hasOwn(obj, keyPath)) return obj[keyPath]; // This line is moved from last to first for optimization purpose.
     if (!keyPath) return obj;
     if (typeof keyPath !== 'string') {
         var rv = [];
@@ -169,7 +173,7 @@ export function delByKeyPath(obj, keyPath) {
 export function shallowClone(obj) {
     var rv = {};
     for (var m in obj) {
-        if (obj.hasOwnProperty(m)) rv[m] = obj[m];
+        if (hasOwn(obj, m)) rv[m] = obj[m];
     }
     return rv;
 }
@@ -188,7 +192,7 @@ export function deepClone(any) {
     } else {
         rv = any.constructor ? Object.create(any.constructor.prototype) : {};
         for (var prop in any) {
-            if (any.hasOwnProperty(prop)) {
+            if (hasOwn(any, prop)) {
                 rv[prop] = deepClone(any[prop]);
             }
         }
@@ -200,8 +204,8 @@ export function getObjectDiff(a, b, rv, prfx) {
     // Compares objects a and b and produces a diff object.
     rv = rv || {};
     prfx = prfx || '';
-    for (var prop in a) if (a.hasOwnProperty(prop)) {
-        if (!b.hasOwnProperty(prop))
+    for (var prop in a) if (hasOwn(a, prop)) {
+        if (!hasOwn(b, prop))
             rv[prfx+prop] = undefined; // Property removed
         else {
             var ap = a[prop],
@@ -212,7 +216,7 @@ export function getObjectDiff(a, b, rv, prfx) {
                 rv[prfx + prop] = b[prop];// Primitive value changed
         }
     }
-    for (prop in b) if (b.hasOwnProperty(prop) && !a.hasOwnProperty(prop)) {
+    for (prop in b) if (hasOwn(b, prop) && !hasOwn(a, prop)) {
         rv[prfx+prop] = b[prop]; // Property added
     }
     return rv;
@@ -224,4 +228,50 @@ export function idbp(idbOperation) {
         req.onerror = reject;
         req.onsuccess = resolve;
     });
+}
+
+// If first argument is iterable or array-like, return it as an array
+export const iteratorSymbol = typeof Symbol !== 'undefined' && Symbol.iterator;
+export const getIteratorOf = iteratorSymbol ? function(x) {
+    var i;
+    return x != null && (i = x[iteratorSymbol]) && i.apply(x);
+} : function () { return null; };
+
+export const NO_CHAR_ARRAY = {};
+// Takes one or several arguments and returns an array based on the following criteras:
+// * If several arguments provided, return arguments converted to an array in a way that
+//   still allows javascript engine to optimize the code.
+// * If single argument is an array, return a clone of it.
+// * If this-pointer equals NO_CHAR_ARRAY, don't accept strings as valid iterables as a special
+//   case to the two bullets below.
+// * If single argument is an iterable, convert it to an array and return the resulting array.
+// * If single argument is array-like (has length of type number), convert it to an array.
+export function getArrayOf (arrayLike) {
+    var i, a, x, it;
+    if (arguments.length === 1) {
+        if (isArray(arrayLike)) return arrayLike.slice();
+        if (this === NO_CHAR_ARRAY && typeof arrayLike === 'string') return [arrayLike];
+        if ((it = getIteratorOf(arrayLike))) {
+            a = [];
+            while ((x = it.next()), !x.done) a.push(x.value);
+            return a;
+        }
+        if (arrayLike == null) return [arrayLike];
+        i = arrayLike.length;
+        if (typeof i === 'number') {
+            a = new Array(i);
+            while (i--) a[i] = arrayLike[i];
+            return a;
+        }
+        return [arrayLike];
+    }
+    i = arguments.length;
+    a = new Array(i);
+    while (i--) a[i] = arguments[i];
+    return a;
+}
+
+const concat = [].concat;
+export function flatten (a) {
+    return concat.apply([], a);
 }

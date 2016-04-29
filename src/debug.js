@@ -9,7 +9,7 @@ export function setDebug(value, filter) {
     libraryFilter = filter;
 }
 
-export var libraryFilter = ()=>true;
+export var libraryFilter = () => true;
 
 export const NEEDS_THROW_FOR_STACK = !new Error("").stack;
 
@@ -19,13 +19,13 @@ export function getErrorWithStack() {
         // Doing something naughty in strict mode here to trigger a specific error
         // that can be explicitely ignored in debugger's exception settings.
         // If we'd just throw new Error() here, IE's debugger's exception settings
-        // wouldn't let us explicitely ignore those errors.
+        // will just consider it as "exception thrown by javascript code" which is
+        // something you wouldn't want it to ignore.
         getErrorWithStack.arguments;
     } catch(e) {
         return e;
-    } else {
-        return new Error();
     }
+    return new Error();
 }
 
 export function prettyStack(exception, numIgnoredFrames) {

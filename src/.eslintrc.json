@@ -17,6 +17,7 @@
     "IDBKeyRange": false,
     "setTimeout": false,
     "clearTimeout": false,
+    "Symbol": false,
     "setImmediate": false,
     "console": false,
     "self": false,

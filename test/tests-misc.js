@@ -15,7 +15,7 @@ module("misc", {
     setup: () => {
         stop();
         resetDatabase(db).catch(e => {
-            ok(false, "Error resetting database: " + e);
+            ok(false, "Error resetting database: " + e.stack);
         }).finally(start);
     },
     teardown: () => {

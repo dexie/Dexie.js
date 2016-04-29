@@ -18,7 +18,7 @@ module("exception-handling", {
     setup: function () {
         stop();
         resetDatabase(db).catch(function (e) {
-            ok(false, "Error resetting database: " + e);
+            ok(false, "Error resetting database: " + e.stack);
         }).finally(start);
     },
     teardown: function () {
@@ -236,7 +236,7 @@ asyncTest("exception in on('populate')", function () {
     });
     db.open().catch(function (err) {
         // Got error
-        ok(err.toString().indexOf("Oops. Failing in upgrade function") != -1, "Got error: " + err);
+        ok(err.toString().indexOf("Oops. Failing in upgrade function") != -1, "Got error: " + err.stack);
         // Create 3rd instance of db that will only read from the existing DB.
         // What we want to check here is that the DB is there but is still
         // only on version 1.
@@ -244,8 +244,8 @@ asyncTest("exception in on('populate')", function () {
         return db.open();
     }).then(function () {
         ok(false, "The database should not have been created");
-    }).catch(function (err) {
-        ok(err.toString().indexOf("doesnt exist") != -1, "The database doesnt exist");
+    }).catch(err => {
+        ok(err instanceof Dexie.NoSuchDatabaseError, "The database doesnt exist");
     }).finally(function () {
         db.delete().then(start);
     });

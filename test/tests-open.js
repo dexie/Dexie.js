@@ -434,3 +434,19 @@ asyncTest("db.close", ()=> {
         db.delete().catch(e=>console.error(e)).finally(start);
     });
 });
+
+spawnedTest("db.open several times", 2, function*(){
+    let db = new Dexie("TestDB");
+    db.version(1).stores({foo: "id"});
+    db.on('populate', ()=>{throw "Failed in populate";});
+    db.open().then(()=>{
+        ok(false, "Should not succeed to open");
+    }).catch(err =>{
+        ok(true, "Got error: " + (err.stack || err));
+    });
+    yield db.open().then(()=>{
+        ok(false, "Should not succeed to open");
+    }).catch(err =>{
+        ok(true, "Got error: " + (err.stack || err));
+    });
+});

@@ -252,7 +252,7 @@ module("crud-hooks", {
     setup: function () {
         stop();
         resetDatabase(db).then(()=>reset()).catch(e => {
-            ok(false, "Error resetting database: " + e);
+            ok(false, "Error resetting database: " + e.stack);
         }).finally(start);
     },
     teardown: function () {

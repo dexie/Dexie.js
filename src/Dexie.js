@@ -32,7 +32,11 @@ import {
     shallowClone,
     deepClone,
     getObjectDiff,
-    assert
+    assert,
+    NO_CHAR_ARRAY,
+    getArrayOf,
+    hasOwn,
+    flatten
 
 } from './utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
@@ -228,7 +232,8 @@ export default function Dexie(dbName, options) {
     function runUpgraders (oldVersion, idbtrans, reject) {
         var trans = db._createTransaction(READWRITE, dbStoreNames, globalSchema);
         trans.create(idbtrans);
-        trans.on('error').subscribe(reject);
+        trans._completion.catch(reject);
+        var rejectTransaction = trans._reject.bind(trans);
         newScope(function () {
             PSD.trans = trans;
             if (oldVersion === 0) {
@@ -236,9 +241,9 @@ export default function Dexie(dbName, options) {
                 keys(globalSchema).forEach(function (tableName) {
                     createTable(idbtrans, tableName, globalSchema[tableName].primKey, globalSchema[tableName].indexes);
                 });
-                Promise.follow(()=>db.on.populate.fire(trans)).catch(reject);
+                Promise.follow(()=>db.on.populate.fire(trans)).catch(rejectTransaction);
             } else
-                updateTablesAndIndexes(oldVersion, trans, idbtrans).catch(reject);
+                updateTablesAndIndexes(oldVersion, trans, idbtrans).catch(rejectTransaction);
         });
     }
 
@@ -477,7 +482,10 @@ export default function Dexie(dbName, options) {
     this.verno = 0;
 
     this.open = function () {
-        if (isBeingOpened || idbdb) return dbReadyPromise;
+        if (isBeingOpened || idbdb)
+            return dbReadyPromise.then(()=> dbOpenError ? rejection(dbOpenError, dbUncaught) : db);
+        //if (Debug.debug) console.log("Calling open(): " + Debug.prettyStack(Debug.getErrorWithStack()));
+        Debug.debug && (openCanceller._stackHolder = Debug.getErrorWithStack()); // Let stacks point to when open() was called rather than where new Dexie() was called.
         isBeingOpened = true;
         dbOpenError = null;
         openComplete = false;
@@ -501,7 +509,7 @@ export default function Dexie(dbName, options) {
             // If no API, throw!
             if (!indexedDB) throw new exceptions.MissingAPI(
                 "indexedDB API not found. If using IE10+, make sure to run your code on a server URL "+
-                "(not locally). If using Safari, make sure to include indexedDB polyfill.");
+                "(not locally). If using old Safari versions, make sure to include indexedDB polyfill.");
             
             var req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
             if (!req) throw new exceptions.MissingAPI("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
@@ -566,18 +574,19 @@ export default function Dexie(dbName, options) {
             return Dexie.vip(db.on.ready.fire);
         }).then(()=>{
             // Resolve the db.open() with the db instance.
+            isBeingOpened = false;
             return db;
         }).catch(err => {
             try {
                 // Did we fail within onupgradeneeded? Make sure to abort the upgrade transaction so it doesnt commit.
                 upgradeTransaction && upgradeTransaction.abort();
             } catch (e) { }
+            isBeingOpened = false; // Set before calling db.close() so that it doesnt reject openCanceller again (leads to unhandled rejection event).
             db.close(); // Closes and resets idbdb, removes connections, resets dbReadyPromise and openCanceller so that a later db.open() is fresh.
             // A call to db.close() may have made on-ready subscribers fail. Use dbOpenError if set, since err could be a follow-up error on that.
             dbOpenError = err; // Record the error. It will be used to reject further promises of db operations.
             return rejection(dbOpenError, dbUncaught); // dbUncaught will make sure any error that happened in any operation before will now bubble to db.on.error() thanks to the special handling in Promise.uncaught().
         }).finally(()=>{
-            isBeingOpened = false;
             openComplete = true;
             resolveDbReady(); // dbReadyPromise is resolved no matter if open() rejects or resolved. It's just to wake up waiters.
         });
@@ -688,27 +697,29 @@ export default function Dexie(dbName, options) {
         /// <param name="scopeFunc" type="Function">Function to execute with transaction</param>
 
         // Let table arguments be all arguments between mode and last argument.
-        tableInstances = slice(arguments, 1, arguments.length - 1);
-        // Let scopeFunc be the last argument
-        scopeFunc = arguments[arguments.length - 1];
+        var i = arguments.length;
+        if (i < 2) throw new exceptions.InvalidArgument("Too few arguments");
+        // Prevent optimzation killer (https://github.com/petkaantonov/bluebird/wiki/Optimization-killers#32-leaking-arguments)
+        // and clone arguments except the first one into local var 'args'.
+        var args = new Array(i - 1);
+        while (--i) args[i-1] = arguments[i];
+        // Let scopeFunc be the last argument and pop it so that args now only contain the table arguments.
+        scopeFunc = args.pop();
+        var tables = flatten(args); // Support using array as middle argument, or a mix of arrays and non-arrays.
         var parentTransaction = PSD.trans;
         // Check if parent transactions is bound to this db instance, and if caller wants to reuse it
         if (!parentTransaction || parentTransaction.db !== db || mode.indexOf('!') !== -1) parentTransaction = null;
         var onlyIfCompatible = mode.indexOf('?') !== -1;
-        mode = mode.replace('!', '').replace('?', '');
+        mode = mode.replace('!', '').replace('?', ''); // Ok. Will change arguments[0] as well but we wont touch arguments henceforth.
         
         try {
             //
             // Get storeNames from arguments. Either through given table instances, or through given table names.
             //
-            var tables = isArray(tableInstances[0]) ? tableInstances.reduce(function (a, b) { return a.concat(b); }) : tableInstances;
-            var storeNames = tables.map(function (tableInstance) {
-                if (typeof tableInstance === "string") {
-                    return tableInstance;
-                } else {
-                    if (!(tableInstance instanceof Table)) throw new TypeError("Invalid table argument to Dexie.transaction(). Only Table or String are allowed");
-                    return tableInstance.name;
-                }
+            var storeNames = tables.map(table => {
+                var storeName = table instanceof Table ? table.name : table;
+                if (typeof storeName !== 'string') throw new TypeError("Invalid table argument to Dexie.transaction(). Only Table or String are allowed");
+                return storeName;
             });
 
             //
@@ -732,7 +743,7 @@ export default function Dexie(dbName, options) {
                 }
                 if (parentTransaction) {
                     storeNames.forEach(function (storeName) {
-                        if (!parentTransaction.tables.hasOwnProperty(storeName)) {
+                        if (!hasOwn(parentTransaction.tables, storeName)) {
                             if (onlyIfCompatible) {
                                 // Spawn new transaction instead.
                                 parentTransaction = null; 
@@ -782,9 +793,9 @@ export default function Dexie(dbName, options) {
                     returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
                     if (returnValue) {
                         if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
-                            // scopeFunc returned an iterable. Handle yield as await.
-                            returnValue = awaitIterable(returnValue);
-                        } else if (typeof returnValue.then === 'function' && (!returnValue.hasOwnProperty('_PSD'))) {
+                            // scopeFunc returned an iterator with throw-support. Handle yield as await.
+                            returnValue = awaitIterator(returnValue);
+                        } else if (typeof returnValue.then === 'function' && !hasOwn(returnValue, '_PSD')) {
                             throw new exceptions.IncompatiblePromise("Incompatible Promise returned from transaction scope (read more at http://tinyurl.com/znyqjqc). Transaction scope: " + scopeFunc.toString());
                         }
                     }
@@ -806,7 +817,7 @@ export default function Dexie(dbName, options) {
     this.table = function (tableName) {
         /// <returns type="WriteableTable"></returns>
         if (fake && autoSchema) return new WriteableTable(tableName);
-        if (!allTables.hasOwnProperty(tableName)) { throw new exceptions.InvalidTable(`Table ${tableName} does not exist`); }
+        if (!hasOwn(allTables, tableName)) { throw new exceptions.InvalidTable(`Table ${tableName} does not exist`); }
         return allTables[tableName];
     };
 
@@ -923,7 +934,7 @@ export default function Dexie(dbName, options) {
                     // Create a new object that derives from constructor:
                     var res = Object.create(constructor.prototype);
                     // Clone members:
-                    for (var m in obj) if (obj.hasOwnProperty(m)) res[m] = obj[m];
+                    for (var m in obj) if (hasOwn(obj, m)) res[m] = obj[m];
                     return res;
                 };
 
@@ -1349,7 +1360,7 @@ export default function Dexie(dbName, options) {
         this.mode = mode;
         this.storeNames = storeNames;
         this.idbtrans = null;
-        this.on = Events(this, ["complete", "error"], "abort");
+        this.on = Events(this, "complete", "error", "abort");
         this.parent = parent || null;
         this.active = true;
         this.tables = Object.create(notInTransFallbackTables); // ...so that all non-included tables exists as instances (possible to call table.name for example) but will fail as soon as trying to execute a query on it.
@@ -1373,6 +1384,7 @@ export default function Dexie(dbName, options) {
                 this.parent ?
                     this.parent._reject(e) :
                     this.active && this.idbtrans && this.idbtrans.abort();
+                this.active = false;
                 return rejection(e); // Indicate we actually DO NOT catch this error.
             });
 
@@ -1440,7 +1452,7 @@ export default function Dexie(dbName, options) {
                         throw new exceptions.DatabaseClosed(dbOpenError);
                     case "MissingAPIError":
                         // Errors where it is no difference whether it was caused by the user operation or an earlier call to db.open()
-                        throw new exceptions.MissingAPI(dbOpenError);
+                        throw new exceptions.MissingAPI(dbOpenError.message, dbOpenError);
                     default:
                         // Make it clear that the user operation was not what caused the error - the error had occurred earlier on db.open()!
                         throw new exceptions.OpenFailed(dbOpenError);
@@ -1456,8 +1468,8 @@ export default function Dexie(dbName, options) {
             });
             idbtrans.onabort = wrap(ev => {
                 preventDefault(ev);
+                this.active && this._reject(new exceptions.Abort());
                 this.active = false;
-                this._reject(new exceptions.Abort());
                 this.on("abort").fire(ev);
             });
             idbtrans.oncomplete = wrap(() => {
@@ -1504,10 +1516,11 @@ export default function Dexie(dbName, options) {
             return this.on("error", cb);
         },
         abort: function () {
-            this._reject(new exceptions.Abort());
+            this.active && this._reject(new exceptions.Abort());
+            this.active = false;
         },
         table: function (name) {
-            if (!this.tables.hasOwnProperty(name)) { throw new exceptions.InvalidTable("Table " + name + " not in transaction"); }
+            if (!hasOwn(this.tables, name)) { throw new exceptions.InvalidTable("Table " + name + " not in transaction"); }
             return this.tables[name];
         }
     });
@@ -1546,10 +1559,6 @@ export default function Dexie(dbName, options) {
 
         function emptyCollection(whereClause) {
             return new whereClause._ctx.collClass(whereClause, function() { return IDBKeyRange.only(""); }).limit(0);
-        }
-
-        function getSetArgs(args) {
-            return slice(args.length === 1 && isArray(args[0]) ? args[0] : args);
         }
 
         function upperFactory(dir) {
@@ -1693,7 +1702,7 @@ export default function Dexie(dbName, options) {
                 return addIgnoreCaseAlgorithm(this, function (x, a) { return x === a[0]; }, [str], "");
             },
             anyOfIgnoreCase: function () {
-                var set = getSetArgs(arguments);
+                var set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
                 if (set.length === 0) return emptyCollection(this);
                 if (!set.every(function (s) { return typeof s === 'string'; })) {
                     return fail(this, "anyOfIgnoreCase() only works with strings");
@@ -1701,7 +1710,7 @@ export default function Dexie(dbName, options) {
                 return addIgnoreCaseAlgorithm(this, function (x, a) { return a.indexOf(x) !== -1; }, set, "");
             },
             startsWithAnyOfIgnoreCase: function () {
-                var set = getSetArgs(arguments);
+                var set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
                 if (set.length === 0) return emptyCollection(this);
                 if (!set.every(function (s) { return typeof s === 'string'; })) {
                     return fail(this, "startsWithAnyOfIgnoreCase() only works with strings");
@@ -1712,7 +1721,7 @@ export default function Dexie(dbName, options) {
                     });}, set, maxString);
             },
             anyOf: function () {
-                var set = getSetArgs(arguments);
+                var set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
                 var compare = ascending;
                 try { set.sort(compare); } catch(e) { return fail(this, INVALID_KEY_ARGUMENT); }
                 if (set.length === 0) return emptyCollection(this);
@@ -1751,7 +1760,7 @@ export default function Dexie(dbName, options) {
             },
 
             noneOf: function() {
-                var set = getSetArgs(arguments);
+                var set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
                 if (set.length === 0) return new this._ctx.collClass(this); // Return entire collection.
                 try { set.sort(ascending); } catch(e) { return fail(this, INVALID_KEY_ARGUMENT);}
                 // Transform ["a","b","c"] to a set of ranges for between/above/below: [[-Infinity,"a"], ["a","b"], ["b","c"], ["c",maxKey]]
@@ -1863,7 +1872,7 @@ export default function Dexie(dbName, options) {
                 return c;
             },
             startsWithAnyOf: function () {
-                var set = getSetArgs(arguments);
+                var set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
 
                 if (!set.every(function (s) { return typeof s === 'string'; })) {
                     return fail(this, "startsWithAnyOf() only works with strings");
@@ -1971,7 +1980,7 @@ export default function Dexie(dbName, options) {
                     function union(item, cursor, advance) {
                         if (!filter || filter(cursor, advance, resolveboth, reject)) {
                             var key = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
-                            if (!set.hasOwnProperty(key)) {
+                            if (!hasOwn(set, key)) {
                                 set[key] = true;
                                 fn(item, cursor, advance);
                             }
@@ -2233,7 +2242,7 @@ export default function Dexie(dbName, options) {
                 var set = {};
                 addFilter(this._ctx, function (cursor) {
                     var strKey = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
-                    var found = set.hasOwnProperty(strKey);
+                    var found = hasOwn(set, strKey);
                     set[strKey] = true;
                     return !found;
                 });
@@ -2280,7 +2289,7 @@ export default function Dexie(dbName, options) {
                         modifyer = function (item) {
                             var origItem = deepClone(item); // Clone the item first so we can compare laters.
                             if (changes.call(this, item, this) === false) return false; // Call the real modifyer function (If it returns false explicitely, it means it dont want to modify anyting on this object)
-                            if (!this.hasOwnProperty("value")) {
+                            if (!hasOwn(this, "value")) {
                                 // The real modifyer function requests a deletion of the object. Inform the deletingHook that a deletion is taking place.
                                 deletingHook.call(this, this.primKey, item, trans);
                             } else {
@@ -2357,7 +2366,7 @@ export default function Dexie(dbName, options) {
                     }
 
                     if (modifyer.call(thisContext, item, thisContext) !== false) { // If a callback explicitely returns false, do not perform the update!
-                        var bDelete = !thisContext.hasOwnProperty("value");
+                        var bDelete = !hasOwn(thisContext, "value");
                         ++count;
                         tryCatch(function () {
                             var req = (bDelete ? cursor.delete() : cursor.update(thisContext.value));
@@ -2784,9 +2793,9 @@ function globalDatabaseList(cb) {
     }
 }
 
-function awaitIterable (iterable) {
-    var callNext = result => iterable.next(result),
-        doThrow = error => iterable.throw(error),
+function awaitIterator (iterator) {
+    var callNext = result => iterator.next(result),
+        doThrow = error => iterator.throw(error),
         onSuccess = step(callNext),
         onError = step(doThrow);
 
@@ -2797,17 +2806,9 @@ function awaitIterable (iterable) {
 
             return next.done ? value :
                 (!value || typeof value.then !== 'function' ?
-                    Array.isArray(value) ? awaitAll(value, 0) : onSuccess(value) :
+                    isArray(value) ? Promise.all(value).then(onSuccess, onError) : onSuccess(value) :
                     value.then(onSuccess, onError));
         };
-    }
-
-    function awaitAll (values, i) {
-        if (i === values.length) return onSuccess(values);
-        var value = values[i];
-        return value.constructor && typeof value.constructor.all == 'function' ?
-            value.constructor.all(values).then(onSuccess, onError) :
-            awaitAll (values, i + 1);
     }
 
     return step(callNext)();
@@ -2962,7 +2963,7 @@ Dexie.vip = function (fn) {
 Dexie.async = function (generatorFn) {
     return function () {
         try {
-            var rv = awaitIterable(generatorFn.apply(this, arguments));
+            var rv = awaitIterator(generatorFn.apply(this, arguments));
             if (!rv || typeof rv.then !== 'function')
                 return Promise.resolve(rv);
             return rv;
@@ -2974,7 +2975,7 @@ Dexie.async = function (generatorFn) {
 
 Dexie.spawn = function (generatorFn, args, thiz) {
     try {
-        var rv = awaitIterable(generatorFn.apply(thiz, args || []));
+        var rv = awaitIterator(generatorFn.apply(thiz, args || []));
         if (!rv || typeof rv.then !== 'function')
             return Promise.resolve(rv);
         return rv;
