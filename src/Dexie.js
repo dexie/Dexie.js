@@ -842,124 +842,112 @@ export default function Dexie(dbName, options) {
         this._collClass = collClass || Collection;
     }
 
-    props(Table.prototype, function () {
-        function failReadonly() {
-            // It's ok to throw here because this can only happen within a transaction,
-            // and will always be caught by the transaction scope and returned as a
-            // failed promise.
-            throw new exceptions.ReadOnly("Current Transaction is READONLY");
-        }
-        return {
-            //
-            // Table Protected Methods
-            //
+    props(Table.prototype, {
 
-            _trans: function getTransaction(mode, fn, writeLocked) {
-                return this._tpf(mode, [this.name], fn, writeLocked);
-            },
-            _idbstore: function getIDBObjectStore(mode, fn, writeLocked) {
-                if (fake) return new Promise(fn); // Simplify the work for Intellisense/Code completion.
-                var self = this;
-                return this._tpf(mode, [this.name], function (resolve, reject, trans) {
-                    fn(resolve, reject, trans.idbtrans.objectStore(self.name), trans);
-                }, writeLocked);
-            },
+        //
+        // Table Protected Methods
+        //
 
-            //
-            // Table Public Methods
-            //
-            get: function (key, cb) {
-                var self = this;
-                return this._idbstore(READONLY, function (resolve, reject, idbstore) {
-                    fake && resolve(self.schema.instanceTemplate);
-                    var req = idbstore.get(key);
-                    req.onerror = eventRejectHandler(reject);
-                    req.onsuccess = function () {
-                        resolve(self.hook.reading.fire(req.result));
-                    };
-                }).then(cb);
-            },
-            where: function (indexName) {
-                return new WhereClause(this, indexName);
-            },
-            count: function (cb) {
-                return this.toCollection().count(cb);
-            },
-            offset: function (offset) {
-                return this.toCollection().offset(offset);
-            },
-            limit: function (numRows) {
-                return this.toCollection().limit(numRows);
-            },
-            reverse: function () {
-                return this.toCollection().reverse();
-            },
-            filter: function (filterFunction) {
-                return this.toCollection().and(filterFunction);
-            },
-            each: function (fn) {
-                return this.toCollection().each(fn);
-            },
-            toArray: function (cb) {
-                return this.toCollection().toArray(cb);
-            },
-            orderBy: function (index) {
-                return new this._collClass(new WhereClause(this, index));
-            },
+        _trans: function getTransaction(mode, fn, writeLocked) {
+            return this._tpf(mode, [this.name], fn, writeLocked);
+        },
+        _idbstore: function getIDBObjectStore(mode, fn, writeLocked) {
+            if (fake) return new Promise(fn); // Simplify the work for Intellisense/Code completion.
+            var self = this;
+            return this._tpf(mode, [this.name], function (resolve, reject, trans) {
+                fn(resolve, reject, trans.idbtrans.objectStore(self.name), trans);
+            }, writeLocked);
+        },
 
-            toCollection: function () {
-                return new this._collClass(new WhereClause(this));
-            },
-
-            mapToClass: function (constructor, structure) {
-                /// <summary>
-                ///     Map table to a javascript constructor function. Objects returned from the database will be instances of this class, making
-                ///     it possible to the instanceOf operator as well as extending the class using constructor.prototype.method = function(){...}.
-                /// </summary>
-                /// <param name="constructor">Constructor function representing the class.</param>
-                /// <param name="structure" optional="true">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
-                /// know what type each member has. Example: {name: String, emailAddresses: [String], password}</param>
-                this.schema.mappedClass = constructor;
-                var instanceTemplate = Object.create(constructor.prototype);
-                if (structure) {
-                    // structure and instanceTemplate is for IDE code competion only while constructor.prototype is for actual inheritance.
-                    applyStructure(instanceTemplate, structure);
-                }
-                this.schema.instanceTemplate = instanceTemplate;
-
-                // Now, subscribe to the when("reading") event to make all objects that come out from this table inherit from given class
-                // no matter which method to use for reading (Table.get() or Table.where(...)... )
-                var readHook = function (obj) {
-                    if (!obj) return obj; // No valid object. (Value is null). Return as is.
-                    // Create a new object that derives from constructor:
-                    var res = Object.create(constructor.prototype);
-                    // Clone members:
-                    for (var m in obj) if (hasOwn(obj, m)) res[m] = obj[m];
-                    return res;
+        //
+        // Table Public Methods
+        //
+        get: function (key, cb) {
+            var self = this;
+            return this._idbstore(READONLY, function (resolve, reject, idbstore) {
+                fake && resolve(self.schema.instanceTemplate);
+                var req = idbstore.get(key);
+                req.onerror = eventRejectHandler(reject);
+                req.onsuccess = function () {
+                    resolve(self.hook.reading.fire(req.result));
                 };
+            }).then(cb);
+        },
+        where: function (indexName) {
+            return new WhereClause(this, indexName);
+        },
+        count: function (cb) {
+            return this.toCollection().count(cb);
+        },
+        offset: function (offset) {
+            return this.toCollection().offset(offset);
+        },
+        limit: function (numRows) {
+            return this.toCollection().limit(numRows);
+        },
+        reverse: function () {
+            return this.toCollection().reverse();
+        },
+        filter: function (filterFunction) {
+            return this.toCollection().and(filterFunction);
+        },
+        each: function (fn) {
+            return this.toCollection().each(fn);
+        },
+        toArray: function (cb) {
+            return this.toCollection().toArray(cb);
+        },
+        orderBy: function (index) {
+            return new this._collClass(new WhereClause(this, index));
+        },
 
-                if (this.schema.readHook) {
-                    this.hook.reading.unsubscribe(this.schema.readHook);
-                }
-                this.schema.readHook = readHook;
-                this.hook("reading", readHook);
-                return constructor;
-            },
-            defineClass: function (structure) {
-                /// <summary>
-                ///     Define all members of the class that represents the table. This will help code completion of when objects are read from the database
-                ///     as well as making it possible to extend the prototype of the returned constructor function.
-                /// </summary>
-                /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
-                /// know what type each member has. Example: {name: String, emailAddresses: [String], properties: {shoeSize: Number}}</param>
-                return this.mapToClass(Dexie.defineClass(structure), structure);
-            },
-            add: failReadonly,
-            put: failReadonly,
-            'delete': failReadonly,
-            clear: failReadonly,
-            update: failReadonly
-        };
+        toCollection: function () {
+            return new this._collClass(new WhereClause(this));
+        },
+
+        mapToClass: function (constructor, structure) {
+            /// <summary>
+            ///     Map table to a javascript constructor function. Objects returned from the database will be instances of this class, making
+            ///     it possible to the instanceOf operator as well as extending the class using constructor.prototype.method = function(){...}.
+            /// </summary>
+            /// <param name="constructor">Constructor function representing the class.</param>
+            /// <param name="structure" optional="true">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
+            /// know what type each member has. Example: {name: String, emailAddresses: [String], password}</param>
+            this.schema.mappedClass = constructor;
+            var instanceTemplate = Object.create(constructor.prototype);
+            if (structure) {
+                // structure and instanceTemplate is for IDE code competion only while constructor.prototype is for actual inheritance.
+                applyStructure(instanceTemplate, structure);
+            }
+            this.schema.instanceTemplate = instanceTemplate;
+
+            // Now, subscribe to the when("reading") event to make all objects that come out from this table inherit from given class
+            // no matter which method to use for reading (Table.get() or Table.where(...)... )
+            var readHook = function (obj) {
+                if (!obj) return obj; // No valid object. (Value is null). Return as is.
+                // Create a new object that derives from constructor:
+                var res = Object.create(constructor.prototype);
+                // Clone members:
+                for (var m in obj) if (hasOwn(obj, m)) res[m] = obj[m];
+                return res;
+            };
+
+            if (this.schema.readHook) {
+                this.hook.reading.unsubscribe(this.schema.readHook);
+            }
+            this.schema.readHook = readHook;
+            this.hook("reading", readHook);
+            return constructor;
+        },
+        defineClass: function (structure) {
+            /// <summary>
+            ///     Define all members of the class that represents the table. This will help code completion of when objects are read from the database
+            ///     as well as making it possible to extend the prototype of the returned constructor function.
+            /// </summary>
+            /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
+            /// know what type each member has. Example: {name: String, emailAddresses: [String], properties: {shoeSize: Number}}</param>
+            return this.mapToClass(Dexie.defineClass(structure), structure);
+        }
     });
 
     //
@@ -1018,328 +1006,335 @@ export default function Dexie(dbName, options) {
         }).uncaught(dbUncaught);
     }
 
-    derive(WriteableTable).from(Table).extend(function () {
-
-        return {
-            bulkDelete: function (keys) {
-                if (this.hook.deleting.fire === nop) {
-                    return this._idbstore(READWRITE, (resolve, reject, idbstore, trans) => {
-                        resolve (bulkDelete(idbstore, trans, keys, false, nop));
-                    });
-                } else {
-                    return this
-                        .where(':id')
-                        .anyOf(keys)
-                        .delete()
-                        .then(()=>{}); // Resolve with undefined.
-                }
-            },
-            bulkPut: function(objects, keys) {
+    derive(WriteableTable).from(Table).extend({
+        bulkDelete: function (keys) {
+            if (this.hook.deleting.fire === nop) {
                 return this._idbstore(READWRITE, (resolve, reject, idbstore, trans) => {
-                    if (!idbstore.keyPath && !this.schema.primKey.auto && !keys)
-                        throw new exceptions.InvalidArgument("bulkPut() with non-inbound keys requires keys array in second argument");
-                    if (idbstore.keyPath && keys)
-                        throw new exceptions.InvalidArgument("bulkPut(): keys argument invalid on tables with inbound keys");
-                    if (keys && keys.length !== objects.length)
-                        throw new exceptions.InvalidArgument("Arguments objects and keys must have the same length");
-                    if (objects.length === 0) return resolve(); // Caller provided empty list.
-                    const done = result => {
-                        if (errorList.length === 0) resolve(result);
-                        else reject(new BulkError(`${this.name}.bulkPut(): ${errorList.length} of ${numObjs} operations failed`, errorList));
-                    };
-                    var req,
-                        errorList = [],
-                        errorHandler,
-                        numObjs = objects.length,
-                        table = trans.tables[this.name]; // Enable us to do stuff in several steps with same transaction.
-                    if (this.hook.creating.fire === nop && this.hook.updating.fire === nop) {
-                        //
-                        // Standard Bulk (no 'creating' or 'updating' hooks to care about)
-                        //
-                        errorHandler = BulkErrorHandlerCatchAll(errorList);
-                        for (var i = 0, l = objects.length; i < l; ++i) {
-                            req = keys ? idbstore.put(objects[i], keys[i]) : idbstore.put(objects[i]);
-                            req.onerror = errorHandler;
-                        }
-                        // Only need to catch success or error on the last operation
-                        // according to the IDB spec.
-                        req.onerror = BulkErrorHandlerCatchAll(errorList, done);
-                        req.onsuccess = eventSuccessHandler(done);
-                    } else {
-                        var effectiveKeys = keys || idbstore.keyPath && objects.map(o=>getByKeyPath(o, idbstore.keyPath));
-                        var objectLookup = effectiveKeys && effectiveKeys.reduce((res, key, i)=> {
-                                if (key != null) res[key] = objects[i];
-                                return res;
-                            }, {}); // Generates map of {[key]: object}
-
-                        var promise = !effectiveKeys ?
-
-                            // Auto-incremented key-less objects only without any keys argument.
-                            table.bulkAdd(objects) :
-
-                            // Keys provided. Either as inbound in provided objects, or as a keys argument.
-                            // Begin with updating those that exists in DB:
-                            table.where(':id').anyOf(effectiveKeys.filter(key => key != null)).modify(function () {
-                                this.value = objectLookup[this.primKey];
-                                objectLookup[this.primKey] = null; // Mark as "don't add this"
-                            }).catch(ModifyError, e => {
-                                errorList = e.failures; // No need to concat here. These are the first errors added.
-                            }).then(()=> {
-                                // Now, let's examine which items didnt exist so we can add them:
-                                var objsToAdd = [],
-                                    keysToAdd = keys && [];
-                                // Iterate backwards. Why? Because if same key was used twice, just add the last one.
-                                for (var i=effectiveKeys.length-1; i>=0; --i) {
-                                    var key = effectiveKeys[i];
-                                    if (key == null || objectLookup[key]) {
-                                        objsToAdd.push(objects[i]);
-                                        keys && keysToAdd.push(key);
-                                        if (key != null) objectLookup[key] = null; // Mark as "dont add again"
-                                    }
-                                }
-                                // The items are in reverse order so reverse them before adding.
-                                // Could be important in order to get auto-incremented keys the way the caller
-                                // would expect. Could have used unshift instead of push()/reverse(),
-                                // but: http://jsperf.com/unshift-vs-reverse
-                                objsToAdd.reverse();
-                                keys && keysToAdd.reverse();
-                                return table.bulkAdd(objsToAdd, keysToAdd);
-                            }).then(lastAddedKey => {
-                                // Resolve with key of the last object in given arguments to bulkPut():
-                                var lastEffectiveKey = effectiveKeys[effectiveKeys.length - 1]; // Key was provided.
-                                return lastEffectiveKey != null ? lastEffectiveKey : lastAddedKey;
-                            });
-
-                        promise.then(done).catch(BulkError, e => {
-                            // Concat failure from ModifyError and reject using our 'done' method.
-                            errorList = errorList.concat(e.failures);
-                            done();
-                        }).catch(reject);
+                    resolve (bulkDelete(idbstore, trans, keys, false, nop));
+                });
+            } else {
+                return this
+                    .where(':id')
+                    .anyOf(keys)
+                    .delete()
+                    .then(()=>{}); // Resolve with undefined.
+            }
+        },
+        bulkPut: function(objects, keys) {
+            return this._idbstore(READWRITE, (resolve, reject, idbstore, trans) => {
+                if (!idbstore.keyPath && !this.schema.primKey.auto && !keys)
+                    throw new exceptions.InvalidArgument("bulkPut() with non-inbound keys requires keys array in second argument");
+                if (idbstore.keyPath && keys)
+                    throw new exceptions.InvalidArgument("bulkPut(): keys argument invalid on tables with inbound keys");
+                if (keys && keys.length !== objects.length)
+                    throw new exceptions.InvalidArgument("Arguments objects and keys must have the same length");
+                if (objects.length === 0) return resolve(); // Caller provided empty list.
+                const done = result => {
+                    if (errorList.length === 0) resolve(result);
+                    else reject(new BulkError(`${this.name}.bulkPut(): ${errorList.length} of ${numObjs} operations failed`, errorList));
+                };
+                var req,
+                    errorList = [],
+                    errorHandler,
+                    numObjs = objects.length,
+                    table = trans.tables[this.name]; // Enable us to do stuff in several steps with same transaction.
+                if (this.hook.creating.fire === nop && this.hook.updating.fire === nop) {
+                    //
+                    // Standard Bulk (no 'creating' or 'updating' hooks to care about)
+                    //
+                    errorHandler = BulkErrorHandlerCatchAll(errorList);
+                    for (var i = 0, l = objects.length; i < l; ++i) {
+                        req = keys ? idbstore.put(objects[i], keys[i]) : idbstore.put(objects[i]);
+                        req.onerror = errorHandler;
                     }
-                }, "locked"); // If called from transaction scope, lock transaction til all steps are done.
-            },
-            bulkAdd: function(objects, keys) {
-                var self = this,
-                    creatingHook = this.hook.creating.fire;
-                return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
-                    if (!idbstore.keyPath && !self.schema.primKey.auto && !keys)
-                        throw new exceptions.InvalidArgument("bulkAdd() with non-inbound keys requires keys array in second argument");
-                    if (idbstore.keyPath && keys)
-                        throw new exceptions.InvalidArgument("bulkAdd(): keys argument invalid on tables with inbound keys");
-                    if (keys && keys.length !== objects.length)
-                        throw new exceptions.InvalidArgument("Arguments objects and keys must have the same length");
-                    if (objects.length === 0) return resolve(); // Caller provided empty list.
-                    function done(result) {
-                        if (errorList.length === 0) resolve(result);
-                        else reject(new BulkError(`${self.name}.bulkAdd(): ${errorList.length} of ${numObjs} operations failed`, errorList));
-                    }
-                    var req,
-                        errorList = [],
-                        errorHandler,
-                        successHandler,
-                        numObjs = objects.length;
-                    if (creatingHook !== nop) {
-                        //
-                        // There are subscribers to hook('creating')
-                        // Must behave as documented.
-                        //
-                        var keyPath = idbstore.keyPath,
-                            hookCtx;
-                        errorHandler = BulkErrorHandlerCatchAll(errorList, null, true);
-                        successHandler = hookedEventSuccessHandler(null);
+                    // Only need to catch success or error on the last operation
+                    // according to the IDB spec.
+                    req.onerror = BulkErrorHandlerCatchAll(errorList, done);
+                    req.onsuccess = eventSuccessHandler(done);
+                } else {
+                    var effectiveKeys = keys || idbstore.keyPath && objects.map(o=>getByKeyPath(o, idbstore.keyPath));
+                    var objectLookup = effectiveKeys && effectiveKeys.reduce((res, key, i)=> {
+                            if (key != null) res[key] = objects[i];
+                            return res;
+                        }, {}); // Generates map of {[key]: object}
 
-                        tryCatch(() => {
-                            for (var i=0, l = objects.length; i < l; ++i) {
-                                hookCtx = { onerror: null, onsuccess: null };
-                                var key = keys && keys[i];
-                                var obj = objects[i],
-                                    effectiveKey = keys ? key : keyPath ? getByKeyPath(obj, keyPath) : undefined,
-                                    keyToUse = creatingHook.call(hookCtx, effectiveKey, obj, trans);
-                                if (effectiveKey == null && keyToUse != null) {
-                                    if (keyPath) {
-                                        obj = deepClone(obj);
-                                        setByKeyPath(obj, keyPath, keyToUse);
-                                    } else {
-                                        key = keyToUse;
-                                    }
-                                }
-                                req = key != null ? idbstore.add(obj, key) : idbstore.add(obj);
-                                req._hookCtx = hookCtx;
-                                if (i < l - 1) {
-                                    req.onerror = errorHandler;
-                                    if (hookCtx.onsuccess)
-                                        req.onsuccess = successHandler;
+                    var promise = !effectiveKeys ?
+
+                        // Auto-incremented key-less objects only without any keys argument.
+                        table.bulkAdd(objects) :
+
+                        // Keys provided. Either as inbound in provided objects, or as a keys argument.
+                        // Begin with updating those that exists in DB:
+                        table.where(':id').anyOf(effectiveKeys.filter(key => key != null)).modify(function () {
+                            this.value = objectLookup[this.primKey];
+                            objectLookup[this.primKey] = null; // Mark as "don't add this"
+                        }).catch(ModifyError, e => {
+                            errorList = e.failures; // No need to concat here. These are the first errors added.
+                        }).then(()=> {
+                            // Now, let's examine which items didnt exist so we can add them:
+                            var objsToAdd = [],
+                                keysToAdd = keys && [];
+                            // Iterate backwards. Why? Because if same key was used twice, just add the last one.
+                            for (var i=effectiveKeys.length-1; i>=0; --i) {
+                                var key = effectiveKeys[i];
+                                if (key == null || objectLookup[key]) {
+                                    objsToAdd.push(objects[i]);
+                                    keys && keysToAdd.push(key);
+                                    if (key != null) objectLookup[key] = null; // Mark as "dont add again"
                                 }
                             }
-                        }, err => {
-                            hookCtx.onerror && hookCtx.onerror(err);
-                            throw err;
+                            // The items are in reverse order so reverse them before adding.
+                            // Could be important in order to get auto-incremented keys the way the caller
+                            // would expect. Could have used unshift instead of push()/reverse(),
+                            // but: http://jsperf.com/unshift-vs-reverse
+                            objsToAdd.reverse();
+                            keys && keysToAdd.reverse();
+                            return table.bulkAdd(objsToAdd, keysToAdd);
+                        }).then(lastAddedKey => {
+                            // Resolve with key of the last object in given arguments to bulkPut():
+                            var lastEffectiveKey = effectiveKeys[effectiveKeys.length - 1]; // Key was provided.
+                            return lastEffectiveKey != null ? lastEffectiveKey : lastAddedKey;
                         });
 
-                        req.onerror = BulkErrorHandlerCatchAll(errorList, done, true);
-                        req.onsuccess = hookedEventSuccessHandler(done);
-                    } else {
-                        //
-                        // Standard Bulk (no 'creating' hook to care about)
-                        //
-                        errorHandler = BulkErrorHandlerCatchAll(errorList);
-                        for (var i = 0, l = objects.length; i < l; ++i) {
-                            req = keys ? idbstore.add(objects[i], keys[i]) : idbstore.add(objects[i]);
-                            req.onerror = errorHandler;
-                        }
-                        // Only need to catch success or error on the last operation
-                        // according to the IDB spec.
-                        req.onerror = BulkErrorHandlerCatchAll(errorList, done);
-                        req.onsuccess = eventSuccessHandler(done);
-                    }
-                });
-            },
-            add: function (obj, key) {
-                /// <summary>
-                ///   Add an object to the database. In case an object with same primary key already exists, the object will not be added.
-                /// </summary>
-                /// <param name="obj" type="Object">A javascript object to insert</param>
-                /// <param name="key" optional="true">Primary key</param>
-                var creatingHook = this.hook.creating.fire;
-                return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
-                    var hookCtx = {onsuccess: null, onerror: null};
-                    if (creatingHook !== nop) {
-                        var effectiveKey = (key != null) ? key : (idbstore.keyPath ? getByKeyPath(obj, idbstore.keyPath) : undefined);
-                        var keyToUse = creatingHook.call(hookCtx, effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
-                        if (effectiveKey == null && keyToUse != null) { // Using "==" and "!=" to check for either null or undefined!
-                            if (idbstore.keyPath)
-                                setByKeyPath(obj, idbstore.keyPath, keyToUse);
-                            else
-                                key = keyToUse;
-                        }
-                    }
-                    try {
-                        var req = key != null ? idbstore.add(obj, key) : idbstore.add(obj);
-                        req._hookCtx = hookCtx;
-                        req.onerror = hookedEventRejectHandler(reject);
-                        req.onsuccess = hookedEventSuccessHandler(function (result) {
-                            // TODO: Remove these two lines in next major release (2.0?)
-                            // It's no good practice to have side effects on provided parameters
-                            var keyPath = idbstore.keyPath;
-                            if (keyPath) setByKeyPath(obj, keyPath, result);
-                            resolve(result);
-                        });
-                    } catch (e) {
-                        if (hookCtx.onerror) hookCtx.onerror(e);
-                        throw e;
-                    }
-                });
-            },
+                    promise.then(done).catch(BulkError, e => {
+                        // Concat failure from ModifyError and reject using our 'done' method.
+                        errorList = errorList.concat(e.failures);
+                        done();
+                    }).catch(reject);
+                }
+            }, "locked"); // If called from transaction scope, lock transaction til all steps are done.
+        },
+        bulkAdd: function(objects, keys) {
+            var self = this,
+                creatingHook = this.hook.creating.fire;
+            return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
+                if (!idbstore.keyPath && !self.schema.primKey.auto && !keys)
+                    throw new exceptions.InvalidArgument("bulkAdd() with non-inbound keys requires keys array in second argument");
+                if (idbstore.keyPath && keys)
+                    throw new exceptions.InvalidArgument("bulkAdd(): keys argument invalid on tables with inbound keys");
+                if (keys && keys.length !== objects.length)
+                    throw new exceptions.InvalidArgument("Arguments objects and keys must have the same length");
+                if (objects.length === 0) return resolve(); // Caller provided empty list.
+                function done(result) {
+                    if (errorList.length === 0) resolve(result);
+                    else reject(new BulkError(`${self.name}.bulkAdd(): ${errorList.length} of ${numObjs} operations failed`, errorList));
+                }
+                var req,
+                    errorList = [],
+                    errorHandler,
+                    successHandler,
+                    numObjs = objects.length;
+                if (creatingHook !== nop) {
+                    //
+                    // There are subscribers to hook('creating')
+                    // Must behave as documented.
+                    //
+                    var keyPath = idbstore.keyPath,
+                        hookCtx;
+                    errorHandler = BulkErrorHandlerCatchAll(errorList, null, true);
+                    successHandler = hookedEventSuccessHandler(null);
 
-            put: function (obj, key) {
-                /// <summary>
-                ///   Add an object to the database but in case an object with same primary key alread exists, the existing one will get updated.
-                /// </summary>
-                /// <param name="obj" type="Object">A javascript object to insert or update</param>
-                /// <param name="key" optional="true">Primary key</param>
-                var self = this,
-                    creatingHook = this.hook.creating.fire,
-                    updatingHook = this.hook.updating.fire;
-                if (creatingHook !== nop || updatingHook !== nop) {
-                    //
-                    // People listens to when("creating") or when("updating") events!
-                    // We must know whether the put operation results in an CREATE or UPDATE.
-                    //
-                    return this._trans(READWRITE, function (resolve, reject, trans) {
-                        // Since key is optional, make sure we get it from obj if not provided
-                        var effectiveKey = (key !== undefined) ? key : (self.schema.primKey.keyPath && getByKeyPath(obj, self.schema.primKey.keyPath));
-                        if (effectiveKey == null) { // "== null" means checking for either null or undefined.
-                            // No primary key. Must use add().
-                            trans.tables[self.name].add(obj).then(resolve, reject);
-                        } else {
-                            // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
-                            trans._lock(); // Needed because operation is splitted into modify() and add().
-                            // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
-                            obj = deepClone(obj);
-                            trans.tables[self.name].where(":id").equals(effectiveKey).modify(function () {
-                                // Replace extisting value with our object
-                                // CRUD event firing handled in WriteableCollection.modify()
-                                this.value = obj;
-                            }).then(function (count) {
-                                if (count === 0) {
-                                    // Object's key was not found. Add the object instead.
-                                    // CRUD event firing will be done in add()
-                                    return trans.tables[self.name].add(obj, key); // Resolving with another Promise. Returned Promise will then resolve with the new key.
+                    tryCatch(() => {
+                        for (var i=0, l = objects.length; i < l; ++i) {
+                            hookCtx = { onerror: null, onsuccess: null };
+                            var key = keys && keys[i];
+                            var obj = objects[i],
+                                effectiveKey = keys ? key : keyPath ? getByKeyPath(obj, keyPath) : undefined,
+                                keyToUse = creatingHook.call(hookCtx, effectiveKey, obj, trans);
+                            if (effectiveKey == null && keyToUse != null) {
+                                if (keyPath) {
+                                    obj = deepClone(obj);
+                                    setByKeyPath(obj, keyPath, keyToUse);
                                 } else {
-                                    return effectiveKey; // Resolve with the provided key.
+                                    key = keyToUse;
                                 }
-                            }).finally(function () {
-                                trans._unlock();
-                            }).then(resolve, reject);
+                            }
+                            req = key != null ? idbstore.add(obj, key) : idbstore.add(obj);
+                            req._hookCtx = hookCtx;
+                            if (i < l - 1) {
+                                req.onerror = errorHandler;
+                                if (hookCtx.onsuccess)
+                                    req.onsuccess = successHandler;
+                            }
                         }
+                    }, err => {
+                        hookCtx.onerror && hookCtx.onerror(err);
+                        throw err;
                     });
-                } else {
-                    // Use the standard IDB put() method.
-                    return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
-                        var req = key !== undefined ? idbstore.put(obj, key) : idbstore.put(obj);
-                        req.onerror = eventRejectHandler(reject);
-                        req.onsuccess = function (ev) {
-                            var keyPath = idbstore.keyPath;
-                            if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
-                            resolve(req.result);
-                        };
-                    });
-                }
-            },
 
-            'delete': function (key) {
-                /// <param name="key">Primary key of the object to delete</param>
-                if (this.hook.deleting.subscribers.length) {
-                    // People listens to when("deleting") event. Must implement delete using WriteableCollection.delete() that will
-                    // call the CRUD event. Only WriteableCollection.delete() will know whether an object was actually deleted.
-                    return this.where(":id").equals(key).delete();
+                    req.onerror = BulkErrorHandlerCatchAll(errorList, done, true);
+                    req.onsuccess = hookedEventSuccessHandler(done);
                 } else {
-                    // No one listens. Use standard IDB delete() method.
-                    return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
-                        var req = idbstore.delete(key);
-                        req.onerror = eventRejectHandler(reject);
-                        req.onsuccess = function () {
-                            resolve(req.result);
-                        };
-                    });
+                    //
+                    // Standard Bulk (no 'creating' hook to care about)
+                    //
+                    errorHandler = BulkErrorHandlerCatchAll(errorList);
+                    for (var i = 0, l = objects.length; i < l; ++i) {
+                        req = keys ? idbstore.add(objects[i], keys[i]) : idbstore.add(objects[i]);
+                        req.onerror = errorHandler;
+                    }
+                    // Only need to catch success or error on the last operation
+                    // according to the IDB spec.
+                    req.onerror = BulkErrorHandlerCatchAll(errorList, done);
+                    req.onsuccess = eventSuccessHandler(done);
                 }
-            },
+            });
+        },
+        add: function (obj, key) {
+            /// <summary>
+            ///   Add an object to the database. In case an object with same primary key already exists, the object will not be added.
+            /// </summary>
+            /// <param name="obj" type="Object">A javascript object to insert</param>
+            /// <param name="key" optional="true">Primary key</param>
+            var creatingHook = this.hook.creating.fire;
+            return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
+                var hookCtx = {onsuccess: null, onerror: null};
+                if (creatingHook !== nop) {
+                    var effectiveKey = (key != null) ? key : (idbstore.keyPath ? getByKeyPath(obj, idbstore.keyPath) : undefined);
+                    var keyToUse = creatingHook.call(hookCtx, effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
+                    if (effectiveKey == null && keyToUse != null) { // Using "==" and "!=" to check for either null or undefined!
+                        if (idbstore.keyPath)
+                            setByKeyPath(obj, idbstore.keyPath, keyToUse);
+                        else
+                            key = keyToUse;
+                    }
+                }
+                try {
+                    var req = key != null ? idbstore.add(obj, key) : idbstore.add(obj);
+                    req._hookCtx = hookCtx;
+                    req.onerror = hookedEventRejectHandler(reject);
+                    req.onsuccess = hookedEventSuccessHandler(function (result) {
+                        // TODO: Remove these two lines in next major release (2.0?)
+                        // It's no good practice to have side effects on provided parameters
+                        var keyPath = idbstore.keyPath;
+                        if (keyPath) setByKeyPath(obj, keyPath, result);
+                        resolve(result);
+                    });
+                } catch (e) {
+                    if (hookCtx.onerror) hookCtx.onerror(e);
+                    throw e;
+                }
+            });
+        },
 
-            clear: function () {
-                if (this.hook.deleting.subscribers.length) {
-                    // People listens to when("deleting") event. Must implement delete using WriteableCollection.delete() that will
-                    // call the CRUD event. Only WriteableCollection.delete() will knows which objects that are actually deleted.
-                    return this.toCollection().delete();
-                } else {
-                    return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
-                        var req = idbstore.clear();
-                        req.onerror = eventRejectHandler(reject);
-                        req.onsuccess = function () {
-                            resolve(req.result);
-                        };
-                    });
-                }
-            },
-
-            update: function (keyOrObject, modifications) {
-                if (typeof modifications !== 'object' || isArray(modifications))
-                    throw new exceptions.InvalidArgument("Modifications must be an object.");
-                if (typeof keyOrObject === 'object' && !isArray(keyOrObject)) {
-                    // object to modify. Also modify given object with the modifications:
-                    keys(modifications).forEach(function (keyPath) {
-                        setByKeyPath(keyOrObject, keyPath, modifications[keyPath]);
-                    });
-                    var key = getByKeyPath(keyOrObject, this.schema.primKey.keyPath);
-                    if (key === undefined) return rejection(new exceptions.InvalidArgument(
-                        "Given object does not contain its primary key"), dbUncaught);
-                    return this.where(":id").equals(key).modify(modifications);
-                } else {
-                    // key to modify
-                    return this.where(":id").equals(keyOrObject).modify(modifications);
-                }
+        put: function (obj, key) {
+            /// <summary>
+            ///   Add an object to the database but in case an object with same primary key alread exists, the existing one will get updated.
+            /// </summary>
+            /// <param name="obj" type="Object">A javascript object to insert or update</param>
+            /// <param name="key" optional="true">Primary key</param>
+            var self = this,
+                creatingHook = this.hook.creating.fire,
+                updatingHook = this.hook.updating.fire;
+            if (creatingHook !== nop || updatingHook !== nop) {
+                //
+                // People listens to when("creating") or when("updating") events!
+                // We must know whether the put operation results in an CREATE or UPDATE.
+                //
+                return this._trans(READWRITE, function (resolve, reject, trans) {
+                    // Since key is optional, make sure we get it from obj if not provided
+                    var effectiveKey = (key !== undefined) ? key : (self.schema.primKey.keyPath && getByKeyPath(obj, self.schema.primKey.keyPath));
+                    if (effectiveKey == null) { // "== null" means checking for either null or undefined.
+                        // No primary key. Must use add().
+                        trans.tables[self.name].add(obj).then(resolve, reject);
+                    } else {
+                        // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
+                        trans._lock(); // Needed because operation is splitted into modify() and add().
+                        // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
+                        obj = deepClone(obj);
+                        trans.tables[self.name].where(":id").equals(effectiveKey).modify(function () {
+                            // Replace extisting value with our object
+                            // CRUD event firing handled in WriteableCollection.modify()
+                            this.value = obj;
+                        }).then(function (count) {
+                            if (count === 0) {
+                                // Object's key was not found. Add the object instead.
+                                // CRUD event firing will be done in add()
+                                return trans.tables[self.name].add(obj, key); // Resolving with another Promise. Returned Promise will then resolve with the new key.
+                            } else {
+                                return effectiveKey; // Resolve with the provided key.
+                            }
+                        }).finally(function () {
+                            trans._unlock();
+                        }).then(resolve, reject);
+                    }
+                });
+            } else {
+                // Use the standard IDB put() method.
+                return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
+                    var req = key !== undefined ? idbstore.put(obj, key) : idbstore.put(obj);
+                    req.onerror = eventRejectHandler(reject);
+                    req.onsuccess = function (ev) {
+                        var keyPath = idbstore.keyPath;
+                        if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
+                        resolve(req.result);
+                    };
+                });
             }
-        };
+        },
+
+        'delete': function (key) {
+            /// <param name="key">Primary key of the object to delete</param>
+            if (this.hook.deleting.subscribers.length) {
+                // People listens to when("deleting") event. Must implement delete using WriteableCollection.delete() that will
+                // call the CRUD event. Only WriteableCollection.delete() will know whether an object was actually deleted.
+                return this.where(":id").equals(key).delete();
+            } else {
+                // No one listens. Use standard IDB delete() method.
+                return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
+                    var req = idbstore.delete(key);
+                    req.onerror = eventRejectHandler(reject);
+                    req.onsuccess = function () {
+                        resolve(req.result);
+                    };
+                });
+            }
+        },
+
+        clear: function () {
+            if (this.hook.deleting.subscribers.length) {
+                // People listens to when("deleting") event. Must implement delete using WriteableCollection.delete() that will
+                // call the CRUD event. Only WriteableCollection.delete() will knows which objects that are actually deleted.
+                return this.toCollection().delete();
+            } else {
+                return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
+                    var req = idbstore.clear();
+                    req.onerror = eventRejectHandler(reject);
+                    req.onsuccess = function () {
+                        resolve(req.result);
+                    };
+                });
+            }
+        },
+
+        update: function (keyOrObject, modifications) {
+            if (typeof modifications !== 'object' || isArray(modifications))
+                throw new exceptions.InvalidArgument("Modifications must be an object.");
+            if (typeof keyOrObject === 'object' && !isArray(keyOrObject)) {
+                // object to modify. Also modify given object with the modifications:
+                keys(modifications).forEach(function (keyPath) {
+                    setByKeyPath(keyOrObject, keyPath, modifications[keyPath]);
+                });
+                var key = getByKeyPath(keyOrObject, this.schema.primKey.keyPath);
+                if (key === undefined) return rejection(new exceptions.InvalidArgument(
+                    "Given object does not contain its primary key"), dbUncaught);
+                return this.where(":id").equals(key).modify(modifications);
+            } else {
+                // key to modify
+                return this.where(":id").equals(keyOrObject).modify(modifications);
+            }
+        }
     });
+    
+    // For each method in WriteableTable that is not present in Table, make sure it puts it there with the failReadonly function.
+    var TableProto = Table.prototype;
+    Object.getOwnPropertyNames(WriteableTable.prototype)
+        .forEach(method => method in TableProto || setProp(TableProto, method, () => {
+            // It's ok to throw here because this can only happen within a transaction,
+            // and will always be caught by the transaction scope and returned as a
+            // failed promise.
+            throw new exceptions.ReadOnly("Current Transaction is READONLY");
+        }));
 
     //
     //

@@ -655,3 +655,13 @@ asyncTest("clear", function () {
         ok(false, e);
     }).finally(start);
 });
+
+spawnedTest("failReadonly", function*(){
+    db.transaction('r', 'users', function*() {
+        yield db.users.bulkAdd([]);
+    }).then(()=>{
+        ok(false, "Should not happen");
+    }).catch ('ReadOnlyError', e => {
+        ok(true, "Got ReadOnlyError: " + e.stack);
+    });
+});
