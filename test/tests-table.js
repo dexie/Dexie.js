@@ -657,11 +657,32 @@ asyncTest("clear", function () {
 });
 
 spawnedTest("failReadonly", function*(){
-    db.transaction('r', 'users', function*() {
+    yield db.transaction('r', 'users', function*() {
         yield db.users.bulkAdd([{first: "Foo", last: "Bar"}]);
     }).then(()=>{
         ok(false, "Should not happen");
     }).catch ('ReadOnlyError', e => {
         ok(true, "Got ReadOnlyError: " + e.stack);
     });
+});
+
+spawnedTest("failNotIncludedStore", function*(){
+    yield db.transaction('rw', 'folks', function*() {
+        yield db.users.bulkAdd([{first: "Foo", last: "Bar"}]);
+    }).then(()=>{
+        ok(false, "Should not happen");
+    }).catch ('NotFoundError', e => {
+        ok(true, "Got NotFoundError: " + e.stack);
+    });
+});
+
+asyncTest("failNotIncludedStoreTrans", () => {
+    db.transaction('rw', 'foodassaddas', ()=>{
+    }).then(()=>{
+        ok(false, "Should not happen");
+    }).catch ('NotFoundError', e => {
+        ok(true, "Got NotFoundError: " + e.stack);
+    }).catch (e => {
+        ok(false, "Oops: " + e.stack);
+    }).then(start);
 });

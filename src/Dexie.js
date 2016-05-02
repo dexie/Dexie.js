@@ -1457,6 +1457,8 @@ export default function Dexie(dbName, options) {
                 // Read lock always
                 if (!self._locked()) {
                     p = self.active ? new Promise(function (resolve, reject) {
+                        if (mode === READWRITE && self.mode !== READWRITE)
+                            throw new exceptions.ReadOnly("Transaction is readonly");
                         if (!self.idbtrans && mode) self.create();
                         if (bWriteLock) self._lock(); // Write lock if write operation is requested
                         fn(resolve, reject, self);
