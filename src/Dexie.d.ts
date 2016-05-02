@@ -16,7 +16,7 @@ declare class Dexie {
     constructor(databaseName: string, options?: {
         addons?: Array<(db: Dexie) => void>,
         autoOpen?: boolean,
-        indexedDB?: IDBDatabase,
+        indexedDB?: IDBFactory,
         IDBKeyRange?: IDBKeyRange
     });
 
