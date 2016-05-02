@@ -6,8 +6,10 @@ export default function Events(ctx) {
     var evs = {};
     var rv = function (eventName, subscriber) {
         if (subscriber) {
-            // Subscribe
-            evs[eventName].subscribe(subscriber);
+            // Subscribe. If additional arguments than just the subscriber was provided, forward them as well.
+            var i = arguments.length, args = new Array(i - 1);
+            while (--i) args[i - 1] = arguments[i];
+            evs[eventName].subscribe.apply(null, args);
             return ctx;
         } else if (typeof (eventName) === 'string') {
             // Return interface allowing to fire or unsubscribe from event

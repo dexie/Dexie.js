@@ -480,7 +480,6 @@ export default function Dexie(dbName, options) {
     this.open = function () {
         if (isBeingOpened || idbdb)
             return dbReadyPromise.then(()=> dbOpenError ? rejection(dbOpenError, dbUncaught) : db);
-        //if (Debug.debug) console.log("Calling open(): " + Debug.prettyStack(Debug.getErrorWithStack()));
         Debug.debug && (openCanceller._stackHolder = Debug.getErrorWithStack()); // Let stacks point to when open() was called rather than where new Dexie() was called.
         isBeingOpened = true;
         dbOpenError = null;

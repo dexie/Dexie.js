@@ -425,6 +425,7 @@ asyncTest("db.close", ()=> {
         ok(e instanceof Dexie.DatabaseClosedError, "Should catch DatabaseClosedError");
         return db.open();
     }).then(()=>{
+        console.log("The call to db.open() completed");
         return db.foo.toArray();
     }).then(res => {
         equal(res.length, 0, "Database re-opened and I got a result from my query");
