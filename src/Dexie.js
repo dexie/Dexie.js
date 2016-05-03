@@ -35,6 +35,7 @@ import {
     assert,
     NO_CHAR_ARRAY,
     getArrayOf,
+    arrayToObject,
     hasOwn,
     flatten
 
@@ -328,11 +329,12 @@ export default function Dexie(dbName, options) {
         for (table in newSchema) {
             var oldDef = oldSchema[table],
                 newDef = newSchema[table];
-            if (!oldDef) diff.add.push([table, newDef]);
-            else {
+            if (!oldDef) {
+                diff.add.push([table, newDef]);
+            } else {
                 var change = {
                     name: table,
-                    def: newSchema[table],
+                    def: newDef,
                     recreate: false,
                     del: [],
                     add: [],
@@ -343,8 +345,9 @@ export default function Dexie(dbName, options) {
                     change.recreate = true;
                     diff.change.push(change);
                 } else {
-                    var oldIndexes = oldDef.indexes.reduce(function (prev, current) { prev[current.name] = current; return prev; }, {});
-                    var newIndexes = newDef.indexes.reduce(function (prev, current) { prev[current.name] = current; return prev; }, {});
+                    // Same primary key. Just find out what differs:
+                    var oldIndexes = oldDef.idxByName;
+                    var newIndexes = newDef.idxByName;
                     for (var idxName in oldIndexes) {
                         if (!newIndexes[idxName]) change.del.push(idxName);
                     }
@@ -354,7 +357,7 @@ export default function Dexie(dbName, options) {
                         if (!oldIdx) change.add.push(newIdx);
                         else if (oldIdx.src !== newIdx.src) change.change.push(newIdx);
                     }
-                    if (change.recreate || change.del.length > 0 || change.add.length > 0 || change.change.length > 0) {
+                    if (change.del.length > 0 || change.add.length > 0 || change.change.length > 0) {
                         diff.change.push(change);
                     }
                 }
@@ -1022,7 +1025,7 @@ export default function Dexie(dbName, options) {
             }
         },
         bulkPut: function(objects, keys) {
-            return this._idbstore(READWRITE, (resolve, reject, idbstore, trans) => {
+            return this._idbstore(READWRITE, (resolve, reject, idbstore) => {
                 if (!idbstore.keyPath && !this.schema.primKey.auto && !keys)
                     throw new exceptions.InvalidArgument("bulkPut() with non-inbound keys requires keys array in second argument");
                 if (idbstore.keyPath && keys)
@@ -1054,11 +1057,8 @@ export default function Dexie(dbName, options) {
                     req.onsuccess = eventSuccessHandler(done);
                 } else {
                     var effectiveKeys = keys || idbstore.keyPath && objects.map(o=>getByKeyPath(o, idbstore.keyPath));
-                    var objectLookup = effectiveKeys && effectiveKeys.reduce((res, key, i)=> {
-                            if (key != null) res[key] = objects[i];
-                            return res;
-                        }, {}); // Generates map of {[key]: object}
-
+                    // Generate map of {[key]: object}
+                    var objectLookup = effectiveKeys && arrayToObject(effectiveKeys, (key, i) => key != null && [key, objects[i]]); 
                     var promise = !effectiveKeys ?
 
                         // Auto-incremented key-less objects only without any keys argument.
@@ -1340,8 +1340,6 @@ export default function Dexie(dbName, options) {
         /// </summary>
         /// <param name="mode" type="String">Any of "readwrite" or "readonly"</param>
         /// <param name="storeNames" type="Array">Array of table names to operate on</param>
-        var self = this;
-        
         this.db = db;
         this.mode = mode;
         this.storeNames = storeNames;
@@ -1377,13 +1375,6 @@ export default function Dexie(dbName, options) {
         //
         // Transaction Protected Methods (not required by API users, but needed internally and eventually by dexie extensions)
         //
-        tables: {
-            get: function () {
-                if (this._tables) return this._tables;
-                return this._tables = this.storeNames.reduce((result, name)=>((result[name] = allTables[name]),result), {});
-            }
-        },
-
         _lock: function () {
             assert (!PSD.global); // Locking and unlocking reuires to be within a PSD scope.
             // Temporary set all requests into a pending queue if they are called before database is ready.
@@ -1480,22 +1471,36 @@ export default function Dexie(dbName, options) {
         },
 
         //
-        // Transaction Public Methods
+        // Transaction Public Properties and Methods
         //
-
-        complete: function (cb) {
-            return this.on("complete", cb);
-        },
-        error: function (cb) {
-            return this.on("error", cb);
-        },
         abort: function () {
             this.active && this._reject(new exceptions.Abort());
             this.active = false;
         },
+        
+        // Deprecate:
+        tables: {
+            get: function () {
+                if (this._tables) return this._tables;
+                return this._tables = arrayToObject(this.storeNames, name => [name, allTables[name]]);
+            }
+        },
+
+        // Deprecate:
+        complete: function (cb) {
+            return this.on("complete", cb);
+        },
+        
+        // Deprecate:
+        error: function (cb) {
+            return this.on("error", cb);
+        },
+        
+        // Deprecate
         table: function (name) {
-            if (!hasOwn(this.tables, name)) { throw new exceptions.InvalidTable("Table " + name + " not in transaction"); }
-            return this.tables[name];
+            if (this.storeNames.indexOf(name) === -1)
+                throw new exceptions.InvalidTable("Table " + name + " not in transaction");
+            return allTables[name];
         }
     });
 
@@ -2799,10 +2804,7 @@ function TableSchema(name, primKey, indexes, instanceTemplate) {
     this.indexes = indexes || [new IndexSpec()];
     this.instanceTemplate = instanceTemplate;
     this.mappedClass = null;
-    this.idxByName = indexes.reduce(function (hashSet, index) {
-        hashSet[index.name] = index;
-        return hashSet;
-    }, {});
+    this.idxByName = arrayToObject(indexes, index => [index.name, index]);
 }
 
 //
