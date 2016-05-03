@@ -9,19 +9,37 @@ db.on("populate", function (trans) {
     users.add({ id: 1, first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
     users.add({ id: 2, first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
 });
-db.on("error", function (e) {
+function dbOnErrorHandler (e) {
     ok(false, "An error bubbled out to the db.on('error'). Should not happen because all tests should catch their errors themselves. " + e);
-});
+}
+db.on("error", dbOnErrorHandler);
 
 module("exception-handling", {
     setup: function () {
         stop();
         resetDatabase(db).catch(function (e) {
-            ok(false, "Error resetting database: " + e);
+            ok(false, "Error resetting database: " + e.stack);
         }).finally(start);
     },
     teardown: function () {
     }
+});
+
+asyncTest("Uncaught promise should signal to Promise.on('error')", function(){
+    // We must not use finally or catch here because then we don't test what we should.
+    var onErrorSignals = 0;
+    function onerror(e) {
+        ++onErrorSignals;
+    }
+    Dexie.Promise.on('error', onerror);
+    db.on('error').unsubscribe(dbOnErrorHandler);
+    db.users.add({ id: 1 });
+    setTimeout(()=> {
+        equal(onErrorSignals, 1, "Promise.on('error') should have been signaled");
+        db.on("error", dbOnErrorHandler);
+        Dexie.Promise.on('error').unsubscribe(onerror);
+        start();
+    }, 100);
 });
 
 spawnedTest("transaction should abort on collection error", function*(){
@@ -110,9 +128,10 @@ asyncTest("exceptionThrown-request-catch", function () {
 });
 
 asyncTest("exceptionThrown-iteration-should-abort-when-using-hook", function () {
-    db.users.hook('deleting', function () {
+    function deletingHook () {
         // Testing with 
-    })
+    };
+    db.users.hook('deleting', deletingHook);
     db.transaction('rw', db.users, function () {
 
         function deleteKarls() {
@@ -129,7 +148,10 @@ asyncTest("exceptionThrown-iteration-should-abort-when-using-hook", function () 
         ok(false, "Transaction should not complete!");
     }).catch(function (err) {
         ok(true, "Transaction aborted");
-    }).finally(start);
+    }).finally(()=>{
+        db.users.hook('deleting').unsubscribe(deletingHook);
+        start();
+    });
 });
 
 asyncTest("exceptionThrown-iteration-should-not-abort-when-using-hook", function () {
@@ -214,7 +236,7 @@ asyncTest("exception in on('populate')", function () {
     });
     db.open().catch(function (err) {
         // Got error
-        ok(err.toString().indexOf("Oops. Failing in upgrade function") != -1, "Got error: " + err);
+        ok(err.toString().indexOf("Oops. Failing in upgrade function") != -1, "Got error: " + err.stack);
         // Create 3rd instance of db that will only read from the existing DB.
         // What we want to check here is that the DB is there but is still
         // only on version 1.
@@ -222,15 +244,15 @@ asyncTest("exception in on('populate')", function () {
         return db.open();
     }).then(function () {
         ok(false, "The database should not have been created");
-    }).catch(function (err) {
-        ok(err.toString().indexOf("doesnt exist") != -1, "The database doesnt exist");
+    }).catch(err => {
+        ok(err instanceof Dexie.NoSuchDatabaseError, "The database doesnt exist");
     }).finally(function () {
         db.delete().then(start);
     });
 });
 
 
-asyncTest("catch-all with db.on('error')", 3, function () {
+asyncTest("catch-all with db.on('error')", 6, function () {
     if (typeof idbModules !== 'undefined' && Dexie.dependencies.indexedDB === idbModules.shimIndexedDB) {
         // Using indexedDBShim.
         ok(false, "This test would hang with IndexedDBShim as of 2015-05-07");
@@ -245,40 +267,56 @@ asyncTest("catch-all with db.on('error')", 3, function () {
     });
     var errorCount = 0;
     ourDB.on("error", function (e) {
-        ok(errorCount < 3, "Uncatched error successfully bubbled to ourDB.on('error'): " + e);
-        if (++errorCount == 3) {
-            Dexie.Promise.on('error').unsubscribe(swallowPromiseOnError);
-            ourDB.delete().then(start);
+        ok(errorCount < 5, "Uncatched error successfully bubbled to ourDB.on('error'): " + e.stack);
+        if (++errorCount == 5) {
+            ourDB.delete().then(()=>{
+                Dexie.Promise.on('error').unsubscribe(swallowPromiseOnError);
+                start();
+            });
         }
     });
     function swallowPromiseOnError(e){
+        return false;
     }
     Dexie.Promise.on('error', swallowPromiseOnError); // Just to get rid of default error logs for not catching.
 
-    ourDB.open();
+    ourDB.delete()
+    .then(()=>ourDB.open())
+    .then(()=>{
 
-    ourDB.transaction("rw", ourDB.users, function () {
-        ourDB.users.add({ username: "dfahlenius" }).then(function () {
-            ok(false, "Should not be able to add two users with same username");
+        ourDB.transaction("rw", ourDB.users, function () {
+            ourDB.users.add({ username: "dfahlenius" }).then(function () {
+                ok(false, "Should not be able to add two users with same username");
+            });
+        }).then(function () {
+            ok(false, "Transaction should not complete since errors wasnt catched");
         });
-    }).then(function () {
-        ok(false, "Transaction should not complete since errors wasnt catched");
-    });
-    ourDB.transaction("rw", ourDB.users, function () {
-        ourDB.users.add({ username: "dfahlenius" }).then(function () {
-            ok(false, "Should not be able to add two users with same username");
+        ourDB.transaction("rw", ourDB.users, function () {
+            ourDB.users.add({ username: "dfahlenius" }).then(function () {
+                ok(false, "Should not be able to add two users with same username");
+            });
+        }).then(function () {
+            ok(false, "Transaction should not complete since errors wasnt catched");
         });
-    }).then(function () {
-        ok(false, "Transaction should not complete since errors wasnt catched");
-    });
-    ourDB.transaction("rw", ourDB.users, function () {
-        ourDB.users.add({ username: "dfahlenius" }).then(function () {
-            ok(false, "Should not be able to add two users with same username");
-        });
-    }).then(function () {
-        ok(false, "Transaction should not complete since errors wasnt catched");
-    });
+        ourDB.transaction("rw", ourDB.users, function () {
+            ourDB.users.add({ id: {} }).then(function () {
+                ok(false, "Should not be able to add user with faulty key");
+            });
+        }).then(function () {
+            ok(false, "Transaction should not complete since errors wasnt catched");
+        }).catch(err => {
+            ok(true, "Got error: " + err.stack);
+            return Dexie.Promise.reject(err); // Returning failed promise to bubble to db.on.error.
+        })
 
+        // And outside transactions:        
+        ourDB.users.add({ username: "dfahlenius" }).then(function () {
+            ok(false, "Should not be able to add two users with same username");
+        });
+        ourDB.users.add({ id: {} }).then(function () {
+            ok(false, "Should not be able to add user with faulty key");
+        });
+    });
 });
 
 asyncTest("Issue #32: db.on('error') doesnt catch 'not found index' DOMExceptions", function () {
@@ -517,7 +555,7 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
             db.open().then(function() {
                 console.log("before");
                 throw "FOO"; // Here a generic error is thrown (not a DB error)
-                console.log("after");
+                //console.log("after");
             });
             db.delete().finally(function() {
                 equal(errorList.length, 5, "THere should be 4 global errors triggered");

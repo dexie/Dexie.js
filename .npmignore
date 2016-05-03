@@ -3,3 +3,4 @@ samples/
 addons/
 *.njsproj
 .*
+*.log

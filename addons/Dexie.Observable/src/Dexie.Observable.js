@@ -456,7 +456,12 @@ export default function Observable(db) {
             if (handledRevision >= latestRevision) return; // Make sure to only run once per revision. (Workaround for IE triggering storage event on same window)
             handledRevision = latestRevision;
             Dexie.vip(function() {
-                readChanges(latestRevision);
+                readChanges(latestRevision).catch('DatabaseClosedError', e=>{
+                    // Handle database closed error gracefully while reading changes.
+                    // Don't bubble to db.on.error or Promise.on.error.
+                    // Even though we intercept the close() method, it might be called when in the middle of
+                    // reading changes and then that flow will cancel with DatabaseClosedError.
+                });
             });
         }
     }
@@ -531,7 +536,14 @@ export default function Observable(db) {
         pollHandle = null;
         var currentInstance = mySyncNode.id;
         Dexie.vip(function() { // VIP ourselves. Otherwise we might not be able to consume intercomm messages from master node before database has finished opening. This would make DB stall forever. Cannot rely on storage-event since it may not always work in some browsers of different processes.
-            readChanges(Observable.latestRevision[db.name]).then(cleanup).then(consumeIntercommMessages).finally(function() {
+            readChanges(Observable.latestRevision[db.name]).then(cleanup).then(consumeIntercommMessages)
+            .catch('DatabaseClosedError', e=>{
+                // Handle database closed error gracefully while reading changes.
+                // Don't bubble to db.on.error or Promise.on.error.
+                // Even though we intercept the close() method, it might be called when in the middle of
+                // reading changes and then that flow will cancel with DatabaseClosedError.
+            })
+            .finally(function() {
                 // Poll again in given interval:
                 if (mySyncNode && mySyncNode.id === currentInstance) {
                     pollHandle = setTimeout(poll, LOCAL_POLL);
@@ -540,6 +552,7 @@ export default function Observable(db) {
         });
     }
 
+    
     function cleanup() {
         var ourSyncNode = mySyncNode;
         if (!ourSyncNode) return Promise.reject("Database closed");
@@ -747,7 +760,7 @@ function promisableChain(f1, f2) {
 // 
 
 Observable.latestRevision = {}; // Latest revision PER DATABASE. Example: Observable.latestRevision.FriendsDB = 37;
-Observable.on = Dexie.events(null, "latestRevisionIncremented", "suicideNurseCall", "intercomm", "beforeunload"); // fire(dbname, value);
+Observable.on = Dexie.Events(null, "latestRevisionIncremented", "suicideNurseCall", "intercomm", "beforeunload"); // fire(dbname, value);
 Observable.createUUID = function() {
     // Decent solution from http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript
     var d = Date.now();

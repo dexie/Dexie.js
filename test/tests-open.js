@@ -152,9 +152,9 @@ asyncTest("test-if-database-exists", 3, function () {
     });
 });
 
-asyncTest("open database without specifying version or schema", 10, function () {
+asyncTest("open database without specifying version or schema", Dexie.Observable ? 1 : 10, function () {
     if (Dexie.Observable) {
-        ok(false, "Dexie.Observable currently not compatible with this mode");
+        ok(true, "Dexie.Observable currently not compatible with this mode");
         return start();
     }
     var db = new Dexie("TestDB");
@@ -268,7 +268,7 @@ asyncTest("Issue #76 Dexie inside Web Worker", function () {
         }).then(function () {
             ok(true, "Transaction committed");
         }).catch(function(err) {
-            ok(false, "Transaction failed");
+            ok(false, "Transaction failed: " + err.stack);
         }).finally(done);
     }
 
@@ -396,7 +396,7 @@ asyncTest("No auto-open", ()=> {
         equal(res.length, 0, "Got an answer now when opened.");
         db.close();
         let openPromise = db.open().then(()=>{
-            debugger;
+            //console.log("Why are we here? " + Dexie.Promise.reject().stack);
             ok(false, "Should not succeed to open because we closed it during the open sequence.")
         }).catch(e=> {
             ok(e instanceof Dexie.DatabaseClosedError, "Got DatabaseClosedError from the db.open() call.");
@@ -408,8 +408,6 @@ asyncTest("No auto-open", ()=> {
         });
         db.close();
         return Promise.all([openPromise, queryPromise]);
-    }).catch(e => {
-        ok(e instanceof Dexie.OpenFailedError);
     }).catch(e => {
         ok(false, e);
     }).finally(start);
@@ -427,6 +425,7 @@ asyncTest("db.close", ()=> {
         ok(e instanceof Dexie.DatabaseClosedError, "Should catch DatabaseClosedError");
         return db.open();
     }).then(()=>{
+        console.log("The call to db.open() completed");
         return db.foo.toArray();
     }).then(res => {
         equal(res.length, 0, "Database re-opened and I got a result from my query");
@@ -434,5 +433,21 @@ asyncTest("db.close", ()=> {
         ok(false, e);
     }).finally(()=>{
         db.delete().catch(e=>console.error(e)).finally(start);
+    });
+});
+
+spawnedTest("db.open several times", 2, function*(){
+    let db = new Dexie("TestDB");
+    db.version(1).stores({foo: "id"});
+    db.on('populate', ()=>{throw "Failed in populate";});
+    db.open().then(()=>{
+        ok(false, "Should not succeed to open");
+    }).catch(err =>{
+        ok(true, "Got error: " + (err.stack || err));
+    });
+    yield db.open().then(()=>{
+        ok(false, "Should not succeed to open");
+    }).catch(err =>{
+        ok(true, "Got error: " + (err.stack || err));
     });
 });

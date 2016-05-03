@@ -23,11 +23,18 @@ module("collection", {
     setup: function () {
         stop();
         resetDatabase(db).catch(function (e) {
-            ok(false, "Error resetting database: " + e);
+            ok(false, "Error resetting database: " + e.stack);
         }).finally(start);
     },
     teardown: function () {
     }
+});
+
+spawnedTest("and with values", function*(){
+    let array = yield db.users.where("last").inAnyRange([["a","g"],["A","G"]])
+        .and(user => user.username === "dfahlander")
+        .toArray();
+    equal (array.length, 1, "Should find one user with given criteria");
 });
 
 spawnedTest("and with keys", function*(){
@@ -459,7 +466,7 @@ asyncTest("or-issue#15-test", function () {
 
         }).catch(function (err) {
 
-            ok(false, "error:" + err);
+            ok(false, "error:" + err.stack);
 
         }).finally(function () {
             if (--numRuns == 0) {

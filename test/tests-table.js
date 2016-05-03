@@ -32,7 +32,7 @@ module("table", {
     setup: function () {
         stop();
         resetDatabase(db).catch(function (e) {
-            ok(false, "Error resetting database: " + e);
+            ok(false, "Error resetting database: " + e.stack);
         }).finally(start);
     },
     teardown: function () {
@@ -654,4 +654,35 @@ asyncTest("clear", function () {
     }).catch(function (e) {
         ok(false, e);
     }).finally(start);
+});
+
+spawnedTest("failReadonly", function*(){
+    yield db.transaction('r', 'users', function*() {
+        yield db.users.bulkAdd([{first: "Foo", last: "Bar"}]);
+    }).then(()=>{
+        ok(false, "Should not happen");
+    }).catch ('ReadOnlyError', e => {
+        ok(true, "Got ReadOnlyError: " + e.stack);
+    });
+});
+
+spawnedTest("failNotIncludedStore", function*(){
+    yield db.transaction('rw', 'folks', function*() {
+        yield db.users.bulkAdd([{first: "Foo", last: "Bar"}]);
+    }).then(()=>{
+        ok(false, "Should not happen");
+    }).catch ('NotFoundError', e => {
+        ok(true, "Got NotFoundError: " + e.stack);
+    });
+});
+
+asyncTest("failNotIncludedStoreTrans", () => {
+    db.transaction('rw', 'foodassaddas', ()=>{
+    }).then(()=>{
+        ok(false, "Should not happen");
+    }).catch ('NotFoundError', e => {
+        ok(true, "Got NotFoundError: " + e.stack);
+    }).catch (e => {
+        ok(false, "Oops: " + e.stack);
+    }).then(start);
 });

@@ -17,12 +17,14 @@
     "IDBKeyRange": false,
     "setTimeout": false,
     "clearTimeout": false,
+    "Symbol": false,
     "setImmediate": false,
     "console": false,
     "self": false,
     "window": false,
     "global": false,
     "navigator": false,
+    "location": false,
     "chrome": false
   }
 }

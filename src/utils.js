@@ -26,15 +26,21 @@ export function extend(obj, extension) {
     return obj;
 }
 
-export function extendProto (proto, extension) {
-    if (typeof extension === 'function') extension = extension(Object.getPrototypeOf(proto));
+export const getProto = Object.getPrototypeOf;
+export const _hasOwn = {}.hasOwnProperty;
+export function hasOwn(obj, prop) {
+    return _hasOwn.call(obj, prop);
+}
+
+export function props (proto, extension) {
+    if (typeof extension === 'function') extension = extension(getProto(proto));
     keys(extension).forEach(key => {
         setProp(proto, key, extension[key]);
     });
 }
 
 export function setProp(obj, prop, functionOrGetSet, options) {
-    Object.defineProperty(obj, prop, extend(typeof functionOrGetSet.get === 'function' ?
+    Object.defineProperty(obj, prop, extend(functionOrGetSet && hasOwn(functionOrGetSet, "get") && typeof functionOrGetSet.get === 'function' ?
         {get: functionOrGetSet.get, set: functionOrGetSet.set, configurable: true} :
         {value: functionOrGetSet, configurable: true, writable: true}, options));
 }
@@ -45,10 +51,18 @@ export function derive(Child) {
             Child.prototype = Object.create(Parent.prototype);
             setProp(Child.prototype, "constructor", Child);
             return {
-                extend: extendProto.bind(null, Child.prototype)
+                extend: props.bind(null, Child.prototype)
             };
         }
     };
+}
+
+export const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
+
+export function getPropertyDescriptor(obj, prop) {
+    var pd = getOwnPropertyDescriptor(obj, prop),
+        proto;
+    return pd || (proto = getProto(obj)) && getPropertyDescriptor (proto, prop);
 }
 
 var _slice = [].slice;
@@ -73,44 +87,37 @@ export function asap(fn) {
     if (_global.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
 }
 
-export function miniTryCatch(fn, onerror) {
+export function getUniqueArray(a) {
+    return a.filter((value, index, self) => self.indexOf(value) === index);
+}
+
+export function trycatcher(fn, reject) {
+    return function () {
+        try {
+            fn.apply(this, arguments);
+        } catch (e) {
+            reject(e);
+        }
+    };
+}
+
+export function tryCatch(fn, onerror, args) {
     try {
-        fn();
+        fn.apply(null, args);
     } catch (ex) {
         onerror && onerror(ex);
     }
 }
 
-export function messageAndStack (e) {
-    var stack = e && e.stack;
-    return stack ?
-        stack.indexOf(e+'') > 0 ?
-            stack :
-        e + ". " + stack :
-        e;
-}
-
-export function stack(error) {
-    if (error.stack) return error; // Provided error already has a stack
-    try {
-        var err = new Error(error.message || error); // In Chrome, stack is generated here.
-        if (err.stack) { error.stack = err.stack; return error; } // If stack was generated, set it.
-        // No stack. Other browsers only put the stack if we throw the error:
-        throw err;
-    } catch (e) {
-        error.stack = e.stack;
-    }
-    return error;
-}
-
-export function fail(err) {
+export function rejection (err, uncaughtHandler) {
     // Get the call stack and return a rejected promise.
-    return Promise.reject(stack(err));
+    var rv = Promise.reject(err);
+    return uncaughtHandler ? rv.uncaught(uncaughtHandler) : rv;
 }
 
 export function getByKeyPath(obj, keyPath) {
     // http://www.w3.org/TR/IndexedDB/#steps-for-extracting-a-key-from-a-value-using-a-key-path
-    if (obj.hasOwnProperty(keyPath)) return obj[keyPath]; // This line is moved from last to first for optimization purpose.
+    if (hasOwn(obj, keyPath)) return obj[keyPath]; // This line is moved from last to first for optimization purpose.
     if (!keyPath) return obj;
     if (typeof keyPath !== 'string') {
         var rv = [];
@@ -163,10 +170,10 @@ export function delByKeyPath(obj, keyPath) {
         });
 }
 
-    export function shallowClone(obj) {
+export function shallowClone(obj) {
     var rv = {};
     for (var m in obj) {
-        if (obj.hasOwnProperty(m)) rv[m] = obj[m];
+        if (hasOwn(obj, m)) rv[m] = obj[m];
     }
     return rv;
 }
@@ -185,7 +192,7 @@ export function deepClone(any) {
     } else {
         rv = any.constructor ? Object.create(any.constructor.prototype) : {};
         for (var prop in any) {
-            if (any.hasOwnProperty(prop)) {
+            if (hasOwn(any, prop)) {
                 rv[prop] = deepClone(any[prop]);
             }
         }
@@ -197,8 +204,8 @@ export function getObjectDiff(a, b, rv, prfx) {
     // Compares objects a and b and produces a diff object.
     rv = rv || {};
     prfx = prfx || '';
-    for (var prop in a) if (a.hasOwnProperty(prop)) {
-        if (!b.hasOwnProperty(prop))
+    for (var prop in a) if (hasOwn(a, prop)) {
+        if (!hasOwn(b, prop))
             rv[prfx+prop] = undefined; // Property removed
         else {
             var ap = a[prop],
@@ -209,7 +216,7 @@ export function getObjectDiff(a, b, rv, prfx) {
                 rv[prfx + prop] = b[prop];// Primitive value changed
         }
     }
-    for (prop in b) if (b.hasOwnProperty(prop) && !a.hasOwnProperty(prop)) {
+    for (prop in b) if (hasOwn(b, prop) && !hasOwn(a, prop)) {
         rv[prfx+prop] = b[prop]; // Property added
     }
     return rv;
@@ -221,4 +228,50 @@ export function idbp(idbOperation) {
         req.onerror = reject;
         req.onsuccess = resolve;
     });
+}
+
+// If first argument is iterable or array-like, return it as an array
+export const iteratorSymbol = typeof Symbol !== 'undefined' && Symbol.iterator;
+export const getIteratorOf = iteratorSymbol ? function(x) {
+    var i;
+    return x != null && (i = x[iteratorSymbol]) && i.apply(x);
+} : function () { return null; };
+
+export const NO_CHAR_ARRAY = {};
+// Takes one or several arguments and returns an array based on the following criteras:
+// * If several arguments provided, return arguments converted to an array in a way that
+//   still allows javascript engine to optimize the code.
+// * If single argument is an array, return a clone of it.
+// * If this-pointer equals NO_CHAR_ARRAY, don't accept strings as valid iterables as a special
+//   case to the two bullets below.
+// * If single argument is an iterable, convert it to an array and return the resulting array.
+// * If single argument is array-like (has length of type number), convert it to an array.
+export function getArrayOf (arrayLike) {
+    var i, a, x, it;
+    if (arguments.length === 1) {
+        if (isArray(arrayLike)) return arrayLike.slice();
+        if (this === NO_CHAR_ARRAY && typeof arrayLike === 'string') return [arrayLike];
+        if ((it = getIteratorOf(arrayLike))) {
+            a = [];
+            while ((x = it.next()), !x.done) a.push(x.value);
+            return a;
+        }
+        if (arrayLike == null) return [arrayLike];
+        i = arrayLike.length;
+        if (typeof i === 'number') {
+            a = new Array(i);
+            while (i--) a[i] = arrayLike[i];
+            return a;
+        }
+        return [arrayLike];
+    }
+    i = arguments.length;
+    a = new Array(i);
+    while (i--) a[i] = arguments[i];
+    return a;
+}
+
+const concat = [].concat;
+export function flatten (a) {
+    return concat.apply([], a);
 }

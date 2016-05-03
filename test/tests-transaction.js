@@ -15,7 +15,7 @@ module("transaction", {
     setup: function () {
         stop();
         resetDatabase(db).catch(function (e) {
-            ok(false, "Error resetting database: " + e);
+            ok(false, "Error resetting database: " + e.stack);
         }).finally(start);
     },
     teardown: function () {
@@ -26,9 +26,9 @@ asyncTest("Transaction should fail if returning non-Dexie Promise in transaction
     db.transaction('rw', db.users, function() {
         return window.Promise.resolve().then(()=> {
             ok(Dexie.currentTransaction == null, "Dexie.currentTransaction == null. If this assertion fails, don't weap. Rejoice and try to understand how the hell this could be possible.");
-            return db.users.add({ username: "foobar" });
+            //return db.users.add({ username: "foobar" });
         }).then(()=>{
-            return db.users.add({ username: "barfoo" });
+            //return db.users.add({ username: "barfoo" });
         });
     }).then (function(){
         ok(false, "Transaction should not commit because we were using a non-Dexie promise");
@@ -70,7 +70,7 @@ asyncTest("Table not in transaction", function () {
         }).then(function () {
             ok(false, "Transaction should not commit because I made an error");
         }).catch(function (err) {
-            ok(true, "Got error since we tried using a table not in transaction: " + err);
+            ok(true, "Got error since we tried using a table not in transaction: " + err.stack);
         });
     }).finally(start);
 });
@@ -81,7 +81,7 @@ asyncTest("Table not in transaction 2", function () {
     }).then(function () {
     ok(false, "Transaction should not commit because I made an error");
     }).catch(function (err) {
-    ok(true, "Got error since we tried using a table not in transaction: " + err);
+    ok(true, "Got error since we tried using a table not in transaction: " + err.stack);
     }).finally(start);
 });
 
@@ -93,7 +93,7 @@ asyncTest("Write into readonly transaction", function () {
     }).then(function () {
         ok(false, "Transaction should not commit because I made an error");
     }).catch(function (err) {
-        ok(true, "Got error since we tried to write to users when in a readonly transaction: " + err);
+        ok(true, "Got error since we tried to write to users when in a readonly transaction: " + err.stack);
     }).finally(start);
 });
 
@@ -119,7 +119,7 @@ asyncTest("Inactive transaction", function () {
     }).then(function () {
         ok(false, "Should not be able to get a here transaction has become inactive");
     }).catch(function (err) {
-        ok(true, "Got error because the transaction has already committed: " + err);
+        ok(true, "Got error because the transaction has already committed: " + err.stack);
     }).finally(start);
 });
 
@@ -145,7 +145,7 @@ asyncTest("Inactive transaction 2", function () {
     }).then(function () {
         ok(false, "Should not be able to get a here transaction has become inactive");
     }).catch(function (err) {
-        ok(true, "Got error because the transaction has already committed: " + err);
+        ok(true, "Got error because the transaction has already committed: " + err.stack);
     }).finally(start);
 });
 
@@ -189,6 +189,7 @@ asyncTest("sub-transactions", function () {
         });
     }).then(function (retval) {
         equal(retval, "hello...", "Return value went all the way down to transaction resolvance");
+        ok(Dexie.currentTransaction == null, "Dexie.currentTransaction is null");
         db.users.count(function (count) { // Transaction-less operation!
             equal(count, 5, "There are five users in db");
         });
@@ -217,6 +218,8 @@ asyncTest("sub-transactions", function () {
             });
             //});
         }).catch("ConstraintError", function (err) {
+            // Yes, it should fail beause of limited rollback support on nested transactions:
+            // https://github.com/dfahlander/Dexie.js/wiki/Dexie.transaction()#limitations-with-nested-transactions
             ok(true, "Got constraint error on outer transaction as well");
         });
     }).catch(function (err) {
@@ -331,8 +334,10 @@ asyncTest("'!' mode: Transaction bound to different db instance", function () {
         pets: "++id,kind",
         petsPerUser: "++,user,pet"
     });
-    db2.open();
-    db.transaction('rw', "users", "pets", function () {
+    
+    db2.delete()
+    .then(()=>db2.open())
+    .then(()=>db.transaction('rw', "users", "pets", function () {
         db2.transaction('rw!', "users", "pets", function () {
             ok(true, "Possible to enter a transaction in db2");
         }).catch(function (err) {
@@ -341,7 +346,7 @@ asyncTest("'!' mode: Transaction bound to different db instance", function () {
             if (++counter == 2) db2.delete().then(start);
             console.log("finally() in db2.transaction(). counter == " + counter);
         });
-    }).finally(function () {
+    })).finally(function () {
         if (++counter == 2) db2.delete().then(start);
         console.log("finally() in db.transaction(). counter == " + counter);
     });
@@ -444,19 +449,20 @@ asyncTest("Transactions in multiple databases", function () {
 	logDb.version(1).stores({
 		log: "++,time,type,message"
 	});
-	logDb.open();
 	var lastLogAddPromise;
-	db.transaction('rw', db.pets, function () {
-		// Test that a non-transactional add in the other DB can coexist with
-		// the current transaction on db:
-		logDb.log.add({time: new Date(), type: "info", message: "Now adding a dog"});
-		db.pets.add({kind: "dog"}).then(function(petId){
-			// Test that a transactional add in the other DB can coexist with
-			// the current transaction on db:
-			lastLogAddPromise = logDb.transaction('rw!', logDb.log, function (){
-				logDb.log.add({time: new Date(), type: "info", message: "Added dog got key " + petId});
-			});
-		});
+	logDb.open().then(()=>{
+	    return db.transaction('rw', db.pets, function () {
+            // Test that a non-transactional add in the other DB can coexist with
+            // the current transaction on db:
+            logDb.log.add({time: new Date(), type: "info", message: "Now adding a dog"});
+            db.pets.add({kind: "dog"}).then(function(petId){
+                // Test that a transactional add in the other DB can coexist with
+                // the current transaction on db:
+                lastLogAddPromise = logDb.transaction('rw!', logDb.log, function (){
+                    logDb.log.add({time: new Date(), type: "info", message: "Added dog got key " + petId});
+                });
+            });
+        });
 	}).then(function() {
 		return lastLogAddPromise; // Need to wait for the transaction of the other database to complete as well.
 	}).then(function(){
@@ -516,13 +522,13 @@ asyncTest("Issue #91 Promise.resolve() from within parent transaction", function
 	        equal(result.username, "Gunnar", "Got the Gunnar we expected");
 	        return Dexie.Promise.resolve(result);
 	    }).catch(function(e) {
-	        ok(false, "Error: " + e);
+	        ok(false, "Error: " + e.stack);
 	    });
 	}).then(function(result) {
 	    ok(!!result, "Got result");
 	    equal(result.username, "Gunnar", "Got the Gunnar we expected");
 	}).catch(function(e) {
-	    ok(false, "Error at root scope: " + e);
+	    ok(false, "Error at root scope: " + e.stack);
 	}).finally(start);
 });
 
@@ -677,7 +683,7 @@ asyncTest("Issue #91 / #95 with Dexie.Promise.resolve() mixed in here and there.
         ok(!Dexie.currentTransaction, "No ongoing transaction now");
         ok(true, "done");
     }).catch(function(error) {
-        ok(false, error);
+        ok(false, error.stack);
     }).finally(start);
     ok(!Dexie.currentTransaction, "After main transaction scope: Still no ongoing transaction at this scope");
 });
@@ -728,7 +734,7 @@ asyncTest("Issue #137 db.table() does not respect current transaction", function
     }).finally(start);
 });
 
-asyncTest("Dexie.currentTransaction in CRUD hooks", 55, function () {
+asyncTest("Dexie.currentTransaction in CRUD hooks", 53, function () {
 
     function CurrentTransChecker(scope, trans) {
         return function() {

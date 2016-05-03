@@ -269,11 +269,15 @@ config = {
             tooltip: "If enabled in browsers with WebSQL support (Safari,Chrome or Opera) all indexedDB calls will go through IndexedDBShim with WebSQL as backend"
 	    },
 	    {
-	        
 	        id: "dontoptimize",
 	        label: "Dont optimize tests",
 	        tooltip: "Always delete and recreate the DB between each test"
-	    }
+	    },
+        {
+            id: "longstacks",
+            label: "Long async stacks",
+            tooltip: "Set Dexie.debug=true, turning on long async stacks on all errors (Actually we use Dexie.debug='dexie' so that frames from dexie.js are also included)"
+        }
 	],
 
 	// Set of all modules.

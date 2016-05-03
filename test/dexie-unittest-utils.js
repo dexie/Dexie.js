@@ -1,8 +1,10 @@
 ﻿import Dexie from 'dexie';
 import {ok, start, asyncTest} from 'QUnit';
 
+Dexie.debug = window.location.search.indexOf('longstacks=true') !== -1 ? 'dexie' : false;
+if (window.location.search.indexOf('longstacks=tests') !== -1) Dexie.debug = true; // Don't include stuff from dexie.js.
 
-var no_optimize = window.no_optimize || window.location.search.indexOf('dontoptimize=true') != -1;
+var no_optimize = window.no_optimize || window.location.search.indexOf('dontoptimize=true') !== -1;
 
 export function resetDatabase(db) {
     /// <param name="db" type="Dexie"></param>

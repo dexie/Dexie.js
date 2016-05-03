@@ -1,4 +1,5 @@
-import { derive, messageAndStack } from './utils';
+import { derive, setProp } from './utils';
+import { getErrorWithStack, prettyStack } from './debug';
 
 var dexieErrorNames = [
     'Modify',
@@ -40,7 +41,8 @@ var errorList = dexieErrorNames.concat(idbDomErrorNames);
 var defaultTexts = {
     VersionChanged: "Database version changed by other database connection",
     DatabaseClosed: "Database has been closed",
-    IncompatiblePromise: "Incompatible Promise used in transaction scope. See http://tinyurl.com/znyqjqc"
+    Abort: "Transaction aborted",
+    TransactionInactive: "Transaction has already completed or failed"
 };
 
 //
@@ -52,35 +54,42 @@ export function DexieError (name, msg) {
     // 2. It doesn't give us much in this case.
     // 3. It would require sub classes to call super(), which
     //    is not needed when deriving from Error.
+    this._e = getErrorWithStack();
     this.name = name;
     this.message = msg;
 }
+
 derive(DexieError).from(Error).extend({
-    dump: function () {
-        return messageAndStack(this);
-    }
+    stack: {
+        get: function() {
+            return this._stack ||
+                (this._stack = this.name + ": " + this.message + prettyStack(this._e, 2));
+        }
+    },
+    toString: function(){ return this.name + ": " + this.message; }
 });
 
 function getMultiErrorMessage (msg, failures) {
     return msg + ". Errors: " + failures
         .map(f=>f.toString())
-        .filter((v,i,s)=>s.indexOf(v)===i) // Only unique error strings
+        .filter((v,i,s)=>s.indexOf(v) === i) // Only unique error strings
         .join('\n');
 }
+
 //
 // ModifyError - thrown in WriteableCollection.modify()
 // Specific constructor because it contains members failures and failedKeys.
 //
 export function ModifyError (msg, failures, successCount, failedKeys) {
-    this.name = "ModifyError";
+    this._e = getErrorWithStack();
     this.failures = failures;
     this.failedKeys = failedKeys;
     this.successCount = successCount;
-    this.message = getMultiErrorMessage(msg, failures);
 }
 derive(ModifyError).from(DexieError);
 
 export function BulkError (msg, failures) {
+    this._e = getErrorWithStack();
     this.name = "BulkError";
     this.failures = failures;
     this.message = getMultiErrorMessage(msg, failures);
@@ -109,16 +118,17 @@ export var exceptions = errorList.reduce((obj,name)=>{
     // 'eval-evil'.
     var fullName = name + "Error";
     function DexieError (msgOrInner, inner){
+        this._e = getErrorWithStack();
         this.name = fullName;
-        if (typeof msgOrInner === 'string') {
+        if (!msgOrInner) {
+            this.message = defaultTexts[name] || fullName;
+            this.inner = null;
+        } else if (typeof msgOrInner === 'string') {
             this.message = msgOrInner;
             this.inner = inner || null;
         } else if (typeof msgOrInner === 'object') {
             this.message = `${msgOrInner.name} ${msgOrInner.message}`;
             this.inner = msgOrInner;
-        } else {
-            this.message = defaultTexts[name];
-            this.inner = null;
         }
     }
     derive(DexieError).from(BaseException);
@@ -137,10 +147,14 @@ export var exceptionMap = idbDomErrorNames.reduce((obj, name)=>{
 }, {});
 
 export function mapError (domError, message) {
-    var rv = domError;
-    if (!(domError instanceof DexieError) && domError.name && exceptionMap[domError.name]) {
-        rv = new exceptionMap[domError.name](message || domError.message, domError);
-        if (domError.stack) rv.stack = domError.stack;
+    if (!domError || domError instanceof DexieError || domError instanceof TypeError || domError instanceof SyntaxError || !domError.name || !exceptionMap[domError.name])
+        return domError;
+    var rv = new exceptionMap[domError.name](message || domError.message, domError);
+    if ("stack" in domError) {
+        // Derive stack from inner exception if it has a stack
+        setProp(rv, "stack", {get: function(){
+            return this.inner.stack;
+        }});
     }
     return rv;
 }

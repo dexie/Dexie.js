@@ -1,16 +1,15 @@
-import {slice, keys, isArray, asap, _global} from './utils';
-import {nop, stoppableEventChain} from './chaining-functions';
+import {keys, isArray, asap} from './utils';
+import {nop, mirror, reverseStoppableEventChain} from './chaining-functions';
 import {exceptions} from './errors';
 
 export default function Events(ctx) {
-    var args = arguments;
     var evs = {};
     var rv = function (eventName, subscriber) {
         if (subscriber) {
-            // Subscribe
-            var args = slice(arguments, 1);
-            var ev = evs[eventName];
-            ev.subscribe.apply(ev, args);
+            // Subscribe. If additional arguments than just the subscriber was provided, forward them as well.
+            var i = arguments.length, args = new Array(i - 1);
+            while (--i) args[i - 1] = arguments[i];
+            evs[eventName].subscribe.apply(null, args);
             return ctx;
         } else if (typeof (eventName) === 'string') {
             // Return interface allowing to fire or unsubscribe from event
@@ -18,19 +17,26 @@ export default function Events(ctx) {
         }
     };
     rv.addEventType = add;
+    
+    for (var i = 1, l = arguments.length; i < l; ++i) {
+        add(arguments[i]);
+    }
+    
+    return rv;
 
     function add(eventName, chainFunction, defaultFunction) {
-        if (isArray(eventName)) return addEventGroup(eventName);
         if (typeof eventName === 'object') return addConfiguredEvents(eventName);
-        if (!chainFunction) chainFunction = stoppableEventChain;
+        if (!chainFunction) chainFunction = reverseStoppableEventChain;
         if (!defaultFunction) defaultFunction = nop;
 
         var context = {
             subscribers: [],
             fire: defaultFunction,
             subscribe: function (cb) {
-                context.subscribers.push(cb);
-                context.fire = chainFunction(context.fire, cb);
+                if (context.subscribers.indexOf(cb) === -1) {
+                    context.subscribers.push(cb);
+                    context.fire = chainFunction(context.fire, cb);
+                }
             },
             unsubscribe: function (cb) {
                 context.subscribers = context.subscribers.filter(function (fn) { return fn !== cb; });
@@ -50,43 +56,18 @@ export default function Events(ctx) {
             } else if (args === 'asap') {
                 // Rather than approaching event subscription using a functional approach, we here do it in a for-loop where subscriber is executed in its own stack
                 // enabling that any exception that occur wont disturb the initiator and also not nescessary be catched and forgotten.
-                var context = add(eventName, null, function fire() {
-                    var args = arguments;
+                var context = add(eventName, mirror, function fire() {
+                    // Optimazation-safe cloning of arguments into args.
+                    var i = arguments.length, args = new Array(i);
+                    while (i--) args[i] = arguments[i];
+                    // All each subscriber:
                     context.subscribers.forEach(function (fn) {
                         asap(function fireEvent() {
-                            fn.apply(_global, args);
+                            fn.apply(null, args);
                         });
                     });
                 });
-                context.subscribe = function (fn) {
-                    // Change how subscribe works to not replace the fire function but to just add the subscriber to subscribers
-                    if (context.subscribers.indexOf(fn) === -1)
-                        context.subscribers.push(fn);
-                };
-                context.unsubscribe = function (fn) {
-                    // Change how unsubscribe works for the same reason as above.
-                    var idxOfFn = context.subscribers.indexOf(fn);
-                    if (idxOfFn !== -1) context.subscribers.splice(idxOfFn, 1);
-                };
             } else throw new exceptions.InvalidArgument("Invalid event config");
         });
     }
-
-    function addEventGroup(eventGroup) {
-        // promise-based event group (i.e. we promise to call one and only one of the events in the pair, and to only call it once.
-        var done = false;
-        eventGroup.forEach(function (name) {
-            add(name).subscribe(checkDone);
-        });
-        function checkDone() {
-            if (done) return false;
-            done = true;
-        }
-    }
-
-    for (var i = 1, l = args.length; i < l; ++i) {
-        add(args[i]);
-    }
-
-    return rv;
 }
