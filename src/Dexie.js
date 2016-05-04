@@ -1993,18 +1993,20 @@ export default function Dexie(dbName, options) {
                 }
 
                 function joiner(_, cursor) {
-                    var key = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
-                    var earlierHit = hasOwn(set, key);
-                    set[key] = true;
+                    var primKey = cursor.primaryKey,
+                        key = cursor.key;
+                    var keyStr = primKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
+                    var earlierHit = hasOwn(set, keyStr);
+                    set[keyStr] = true;
                     if ((useOr && !earlierHit) || (useAnd && earlierHit)) {
                         if (ctx.keysOnly)
-                            fn(cursor.key, cursor);
+                            fn(key, cursor);
                         else {
                             --resolved;
-                            var req = idbstore.get(key);
+                            var req = idbstore.get(primKey);
                             req.onsuccess = wrap(ev => {
                                 var value = ev.target.result;
-                                fn (valueMapper ? valueMapper(value) : value, {primaryKey: key});
+                                fn (valueMapper ? valueMapper(value) : value, {primaryKey: primKey});
                                 resolveboth();
                             }, reject);
                             req.onerror = eventRejectHandler(reject);
@@ -2012,7 +2014,7 @@ export default function Dexie(dbName, options) {
                     }
                 }
                 
-                var cty = ctx.or._ctx,
+                var cty = (ctx.or || ctx.and)._ctx,
                     filter2 = cty.replayFilter ? combine(cty.filter, cty.replayFilter()) : cty.filter;
                 // TODO: To support joining different tables, get idbstore from ctx somehow instead. 
                 iterate(openCursor(ctx, idbstore, true), combine(ctx.algorithm, filter), joiner, resolve, reject);
@@ -2230,25 +2232,41 @@ export default function Dexie(dbName, options) {
                 return this;
             },
             
-            and: function (filterFunctionOrCollection) {
-                if (filterFunctionOrCollection instanceof Collection)
-                    return this.clone({and: filterFunctionOrCollection});
-                return this.filter(filterFunctionOrCollection);
+            and: function (param) {
+                if (typeof param === 'function') return this.filter(param);
+                if (typeof param === 'string') return this.where(param);
+                if (param instanceof Collection) {
+                    if (param._ctx.table !== this._ctx.table)
+                        throw new exceptions.InvalidTable("AND expressions must use same table");
+                    return this.clone({and: param});
+                }
+                return this.filter(param);
             },
-
+            
             or: function (indexNameOrCollection) {
-                if (indexNameOrCollection instanceof Collection)
+                if (indexNameOrCollection instanceof Collection) {
+                    if (indexNameOrCollection._ctx.table !== this._ctx.table)
+                        throw new exceptions.InvalidTable("OR expressions must use same table");
                     return this.clone({or: indexNameOrCollection});
+                }
                 return new WhereClause(this._ctx.table, indexNameOrCollection, this);
             },
             
-            orderBy: function (indexName) {
-                return this.and(this.table.orderBy(indexName));
+            where: function (indexName) {
+                return new WhereClause(this._ctx.table, indexName, null, this);
             },
+            
+            orderBy: function (indexName) {
+                var ctx = this._ctx;
+                if (indexName === ctx.index) return this;
+                return this.and(ctx.table.orderBy(indexName));
+            },  
 
             reverse: function () {
-                this._ctx.dir = (this._ctx.dir === "prev" ? "next" : "prev");
-                if (this._ondirectionchange) this._ondirectionchange(this._ctx.dir);
+                var ctx = this._ctx;
+                ctx.dir = (ctx.dir === "prev" ? "next" : "prev");
+                if (this._ondirectionchange) this._ondirectionchange(ctx.dir);
+                if (ctx.and) ctx.and.reverse();
                 return this;
             },
 

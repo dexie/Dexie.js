@@ -1,4 +1,5 @@
-﻿import "./tests-crud-hooks";
+﻿import "./tests-join-expressions.js"
+import "./tests-crud-hooks";
 import "./tests-misc";
 import "./tests-yield";
 import "./tests-whereclause.js";
