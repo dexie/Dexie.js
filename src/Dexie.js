@@ -1525,7 +1525,7 @@ export default function Dexie(dbName, options) {
     //
     //
     //
-    function WhereClause(table, index, orCollection) {
+    function WhereClause(table, index, orCollection, andCollection) {
         /// <param name="table" type="Table"></param>
         /// <param name="index" type="String" optional="true"></param>
         /// <param name="orCollection" type="Collection" optional="true"></param>
@@ -1533,7 +1533,8 @@ export default function Dexie(dbName, options) {
             table: table,
             index: index === ":id" ? null : index,
             collClass: table._collClass,
-            or: orCollection
+            or: orCollection,
+            and: andCollection
         };
     }
 
@@ -1916,6 +1917,7 @@ export default function Dexie(dbName, options) {
             limit: Infinity,
             error: error, // If set, any promise must be rejected with this error
             or: whereCtx.or,
+            and: whereCtx.and,
             valueMapper: table.hook.reading.fire
         };
     }
@@ -1968,39 +1970,56 @@ export default function Dexie(dbName, options) {
          *      dir: "next" | "prev"
          * }
          */
-        function openCursor(ctx, store) {
+        function openCursor(ctx, store, keysOnly) {
             var idxOrStore = getIndexOrStore(ctx, store);
-            return ctx.keysOnly && 'openKeyCursor' in idxOrStore ?
+            return (keysOnly || ctx.keysOnly) && 'openKeyCursor' in idxOrStore ?
                 idxOrStore.openKeyCursor(ctx.range || null, ctx.dir + ctx.unique) :
                 idxOrStore.openCursor(ctx.range || null, ctx.dir + ctx.unique);
         }
 
         function iter(ctx, fn, resolve, reject, idbstore) {
             var filter = ctx.replayFilter ? combine(ctx.filter, ctx.replayFilter()) : ctx.filter;
-            if (!ctx.or) {
-                iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, !ctx.keysOnly && ctx.valueMapper);
-            } else (()=>{
+            var valueMapper = !ctx.keysOnly && ctx.valueMapper;
+            if (!ctx.or && !ctx.and) {
+                iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, valueMapper);
+            } else if (ctx.or || ctx.and) (()=>{
                 var set = {};
                 var resolved = 0;
+                var useOr = !!ctx.or,
+                    useAnd = !!ctx.and;
 
                 function resolveboth() {
                     if (++resolved === 2) resolve(); // Seems like we just support or btwn max 2 expressions, but there are no limit because we do recursion.
                 }
 
-                function union(item, cursor, advance) {
-                    if (!filter || filter(cursor, advance, resolveboth, reject)) {
-                        var key = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
-                        if (!hasOwn(set, key)) {
-                            set[key] = true;
-                            fn(item, cursor, advance);
+                function joiner(_, cursor) {
+                    var key = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
+                    var earlierHit = hasOwn(set, key);
+                    set[key] = true;
+                    if ((useOr && !earlierHit) || (useAnd && earlierHit)) {
+                        if (ctx.keysOnly)
+                            fn(cursor.key, cursor);
+                        else {
+                            --resolved;
+                            var req = idbstore.get(key);
+                            req.onsuccess = wrap(ev => {
+                                var value = ev.target.result;
+                                fn (valueMapper ? valueMapper(value) : value, {primaryKey: key});
+                                resolveboth();
+                            }, reject);
+                            req.onerror = eventRejectHandler(reject);
                         }
                     }
                 }
-
-                ctx.or._iterate(union, resolveboth, reject, idbstore);
-                iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, !ctx.keysOnly && ctx.valueMapper);
+                
+                var cty = ctx.or._ctx,
+                    filter2 = cty.replayFilter ? combine(cty.filter, cty.replayFilter()) : cty.filter;
+                // TODO: To support joining different tables, get idbstore from ctx somehow instead. 
+                iterate(openCursor(ctx, idbstore, true), combine(ctx.algorithm, filter), joiner, resolve, reject);
+                iterate(openCursor(cty, idbstore, true), combine(cty.algorithm, filter2), joiner, resolve, reject);
             })();
         }
+        
         function getInstanceTemplate(ctx) {
             return ctx.table.schema.instanceTemplate;
         }
@@ -2211,12 +2230,20 @@ export default function Dexie(dbName, options) {
                 return this;
             },
             
-            and: function (filterFunction) {
-                return this.filter(filterFunction);
+            and: function (filterFunctionOrCollection) {
+                if (filterFunctionOrCollection instanceof Collection)
+                    return this.clone({and: filterFunctionOrCollection});
+                return this.filter(filterFunctionOrCollection);
             },
 
-            or: function (indexName) {
-                return new WhereClause(this._ctx.table, indexName, this);
+            or: function (indexNameOrCollection) {
+                if (indexNameOrCollection instanceof Collection)
+                    return this.clone({or: indexNameOrCollection});
+                return new WhereClause(this._ctx.table, indexNameOrCollection, this);
+            },
+            
+            orderBy: function (indexName) {
+                return this.and(this.table.orderBy(indexName));
             },
 
             reverse: function () {
