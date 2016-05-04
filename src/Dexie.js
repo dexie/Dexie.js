@@ -1958,7 +1958,7 @@ export default function Dexie(dbName, options) {
             var filter = ctx.replayFilter ? combine(ctx.filter, ctx.replayFilter()) : ctx.filter;
             if (!ctx.or) {
                 iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, !ctx.keysOnly && ctx.valueMapper);
-            } else {
+            } else (()=>{
                 var set = {};
                 var resolved = 0;
 
@@ -1978,7 +1978,7 @@ export default function Dexie(dbName, options) {
 
                 ctx.or._iterate(union, resolveboth, reject, idbstore);
                 iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, !ctx.keysOnly && ctx.valueMapper);
-            }
+            })();
         }
         function getInstanceTemplate(ctx) {
             return ctx.table.schema.instanceTemplate;
