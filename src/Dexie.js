@@ -1924,6 +1924,13 @@ export default function Dexie(dbName, options) {
             ctx.isMatch = combine(ctx.isMatch, fn);
         }
 
+        /** @param ctx {
+         *      isPrimKey: boolean,
+         *      table: Table,
+         *      index: string
+         * }
+         * @param store IDBObjectStore
+         **/
         function getIndexOrStore(ctx, store) {
             if (ctx.isPrimKey) return store;
             var indexSpec = ctx.table.schema.idxByName[ctx.index];
@@ -1931,6 +1938,15 @@ export default function Dexie(dbName, options) {
             return store.index(indexSpec.name);
         }
 
+        /** @param ctx {
+         *      isPrimKey: boolean,
+         *      table: Table,
+         *      index: string,
+         *      keysOnly: boolean,
+         *      range?: IDBKeyRange,
+         *      dir: "next" | "prev"
+         * }
+         */
         function openCursor(ctx, store) {
             var idxOrStore = getIndexOrStore(ctx, store);
             return ctx.keysOnly && 'openKeyCursor' in idxOrStore ?
@@ -1943,27 +1959,25 @@ export default function Dexie(dbName, options) {
             if (!ctx.or) {
                 iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, !ctx.keysOnly && ctx.valueMapper);
             } else {
-                (function () {
-                    var set = {};
-                    var resolved = 0;
+                var set = {};
+                var resolved = 0;
 
-                    function resolveboth() {
-                        if (++resolved === 2) resolve(); // Seems like we just support or btwn max 2 expressions, but there are no limit because we do recursion.
-                    }
+                function resolveboth() {
+                    if (++resolved === 2) resolve(); // Seems like we just support or btwn max 2 expressions, but there are no limit because we do recursion.
+                }
 
-                    function union(item, cursor, advance) {
-                        if (!filter || filter(cursor, advance, resolveboth, reject)) {
-                            var key = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
-                            if (!hasOwn(set, key)) {
-                                set[key] = true;
-                                fn(item, cursor, advance);
-                            }
+                function union(item, cursor, advance) {
+                    if (!filter || filter(cursor, advance, resolveboth, reject)) {
+                        var key = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
+                        if (!hasOwn(set, key)) {
+                            set[key] = true;
+                            fn(item, cursor, advance);
                         }
                     }
+                }
 
-                    ctx.or._iterate(union, resolveboth, reject, idbstore);
-                    iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, !ctx.keysOnly && ctx.valueMapper);
-                })();
+                ctx.or._iterate(union, resolveboth, reject, idbstore);
+                iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, !ctx.keysOnly && ctx.valueMapper);
             }
         }
         function getInstanceTemplate(ctx) {
