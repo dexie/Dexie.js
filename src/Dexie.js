@@ -35,6 +35,7 @@ import {
     assert,
     NO_CHAR_ARRAY,
     getArrayOf,
+    arrayToObject,
     hasOwn,
     flatten
 
@@ -102,7 +103,8 @@ export default function Dexie(dbName, options) {
             cancelOpen = reject;
         });
     var autoSchema = true;
-    var hasNativeGetDatabaseNames = !!getNativeGetDatabaseNamesFn(indexedDB);
+    var hasNativeGetDatabaseNames = !!getNativeGetDatabaseNamesFn(indexedDB),
+        hasGetAll;
 
     function init() {
         // Default subscribers to "versionchange" and "blocked".
@@ -328,11 +330,12 @@ export default function Dexie(dbName, options) {
         for (table in newSchema) {
             var oldDef = oldSchema[table],
                 newDef = newSchema[table];
-            if (!oldDef) diff.add.push([table, newDef]);
-            else {
+            if (!oldDef) {
+                diff.add.push([table, newDef]);
+            } else {
                 var change = {
                     name: table,
-                    def: newSchema[table],
+                    def: newDef,
                     recreate: false,
                     del: [],
                     add: [],
@@ -343,8 +346,9 @@ export default function Dexie(dbName, options) {
                     change.recreate = true;
                     diff.change.push(change);
                 } else {
-                    var oldIndexes = oldDef.indexes.reduce(function (prev, current) { prev[current.name] = current; return prev; }, {});
-                    var newIndexes = newDef.indexes.reduce(function (prev, current) { prev[current.name] = current; return prev; }, {});
+                    // Same primary key. Just find out what differs:
+                    var oldIndexes = oldDef.idxByName;
+                    var newIndexes = newDef.idxByName;
                     for (var idxName in oldIndexes) {
                         if (!newIndexes[idxName]) change.del.push(idxName);
                     }
@@ -354,7 +358,7 @@ export default function Dexie(dbName, options) {
                         if (!oldIdx) change.add.push(newIdx);
                         else if (oldIdx.src !== newIdx.src) change.change.push(newIdx);
                     }
-                    if (change.recreate || change.del.length > 0 || change.add.length > 0 || change.change.length > 0) {
+                    if (change.del.length > 0 || change.add.length > 0 || change.change.length > 0) {
                         diff.change.push(change);
                     }
                 }
@@ -1022,7 +1026,7 @@ export default function Dexie(dbName, options) {
             }
         },
         bulkPut: function(objects, keys) {
-            return this._idbstore(READWRITE, (resolve, reject, idbstore, trans) => {
+            return this._idbstore(READWRITE, (resolve, reject, idbstore) => {
                 if (!idbstore.keyPath && !this.schema.primKey.auto && !keys)
                     throw new exceptions.InvalidArgument("bulkPut() with non-inbound keys requires keys array in second argument");
                 if (idbstore.keyPath && keys)
@@ -1054,11 +1058,8 @@ export default function Dexie(dbName, options) {
                     req.onsuccess = eventSuccessHandler(done);
                 } else {
                     var effectiveKeys = keys || idbstore.keyPath && objects.map(o=>getByKeyPath(o, idbstore.keyPath));
-                    var objectLookup = effectiveKeys && effectiveKeys.reduce((res, key, i)=> {
-                            if (key != null) res[key] = objects[i];
-                            return res;
-                        }, {}); // Generates map of {[key]: object}
-
+                    // Generate map of {[key]: object}
+                    var objectLookup = effectiveKeys && arrayToObject(effectiveKeys, (key, i) => key != null && [key, objects[i]]); 
                     var promise = !effectiveKeys ?
 
                         // Auto-incremented key-less objects only without any keys argument.
@@ -1340,8 +1341,6 @@ export default function Dexie(dbName, options) {
         /// </summary>
         /// <param name="mode" type="String">Any of "readwrite" or "readonly"</param>
         /// <param name="storeNames" type="Array">Array of table names to operate on</param>
-        var self = this;
-        
         this.db = db;
         this.mode = mode;
         this.storeNames = storeNames;
@@ -1377,13 +1376,6 @@ export default function Dexie(dbName, options) {
         //
         // Transaction Protected Methods (not required by API users, but needed internally and eventually by dexie extensions)
         //
-        tables: {
-            get: function () {
-                if (this._tables) return this._tables;
-                return this._tables = this.storeNames.reduce((result, name)=>((result[name] = allTables[name]),result), {});
-            }
-        },
-
         _lock: function () {
             assert (!PSD.global); // Locking and unlocking reuires to be within a PSD scope.
             // Temporary set all requests into a pending queue if they are called before database is ready.
@@ -1480,22 +1472,36 @@ export default function Dexie(dbName, options) {
         },
 
         //
-        // Transaction Public Methods
+        // Transaction Public Properties and Methods
         //
-
-        complete: function (cb) {
-            return this.on("complete", cb);
-        },
-        error: function (cb) {
-            return this.on("error", cb);
-        },
         abort: function () {
             this.active && this._reject(new exceptions.Abort());
             this.active = false;
         },
+        
+        // Deprecate:
+        tables: {
+            get: function () {
+                if (this._tables) return this._tables;
+                return this._tables = arrayToObject(this.storeNames, name => [name, allTables[name]]);
+            }
+        },
+
+        // Deprecate:
+        complete: function (cb) {
+            return this.on("complete", cb);
+        },
+        
+        // Deprecate:
+        error: function (cb) {
+            return this.on("error", cb);
+        },
+        
+        // Deprecate
         table: function (name) {
-            if (!hasOwn(this.tables, name)) { throw new exceptions.InvalidTable("Table " + name + " not in transaction"); }
-            return this.tables[name];
+            if (this.storeNames.indexOf(name) === -1)
+                throw new exceptions.InvalidTable("Table " + name + " not in transaction");
+            return allTables[name];
         }
     });
 
@@ -1891,6 +1897,7 @@ export default function Dexie(dbName, options) {
             algorithm: null,
             filter: null,
             replayFilter: null,
+            justLimit: true, // True if a replayFilter is just a filter that performs a "limit" operation (or none at all)
             isMatch: null,
             offset: 0,
             limit: Infinity,
@@ -1899,6 +1906,11 @@ export default function Dexie(dbName, options) {
             valueMapper: table.hook.reading.fire
         };
     }
+    
+    function isPlainKeyRange (ctx, ignoreLimitFilter) {
+        return !(ctx.filter || ctx.algorithm || ctx.or) &&
+            (ignoreLimitFilter ? ctx.justLimit : !ctx.replayFilter);
+    }    
 
     props(Collection.prototype, function () {
 
@@ -1910,15 +1922,23 @@ export default function Dexie(dbName, options) {
             ctx.filter = combine(ctx.filter, fn);
         }
 
-        function addReplayFilter (ctx, factory) {
+        function addReplayFilter (ctx, factory, isLimitFilter) {
             var curr = ctx.replayFilter;
             ctx.replayFilter = curr ? ()=>combine(curr(), factory()) : factory;
+            ctx.justLimit = isLimitFilter && !curr;
         }
 
         function addMatchFilter(ctx, fn) {
             ctx.isMatch = combine(ctx.isMatch, fn);
         }
 
+        /** @param ctx {
+         *      isPrimKey: boolean,
+         *      table: Table,
+         *      index: string
+         * }
+         * @param store IDBObjectStore
+         **/
         function getIndexOrStore(ctx, store) {
             if (ctx.isPrimKey) return store;
             var indexSpec = ctx.table.schema.idxByName[ctx.index];
@@ -1926,6 +1946,15 @@ export default function Dexie(dbName, options) {
             return store.index(indexSpec.name);
         }
 
+        /** @param ctx {
+         *      isPrimKey: boolean,
+         *      table: Table,
+         *      index: string,
+         *      keysOnly: boolean,
+         *      range?: IDBKeyRange,
+         *      dir: "next" | "prev"
+         * }
+         */
         function openCursor(ctx, store) {
             var idxOrStore = getIndexOrStore(ctx, store);
             return ctx.keysOnly && 'openKeyCursor' in idxOrStore ?
@@ -1937,35 +1966,32 @@ export default function Dexie(dbName, options) {
             var filter = ctx.replayFilter ? combine(ctx.filter, ctx.replayFilter()) : ctx.filter;
             if (!ctx.or) {
                 iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, !ctx.keysOnly && ctx.valueMapper);
-            } else {
-                (function () {
-                    var set = {};
-                    var resolved = 0;
+            } else (()=>{
+                var set = {};
+                var resolved = 0;
 
-                    function resolveboth() {
-                        if (++resolved === 2) resolve(); // Seems like we just support or btwn max 2 expressions, but there are no limit because we do recursion.
-                    }
+                function resolveboth() {
+                    if (++resolved === 2) resolve(); // Seems like we just support or btwn max 2 expressions, but there are no limit because we do recursion.
+                }
 
-                    function union(item, cursor, advance) {
-                        if (!filter || filter(cursor, advance, resolveboth, reject)) {
-                            var key = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
-                            if (!hasOwn(set, key)) {
-                                set[key] = true;
-                                fn(item, cursor, advance);
-                            }
+                function union(item, cursor, advance) {
+                    if (!filter || filter(cursor, advance, resolveboth, reject)) {
+                        var key = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
+                        if (!hasOwn(set, key)) {
+                            set[key] = true;
+                            fn(item, cursor, advance);
                         }
                     }
+                }
 
-                    ctx.or._iterate(union, resolveboth, reject, idbstore);
-                    iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, !ctx.keysOnly && ctx.valueMapper);
-                })();
-            }
+                ctx.or._iterate(union, resolveboth, reject, idbstore);
+                iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, !ctx.keysOnly && ctx.valueMapper);
+            })();
         }
         function getInstanceTemplate(ctx) {
             return ctx.table.schema.instanceTemplate;
         }
-
-
+        
         return {
 
             //
@@ -2015,8 +2041,14 @@ export default function Dexie(dbName, options) {
             each: function (fn) {
                 var ctx = this._ctx;
 
-                fake && fn(getInstanceTemplate(ctx));
-
+                if (fake) {
+                    var item = getInstanceTemplate(ctx),
+                        primKeyPath = ctx.table.schema.primKey.keyPath,
+                        key = getByKeyPath(item, ctx.index ? ctx.table.schema.idxByName[ctx.index].keyPath : primKeyPath),
+                        primaryKey = getByKeyPath(item, primKeyPath);
+                    fn(item, {key: key, primaryKey: primaryKey});
+                }
+                
                 return this._read(function (resolve, reject, idbstore) {
                     iter(ctx, fn, resolve, reject, idbstore);
                 });
@@ -2026,21 +2058,21 @@ export default function Dexie(dbName, options) {
                 if (fake) return Promise.resolve(0).then(cb);
                 var ctx = this._ctx;
 
-                if (ctx.filter || ctx.algorithm || ctx.or || ctx.replayFilter) {
-                    // When filters are applied or 'ored' collections are used, we must count manually
-                    var count = 0;
-                    return this._read(function (resolve, reject, idbstore) {
-                        iter(ctx, function () { ++count; return false; }, function () { resolve(count); }, reject, idbstore);
-                    }, cb);
-                } else {
-                    // Otherwise, we can use the count() method if the index.
+                if (isPlainKeyRange(ctx, true)) {
+                    // This is a plain key range. We can use the count() method if the index.
                     return this._read(function (resolve, reject, idbstore) {
                         var idx = getIndexOrStore(ctx, idbstore);
                         var req = (ctx.range ? idx.count(ctx.range) : idx.count());
                         req.onerror = eventRejectHandler(reject);
                         req.onsuccess = function (e) {
-                            resolve(e.target.result);
+                            resolve(Math.min(e.target.result, ctx.limit));
                         };
+                    }, cb);
+                } else {
+                    // Algorithms, filters or expressions are applied. Need to count manually.
+                    var count = 0;
+                    return this._read(function (resolve, reject, idbstore) {
+                        iter(ctx, function () { ++count; return false; }, function () { resolve(count); }, reject, idbstore);
                     }, cb);
                 }
             },
@@ -2070,10 +2102,27 @@ export default function Dexie(dbName, options) {
                 var ctx = this._ctx;
                 return this._read(function (resolve, reject, idbstore) {
                     fake && resolve([getInstanceTemplate(ctx)]);
-                    var a = [];
-                    iter(ctx, function (item) { a.push(item); }, function arrayComplete() {
-                        resolve(a);
-                    }, reject, idbstore);
+                    if (hasGetAll && ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
+                        // Special optimation if we could use IDBObjectStore.getAll() or
+                        // IDBKeyRange.getAll():
+                        var readingHook = ctx.table.hook.reading.fire;
+                        var idxOrStore = getIndexOrStore(ctx, idbstore);
+                        var req = ctx.limit < Infinity ?
+                            idxOrStore.getAll(ctx.range, ctx.limit) :
+                            idxOrStore.getAll(ctx.range);
+                        req.onerror = eventRejectHandler(reject);
+                        req.onsuccess = readingHook === mirror ?
+                            eventSuccessHandler(resolve) :
+                            wrap(eventSuccessHandler(res => {
+                                resolve (res.map(readingHook));
+                            }));
+                    } else {
+                        // Getting array through a cursor.
+                        var a = [];
+                        iter(ctx, function (item) { a.push(item); }, function arrayComplete() {
+                            resolve(a);
+                        }, reject, idbstore);
+                    }
                 }, cb);
             },
 
@@ -2081,7 +2130,7 @@ export default function Dexie(dbName, options) {
                 var ctx = this._ctx;
                 if (offset <= 0) return this;
                 ctx.offset += offset; // For count()
-                if (!ctx.or && !ctx.algorithm && !ctx.filter && !ctx.replayFilter) {
+                if (isPlainKeyRange(ctx)) {
                     addReplayFilter(ctx, ()=> {
                         var offsetLeft = offset;
                         return (cursor, advance) => {
@@ -2111,7 +2160,7 @@ export default function Dexie(dbName, options) {
                         if (--rowsLeft <= 0) advance(resolve); // Stop after this item has been included
                         return rowsLeft >= 0; // If numRows is already below 0, return false because then 0 was passed to numRows initially. Otherwise we wouldnt come here.
                     };
-                });
+                }, true);
                 return this;
             },
 
@@ -2169,7 +2218,6 @@ export default function Dexie(dbName, options) {
 
             eachKey: function (cb) {
                 var ctx = this._ctx;
-                fake && cb(getByKeyPath(getInstanceTemplate(this._ctx), this._ctx.index ? this._ctx.table.schema.idxByName[this._ctx.index].keyPath : this._ctx.table.schema.primKey.keyPath));
                 ctx.keysOnly = !ctx.isMatch;
                 return this.each(function (val, cursor) { cb(cursor.key, cursor); });
             },
@@ -2178,14 +2226,42 @@ export default function Dexie(dbName, options) {
                 this._ctx.unique = "unique";
                 return this.eachKey(cb);
             },
+            
+            eachPrimaryKey: function (cb) {
+                var ctx = this._ctx;
+                ctx.keysOnly = !ctx.isMatch;
+                return this.each(function (val, cursor) { cb(cursor.primaryKey, cursor); });
+            },
 
             keys: function (cb) {
                 var ctx = this._ctx;
                 ctx.keysOnly = !ctx.isMatch;
                 var a = [];
-                if (fake) return new Promise(this.eachKey.bind(this)).then(function(x) { return [x]; }).then(cb);
                 return this.each(function (item, cursor) {
                     a.push(cursor.key);
+                }).then(function () {
+                    return a;
+                }).then(cb);
+            },
+            
+            primaryKeys: function (cb) {
+                var ctx = this._ctx;
+                if (hasGetAll && ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
+                    // Special optimation if we could use IDBObjectStore.getAllKeys() or
+                    // IDBKeyRange.getAllKeys():
+                    return this._read((resolve, reject, idbstore) =>{
+                        var idxOrStore = getIndexOrStore(ctx, idbstore);
+                        var req = ctx.limit < Infinity ?
+                            idxOrStore.getAllKeys(ctx.range, ctx.limit) :
+                            idxOrStore.getAllKeys(ctx.range);
+                        req.onerror = eventRejectHandler(reject);
+                        req.onsuccess = eventSuccessHandler(resolve);
+                    }).then(cb);
+                }
+                ctx.keysOnly = !ctx.isMatch;
+                var a = [];
+                return this.each(function (item, cursor) {
+                    a.push(cursor.primaryKey);
                 }).then(function () {
                     return a;
                 }).then(cb);
@@ -2381,10 +2457,7 @@ export default function Dexie(dbName, options) {
                 deletingHook = ctx.table.hook.deleting.fire,
                 hasDeleteHook = deletingHook !== nop;
             if (!hasDeleteHook &&
-                !ctx.or &&
-                !ctx.algorithm &&
-                !ctx.filter &&
-                !ctx.replayFilter &&
+                isPlainKeyRange(ctx) &&
                 ((ctx.isPrimKey && !hangsOnDeleteLargeKeyRange) || !range)) // if no range, we'll use clear().
             {
                 // May use IDBObjectStore.delete(IDBKeyRange) in this case (Issue #208)
@@ -2611,6 +2684,7 @@ export default function Dexie(dbName, options) {
         for (var i = 0; i < storeNames.length; ++i) {
             var storeName = storeNames[i];
             var store = idbtrans.objectStore(storeName);
+            hasGetAll = 'getAll' in store;
             for (var j = 0; j < store.indexNames.length; ++j) {
                 var indexName = store.indexNames[j];
                 var keyPath = store.index(indexName).keyPath;
@@ -2799,10 +2873,7 @@ function TableSchema(name, primKey, indexes, instanceTemplate) {
     this.indexes = indexes || [new IndexSpec()];
     this.instanceTemplate = instanceTemplate;
     this.mappedClass = null;
-    this.idxByName = indexes.reduce(function (hashSet, index) {
-        hashSet[index.name] = index;
-        return hashSet;
-    }, {});
+    this.idxByName = arrayToObject(indexes, index => [index.name, index]);
 }
 
 //
