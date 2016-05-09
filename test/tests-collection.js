@@ -381,6 +381,26 @@ asyncTest("uniqueKeys", function () {
     }).finally(start);
 });
 
+asyncTest("primaryKeys", function () {
+    db.users.orderBy("last").primaryKeys(function(a) {
+        ok(a.length, 2);
+        equal(a[0], 2, "Second is Karl");
+        equal(a[1], 1, "First is David");
+    }).catch(function (e) {
+        ok(false, e);
+    }).finally(start);
+});
+
+asyncTest("primaryKeys2", function () {
+    db.users.orderBy("first").primaryKeys(function(a) {
+        ok(a.length, 2);
+        equal(a[0], 1, "First is David");
+        equal(a[1], 2, "Second is Karl");
+    }).catch(function (e) {
+        ok(false, e);
+    }).finally(start);
+});
+
 asyncTest("eachKey and eachUniqueKey", function () {
     db.transaction("rw", db.users, function () {
         db.users.add({ id: 3, first: "Ylva", last: "Fahlander", username: "yfahlander" });
