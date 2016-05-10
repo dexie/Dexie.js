@@ -217,21 +217,26 @@ export function getObjectDiff(a, b, rv, prfx) {
     // Compares objects a and b and produces a diff object.
     rv = rv || {};
     prfx = prfx || '';
-    for (var prop in a) if (hasOwn(a, prop)) {
+    keys(a).forEach(prop => {
         if (!hasOwn(b, prop))
             rv[prfx+prop] = undefined; // Property removed
         else {
             var ap = a[prop],
                 bp = b[prop];
-            if (typeof ap === 'object' && typeof bp === 'object')
-                getObjectDiff(ap, bp, rv, prfx + prop + ".");
+            if (typeof ap === 'object' && typeof bp === 'object' &&
+                    ap && bp &&
+                    ap.constructor === bp.constructor)
+                // Same type of object but its properties may have changed
+                getObjectDiff (ap, bp, rv, prfx + prop + ".");
             else if (ap !== bp)
                 rv[prfx + prop] = b[prop];// Primitive value changed
         }
-    }
-    for (prop in b) if (hasOwn(b, prop) && !hasOwn(a, prop)) {
-        rv[prfx+prop] = b[prop]; // Property added
-    }
+    });
+    keys(b).forEach(prop => {
+        if (!hasOwn(a, prop)) {
+            rv[prfx+prop] = b[prop]; // Property added
+        }
+    });
     return rv;
 }
 

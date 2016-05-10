@@ -54,7 +54,8 @@ import {
 } from './chaining-functions';
 import * as Debug from './debug';
 
-var maxString = String.fromCharCode(65535),
+var DEXIE_VERSION = '{version}',
+    maxString = String.fromCharCode(65535),
     // maxKey is an Array<Array> if indexedDB implementations supports array keys (not supported by IE,Edge or Safari at the moment)
     // Otherwise maxKey is maxString. This is handy when needing an open upper border without limit.
     maxKey = (function(){try {IDBKeyRange.only([[]]);return [[]];}catch(e){return maxString;}})(),
@@ -2876,201 +2877,231 @@ function TableSchema(name, primKey, indexes, instanceTemplate) {
     this.idxByName = arrayToObject(indexes, index => [index.name, index]);
 }
 
-//
-// Static delete() method.
-//
-Dexie.delete = function (databaseName) {
-    var db = new Dexie(databaseName),
-        promise = db.delete();
-    promise.onblocked = function (fn) {
-        db.on("blocked", fn);
-        return this;
-    };
-    return promise;
-};
-
-//
-// Static exists() method.
-//
-Dexie.exists = function(name) {
-    return new Dexie(name).open().then(db=>{
-        db.close();
-        return true;
-    }).catch(Dexie.NoSuchDatabaseError, () => false);
-};
-
-//
-// Static method for retrieving a list of all existing databases at current host.
-//
-Dexie.getDatabaseNames = function (cb) {
-    return new Promise(function (resolve, reject) {
-        var getDatabaseNames = getNativeGetDatabaseNamesFn(indexedDB);
-        if (getDatabaseNames) { // In case getDatabaseNames() becomes standard, let's prepare to support it:
-            var req = getDatabaseNames();
-            req.onsuccess = function (event) {
-                resolve(slice(event.target.result, 0)); // Converst DOMStringList to Array<String>
-            };
-            req.onerror = eventRejectHandler(reject);
-        } else {
-            globalDatabaseList(function (val) {
-                resolve(val);
-                return false;
-            });
-        }
-    }).then(cb);
-};
-
-Dexie.defineClass = function (structure) {
-    /// <summary>
-    ///     Create a javascript constructor based on given template for which properties to expect in the class.
-    ///     Any property that is a constructor function will act as a type. So {name: String} will be equal to {name: new String()}.
-    /// </summary>
-    /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
-    /// know what type each member has. Example: {name: String, emailAddresses: [String], properties: {shoeSize: Number}}</param>
-
-    // Default constructor able to copy given properties into this object.
-    function Class(properties) {
-        /// <param name="properties" type="Object" optional="true">Properties to initialize object with.
-        /// </param>
-        properties ? extend(this, properties) : fake && applyStructure(this, structure);
-    }
-    return Class;
-};
-
-Dexie.applyStructure = applyStructure;
-
-Dexie.ignoreTransaction = function (scopeFunc) {
-    // In case caller is within a transaction but needs to create a separate transaction.
-    // Example of usage:
-    //
-    // Let's say we have a logger function in our app. Other application-logic should be unaware of the
-    // logger function and not need to include the 'logentries' table in all transaction it performs.
-    // The logging should always be done in a separate transaction and not be dependant on the current
-    // running transaction context. Then you could use Dexie.ignoreTransaction() to run code that starts a new transaction.
-    //
-    //     Dexie.ignoreTransaction(function() {
-    //         db.logentries.add(newLogEntry);
-    //     });
-    //
-    // Unless using Dexie.ignoreTransaction(), the above example would try to reuse the current transaction
-    // in current Promise-scope.
-    //
-    // An alternative to Dexie.ignoreTransaction() would be setImmediate() or setTimeout(). The reason we still provide an
-    // API for this because
-    //  1) The intention of writing the statement could be unclear if using setImmediate() or setTimeout().
-    //  2) setTimeout() would wait unnescessary until firing. This is however not the case with setImmediate().
-    //  3) setImmediate() is not supported in the ES standard.
-    //  4) You might want to keep other PSD state that was set in a parent PSD, such as PSD.letThrough.
-    return PSD.trans ?
-        usePSD(PSD.transless, scopeFunc) : // Use the closest parent that was non-transactional.
-        scopeFunc(); // No need to change scope because there is no ongoing transaction.
-};
-
-Dexie.vip = function (fn) {
-    // To be used by subscribers to the on('ready') event.
-    // This will let caller through to access DB even when it is blocked while the db.ready() subscribers are firing.
-    // This would have worked automatically if we were certain that the Provider was using Dexie.Promise for all asyncronic operations. The promise PSD
-    // from the provider.connect() call would then be derived all the way to when provider would call localDatabase.applyChanges(). But since
-    // the provider more likely is using non-promise async APIs or other thenable implementations, we cannot assume that.
-    // Note that this method is only useful for on('ready') subscribers that is returning a Promise from the event. If not using vip()
-    // the database could deadlock since it wont open until the returned Promise is resolved, and any non-VIPed operation started by
-    // the caller will not resolve until database is opened.
-    return newScope(function () {
-        PSD.letThrough = true; // Make sure we are let through if still blocking db due to onready is firing.
-        return fn();
-    });
-};
-
-Dexie.async = function (generatorFn) {
-    return function () {
-        try {
-            var rv = awaitIterator(generatorFn.apply(this, arguments));
-            if (!rv || typeof rv.then !== 'function')
-                return Promise.resolve(rv);
-            return rv;
-        } catch (e) {
-            return rejection (e);
-        }
-    };
-};
-
-Dexie.spawn = function (generatorFn, args, thiz) {
-    try {
-        var rv = awaitIterator(generatorFn.apply(thiz, args || []));
-        if (!rv || typeof rv.then !== 'function')
-            return Promise.resolve(rv);
-        return rv;
-    } catch (e) {
-        return rejection(e);
-    }
-};
-
-// Dexie.currentTransaction property. Only applicable for transactions entered using the new "transact()" method.
-setProp(Dexie, "currentTransaction", {
-    get: function () {
-        /// <returns type="Transaction"></returns>
-        return PSD.trans || null;
-    }
-});
+// Used in when defining dependencies later...
+// (If IndexedDBShim is loaded, prefer it before standard indexedDB)
+var idbshim = _global.idbModules && _global.idbModules.shimIndexedDB ? _global.idbModules : {};
 
 function safariMultiStoreFix(storeNames) {
     return storeNames.length === 1 ? storeNames[0] : storeNames;
 }
 
-// Export our Promise implementation since it can be handy as a standalone Promise implementation
-Dexie.Promise = Promise;
-// Dexie.debug proptery:
-// Dexie.debug = false
-// Dexie.debug = true
-// Dexie.debug = "dexie" - don't hide dexie's stack frames.
-setProp(Dexie, "debug", {
-    get: ()=>Debug.debug,
-    set: value => {
-        Debug.setDebug(value, value === 'dexie' ? ()=>true : dexieStackFrameFilter);
-    }
-});
-Promise.rejectionMapper = mapError;
-// Export our derive/extend/override methodology
-Dexie.derive = derive;
-Dexie.extend = extend;
-Dexie.props = props;
-Dexie.override = override;
-// Export our Events() function - can be handy as a toolkit
-Dexie.Events = Dexie.events = Events; // Backward compatible lowercase version.
-// Utilities
-Dexie.getByKeyPath = getByKeyPath;
-Dexie.setByKeyPath = setByKeyPath;
-Dexie.delByKeyPath = delByKeyPath;
-Dexie.shallowClone = shallowClone;
-Dexie.deepClone = deepClone;
-Dexie.addons = [];
-Dexie.fakeAutoComplete = fakeAutoComplete;
-Dexie.asap = asap;
-Dexie.maxKey = maxKey;
-Dexie.connections = connections;
+function getNativeGetDatabaseNamesFn(indexedDB) {
+    var fn = indexedDB && (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
+    return fn && fn.bind(indexedDB);
+}
 
 // Export Error classes
-extend(Dexie, fullNameExceptions); // Dexie.XXXError = class XXXError {...};
-Dexie.MultiModifyError = Dexie.ModifyError; // Backward compatibility 0.9.8
-Dexie.errnames = errnames;
-
-// Export other static classes
-Dexie.IndexSpec = IndexSpec;
-Dexie.TableSchema = TableSchema;
+props(Dexie, fullNameExceptions); // Dexie.XXXError = class XXXError {...};
 
 //
-// Dependencies
-//
-// These will automatically work in browsers with indexedDB support, or where an indexedDB polyfill has been included.
-//
-// In node.js, however, these properties must be set "manually" before instansiating a new Dexie(). For node.js, you need to require indexeddb-js or similar and then set these deps.
-//
-var idbshim = _global.idbModules && _global.idbModules.shimIndexedDB ? _global.idbModules : {};
-Dexie.dependencies = {
-    // Required:
-    indexedDB: idbshim.shimIndexedDB || _global.indexedDB || _global.mozIndexedDB || _global.webkitIndexedDB || _global.msIndexedDB,
-    IDBKeyRange: idbshim.IDBKeyRange || _global.IDBKeyRange || _global.webkitIDBKeyRange
-};
+// Static methods and properties
+// 
+props(Dexie, {
+    
+    //
+    // Static delete() method.
+    //
+    delete: function (databaseName) {
+        var db = new Dexie(databaseName),
+            promise = db.delete();
+        promise.onblocked = function (fn) {
+            db.on("blocked", fn);
+            return this;
+        };
+        return promise;
+    },
+    
+    //
+    // Static exists() method.
+    //
+    exists: function(name) {
+        return new Dexie(name).open().then(db=>{
+            db.close();
+            return true;
+        }).catch(Dexie.NoSuchDatabaseError, () => false);
+    },
+    
+    //
+    // Static method for retrieving a list of all existing databases at current host.
+    //
+    getDatabaseNames: function (cb) {
+        return new Promise(function (resolve, reject) {
+            var getDatabaseNames = getNativeGetDatabaseNamesFn(indexedDB);
+            if (getDatabaseNames) { // In case getDatabaseNames() becomes standard, let's prepare to support it:
+                var req = getDatabaseNames();
+                req.onsuccess = function (event) {
+                    resolve(slice(event.target.result, 0)); // Converst DOMStringList to Array<String>
+                };
+                req.onerror = eventRejectHandler(reject);
+            } else {
+                globalDatabaseList(function (val) {
+                    resolve(val);
+                    return false;
+                });
+            }
+        }).then(cb);
+    },
+    
+    defineClass: function (structure) {
+        /// <summary>
+        ///     Create a javascript constructor based on given template for which properties to expect in the class.
+        ///     Any property that is a constructor function will act as a type. So {name: String} will be equal to {name: new String()}.
+        /// </summary>
+        /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
+        /// know what type each member has. Example: {name: String, emailAddresses: [String], properties: {shoeSize: Number}}</param>
+
+        // Default constructor able to copy given properties into this object.
+        function Class(properties) {
+            /// <param name="properties" type="Object" optional="true">Properties to initialize object with.
+            /// </param>
+            properties ? extend(this, properties) : fake && applyStructure(this, structure);
+        }
+        return Class;
+    },
+    
+    applyStructure: applyStructure,
+    
+    ignoreTransaction: function (scopeFunc) {
+        // In case caller is within a transaction but needs to create a separate transaction.
+        // Example of usage:
+        //
+        // Let's say we have a logger function in our app. Other application-logic should be unaware of the
+        // logger function and not need to include the 'logentries' table in all transaction it performs.
+        // The logging should always be done in a separate transaction and not be dependant on the current
+        // running transaction context. Then you could use Dexie.ignoreTransaction() to run code that starts a new transaction.
+        //
+        //     Dexie.ignoreTransaction(function() {
+        //         db.logentries.add(newLogEntry);
+        //     });
+        //
+        // Unless using Dexie.ignoreTransaction(), the above example would try to reuse the current transaction
+        // in current Promise-scope.
+        //
+        // An alternative to Dexie.ignoreTransaction() would be setImmediate() or setTimeout(). The reason we still provide an
+        // API for this because
+        //  1) The intention of writing the statement could be unclear if using setImmediate() or setTimeout().
+        //  2) setTimeout() would wait unnescessary until firing. This is however not the case with setImmediate().
+        //  3) setImmediate() is not supported in the ES standard.
+        //  4) You might want to keep other PSD state that was set in a parent PSD, such as PSD.letThrough.
+        return PSD.trans ?
+            usePSD(PSD.transless, scopeFunc) : // Use the closest parent that was non-transactional.
+            scopeFunc(); // No need to change scope because there is no ongoing transaction.
+    },
+    
+    vip: function (fn) {
+        // To be used by subscribers to the on('ready') event.
+        // This will let caller through to access DB even when it is blocked while the db.ready() subscribers are firing.
+        // This would have worked automatically if we were certain that the Provider was using Dexie.Promise for all asyncronic operations. The promise PSD
+        // from the provider.connect() call would then be derived all the way to when provider would call localDatabase.applyChanges(). But since
+        // the provider more likely is using non-promise async APIs or other thenable implementations, we cannot assume that.
+        // Note that this method is only useful for on('ready') subscribers that is returning a Promise from the event. If not using vip()
+        // the database could deadlock since it wont open until the returned Promise is resolved, and any non-VIPed operation started by
+        // the caller will not resolve until database is opened.
+        return newScope(function () {
+            PSD.letThrough = true; // Make sure we are let through if still blocking db due to onready is firing.
+            return fn();
+        });
+    },
+
+    async: function (generatorFn) {
+        return function () {
+            try {
+                var rv = awaitIterator(generatorFn.apply(this, arguments));
+                if (!rv || typeof rv.then !== 'function')
+                    return Promise.resolve(rv);
+                return rv;
+            } catch (e) {
+                return rejection (e);
+            }
+        };
+    },
+
+    spawn: function (generatorFn, args, thiz) {
+        try {
+            var rv = awaitIterator(generatorFn.apply(thiz, args || []));
+            if (!rv || typeof rv.then !== 'function')
+                return Promise.resolve(rv);
+            return rv;
+        } catch (e) {
+            return rejection(e);
+        }
+    },
+    
+    // Dexie.currentTransaction property
+    currentTransaction: {
+        get: () => PSD.trans || null
+    },
+    
+    // Export our Promise implementation since it can be handy as a standalone Promise implementation
+    Promise: Promise,
+    
+    // Dexie.debug proptery:
+    // Dexie.debug = false
+    // Dexie.debug = true
+    // Dexie.debug = "dexie" - don't hide dexie's stack frames.
+    debug: {
+        get: () => Debug.debug,
+        set: value => {
+            Debug.setDebug(value, value === 'dexie' ? ()=>true : dexieStackFrameFilter);
+        }
+    },
+    
+    // Export our derive/extend/override methodology
+    derive: derive,
+    extend: extend,
+    props: props,
+    override: override,
+    // Export our Events() function - can be handy as a toolkit
+    Events: Events,
+    events: Events, // Backward compatible lowercase version. Deprecate.
+    // Utilities
+    getByKeyPath: getByKeyPath,
+    setByKeyPath: setByKeyPath,
+    delByKeyPath: delByKeyPath,
+    shallowClone: shallowClone,
+    deepClone: deepClone,
+    getObjectDiff: getObjectDiff,
+    asap: asap,
+    maxKey: maxKey,
+    // Addon registry
+    addons: [],
+    // Global DB connection list
+    connections: connections,
+    
+    MultiModifyError: exceptions.Modify, // Backward compatibility 0.9.8. Deprecate.
+    errnames: errnames,
+    
+    // Export other static classes
+    IndexSpec: IndexSpec,
+    TableSchema: TableSchema,
+    
+    //
+    // Dependencies
+    //
+    // These will automatically work in browsers with indexedDB support, or where an indexedDB polyfill has been included.
+    //
+    // In node.js, however, these properties must be set "manually" before instansiating a new Dexie().
+    // For node.js, you need to require indexeddb-js or similar and then set these deps.
+    //
+    dependencies: {
+        // Required:
+        indexedDB: idbshim.shimIndexedDB || _global.indexedDB || _global.mozIndexedDB || _global.webkitIndexedDB || _global.msIndexedDB,
+        IDBKeyRange: idbshim.IDBKeyRange || _global.IDBKeyRange || _global.webkitIDBKeyRange
+    },
+    
+    // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
+    semVer: DEXIE_VERSION,
+    version: DEXIE_VERSION.split('.')
+        .map(n => parseInt(n))
+        .reduce((p,c,i) => p + (c/Math.pow(10,i*2))),
+    fakeAutoComplete: fakeAutoComplete,
+    
+    // https://github.com/dfahlander/Dexie.js/issues/186
+    // typescript compiler tsc in mode ts-->es5 & commonJS, will expect require() to return
+    // x.default. Workaround: Set Dexie.default = Dexie.
+    default: Dexie
+});
+
 tryCatch(()=>{
     // Optional dependencies
     // localStorage
@@ -3078,24 +3109,11 @@ tryCatch(()=>{
         ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : _global.localStorage);
 });
 
-// API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
-Dexie.semVer = "{version}";
-Dexie.version = Dexie.semVer.split('.')
-    .map(n => parseInt(n))
-    .reduce((p,c,i) => p + (c/Math.pow(10,i*2)));
-
-function getNativeGetDatabaseNamesFn(indexedDB) {
-    var fn = indexedDB && (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
-    return fn && fn.bind(indexedDB);
-}
+// Map DOMErrors and DOMExceptions to corresponding Dexie errors. May change in Dexie v2.0.
+Promise.rejectionMapper = mapError;
 
 // Fool IDE to improve autocomplete. Tested with Visual Studio 2013 and 2015.
 doFakeAutoComplete(function() {
     Dexie.fakeAutoComplete = fakeAutoComplete = doFakeAutoComplete;
     Dexie.fake = fake = true;
 });
-
-// https://github.com/dfahlander/Dexie.js/issues/186
-// typescript compiler tsc in mode ts-->es5 & commonJS, will expect require() to return
-// x.default. Workaround: Set Dexie.default = Dexie.
-Dexie.default = Dexie;
