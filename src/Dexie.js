@@ -3060,7 +3060,7 @@ props(Dexie, {
     delByKeyPath: delByKeyPath,
     shallowClone: shallowClone,
     deepClone: deepClone,
-    fakeAutoComplete: fakeAutoComplete,
+    getObjectDiff: getObjectDiff,
     asap: asap,
     maxKey: maxKey,
     // Addon registry
@@ -3094,6 +3094,7 @@ props(Dexie, {
     version: DEXIE_VERSION.split('.')
         .map(n => parseInt(n))
         .reduce((p,c,i) => p + (c/Math.pow(10,i*2))),
+    fakeAutoComplete: fakeAutoComplete,
     
     // https://github.com/dfahlander/Dexie.js/issues/186
     // typescript compiler tsc in mode ts-->es5 & commonJS, will expect require() to return
