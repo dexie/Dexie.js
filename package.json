@@ -35,7 +35,7 @@
     "test:debug": "node_modules/.bin/karma start test/karma.conf.js --log-level debug"
   },
   "engines": {
-    "node": ">=4.2 <5.0"
+    "node": ">=4.2"
   },
   "homepage": "http://dexie.org",
   "devDependencies": {
