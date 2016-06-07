@@ -122,7 +122,7 @@ spawnedTest("#248 'modifications' object in 'updating' hook can be bizarre", fun
     }
 });
 
-asyncTest("Issue: Broken Promise rejection #264", function () {
+asyncTest("Issue: Broken Promise rejection #264", 1, function () {
     db.open().then(()=>{
         return db.users.where('id')
             .equals('does-not-exist')
@@ -132,7 +132,6 @@ asyncTest("Issue: Broken Promise rejection #264", function () {
     }).catch(function (err) {
         equal(err, undefined, "Should catch the rejection");
     }).then(res => {
-        equal(res, undefined, "Should get the result of the catch");
         start();
     }).catch(err => {
         start();
