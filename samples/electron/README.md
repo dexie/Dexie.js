@@ -29,5 +29,5 @@ npm install
 npm start
 ```
 
-No prerequisits. Well, you need a computer. And nodejs of course.
+No prerequisits. Well, you need a computer. And nodejs of course. Electron is installed with the dependencies.
 
