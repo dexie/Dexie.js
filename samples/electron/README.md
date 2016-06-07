@@ -13,6 +13,8 @@ Here is just very simple sample to use Dexie to persist your app data in offline
 
 ..is just a cut'n'paste from [Dexie's ES6 sample](https://github.com/dfahlander/Dexie.js#hello-world-es2015--es6).
 
+Note: This samples sets `Dexie.debug = true;`. See documetation about [Dexie.debug](https://github.com/dfahlander/Dexie.js/wiki/Dexie.debug) and how to automate that in a build step.
+
 
 ### No build steps
 
@@ -27,6 +29,5 @@ npm install
 npm start
 ```
 
-No prerequisits.
+No prerequisits. Well, you need a computer. And nodejs of course.
 
-Note: This samples sets `Dexie.debug = true;`. See documetation about [Dexie.debug](https://github.com/dfahlander/Dexie.js/wiki/Dexie.debug) and how to automate that in a build step.
