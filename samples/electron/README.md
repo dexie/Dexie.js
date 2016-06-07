@@ -9,7 +9,7 @@ This is just an extremely simple sample to use Dexie to persist your app data lo
 
 ..is just a cut'n'paste from [electron's get started sample](https://github.com/electron/electron/blob/master/docs/tutorial/quick-start.md#write-your-first-electron-app)
 
-### index.html
+### [index.html](https://github.com/dfahlander/Dexie.js/blob/master/samples/electron/index.html)
 
 ..is just a cut'n'paste from [Dexie's ES6 sample](https://github.com/dfahlander/Dexie.js#hello-world-es2015--es6).
 
