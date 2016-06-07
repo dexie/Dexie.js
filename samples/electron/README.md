@@ -23,7 +23,9 @@ Like. It. a. Lot!
 
 ## Usage
 ```
-npm install -g electron-prebuilt
-cd Dexie.js/samples/electron
-electron .
+npm install
+npm start
 ```
+
+Note: You don't need to have Electron installed to run this sample. It's simply downloaded with `npm install`.
+

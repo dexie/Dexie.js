@@ -4,6 +4,7 @@
   "description": "",
   "main": "main.js",
   "scripts": {
+    "start": "node_modules/.bin/electron .",
     "test": "echo \"Error: no test specified\" && exit 1"
   },
   "author": "",
