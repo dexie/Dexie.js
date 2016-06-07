@@ -4,6 +4,8 @@
   <script>
     // Import Dexie
     const Dexie = require('dexie');
+    // Force debug mode to get long stacks from exceptions.
+    Dexie.debug = true; // In production, set to false to increase performance a little.
 
     //
     // Declare Database
@@ -29,7 +31,7 @@
         alert ("My young friends: " + JSON.stringify(youngFriends));
 
     }).catch(e => {
-        alert(e);
+        console.error (e.stack);
     });    
   </script>
  </head>
