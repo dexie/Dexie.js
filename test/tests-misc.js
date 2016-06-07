@@ -121,3 +121,20 @@ spawnedTest("#248 'modifications' object in 'updating' hook can be bizarre", fun
         db.foo.hook('updating').unsubscribe(updatingHook);
     }
 });
+
+asyncTest("Issue: Broken Promise rejection #264", function () {
+    db.open().then(()=>{
+        return db.users.where('id')
+            .equals('does-not-exist')
+            .first()
+    }).then(function(result){
+        return Promise.reject(undefined);
+    }).catch(function (err) {
+        equal(err, undefined, "Should catch the rejection");
+    }).then(res => {
+        equal(res, undefined, "Should get the result of the catch");
+        start();
+    }).catch(err => {
+        start();
+    });
+});
