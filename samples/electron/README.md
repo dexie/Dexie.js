@@ -16,8 +16,8 @@ This is just an extremely simple sample to use Dexie to persist your app data lo
 
 ### No build steps
 
-* No need for transpilation because Electron's chromium version alread understand most ES6.
-* No need for bundling because Electron's web pages has native window.require().
+* No need for a transpilation step because Electron's chromium version already understand most of ES6.
+* No need for a bundling step because Electron's web pages has native window.require().
 
 Like. It. a. Lot!
 
