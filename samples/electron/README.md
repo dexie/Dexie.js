@@ -3,16 +3,23 @@ It enables you to build portable desktop apps like `#slack`, `atom` and `visual 
 
 Even more awesome with a local database.
 
-This is just an extremely simple sample to use Dexie for persistance in your desktop app
+This is just an extremely simple sample to use Dexie to persist your app data locally.
 
 ### main.js
 
-Cut'n'paste from [electron's get started sample](https://github.com/electron/electron/blob/master/docs/tutorial/quick-start.md#write-your-first-electron-app)
+..is just a cut'n'paste from [electron's get started sample](https://github.com/electron/electron/blob/master/docs/tutorial/quick-start.md#write-your-first-electron-app)
 
 ### index.html
 
-Cut'n'paste from [Dexie's hello world sample](https://github.com/dfahlander/Dexie.js/blob/master/README.md#hello-world)
+..is just a cut'n'paste from [Dexie's ES6 sample](https://github.com/dfahlander/Dexie.js#hello-world-es2015--es6).
 
+
+### No build steps
+
+* No need for transpilation because Electron's chromium version alread understand most ES6.
+* No need for bundling because Electron's web pages has native window.require().
+
+Like. It. a. Lot!
 
 ## Usage
 ```
