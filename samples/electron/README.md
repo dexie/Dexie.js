@@ -8,5 +8,6 @@ Simple sample on how to use Dexie from within an electron app. The sample is jus
 ## Usage
 ```
 npm install -g electron-prebuilt
+cd Dexie.js/samples/electron
 electron .
 ```
