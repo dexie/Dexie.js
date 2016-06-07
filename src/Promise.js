@@ -355,7 +355,7 @@ function handleRejection (promise, reason) {
     reason = rejectionMapper(reason);
     promise._state = false;
     promise._value = reason;
-    debug && reason !== null && !reason._promise && typeof reason === 'object' && tryCatch(()=>{
+    debug && reason !== null && typeof reason === 'object' && !reason._promise && tryCatch(()=>{
         var origProp = getPropertyDescriptor(reason, "stack");        
         reason._promise = promise;    
         setProp(reason, "stack", {
