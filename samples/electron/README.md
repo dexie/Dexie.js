@@ -11,7 +11,7 @@ Here is just very simple sample to use Dexie to persist your app data in offline
 
 ### [index.html](https://github.com/dfahlander/Dexie.js/blob/master/samples/electron/index.html)
 
-..is just a cut'n'paste from [Dexie's ES6 sample](https://github.com/dfahlander/Dexie.js#hello-world-es2015--es6).
+..is (almost) just a cut'n'paste from [Dexie's ES6 sample](https://github.com/dfahlander/Dexie.js#hello-world-es2015--es6).
 
 Note: This sample sets `Dexie.debug = true;`. Read more about [Dexie.debug](https://github.com/dfahlander/Dexie.js/wiki/Dexie.debug) if you like, and how to automate that in a build step.
 
