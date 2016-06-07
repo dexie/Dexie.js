@@ -3,7 +3,7 @@ It enables you to build portable desktop apps like `#slack`, `atom` and `visual 
 
 Even more awesome when using the built-in standard indexedDB database via Dexie.js.
 
-Here is just very simple sample to use Dexie to persist your app data locally in Electron apps.
+Here is just very simple sample to use Dexie to persist your app data in offline Electron apps.
 
 ### main.js
 
