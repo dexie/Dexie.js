@@ -256,7 +256,7 @@ declare module Dexie {
 
         limit(n: number): Collection<T, Key>;
 
-        each(callback: (obj: T, cursor: IDBCursor) => any): Promise<void>;
+        each(callback: (obj: T, cursor: {key: IndexableType, primaryKey: Key}) => any): Promise<void>;
 
         toArray(): Promise<Array<T>>;
         toArray<U>(onFulfilled: (value: Array<T>) => Thenable<U>): Promise<U>;
@@ -306,16 +306,20 @@ declare module Dexie {
         count<U>(onFulfilled: (value: number) => Thenable<U>): Promise<U>;
         count<U>(onFulfilled: (value: number) => U): Promise<U>;
         distinct(): Collection<T, Key>;
-        each(callback: (obj: T, cursor: IDBCursor) => any): Promise<void>;
-        eachKey(callback: (key: Key, cursor: IDBCursor) => any): Promise<void>;
-        eachUniqueKey(callback: (key: Key, cursor: IDBCursor) => any): Promise<void>;
+        each(callback: (obj: T, cursor: {key: IndexableType, primaryKey: Key}) => any): Promise<void>;
+        eachKey(callback: (key: IndexableType, cursor: {key: IndexableType, primaryKey: Key}) => any): Promise<void>;
+        eachPrimaryKey(callback: (key: Key, cursor: {key: IndexableType, primaryKey: Key}) => any): Promise<void>;
+        eachUniqueKey(callback: (key: IndexableType, cursor: {key: IndexableType, primaryKey: Key}) => any): Promise<void>;
         filter(filter: (x: T) => boolean): Collection<T, Key>;
         first(): Promise<T>;
         first<U>(onFulfilled: (value: T) => Thenable<U>): Promise<U>;
         first<U>(onFulfilled: (value: T) => U): Promise<U>;
-        keys(): Promise<Key[]>;
-        keys<U>(onFulfilled: (value: Key[]) => Thenable<U>): Promise<U>;
-        keys<U>(onFulfilled: (value: Key[]) => U): Promise<U>;
+        keys(): Promise<IndexableType[]>;
+        keys<U>(onFulfilled: (value: IndexableType[]) => Thenable<U>): Promise<U>;
+        keys<U>(onFulfilled: (value: IndexableType[]) => U): Promise<U>;
+        primaryKeys(): Promise<Key[]>;
+        primaryKeys<U>(onFulfilled: (value: Key[]) => Thenable<U>): Promise<U>;
+        primaryKeys<U>(onFulfilled: (value: Key[]) => U): Promise<U>;
         last(): Promise<T>;
         last<U>(onFulfilled: (value: T) => Thenable<U>): Promise<U>;
         last<U>(onFulfilled: (value: T) => U): Promise<U>;
@@ -330,9 +334,9 @@ declare module Dexie {
         toArray(): Promise<Array<T>>;
         toArray<U>(onFulfilled: (value: Array<T>) => Thenable<U>): Promise<U>;
         toArray<U>(onFulfilled: (value: Array<T>) => U): Promise<U>;
-        uniqueKeys(): Promise<Key[]>;
-        uniqueKeys<U>(onFulfilled: (value: Key[]) => Thenable<U>): Promise<U>;
-        uniqueKeys<U>(onFulfilled: (value: Key[]) => U): Promise<U>;
+        uniqueKeys(): Promise<IndexableType[]>;
+        uniqueKeys<U>(onFulfilled: (value: IndexableType[]) => Thenable<U>): Promise<U>;
+        uniqueKeys<U>(onFulfilled: (value: IndexableType[]) => U): Promise<U>;
         until(filter: (value: T) => boolean, includeStopEntry?: boolean): Collection<T, Key>;
         // WriteableCollection:
         delete(): Promise<number>;

@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase} from './dexie-unittest-utils';
+import {resetDatabase, spawnedTest} from './dexie-unittest-utils';
 
 const async = Dexie.async;
 
@@ -8,6 +8,7 @@ var db = new Dexie("TestIssuesDB");
 db.version(1).stores({
     users: "id,first,last,&username,*&email,*pets",
     keyless: ",name",
+    foo: "id"
     // If required for your test, add more tables here
 });
 
@@ -56,3 +57,67 @@ asyncTest("#102 Passing an empty array to anyOf throws exception", async(functio
         start();
     }
 }));
+
+spawnedTest("#248 'modifications' object in 'updating' hook can be bizarre", function*() {
+    var numCreating = 0,
+        numUpdating = 0;
+    function CustomDate (realDate) {
+        this._year = new Date(realDate).getFullYear();
+        this._month = new Date(realDate).getMonth();
+        this._day = new Date(realDate).getDate();
+        this._millisec = new Date(realDate).getTime();
+        //...
+    }
+    
+    function creatingHook (primKey, obj) {
+        ++numCreating;
+        var date = obj.date;
+        if (date && date instanceof CustomDate) {
+            obj.date = new Date(date._year, date._month, date._day);
+        }
+    }
+    function updatingHook (modifications, primKey, obj) {
+        ++numUpdating;
+        var date = modifications.date;
+        if (date && date instanceof CustomDate) {
+            return {date: new Date(date._year, date._month, date._day)};
+        }
+    }
+    function readingHook (obj) {
+        if (obj.date && obj.date instanceof Date) {
+            obj.date = new CustomDate(obj.date);
+        }
+        return obj;
+    }
+    
+    db.foo.hook('creating', creatingHook);
+    db.foo.hook('reading', readingHook);
+    db.foo.hook('updating', updatingHook);
+    var testDate = new CustomDate(new Date(2016, 5, 11));
+    equal(testDate._year, 2016, "CustomDate has year 2016");
+    equal(testDate._month, 5, "CustomDate has month 5");
+    equal(testDate._day, 11, "CustomDate has day 11");
+    var testDate2 = new CustomDate(new Date(2016, 5, 12));
+    try {
+        db.foo.add ({id: 1, date: testDate});
+        
+        var retrieved = yield db.foo.get(1);
+        
+        ok(retrieved.date instanceof CustomDate, "Got a CustomDate object when retrieving object");
+        equal (retrieved.date._day, 11, "The CustomDate is on day 11");
+        db.foo.put ({id: 1, date: testDate2});
+        
+        retrieved = yield db.foo.get(1);
+        
+        ok(retrieved.date.constructor === CustomDate, "Got a CustomDate object when retrieving object");
+        equal (retrieved.date._day, 12, "The CustomDate is now on day 12");
+        
+        // Check that hooks has been called expected number of times
+        equal(numCreating, 1, "creating hook called once");
+        equal(numUpdating, 1, "updating hook called once");
+    } finally {
+        db.foo.hook('creating').unsubscribe(creatingHook);
+        db.foo.hook('reading').unsubscribe(readingHook);
+        db.foo.hook('updating').unsubscribe(updatingHook);
+    }
+});

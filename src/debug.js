@@ -22,6 +22,7 @@ export function getErrorWithStack() {
         // will just consider it as "exception thrown by javascript code" which is
         // something you wouldn't want it to ignore.
         getErrorWithStack.arguments;
+        throw new Error(); // Fallback if above line don't throw.
     } catch(e) {
         return e;
     }

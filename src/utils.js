@@ -91,6 +91,19 @@ export function getUniqueArray(a) {
     return a.filter((value, index, self) => self.indexOf(value) === index);
 }
 
+/** Generate an object (hash map) based on given array.
+ * @param extractor Function taking an array item and its index and returning an array of 2 items ([key, value]) to
+ *        instert on the resulting object for each item in the array. If this function returns a falsy value, the
+ *        current item wont affect the resulting object.
+ */
+export function arrayToObject (array, extractor) {
+    return array.reduce((result, item, i) => {
+        var nameAndValue = extractor(item, i);
+        if (nameAndValue) result[nameAndValue[0]] = nameAndValue[1];
+        return result;
+    }, {});
+}
+
 export function trycatcher(fn, reject) {
     return function () {
         try {
@@ -204,21 +217,26 @@ export function getObjectDiff(a, b, rv, prfx) {
     // Compares objects a and b and produces a diff object.
     rv = rv || {};
     prfx = prfx || '';
-    for (var prop in a) if (hasOwn(a, prop)) {
+    keys(a).forEach(prop => {
         if (!hasOwn(b, prop))
             rv[prfx+prop] = undefined; // Property removed
         else {
             var ap = a[prop],
                 bp = b[prop];
-            if (typeof ap === 'object' && typeof bp === 'object')
-                getObjectDiff(ap, bp, rv, prfx + prop + ".");
+            if (typeof ap === 'object' && typeof bp === 'object' &&
+                    ap && bp &&
+                    ap.constructor === bp.constructor)
+                // Same type of object but its properties may have changed
+                getObjectDiff (ap, bp, rv, prfx + prop + ".");
             else if (ap !== bp)
                 rv[prfx + prop] = b[prop];// Primitive value changed
         }
-    }
-    for (prop in b) if (hasOwn(b, prop) && !hasOwn(a, prop)) {
-        rv[prfx+prop] = b[prop]; // Property added
-    }
+    });
+    keys(b).forEach(prop => {
+        if (!hasOwn(a, prop)) {
+            rv[prfx+prop] = b[prop]; // Property added
+        }
+    });
     return rv;
 }
 
