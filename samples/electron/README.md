@@ -29,3 +29,4 @@ npm start
 
 Note: You don't need to have Electron installed to run this sample. It's simply downloaded with `npm install`.
 
+Note2: This samples sets `Dexie.debug = true;`. See documetation about [Dexie.debug](https://github.com/dfahlander/Dexie.js/wiki/Dexie.debug) and how to automate that in a build step.
