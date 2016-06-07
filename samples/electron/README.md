@@ -1,6 +1,6 @@
 # [Electron](http://electron.atom.io) is awesome!
 
-## Extreemely simple sample to use Dexie for persistance in your desktop app
+Extreemely simple sample to use Dexie for persistance in your desktop app
 
 ### main.js
 
