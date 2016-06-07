@@ -1,6 +1,7 @@
 # [Electron](http://electron.atom.io) is awesome!
+Even more with a database engine.
 
-Extreemely simple sample to use Dexie for persistance in your desktop app
+This is just an extremely simple sample to use Dexie for persistance in your desktop app
 
 ### main.js
 
