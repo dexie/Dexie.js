@@ -1,5 +1,7 @@
 # [Electron](http://electron.atom.io) is awesome!
-Even more with a database engine.
+It enables you to build apps like #slack, atom and visual studio code.
+
+Even more awesome with a local database.
 
 This is just an extremely simple sample to use Dexie for persistance in your desktop app
 
