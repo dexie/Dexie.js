@@ -1,5 +1,5 @@
 # [Electron is awesome!](http://electron.atom.io)
-It enables you to build apps like #slack, atom and visual studio code.
+It enables you to build portable desktop apps like `#slack`, `atom` and `visual studio code` with a breeze.
 
 Even more awesome with a local database.
 
