@@ -1,4 +1,4 @@
-# [Electron](http://electron.atom.io) is awesome!
+# [Electron is awesome!](http://electron.atom.io)
 It enables you to build apps like #slack, atom and visual studio code.
 
 Even more awesome with a local database.
