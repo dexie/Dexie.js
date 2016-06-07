@@ -1,5 +1,6 @@
 {
   "name": "dexie-observable",
+  "version": "0.1.9",
   "homepage": "https://dexie.org",
   "authors": [
     "David Fahlander"
