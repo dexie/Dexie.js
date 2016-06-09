@@ -25,6 +25,8 @@
     "global": false,
     "navigator": false,
     "location": false,
-    "chrome": false
+    "chrome": false,
+    "document": false,
+    "MutationObserver": false
   }
 }

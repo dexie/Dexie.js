@@ -50,13 +50,24 @@ var LONG_STACKS_CLIP_LIMIT = 100,
    db.ready().then() for every operation to make sure the indexedDB event is started in an
    emulated micro tick.
 */
-var schedulePhysicalTick = (typeof setImmediate === 'undefined' ?
-    // No support for setImmediate. No worry, setTimeout is only called
-    // once time. Every tick that follows will be our emulated micro tick.
-    // Could have uses setTimeout.bind(null, 0, physicalTick) if it wasnt for that FF13 and below has a bug 
-    ()=>{setTimeout(physicalTick,0);} : 
-    // setImmediate supported. Modern platform. Also supports Function.bind().
-    setImmediate.bind(null, physicalTick));
+var schedulePhysicalTick = (_global.setImmediate ? 
+    // setImmediate supported. Those modern platforms also supports Function.bind().
+    setImmediate.bind(null, physicalTick) :
+    _global.MutationObserver ?
+        // MutationObserver supported
+        () => {
+            var hiddenDiv = document.createElement("div");
+            (new MutationObserver(() => {
+                physicalTick();
+                hiddenDiv = null;
+            })).observe(hiddenDiv, { attributes: true });
+            hiddenDiv.setAttribute('i', '1');
+        } :
+        // No support for setImmediate or MutationObserver. No worry, setTimeout is only called
+        // once time. Every tick that follows will be our emulated micro tick.
+        // Could have uses setTimeout.bind(null, 0, physicalTick) if it wasnt for that FF13 and below has a bug 
+        ()=>{setTimeout(physicalTick,0);}
+);
 
 // Confifurable through Promise.scheduler.
 // Don't export because it would be unsafe to let unknown

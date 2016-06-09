@@ -16,13 +16,14 @@ module.exports = function(config) {
     bs_firefox: {
       base: 'BrowserStack',
       browser: 'firefox',
-      browser_version: '45.0',
-      os: 'OS X',
-      os_version: 'El Capitan'
+      browser_version: '46.0',
+      os: 'Windows',
+      os_version: '10'
     },
   };
 
   cfg.browsers = [
+    //'Firefox'
     'bs_firefox',
   ];
 
@@ -30,6 +31,7 @@ module.exports = function(config) {
       'karma-qunit',
       'karma-mocha-reporter',
       'karma-browserstack-launcher'
+      //'karma-firefox-launcher'
   ];
 
   config.set(cfg);
