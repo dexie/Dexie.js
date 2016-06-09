@@ -3,6 +3,8 @@ node_js:
   - "6"
   - "5"
   - "4"
+addons:
+  firefox: "46.0"
 matrix:
   fast_finish: true
 script:
