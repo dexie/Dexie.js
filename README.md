@@ -133,7 +133,7 @@ db.transaction('rw', db.friends, function*() {
     alert(e);
 });
 ```
-*NOTE: db.transaction() will treat generator functions (function*) so that it is possible to use `yield` for consuming promises. [Yield can be used outside transactions as well](https://github.com/dfahlander/Dexie.js/wiki/Simplify-with-yield).
+*NOTE: db.transaction() will treat generator functions (function * ) so that it is possible to use `yield` for consuming promises. [Yield can be used outside transactions as well](https://github.com/dfahlander/Dexie.js/wiki/Simplify-with-yield).
 
 #### Hello World (ES2016 / ES7)
 ```js
