@@ -12,7 +12,7 @@ module.exports = function(config) {
   if (!cfg.browserStack.username)
     throw new Error("You must provider username/key in the env variables BROWSER_STACK_USERNAME and BROWSER_STACK_ACCESS_KEY");
 
-  /*cfg.customLaunchers = {
+  cfg.customLaunchers = {
     bs_firefox: {
       base: 'BrowserStack',
       browser: 'firefox',
@@ -20,18 +20,18 @@ module.exports = function(config) {
       os: 'Windows',
       os_version: '10'
     },
-  };*/
+  };
 
   cfg.browsers = [
-    'Firefox'
-    //'bs_firefox',
+    //'Firefox'
+    'bs_firefox',
   ];
 
   cfg.plugins = [
       'karma-qunit',
       'karma-mocha-reporter',
-      //'karma-browserstack-launcher'
-      'karma-firefox-launcher'
+      'karma-browserstack-launcher'
+      //'karma-firefox-launcher'
   ];
 
   config.set(cfg);
