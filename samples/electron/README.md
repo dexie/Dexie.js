@@ -5,7 +5,7 @@ Even more awesome when using the built-in standard indexedDB database via Dexie.
 
 Here is just very simple sample to use Dexie to persist your app data in offline Electron apps.
 
-### main.js
+### [main.js](https://github.com/dfahlander/Dexie.js/blob/master/samples/electron/main.js)
 
 ..is just a cut'n'paste from [electron's get started sample](https://github.com/electron/electron/blob/master/docs/tutorial/quick-start.md#write-your-first-electron-app)
 
