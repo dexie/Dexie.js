@@ -61,7 +61,7 @@
     "es6-promisify-all": "^0.1.0",
     "eslint": "^2.7.0",
     "karma": "^0.13.19",
-    "karma-browserstack-launcher": "^0.1.10",
+    "karma-browserstack-launcher": "^1.0.1",
     "karma-chrome-launcher": "^0.2.2",
     "karma-firefox-launcher": "^0.1.7",
     "karma-mocha-reporter": "^1.1.5",
