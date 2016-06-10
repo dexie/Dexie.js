@@ -45,6 +45,8 @@ Dexie.js solves these limitations and provides a neat database API. Dexie.js aim
 </html>
 ```
 
+See also [Getting Started](https://github.com/dfahlander/Dexie.js/wiki/Getting%20started)
+
 #### Supported operations
 ```js
 above(key): Collection;
