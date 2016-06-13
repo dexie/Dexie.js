@@ -224,10 +224,6 @@ db.transaction('rw', db.friends, async() => {
 });
 ```
 
-Documentation
--------------
-[https://github.com/dfahlander/Dexie.js/wiki/Dexie.js](https://github.com/dfahlander/Dexie.js/wiki/Dexie.js)
-
 Samples
 -------
 https://github.com/dfahlander/Dexie.js/wiki/Samples
