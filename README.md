@@ -52,6 +52,9 @@ Yes, it's that simple.
 
 [Samples](https://github.com/dfahlander/Dexie.js/wiki/Samples)
 
+### Performance
+
+Dexie has a kick-ass performance. It's [bulk methods](https://github.com/dfahlander/Dexie.js/wiki/WriteableTable.bulkPut()) take advantage of a not well known feature in indexedDB that makes it possible to store stuff without listening to every onsuccess event. This speeds up the performance to a maximum.
 
 #### Supported operations
 ```js
