@@ -46,8 +46,6 @@ Dexie provides a neat database API with a well thought-through API design, robus
 ```
 Yes, it's that simple.
 
-#### Documentation
-
 [Tutorial](https://github.com/dfahlander/Dexie.js/wiki/Tutorial)
 
 [API Reference](https://github.com/dfahlander/Dexie.js/wiki/API-Reference)
