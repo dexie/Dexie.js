@@ -1,5 +1,5 @@
 # [Electron is awesome!](http://electron.atom.io)
-It enables you to build portable desktop apps like `#slack`, `atom` and `visual studio code` with a breeze.
+It enables you to build portable desktop apps like `#slack`, `atom` and `visual studio code`.
 
 Even more awesome when using the built-in standard indexedDB database via Dexie.js.
 
