@@ -18,6 +18,7 @@ Dexie.js solves these limitations and provides a neat database API. Dexie.js aim
 #### Hello World
 
 ```html
+<!doctype html>
 <html>
  <head>
   <script src="https://npmcdn.com/dexie@latest/dist/dexie.js"></script>
