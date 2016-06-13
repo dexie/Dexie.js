@@ -3,17 +3,18 @@ Dexie.js
 
 [![NPM Version][npm-image]][npm-url] [![Build Status](https://travis-ci.org/dfahlander/Dexie.js.svg?branch=master)](https://travis-ci.org/dfahlander/Dexie.js)[![Tested with Browserstack](http://dexie.org/assets/images/tested-with-browserstack2.png)](https://www.browserstack.com)
 
-#### What is Dexie.js?
 Dexie.js is a wrapper library for indexedDB - the standard database in the browser.
 
-#### Why is Dexie.js needed?
+Home page: http://dexie.org
+
+#### Why?
 Dexie solves three main issues with the native IndexedDB API:
 
  1. Ambivalent error handling
  2. Poor queries
  3. Code complexity
 
-Dexie.js solves these limitations and provides a neat database API. Dexie.js aims to be the first-hand choice of a IDB Wrapper Library due to its well thought-through API design, robust error handling, extendability, change tracking awareness and its extended KeyRange support (case insensitive search, set matches and OR operations).
+Dexie provides a neat database API with a well thought-through API design, robust error handling, extendability, change tracking awareness and extended KeyRange support (case insensitive search, set matches and OR operations).
 
 #### Hello World
 
@@ -45,8 +46,13 @@ Dexie.js solves these limitations and provides a neat database API. Dexie.js aim
  </head>
 </html>
 ```
+Yes, it's that simple.
 
-See also [Getting Started](https://github.com/dfahlander/Dexie.js/wiki/Getting%20started)
+#### Documentation
+
+[Tutorial](https://github.com/dfahlander/Dexie.js/wiki/Tutorial)
+
+[API Reference](https://github.com/dfahlander/Dexie.js/wiki/API-Reference)
 
 #### Supported operations
 ```js
