@@ -132,7 +132,7 @@ db.transaction('rw', db.friends, function*() {
     alert ("My young friends: " + JSON.stringify(youngFriends));
     
 }).catch(e => {
-    alert(e);
+    alert(e.stack || e);
 });
 ```
 *NOTE: db.transaction() will treat generator functions (function * ) so that it is possible to use `yield` for consuming promises. [Yield can be used outside transactions as well](https://github.com/dfahlander/Dexie.js/wiki/Simplify-with-yield).
@@ -163,7 +163,7 @@ db.transaction('rw', db.friends, async() => {
     alert ("My young friends: " + JSON.stringify(youngFriends));
     
 }).catch(e => {
-    alert(e);
+    alert(e.stack || e);
 });
 
 ```
@@ -212,7 +212,7 @@ db.transaction('rw', db.friends, async() => {
     alert ("My young friends: " + JSON.stringify(youngFriends));
     
 }).catch(e => {
-    alert(e);
+    alert(e.stack || e);
 });
 ```
 
