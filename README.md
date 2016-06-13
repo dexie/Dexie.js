@@ -52,6 +52,9 @@ Yes, it's that simple.
 
 [API Reference](https://github.com/dfahlander/Dexie.js/wiki/API-Reference)
 
+[Samples](https://github.com/dfahlander/Dexie.js/wiki/Samples)
+
+
 #### Supported operations
 ```js
 above(key): Collection;
