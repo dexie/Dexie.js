@@ -257,7 +257,7 @@ Here is a little cheat-sheet for how to symlink your app's `node_modules/dexie` 
 
 1. Fork Dexie.js from the web gui on github
 2. Clone your fork locally by launching a shell/command window and cd to a neutral place (like `~repos/`, `c:\repos` or whatever)
-3. If you're on npm 2.x and Windows, you might to be elevate your command prompt for `npm install` to succeed.
+3. Run the following commands: *(if you're on npm 2.x and Windows, you need to elevate your command prompt for `npm install` to succeed)*
 
     ```
     git clone https://github.com/YOUR-USERNAME/Dexie.js.git
