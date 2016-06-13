@@ -38,7 +38,7 @@ Dexie.js solves these limitations and provides a neat database API. Dexie.js aim
    }).then(function (youngFriends) {
        alert ("My young friends: " + JSON.stringify(youngFriends));
    }).catch(function (e) {
-       alert ("Error: " + e);
+       alert ("Error: " + (e.stack || e));
    });
   </script>
  </head>
