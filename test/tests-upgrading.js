@@ -155,6 +155,19 @@ asyncTest("upgrade", function () {
         ok(true, "Could upgrade to version 8 - deleting an object store");
         equal(db.tables.length, baseNumberOfTables + 1, "There should only be 1 store now");
 
+        // 
+        // Now, test to use a removed object store while running an upgrade function.
+        //
+        db = new Dexie(DBNAME);
+        db.version(8).stores({ store1: null });
+        db.version(9).stores({ store1: "++id,email" });
+        db.version(10).stores({ store1: null }).upgrade(function (trans) {
+            trans.table("store1").add({ email: "user@abc.com" });
+        });
+        return db.open();
+    }).then(function () {
+        ok(true, "Could upgrade to version 10 - deleting an object store with upgrade function");
+        equal(db.tables.length, baseNumberOfTables + 1, "There should only be 1 store now");
         // Now test: Delete DB and open it with ALL versions specs specified (check it will run in sequence)
         return db.delete();
     }).then(function () {
