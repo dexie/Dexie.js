@@ -151,7 +151,7 @@ declare module Dexie {
 
         catch<U>(errorName: string, onRejected: (error: {name: string}) => U): Promise<R|U>;
 
-        finally<R>(onFinally: () => any): Promise<R>;
+        finally(onFinally: () => any): Promise<R>;
 
         onuncatched: () => any;
     }
