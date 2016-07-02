@@ -148,6 +148,10 @@ asyncTest("upgrade", function () {
         db.version(8).stores({ store1: null }); // Deleting a version.
         return db.open();
     }).then(function () {
+        // Let Dexie determine actual IDB state 
+        db = new Dexie(DBNAME);
+        return db.open();
+    }).then(function () {
         ok(true, "Could upgrade to version 8 - deleting an object store");
         equal(db.tables.length, baseNumberOfTables + 1, "There should only be 1 store now");
 

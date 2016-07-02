@@ -300,7 +300,7 @@ export default function Dexie(dbName, options) {
                 }
             });
             queue.push(function (idbtrans) {
-                if (anyContentUpgraderHasRun && !hasIEDeleteObjectStoreBug) { // Dont delete old tables if ieBug is present and a content upgrader has run. Let tables be left in DB so far. This needs to be taken care of.
+                if (!anyContentUpgraderHasRun || !hasIEDeleteObjectStoreBug) { // Dont delete old tables if ieBug is present and a content upgrader has run. Let tables be left in DB so far. This needs to be taken care of.
                     var newSchema = version._cfg.dbschema;
                     // Delete old tables
                     deleteRemovedTables(newSchema, idbtrans);
