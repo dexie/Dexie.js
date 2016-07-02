@@ -1,9 +1,9 @@
+addons:
+  - firefox: "47.0"
 language: node_js
 node_js:
   - "6"
   - "4"
-addons:
-  - firefox: "47.0"
 matrix:
   fast_finish: true
 before_script:
