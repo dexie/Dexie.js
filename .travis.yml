@@ -1,10 +1,14 @@
 language: node_js
+addons:
+  firefox: "47.0"
 node_js:
   - "6"
-  - "5"
   - "4"
 matrix:
   fast_finish: true
+before_script:
+  - export DISPLAY=:99.0
+  - sh -e /etc/init.d/xvfb start
 script:
   - eslint src
   - npm run build
