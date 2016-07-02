@@ -9,7 +9,10 @@ module.exports = function(config) {
       username: process.env.BROWSER_STACK_USERNAME,
       accessKey: process.env.BROWSER_STACK_ACCESS_KEY
   };
-  if (!cfg.browserStack.username)
+  
+  var isPullRequest = process.env.TRAVIS_PULL_REQUEST !== 'false';
+  
+  if (!isPullRequest && !cfg.browserStack.username)
     throw new Error("You must provider username/key in the env variables BROWSER_STACK_USERNAME and BROWSER_STACK_ACCESS_KEY");
 
   cfg.customLaunchers = {
@@ -22,16 +25,15 @@ module.exports = function(config) {
     },
   };
 
-  cfg.browsers = [
-    //'Firefox'
-    'bs_firefox',
+  cfg.browsers = isPullRequest ? ['Firefox'] :
+    ['bs_firefox']
   ];
 
   cfg.plugins = [
       'karma-qunit',
       'karma-mocha-reporter',
       'karma-browserstack-launcher'
-      //'karma-firefox-launcher'
+      'karma-firefox-launcher'
   ];
 
   config.set(cfg);
