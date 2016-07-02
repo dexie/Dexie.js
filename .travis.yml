@@ -1,6 +1,6 @@
-addons:
-  - firefox: "47.0"
 language: node_js
+addons:
+  firefox: "47.0"
 node_js:
   - "6"
   - "4"
