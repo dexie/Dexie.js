@@ -25,8 +25,8 @@ module.exports = function(config) {
     },
   };
 
-  cfg.browsers = isPullRequest ? ['Firefox'] :
-    ['bs_firefox']
+  cfg.browsers = isPullRequest ? ['Firefox'] : [
+    'bs_firefox'
   ];
 
   cfg.plugins = [
