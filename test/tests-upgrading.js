@@ -5,7 +5,7 @@ import {resetDatabase, supports} from './dexie-unittest-utils';
 module("upgrading");
 
 var Promise = Dexie.Promise;
-
+Dexie.debug = true;
 asyncTest("upgrade", function () {
     // To test:
     // V Start with empty schema
@@ -143,7 +143,7 @@ asyncTest("upgrade", function () {
         // Now, test to remove an object store
         //
         db = new Dexie(DBNAME);
-        db.version(6).stores({ store1: "++id,*email" }); // Need to keep version 6 or add its missing stores to version 7. Choosing to keep versoin 6.
+        db.version(6).stores({ store1: "++id,*email" }); // Need to keep version 6 or add its missing stores to version 7. Choosing to keep version 6.
         db.version(7).stores({ store2: "uuid" });
         db.version(8).stores({ store1: null }); // Deleting a version.
         return db.open();
@@ -162,8 +162,13 @@ asyncTest("upgrade", function () {
         db.version(8).stores({ store1: null });
         db.version(9).stores({ store1: "++id,email" });
         db.version(10).stores({ store1: null }).upgrade(function (trans) {
+            // Just add a value to show the store is present.
             trans.table("store1").add({ email: "user@abc.com" });
         });
+        return db.open();
+    }).then(function () {
+        // Let Dexie determine actual IDB state 
+        db = new Dexie(DBNAME);
         return db.open();
     }).then(function () {
         ok(true, "Could upgrade to version 10 - deleting an object store with upgrade function");
