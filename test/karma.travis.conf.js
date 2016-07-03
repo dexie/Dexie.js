@@ -5,15 +5,15 @@ module.exports = function(config) {
     captureConsole: false
   };
   cfg.port = 19145;
-  cfg.browserStack = {
-      username: process.env.BROWSER_STACK_USERNAME,
-      accessKey: process.env.BROWSER_STACK_ACCESS_KEY
-  };
   
-  var isPullRequest = process.env.TRAVIS_PULL_REQUEST !== 'false';
-  
-  if (!isPullRequest && !cfg.browserStack.username)
-    throw new Error("You must provider username/key in the env variables BROWSER_STACK_USERNAME and BROWSER_STACK_ACCESS_KEY");
+  var useBrowserStack = process.env.TRAVIS_PULL_REQUEST === 'false' && process.env.BROWSER_STACK_USERNAME;
+
+  if (useBrowserStack) {  
+    cfg.browserStack = {
+        username: process.env.BROWSER_STACK_USERNAME,
+        accessKey: process.env.BROWSER_STACK_ACCESS_KEY
+    };
+  }
 
   cfg.customLaunchers = {
     bs_firefox: {
@@ -25,7 +25,7 @@ module.exports = function(config) {
     },
   };
 
-  cfg.browsers = isPullRequest ? ['Firefox'] : [
+  cfg.browsers = !useBrowserStack ? ['Firefox'] : [
     'bs_firefox'
   ];
 
