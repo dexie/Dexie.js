@@ -71,7 +71,7 @@
     "qunitjs": "^1.14.0",
     "rollup": "^0.20.5",
     "serve-static": "^1.10.2",
-    "uglify-js": "^2.5.0"
+    "uglify-js": "mishoo/UglifyJS2#harmony"
   },
   "dependencies": {}
 }
