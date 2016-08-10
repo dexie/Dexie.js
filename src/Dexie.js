@@ -353,7 +353,7 @@ export default function Dexie(dbName, options) {
                                 name,
                                 spec.primKey,
                                 spec.indexes);
-                };
+                }
                 Promise.follow(() => db.on.populate.fire(trans))
                        .catch(rejectTransaction);
             } else {
@@ -480,7 +480,7 @@ export default function Dexie(dbName, options) {
                         name,
                         spec.primKey,
                         spec.indexes);
-        };
+        }
     }
 
     function addIndex(store, idx) {

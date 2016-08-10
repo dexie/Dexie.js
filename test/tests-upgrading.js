@@ -162,7 +162,7 @@ asyncTest("upgrade", function () {
         db.version(5).stores({ store1: "++id,&email" });
         // Changing email index from unique to multi-valued
         db.version(6).stores({ store1: "++id,*email" }).upgrade(t => {
-            trans.table("store1").toCollection().modify(obj => {
+            t.table("store1").toCollection().modify(obj => {
                 // Turning single-valued unique email into an array of
                 // emails.
                 obj.email = [obj.email];
@@ -222,7 +222,7 @@ asyncTest("upgrade", function () {
         db.version(8).stores({ store1: null });
         db.version(9).stores({ store1: "++id,email" });
         db.version(10).stores({ store1: null }).upgrade(t => {
-            checkTransactionObjectStores(t, ["store1"]);
+            checkTransactionObjectStores(t, ["store1", "store2"]);
             // TODO: actually use the object store.
             ok(true, "Upgrade transaction contains deleted store.");
         });
@@ -299,7 +299,7 @@ asyncTest("upgrade", function () {
         });
         // Changing email index from unique to multi-valued
         db.version(6).stores({ store1: "++id,*email" }).upgrade(t => {
-            trans.table("store1").toCollection().modify(obj => {
+            t.table("store1").toCollection().modify(obj => {
                 // Turning single-valued unique email into an array of
                 // emails.
                 obj.email = [obj.email];
