@@ -199,7 +199,8 @@ export default function Dexie(dbName, options) {
             var preUpgradeStoresSpec = {};
             var postUpgradeStoresSpec = {};
 
-            for (let version of versions) {
+            for (let i = 0, ii = versions.length; i < ii; i++) {
+                let version = versions[i];
                 if (version === this) {
                     var undeleted = filter(version._cfg.storesSource,
                                            v => v !== null);
