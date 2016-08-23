@@ -278,7 +278,7 @@ Here is a little cheat-sheet for how to symlink your app's `node_modules/dexie` 
 
 Your app's `node_modules/dexie/` is now sym-linked to the Dexie.js clone on your hard drive so any change you do there will propagate to your app. Build dexie.js using `npm run build` or `npm run watch`. The latter will react on any source file change and rebuild the dist files.
 
-That's it. Now you're up and running to test and commit changes to Dexie.js that will instantly affect the app you are developing.
+That's it. Now you're up and running to test and commit changes to files under dexie/src/* or dexie/test/* and the changes will instantly affect the app you are developing.
 
 Pull requests are more than welcome. Some advices are:
 
