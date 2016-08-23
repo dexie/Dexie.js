@@ -265,8 +265,8 @@ Here is a little cheat-sheet for how to symlink your app's `node_modules/dexie` 
 3. Run the following commands: *(if you're on npm 2.x and Windows, you need to elevate your command prompt for `npm install` to succeed)*
 
     ```
-    git clone https://github.com/YOUR-USERNAME/Dexie.js.git
-    cd Dexie.js
+    git clone https://github.com/YOUR-USERNAME/Dexie.js.git dexie
+    cd dexie
     npm install
     npm run build
     npm link
