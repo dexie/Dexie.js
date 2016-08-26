@@ -231,9 +231,9 @@ https://github.com/dfahlander/Dexie.js/wiki/Samples
 
 https://github.com/dfahlander/Dexie.js/tree/master/samples
 
-Forum
+Knowledge Base
 -----
-[https://groups.google.com/forum/#!forum/dexiejs](https://groups.google.com/forum/#!forum/dexiejs)
+[https://github.com/dfahlander/Dexie.js/wiki/Questions-and-Answers](https://github.com/dfahlander/Dexie.js/wiki/Questions-and-Answers)
 
 Website
 -------
