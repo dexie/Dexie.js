@@ -451,3 +451,22 @@ spawnedTest("db.open several times", 2, function*(){
         ok(true, "Got error: " + (err.stack || err));
     });
 });
+
+asyncTest("#306 db.on('ready') subscriber should be called also if db is already open", ()=>{
+    let db = new Dexie("TestDB");
+    db.version(1).stores({foo: "id"});
+    db.on('ready', ()=>{
+        ok(true, "Early db.on('ready') subscriber called.");
+    });
+    var lateSubscriberCalled = false;
+    db.open().then(()=>{
+        ok(true, "db successfully opened");
+        db.on('ready', ()=>{
+           lateSubscriberCalled = true;
+        });
+    }).then(() => {
+        ok(lateSubscriberCalled, "Late db.on('ready') subscriber should also be called.");
+    }).catch (err => {
+        ok(false, err.stack || err);
+    }).finally(start);
+});

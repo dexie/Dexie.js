@@ -265,8 +265,8 @@ Here is a little cheat-sheet for how to symlink your app's `node_modules/dexie` 
 3. Run the following commands: *(if you're on npm 2.x and Windows, you need to elevate your command prompt for `npm install` to succeed)*
 
     ```
-    git clone https://github.com/YOUR-USERNAME/Dexie.js.git
-    cd Dexie.js
+    git clone https://github.com/YOUR-USERNAME/Dexie.js.git dexie
+    cd dexie
     npm install
     npm run build
     npm link
@@ -278,7 +278,7 @@ Here is a little cheat-sheet for how to symlink your app's `node_modules/dexie` 
 
 Your app's `node_modules/dexie/` is now sym-linked to the Dexie.js clone on your hard drive so any change you do there will propagate to your app. Build dexie.js using `npm run build` or `npm run watch`. The latter will react on any source file change and rebuild the dist files.
 
-That's it. Now you're up and running to test and commit changes to Dexie.js that will instantly affect the app you are developing.
+That's it. Now you're up and running to test and commit changes to files under dexie/src/* or dexie/test/* and the changes will instantly affect the app you are developing.
 
 Pull requests are more than welcome. Some advices are:
 
