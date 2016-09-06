@@ -4,13 +4,13 @@ the [releases](https://github.com/dfahlander/Dexie.js/tree/releases/addons/Dexie
 branch.
 
 ## Download
-[npmcdn.com/dexie-observable/dist/dexie-observable.js](https://npmcdn.com/dexie-observable/dist/dexie-observable.js)
+[unpkg.com/dexie-observable/dist/dexie-observable.js](https://unpkg.com/dexie-observable/dist/dexie-observable.js)
 
-[npmcdn.com/dexie-observable/dist/dexie-observable.min.js](https://npmcdn.com/dexie-observable/dist/dexie-observable.min.js)
+[unpkg.com/dexie-observable/dist/dexie-observable.min.js](https://unpkg.com/dexie-observable/dist/dexie-observable.min.js)
 
-[npmcdn.com/dexie-observable/dist/dexie-observable.js.map](https://npmcdn.com/dexie-observable/dist/dexie-observable.js.map)
+[unpkg.com/dexie-observable/dist/dexie-observable.js.map](https://unpkg.com/dexie-observable/dist/dexie-observable.js.map)
 
-[npmcdn.com/dexie-observable/dist/dexie-observable.min.js.map](https://npmcdn.com/dexie-observable/dist/dexie-observable.min.js.map)
+[unpkg.com/dexie-observable/dist/dexie-observable.min.js.map](https://unpkg.com/dexie-observable/dist/dexie-observable.min.js.map)
 
 ## npm
 ```

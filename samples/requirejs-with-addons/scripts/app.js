@@ -1,8 +1,8 @@
 ﻿
 require.config({
     paths: {
-        "dexie": "https://npmcdn.com/dexie/dist/dexie",
-        "dexie-observable": "https://npmcdn.com/dexie-observable/dist/dexie-observable"
+        "dexie": "https://unpkg.com/dexie/dist/dexie",
+        "dexie-observable": "https://unpkg.com/dexie-observable/dist/dexie-observable"
     }
 });
 
