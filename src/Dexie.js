@@ -674,11 +674,20 @@ export default function Dexie(dbName, options) {
     this.on.ready.subscribe = override (this.on.ready.subscribe, function (subscribe) {
         return (subscriber, bSticky) => {
             Dexie.vip(()=>{
-                subscribe(subscriber);
-                if (!bSticky) subscribe(function unsubscribe() {
-                    db.on.ready.unsubscribe(subscriber);
-                    db.on.ready.unsubscribe(unsubscribe);
-                });
+                if (openComplete) {
+                    // Database already open. Call subscriber asap.
+                    Promise.resolve().then(subscriber);
+                    // bSticky: Also subscribe to future open sucesses (after close / reopen) 
+                    if (bSticky) subscribe(subscriber); 
+                } else {
+                    // Database not yet open. Subscribe to it.
+                    subscribe(subscriber);
+                    // If bSticky is falsy, make sure to unsubscribe subscriber when fired once.
+                    if (!bSticky) subscribe(function unsubscribe() {
+                        db.on.ready.unsubscribe(subscriber);
+                        db.on.ready.unsubscribe(unsubscribe);
+                    });
+                }
             });
         }
     });
