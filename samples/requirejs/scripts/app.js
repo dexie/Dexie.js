@@ -1,7 +1,7 @@
 ﻿
 require.config({
     paths: {
-        "dexie": "https://npmcdn.com/dexie/dist/dexie"
+        "dexie": "https://unpkg.com/dexie/dist/dexie"
     }
 });
 

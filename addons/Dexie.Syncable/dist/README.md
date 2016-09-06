@@ -4,13 +4,13 @@ the [releases](https://github.com/dfahlander/Dexie.js/tree/releases/addons/Dexie
 branch.
 
 ## Download
-[npmcdn.com/dexie-syncable/dist/dexie-syncable.js](https://npmcdn.com/dexie-syncable/dist/dexie-syncable.js)
+[unpkg.com/dexie-syncable/dist/dexie-syncable.js](https://unpkg.com/dexie-syncable/dist/dexie-syncable.js)
 
-[npmcdn.com/dexie-syncable/dist/dexie-syncable.min.js](https://npmcdn.com/dexie-syncable/dist/dexie-syncable.min.js)
+[unpkg.com/dexie-syncable/dist/dexie-syncable.min.js](https://unpkg.com/dexie-syncable/dist/dexie-syncable.min.js)
 
-[npmcdn.com/dexie-syncable/dist/dexie-syncable.js.map](https://npmcdn.com/dexie-syncable/dist/dexie-syncable.js.map)
+[unpkg.com/dexie-syncable/dist/dexie-syncable.js.map](https://unpkg.com/dexie-syncable/dist/dexie-syncable.js.map)
 
-[npmcdn.com/dexie-syncable/dist/dexie-syncable.min.js.map](https://npmcdn.com/dexie-syncable/dist/dexie-syncable.min.js.map)
+[unpkg.com/dexie-syncable/dist/dexie-syncable.min.js.map](https://unpkg.com/dexie-syncable/dist/dexie-syncable.min.js.map)
 
 ## npm
 ```
