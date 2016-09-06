@@ -1,6 +1,6 @@
 {
   "name": "dexie",
-  "version": "1.4.1",
+  "version": "1.4.2",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "jsnext:main": "src/Dexie.js",
