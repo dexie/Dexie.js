@@ -26,6 +26,14 @@ export function extend(obj, extension) {
     return obj;
 }
 
+export function filter (obj, pred) {
+    var newObj = {};
+    keys(obj).forEach(key => {
+        if (pred(obj[key])) newObj[key] = obj[key];
+    });
+    return newObj;
+}
+
 export const getProto = Object.getPrototypeOf;
 export const _hasOwn = {}.hasOwnProperty;
 export function hasOwn(obj, prop) {
