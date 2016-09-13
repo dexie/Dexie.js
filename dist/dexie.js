@@ -1472,9 +1472,9 @@
            /// <returns type="Version"></returns>
            if (idbdb || isBeingOpened) throw new exceptions.Schema("Cannot add version when database is open");
 
-           var version = versions.find(function (v) {
-               return v._cfg.version === versionNumber;
-           });
+           // Changed versions.find() to versions.filter() because of IE compatibility issues
+           function findVersionNumber(v) { return v._cfg.version === versionNumber; }
+           var version = versions.filter(findVersionNumber)[0];
            if (version) return version;
            version = new Version(versionNumber);
            versions.push(version);
