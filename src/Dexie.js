@@ -752,7 +752,7 @@ export default function Dexie(dbName, options) {
                 }
                 if (parentTransaction) {
                     storeNames.forEach(function (storeName) {
-                        if (!hasOwn(parentTransaction.tables, storeName)) {
+                        if (parentTransaction && !hasOwn(parentTransaction.tables, storeName)) {
                             if (onlyIfCompatible) {
                                 // Spawn new transaction instead.
                                 parentTransaction = null; 
