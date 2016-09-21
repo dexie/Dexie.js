@@ -13,7 +13,9 @@ build([{
             "dist/dexie.js.map",
             "dist/dexie.min.js",
             "dist/dexie.min.js.map",
-            "dist/dexie.min.js.gz"
+            "dist/dexie.min.js.gz",
+			"dist/dexie.es6.js",
+			"dist/dexie.es6.js.map"
         ],
         "src/Dexie.d.ts": [
             "dist/dexie.d.ts"

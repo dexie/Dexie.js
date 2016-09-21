@@ -3,7 +3,7 @@
   "version": "1.4.2",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
-  "jsnext:main": "src/Dexie.js",
+  "jsnext:main": "dist/dexie.es6.js",
   "typings": "dist/dexie.d.ts",
   "jspm": {
     "format": "cjs",

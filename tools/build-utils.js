@@ -66,7 +66,7 @@ export async function rebuildFiles(options, replacements, files) {
         return {
             entry: entry,
             rollups: targets.filter(f=>ext(f) === '.js' || ext(f) === '.es6.js').map(f => ({
-                entry: `${TMPDIR}${entry}`,
+                entry: ext(f) === '.es6.js' ? `${entry}` : `${TMPDIR}${entry}`,
                 rollupCfg: {
                     format: ext(f) === '.js' ? 'umd' : 'es6',
                     dest: f,
