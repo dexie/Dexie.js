@@ -1,4 +1,8 @@
-﻿import Dexie from 'dexie';
+﻿// DISCLAIMBER: This sample won't work with Typescript 2.0. Async / await is not encouraged any longer when using
+// indexedDB in any library due to the incompability between IndexedDB and native Promise in Firefox, Safari and
+// Edge browsers. See https://github.com/dfahlander/Dexie.js/issues/315
+
+import Dexie from 'dexie';
 
 const Promise = Dexie.Promise; // KEEP! (or loose transaction safety in await calls!)
 const all = Promise.all;
