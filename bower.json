@@ -22,8 +22,14 @@
     "**/.*",
     "**/tmp/",
     "addons/*/bower.json",
+    "addons/*/package.json",
+    "addons/*/test/",
+    "addons/*/tools/",
     "samples/",
-    "*.njsproj"
+    "*.njsproj",
+    "src",
+    "test",
+    "tools"
   ],
   "version": "1.4.2"
 }
