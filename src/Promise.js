@@ -269,7 +269,10 @@ props (Promise, {
     },
     
     resolve: value => {
-        if (value && typeof value.then === 'function') return value;
+        if (value instanceof Promise) return value;
+        if (value && typeof value.then === 'function') return new Promise((resolve, reject)=>{
+            value.then(resolve, reject);
+        });
         return new Promise(INTERNAL, true, value);
     },
     
