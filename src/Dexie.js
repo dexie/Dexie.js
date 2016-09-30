@@ -696,6 +696,26 @@ export default function Dexie(dbName, options) {
         db.on("populate").fire(db._createTransaction(READWRITE, dbStoreNames, globalSchema));
         db.on("error").fire(new Error());
     });
+    
+    this.tranx = function (mode, tableInstances, scopeFunc) {
+        var l = arguments.length,
+            args = new Array(l),
+            i = l;
+        while (i--) args[i] = arguments[i];
+        var func = args[l-1];
+        args[l-1] = function () {
+            PSD.onenter = function () {
+                this.Promise = _global.Promise;
+                _global.Promise = Promise;
+            }
+            PSD.onleave = function () {
+                _global.Promise = this.Promise;
+            }
+            PSD.onenter();
+            return func.call(this, this); // Give transaction as first argument instead of table instances.
+        };
+        return this.transaction.apply(this, args);
+    }
 
     this.transaction = function (mode, tableInstances, scopeFunc) {
         /// <summary>
