@@ -94,6 +94,8 @@ export var globalPSD = {
     ref: 0,
     unhandleds: [],
     onunhandled: globalError,
+    onenter: null,
+    onleave: null,
     //env: null, // Will be set whenever leaving a scope using wrappers.snapshot()
     finalize: function () {
         this.unhandleds.forEach(uh => {
@@ -109,30 +111,6 @@ export var PSD = globalPSD;
 export var microtickQueue = []; // Callbacks to call in this or next physical tick.
 export var numScheduledCalls = 0; // Number of listener-calls left to do in this physical tick.
 export var tickFinalizers = []; // Finalizers to call when there are no more async calls scheduled within current physical tick.
-
-// Wrappers are not being used yet. Their framework is functioning and can be used
-// to replace environment during a PSD scope (a.k.a. 'zone').
-/* **KEEP** export var wrappers = (() => {
-    var wrappers = [];
-
-    return {
-        snapshot: () => {
-            var i = wrappers.length,
-                result = new Array(i);
-            while (i--) result[i] = wrappers[i].snapshot();
-            return result;
-        },
-        restore: values => {
-            var i = wrappers.length;
-            while (i--) wrappers[i].restore(values[i]);
-        },
-        wrap: () => wrappers.map(w => w.wrap()),
-        add: wrapper => {
-            wrappers.push(wrapper);
-        }
-    };
-})();
-*/
 
 export default function Promise(fn) {
     if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');    
@@ -431,9 +409,9 @@ function callListener (cb, promise, listener) {
     var psd = listener.psd;
     try {
         if (psd !== outerScope) {
-            // **KEEP** outerScope.env = wrappers.snapshot(); // Snapshot outerScope's environment.
             PSD = psd;
-            // **KEEP** wrappers.restore(psd.env); // Restore PSD's environment.
+            outerScope.onleave && outerScope.onleave();
+            psd.onenter && psd.onenter();
         }
         
         // Set static variable currentFulfiller to the promise that is being fullfilled,
@@ -459,7 +437,8 @@ function callListener (cb, promise, listener) {
         // Restore PSD, env and currentFulfiller.
         if (psd !== outerScope) {
             PSD = outerScope;
-            // **KEEP** wrappers.restore(outerScope.env); // Restore outerScope's environment
+            psd.onleave && psd.onleave();
+            outerScope.onenter && outerScope.onenter();
         }
         currentFulfiller = null;
         if (--numScheduledCalls === 0) finalizePhysicalTick();
@@ -481,7 +460,7 @@ function getStack (promise, stacks, limit) {
             stack = prettyStack(failure, 0);
         } else {
             errorName = failure; // If error is undefined or null, show that.
-            message = ""
+            message = "";
         }
         stacks.push(errorName + (message ? ": " + message : "") + stack);
     }
@@ -602,9 +581,9 @@ export function wrap (fn, errorCatcher) {
 
         try {
             if (outerScope !== psd) {
-                // **KEEP** outerScope.env = wrappers.snapshot(); // Snapshot outerScope's environment
                 PSD = psd;
-                // **KEEP** wrappers.restore(psd.env); // Restore PSD's environment.
+                outerScope.onleave && outerScope.onleave();
+                psd.onenter && psd.onenter();
             }
             return fn.apply(this, arguments);
         } catch (e) {
@@ -612,7 +591,8 @@ export function wrap (fn, errorCatcher) {
         } finally {
             if (outerScope !== psd) {
                 PSD = outerScope;
-                // **KEEP** wrappers.restore(outerScope.env); // Restore outerScope's environment
+                psd.onleave && psd.onleave();
+                outerScope.onenter && outerScope.onenter();
             }
             if (wasRootExec) endMicroTickScope();
         }
@@ -625,7 +605,8 @@ export function newScope (fn, a1, a2, a3) {
     psd.parent = parent;
     psd.ref = 0;
     psd.global = false;
-    // **KEEP** psd.env = wrappers.wrap(psd);
+    psd.onenter = null;
+    psd.onleave = null;
     
     // unhandleds and onunhandled should not be specifically set here.
     // Leave them on parent prototype.
@@ -644,15 +625,16 @@ export function usePSD (psd, fn, a1, a2, a3) {
     var outerScope = PSD;
     try {
         if (psd !== outerScope) {
-            // **KEEP** outerScope.env = wrappers.snapshot(); // snapshot outerScope's environment.
             PSD = psd;
-            // **KEEP** wrappers.restore(psd.env); // Restore PSD's environment.
+            outerScope.onleave && outerScope.onleave();
+            psd.onenter && psd.onenter();
         }
         return fn(a1, a2, a3);
     } finally {
         if (psd !== outerScope) {
             PSD = outerScope;
-            // **KEEP** wrappers.restore(outerScope.env); // Restore outerScope's environment.
+            psd.onleave && psd.onleave();
+            outerScope.onenter && outerScope.onenter();
         }
     }
 }
@@ -666,59 +648,6 @@ function globalError(err, promise) {
         Promise.on.error.fire(err, promise); // TODO: Deprecated and use same global handler as bluebird.
     } catch (e) {}
 }
-
-/* **KEEP** 
-
-export function wrapPromise(PromiseClass) {
-    var proto = PromiseClass.prototype;
-    var origThen = proto.then;
-    
-    wrappers.add({
-        snapshot: () => proto.then,
-        restore: value => {proto.then = value;},
-        wrap: () => patchedThen
-    });
-
-    function patchedThen (onFulfilled, onRejected) {
-        var promise = this;
-        var onFulfilledProxy = wrap(function(value){
-            var rv = value;
-            if (onFulfilled) {
-                rv = onFulfilled(rv);
-                if (rv && typeof rv.then === 'function') rv.then(); // Intercept that promise as well.
-            }
-            --PSD.ref || PSD.finalize();
-            return rv;
-        });
-        var onRejectedProxy = wrap(function(err){
-            promise._$err = err;
-            var unhandleds = PSD.unhandleds;
-            var idx = unhandleds.length,
-                rv;
-            while (idx--) if (unhandleds[idx]._$err === err) break;
-            if (onRejected) {
-                if (idx !== -1) unhandleds.splice(idx, 1); // Mark as handled.
-                rv = onRejected(err);
-                if (rv && typeof rv.then === 'function') rv.then(); // Intercept that promise as well.
-            } else {
-                if (idx === -1) unhandleds.push(promise);
-                rv = PromiseClass.reject(err);
-                rv._$nointercept = true; // Prohibit eternal loop.
-            }
-            --PSD.ref || PSD.finalize();
-            return rv;
-        });
-        
-        if (this._$nointercept) return origThen.apply(this, arguments);
-        ++PSD.ref;
-        return origThen.call(this, onFulfilledProxy, onRejectedProxy);
-    }
-}
-
-// Global Promise wrapper
-if (_global.Promise) wrapPromise(_global.Promise);
-
-*/
 
 doFakeAutoComplete(() => {
     // Simplify the job for VS Intellisense. This piece of code is one of the keys to the new marvellous intellisense support in Dexie.

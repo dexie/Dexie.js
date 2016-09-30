@@ -7,6 +7,7 @@ import "./tests-table.js";
 import "./tests-extendability.js";
 import "./tests-promise.js";
 import "./tests-transaction.js";
+import "./tests-tranx.js";
 import "./tests-open.js";
 import "./tests-exception-handling.js";
 import "./tests-upgrading.js";
