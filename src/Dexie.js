@@ -697,7 +697,7 @@ export default function Dexie(dbName, options) {
         db.on("error").fire(new Error());
     });
     
-    this.tranx = function (mode, tableInstances, scopeFunc) {
+    this.tranx = function () {
         var l = arguments.length,
             args = new Array(l),
             i = l;
@@ -715,7 +715,7 @@ export default function Dexie(dbName, options) {
                 this.Promise = _global.Promise;
                 _global.Promise = Promise;
                 return true;
-            };
+            }
             
             function onleave () {
                 _global.Promise = this.Promise;
