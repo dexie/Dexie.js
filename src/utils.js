@@ -39,8 +39,10 @@ export function props (proto, extension) {
     });
 }
 
+export const defineProperty = Object.defineProperty;
+
 export function setProp(obj, prop, functionOrGetSet, options) {
-    Object.defineProperty(obj, prop, extend(functionOrGetSet && hasOwn(functionOrGetSet, "get") && typeof functionOrGetSet.get === 'function' ?
+    defineProperty(obj, prop, extend(functionOrGetSet && hasOwn(functionOrGetSet, "get") && typeof functionOrGetSet.get === 'function' ?
         {get: functionOrGetSet.get, set: functionOrGetSet.set, configurable: true} :
         {value: functionOrGetSet, configurable: true, writable: true}, options));
 }

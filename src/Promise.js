@@ -96,6 +96,7 @@ export var globalPSD = {
     onunhandled: globalError,
     onenter: null,
     onleave: null,
+    tranx: false,
     //env: null, // Will be set whenever leaving a scope using wrappers.snapshot()
     finalize: function () {
         this.unhandleds.forEach(uh => {
@@ -635,6 +636,37 @@ export function usePSD (psd, fn, a1, a2, a3) {
             outerScope.onenter && outerScope.onenter();
         }
     }
+}
+
+function patchGlobalPromise (psd) {
+    let GlobalPromise = _global.Promise,
+        GlobalPromiseProto = GlobalPromise.prototype;
+    psd.GP = GlobalPromise;
+    psd.GPthen = getOwnPropertyDescriptor (GlobalPromiseProto, 'then');
+    _global.Promise = Promise;
+    defineProperty(GlobalPromiseProto, 'then', {get: function(){
+        var psd = PSD;
+        return function () {
+            function proxy (x) {
+                
+            }
+            if (psd === PSD) {
+                arguments[0] = arguments[1] = proxy;
+            }
+            return origThen.apply(this, arguments);
+            return psd === PSD ?
+                try {
+                    
+                } finally {
+                    
+                }
+        };
+    }, configurable: true});
+}
+
+function restoreGlobalPromise (psd) {
+    _global.Promise = psd.Promise;
+    Object.defineProperty(NativePromiseProto, 'then', psd.nthen);
 }
 
 function globalError(err, promise) {
