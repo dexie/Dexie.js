@@ -702,17 +702,31 @@ export default function Dexie(dbName, options) {
             args = new Array(l),
             i = l;
         while (i--) args[i] = arguments[i];
-        var func = args[l-1];
+        var scopeFunc = args[l-1];
         args[l-1] = function () {
-            PSD.onenter = function () {
+            // Replace global Promise within this transaction zone.
+            
+            // NOTE: For now, it's okay to just set PSD.onenter / PSD.onleave.
+            // If these events would be used for other purposes in a future verison,
+            // we would have to have some kind of addEventListener() functionality, for
+            // example via PSD.onenter = combine(PSD.onenter, ourSubscriber)
+            
+            function onenter () {
                 this.Promise = _global.Promise;
                 _global.Promise = Promise;
-            }
-            PSD.onleave = function () {
+                return true;
+            };
+            
+            function onleave () {
                 _global.Promise = this.Promise;
             }
-            PSD.onenter();
-            return func.call(this, this); // Give transaction as first argument instead of table instances.
+            
+            PSD.onenter = onenter;
+            PSD.onleave = onleave;
+            
+            onenter.apply(PSD); // Zone already entered, so need to explicitely invoke onenter now.
+            
+            return scopeFunc.call(this, this); // Give transaction as first argument instead of table instances.
         };
         return this.transaction.apply(this, args);
     }
