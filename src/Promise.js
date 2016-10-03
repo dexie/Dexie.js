@@ -605,8 +605,6 @@ export function newScope (fn, a1, a2, a3) {
     psd.parent = parent;
     psd.ref = 0;
     psd.global = false;
-    psd.onenter = null;
-    psd.onleave = null;
     
     // unhandleds and onunhandled should not be specifically set here.
     // Leave them on parent prototype.
