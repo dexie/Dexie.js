@@ -168,7 +168,7 @@ props(Promise.prototype, {
     
     _then: function (onFulfilled, onRejected) {
         // A little tinier version of then() that don't have to create a resulting promise.
-        propagateToListener(this, new Listener(null, null, onFulfilled, onRejected));        
+        propagateToListener(this, new Listener(null, null, onFulfilled, onRejected, PSD));        
     },
 
     catch: function (onRejected) {
@@ -234,8 +234,8 @@ function Listener(onFulfilled, onRejected, resolve, reject, zone) {
     this.onRejected = typeof onRejected === 'function' ? onRejected : null;
     this.resolve = resolve;
     this.reject = reject;
-    this.psd = zone;
-    this.possibleAwait = zone !== PSD;
+    this.psd = zone.pgp ? zone : PSD;
+    this.possibleAwait = zone.pgp && zone !== PSD;
 }
 
 // Promise Static Properties
