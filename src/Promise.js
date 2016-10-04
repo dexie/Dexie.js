@@ -1,5 +1,6 @@
 import {doFakeAutoComplete, tryCatch, props,
-        setProp, _global, getPropertyDescriptor, getArrayOf} from './utils';
+        setProp, _global, getPropertyDescriptor, getArrayOf,
+        getOwnPropertyDescriptor, defineProperty, extend} from './utils';
 import {reverseStoppableEventChain, nop, callBoth, mirror} from './chaining-functions';
 import Events from './Events';
 import {debug, prettyStack, getErrorWithStack} from './debug';
@@ -94,9 +95,7 @@ export var globalPSD = {
     ref: 0,
     unhandleds: [],
     onunhandled: globalError,
-    onenter: null,
-    onleave: null,
-    tranx: false,
+    pgp: false,
     //env: null, // Will be set whenever leaving a scope using wrappers.snapshot()
     finalize: function () {
         this.unhandleds.forEach(uh => {
@@ -154,12 +153,17 @@ export default function Promise(fn) {
 
 props(Promise.prototype, {
 
-    then: function (onFulfilled, onRejected) {
-        var rv = new Promise((resolve, reject) => {
-            propagateToListener(this, new Listener(onFulfilled, onRejected, resolve, reject));
-        });
-        debug && (!this._prev || this._state === null) && linkToPreviousPromise(rv, this);
-        return rv;
+    then: {
+        get: function() {
+            var zone = PSD;
+            return function (onFulfilled, onRejected) {
+                var rv = new Promise((resolve, reject) => {
+                    propagateToListener(this, new Listener(onFulfilled, onRejected, resolve, reject, zone));
+                });
+                debug && (!this._prev || this._state === null) && linkToPreviousPromise(rv, this);
+                return rv;
+            }
+        }
     },
     
     _then: function (onFulfilled, onRejected) {
@@ -225,12 +229,13 @@ props(Promise.prototype, {
     }
 });
 
-function Listener(onFulfilled, onRejected, resolve, reject) {
+function Listener(onFulfilled, onRejected, resolve, reject, zone) {
     this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
     this.onRejected = typeof onRejected === 'function' ? onRejected : null;
     this.resolve = resolve;
     this.reject = reject;
-    this.psd = PSD;
+    this.psd = zone;
+    this.possibleAwait = zone !== PSD;
 }
 
 // Promise Static Properties
@@ -320,7 +325,7 @@ function executePromiseTask (promise, fn) {
     // https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
     try {
         fn(value => {
-            if (promise._state !== null) return;
+            if (promise._state !== null) return; // Already settled
             if (value === promise) throw new TypeError('A promise cannot be resolved with itself.');
             var shouldExecuteTick = promise._lib && beginMicroTickScope();
             if (value && typeof value.then === 'function') {
@@ -406,13 +411,14 @@ function propagateToListener(promise, listener) {
 }
 
 function callListener (cb, promise, listener) {
-    var outerScope = PSD;
-    var psd = listener.psd;
+    var outerScope = PSD,
+        psd = listener.psd,
+        ret;
     try {
-        if (psd !== outerScope) {
-            PSD = psd;
-            outerScope.onleave && outerScope.onleave();
-            psd.onenter && psd.onenter();
+        switchToZone(psd);
+        if (psd.possibleAwait) {
+            ++psd.ref;
+            enqueueNativeMicroTask(()=>switchToZone(psd))
         }
         
         // Set static variable currentFulfiller to the promise that is being fullfilled,
@@ -420,31 +426,32 @@ function callListener (cb, promise, listener) {
         currentFulfiller = promise;
         
         // Call callback and resolve our listener with it's return value.
-        var value = promise._value,
-            ret;
+        var value = promise._value;
         if (promise._state) {
+            // cb is onResolved
             ret = cb (value);
         } else {
+            // cb is onRejected
             if (rejectingErrors.length) rejectingErrors = [];
             ret = cb(value);
             if (rejectingErrors.indexOf(value) === -1)
                 markErrorAsHandled(promise); // Callback didnt do Promise.reject(err) nor reject(err) onto another promise.
         }
-        listener.resolve(ret);
     } catch (e) {
         // Exception thrown in callback. Reject our listener.
         listener.reject(e);
     } finally {
         // Restore PSD, env and currentFulfiller.
-        if (psd !== outerScope) {
-            PSD = outerScope;
-            psd.onleave && psd.onleave();
-            outerScope.onenter && outerScope.onenter();
-        }
+        switchToZone(outerScope);
+        if (psd.possibleAwait) enqueueNativeMicroTask(()=>{
+            switchToZone(outerScope);
+            --psd.ref || psd.finalize();
+        });
         currentFulfiller = null;
         if (--numScheduledCalls === 0) finalizePhysicalTick();
         --psd.ref || psd.finalize();
     }
+    listener.resolve(ret);
 }
 
 function getStack (promise, stacks, limit) {
@@ -581,31 +588,24 @@ export function wrap (fn, errorCatcher) {
             outerScope = PSD;
 
         try {
-            if (outerScope !== psd) {
-                PSD = psd;
-                outerScope.onleave && outerScope.onleave();
-                psd.onenter && psd.onenter();
-            }
+            switchToZone(psd);
             return fn.apply(this, arguments);
         } catch (e) {
             errorCatcher && errorCatcher(e);
         } finally {
-            if (outerScope !== psd) {
-                PSD = outerScope;
-                psd.onleave && psd.onleave();
-                outerScope.onenter && outerScope.onenter();
-            }
+            switchToZone(outerScope);
             if (wasRootExec) endMicroTickScope();
         }
     };
 }
     
-export function newScope (fn, a1, a2, a3) {
+export function newScope (fn, props) {
     var parent = PSD,
         psd = Object.create(parent);
     psd.parent = parent;
     psd.ref = 0;
     psd.global = false;
+    if (props) extend(psd, props);
     
     // unhandleds and onunhandled should not be specifically set here.
     // Leave them on parent prototype.
@@ -620,53 +620,85 @@ export function newScope (fn, a1, a2, a3) {
     return rv;
 }
 
+function switchToZone (targetZone) {
+    if (targetZone === PSD) return;
+    var currentZone = PSD;
+    PSD = targetZone;
+    if (currentZone.global && targetZone.pgp) {
+        patchGlobalPromise(targetZone);
+    } else if (targetZone.global && currentZone.pgp) {
+        restoreGlobalPromise(currentZone);
+    }
+}
+
 export function usePSD (psd, fn, a1, a2, a3) {
     var outerScope = PSD;
     try {
-        if (psd !== outerScope) {
-            PSD = psd;
-            outerScope.onleave && outerScope.onleave();
-            psd.onenter && psd.onenter();
-        }
+        switchToZone(psd);
         return fn(a1, a2, a3);
     } finally {
-        if (psd !== outerScope) {
-            PSD = outerScope;
-            psd.onleave && psd.onleave();
-            outerScope.onenter && outerScope.onenter();
+        switchToZone(outerScope);
+    }
+}
+
+const settledNativePromise = _global.Promise && _global.Promise.resolve(),
+      nativePromiseThen = _global.Promise && _global.Promise.prototype.then;
+
+function enqueueNativeMicroTask (job) {
+    nativePromiseThen ? nativePromiseThen.call(settledNativePromise, job) : job();
+}
+
+function nativeAwaitCompatibleWrap(fn, zone) {
+    return function () {
+        var outerZone = PSD;
+        switchToZone(zone);
+        ++zone.ref;
+        enqueueNativeMicroTask(()=>switchToZone(zone));
+        try {
+            return fn.apply(this, arguments);
+         } finally {
+            enqueueNativeMicroTask(()=>{
+                switchToZone(outerZone);
+                --zone.ref || zone.finalize(); // if ref reaches zero, call finalize();
+            });
+            switchToZone(outerZone);
         }
     }
 }
 
-function patchGlobalPromise (psd) {
-    let GlobalPromise = _global.Promise,
-        GlobalPromiseProto = GlobalPromise.prototype;
-    psd.GP = GlobalPromise;
-    psd.GPthen = getOwnPropertyDescriptor (GlobalPromiseProto, 'then');
+function patchGlobalPromise (zoneToEnter) {
+    var GlobalPromise = _global.Promise,
+        GlobalPromiseProto = GlobalPromise.prototype,
+        nativeThen = GlobalPromiseProto.then;
+    zoneToEnter.GP = GlobalPromise;
+    zoneToEnter.GP_then = getOwnPropertyDescriptor (GlobalPromiseProto, 'then');
+    
+    // Replace _global.Promise (needed in all browsers but Chrome due to incompability
+    // between IDB transactions and native Promise, see https://github.com/dfahlander/Dexie.js/issues/317)
+    // This will solve the typescript 2.0 case and possibly other transpiled environments.
     _global.Promise = Promise;
+    
+    // Patch native Promise.prototype.then to keep zone state between native
+    // await calls in Chrome and future IDB+Promise capable browsers)
     defineProperty(GlobalPromiseProto, 'then', {get: function(){
-        var psd = PSD;
-        return function () {
-            function proxy (x) {
-                
+        var zone = PSD;
+        return function (onResolved, onRejected) {
+            if (zone === PSD) {
+                // Normal .then invokation. Switch zone in current call stack.
+                return nativeThen.call(this, wrap(onResolved), wrap(onRejected));
+            } else {
+                // '.then' invoked lazily. Keep abreast of switching zones in an ES7 await compatible manner. 
+                return nativeThen.call(this,
+                    typeof onResolved === 'function' && nativeAwaitCompatibleWrap(onResolved, zone),
+                    typeof onRejected === 'function' && nativeAwaitCompatibleWrap(onRejected, zone));
             }
-            if (psd === PSD) {
-                arguments[0] = arguments[1] = proxy;
-            }
-            return origThen.apply(this, arguments);
-            return psd === PSD ?
-                try {
-                    
-                } finally {
-                    
-                }
         };
     }, configurable: true});
 }
 
-function restoreGlobalPromise (psd) {
-    _global.Promise = psd.Promise;
-    Object.defineProperty(NativePromiseProto, 'then', psd.nthen);
+function restoreGlobalPromise (zoneToLeave) {
+    _global.Promise = zoneToLeave.GP;
+    defineProperty(zoneToLeave.GP.prototype, 'then', zoneToLeave.GP_then);
 }
 
 function globalError(err, promise) {
