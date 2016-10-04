@@ -697,41 +697,24 @@ export default function Dexie(dbName, options) {
         db.on("error").fire(new Error());
     });
     
-    this.tranx = function () {
-        var l = arguments.length,
-            args = new Array(l),
-            i = l;
-        while (i--) args[i] = arguments[i];
-        var scopeFunc = args[l-1];
-        args[l-1] = function () {
-            // Replace global Promise within this transaction zone.
-            
-            // NOTE: For now, it's okay to just set PSD.onenter / PSD.onleave.
-            // If these events would be used for other purposes in a future verison,
-            // we would have to have some kind of addEventListener() functionality, for
-            // example via PSD.onenter = combine(PSD.onenter, ourSubscriber)
-            
-            function onenter () {
-                this.Promise = _global.Promise;
-                _global.Promise = Promise;
-                return true;
-            }
-            
-            function onleave () {
-                _global.Promise = this.Promise;
-            }
-            
-            PSD.onenter = onenter;
-            PSD.onleave = onleave;
-            
-            onenter.apply(PSD); // Zone already entered, so need to explicitely invoke onenter now.
-            
-            return scopeFunc.call(this, this); // Give transaction as first argument instead of table instances.
-        };
-        return this.transaction.apply(this, args);
-    }
+    this.tranx = function (mode, _tableArgs_, scopeFunc) {
+        /// <summary>
+        ///     Start an IndexedDB transaction and enter a zone where global Promise is being
+        ///     temporarly patched to work with async / await:
+        ///     * global.Promise.prototype.then is replaced with a proxy that invokes zones
+        ///       between await calls and Promise.all() calls (for native await calls in Chromium)
+        ///     * global.Promise is replaced with Dexie.Promise (for transpiled async / await in Typescript)
+        /// </summary>
+        /// <param name="mode" type="String">"r" for readonly, or "rw" for readwrite</param>
+        /// <param name="tableInstances">Table instance, Array of Table instances, String or String Array of object stores to include in the transaction</param>
+        /// <param name="scopeFunc" type="Function">Function to execute with transaction</param>
 
-    this.transaction = function (mode, tableInstances, scopeFunc) {
+        var args = extractTransactionArgs.apply(null, arguments);
+        args.push({pgp: true}); // Add scope property pgp:true to argument list.
+        return this._transaction.apply (this, args);
+    }
+    
+    this.transaction = function (mode, _tableArgs_, scopeFunc) {
         /// <summary>
         ///
         /// </summary>
@@ -739,6 +722,11 @@ export default function Dexie(dbName, options) {
         /// <param name="tableInstances">Table instance, Array of Table instances, String or String Array of object stores to include in the transaction</param>
         /// <param name="scopeFunc" type="Function">Function to execute with transaction</param>
 
+        var args = extractTransactionArgs.apply(this, arguments);
+        return this._transaction.apply(this, args);
+    }
+    
+    function extractTransactionArgs (mode, _tableArgs_, scopeFunc) {
         // Let table arguments be all arguments between mode and last argument.
         var i = arguments.length;
         if (i < 2) throw new exceptions.InvalidArgument("Too few arguments");
@@ -749,6 +737,10 @@ export default function Dexie(dbName, options) {
         // Let scopeFunc be the last argument and pop it so that args now only contain the table arguments.
         scopeFunc = args.pop();
         var tables = flatten(args); // Support using array as middle argument, or a mix of arrays and non-arrays.
+        return [mode, tables, scopeFunc];
+    }
+
+    this._transaction = function (mode, tables, scopeFunc, zoneProps) {
         var parentTransaction = PSD.trans;
         // Check if parent transactions is bound to this db instance, and if caller wants to reuse it
         if (!parentTransaction || parentTransaction.db !== db || mode.indexOf('!') !== -1) parentTransaction = null;
@@ -848,12 +840,10 @@ export default function Dexie(dbName, options) {
                 }).then(()=>{
                     return returnValue;
                 }).catch (e => {
-                    //reject(e);
                     trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
                     return rejection(e);
                 });
-                //});
-            })));
+            }, zoneProps)));
         }
     };
 
