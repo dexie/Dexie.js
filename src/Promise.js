@@ -303,7 +303,7 @@ props (Promise, {
                     });
                 }, psd.finalize);
                 fn();
-            }, resolve, reject);
+            }, null, resolve, reject);
         });
     },
 
@@ -599,7 +599,7 @@ export function wrap (fn, errorCatcher) {
     };
 }
     
-export function newScope (fn, props) {
+export function newScope (fn, props, a1, a2) {
     var parent = PSD,
         psd = Object.create(parent);
     psd.parent = parent;
@@ -615,7 +615,7 @@ export function newScope (fn, props) {
     psd.finalize = function () {
         --this.parent.ref || this.parent.finalize();
     }
-    var rv = usePSD (psd, fn, a1, a2, a3);
+    var rv = usePSD (psd, fn, a1, a2);
     if (psd.ref === 0) psd.finalize();
     return rv;
 }
