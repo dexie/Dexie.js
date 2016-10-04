@@ -697,7 +697,7 @@ export default function Dexie(dbName, options) {
         db.on("error").fire(new Error());
     });
     
-    this.tranx = function (mode, _tableArgs_, scopeFunc) {
+    this.tranx = function () {
         /// <summary>
         ///     Start an IndexedDB transaction and enter a zone where global Promise is being
         ///     temporarly patched to work with async / await:
@@ -714,7 +714,7 @@ export default function Dexie(dbName, options) {
         return this._transaction.apply (this, args);
     }
     
-    this.transaction = function (mode, _tableArgs_, scopeFunc) {
+    this.transaction = function () {
         /// <summary>
         ///
         /// </summary>
