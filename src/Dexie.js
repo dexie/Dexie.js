@@ -709,8 +709,8 @@ export default function Dexie(dbName, options) {
         /// <param name="tableInstances">Table instance, Array of Table instances, String or String Array of object stores to include in the transaction</param>
         /// <param name="scopeFunc" type="Function">Function to execute with transaction</param>
 
-        var [mode, tables, scopeFunc] = extractTransactionArgs.apply(null, arguments);
-        return this._transaction.call (this, mode, tables, function(){return scopeFunc.call(this, this);}, {pgp: true});
+        var args = extractTransactionArgs.apply(null, arguments);
+        return this._transaction.call (this, args[0], args[1], function(){return args[2].call(this, this);}, {pgp: true});
     }
     
     this.transaction = function () {

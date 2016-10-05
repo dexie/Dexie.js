@@ -42,37 +42,48 @@ var INTERNAL = {};
 var LONG_STACKS_CLIP_LIMIT = 100,
     // When calling error.stack or promise.stack, limit the number of asyncronic stacks to print out. 
     MAX_LONG_STACKS = 20,
-    stack_being_generated = false;
+    stack_being_generated = false,
+    nativePromiseProto = (()=>{
+        try {
+            // Be able to patch native async functions
+            return new Function("return Object.getPrototypeOf((async ()=>{})())")();
+        } catch(e) {
+            return _global.Promise && _global.Promise.prototype; // Support strictly transpiled async functions 
+        }
+    })();
 
-/* The default "nextTick" function used only for the very first promise in a promise chain.
+const resolvedNativePromise = nativePromiseProto && nativePromiseProto.constructor.resolve(),
+      resolvedGlobalPromise = _global.Promise && _global.Promise.resolve(),
+      nativePromiseThen = nativePromiseProto && nativePromiseProto.then;
+
+/* The default function used only for the very first promise in a promise chain.
    As soon as then promise is resolved or rejected, all next tasks will be executed in micro ticks
    emulated in this module. For indexedDB compatibility, this means that every method needs to 
    execute at least one promise before doing an indexedDB operation. Dexie will always call 
    db.ready().then() for every operation to make sure the indexedDB event is started in an
-   emulated micro tick.
+   indexedDB-compatible emulated micro task loop.
 */
-var schedulePhysicalTick = (_global.setImmediate ? 
-    // setImmediate supported. Those modern platforms also supports Function.bind().
-    setImmediate.bind(null, physicalTick) :
-    _global.MutationObserver ?
-        // MutationObserver supported
-        () => {
-            var hiddenDiv = document.createElement("div");
-            (new MutationObserver(() => {
-                physicalTick();
-                hiddenDiv = null;
-            })).observe(hiddenDiv, { attributes: true });
-            hiddenDiv.setAttribute('i', '1');
-        } :
-        // No support for setImmediate or MutationObserver. No worry, setTimeout is only called
-        // once time. Every tick that follows will be our emulated micro tick.
-        // Could have uses setTimeout.bind(null, 0, physicalTick) if it wasnt for that FF13 and below has a bug 
-        ()=>{setTimeout(physicalTick,0);}
-);
-// BUGBUG: JUST TESTING!:
-//schedulePhysicalTick = ()=>enqueueNativeMicroTask(physicalTick);
+var schedulePhysicalTick = resolvedGlobalPromise ?
+    ()=>usePSD(globalPSD, resolvedGlobalPromise.then.bind(resolvedGlobalPromise, physicalTick)) :
+    _global.setImmediate ? 
+        // setImmediate supported. Those modern platforms also supports Function.bind().
+        setImmediate.bind(null, physicalTick) :
+        _global.MutationObserver ?
+            // MutationObserver supported
+            () => {
+                var hiddenDiv = document.createElement("div");
+                (new MutationObserver(() => {
+                    physicalTick();
+                    hiddenDiv = null;
+                })).observe(hiddenDiv, { attributes: true });
+                hiddenDiv.setAttribute('i', '1');
+            } :
+            // No support for setImmediate or MutationObserver. No worry, setTimeout is only called
+            // once time. Every tick that follows will be our emulated micro tick.
+            // Could have uses setTimeout.bind(null, 0, physicalTick) if it wasnt for that FF13 and below has a bug 
+            ()=>{setTimeout(physicalTick,0);};
 
-// Confifurable through Promise.scheduler.
+// Configurable through Promise.scheduler.
 // Don't export because it would be unsafe to let unknown
 // code call it unless they do try..catch within their callback.
 // This function can be retrieved through getter of Promise.scheduler though,
@@ -83,7 +94,7 @@ var asap = function (callback, args) {
         schedulePhysicalTick();
         needsNewPhysicalTick = false;
     }
-}
+};
 
 var isOutsideMicroTick = true, // True when NOT in a virtual microTick.
     needsNewPhysicalTick = true, // True when a push to microtickQueue must also schedulePhysicalTick()
@@ -437,7 +448,9 @@ function callListener (cb, promise, listener) {
                 // onResolved or onRejected callbacks on the "PromiseJobs" queue. We must enque a zone-
                 // invoker and zone-resetter before and after the native queue record.
                 ++psd.ref;
-                enqueueNativeMicroTask(()=>switchToZone(psd))
+                enqueueNativeMicroTask(()=>{
+                    switchToZone(psd);
+                });
             }
             
             if (promise._state) {
@@ -657,20 +670,8 @@ export function usePSD (psd, fn, a1, a2, a3) {
     }
 }
 
-const nativePromiseProto = (()=>{
-    try {
-        // Be able to patch native async functions
-        return new Function("return Object.getPrototypeOf((async ()=>{})())")();
-    } catch(e) {
-        return _global.Promise && _global.Promise.prototype; // Support strictly transpiled async functions 
-    }
-})();
-
-const settledNativePromise = nativePromiseProto && nativePromiseProto.constructor.resolve(),
-      nativePromiseThen = nativePromiseProto && nativePromiseProto.then;
-
 function enqueueNativeMicroTask (job) {
-    nativePromiseThen ? nativePromiseThen.call(settledNativePromise, job) : asap(job, []);
+    nativePromiseThen ? nativePromiseThen.call(resolvedNativePromise, job) : asap(job, []);
 }
 
 function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
@@ -686,13 +687,15 @@ function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
             // Thos [[Resolve]] and [[Reject]] internal slots will in its turn enqueue its internal
             // onResolved or onRejected callbacks on the "PromiseJobs" queue. We must enque a zone-
             // invoker and zone-resetter before and after the native queue record.
-            enqueueNativeMicroTask(()=>switchToZone(zone));
+            enqueueNativeMicroTask(()=>{
+                switchToZone(zone);
+            });
         }
         try {
             return fn.apply(this, arguments);
          } finally {
             if (possibleAwait) enqueueNativeMicroTask(()=>{
-                switchToZone(outerZone);
+                switchToZone(globalPSD);
                 --zone.ref || zone.finalize(); // if ref reaches zero, call finalize();
             });
             switchToZone(outerZone);
@@ -700,9 +703,21 @@ function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
     }
 }
 
+function getPatchedThenDescriptor (origThen) {
+    return {get: function(){
+        var zone = PSD;
+        return function (onResolved, onRejected) {
+            return origThen.call(this,
+                typeof onResolved === 'function' && nativeAwaitCompatibleWrap(onResolved, zone, zone !== PSD),
+                typeof onRejected === 'function' && nativeAwaitCompatibleWrap(onRejected, zone, zone !== PSD));
+        };
+    }, configurable: true};
+}
+
 function patchGlobalPromise (zoneToEnter) {
     var GlobalPromise = _global.Promise,
-        nativeThen = nativePromiseProto.then;
+        globalPromiseProto = GlobalPromise.prototype,
+        globalPromiseThen = globalPromiseProto.then;
     zoneToEnter.GP = GlobalPromise;
     zoneToEnter.nthen = getOwnPropertyDescriptor (nativePromiseProto, 'then');
     zoneToEnter.npc = nativePromiseProto.constructor;
@@ -714,14 +729,13 @@ function patchGlobalPromise (zoneToEnter) {
     
     // Patch native Promise.prototype.then to keep zone state between native
     // await calls in Chrome and future IDB+Promise capable browsers)
-    defineProperty(nativePromiseProto, 'then', {get: function(){
-        var zone = PSD;
-        return function (onResolved, onRejected) {
-            return nativeThen.call(this,
-                typeof onResolved === 'function' && nativeAwaitCompatibleWrap(onResolved, zone, zone !== PSD),
-                typeof onRejected === 'function' && nativeAwaitCompatibleWrap(onRejected, zone, zone !== PSD));
-        };
-    }, configurable: true});
+    defineProperty(nativePromiseProto, 'then', getPatchedThenDescriptor(nativePromiseThen));
+    if (nativePromiseProto !== globalPromiseProto) {
+        // Global promise is not nescessarily native Promise.
+        // If global promise is patched (polyfilled or similar), make sure to patch it as well.
+        zoneToEnter.gthen = getOwnPropertyDescriptor (globalPromiseProto, 'then');
+        defineProperty(globalPromiseProto, 'then', getPatchedThenDescriptor(globalPromiseThen));
+    }
     // Also override constructor (https://github.com/tc39/ecmascript-asyncawait/issues/65#issuecomment-145250337)
     nativePromiseProto.constructor = Promise;
 }
@@ -729,6 +743,7 @@ function patchGlobalPromise (zoneToEnter) {
 function restoreGlobalPromise (zoneToLeave) {
     _global.Promise = zoneToLeave.GP;
     defineProperty(nativePromiseProto, 'then', zoneToLeave.nthen);
+    if (zoneToLeave.gthen) defineProperty(_global.Promise.prototype, 'then', zoneToLeave.gthen);
     nativePromiseProto.constructor = zoneToLeave.npc;
 }
 
