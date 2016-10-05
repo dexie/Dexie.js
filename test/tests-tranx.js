@@ -4,6 +4,11 @@ import {resetDatabase, spawnedTest} from './dexie-unittest-utils';
 
 "use strict";
 
+const hasNativeAsyncFunctions = false;
+try {
+    hasNativeAsyncFunctions = !!new Function(`return (async ()=>{})();`)().then;
+} catch (e) {}
+
 var db = new Dexie("TestDBTranx");
 db.version(1).stores({
     items: "id"
@@ -70,7 +75,10 @@ asyncTest("Should be able to use native async await", function() {
         })`);
         return f(ok, equal, Dexie, db);
     }).catch(e => {
-        ok(true, `This browser does not support native async functions`);
+        if (hasNativeAsyncFunctions)
+            ok(false, `Error: ${e.stack || e}`);
+        else 
+            ok(true, `This browser does not support native async functions`);
     }).then(start);
 });
 
@@ -129,8 +137,10 @@ asyncTest("Must not leak PSD zone", function() {
             return f(ok, equal, Dexie, trans, hiddenDiv, mutationObserverPromise, NativePromise);
         }).catch (e => {
             // Could not test native async functions in this browser.
-            debugger;
-            ok(true, "Native async function not supported in this browser");
+            if (hasNativeAsyncFunctions)
+                ok(false, `Error: ${e.stack || e}`);
+            else 
+                ok(true, `This browser does not support native async functions`);
         }).then(()=>{
             // NativePromise
             ok(Dexie.currentTransaction === trans, "Still same transaction");
@@ -152,12 +162,31 @@ asyncTest("Must not leak PSD zone", function() {
 });
 
 spawnedTest("Should use Promise.all where applicable", function* (){
-   yield db.tranx('rw', db.items, function* () {
-       let x = yield Promise.resolve(3);
-       yield db.items.bulkAdd([{id: 'a'}, {id: 'b'}]);
-       let all = yield Promise.all(db.items.get('a'), db.items.get('b'));
-       equal (all.length, 2);
-       equal (all[0].id, 'a');
-       equal (all[1].id, 'b');
+    yield db.tranx('rw', db.items, function* () {
+        let x = yield window.Promise.resolve(3);
+        yield db.items.bulkAdd([{id: 'a'}, {id: 'b'}]);
+        let all = yield window.Promise.all([db.items.get('a'), db.items.get('b')]);
+        equal (all.length, 2);
+        equal (all[0].id, 'a');
+        equal (all[1].id, 'b');
+        all = yield window.Promise.all([db.items.get('a'), db.items.get('b')]);
+        equal (all.length, 2);
+        equal (all[0].id, 'a');
+        equal (all[1].id, 'b');
+    });
+});
+
+spawnedTest("Even when keeping a reference to global Promise, still maintain PSD zone states", function* (){
+   let Promise = window.Promise;
+   yield db.tranx('rw', db.items, () => {
+       var trans = Dexie.currentTransaction;
+       ok (trans !== null, "Have a transaction");
+       return Promise.resolve().then(()=>{
+           ok (Dexie.currentTransaction === trans, "Still have the same current transaction.");
+           return Promise.resolve().then(()=>Promise.resolve());
+       }).then(()=>{
+           ok (Dexie.currentTransaction === trans, "Still have the same current transaction after multiple global.Promise.resolve() calls");
+       });
    });
 });
+
