@@ -69,12 +69,14 @@ var schedulePhysicalTick = (_global.setImmediate ?
         // Could have uses setTimeout.bind(null, 0, physicalTick) if it wasnt for that FF13 and below has a bug 
         ()=>{setTimeout(physicalTick,0);}
 );
+// BUGBUG: JUST TESTING!:
+//schedulePhysicalTick = ()=>enqueueNativeMicroTask(physicalTick);
 
 // Confifurable through Promise.scheduler.
 // Don't export because it would be unsafe to let unknown
 // code call it unless they do try..catch within their callback.
 // This function can be retrieved through getter of Promise.scheduler though,
-// but users must not do Promise.scheduler (myFuncThatThrows exception)!
+// but users must not do Promise.scheduler = myFuncThatThrowsException
 var asap = function (callback, args) {
     microtickQueue.push([callback, args]);
     if (needsNewPhysicalTick) {
@@ -416,42 +418,56 @@ function callListener (cb, promise, listener) {
         ret;
     try {
         switchToZone(psd);
-        if (psd.possibleAwait) {
-            ++psd.ref;
-            enqueueNativeMicroTask(()=>switchToZone(psd))
-        }
         
         // Set static variable currentFulfiller to the promise that is being fullfilled,
         // so that we connect the chain of promises (for long stacks support)
         currentFulfiller = promise;
         
         // Call callback and resolve our listener with it's return value.
-        var value = promise._value;
-        if (promise._state) {
-            // cb is onResolved
-            ret = cb (value);
-        } else {
-            // cb is onRejected
-            if (rejectingErrors.length) rejectingErrors = [];
-            ret = cb(value);
-            if (rejectingErrors.indexOf(value) === -1)
-                markErrorAsHandled(promise); // Callback didnt do Promise.reject(err) nor reject(err) onto another promise.
+        var value = promise._value,
+            possibleAwait = listener.possibleAwait;
+            
+        try {
+            if (possibleAwait) {
+                // Before calling cb (which is onResolved or onRejected),
+                // enque a zone injector onto the Micro Task queue, because when cb() is executed,
+                // it will call resolvingFunctions.[[Resolve]] or resolvingFunctions.[[Reject]] as
+                // specified in ES2015, PromiseResolveThenableJob http://www.ecma-international.org/ecma-262/6.0/#sec-promiseresolvethenablejob
+                // Those [[Resolve]] and [[Reject]] internal slots will in its turn enqueue its internal
+                // onResolved or onRejected callbacks on the "PromiseJobs" queue. We must enque a zone-
+                // invoker and zone-resetter before and after the native queue record.
+                ++psd.ref;
+                enqueueNativeMicroTask(()=>switchToZone(psd))
+            }
+            
+            if (promise._state) {
+                // cb is onResolved
+                ret = cb (value);
+            } else {
+                // cb is onRejected
+                if (rejectingErrors.length) rejectingErrors = [];
+                ret = cb(value);
+                if (rejectingErrors.indexOf(value) === -1)
+                    markErrorAsHandled(promise); // Callback didnt do Promise.reject(err) nor reject(err) onto another promise.
+            }
+        } finally {
+            if (possibleAwait) enqueueNativeMicroTask(()=>{
+                // Restore zone by enqueuing a restorer.
+                switchToZone(globalPSD);
+                --psd.ref || psd.finalize();
+            });
         }
+        listener.resolve(ret);
     } catch (e) {
         // Exception thrown in callback. Reject our listener.
         listener.reject(e);
     } finally {
         // Restore PSD, env and currentFulfiller.
         switchToZone(outerScope);
-        if (psd.possibleAwait) enqueueNativeMicroTask(()=>{
-            switchToZone(outerScope);
-            --psd.ref || psd.finalize();
-        });
         currentFulfiller = null;
         if (--numScheduledCalls === 0) finalizePhysicalTick();
         --psd.ref || psd.finalize();
     }
-    listener.resolve(ret);
 }
 
 function getStack (promise, stacks, limit) {
@@ -641,23 +657,41 @@ export function usePSD (psd, fn, a1, a2, a3) {
     }
 }
 
-const settledNativePromise = _global.Promise && _global.Promise.resolve(),
-      nativePromiseThen = _global.Promise && _global.Promise.prototype.then;
+const nativePromiseProto = (()=>{
+    try {
+        // Be able to patch native async functions
+        return new Function("return Object.getPrototypeOf((async ()=>{})())")();
+    } catch(e) {
+        return _global.Promise && _global.Promise.prototype; // Support strictly transpiled async functions 
+    }
+})();
+
+const settledNativePromise = nativePromiseProto && nativePromiseProto.constructor.resolve(),
+      nativePromiseThen = nativePromiseProto && nativePromiseProto.then;
 
 function enqueueNativeMicroTask (job) {
-    nativePromiseThen ? nativePromiseThen.call(settledNativePromise, job) : job();
+    nativePromiseThen ? nativePromiseThen.call(settledNativePromise, job) : asap(job, []);
 }
 
-function nativeAwaitCompatibleWrap(fn, zone) {
+function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
     return function () {
         var outerZone = PSD;
         switchToZone(zone);
-        ++zone.ref;
-        enqueueNativeMicroTask(()=>switchToZone(zone));
+        if (possibleAwait) {
+            ++zone.ref;
+            // Before calling fn (which is onResolved or onRejected),
+            // enque a zone injector onto the Micro Task queue, because when fn() is executed,
+            // it will call resolvingFunctions.[[Resolve]] or resolvingFunctions.[[Reject]] as
+            // specified in ES2015, PromiseResolveThenableJob http://www.ecma-international.org/ecma-262/6.0/#sec-promiseresolvethenablejob
+            // Thos [[Resolve]] and [[Reject]] internal slots will in its turn enqueue its internal
+            // onResolved or onRejected callbacks on the "PromiseJobs" queue. We must enque a zone-
+            // invoker and zone-resetter before and after the native queue record.
+            enqueueNativeMicroTask(()=>switchToZone(zone));
+        }
         try {
             return fn.apply(this, arguments);
          } finally {
-            enqueueNativeMicroTask(()=>{
+            if (possibleAwait) enqueueNativeMicroTask(()=>{
                 switchToZone(outerZone);
                 --zone.ref || zone.finalize(); // if ref reaches zero, call finalize();
             });
@@ -668,10 +702,10 @@ function nativeAwaitCompatibleWrap(fn, zone) {
 
 function patchGlobalPromise (zoneToEnter) {
     var GlobalPromise = _global.Promise,
-        GlobalPromiseProto = GlobalPromise.prototype,
-        nativeThen = GlobalPromiseProto.then;
+        nativeThen = nativePromiseProto.then;
     zoneToEnter.GP = GlobalPromise;
-    zoneToEnter.GP_then = getOwnPropertyDescriptor (GlobalPromiseProto, 'then');
+    zoneToEnter.nthen = getOwnPropertyDescriptor (nativePromiseProto, 'then');
+    zoneToEnter.npc = nativePromiseProto.constructor;
     
     // Replace _global.Promise (needed in all browsers but Chrome due to incompability
     // between IDB transactions and native Promise, see https://github.com/dfahlander/Dexie.js/issues/317)
@@ -680,25 +714,22 @@ function patchGlobalPromise (zoneToEnter) {
     
     // Patch native Promise.prototype.then to keep zone state between native
     // await calls in Chrome and future IDB+Promise capable browsers)
-    defineProperty(GlobalPromiseProto, 'then', {get: function(){
+    defineProperty(nativePromiseProto, 'then', {get: function(){
         var zone = PSD;
         return function (onResolved, onRejected) {
-            if (zone === PSD) {
-                // Normal .then invokation. Switch zone in current call stack.
-                return nativeThen.call(this, wrap(onResolved), wrap(onRejected));
-            } else {
-                // '.then' invoked lazily. Keep abreast of switching zones in an ES7 await compatible manner. 
-                return nativeThen.call(this,
-                    typeof onResolved === 'function' && nativeAwaitCompatibleWrap(onResolved, zone),
-                    typeof onRejected === 'function' && nativeAwaitCompatibleWrap(onRejected, zone));
-            }
+            return nativeThen.call(this,
+                typeof onResolved === 'function' && nativeAwaitCompatibleWrap(onResolved, zone, zone !== PSD),
+                typeof onRejected === 'function' && nativeAwaitCompatibleWrap(onRejected, zone, zone !== PSD));
         };
     }, configurable: true});
+    // Also override constructor (https://github.com/tc39/ecmascript-asyncawait/issues/65#issuecomment-145250337)
+    nativePromiseProto.constructor = Promise;
 }
 
 function restoreGlobalPromise (zoneToLeave) {
     _global.Promise = zoneToLeave.GP;
-    defineProperty(zoneToLeave.GP.prototype, 'then', zoneToLeave.GP_then);
+    defineProperty(nativePromiseProto, 'then', zoneToLeave.nthen);
+    nativePromiseProto.constructor = zoneToLeave.npc;
 }
 
 function globalError(err, promise) {
