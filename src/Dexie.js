@@ -709,9 +709,8 @@ export default function Dexie(dbName, options) {
         /// <param name="tableInstances">Table instance, Array of Table instances, String or String Array of object stores to include in the transaction</param>
         /// <param name="scopeFunc" type="Function">Function to execute with transaction</param>
 
-        var args = extractTransactionArgs.apply(null, arguments);
-        args.push({pgp: true}); // Add scope property pgp:true to argument list.
-        return this._transaction.apply (this, args);
+        var [mode, tables, scopeFunc] = extractTransactionArgs.apply(null, arguments);
+        return this._transaction.call (this, mode, tables, function(){return scopeFunc.call(this, this);}, {pgp: true});
     }
     
     this.transaction = function () {
@@ -830,7 +829,7 @@ export default function Dexie(dbName, options) {
                         if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
                             // scopeFunc returned an iterator with throw-support. Handle yield as await.
                             returnValue = awaitIterator(returnValue);
-                        } else if (typeof returnValue.then === 'function' && !hasOwn(returnValue, '_PSD')) {
+                        } else if ((!zoneProps || !zoneProps.pgp) && typeof returnValue.then === 'function' && !hasOwn(returnValue, '_PSD')) {
                             throw new exceptions.IncompatiblePromise("Incompatible Promise returned from transaction scope (read more at http://tinyurl.com/znyqjqc). Transaction scope: " + scopeFunc.toString());
                         }
                     }
