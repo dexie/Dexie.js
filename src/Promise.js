@@ -115,8 +115,8 @@ export var globalPSD = {
     pgp: false,
     env: { // Environment globals snapshotted on leaving global zone
         Promise: _global.Promise,
-        nc: nativePromiseProto.constructor,
-        nthen: nativePromiseProto.then,
+        nc: nativePromiseProto && nativePromiseProto.constructor,
+        nthen: nativePromiseProto && nativePromiseProto.then,
         gthen: _global.Promise && _global.Promise.prototype.then,
         dthen: null // Will be set later on.
     },
@@ -614,12 +614,14 @@ export function newScope (fn, props, a1, a2) {
     psd.global = false;
     // Prepare for promise patching (done in usePSD):
     var globalEnv = globalPSD.env;
-    psd.env = {
+    psd.env = nativePromiseThen ? {
         Promise: Promise, // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
         nc: Promise, 
         nthen: getPatchedPromiseThen (globalEnv.nthen, psd), // native then
         gthen: getPatchedPromiseThen (globalEnv.gthen, psd), // global then
         dthen: getPatchedPromiseThen (globalEnv.dthen, psd)  // dexie then
+    } : {
+        dthen: getPatchedPromiseThen (globalEnv.dthen, psd)
     };
     if (props) extend(psd, props);
     
@@ -642,7 +644,7 @@ function switchToZone (targetZone) {
     PSD = targetZone;
     
     // Snapshot on every leave from global zone.
-    if (currentZone === globalPSD) {
+    if (currentZone === globalPSD && ('Promise' in _global)) {
         var globalEnv = globalPSD.env;
         globalEnv.Promise = _global.Promise; // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
         globalEnv.nc = nativePromiseProto.constructor;
