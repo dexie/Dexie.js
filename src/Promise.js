@@ -50,11 +50,13 @@ var LONG_STACKS_CLIP_LIMIT = 100,
         } catch(e) {
             return _global.Promise && _global.Promise.prototype; // Support strictly transpiled async functions 
         }
-    })();
-
-const resolvedNativePromise = nativePromiseProto && nativePromiseProto.constructor.resolve(),
-      resolvedGlobalPromise = _global.Promise && _global.Promise.resolve(),
-      nativePromiseThen = nativePromiseProto && nativePromiseProto.then;
+    })(),
+    nativePromiseThen = nativePromiseProto && nativePromiseProto.then,
+    GlobalPromise = _global.Promise,
+    globalPromiseThen = GlobalPromise && GlobalPromise.prototype.then,
+    resolvedNativePromise = nativePromiseProto && nativePromiseProto.constructor.resolve(),
+    resolvedGlobalPromise = _global.Promise && _global.Promise.resolve();
+    
 
 /* The default function used only for the very first promise in a promise chain.
    As soon as then promise is resolved or rejected, all next tasks will be executed in micro ticks
@@ -714,27 +716,46 @@ function getPatchedThenDescriptor (origThen) {
     }, configurable: true};
 }
 
-function patchGlobalPromise (zoneToEnter) {
-    var GlobalPromise = _global.Promise,
-        globalPromiseProto = GlobalPromise.prototype,
-        globalPromiseThen = globalPromiseProto.then;
-    zoneToEnter.GP = GlobalPromise;
-    zoneToEnter.nthen = getOwnPropertyDescriptor (nativePromiseProto, 'then');
-    zoneToEnter.npc = nativePromiseProto.constructor;
+function getPatchedPromiseThen (origThen, zone) {
+    return function (onResolved, onRejected) {
+        return origThen.call(this,
+            typeof onResolved === 'function' && nativeAwaitCompatibleWrap(onResolved, zone, zone !== PSD),
+            typeof onRejected === 'function' && nativeAwaitCompatibleWrap(onRejected, zone, zone !== PSD));
+    };
+}
+
+function getPatchedDexiePromiseThen (zone) {
+
+}
+
+function patchGlobalPromise (zoneToLeave, zoneToEnter) {
+    if (zoneToLeave.global) {
+        GlobalPromise = _global.Promise;
+        globalPromiseThen = GlobalPromise.prototype.then;
+        nativePromiseThen = nativePromiseProto.then;
+        zoneToLeave.nthen = nativePromiseProto.then;
+
+        // Replace _global.Promise (needed in all browsers but Chrome due to incompability
+        // between IDB transactions and native Promise, see https://github.com/dfahlander/Dexie.js/issues/317)
+        // This will solve the typescript 2.0 case and possibly other transpiled environments.
+        _global.Promise = Promise;
+    } else if (zoneToEnter.global) {
+        _global.Promise = zoneToLeave.GP;
+        globalPromiseProto.then = zoneToLeave.gthen;
+        native
+    }
     
-    // Replace _global.Promise (needed in all browsers but Chrome due to incompability
-    // between IDB transactions and native Promise, see https://github.com/dfahlander/Dexie.js/issues/317)
-    // This will solve the typescript 2.0 case and possibly other transpiled environments.
-    _global.Promise = Promise;
     
     // Patch native Promise.prototype.then to keep zone state between native
     // await calls in Chrome and future IDB+Promise capable browsers)
-    defineProperty(nativePromiseProto, 'then', getPatchedThenDescriptor(nativePromiseThen));
+    //defineProperty(nativePromiseProto, 'then', getPatchedThenDescriptor(nativePromiseThen));
+    nativePromiseProto.then = getPatchedPromiseThen (zoneToEnter.nthen, zoneToEnter);
     if (nativePromiseProto !== globalPromiseProto) {
         // Global promise is not nescessarily native Promise.
         // If global promise is patched (polyfilled or similar), make sure to patch it as well.
-        zoneToEnter.gthen = getOwnPropertyDescriptor (globalPromiseProto, 'then');
-        defineProperty(globalPromiseProto, 'then', getPatchedThenDescriptor(globalPromiseThen));
+        zoneToEnter.gthen = globalPromiseThen;
+        //defineProperty(globalPromiseProto, 'then', getPatchedThenDescriptor(globalPromiseThen));
+        globalPromiseProto.then = getPatchedPromiseThen (globalPromiseThen, zoneToEnter);
     }
     // Also override constructor (https://github.com/tc39/ecmascript-asyncawait/issues/65#issuecomment-145250337)
     nativePromiseProto.constructor = Promise;
