@@ -1,5 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
+import {spawnedTest} from './dexie-unittest-utils';
 
 module("promise");
 
@@ -366,4 +367,32 @@ asyncTest("Promise.on.error3", ()=> {
         Dexie.Promise.on.error.unsubscribe(onError);
         start();
     }, 40);
+});
+
+spawnedTest("Dexie.Promise should act as being derived from global Promise", function* () {
+
+    ok (Dexie.Promise !== Promise, "Just make sure global Promise isnt set to Dexie.Promise");
+    
+    let p = new Dexie.Promise(resolve => resolve());
+    ok (p instanceof Promise, "new Dexie.Promise() instanceof window.Promise");
+
+    //
+    // Extend a static Promise method on global Promise:
+    //
+    Promise.myStaticMethod = function () {
+        return "hello";
+    }
+    //
+    // Extend a statefull method on global Promise:
+    //
+    Promise.prototype.myMethod = function (callback) {
+        return "hola";
+    }
+        
+    equal (Dexie.Promise.myStaticMethod(), "hello", "Could invoke a statically derived method");
+    equal (p.myMethod(), "hola", "Could invoke a derived method");
+    
+    // Cleanup
+    delete Promise.myStaticMethod;
+    delete Promise.prototype.myMethod;
 });

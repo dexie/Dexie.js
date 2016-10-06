@@ -14,7 +14,7 @@ db.version(1).stores({
     items: "id"
 });
 
-module("tranx", {
+module("asyncawait", {
     setup: function () {
         stop();
         resetDatabase(db).catch(function (e) {
@@ -26,7 +26,7 @@ module("tranx", {
 });
 
 asyncTest("Should be able to use global Promise within transaction scopes", function(){
-    db.tranx('rw', db.items, trans => {
+    db.transaction('rw', db.items, trans => {
         return window.Promise.resolve().then(()=> {
             ok(Dexie.currentTransaction == trans, "Transaction scopes should persist through Promise.resolve()");
             return db.items.add({ id: "foobar" });
@@ -45,7 +45,7 @@ asyncTest("Should be able to use global Promise within transaction scopes", func
 
 asyncTest("Should be able to use native async await", function() {
     Promise.resolve().then(()=>{
-        let f = new Function('ok','equal', 'Dexie', 'db', `return db.tranx('rw', db.items, async ()=>{
+        let f = new Function('ok','equal', 'Dexie', 'db', `return db.transaction('rw', db.items, async ()=>{
             let trans = Dexie.currentTransaction;
             ok(!!trans, "Should have a current transaction");
             await db.items.add({id: 'foo'});
@@ -100,7 +100,7 @@ asyncTest("Must not leak PSD zone", function() {
         })).observe(hiddenDiv, { attributes: true });
     });
     
-    db.tranx('rw', db.items, ()=>{
+    db.transaction('rw', db.items, ()=>{
         let trans = Dexie.currentTransaction;
         ok(trans !== null, "Should have a current transaction");
         let otherZonePromise;
@@ -162,14 +162,14 @@ asyncTest("Must not leak PSD zone", function() {
 });
 
 spawnedTest("Should use Promise.all where applicable", function* (){
-    yield db.tranx('rw', db.items, function* () {
-        let x = yield window.Promise.resolve(3);
+    yield db.transaction('rw', db.items, function* () {
+        let x = yield Promise.resolve(3);
         yield db.items.bulkAdd([{id: 'a'}, {id: 'b'}]);
-        let all = yield window.Promise.all([db.items.get('a'), db.items.get('b')]);
+        let all = yield Promise.all([db.items.get('a'), db.items.get('b')]);
         equal (all.length, 2);
         equal (all[0].id, 'a');
         equal (all[1].id, 'b');
-        all = yield window.Promise.all([db.items.get('a'), db.items.get('b')]);
+        all = yield Promise.all([db.items.get('a'), db.items.get('b')]);
         equal (all.length, 2);
         equal (all[0].id, 'a');
         equal (all[1].id, 'b');
@@ -178,7 +178,7 @@ spawnedTest("Should use Promise.all where applicable", function* (){
 
 spawnedTest("Even when keeping a reference to global Promise, still maintain PSD zone states", function* (){
    let Promise = window.Promise;
-   yield db.tranx('rw', db.items, () => {
+   yield db.transaction('rw', db.items, () => {
        var trans = Dexie.currentTransaction;
        ok (trans !== null, "Have a transaction");
        return Promise.resolve().then(()=>{
@@ -194,14 +194,14 @@ spawnedTest ("Sub Transactions with async await", function*() {
     try {
         yield new Function ('equal', 'ok', 'Dexie', 'db', `return (async ()=>{
             await db.items.bulkAdd([{id: 1}, {id:2}, {id: 3}]);
-            let result = await db.tranx('rw', db.items, async ()=>{
+            let result = await db.transaction('rw', db.items, async ()=>{
                 let items = await db.items.toArray();
-                let numItems = await db.tranx('r', db.items, async ()=>{
+                let numItems = await db.transaction('r', db.items, async ()=>{
                     equal(await db.items.count(), await db.items.count(), "Two awaits of count should equal");
                     equal(await db.items.count(), 3, "Should be 3 items");
                     return await db.items.count();
                 });
-                let numItems2 = await db.tranx('r', db.items, async ()=>{
+                let numItems2 = await db.transaction('r', db.items, async ()=>{
                     equal(await db.items.count(), await db.items.count(), "Two awaits of count should equal");
                     equal(await db.items.count(), 3, "Should be 3 items");
                     return await db.items.count();

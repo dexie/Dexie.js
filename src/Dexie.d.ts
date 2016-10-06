@@ -434,7 +434,6 @@ declare module Dexie {
     class UnsupportedError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class InternalError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class DatabaseClosedError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
-    class IncompatiblePromiseError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class UnknownError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class ConstraintError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class DataError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
