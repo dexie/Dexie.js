@@ -178,15 +178,15 @@ props(Promise.prototype, {
 
     then: function (onFulfilled, onRejected) {
         var rv = new Promise((resolve, reject) => {
-            propagateToListener(this, new Listener(onFulfilled, onRejected, resolve, reject));
+            propagateToListener(this, new Listener(onFulfilled, onRejected, resolve, reject, PSD));
         });
         debug && (!this._prev || this._state === null) && linkToPreviousPromise(rv, this);
         return rv;
     },
-    
+        
     _then: function (onFulfilled, onRejected) {
         // A little tinier version of then() that don't have to create a resulting promise.
-        propagateToListener(this, new Listener(null, null, onFulfilled, onRejected));        
+        propagateToListener(this, new Listener(null, null, onFulfilled, onRejected, PSD));        
     },
 
     catch: function (onRejected) {
@@ -247,11 +247,12 @@ props(Promise.prototype, {
     }
 });
 
-function Listener(onFulfilled, onRejected, resolve, reject) {
+function Listener(onFulfilled, onRejected, resolve, reject, zone) {
     this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
     this.onRejected = typeof onRejected === 'function' ? onRejected : null;
     this.resolve = resolve;
     this.reject = reject;
+    this.psd = zone;
 }
 
 // Promise Static Properties
@@ -420,6 +421,7 @@ function propagateToListener(promise, listener) {
         // This Listener doesnt have a listener for the event being triggered (onFulfilled or onReject) so lets forward the event to any eventual listeners on the Promise instance returned by then() or catch()
         return (promise._state ? listener.resolve : listener.reject) (promise._value);
     }
+    ++listener.psd.ref;
     ++numScheduledCalls;
     asap (callListener, [cb, promise, listener]);
 }
@@ -451,6 +453,7 @@ function callListener (cb, promise, listener) {
         // Restore env and currentFulfiller.
         currentFulfiller = null;
         if (--numScheduledCalls === 0) finalizePhysicalTick();
+        --listener.psd.ref || listener.psd.finalize();
     }
 }
 
@@ -687,10 +690,7 @@ function enqueueNativeMicroTask (job) {
 }
 
 function nativeAwaitCompatibleWrap(fn, zone, possibleAwait, isReject) {
-    //
-    // Precondition: ++zone.ref
-    //
-    return typeof fn === 'function' ? function () {
+    return typeof fn !== 'function' ? fn : function () {
         var outerZone = PSD;
         switchToZone(zone);
         if (possibleAwait) {
@@ -701,6 +701,7 @@ function nativeAwaitCompatibleWrap(fn, zone, possibleAwait, isReject) {
             // Thos [[Resolve]] and [[Reject]] internal slots will in its turn enqueue its internal
             // onResolved or onRejected callbacks on the "PromiseJobs" queue. We must enque a zone-
             // invoker and zone-resetter before and after the native queue record.
+            ++zone.ref;
             enqueueNativeMicroTask(()=>{
                 switchToZone(zone);
             });
@@ -714,26 +715,17 @@ function nativeAwaitCompatibleWrap(fn, zone, possibleAwait, isReject) {
                     switchToZone(globalPSD);
                     --zone.ref || zone.finalize(); // if ref reaches zero, call finalize();
                 });
-            } else {
-                --zone.ref || zone.finalize(); // if ref reaches zero, call finalize();
             }
         }
-    } : function (x) {
-        if (isReject) {
-            x = Promise.reject(x);
-        }
-        --zone.ref || zone.finalize(); // if ref reaches zero, call finalize();
-        return x;
-    }
+    };
 }
 
 function getPatchedPromiseThen (origThen, zone) {
     return function (onResolved, onRejected) {
-        ++zone.ref;
         var possibleAwait = (zone !== PSD) && !!nativePromiseThen;
         return origThen.call(this,
             nativeAwaitCompatibleWrap(onResolved, zone, possibleAwait),
-            nativeAwaitCompatibleWrap(onRejected, zone, possibleAwait, true));
+            nativeAwaitCompatibleWrap(onRejected, zone, possibleAwait));
     };
 }
 
