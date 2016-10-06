@@ -118,13 +118,13 @@ export function spawnedTest (name, num, promiseGenerator) {
         asyncTest(name, function(){
             Dexie.spawn(promiseGenerator)
                 .catch(e => ok(false, e.stack || e))
-                .finally(start);
+                .then(start);
         });
     } else {
         asyncTest(name, num, function(){
             Dexie.spawn(promiseGenerator)
                 .catch(e => ok(false, e.stack || e))
-                .finally(start);
+                .then(start);
         });
     }
 }

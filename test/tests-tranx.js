@@ -190,3 +190,28 @@ spawnedTest("Even when keeping a reference to global Promise, still maintain PSD
    });
 });
 
+spawnedTest ("Sub Transactions with async await", function*() {
+    try {
+        yield new Function ('equal', 'ok', 'Dexie', 'db', `return (async ()=>{
+            await db.items.bulkAdd([{id: 1}, {id:2}, {id: 3}]);
+            let result = await db.tranx('rw', db.items, async ()=>{
+                let items = await db.items.toArray();
+                let numItems = await db.tranx('r', db.items, async ()=>{
+                    equal(await db.items.count(), await db.items.count(), "Two awaits of count should equal");
+                    equal(await db.items.count(), 3, "Should be 3 items");
+                    return await db.items.count();
+                });
+                let numItems2 = await db.tranx('r', db.items, async ()=>{
+                    equal(await db.items.count(), await db.items.count(), "Two awaits of count should equal");
+                    equal(await db.items.count(), 3, "Should be 3 items");
+                    return await db.items.count();
+                });
+                equal (numItems, numItems2, "The total two inner transactions should be possible to run after each other");
+                return numItems;
+            });
+            equal (result, 3, "Result should be 3");
+        })();`)(equal, ok, Dexie, db);
+    } catch (e) {
+        ok(e.name === 'SyntaxError', "No support for native async functions in this browser");        
+    }
+});
