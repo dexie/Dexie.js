@@ -256,7 +256,7 @@ asyncTest("Issue #76 Dexie inside Web Worker", function () {
 
             db.open();
             ok(true, "Could open the database");
-
+            
             return db.transaction('rw', db.table1, function() {
                 ok(true, "Could create a transaction");
                 db.table1.add({ name: "My first object" }).then(function(id) {
