@@ -1,4 +1,4 @@
-import {doFakeAutoComplete, tryCatch, props,
+import {doFakeAutoComplete, tryCatch, props, derive,
         setProp, _global, getPropertyDescriptor, getArrayOf, extend} from './utils';
 import {reverseStoppableEventChain, nop, callBoth, mirror} from './chaining-functions';
 import Events from './Events';
@@ -174,7 +174,9 @@ export default function Promise(fn) {
     executePromiseTask(this, fn);
 }
 
-props(Promise.prototype, {
+// Make this Promise virtually derive from global Promise (extension methods on global promise should extend Dexie.Promise)
+if (Object.setPrototypeOf && _global.Promise) Object.setPrototypeOf(Promise, _global.Promise);
+derive (Promise).from(_global.Promise || Object).extend ({
 
     then: function (onFulfilled, onRejected) {
         var rv = new Promise((resolve, reject) => {
@@ -305,7 +307,7 @@ props (Promise, {
         set: value => {rejectionMapper = value;} // Map reject failures
     },
             
-    follow: fn => {
+    follow: (fn, zoneProps) => {
         return new Promise((resolve, reject) => {
             return newScope((resolve, reject) => {
                 var psd = PSD;
@@ -320,7 +322,7 @@ props (Promise, {
                     });
                 }, psd.finalize);
                 fn();
-            }, null, resolve, reject);
+            }, zoneProps, resolve, reject);
         });
     },
 
@@ -656,7 +658,7 @@ function switchToZone (targetZone) {
     // Patch our own Promise to keep zones in it:
     Promise.prototype.then = targetZone.env.dthen;
     
-    if (('Promise' in _global) && (targetZone.pgp || currentZone.pgp)) {
+    if (('Promise' in _global)) {
         // Swich environments
         
         // Set this Promise to window.Promise so that Typescript 2.0's async functions will work on Firefox, Safari and IE, as well as with Zonejs and angular.

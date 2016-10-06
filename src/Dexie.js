@@ -697,22 +697,6 @@ export default function Dexie(dbName, options) {
         db.on("error").fire(new Error());
     });
     
-    this.tranx = function () {
-        /// <summary>
-        ///     Start an IndexedDB transaction and enter a zone where global Promise is being
-        ///     temporarly patched to work with async / await:
-        ///     * global.Promise.prototype.then is replaced with a proxy that invokes zones
-        ///       between await calls and Promise.all() calls (for native await calls in Chromium)
-        ///     * global.Promise is replaced with Dexie.Promise (for transpiled async / await in Typescript)
-        /// </summary>
-        /// <param name="mode" type="String">"r" for readonly, or "rw" for readwrite</param>
-        /// <param name="tableInstances">Table instance, Array of Table instances, String or String Array of object stores to include in the transaction</param>
-        /// <param name="scopeFunc" type="Function">Function to execute with transaction</param>
-
-        var args = extractTransactionArgs.apply(null, arguments);
-        return this._transaction.call (this, args[0], args[1], function(){return args[2].call(this, this);}, {pgp: true});
-    }
-    
     this.transaction = function () {
         /// <summary>
         ///
@@ -739,7 +723,7 @@ export default function Dexie(dbName, options) {
         return [mode, tables, scopeFunc];
     }
 
-    this._transaction = function (mode, tables, scopeFunc, zoneProps) {
+    this._transaction = function (mode, tables, scopeFunc) {
         var parentTransaction = PSD.trans;
         // Check if parent transactions is bound to this db instance, and if caller wants to reuse it
         if (!parentTransaction || parentTransaction.db !== db || mode.indexOf('!') !== -1) parentTransaction = null;
@@ -800,15 +784,17 @@ export default function Dexie(dbName, options) {
             
         function enterTransactionScope(resolve) {
             var parentPSD = PSD;
-            resolve(Promise.resolve().then(()=>newScope(()=>{
+            resolve(Promise.resolve().then(()=>{
                 // Keep a pointer to last non-transactional PSD to use if someone calls Dexie.ignoreTransaction().
-                PSD.transless = PSD.transless || parentPSD;
+                var transless = PSD.transless || parentPSD;
                 // Our transaction.
                 //return new Promise((resolve, reject) => {
                 var trans = db._createTransaction(mode, storeNames, globalSchema, parentTransaction);
                 // Let the transaction instance be part of a Promise-specific data (PSD) value.
-                PSD.trans = trans;
-                
+                var zoneProps = {
+                    trans: trans,
+                    transless: transless
+                };                
 
                 if (parentTransaction) {
                     // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
@@ -817,23 +803,17 @@ export default function Dexie(dbName, options) {
                     trans.create(); // Create the backend transaction so that complete() or error() will trigger even if no operation is made upon it.
                 }
                 
-                // Provide arguments to the scope function (for backward compatibility)
-                var tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
-                tableArgs.push(trans);
-
                 var returnValue;
                 return Promise.follow(()=>{
                     // Finally, call the scope function with our table and transaction arguments.
-                    returnValue = scopeFunc.apply(trans, tableArgs); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
+                    returnValue = scopeFunc.call(trans, trans); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
                     if (returnValue) {
                         if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
                             // scopeFunc returned an iterator with throw-support. Handle yield as await.
                             returnValue = awaitIterator(returnValue);
-                        } else if ((!zoneProps || !zoneProps.pgp) && typeof returnValue.then === 'function' && !hasOwn(returnValue, '_PSD')) {
-                            throw new exceptions.IncompatiblePromise("Incompatible Promise returned from transaction scope (read more at http://tinyurl.com/znyqjqc). Transaction scope: " + scopeFunc.toString());
                         }
                     }
-                }).uncaught(dbUncaught).then(()=>{
+                }, zoneProps).uncaught(dbUncaught).then(()=>{
                     if (parentTransaction) trans._resolve(); // sub transactions don't react to idbtrans.oncomplete. We must trigger a acompletion.
                     return trans._completion; // Even if WE believe everything is fine. Await IDBTransaction's oncomplete or onerror as well.
                 }).then(()=>{
@@ -842,7 +822,7 @@ export default function Dexie(dbName, options) {
                     trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
                     return rejection(e);
                 });
-            }, zoneProps)));
+            }));
         }
     };
 

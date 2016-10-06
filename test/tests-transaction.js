@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase} from './dexie-unittest-utils';
+import {resetDatabase, spawnedTest} from './dexie-unittest-utils';
 
 "use strict";
 
@@ -22,19 +22,62 @@ module("transaction", {
     }
 });
 
-asyncTest("Transaction should fail if returning non-Dexie Promise in transaction scope", function(){
-    db.transaction('rw', db.users, function() {
-        return window.Promise.resolve().then(()=> {
-            ok(Dexie.currentTransaction == null, "Dexie.currentTransaction == null. If this assertion fails, don't weap. Rejoice and try to understand how the hell this could be possible.");
-            //return db.users.add({ username: "foobar" });
+var NativePromise = window.Promise;
+
+asyncTest("Transaction should work when returning native Promise in transaction scope", function() {
+    db.transaction('rw', db.users, trans => {
+        ok(Dexie.currentTransaction === trans, "First argument to transaction callback should be the transaction instance itself");
+        return NativePromise.resolve().then(()=> {
+            ok(Dexie.currentTransaction === trans, "Dexie.currentTransaction should persted through the native promise!");
         }).then(()=>{
-            //return db.users.add({ username: "barfoo" });
-        });
-    }).then (function(){
-        ok(false, "Transaction should not commit because we were using a non-Dexie promise");
-    }).catch ('IncompatiblePromiseError', function(e){
-        ok(true, "Good. Should fail with 'IncompatiblePromiseError': " + e);
+            return db.users.add({ username: "barfoo" }); // Will only work on Chrome, Opera and Edge as of Oktober 6, 2016.
+        }).then(()=>{
+            ok(Dexie.currentTransaction === trans, "Dexie.currentTransaction should persted through the native promise!");
+            return db.users.count();
+        })
+    }).then (count => {
+        ok(true, `User count: ${count}. REJOICE! YOUR BROWSER'S INDEXEDDB PLAYS BALL WITH PROMISES!`);
+    }).catch ('TransactionInactiveError', e => {
+        ok(true, "Your browser has native incompatibility between native Promise and IndexedDB. This is why we still avoid returning native promises.");
+    }).catch (e => {
+        ok(false, `Failed: ${e.stack || e}`);
     }).finally(start);
+});
+
+spawnedTest("Global Promise in transaction zone should inherit promise extensions", function*() {
+    ok (Dexie.Promise !== Promise, "Promise at global scope should be the native promise.")
+    //
+    // Extend a static Promise method on global Promise:
+    //
+    Promise.myJoin = function () {
+        let last = arguments.length - 1,
+            callback = arguments[last],
+            i = last,
+            promises = new Array(i);
+        while (i--) promises[i] = arguments[i];
+        return Promise.all(promises).then(result => callback.apply(null, result));
+    }
+    //
+    // Extend a statefull method on global Promise:
+    //
+    Promise.prototype.mySpread = function (callback) {
+        return this.then(result => callback.apply(null, result));
+    }
+    yield db.transaction('rw', db.users, function* () {
+        ok (Dexie.Promise === Promise, "Promise in transaction scope should be Dexie.promise");
+        yield db.users.bulkAdd([{username: 1}, {username: 2}]);
+        yield Promise.myJoin(db.users.get(1), db.users.get(2), (first, second) => {
+            equal (first.username, 1, "Got first user");
+            equal (second.username, 2, "Got second user");
+            return Promise.all([db.users.get(1), db.users.get(2)]);
+        }).mySpread ((first, second) => {
+            equal (first.username, 1, "Got first user");
+            equal (second.username, 2, "Got second user");
+        });
+    });
+    // Cleanup Promise extensions used in this unit test:
+    delete Promise.join;
+    delete Promise.prototype.spread;
 });
 
 asyncTest("empty transaction block", function () {

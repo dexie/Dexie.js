@@ -496,10 +496,10 @@ asyncTest("Issue #67 - Regression test - Transaction still fails if error in key
 
 asyncTest("Issue #69 Global exception handler for promises", function () {
     var errorList = [];
-    function globalRejectionHandler(e) {
-        console.log("Got error: " + e);
-        if (errorList.indexOf(e) === -1) // Current implementation: accept multiple redundant triggers
-            errorList.push(e);
+    function globalRejectionHandler(reason, promise) {
+        console.log("Got error: " + reason);
+        if (errorList.indexOf(reason) === -1) // Current implementation: accept multiple redundant triggers
+            errorList.push(reason);
     }
 
     Dexie.Promise.on("error", globalRejectionHandler);
@@ -536,9 +536,12 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
         // Now we have handled it. Not bubble to global handler!
     });
 
-    // With finally, it should yet trigger the global event:
-    new Dexie.Promise(function(resolve, reject) {
-        reject("forth error (uncatched but with finally)");
+    Dexie.Promise.resolve(Promise.reject(new Error("Converting a rejected standard promise to Dexie.Promise but don't catch it")))
+    .finally(()=>{    
+        // With finally, it should yet trigger the global event:
+        return new Dexie.Promise(function(resolve, reject) {
+            reject("forth error (uncatched but with finally)");
+        });
     }).finally(function() {
         // From issue #43:
         // Prepare by cleaning up any unfinished previous run:
@@ -557,12 +560,13 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
                 //console.log("after");
             });
             db.delete().finally(function() {
-                equal(errorList.length, 5, "THere should be 4 global errors triggered");
+                equal(errorList.length, 6, "THere should be 6 global errors triggered");
                 equal(errorList[0], "first error (by reject)", "first error (by reject)");
                 equal(errorList[1], "second error (throw)", "second error (throw)");
                 equal(errorList[2], "Simple error 1", "Simple error 1");
-                equal(errorList[3], "forth error (uncatched but with finally)", "forth error (uncatched but with finally)");
-                equal(errorList[4], "FOO", "FOO");
+                equal(errorList[3].message, "Converting a rejected standard promise to Dexie.Promise but don't catch it", "Converting a rejected standard promise to Dexie.Promise but don't catch it");
+                equal(errorList[4], "forth error (uncatched but with finally)", "forth error (uncatched but with finally)");
+                equal(errorList[5], "FOO", "FOO");
                 // cleanup:
                 Dexie.Promise.on("error").unsubscribe(globalRejectionHandler);
                 start();
