@@ -1,4 +1,4 @@
-import {doFakeAutoComplete, tryCatch, props, derive,
+import {doFakeAutoComplete, tryCatch, props,
         setProp, _global, getPropertyDescriptor, getArrayOf, extend} from './utils';
 import {reverseStoppableEventChain, nop, callBoth, mirror} from './chaining-functions';
 import Events from './Events';
@@ -174,9 +174,7 @@ export default function Promise(fn) {
     executePromiseTask(this, fn);
 }
 
-// Make this Promise virtually derive from global Promise (extension methods on global promise should extend Dexie.Promise)
-if (Object.setPrototypeOf && _global.Promise) Object.setPrototypeOf(Promise, _global.Promise);
-derive (Promise).from(_global.Promise || Object).extend ({
+props(Promise.prototype, {
 
     then: function (onFulfilled, onRejected) {
         var rv = new Promise((resolve, reject) => {
@@ -693,7 +691,7 @@ function enqueueNativeMicroTask (job) {
     nativePromiseThen.call(resolvedNativePromise, job);
 }
 
-function nativeAwaitCompatibleWrap(fn, zone, possibleAwait, isReject) {
+function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
     return typeof fn !== 'function' ? fn : function () {
         var outerZone = PSD;
         switchToZone(zone);

@@ -44,42 +44,6 @@ asyncTest("Transaction should work when returning native Promise in transaction 
     }).finally(start);
 });
 
-spawnedTest("Global Promise in transaction zone should inherit promise extensions", function*() {
-    ok (Dexie.Promise !== Promise, "Promise at global scope should be the native promise.")
-    //
-    // Extend a static Promise method on global Promise:
-    //
-    Promise.myJoin = function () {
-        let last = arguments.length - 1,
-            callback = arguments[last],
-            i = last,
-            promises = new Array(i);
-        while (i--) promises[i] = arguments[i];
-        return Promise.all(promises).then(result => callback.apply(null, result));
-    }
-    //
-    // Extend a statefull method on global Promise:
-    //
-    Promise.prototype.mySpread = function (callback) {
-        return this.then(result => callback.apply(null, result));
-    }
-    yield db.transaction('rw', db.users, function* () {
-        ok (Dexie.Promise === Promise, "Promise in transaction scope should be Dexie.promise");
-        yield db.users.bulkAdd([{username: 1}, {username: 2}]);
-        yield Promise.myJoin(db.users.get(1), db.users.get(2), (first, second) => {
-            equal (first.username, 1, "Got first user");
-            equal (second.username, 2, "Got second user");
-            return Promise.all([db.users.get(1), db.users.get(2)]);
-        }).mySpread ((first, second) => {
-            equal (first.username, 1, "Got first user");
-            equal (second.username, 2, "Got second user");
-        });
-    });
-    // Cleanup Promise extensions used in this unit test:
-    delete Promise.join;
-    delete Promise.prototype.spread;
-});
-
 asyncTest("empty transaction block", function () {
     db.transaction('rw', db.users, db.pets, function () {
         ok(true, "Entering transaction block but dont start any transaction");
