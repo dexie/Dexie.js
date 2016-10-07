@@ -136,7 +136,7 @@ async function rollupAndMinify(rollupInfo) {
         } : {});
 
         // min.js
-        await writeFile(rollupInfo.min.file, result.code);
+        await writeFile(rollupInfo.min.file, result.code.replace('sourceMappingURL=dist/', 'sourceMappingURL='));
 
         // min.js.map
         if (rollupInfo.min.map)
