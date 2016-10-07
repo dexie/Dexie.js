@@ -1,4 +1,4 @@
-import { derive, setProp, assert } from './utils';
+import { derive, setProp } from './utils';
 import { getErrorWithStack, prettyStack } from './debug';
 
 var dexieErrorNames = [
