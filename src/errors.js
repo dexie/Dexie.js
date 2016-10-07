@@ -15,8 +15,7 @@ var dexieErrorNames = [
     'SubTransaction',
     'Unsupported',
     'Internal',
-    'DatabaseClosed',
-    'IncompatiblePromise'
+    'DatabaseClosed'
 ];
 
 var idbDomErrorNames = [
