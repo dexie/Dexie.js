@@ -25,7 +25,6 @@ import {
     asap,
     trycatcher,
     tryCatch,
-    rejection,
     getByKeyPath,
     setByKeyPath,
     delByKeyPath,
@@ -40,6 +39,7 @@ import {
     flatten
 
 } from './utils';
+import { rejection } from './promise-utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
 import Promise, {wrap, PSD, newScope, usePSD} from './Promise';
 import Events from './Events';
