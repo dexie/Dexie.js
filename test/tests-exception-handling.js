@@ -8,10 +8,6 @@ db.on("populate", function (trans) {
     db.users.add({ id: 1, first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
     db.users.add({ id: 2, first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
 });
-function dbOnErrorHandler (e) {
-    ok(false, "An error bubbled out to the db.on('error'). Should not happen because all tests should catch their errors themselves. " + e);
-}
-db.on("error", dbOnErrorHandler);
 
 module("exception-handling", {
     setup: function () {
@@ -24,19 +20,19 @@ module("exception-handling", {
     }
 });
 
-asyncTest("Uncaught promise should signal to Promise.on('error')", function(){
+asyncTest("Uncaught promise should signal 'unhandledrejection'", function(){
     // We must not use finally or catch here because then we don't test what we should.
     var onErrorSignals = 0;
-    function onerror(e) {
+    function onerror(ev) {
         ++onErrorSignals;
     }
-    Dexie.Promise.on('error', onerror);
-    db.on('error').unsubscribe(dbOnErrorHandler);
+    //Dexie.Promise.on('error', onerror);
+    window.addEventListener('unhandledrejection', onerror);
     db.users.add({ id: 1 });
     setTimeout(()=> {
         equal(onErrorSignals, 1, "Promise.on('error') should have been signaled");
-        db.on("error", dbOnErrorHandler);
-        Dexie.Promise.on('error').unsubscribe(onerror);
+        //Dexie.Promise.on('error').unsubscribe(onerror);
+        window.removeEventListener('unhandledrejection', onerror);
         start();
     }, 100);
 });
@@ -250,105 +246,6 @@ asyncTest("exception in on('populate')", function () {
     });
 });
 
-
-asyncTest("catch-all with db.on('error')", 6, function () {
-    if (typeof idbModules !== 'undefined' && Dexie.dependencies.indexedDB === idbModules.shimIndexedDB) {
-        // Using indexedDBShim.
-        ok(false, "This test would hang with IndexedDBShim as of 2015-05-07");
-        start();
-        return;
-    }
-    var ourDB = new Dexie("TestDB2");
-    ourDB.version(1).stores({ users: "++id,first,last,&username,&*email,*pets" });
-    ourDB.on("populate", function () {
-        ourDB.users.add({ first: "Daniel", last: "Fahlenius", username: "dfahlenius", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
-        ourDB.users.add({ first: "Carl", last: "Cedersköld", username: "cceder", email: ["karl@ceder.what"], pets: [] });
-    });
-    var errorCount = 0;
-    ourDB.on("error", function (e) {
-        ok(errorCount < 5, "Uncatched error successfully bubbled to ourDB.on('error'): " + e.stack);
-        if (++errorCount == 5) {
-            ourDB.delete().then(()=>{
-                Dexie.Promise.on('error').unsubscribe(swallowPromiseOnError);
-                start();
-            });
-        }
-    });
-    function swallowPromiseOnError(e){
-        return false;
-    }
-    Dexie.Promise.on('error', swallowPromiseOnError); // Just to get rid of default error logs for not catching.
-
-    ourDB.delete()
-    .then(()=>ourDB.open())
-    .then(()=>{
-
-        ourDB.transaction("rw", ourDB.users, function () {
-            ourDB.users.add({ username: "dfahlenius" }).then(function () {
-                ok(false, "Should not be able to add two users with same username");
-            });
-        }).then(function () {
-            ok(false, "Transaction should not complete since errors wasnt catched");
-        });
-        ourDB.transaction("rw", ourDB.users, function () {
-            ourDB.users.add({ username: "dfahlenius" }).then(function () {
-                ok(false, "Should not be able to add two users with same username");
-            });
-        }).then(function () {
-            ok(false, "Transaction should not complete since errors wasnt catched");
-        });
-        ourDB.transaction("rw", ourDB.users, function () {
-            ourDB.users.add({ id: {} }).then(function () {
-                ok(false, "Should not be able to add user with faulty key");
-            });
-        }).then(function () {
-            ok(false, "Transaction should not complete since errors wasnt catched");
-        }).catch(err => {
-            ok(true, "Got error: " + err.stack);
-            return Dexie.Promise.reject(err); // Returning failed promise to bubble to db.on.error.
-        })
-
-        // And outside transactions:        
-        ourDB.users.add({ username: "dfahlenius" }).then(function () {
-            ok(false, "Should not be able to add two users with same username");
-        });
-        ourDB.users.add({ id: {} }).then(function () {
-            ok(false, "Should not be able to add user with faulty key");
-        });
-    });
-});
-
-asyncTest("Issue #32: db.on('error') doesnt catch 'not found index' DOMExceptions", function () {
-    var ourDB = new Dexie("TestDB2");
-    new Dexie.Promise(function (finalResolve) {
-        ourDB.version(1).stores({ users: "++id" });
-        ourDB.on("populate", function() {
-            db.users.add({ id: 100, first: "David", last: "Fahlander" });
-        });
-        var errorHasBubbled = false;
-        ourDB.on("error", function(e) {
-            errorHasBubbled = true;
-            ok(true, "Uncatched error successfully bubbled to db.on('error'): " + e);
-            finalResolve();
-        });
-
-        ourDB.open().then(function () {
-
-            // Make the db fail by not finding a correct index:
-            ourDB.users.where("I am a little frog!").equals(18).toArray();
-
-            setTimeout(function() {
-                if (!errorHasBubbled) {
-                    ok(false, "Timeout! Error never bubbled to db.on('error')");
-                }
-                finalResolve();
-            }, 300);
-        });
-    }).then(function() {
-        ourDB.delete().then(start);
-    });
-});
-
 asyncTest("Error in on('populate') should abort database creation", function () {
     var popufail = new Dexie("PopufailDB");
     popufail.version(1).stores({ users: "++id,first,last,&username,&*email,*pets" });
@@ -496,13 +393,14 @@ asyncTest("Issue #67 - Regression test - Transaction still fails if error in key
 
 asyncTest("Issue #69 Global exception handler for promises", function () {
     var errorList = [];
-    function globalRejectionHandler(reason, promise) {
-        console.log("Got error: " + reason);
-        if (errorList.indexOf(reason) === -1) // Current implementation: accept multiple redundant triggers
-            errorList.push(reason);
+    function globalRejectionHandler(ev) {
+        console.log("Got error: " + ev.reason);
+        if (errorList.indexOf(ev.reason) === -1) // Current implementation: accept multiple redundant triggers
+            errorList.push(ev.reason);
     }
 
-    Dexie.Promise.on("error", globalRejectionHandler);
+    //Dexie.Promise.on("error", globalRejectionHandler);
+    window.addEventListener('unhandledrejection', globalRejectionHandler);
         
     // The most simple case: Any Promise reject that is not catched should
     // be handled by the global error listener.
@@ -549,11 +447,11 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
             // Now just do some Dexie stuff...
             var db = new Dexie("testdb");
             db.version(1).stores({ table1: "id" });
-            db.on('error', function(err) {
+            /*db.on('error', function(err) {
                 // Global 'db' error handler (will never be called 'cause the error is not in a transaction)
                 console.log("db.on.error: " + err);
                 errorList.push("Got db.on.error: " + err);
-            });
+            });*/
             db.open().then(function() {
                 console.log("before");
                 throw "FOO"; // Here a generic error is thrown (not a DB error)
@@ -568,7 +466,8 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
                 equal(errorList[4], "forth error (uncatched but with finally)", "forth error (uncatched but with finally)");
                 equal(errorList[5], "FOO", "FOO");
                 // cleanup:
-                Dexie.Promise.on("error").unsubscribe(globalRejectionHandler);
+                //Dexie.Promise.on("error").unsubscribe(globalRejectionHandler);
+                window.removeEventListener('unhandledrejection', globalRejectionHandler);
                 start();
             });
         });

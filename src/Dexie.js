@@ -39,9 +39,8 @@ import {
     flatten
 
 } from './utils';
-import { rejection } from './promise-utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
-import Promise, {wrap, PSD, newScope, usePSD} from './Promise';
+import Promise, {wrap, PSD, newScope, usePSD, rejection} from './Promise';
 import Events from './Events';
 import {
     nop,
@@ -396,10 +395,6 @@ export default function Dexie(dbName, options) {
         store.createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multi });
     }
 
-    function dbUncaught(err) {
-        return db.on.error.fire(err);
-    }
-
     //
     //
     //      Dexie Protected API
@@ -426,7 +421,7 @@ export default function Dexie(dbName, options) {
         if (!openComplete && (!PSD.letThrough)) {
             if (!isBeingOpened) {
                 if (!autoOpen)
-                    return rejection(new exceptions.DatabaseClosed(), dbUncaught);
+                    return rejection (new exceptions.DatabaseClosed());
                 db.open().catch(nop); // Open in background. If if fails, it will be catched by the final promise anyway.
             }
             return dbReadyPromise.then(()=>tempTransaction(mode, storeNames, fn));
@@ -468,7 +463,7 @@ export default function Dexie(dbName, options) {
             dbReadyPromise.then(()=>{
                 fn(resolve, reject);
             });
-        }).uncaught(dbUncaught);
+        });
     };
     
     //
@@ -484,7 +479,7 @@ export default function Dexie(dbName, options) {
 
     this.open = function () {
         if (isBeingOpened || idbdb)
-            return dbReadyPromise.then(()=> dbOpenError ? rejection(dbOpenError, dbUncaught) : db);
+            return dbReadyPromise.then(()=> dbOpenError ? rejection (dbOpenError) : db);
         Debug.debug && (openCanceller._stackHolder = Debug.getErrorWithStack()); // Let stacks point to when open() was called rather than where new Dexie() was called.
         isBeingOpened = true;
         dbOpenError = null;
@@ -585,7 +580,7 @@ export default function Dexie(dbName, options) {
             db.close(); // Closes and resets idbdb, removes connections, resets dbReadyPromise and openCanceller so that a later db.open() is fresh.
             // A call to db.close() may have made on-ready subscribers fail. Use dbOpenError if set, since err could be a follow-up error on that.
             dbOpenError = err; // Record the error. It will be used to reject further promises of db operations.
-            return rejection(dbOpenError, dbUncaught); // dbUncaught will make sure any error that happened in any operation before will now bubble to db.on.error() thanks to the special handling in Promise.uncaught().
+            return rejection (dbOpenError);
         }).finally(()=>{
             openComplete = true;
             resolveDbReady(); // dbReadyPromise is resolved no matter if open() rejects or resolved. It's just to wake up waiters.
@@ -636,7 +631,7 @@ export default function Dexie(dbName, options) {
                 req.onerror = wrap(eventRejectHandler(reject));
                 req.onblocked = fireOnBlocked;
             }
-        }).uncaught(dbUncaught);
+        });
     };
 
     this.backendDB = function () {
@@ -669,7 +664,7 @@ export default function Dexie(dbName, options) {
     //
     // Events
     //
-    this.on = Events(this, "error", "populate", "blocked", "versionchange", {ready: [promisableChain, nop]});
+    this.on = Events(this, "populate", "blocked", "versionchange", {ready: [promisableChain, nop]});
 
     this.on.ready.subscribe = override (this.on.ready.subscribe, function (subscribe) {
         return (subscriber, bSticky) => {
@@ -694,7 +689,6 @@ export default function Dexie(dbName, options) {
 
     fakeAutoComplete(function () {
         db.on("populate").fire(db._createTransaction(READWRITE, dbStoreNames, globalSchema));
-        db.on("error").fire(new Error());
     });
     
     this.transaction = function () {
@@ -775,7 +769,7 @@ export default function Dexie(dbName, options) {
         } catch (e) {
             return parentTransaction ?
                 parentTransaction._promise(null, (_, reject) => {reject(e);}) :
-                rejection (e, dbUncaught);
+                rejection (e);
         }
         // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
         return (parentTransaction ?
@@ -813,7 +807,7 @@ export default function Dexie(dbName, options) {
                             returnValue = awaitIterator(returnValue);
                         }
                     }
-                }, zoneProps).uncaught(dbUncaught).then(()=>{
+                }, zoneProps).then(()=>{
                     if (parentTransaction) trans._resolve(); // sub transactions don't react to idbtrans.oncomplete. We must trigger a acompletion.
                     return trans._completion; // Even if WE believe everything is fine. Await IDBTransaction's oncomplete or onerror as well.
                 }).then(()=>{
@@ -1021,7 +1015,7 @@ export default function Dexie(dbName, options) {
                     throw err;
                 });
             }
-        }).uncaught(dbUncaught);
+        });
     }
 
     derive(WriteableTable).from(Table).extend({
@@ -1331,8 +1325,8 @@ export default function Dexie(dbName, options) {
                     setByKeyPath(keyOrObject, keyPath, modifications[keyPath]);
                 });
                 var key = getByKeyPath(keyOrObject, this.schema.primKey.keyPath);
-                if (key === undefined) return rejection(new exceptions.InvalidArgument(
-                    "Given object does not contain its primary key"), dbUncaught);
+                if (key === undefined) return rejection (new exceptions.InvalidArgument(
+                    "Given object does not contain its primary key"));
                 return this.where(":id").equals(key).modify(modifications);
             } else {
                 // key to modify
@@ -1371,7 +1365,7 @@ export default function Dexie(dbName, options) {
         this._completion = new Promise ((resolve, reject) => {
             this._resolve = resolve;
             this._reject = reject;
-        }).uncaught(dbUncaught);
+        });
         
         this._completion.then(
             ()=> {this.on.complete.fire();},
@@ -1480,7 +1474,7 @@ export default function Dexie(dbName, options) {
                     });
                 }
                 p._lib = true;
-                return p.uncaught(dbUncaught);
+                return p;
             });
         },
 

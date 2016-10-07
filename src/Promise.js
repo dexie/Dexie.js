@@ -1,7 +1,6 @@
 import {doFakeAutoComplete, tryCatch, props,
         setProp, _global, getPropertyDescriptor, getArrayOf, extend} from './utils';
 import {reverseStoppableEventChain, nop, callBoth, mirror} from './chaining-functions';
-import Events from './Events';
 import {debug, prettyStack, getErrorWithStack} from './debug';
 
 //
@@ -215,22 +214,6 @@ props(Promise.prototype, {
         });
     },
     
-    // Deprecate in next major. Needed only for db.on.error.
-    uncaught: function (uncaughtHandler) {
-        // Be backward compatible and use "onuncatched" as the event name on this.
-        // Handle multiple subscribers through reverseStoppableEventChain(). If a handler returns `false`, bubbling stops.
-        this.onuncatched = reverseStoppableEventChain(this.onuncatched, uncaughtHandler);
-        // In case caller does this on an already rejected promise, assume caller wants to point out the error to this promise and not
-        // a previous promise. Reason: the prevous promise may lack onuncatched handler. 
-        if (this._state === false && unhandledErrors.indexOf(this) === -1) {
-            // Replace unhandled error's destinaion promise with this one!
-            unhandledErrors.some((p,i,l) => p._value === this._value && (l[i] = this));
-            // Actually we do this shit because we need to support db.on.error() correctly during db.open(). If we deprecate db.on.error, we could
-            // take away this piece of code as well as the onuncatched and uncaught() method.
-        }
-        return this;
-    },
-        
     stack: {
         get: function() {
             if (this._stack) return this._stack;
@@ -322,13 +305,7 @@ props (Promise, {
                 fn();
             }, zoneProps, resolve, reject);
         });
-    },
-
-    on: Events(null, {"error": [
-        reverseStoppableEventChain,
-        defaultErrorHandler] // Default to defaultErrorHandler
-    })
-    
+    }
 });
 
 /**
@@ -575,11 +552,6 @@ function markErrorAsHandled(promise) {
     }
 }
 
-// By default, log uncaught errors to the console
-function defaultErrorHandler(e) {
-    console.warn(`Unhandled rejection: ${e.stack || e}`);
-}
-
 function PromiseReject (reason) {
     return new Promise(INTERNAL, false, reason);
 }
@@ -731,13 +703,27 @@ function getPatchedPromiseThen (origThen, zone) {
     };
 }
 
+const UNHANDLEDREJECTION = "unhandledrejection";
+
 function globalError(err, promise) {
     var rv;
     try {
         rv = promise.onuncatched(err);
     } catch (e) {}
     if (rv !== false) try {
-        Promise.on.error.fire(err, promise); // TODO: Deprecated and use same global handler as bluebird.
+        var event, eventData = {promise: promise, reason: err};
+        /*if (_global.PromiseRejectionEvent) { // Don't use. In chromw, makes it fire twice!
+            event = new PromiseRejectionEvent(UNHANDLEDREJECTION, eventData);
+        } else*/ if (_global.document && document.createEvent) {
+            event = document.createEvent('Event');
+            event.initEvent(UNHANDLEDREJECTION, true, true);
+            extend(event, eventData);
+        } else if (_global.CustomEvent) {
+            event = new CustomEvent(UNHANDLEDREJECTION, {detail: eventData});
+            extend(event, eventData);
+        }
+        if (event && _global.dispatchEvent) dispatchEvent(event);
+        else console.warn(`Unhandled rejection: ${e.stack || e}`);
     } catch (e) {}
 }
 
@@ -747,3 +733,5 @@ doFakeAutoComplete(() => {
         setTimeout(()=>{fn.apply(null, args);}, 0);
     };
 });
+
+export var rejection = Promise.reject;
