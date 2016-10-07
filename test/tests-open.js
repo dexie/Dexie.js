@@ -244,7 +244,7 @@ asyncTest("Issue #76 Dexie inside Web Worker", function () {
     //
     // Code to execute in the web worker:
     //
-    function CodeToExecuteInWebWorker(ok, done) {
+    var CodeToExecuteInWebWorker = `function CodeToExecuteInWebWorker(ok, done) {
         ok(true, "Could enter the web worker");
 
         Dexie.delete("codeFromWorker").then(function() {
@@ -270,7 +270,7 @@ asyncTest("Issue #76 Dexie inside Web Worker", function () {
         }).catch(function(err) {
             ok(false, "Transaction failed: " + err.stack);
         }).finally(done);
-    }
+    }`;
 
     //
     // Frameworking...
