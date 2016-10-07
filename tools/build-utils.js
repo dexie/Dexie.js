@@ -70,6 +70,7 @@ export async function rebuildFiles(options, replacements, files) {
                 rollupCfg: {
                     format: ext(f) === '.js' ? 'umd' : 'es6',
                     dest: f,
+                    globals: {dexie: "Dexie", QUnit: "QUnit"},
                     sourceMap: targets.indexOf(f + '.map') !== -1,
                     moduleName: getUmdModuleName(entry)
                 },
