@@ -397,6 +397,7 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
         console.log("Got error: " + ev.reason);
         if (errorList.indexOf(ev.reason) === -1) // Current implementation: accept multiple redundant triggers
             errorList.push(ev.reason);
+        ev.preventDefault();
     }
 
     //Dexie.Promise.on("error", globalRejectionHandler);
