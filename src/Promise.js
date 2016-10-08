@@ -722,8 +722,12 @@ function globalError(err, promise) {
             event = new CustomEvent(UNHANDLEDREJECTION, {detail: eventData});
             extend(event, eventData);
         }
-        if (event && _global.dispatchEvent) dispatchEvent(event);
-        else console.warn(`Unhandled rejection: ${e.stack || e}`);
+        if (event && _global.dispatchEvent) {
+            dispatchEvent(event);
+        }
+        if (!event.defaultPrevented) {
+            console.warn(`Unhandled rejection: ${err.stack || err}`);
+        }
     } catch (e) {}
 }
 
