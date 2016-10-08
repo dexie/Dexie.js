@@ -3055,7 +3055,6 @@ props(Dexie, {
     override: override,
     // Export our Events() function - can be handy as a toolkit
     Events: Events,
-    events: Events, // Backward compatible lowercase version. Deprecate.
     // Utilities
     getByKeyPath: getByKeyPath,
     setByKeyPath: setByKeyPath,
