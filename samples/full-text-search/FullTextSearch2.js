@@ -28,11 +28,9 @@ db.emails.hook("creating", function (primKey, obj, trans) {
     // Must wait till we have the auto-incremented key.
     trans._lock(); // Lock transaction until we got primary key and added all mappings. App code trying to read from _emailWords the line after having added an email must then wait until we are done writing the mappings.
     this.onsuccess = function (primKey) {
-        /// <param name="trans" type="db.Transaction"></param>
-        var _emailWords = trans.table("_emailWords");
         // Add mappings for all words.
         getAllWords(obj.message).forEach(function (word) {
-            _emailWords.add({ word: word, emailId: primKey });
+            db._emailWords.add({ word: word, emailId: primKey });
         });
         trans._unlock();
     }
@@ -46,12 +44,11 @@ db.emails.hook("updating", function (mods, primKey, obj, trans) {
     if (mods.hasOwnProperty("message")) {
         // message property is about to be changed.
         // Delete existing mappings
-        var _emailWords = trans.table("_emailWords");
-        _emailWords.where("emailId").equals(primKey).delete();
+        db._emailWords.where("emailId").equals(primKey).delete();
         // Add new mappings.
         if (typeof mods.message == 'string') {
             getAllWords(mods.message).forEach(function (word) {
-                _emailWords.add({ word: word, emailId: primKey });
+                db._emailWords.add({ word: word, emailId: primKey });
             });
         }
     }
@@ -62,7 +59,7 @@ db.emails.hook("deleting", function (primKey, obj, trans) {
     if (obj.message) {
         // Email is about to be deleted.
         // Delete existing mappings
-        trans.table("_emailWords").where("emailId").equals(primKey).delete();
+        db._emailWords.where("emailId").equals(primKey).delete();
     }
 });
 

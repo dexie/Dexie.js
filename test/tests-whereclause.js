@@ -52,9 +52,9 @@ var firstFolderId = 0,
     firstFileId = 0,
     lastFileId = 0;
 
-db.on("populate", function(trans) {
-    var folders = trans.table("folders");
-    var files = trans.table("files");
+db.on("populate", () => {
+    var folders = db.table("folders");
+    var files = db.table("files");
     folders.add({path: "/", description: "Root folder"}).then(function(id) {
         firstFolderId = id;
     });

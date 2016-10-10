@@ -697,7 +697,7 @@ export default function Syncable (db) {
                             var lastCreatePromise = null;
                             if (offset >= changes.length) return Promise.resolve(null);
                             var change = changes[offset];
-                            var table = trans.tables[change.table];
+                            var table = db.table(change.table);
                             while (change && change.type === CREATE) {
                                 // Optimize CREATE changes because on initial sync with server, the entire DB will be downloaded in forms of CREATE changes.
                                 // Instead of waiting for each change to resolve, do all CREATE changes in bulks until another type of change is stepped upon.
@@ -709,7 +709,7 @@ export default function Syncable (db) {
                                     });
                                 })(change, table, specifyKey);
                                 change = changes[++offset];
-                                if (change) table = trans.tables[change.table];
+                                if (change) table = db.table(change.table);
                             }
 
                             if (lastCreatePromise) {

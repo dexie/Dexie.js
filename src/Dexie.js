@@ -752,7 +752,7 @@ export default function Dexie(dbName, options) {
                 }
                 if (parentTransaction) {
                     storeNames.forEach(function (storeName) {
-                        if (parentTransaction && !hasOwn(parentTransaction.tables, storeName)) {
+                        if (parentTransaction && parentTransaction.storeNames.indexOf(storeName) === -1) {
                             if (onlyIfCompatible) {
                                 // Spawn new transaction instead.
                                 parentTransaction = null; 
@@ -1248,13 +1248,13 @@ export default function Dexie(dbName, options) {
                     var effectiveKey = (key !== undefined) ? key : (self.schema.primKey.keyPath && getByKeyPath(obj, self.schema.primKey.keyPath));
                     if (effectiveKey == null) { // "== null" means checking for either null or undefined.
                         // No primary key. Must use add().
-                        trans.tables[self.name].add(obj).then(resolve, reject);
+                        self.add(obj).then(resolve, reject);
                     } else {
                         // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
                         trans._lock(); // Needed because operation is splitted into modify() and add().
                         // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
                         obj = deepClone(obj);
-                        trans.tables[self.name].where(":id").equals(effectiveKey).modify(function () {
+                        self.where(":id").equals(effectiveKey).modify(function () {
                             // Replace extisting value with our object
                             // CRUD event firing handled in WriteableCollection.modify()
                             this.value = obj;
@@ -1262,7 +1262,7 @@ export default function Dexie(dbName, options) {
                             if (count === 0) {
                                 // Object's key was not found. Add the object instead.
                                 // CRUD event firing will be done in add()
-                                return trans.tables[self.name].add(obj, key); // Resolving with another Promise. Returned Promise will then resolve with the new key.
+                                return self.add(obj, key); // Resolving with another Promise. Returned Promise will then resolve with the new key.
                             } else {
                                 return effectiveKey; // Resolve with the provided key.
                             }
@@ -1489,30 +1489,26 @@ export default function Dexie(dbName, options) {
             this.active = false;
         },
         
-        // Deprecate:
         tables: {
-            get: function () {
-                if (this._tables) return this._tables;
-                return this._tables = arrayToObject(this.storeNames, name => [name, allTables[name]]);
-            }
+            get: Debug.deprecate ("Transaction.tables", function () {
+                return arrayToObject(this.storeNames, name => [name, allTables[name]]);
+            }, "Use db.tables()")
         },
 
-        // Deprecate:
-        complete: function (cb) {
+        complete: Debug.deprecate ("Transaction.complete()", function (cb) {
             return this.on("complete", cb);
-        },
+        }),
         
-        // Deprecate:
-        error: function (cb) {
+        error: Debug.deprecate ("Transaction.error()", function (cb) {
             return this.on("error", cb);
-        },
+        }),
         
-        // Deprecate
-        table: function (name) {
+        table: Debug.deprecate ("Transaction.table()", function (name) {
             if (this.storeNames.indexOf(name) === -1)
                 throw new exceptions.InvalidTable("Table " + name + " not in transaction");
             return allTables[name];
-        }
+        })
+        
     });
 
     //

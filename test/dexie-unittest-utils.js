@@ -19,13 +19,13 @@ export function resetDatabase(db) {
                     // Now, snapshot the database how it looks like initially (what on.populate did)
                     return db.transaction('r', db.tables, function() {
                         var trans = Dexie.currentTransaction;
-                        return Promise.all(Object.keys(trans.tables).filter(function(tableName) {
+                        return Promise.all(trans.storeNames.filter(function(tableName) {
                             // Don't clear 'meta tables'
                             return tableName[0] != '_' && tableName[0] != '$';
                         }).map(function (tableName) {
                             var items = {};
                             initialState[tableName] = items;
-                            return trans.tables[tableName].each(function(item, cursor) {
+                            return db.table(tableName).each(function(item, cursor) {
                                 items[cursor.primaryKey] = { key: cursor.primaryKey, value: item };
                             });
                         }));
@@ -42,13 +42,13 @@ export function resetDatabase(db) {
             // Got to do an operation in order for backend transaction to be created.
             var trans = Dexie.currentTransaction;
             var initialState = db._initialState;
-            return Promise.all(Object.keys(trans.tables).filter(function(tableName) {
+            return Promise.all(trans.storeNames.filter(function(tableName) {
                 // Don't clear 'meta tables'
                 return tableName[0] != '_' && tableName[0] != '$';
             }).map(function(tableName) {
                 // Read current state
                 var items = {};
-                return trans.tables[tableName].each(function(item, cursor) {
+                return db.table(tableName).each(function(item, cursor) {
                     items[cursor.primaryKey] = { key: cursor.primaryKey, value: item };
                 }).then(function() {
                     // Diff from initialState
@@ -58,8 +58,8 @@ export function resetDatabase(db) {
                         var item = items[key];
                         var initialItem = initialItems[key];
                         if (!item || JSON.stringify(item.value) != JSON.stringify(initialItem.value))
-                            return (db.table(tableName).schema.primKey.keyPath ? trans.tables[tableName].put(initialItem.value) :
-                                trans.tables[tableName].put(initialItem.value, initialItem.key));
+                            return (db.table(tableName).schema.primKey.keyPath ? db.table(tableName).put(initialItem.value) :
+                                db.table(tableName).put(initialItem.value, initialItem.key));
                         return Promise.resolve();
                     }));
                 }).then(function() {
@@ -69,7 +69,7 @@ export function resetDatabase(db) {
                         var item = items[key];
                         var initialItem = initialItems[key];
                         if (!initialItem)
-                            return trans.tables[tableName].delete(item.key);
+                            return db.table(tableName).delete(item.key);
                         return Promise.resolve();
                     }));
                 });
@@ -82,12 +82,12 @@ export function deleteDatabase(db) {
     return no_optimize ? db.delete() : db.transaction('rw!', db.tables, function() {
         // Got to do an operation in order for backend transaction to be created.
         var trans = Dexie.currentTransaction;
-        return Promise.all(Object.keys(trans.tables).filter(function(tableName) {
+        return Promise.all(trans.storeNames.filter(function(tableName) {
             // Don't clear 'meta tables'
             return tableName[0] != '_' && tableName[0] != '$';
         }).map(function(tableName) {
             // Clear all tables
-            return trans.tables[tableName].clear();
+            return db.table(tableName).clear();
         }));
     });
 }

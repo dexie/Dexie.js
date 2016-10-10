@@ -83,7 +83,7 @@ asyncTest("upgrade", function () {
         db.version(4).stores({ store1: "++id" });
         db.version(5).stores({ store1: "++id,&email" }).upgrade(function (trans) {
             var counter = 0;
-            trans.table("store1").toCollection().modify(function (obj) {
+            db.store1.toCollection().modify(function (obj) {
                 // Since we have a new primary key we must make sure it's unique on all objects
                 obj.email = "user" + (++counter) +"@abc.com";
             });
@@ -104,8 +104,8 @@ asyncTest("upgrade", function () {
         //
         db = new Dexie(DBNAME);
         db.version(5).stores({ store1: "++id,&email" }); // Need not to specify an upgrader function when we know it's not gonna run (we are already on ver 5)
-        db.version(6).stores({ store1: "++id,*email" }).upgrade(function (trans) { // Changing email index from unique to multi-valued
-            trans.table("store1").toCollection().modify(function(obj) {
+        db.version(6).stores({ store1: "++id,*email" }).upgrade(function () { // Changing email index from unique to multi-valued
+            db.store1.toCollection().modify(function(obj) {
                 obj.email = [obj.email]; // Turning single-valued unique email into an array of emails.
             });
         }); 
@@ -163,15 +163,15 @@ asyncTest("upgrade", function () {
         db.version(2).stores({ store1: "++id" });
         db.version(3).stores({ store1: "++id,name" }); // Adding the name index
         db.version(4).stores({ store1: "++id" });
-        db.version(5).stores({ store1: "++id,&email" }).upgrade(function (trans) {
+        db.version(5).stores({ store1: "++id,&email" }).upgrade(function () {
             var counter = 0;
-            trans.table("store1").toCollection().modify(function (obj) {
+            db.store1.toCollection().modify(function (obj) {
                 // Since we have a new primary key we must make sure it's unique on all objects
                 obj.email = "user" + (++counter) + "@abc.com";
             });
         });
-        db.version(6).stores({ store1: "++id,*email" }).upgrade(function (trans) { // Changing email index from unique to multi-valued
-            trans.table("store1").toCollection().modify(function (obj) {
+        db.version(6).stores({ store1: "++id,*email" }).upgrade(function () { // Changing email index from unique to multi-valued
+            db.store1.toCollection().modify(function (obj) {
                 obj.email = [obj.email]; // Turning single-valued unique email into an array of emails.
             });
         });
@@ -191,14 +191,14 @@ asyncTest("upgrade", function () {
         db = new Dexie(DBNAME);
         db.version(8).stores({ store1: null });
         db.version(7).stores({ store2: "uuid" });
-        db.version(6).stores({ store1: "++id,*email" }).upgrade(function (trans) { // Changing email index from unique to multi-valued
-            trans.table("store1").toCollection().modify(function (obj) {
+        db.version(6).stores({ store1: "++id,*email" }).upgrade(function () { // Changing email index from unique to multi-valued
+            db.store1.toCollection().modify(function (obj) {
                 obj.email = [obj.email]; // Turning single-valued unique email into an array of emails.
             });
         });
-        db.version(5).stores({ store1: "++id,&email" }).upgrade(function (trans) {
+        db.version(5).stores({ store1: "++id,&email" }).upgrade(function () {
             var counter = 0;
-            trans.table("store1").toCollection().modify(function (obj) {
+            db.store1.toCollection().modify(function (obj) {
                 // Since we have a new primary key we must make sure it's unique on all objects
                 obj.email = "user" + (++counter) + "@abc.com";
             });

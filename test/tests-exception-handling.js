@@ -5,9 +5,8 @@ import {resetDatabase, spawnedTest} from './dexie-unittest-utils';
 var db = new Dexie("TestDBException");
 db.version(1).stores({ users: "id,first,last,&username,&*email,*pets" });
 db.on("populate", function (trans) {
-    var users = trans.table("users");
-    users.add({ id: 1, first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
-    users.add({ id: 2, first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
+    db.users.add({ id: 1, first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
+    db.users.add({ id: 2, first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
 });
 function dbOnErrorHandler (e) {
     ok(false, "An error bubbled out to the db.on('error'). Should not happen because all tests should catch their errors themselves. " + e);
