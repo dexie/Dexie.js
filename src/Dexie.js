@@ -793,7 +793,7 @@ export default function Dexie(dbName, options) {
                 }
                 
                 // Provide arguments to the scope function (for backward compatibility)
-                var tableArgs = storeNames.map(function (name) { return trans.tables[name]; });
+                var tableArgs = storeNames.map(function (name) { return allTables[name]; });
                 tableArgs.push(trans);
 
                 var returnValue;
@@ -3058,7 +3058,7 @@ props(Dexie, {
     override: override,
     // Export our Events() function - can be handy as a toolkit
     Events: Events,
-    events: Events, // Backward compatible lowercase version. Deprecate.
+    events: { get: Debug.deprecated(()=>Events) }, // Backward compatible lowercase version.
     // Utilities
     getByKeyPath: getByKeyPath,
     setByKeyPath: setByKeyPath,
