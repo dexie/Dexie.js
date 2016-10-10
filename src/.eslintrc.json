@@ -27,6 +27,8 @@
     "location": false,
     "chrome": false,
     "document": false,
-    "MutationObserver": false
+    "MutationObserver": false,
+    "CustomEvent": false,
+    "dispatchEvent": false
   }
 }

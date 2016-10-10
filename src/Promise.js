@@ -1,6 +1,6 @@
 import {doFakeAutoComplete, tryCatch, props,
         setProp, _global, getPropertyDescriptor, getArrayOf, extend} from './utils';
-import {reverseStoppableEventChain, nop, callBoth, mirror} from './chaining-functions';
+import {nop, callBoth, mirror} from './chaining-functions';
 import {debug, prettyStack, getErrorWithStack} from './debug';
 
 //
