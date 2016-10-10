@@ -1490,20 +1490,20 @@ export default function Dexie(dbName, options) {
         },
         
         tables: {
-            get: Debug.deprecate ("Transaction.tables", function () {
+            get: Debug.deprecated ("Transaction.tables", function () {
                 return arrayToObject(this.storeNames, name => [name, allTables[name]]);
             }, "Use db.tables()")
         },
 
-        complete: Debug.deprecate ("Transaction.complete()", function (cb) {
+        complete: Debug.deprecated ("Transaction.complete()", function (cb) {
             return this.on("complete", cb);
         }),
         
-        error: Debug.deprecate ("Transaction.error()", function (cb) {
+        error: Debug.deprecated ("Transaction.error()", function (cb) {
             return this.on("error", cb);
         }),
         
-        table: Debug.deprecate ("Transaction.table()", function (name) {
+        table: Debug.deprecated ("Transaction.table()", function (name) {
             if (this.storeNames.indexOf(name) === -1)
                 throw new exceptions.InvalidTable("Table " + name + " not in transaction");
             return allTables[name];
