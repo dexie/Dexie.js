@@ -27,16 +27,17 @@ module("exception-handling", {
 asyncTest("Uncaught promise should signal to Promise.on('error')", function(){
     // We must not use finally or catch here because then we don't test what we should.
     var onErrorSignals = 0;
-    function onerror(e) {
+    function onerror(ev) {
         ++onErrorSignals;
+        ev.preventDefault();
     }
-    Dexie.Promise.on('error', onerror);
+    window.addEventListener('unhandledrejection', onerror);
     db.on('error').unsubscribe(dbOnErrorHandler);
     db.users.add({ id: 1 });
     setTimeout(()=> {
         equal(onErrorSignals, 1, "Promise.on('error') should have been signaled");
         db.on("error", dbOnErrorHandler);
-        Dexie.Promise.on('error').unsubscribe(onerror);
+        window.removeEventListener('unhandledrejection', onerror);
         start();
     }, 100);
 });
@@ -269,7 +270,7 @@ asyncTest("catch-all with db.on('error')", 6, function () {
         ok(errorCount < 5, "Uncatched error successfully bubbled to ourDB.on('error'): " + e.stack);
         if (++errorCount == 5) {
             ourDB.delete().then(()=>{
-                Dexie.Promise.on('error').unsubscribe(swallowPromiseOnError);
+                window.removeEventListener('unhandledrejection', swallowPromiseOnError);
                 start();
             });
         }
