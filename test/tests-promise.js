@@ -165,7 +165,6 @@ asyncTest("onunhandledrejection should not propagate if catched after finally", 
     function logErr (ev) {
         ok(false, "Should already be catched:" + ev.reason);
     }
-    //Promise.on('error', logErr);
     window.addEventListener('unhandledrejection', logErr);
     var p = new Promise((resolve, reject)=>{
         reject("apa");
@@ -303,14 +302,13 @@ asyncTest("Issue #97 A transaction may be lost after calling Dexie.Promise.resol
     }
 });*/
 
-asyncTest("Promise.on.error", ()=> {
+asyncTest("unhandledrejection", ()=> {
     var errors = [];
     function onError(ev) {
         errors.push(ev.reason);
-        return false;
+        ev.preventDefault();
     }
     window.addEventListener('unhandledrejection', onError);
-    //Dexie.Promise.on('error', onError);
     
     new Dexie.Promise((resolve, reject) => {
         reject ("error");
@@ -318,18 +316,17 @@ asyncTest("Promise.on.error", ()=> {
     setTimeout(()=>{
         equal(errors.length, 1, "Should be one error there");
         equal(errors[0], "error", "Should be our error there");
-        //Dexie.Promise.on.error.unsubscribe(onError);
         window.removeEventListener('unhandledrejection', onError);
 
         start();
     }, 40);
 });
 
-asyncTest("Promise.on.error2", ()=> {
+asyncTest("unhandledrejection2", ()=> {
     var errors = [];
     function onError(ev) {
         errors.push(ev.reason);
-        return false;
+        ev.preventDefault();
     }
     window.addEventListener('unhandledrejection', onError);
     
@@ -345,17 +342,16 @@ asyncTest("Promise.on.error2", ()=> {
     setTimeout(()=>{
         equal(errors.length, 1, "Should be one error there");
         equal(errors[0], "error", "Should be our error there");
-        //Dexie.Promise.on.error.unsubscribe(onError);
         window.removeEventListener('unhandledrejection', onError);
         start();
     }, 40);
 });
 
-asyncTest("Promise.on.error3", ()=> {
+asyncTest("unhandledrejection3", ()=> {
     var errors = [];
     function onError(ev) {
         errors.push(ev.reason);
-        return false;
+        ev.preventDefault();
     }
     window.addEventListener('unhandledrejection', onError);
     

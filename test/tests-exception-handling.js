@@ -25,13 +25,12 @@ asyncTest("Uncaught promise should signal 'unhandledrejection'", function(){
     var onErrorSignals = 0;
     function onerror(ev) {
         ++onErrorSignals;
+        ev.preventDefault();
     }
-    //Dexie.Promise.on('error', onerror);
     window.addEventListener('unhandledrejection', onerror);
     db.users.add({ id: 1 });
     setTimeout(()=> {
-        equal(onErrorSignals, 1, "Promise.on('error') should have been signaled");
-        //Dexie.Promise.on('error').unsubscribe(onerror);
+        equal(onErrorSignals, 1, "unhandledrejection should have been signaled");
         window.removeEventListener('unhandledrejection', onerror);
         start();
     }, 100);
@@ -400,7 +399,6 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
         ev.preventDefault();
     }
 
-    //Dexie.Promise.on("error", globalRejectionHandler);
     window.addEventListener('unhandledrejection', globalRejectionHandler);
         
     // The most simple case: Any Promise reject that is not catched should
@@ -467,7 +465,6 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
                 equal(errorList[4], "forth error (uncatched but with finally)", "forth error (uncatched but with finally)");
                 equal(errorList[5], "FOO", "FOO");
                 // cleanup:
-                //Dexie.Promise.on("error").unsubscribe(globalRejectionHandler);
                 window.removeEventListener('unhandledrejection', globalRejectionHandler);
                 start();
             });
