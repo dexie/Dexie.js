@@ -13,10 +13,9 @@ var User = db.users.defineClass({
     email:      [String],
     pets:       [String],
 });
-db.on("populate", function (trans) {
-    var users = trans.table("users");
-    users.add({ id: 1, first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
-    users.add({ id: 2, first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
+db.on("populate", function () {
+    db.users.add({ id: 1, first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
+    db.users.add({ id: 2, first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
 });
 
 module("collection", {

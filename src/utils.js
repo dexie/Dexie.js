@@ -8,9 +8,6 @@
  * www.dexie.com
  * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
  */
-import Promise from './Promise';
-import {exceptions} from './errors';
-
 export var keys = Object.keys;
 export var isArray = Array.isArray;
 export var _global =
@@ -79,8 +76,8 @@ export function doFakeAutoComplete(fn) {
     clearTimeout(to);
 }
 
-export function assert(b) {
-    if (!b) throw new exceptions.Internal("Assertion failed");
+export function assert (b) {
+    if (!b) throw new Error("Assertion Failed");
 }
 
 export function asap(fn) {
@@ -120,12 +117,6 @@ export function tryCatch(fn, onerror, args) {
     } catch (ex) {
         onerror && onerror(ex);
     }
-}
-
-export function rejection (err, uncaughtHandler) {
-    // Get the call stack and return a rejected promise.
-    var rv = Promise.reject(err);
-    return uncaughtHandler ? rv.uncaught(uncaughtHandler) : rv;
 }
 
 export function getByKeyPath(obj, keyPath) {
@@ -238,14 +229,6 @@ export function getObjectDiff(a, b, rv, prfx) {
         }
     });
     return rv;
-}
-
-export function idbp(idbOperation) {
-    return new Promise((resolve,reject) => {
-        var req = idbOperation();
-        req.onerror = reject;
-        req.onsuccess = resolve;
-    });
 }
 
 // If first argument is iterable or array-like, return it as an array

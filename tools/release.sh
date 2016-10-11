@@ -19,6 +19,17 @@ validate_semver() {
 
 current_version=$(node -p "require('./package').version")
 
+# Adapt to master branch name (master or master-1, master-2 etc)
+master_branch="$(git symbolic-ref HEAD)"
+master_branch=${master_branch##refs/heads/}
+echo "Master branch is: '$master_branch'"
+if ! [[ $master_branch =~ ^master ]]; then
+    echo >&2 "Error: Must be on a branch prefixed 'master'";
+    exit 1;
+fi  
+master_suffix="${master_branch##master}"
+
+
 # Next version?
 printf "Next version (current is $current_version)? "
 read next_version
@@ -26,10 +37,10 @@ read next_version
 validate_semver $next_version
 
 if echo "$next_version" | grep -q "-"; then
-	NPMTAG="next"
+	NPMTAG="next$master_suffix"
     echo "Will use: npm publish --tag $NPMTAG"
 else
-	NPMTAG="latest"
+	NPMTAG="latest$master_suffix"
     echo "Will use: npm publish without any tag (production publish)"
 fi
 
@@ -46,7 +57,7 @@ master_release_commit=$(git rev-parse HEAD)
 #
 # Merge last release output here before rebuilding
 #
-git merge --no-edit -s ours origin/releases
+git merge --no-edit -s ours origin/releases$master_suffix
 
 #
 # eslint
@@ -96,25 +107,24 @@ git add -A --no-ignore-removal -f test/bundle.js 2>/dev/null
 git commit -am "Build output" 2>/dev/null
 # Tag the release
 git tag -a -m "$next_ref" $next_ref
-#git tag -a -m "$next_ref" latest -f
 # Now, push the changes to the releases branch
-git push origin master:releases --follow-tags
+git push origin master$master_suffix:releases$master_suffix --follow-tags
 
-printf "Successful push to master:releases\n\n"
+printf "Successful push to master$master_suffix:releases$master_suffix\n\n"
 
 if [ "$TAG" = "latest" ]; then
 	npm publish
 else
-    npm publish --tag $NPMTAG
+  npm publish --tag $NPMTAG
 fi
 
 printf "Successful publish to npm.\n\n"
 
 # Push the update of package.json to master
-printf "Pushing Release-commit to master (with updated version in package.json)\n"
-git push origin $master_release_commit:master
+printf "Pushing Release-commit to master$master_suffix (with updated version in package.json)\n"
+git push origin $master_release_commit:master$master_suffix
 
-printf "Resetting to origin/master\n"
-git reset --hard origin/master
+printf "Resetting to origin/master$master_suffix\n"
+git reset --hard origin/master$master_suffix
 
 printf "Done."

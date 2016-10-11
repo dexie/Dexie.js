@@ -302,7 +302,7 @@ export default function Observable(db) {
                 obj: obj
             };
 
-            var promise = trans.tables._changes.add(change).then(function(rev) {
+            var promise = db._changes.add(change).then(function(rev) {
                 trans._lastWrittenRevision = Math.max(trans._lastWrittenRevision, rev);
                 return rev;
             });
@@ -312,14 +312,14 @@ export default function Observable(db) {
                 if (primKey != resultKey)
                     promise._then(function() {
                         change.key = resultKey;
-                        trans.tables._changes.put(change);
+                        db._changes.put(change);
                     });
             }
             this.onerror = function(err) {
                 // If the main operation fails, make sure to regret the change
                 promise._then(function(rev) {
                     // Will only happen if app code catches the main operation error to prohibit transaction from aborting.
-                    trans.tables._changes.delete(rev);
+                    db._changes.delete(rev);
                 });
             }
 
@@ -362,7 +362,7 @@ export default function Observable(db) {
                     oldObj: oldObj,
                     obj: newObj
                 };
-                var promise = trans.tables._changes.add(change); // Just so we get the correct revision order of the update...
+                var promise = db._changes.add(change); // Just so we get the correct revision order of the update...
                 this.onsuccess = function() {
                     promise._then(function(rev) {
                         trans._lastWrittenRevision = Math.max(trans._lastWrittenRevision, rev);
@@ -372,7 +372,7 @@ export default function Observable(db) {
                     // If the main operation fails, make sure to regret the change.
                     promise._then(function(rev) {
                         // Will only happen if app code catches the main operation error to prohibit transaction from aborting.
-                        trans.tables._changes.delete(rev);
+                        db._changes.delete(rev);
                     });
                 };
             }
@@ -380,7 +380,7 @@ export default function Observable(db) {
 
         table.hook('deleting').subscribe(function(primKey, obj, trans) {
             /// <param name="trans" type="db.Transaction"></param>
-            var promise = trans.tables._changes.add({
+            var promise = db._changes.add({
                 source: trans.source || null, // If a "source" is marked on the transaction, store it. Useful for observers that want to ignore their own changes.
                 table: tableName,
                 key: primKey,
@@ -396,7 +396,7 @@ export default function Observable(db) {
                 // do setTimeout() and we would loose the transaction.
                 promise._then(function(rev) {
                     // Will only happen if app code catches the main operation error to prohibit transaction from aborting.
-                    trans.tables._changes.delete(rev);
+                    db._changes.delete(rev);
                 });
             };
         });
