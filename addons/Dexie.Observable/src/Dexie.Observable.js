@@ -458,7 +458,7 @@ export default function Observable(db) {
             Dexie.vip(function() {
                 readChanges(latestRevision).catch('DatabaseClosedError', e=>{
                     // Handle database closed error gracefully while reading changes.
-                    // Don't bubble to db.on.error or Promise.on.error.
+                    // Don't trigger unhandledrejection
                     // Even though we intercept the close() method, it might be called when in the middle of
                     // reading changes and then that flow will cancel with DatabaseClosedError.
                 });
@@ -539,7 +539,7 @@ export default function Observable(db) {
             readChanges(Observable.latestRevision[db.name]).then(cleanup).then(consumeIntercommMessages)
             .catch('DatabaseClosedError', e=>{
                 // Handle database closed error gracefully while reading changes.
-                // Don't bubble to db.on.error or Promise.on.error.
+                // Don't signal 'unhandledrejection'.
                 // Even though we intercept the close() method, it might be called when in the middle of
                 // reading changes and then that flow will cancel with DatabaseClosedError.
             })

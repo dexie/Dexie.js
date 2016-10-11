@@ -670,6 +670,8 @@ export default function Dexie(dbName, options) {
     // Events
     //
     this.on = Events(this, "error", "populate", "blocked", "versionchange", {ready: [promisableChain, nop]});
+    this.on.error.subscribe = Debug.deprecated("Dexie.on.error", this.on.error.subscribe);
+    this.on.error.unsubscribe = Debug.deprecated("Dexie.on.error.unsubscribe", this.on.error.unsubscribe);
 
     this.on.ready.subscribe = override (this.on.ready.subscribe, function (subscribe) {
         return (subscriber, bSticky) => {
