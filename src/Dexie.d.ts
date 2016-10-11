@@ -118,10 +118,8 @@ declare class Dexie {
     Table : new()=>Dexie.Table<any,any>;
     WhereClause: new()=>Dexie.WhereClause<any,any>;
     Version: new()=>Dexie.Version;
-    WriteableTable: new()=>Dexie.Table<any,any>;
     Transaction: new()=>Dexie.Transaction;
     Collection: new()=>Dexie.Collection<any,any>;
-    WriteableCollection: new()=>Dexie.Collection<any,any>;    
 }
 
 declare module Dexie {
