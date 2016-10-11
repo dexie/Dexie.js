@@ -206,8 +206,8 @@ asyncTest("exception in upgrader", function () {
         db.close();
         db = new Dexie("TestUpgrader");
         db.version(1).stores({ cars: "++id,name,brand" });
-        db.version(2).upgrade(function (trans) { trans.cars.add({ name: "My car", brand: "Pegeut" }); });
-        db.version(3).upgrade(function (trans) {
+        db.version(2).upgrade(function () { db.cars.add({ name: "My car", brand: "Pegeut" }); });
+        db.version(3).upgrade(function () {
             throw new Error("Oops. Failing in upgrade function");
         });
         return db.open();
