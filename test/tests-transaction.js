@@ -695,38 +695,6 @@ asyncTest("Issue #91 / #95 with Dexie.Promise.resolve() mixed in here and there.
     ok(!Dexie.currentTransaction, "After main transaction scope: Still no ongoing transaction at this scope");
 });
 
-asyncTest("Promise Microtask / indexedDB transaction compatibility", function() {
-    // Change line below from Dexie.Promise to window.Promise to test
-    // compatibility between indexedDB transactions and window.Promise.
-    // As of 2015-06-25, this works only with Chromium but not with Firefox
-    // and not with IE11 because it lacks window.Promise.
-    var Promise = Dexie.Promise; // window.Promise;
-
-    db.transaction('rw', db.users, function() {
-        var trans = Dexie.currentTransaction;
-        return Promise.resolve(trans.users.add({ username: "apansson" })).then(function() {
-            return Promise.resolve(trans.users.get("apansson"));
-        }).then(function(o) {
-            equal(o.username, "apansson", "Got the correct object");
-            var p = Promise.resolve(o);
-            for (var i = 0; i < 100; ++i) {
-                p = p.then(function(o) { return o; });
-            }
-            return p;
-        }).then(function(o) {
-            return trans.users.get("apansson");
-        }).then(function(o) {
-            equal(o.username, "apansson", "Got the correct object after 100 promises in a chain");
-        }).catch(function(e) {
-            ok(false, "Error: " + e);
-        });
-    }).then(function() {
-        ok(true, "Transaction successfully committed");
-    }).catch(function(e) {
-        ok(false, "Error:" + e);
-    }).finally(start);
-});
-
 asyncTest("Issue #137 db.table() does not respect current transaction", function() {
     db.transaction('rw', db.users, function() {
         db.users.add({ username: "erictheviking", color: "blue" }).then(function() {
