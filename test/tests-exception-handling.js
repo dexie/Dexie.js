@@ -24,7 +24,7 @@ module("exception-handling", {
     }
 });
 
-asyncTest("Uncaught promise should signal to Promise.on('error')", function(){
+asyncTest("Uncaught promise should signal 'unhandledrejection'", function(){
     // We must not use finally or catch here because then we don't test what we should.
     var onErrorSignals = 0;
     function onerror(ev) {
@@ -32,11 +32,9 @@ asyncTest("Uncaught promise should signal to Promise.on('error')", function(){
         ev.preventDefault();
     }
     window.addEventListener('unhandledrejection', onerror);
-    db.on('error').unsubscribe(dbOnErrorHandler);
     db.users.add({ id: 1 });
     setTimeout(()=> {
-        equal(onErrorSignals, 1, "Promise.on('error') should have been signaled");
-        db.on("error", dbOnErrorHandler);
+        equal(onErrorSignals, 1, "'unhandledrejection' should have been signaled");
         window.removeEventListener('unhandledrejection', onerror);
         start();
     }, 100);
@@ -275,10 +273,10 @@ asyncTest("catch-all with db.on('error')", 6, function () {
             });
         }
     });
-    function swallowPromiseOnError(e){
-        return false;
+    function swallowPromiseOnError(ev){
+        ev.preventDefault();
     }
-    Dexie.Promise.on('error', swallowPromiseOnError); // Just to get rid of default error logs for not catching.
+    window.addEventListener('unhandledrejection', swallowPromiseOnError); // Just to get rid of default error logs for not catching.
 
     ourDB.delete()
     .then(()=>ourDB.open())
@@ -497,13 +495,14 @@ asyncTest("Issue #67 - Regression test - Transaction still fails if error in key
 
 asyncTest("Issue #69 Global exception handler for promises", function () {
     var errorList = [];
-    function globalRejectionHandler(e) {
-        console.log("Got error: " + e);
+    function globalRejectionHandler(ev) {
+        console.log("Got error: " + ev.reason);
         if (errorList.indexOf(e) === -1) // Current implementation: accept multiple redundant triggers
             errorList.push(e);
+        ev.preventDefault();
     }
 
-    Dexie.Promise.on("error", globalRejectionHandler);
+    window.addEventListener('unhandledrejection', globalRejectionHandler);
         
     // The most simple case: Any Promise reject that is not catched should
     // be handled by the global error listener.
@@ -565,7 +564,7 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
                 equal(errorList[3], "forth error (uncatched but with finally)", "forth error (uncatched but with finally)");
                 equal(errorList[4], "FOO", "FOO");
                 // cleanup:
-                Dexie.Promise.on("error").unsubscribe(globalRejectionHandler);
+                window.removeEventListener('unhandledrejection', globalRejectionHandler);
                 start();
             });
         });
