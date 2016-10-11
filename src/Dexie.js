@@ -1470,8 +1470,13 @@ export default function Dexie(dbName, options) {
         abort: function () {
             this.active && this._reject(new exceptions.Abort());
             this.active = false;
-        }
-                
+        },
+
+        tables: {
+            get: Debug.deprecated ("Transaction.tables", ()=>allTables)
+        },
+
+        table: Debug.deprecated ("Transaction.table()", name => allTables[name])
     });
 
     //
