@@ -72,9 +72,6 @@
         db2.open().then(function () {
             console.log("db2 opened");
         });
-        db2.on.error.subscribe(function (error) {
-            console.error("db2 error: " + error);
-        });
 
         db2.on('changes', function (changes, partial) {
             console.log("db2.on('changes'): changes.length: " + changes.length + "\tpartial: " + (partial ? "true" : "false"));

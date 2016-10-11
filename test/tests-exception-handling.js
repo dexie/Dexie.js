@@ -546,11 +546,6 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
             // Now just do some Dexie stuff...
             var db = new Dexie("testdb");
             db.version(1).stores({ table1: "id" });
-            db.on('error', function(err) {
-                // Global 'db' error handler (will never be called 'cause the error is not in a transaction)
-                console.log("db.on.error: " + err);
-                errorList.push("Got db.on.error: " + err);
-            });
             db.open().then(function() {
                 console.log("before");
                 throw "FOO"; // Here a generic error is thrown (not a DB error)
