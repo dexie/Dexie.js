@@ -1,5 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
+import {spawnedTest} from './dexie-unittest-utils';
 
 module("promise");
 
@@ -129,13 +130,14 @@ asyncTest ("Promise.follow chained", ()=>{
     //});
 });
 
-asyncTest("Promise.on.error should propagate once", 1, function(){
+asyncTest("onunhandledrejection should propagate once", 1, function(){
     var Promise = Dexie.Promise;
-    function logErr (e) {
-        ok(true, e);
+    function logErr (ev) {
+        ok(true, ev.reason);
         return false;
     }
-    Promise.on('error', logErr);
+    
+    window.addEventListener('unhandledrejection', logErr);
     var p = new Promise((resolve, reject)=>{
         reject("apa");
     }).finally(()=>{
@@ -152,18 +154,18 @@ asyncTest("Promise.on.error should propagate once", 1, function(){
     });
     Promise.all([p, p2, p3, p4]).finally(()=>{
         setTimeout(()=>{
-            Promise.on('error').unsubscribe(logErr);
+            window.removeEventListener('unhandledrejection', logErr);
             start();
         }, 1);
     });
 });
 
-asyncTest("Promise.on.error should not propagate if catched after finally", 1, function(){
+asyncTest("onunhandledrejection should not propagate if catched after finally", 1, function(){
     var Promise = Dexie.Promise;
-    function logErr (e) {
-        ok(false, "Should already be catched:" + e);
+    function logErr (ev) {
+        ok(false, "Should already be catched:" + ev.reason);
     }
-    Promise.on('error', logErr);
+    window.addEventListener('unhandledrejection', logErr);
     var p = new Promise((resolve, reject)=>{
         reject("apa");
     }).finally(()=>{
@@ -184,7 +186,7 @@ asyncTest("Promise.on.error should not propagate if catched after finally", 1, f
 
     Promise.all([p, p2, p3, p4]).finally(()=>{
         setTimeout(()=>{
-            Promise.on('error').unsubscribe(logErr);
+            window.removeEventListener('unhandledrejection', logErr);
             start();
         }, 1);
     });
@@ -300,13 +302,13 @@ asyncTest("Issue #97 A transaction may be lost after calling Dexie.Promise.resol
     }
 });*/
 
-asyncTest("Promise.on.error", ()=> {
+asyncTest("unhandledrejection", ()=> {
     var errors = [];
-    function onError(e, p) {
-        errors.push(e);
-        return false;
+    function onError(ev) {
+        errors.push(ev.reason);
+        ev.preventDefault();
     }
-    Dexie.Promise.on('error', onError);
+    window.addEventListener('unhandledrejection', onError);
     
     new Dexie.Promise((resolve, reject) => {
         reject ("error");
@@ -314,18 +316,19 @@ asyncTest("Promise.on.error", ()=> {
     setTimeout(()=>{
         equal(errors.length, 1, "Should be one error there");
         equal(errors[0], "error", "Should be our error there");
-        Dexie.Promise.on.error.unsubscribe(onError);
+        window.removeEventListener('unhandledrejection', onError);
+
         start();
     }, 40);
 });
 
-asyncTest("Promise.on.error2", ()=> {
+asyncTest("unhandledrejection2", ()=> {
     var errors = [];
-    function onError(e, p) {
-        errors.push(e);
-        return false;
+    function onError(ev) {
+        errors.push(ev.reason);
+        ev.preventDefault();
     }
-    Dexie.Promise.on('error', onError);
+    window.addEventListener('unhandledrejection', onError);
     
     new Dexie.Promise((resolve, reject) => {
         new Dexie.Promise((resolve2, reject2) => {
@@ -339,18 +342,18 @@ asyncTest("Promise.on.error2", ()=> {
     setTimeout(()=>{
         equal(errors.length, 1, "Should be one error there");
         equal(errors[0], "error", "Should be our error there");
-        Dexie.Promise.on.error.unsubscribe(onError);
+        window.removeEventListener('unhandledrejection', onError);
         start();
     }, 40);
 });
 
-asyncTest("Promise.on.error3", ()=> {
+asyncTest("unhandledrejection3", ()=> {
     var errors = [];
-    function onError(e, p) {
-        errors.push(e);
-        return false;
+    function onError(ev) {
+        errors.push(ev.reason);
+        ev.preventDefault();
     }
-    Dexie.Promise.on('error', onError);
+    window.addEventListener('unhandledrejection', onError);
     
     new Dexie.Promise((resolve, reject) => {
         new Dexie.Promise((resolve2, reject2) => {
@@ -363,7 +366,7 @@ asyncTest("Promise.on.error3", ()=> {
     
     setTimeout(()=>{
         equal(errors.length, 0, "Should be zarro errors there");
-        Dexie.Promise.on.error.unsubscribe(onError);
+        window.removeEventListener('unhandledrejection', onError);
         start();
     }, 40);
 });

@@ -118,10 +118,8 @@ declare class Dexie {
     Table : new()=>Dexie.Table<any,any>;
     WhereClause: new()=>Dexie.WhereClause<any,any>;
     Version: new()=>Dexie.Version;
-    WriteableTable: new()=>Dexie.Table<any,any>;
     Transaction: new()=>Dexie.Transaction;
     Collection: new()=>Dexie.Collection<any,any>;
-    WriteableCollection: new()=>Dexie.Collection<any,any>;    
 }
 
 declare module Dexie {
@@ -434,7 +432,6 @@ declare module Dexie {
     class UnsupportedError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class InternalError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class DatabaseClosedError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
-    class IncompatiblePromiseError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class UnknownError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class ConstraintError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}
     class DataError extends DexieError {constructor (msg?: string, inner?: Object);	constructor (inner: Object);}

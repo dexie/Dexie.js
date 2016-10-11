@@ -1,7 +1,6 @@
 import {doFakeAutoComplete, tryCatch, props,
-        setProp, _global, getPropertyDescriptor, getArrayOf} from './utils';
-import {reverseStoppableEventChain, nop, callBoth, mirror} from './chaining-functions';
-import Events from './Events';
+        setProp, _global, getPropertyDescriptor, getArrayOf, extend} from './utils';
+import {nop, callBoth, mirror} from './chaining-functions';
 import {debug, prettyStack, getErrorWithStack} from './debug';
 
 //
@@ -38,53 +37,71 @@ import {debug, prettyStack, getErrorWithStack} from './debug';
 var INTERNAL = {};
 
 // Async stacks (long stacks) must not grow infinitely.
-var LONG_STACKS_CLIP_LIMIT = 100,
+const
+    LONG_STACKS_CLIP_LIMIT = 100,
     // When calling error.stack or promise.stack, limit the number of asyncronic stacks to print out. 
     MAX_LONG_STACKS = 20,
-    stack_being_generated = false;
+    nativePromiseInstanceAndProto = (()=>{
+        try {
+            // Be able to patch native async functions
+            return new Function("let p=(async ()=>{})(); return [p, Object.getPrototypeOf(p)];")();
+        } catch(e) {
+            var P = _global.Promise;
+            return [P && P.resolve(), P && P.prototype]; // Support transpiled async functions 
+        }
+    })(),
+    resolvedNativePromise = nativePromiseInstanceAndProto[0],
+    nativePromiseProto = nativePromiseInstanceAndProto[1],
+    resolvedGlobalPromise = _global.Promise && _global.Promise.resolve(),
+    nativePromiseThen = nativePromiseProto && nativePromiseProto.then;
+    
+var stack_being_generated = false;    
 
-/* The default "nextTick" function used only for the very first promise in a promise chain.
+/* The default function used only for the very first promise in a promise chain.
    As soon as then promise is resolved or rejected, all next tasks will be executed in micro ticks
    emulated in this module. For indexedDB compatibility, this means that every method needs to 
    execute at least one promise before doing an indexedDB operation. Dexie will always call 
    db.ready().then() for every operation to make sure the indexedDB event is started in an
-   emulated micro tick.
+   indexedDB-compatible emulated micro task loop.
 */
-var schedulePhysicalTick = (_global.setImmediate ? 
-    // setImmediate supported. Those modern platforms also supports Function.bind().
-    setImmediate.bind(null, physicalTick) :
-    _global.MutationObserver ?
-        // MutationObserver supported
-        () => {
-            var hiddenDiv = document.createElement("div");
-            (new MutationObserver(() => {
-                physicalTick();
-                hiddenDiv = null;
-            })).observe(hiddenDiv, { attributes: true });
-            hiddenDiv.setAttribute('i', '1');
-        } :
-        // No support for setImmediate or MutationObserver. No worry, setTimeout is only called
-        // once time. Every tick that follows will be our emulated micro tick.
-        // Could have uses setTimeout.bind(null, 0, physicalTick) if it wasnt for that FF13 and below has a bug 
-        ()=>{setTimeout(physicalTick,0);}
-);
+var schedulePhysicalTick = resolvedGlobalPromise ?
+    () => {
+        usePSD(globalPSD, () => {
+        resolvedGlobalPromise.then(physicalTick);} ) }:
+    _global.setImmediate ? 
+        // setImmediate supported. Those modern platforms also supports Function.bind().
+        setImmediate.bind(null, physicalTick) :
+        _global.MutationObserver ?
+            // MutationObserver supported
+            () => {
+                var hiddenDiv = document.createElement("div");
+                (new MutationObserver(() => {
+                    physicalTick();
+                    hiddenDiv = null;
+                })).observe(hiddenDiv, { attributes: true });
+                hiddenDiv.setAttribute('i', '1');
+            } :
+            // No support for setImmediate or MutationObserver. No worry, setTimeout is only called
+            // once time. Every tick that follows will be our emulated micro tick.
+            // Could have uses setTimeout.bind(null, 0, physicalTick) if it wasnt for that FF13 and below has a bug 
+            ()=>{setTimeout(physicalTick,0);};
 
-// Confifurable through Promise.scheduler.
+// Configurable through Promise.scheduler.
 // Don't export because it would be unsafe to let unknown
 // code call it unless they do try..catch within their callback.
 // This function can be retrieved through getter of Promise.scheduler though,
-// but users must not do Promise.scheduler (myFuncThatThrows exception)!
+// but users must not do Promise.scheduler = myFuncThatThrowsException
 var asap = function (callback, args) {
     microtickQueue.push([callback, args]);
     if (needsNewPhysicalTick) {
         schedulePhysicalTick();
         needsNewPhysicalTick = false;
     }
-}
+};
 
 var isOutsideMicroTick = true, // True when NOT in a virtual microTick.
     needsNewPhysicalTick = true, // True when a push to microtickQueue must also schedulePhysicalTick()
-    unhandledErrors = [], // Rejected promises that has occured. Used for firing Promise.on.error and promise.onuncatched.
+    unhandledErrors = [], // Rejected promises that has occured. Used for triggering 'unhandledrejection'.
     rejectingErrors = [], // Tracks if errors are being re-rejected during onRejected callback.
     currentFulfiller = null,
     rejectionMapper = mirror; // Remove in next major when removing error mapping of DOMErrors and DOMExceptions
@@ -94,7 +111,14 @@ export var globalPSD = {
     ref: 0,
     unhandleds: [],
     onunhandled: globalError,
-    //env: null, // Will be set whenever leaving a scope using wrappers.snapshot()
+    pgp: false,
+    env: { // Environment globals snapshotted on leaving global zone
+        Promise: _global.Promise,
+        nc: nativePromiseProto && nativePromiseProto.constructor,
+        nthen: nativePromiseProto && nativePromiseProto.then,
+        gthen: _global.Promise && _global.Promise.prototype.then,
+        dthen: null // Will be set later on.
+    },
     finalize: function () {
         this.unhandleds.forEach(uh => {
             try {
@@ -109,30 +133,6 @@ export var PSD = globalPSD;
 export var microtickQueue = []; // Callbacks to call in this or next physical tick.
 export var numScheduledCalls = 0; // Number of listener-calls left to do in this physical tick.
 export var tickFinalizers = []; // Finalizers to call when there are no more async calls scheduled within current physical tick.
-
-// Wrappers are not being used yet. Their framework is functioning and can be used
-// to replace environment during a PSD scope (a.k.a. 'zone').
-/* **KEEP** export var wrappers = (() => {
-    var wrappers = [];
-
-    return {
-        snapshot: () => {
-            var i = wrappers.length,
-                result = new Array(i);
-            while (i--) result[i] = wrappers[i].snapshot();
-            return result;
-        },
-        restore: values => {
-            var i = wrappers.length;
-            while (i--) wrappers[i].restore(values[i]);
-        },
-        wrap: () => wrappers.map(w => w.wrap()),
-        add: wrapper => {
-            wrappers.push(wrapper);
-        }
-    };
-})();
-*/
 
 export default function Promise(fn) {
     if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');    
@@ -177,15 +177,15 @@ props(Promise.prototype, {
 
     then: function (onFulfilled, onRejected) {
         var rv = new Promise((resolve, reject) => {
-            propagateToListener(this, new Listener(onFulfilled, onRejected, resolve, reject));
+            propagateToListener(this, new Listener(onFulfilled, onRejected, resolve, reject, PSD));
         });
         debug && (!this._prev || this._state === null) && linkToPreviousPromise(rv, this);
         return rv;
     },
-    
+        
     _then: function (onFulfilled, onRejected) {
         // A little tinier version of then() that don't have to create a resulting promise.
-        propagateToListener(this, new Listener(null, null, onFulfilled, onRejected));        
+        propagateToListener(this, new Listener(null, null, onFulfilled, onRejected, PSD));        
     },
 
     catch: function (onRejected) {
@@ -214,22 +214,6 @@ props(Promise.prototype, {
         });
     },
     
-    // Deprecate in next major. Needed only for db.on.error.
-    uncaught: function (uncaughtHandler) {
-        // Be backward compatible and use "onuncatched" as the event name on this.
-        // Handle multiple subscribers through reverseStoppableEventChain(). If a handler returns `false`, bubbling stops.
-        this.onuncatched = reverseStoppableEventChain(this.onuncatched, uncaughtHandler);
-        // In case caller does this on an already rejected promise, assume caller wants to point out the error to this promise and not
-        // a previous promise. Reason: the prevous promise may lack onuncatched handler. 
-        if (this._state === false && unhandledErrors.indexOf(this) === -1) {
-            // Replace unhandled error's destinaion promise with this one!
-            unhandledErrors.some((p,i,l) => p._value === this._value && (l[i] = this));
-            // Actually we do this shit because we need to support db.on.error() correctly during db.open(). If we deprecate db.on.error, we could
-            // take away this piece of code as well as the onuncatched and uncaught() method.
-        }
-        return this;
-    },
-        
     stack: {
         get: function() {
             if (this._stack) return this._stack;
@@ -246,12 +230,12 @@ props(Promise.prototype, {
     }
 });
 
-function Listener(onFulfilled, onRejected, resolve, reject) {
+function Listener(onFulfilled, onRejected, resolve, reject, zone) {
     this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
     this.onRejected = typeof onRejected === 'function' ? onRejected : null;
     this.resolve = resolve;
     this.reject = reject;
-    this.psd = PSD;
+    this.psd = zone;
 }
 
 // Promise Static Properties
@@ -304,7 +288,7 @@ props (Promise, {
         set: value => {rejectionMapper = value;} // Map reject failures
     },
             
-    follow: fn => {
+    follow: (fn, zoneProps) => {
         return new Promise((resolve, reject) => {
             return newScope((resolve, reject) => {
                 var psd = PSD;
@@ -319,15 +303,9 @@ props (Promise, {
                     });
                 }, psd.finalize);
                 fn();
-            }, resolve, reject);
+            }, zoneProps, resolve, reject);
         });
-    },
-
-    on: Events(null, {"error": [
-        reverseStoppableEventChain,
-        defaultErrorHandler] // Default to defaultErrorHandler
-    })
-    
+    }
 });
 
 /**
@@ -341,7 +319,7 @@ function executePromiseTask (promise, fn) {
     // https://github.com/promises-aplus/promises-spec#the-promise-resolution-procedure
     try {
         fn(value => {
-            if (promise._state !== null) return;
+            if (promise._state !== null) return; // Already settled
             if (value === promise) throw new TypeError('A promise cannot be resolved with itself.');
             var shouldExecuteTick = promise._lib && beginMicroTickScope();
             if (value && typeof value.then === 'function') {
@@ -420,32 +398,25 @@ function propagateToListener(promise, listener) {
         // This Listener doesnt have a listener for the event being triggered (onFulfilled or onReject) so lets forward the event to any eventual listeners on the Promise instance returned by then() or catch()
         return (promise._state ? listener.resolve : listener.reject) (promise._value);
     }
-    var psd = listener.psd;
-    ++psd.ref;
+    ++listener.psd.ref;
     ++numScheduledCalls;
     asap (callListener, [cb, promise, listener]);
 }
 
 function callListener (cb, promise, listener) {
-    var outerScope = PSD;
-    var psd = listener.psd;
     try {
-        if (psd !== outerScope) {
-            // **KEEP** outerScope.env = wrappers.snapshot(); // Snapshot outerScope's environment.
-            PSD = psd;
-            // **KEEP** wrappers.restore(psd.env); // Restore PSD's environment.
-        }
-        
         // Set static variable currentFulfiller to the promise that is being fullfilled,
         // so that we connect the chain of promises (for long stacks support)
         currentFulfiller = promise;
         
         // Call callback and resolve our listener with it's return value.
-        var value = promise._value,
-            ret;
+        var ret, value = promise._value;
+            
         if (promise._state) {
+            // cb is onResolved
             ret = cb (value);
         } else {
+            // cb is onRejected
             if (rejectingErrors.length) rejectingErrors = [];
             ret = cb(value);
             if (rejectingErrors.indexOf(value) === -1)
@@ -456,14 +427,10 @@ function callListener (cb, promise, listener) {
         // Exception thrown in callback. Reject our listener.
         listener.reject(e);
     } finally {
-        // Restore PSD, env and currentFulfiller.
-        if (psd !== outerScope) {
-            PSD = outerScope;
-            // **KEEP** wrappers.restore(outerScope.env); // Restore outerScope's environment
-        }
+        // Restore env and currentFulfiller.
         currentFulfiller = null;
         if (--numScheduledCalls === 0) finalizePhysicalTick();
-        --psd.ref || psd.finalize();
+        --listener.psd.ref || listener.psd.finalize();
     }
 }
 
@@ -481,7 +448,7 @@ function getStack (promise, stacks, limit) {
             stack = prettyStack(failure, 0);
         } else {
             errorName = failure; // If error is undefined or null, show that.
-            message = ""
+            message = "";
         }
         stacks.push(errorName + (message ? ": " + message : "") + stack);
     }
@@ -585,14 +552,10 @@ function markErrorAsHandled(promise) {
     }
 }
 
-// By default, log uncaught errors to the console
-function defaultErrorHandler(e) {
-    console.warn(`Unhandled rejection: ${e.stack || e}`);
-}
-
 function PromiseReject (reason) {
     return new Promise(INTERNAL, false, reason);
 }
+
 
 export function wrap (fn, errorCatcher) {
     var psd = PSD;
@@ -601,31 +564,38 @@ export function wrap (fn, errorCatcher) {
             outerScope = PSD;
 
         try {
-            if (outerScope !== psd) {
-                // **KEEP** outerScope.env = wrappers.snapshot(); // Snapshot outerScope's environment
-                PSD = psd;
-                // **KEEP** wrappers.restore(psd.env); // Restore PSD's environment.
-            }
+            switchToZone(psd);
             return fn.apply(this, arguments);
         } catch (e) {
             errorCatcher && errorCatcher(e);
         } finally {
-            if (outerScope !== psd) {
-                PSD = outerScope;
-                // **KEEP** wrappers.restore(outerScope.env); // Restore outerScope's environment
-            }
+            switchToZone(outerScope);
             if (wasRootExec) endMicroTickScope();
         }
     };
 }
+
+
+globalPSD.env.dthen = Promise.prototype.then;
     
-export function newScope (fn, a1, a2, a3) {
+export function newScope (fn, props, a1, a2) {
     var parent = PSD,
         psd = Object.create(parent);
     psd.parent = parent;
     psd.ref = 0;
     psd.global = false;
-    // **KEEP** psd.env = wrappers.wrap(psd);
+    // Prepare for promise patching (done in usePSD):
+    var globalEnv = globalPSD.env;
+    psd.env = nativePromiseThen ? {
+        Promise: Promise, // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
+        nc: Promise, 
+        nthen: getPatchedPromiseThen (globalEnv.nthen, psd), // native then
+        gthen: getPatchedPromiseThen (globalEnv.gthen, psd), // global then
+        dthen: getPatchedPromiseThen (globalEnv.dthen, psd)  // dexie then
+    } : {
+        dthen: getPatchedPromiseThen (globalEnv.dthen, psd)
+    };
+    if (props) extend(psd, props);
     
     // unhandleds and onunhandled should not be specifically set here.
     // Leave them on parent prototype.
@@ -635,27 +605,105 @@ export function newScope (fn, a1, a2, a3) {
     psd.finalize = function () {
         --this.parent.ref || this.parent.finalize();
     }
-    var rv = usePSD (psd, fn, a1, a2, a3);
+    var rv = usePSD (psd, fn, a1, a2);
     if (psd.ref === 0) psd.finalize();
     return rv;
+}
+
+function switchToZone (targetZone) {
+    if (targetZone === PSD) return;
+    var currentZone = PSD;
+    PSD = targetZone;
+    
+    // Snapshot on every leave from global zone.
+    if (currentZone === globalPSD && ('Promise' in _global)) {
+        var globalEnv = globalPSD.env;
+        globalEnv.Promise = _global.Promise; // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
+        globalEnv.nc = nativePromiseProto.constructor;
+        globalEnv.nthen = nativePromiseProto.then;
+        globalEnv.gthen = _global.Promise.prototype.then;
+        globalEnv.dthen = Promise.prototype.then;
+    }
+    
+    // Patch our own Promise to keep zones in it:
+    Promise.prototype.then = targetZone.env.dthen;
+    
+    if (('Promise' in _global)) {
+        // Swich environments
+        
+        // Set this Promise to window.Promise so that Typescript 2.0's async functions will work on Firefox, Safari and IE, as well as with Zonejs and angular.
+        _global.Promise = targetZone.env.Promise;
+        
+        // Make native async functions work according to their standard specification but invoke our zones
+        // (https://github.com/tc39/ecmascript-asyncawait/issues/65)
+        nativePromiseProto.then = targetZone.env.nthen;
+        
+        // Also override constructor (https://github.com/tc39/ecmascript-asyncawait/issues/65#issuecomment-145250337)
+        nativePromiseProto.constructor = targetZone.env.nc;
+        
+        // Also patch the global Promise in case it differs from native Promise (must work with transpilers and polyfills)
+        globalPSD.env.Promise.prototype.then = targetZone.env.gthen;
+    }
 }
 
 export function usePSD (psd, fn, a1, a2, a3) {
     var outerScope = PSD;
     try {
-        if (psd !== outerScope) {
-            // **KEEP** outerScope.env = wrappers.snapshot(); // snapshot outerScope's environment.
-            PSD = psd;
-            // **KEEP** wrappers.restore(psd.env); // Restore PSD's environment.
-        }
+        switchToZone(psd);
         return fn(a1, a2, a3);
     } finally {
-        if (psd !== outerScope) {
-            PSD = outerScope;
-            // **KEEP** wrappers.restore(outerScope.env); // Restore outerScope's environment.
-        }
+        switchToZone(outerScope);
     }
 }
+
+function enqueueNativeMicroTask (job) {
+    //
+    // Precondition: nativePromiseThen !== undefined
+    //
+    nativePromiseThen.call(resolvedNativePromise, job);
+}
+
+function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
+    return typeof fn !== 'function' ? fn : function () {
+        var outerZone = PSD;
+        switchToZone(zone);
+        if (possibleAwait) {
+            // Before calling fn (which is onResolved or onRejected),
+            // enque a zone injector onto the Micro Task queue, because when fn() is executed,
+            // it will call resolvingFunctions.[[Resolve]] or resolvingFunctions.[[Reject]] as
+            // specified in ES2015, PromiseResolveThenableJob http://www.ecma-international.org/ecma-262/6.0/#sec-promiseresolvethenablejob
+            // Thos [[Resolve]] and [[Reject]] internal slots will in its turn enqueue its internal
+            // onResolved or onRejected callbacks on the "PromiseJobs" queue. We must enque a zone-
+            // invoker and zone-resetter before and after the native queue record.
+            ++zone.ref;
+            enqueueNativeMicroTask(()=>{
+                switchToZone(zone);
+            });
+        }
+        try {
+            return fn.apply(this, arguments);
+        } finally {
+            switchToZone(outerZone);
+            if (possibleAwait) {
+                enqueueNativeMicroTask(()=>{
+                    switchToZone(globalPSD);
+                    --zone.ref || zone.finalize(); // if ref reaches zero, call finalize();
+                });
+            }
+        }
+    };
+}
+
+function getPatchedPromiseThen (origThen, zone) {
+    return function (onResolved, onRejected) {
+        var possibleAwait = (zone !== PSD) && !!nativePromiseThen;
+        return origThen.call(this,
+            nativeAwaitCompatibleWrap(onResolved, zone, possibleAwait),
+            nativeAwaitCompatibleWrap(onRejected, zone, possibleAwait));
+    };
+}
+
+const UNHANDLEDREJECTION = "unhandledrejection";
 
 function globalError(err, promise) {
     var rv;
@@ -663,62 +711,25 @@ function globalError(err, promise) {
         rv = promise.onuncatched(err);
     } catch (e) {}
     if (rv !== false) try {
-        Promise.on.error.fire(err, promise); // TODO: Deprecated and use same global handler as bluebird.
+        var event, eventData = {promise: promise, reason: err};
+        /*if (_global.PromiseRejectionEvent) { // Don't use. In chromw, makes it fire twice!
+            event = new PromiseRejectionEvent(UNHANDLEDREJECTION, eventData);
+        } else*/ if (_global.document && document.createEvent) {
+            event = document.createEvent('Event');
+            event.initEvent(UNHANDLEDREJECTION, true, true);
+            extend(event, eventData);
+        } else if (_global.CustomEvent) {
+            event = new CustomEvent(UNHANDLEDREJECTION, {detail: eventData});
+            extend(event, eventData);
+        }
+        if (event && _global.dispatchEvent) {
+            dispatchEvent(event);
+        }
+        if (!event.defaultPrevented) {
+            console.warn(`Unhandled rejection: ${err.stack || err}`);
+        }
     } catch (e) {}
 }
-
-/* **KEEP** 
-
-export function wrapPromise(PromiseClass) {
-    var proto = PromiseClass.prototype;
-    var origThen = proto.then;
-    
-    wrappers.add({
-        snapshot: () => proto.then,
-        restore: value => {proto.then = value;},
-        wrap: () => patchedThen
-    });
-
-    function patchedThen (onFulfilled, onRejected) {
-        var promise = this;
-        var onFulfilledProxy = wrap(function(value){
-            var rv = value;
-            if (onFulfilled) {
-                rv = onFulfilled(rv);
-                if (rv && typeof rv.then === 'function') rv.then(); // Intercept that promise as well.
-            }
-            --PSD.ref || PSD.finalize();
-            return rv;
-        });
-        var onRejectedProxy = wrap(function(err){
-            promise._$err = err;
-            var unhandleds = PSD.unhandleds;
-            var idx = unhandleds.length,
-                rv;
-            while (idx--) if (unhandleds[idx]._$err === err) break;
-            if (onRejected) {
-                if (idx !== -1) unhandleds.splice(idx, 1); // Mark as handled.
-                rv = onRejected(err);
-                if (rv && typeof rv.then === 'function') rv.then(); // Intercept that promise as well.
-            } else {
-                if (idx === -1) unhandleds.push(promise);
-                rv = PromiseClass.reject(err);
-                rv._$nointercept = true; // Prohibit eternal loop.
-            }
-            --PSD.ref || PSD.finalize();
-            return rv;
-        });
-        
-        if (this._$nointercept) return origThen.apply(this, arguments);
-        ++PSD.ref;
-        return origThen.call(this, onFulfilledProxy, onRejectedProxy);
-    }
-}
-
-// Global Promise wrapper
-if (_global.Promise) wrapPromise(_global.Promise);
-
-*/
 
 doFakeAutoComplete(() => {
     // Simplify the job for VS Intellisense. This piece of code is one of the keys to the new marvellous intellisense support in Dexie.
@@ -726,3 +737,5 @@ doFakeAutoComplete(() => {
         setTimeout(()=>{fn.apply(null, args);}, 0);
     };
 });
+
+export var rejection = Promise.reject;

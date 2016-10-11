@@ -15,8 +15,7 @@ var dexieErrorNames = [
     'SubTransaction',
     'Unsupported',
     'Internal',
-    'DatabaseClosed',
-    'IncompatiblePromise'
+    'DatabaseClosed'
 ];
 
 var idbDomErrorNames = [
@@ -77,7 +76,7 @@ function getMultiErrorMessage (msg, failures) {
 }
 
 //
-// ModifyError - thrown in WriteableCollection.modify()
+// ModifyError - thrown in Collection.modify()
 // Specific constructor because it contains members failures and failedKeys.
 //
 export function ModifyError (msg, failures, successCount, failedKeys) {

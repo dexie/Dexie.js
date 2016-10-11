@@ -23,10 +23,18 @@ module.exports = function(config) {
       os: 'Windows',
       os_version: '10'
     },
+    bs_ie11: {
+      base: 'BrowserStack',
+      browser: 'ie',
+      browser_version: '11',
+      os: 'Windows',
+      os_version: 7
+    }
   };
 
   cfg.browsers = !useBrowserStack ? ['Firefox'] : [
-    'bs_firefox'
+    'bs_firefox',
+    'bs_ie11'
   ];
 
   cfg.plugins = [
