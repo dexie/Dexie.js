@@ -678,7 +678,7 @@ export default function Dexie(dbName, options) {
             Dexie.vip(()=>{
                 if (openComplete) {
                     // Database already open. Call subscriber asap.
-                    Promise.resolve().then(subscriber);
+                    if (!dbOpenError) Promise.resolve().then(subscriber);
                     // bSticky: Also subscribe to future open sucesses (after close / reopen) 
                     if (bSticky) subscribe(subscriber); 
                 } else {
