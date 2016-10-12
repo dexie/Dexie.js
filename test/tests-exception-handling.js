@@ -8,10 +8,6 @@ db.on("populate", function (trans) {
     db.users.add({ id: 1, first: "David", last: "Fahlander", username: "dfahlander", email: ["david@awarica.com", "daw@thridi.com"], pets: ["dog"] });
     db.users.add({ id: 2, first: "Karl", last: "Cedersköld", username: "kceder", email: ["karl@ceder.what"], pets: [] });
 });
-function dbOnErrorHandler (e) {
-    ok(false, "An error bubbled out to the db.on('error'). Should not happen because all tests should catch their errors themselves. " + e);
-}
-db.on("error", dbOnErrorHandler);
 
 module("exception-handling", {
     setup: function () {
@@ -497,8 +493,8 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
     var errorList = [];
     function globalRejectionHandler(ev) {
         console.log("Got error: " + ev.reason);
-        if (errorList.indexOf(e) === -1) // Current implementation: accept multiple redundant triggers
-            errorList.push(e);
+        if (errorList.indexOf(ev.reason) === -1) // Current implementation: accept multiple redundant triggers
+            errorList.push(ev.reason);
         ev.preventDefault();
     }
 
