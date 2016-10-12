@@ -51,10 +51,10 @@
 			});
 		});
 		window.addEventListener('unhandledrejection', onError);
-		function onError (err) {
+		function onError (ev) {
 			window.removeEventListener('unhandledrejection', onError);
 			db1.close();
-			ok(false, err);
+			ok(false, ev.reason);
 			start();
 		}
 		db1.syncable.on('statusChanged', function (newStatus) {
