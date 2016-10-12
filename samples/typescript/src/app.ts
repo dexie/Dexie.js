@@ -24,12 +24,6 @@ document.addEventListener('DOMContentLoaded', async function () {
     // Test it:
     console.log("Hello world!");
 
-    // It's always a good practice to put this listener in the bootstrapping of your app:
-    Dexie.Promise.on.error.subscribe(e => {
-        // Log any uncatched error. In case you forgot to catch something...
-        console.error(e);
-    });
-    
     try {
         //
         // Let's clear and re-seed the database:

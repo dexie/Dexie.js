@@ -1,8 +1,8 @@
 import {doFakeAutoComplete, tryCatch, props,
-        setProp, _global, getPropertyDescriptor, getArrayOf} from './utils';
+        setProp, _global, getPropertyDescriptor, getArrayOf, extend} from './utils';
 import {reverseStoppableEventChain, nop, callBoth, mirror} from './chaining-functions';
 import Events from './Events';
-import {debug, prettyStack, getErrorWithStack} from './debug';
+import {debug, prettyStack, getErrorWithStack, deprecated} from './debug';
 
 //
 // Promise Class for Dexie library
@@ -84,7 +84,7 @@ var asap = function (callback, args) {
 
 var isOutsideMicroTick = true, // True when NOT in a virtual microTick.
     needsNewPhysicalTick = true, // True when a push to microtickQueue must also schedulePhysicalTick()
-    unhandledErrors = [], // Rejected promises that has occured. Used for firing Promise.on.error and promise.onuncatched.
+    unhandledErrors = [], // Rejected promises that has occured. Used for firing unhandledrejection.
     rejectingErrors = [], // Tracks if errors are being re-rejected during onRejected callback.
     currentFulfiller = null,
     rejectionMapper = mirror; // Remove in next major when removing error mapping of DOMErrors and DOMExceptions
@@ -327,8 +327,12 @@ props (Promise, {
         reverseStoppableEventChain,
         defaultErrorHandler] // Default to defaultErrorHandler
     })
-    
+
 });
+
+var PromiseOnError = Promise.on.error;
+PromiseOnError.subscribe = deprecated ("Promise.on('error')", PromiseOnError.subscribe);
+PromiseOnError.unsubscribe = deprecated ("Promise.on('error').unsubscribe", PromiseOnError.unsubscribe);
 
 /**
 * Take a potentially misbehaving resolver function and make sure
@@ -657,15 +661,36 @@ export function usePSD (psd, fn, a1, a2, a3) {
     }
 }
 
+const UNHANDLEDREJECTION = "unhandledrejection";
+
 function globalError(err, promise) {
     var rv;
     try {
         rv = promise.onuncatched(err);
     } catch (e) {}
     if (rv !== false) try {
-        Promise.on.error.fire(err, promise); // TODO: Deprecated and use same global handler as bluebird.
+        var event, eventData = {promise: promise, reason: err};
+        if (_global.document && document.createEvent) {
+            event = document.createEvent('Event');
+            event.initEvent(UNHANDLEDREJECTION, true, true);
+            extend(event, eventData);
+        } else if (_global.CustomEvent) {
+            event = new CustomEvent(UNHANDLEDREJECTION, {detail: eventData});
+            extend(event, eventData);
+        }
+        if (event && _global.dispatchEvent) {
+            dispatchEvent(event);
+            if (!_global.PromiseRejectionEvent && _global.onunhandledrejection)
+                // No native support for PromiseRejectionEvent but user has set window.onunhandledrejection. Manually call it.
+                try {_global.onunhandledrejection(event);} catch (_) {}
+        }
+        if (!event.defaultPrevented) {
+            // Backward compatibility: fire to events registered at Promise.on.error
+            Promise.on.error.fire(err, promise);
+        }
     } catch (e) {}
 }
+
 
 /* **KEEP** 
 

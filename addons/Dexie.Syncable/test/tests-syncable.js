@@ -50,12 +50,13 @@
 				db1.objects.update(key, {name: "four"});
 			});
 		});
-		db1.on('error', function onError (err) {
-			db1.on('error').unsubscribe(onError);
+		window.addEventListener('unhandledrejection', onError);
+		function onError (ev) {
+			window.removeEventListener('unhandledrejection', onError);
 			db1.close();
-			ok(false, err);
+			ok(false, ev.reason);
 			start();
-		});
+		}
 		db1.syncable.on('statusChanged', function (newStatus) {
 			ok(true, "Status changed to " + Dexie.Syncable.StatusTexts[newStatus]);
 		});
