@@ -27,11 +27,12 @@ asyncTest("Uncaught promise should signal 'unhandledrejection'", function(){
         ++onErrorSignals;
         ev.preventDefault();
     }
-    window.addEventListener('unhandledrejection', onerror);
+    var prevUnhandledRejection = window.onunhandledrejection;
+    window.onunhandledrejection = onerror;
     db.users.add({ id: 1 });
     setTimeout(()=> {
         equal(onErrorSignals, 1, "'unhandledrejection' should have been signaled");
-        window.removeEventListener('unhandledrejection', onerror);
+        window.onunhandledrejection = prevUnhandledRejection;
         start();
     }, 100);
 });

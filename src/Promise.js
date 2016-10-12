@@ -670,9 +670,7 @@ function globalError(err, promise) {
     } catch (e) {}
     if (rv !== false) try {
         var event, eventData = {promise: promise, reason: err};
-        /*if (_global.PromiseRejectionEvent) { // Don't use. In chromw, makes it fire twice!
-            event = new PromiseRejectionEvent(UNHANDLEDREJECTION, eventData);
-        } else*/ if (_global.document && document.createEvent) {
+        if (_global.document && document.createEvent) {
             event = document.createEvent('Event');
             event.initEvent(UNHANDLEDREJECTION, true, true);
             extend(event, eventData);
@@ -682,6 +680,9 @@ function globalError(err, promise) {
         }
         if (event && _global.dispatchEvent) {
             dispatchEvent(event);
+            if (!_global.PromiseRejectionEvent && _global.onunhandledrejection)
+                // No native support for PromiseRejectionEvent but user has set window.onunhandledrejection. Manually call it.
+                try {_global.onunhandledrejection(event);} catch (_) {}
         }
         if (!event.defaultPrevented) {
             // Backward compatibility: fire to events registered at Promise.on.error
