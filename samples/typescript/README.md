@@ -4,7 +4,7 @@ This is a sample on how to use Dexie.js with Typescript and babel. The following
 
 * How to subclass Dexie and define tables in a type-safe manner.
 * How to create an entity with Dexie.
-* How to use async / await with Dexie **NOTE! Discouraged since Typescript 2.0. See [this issue](https://github.com/dfahlander/Dexie.js/issues/317)** 
+* How to use async / await with Dexie.
 * How to create something similar to navigation properties on entities.
 
 ## Install
@@ -20,7 +20,7 @@ npm run build
 ```
 npm install -g http-server
 http-server . -a localhost -p 8081
-Surf to http://localhost:8081/app.html
+Surf to http://localhost:8081/src/app.html
 ```
 
 # The app

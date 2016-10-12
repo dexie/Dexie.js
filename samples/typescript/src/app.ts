@@ -1,14 +1,9 @@
-﻿// DISCLAIMBER: This sample won't work with Typescript 2.0. Async / await is not encouraged any longer when using
-// indexedDB in any library due to the incompability between IndexedDB and native Promise in Firefox, Safari and
-// Edge browsers. See https://github.com/dfahlander/Dexie.js/issues/315
-
+﻿
 import Dexie from 'dexie';
 import Console from './console';
 import {db,Contact} from './appdb';
 
-const Promise = Dexie.Promise, // KEEP! (or loose transaction safety in await calls!)
-      all = Promise.all,
-      console = new Console(); // So that you dont have to press F12...
+const console = new Console(); // So that you dont have to press F12...
 
 document.addEventListener('DOMContentLoaded', async function () {
     
@@ -31,7 +26,7 @@ document.addEventListener('DOMContentLoaded', async function () {
         console.log("Clearing database...");
         //await db.delete();
         //await db.open();
-        await all(db.contacts.clear(), db.emails.clear(), db.phones.clear());
+        await Promise.all([db.contacts.clear(), db.emails.clear(), db.phones.clear()]);
         
         await haveSomeFun();
     } catch (ex) {
@@ -111,7 +106,7 @@ async function printContacts() {
 
         // Resolve array properties 'emails' and 'phones'
         // on each and every contact:
-        await all (contacts.map(contact => contact.loadNavigationProperties()));
+        await Promise.all (contacts.map(contact => contact.loadNavigationProperties()));
 
         return contacts;
     });
