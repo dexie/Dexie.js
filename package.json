@@ -1,6 +1,6 @@
 {
   "name": "dexie",
-  "version": "1.5.0-rc",
+  "version": "1.5.0-rc.2",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "jsnext:main": "dist/dexie.es6.js",
