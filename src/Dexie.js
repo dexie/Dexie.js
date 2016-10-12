@@ -2086,7 +2086,7 @@ export default function Dexie(dbName, options) {
                         req.onsuccess = readingHook === mirror ?
                             eventSuccessHandler(resolve) :
                             wrap(eventSuccessHandler(res => {
-                                try {resolve (res.map(readingHook));} catch(e) {reject(e);};
+                                try {resolve (res.map(readingHook));} catch(e) {reject(e);}
                             }));
                     } else {
                         // Getting array through a cursor.
