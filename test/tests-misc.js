@@ -137,3 +137,46 @@ asyncTest("Issue: Broken Promise rejection #264", 1, function () {
         start();
     });
 });
+
+asyncTest ("#323 @gitawego's post. Should not fail unexpectedly on readonly properties", function(){
+    class Foo {
+        get synced() { return false;}
+    }
+
+    db.foo.mapToClass(Foo);
+    
+    db.transaction('rw', db.foo, function () {
+      db.foo.put({id:1});
+      db.foo.where('id').equals(1).modify({
+        synced: true
+      });
+    }).catch (e => {
+        ok(false, "Could not update it: " + (e.stack || e));
+    }).then (() => {
+        ok(true, "Could update it");
+        return db.foo.get(1);
+    }).then (foo => {
+        return db.foo.get(1);        
+    }).then (foo=>{
+        console.log("Wow, it could get it even though it's mapped to a class that forbids writing that property.");
+    }).catch(e => {
+        ok(true, `Got error from get: ${e.stack || e}`);
+    }).then(() => {
+        return db.foo.toArray();
+    }).then(array => {
+        console.log(`Got array of length: ${array.length}`);
+    }).catch(e => {
+        ok(true, `Got error from toArray: ${e.stack || e}`);
+        return db.foo.each(item => console.log(item));
+    }).then(array => {
+        console.log(`Could do each`);
+    }).catch(e => {
+        ok(true, `Got error from each(): ${e.stack || e}`);
+        return db.foo.toCollection().sortBy('synced');
+    }).then(array => {
+        console.log(`Could do sortBy`);
+    }).catch(e => {
+        ok(true, `Got error from sortBy(): ${e.stack || e}`);
+    }).finally(start);
+    
+});

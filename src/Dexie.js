@@ -924,9 +924,9 @@ export default function Dexie(dbName, options) {
                 fake && resolve(self.schema.instanceTemplate);
                 var req = idbstore.get(key);
                 req.onerror = eventRejectHandler(reject);
-                req.onsuccess = function () {
+                req.onsuccess = wrap(function () {
                     resolve(self.hook.reading.fire(req.result));
-                };
+                }, reject);
             }).then(cb);
         },
         where: function (indexName) {
@@ -984,7 +984,7 @@ export default function Dexie(dbName, options) {
                 // Create a new object that derives from constructor:
                 var res = Object.create(constructor.prototype);
                 // Clone members:
-                for (var m in obj) if (hasOwn(obj, m)) res[m] = obj[m];
+                for (var m in obj) if (hasOwn(obj, m)) try {res[m] = obj[m];} catch(_){}
                 return res;
             };
 
@@ -2086,7 +2086,7 @@ export default function Dexie(dbName, options) {
                         req.onsuccess = readingHook === mirror ?
                             eventSuccessHandler(resolve) :
                             wrap(eventSuccessHandler(res => {
-                                resolve (res.map(readingHook));
+                                try {resolve (res.map(readingHook));} catch(e) {reject(e);};
                             }));
                     } else {
                         // Getting array through a cursor.
