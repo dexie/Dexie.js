@@ -146,8 +146,81 @@ db.transaction('rw', db.friends, function*() {
 ```
 *NOTE: db.transaction() will treat generator functions (function * ) so that it is possible to use `yield` for consuming promises. [Yield can be used outside transactions as well](https://github.com/dfahlander/Dexie.js/wiki/Simplify-with-yield).*
 
-#### async await
-ES7 async await can be used with Dexie promises, but not within transactions. The reason is that indexedDB and native Promise does not play in any browser other than chromium based. The TC39 group has tied the new async/await algorithms hard to native Promises. Together this makes it incompatible with IndexedDB as of September 2016. See [Issue 317](https://github.com/dfahlander/Dexie.js/issues/317).
+#### Hello World (ES2016 / ES7)
+```js
+import Dexie from 'dexie';
+
+//
+// Declare Database
+//
+var db = new Dexie("FriendDatabase");
+db.version(1).stores({ friends: "++id,name,age" });
+
+db.transaction('rw', db.friends, async() => {
+
+    // Make sure we have something in DB:
+    if ((await db.friends.where('name').equals('Josephine').count()) === 0) {
+        let id = await db.friends.add({name: "Josephine", age: 21});
+        alert (`Addded friend with id ${id}`);
+    }
+    
+    // Query:
+    let youngFriends = await db.friends.where("age").below(25).toArray();
+        
+    // Show result:
+    alert ("My young friends: " + JSON.stringify(youngFriends));
+    
+}).catch(e => {
+    alert(e.stack || e);
+});
+
+```
+
+#### Hello World (Typescript)
+
+```js
+import Dexie from 'dexie';
+
+interface IFriend {
+    id?: number;
+    name?: string;
+    age?: number;
+}
+
+//
+// Declare Database
+//
+class FriendDatabase extends Dexie {
+    friends: Dexie.Table<IFriend,number>;
+    
+    constructor() {
+        super("FriendDatabase");
+        this.version(1).stores({
+            friends: "++id,name,age"
+        });
+    }
+}
+
+var db = new FriendDatabase();
+
+db.transaction('rw', db.friends, async() => {
+
+    // Make sure we have something in DB:
+    if ((await db.friends.where('name').equals('Josephine').count()) === 0) {
+        let id = await db.friends.add({name: "Josephine", age: 21});
+        alert (`Addded friend with id ${id}`);
+    }
+    
+    // Query:
+    let youngFriends = await db.friends.where("age").below(25).toArray();
+        
+    // Show result:
+    alert ("My young friends: " + JSON.stringify(youngFriends));
+    
+}).catch(e => {
+    alert(e.stack || e);
+});
+```
 
 Samples
 -------

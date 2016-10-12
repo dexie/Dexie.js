@@ -25,7 +25,8 @@
   },
   "homepage": "https://github.com/dfahlander/Dexie.js#readme",
   "dependencies": {
-    "dexie": "1.x"
+    "dexie": "2.0.0-beta.2",
+    "typescript": "^2.1.0-dev.20161012"
   },
   "devDependencies": {
     "babel-cli": "^6.6.0",
