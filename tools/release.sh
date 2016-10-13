@@ -103,7 +103,7 @@ rm -rf dist/*.gz
 git add -A --no-ignore-removal -f dist/ 2>/dev/null
 git add -A --no-ignore-removal -f addons/*/dist/ 2>/dev/null
 git add -A --no-ignore-removal -f test/bundle.js 2>/dev/null
-git add -A --no-ignore-removal -f node_modules/babel-polyfill/dist/ 2>/dev/null
+#git add -A --no-ignore-removal -f node_modules/babel-polyfill/dist/ 2>/dev/null
 
 # Commit all changes (still locally)
 git commit -am "Build output" 2>/dev/null
