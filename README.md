@@ -178,6 +178,8 @@ db.transaction('rw', db.friends, async() => {
 
 #### Hello World (Typescript)
 
+*This sample requires using Dexie v2, `npm install dexie@^2.0.0-beta`*
+
 ```js
 import Dexie from 'dexie';
 
@@ -239,18 +241,19 @@ Website
 Install over npm
 ----------------
 ```
-npm install dexie
+npm install dexie@^2.0.0-beta
 ```
+
 
 Download
 --------
 For those who don't like package managers, here's the download links:
 
-https://unpkg.com/dexie/dist/dexie.min.js
+https://unpkg.com/dexie@^2.0.0-beta/dist/dexie.js
 
-https://unpkg.com/dexie/dist/dexie.min.js.map
+https://unpkg.com/dexie@^2.0.0-beta/dist/dexie.js.map
 
-https://unpkg.com/dexie/dist/dexie.d.ts
+https://unpkg.com/dexie@^2.0.0-beta/dist/dexie.d.ts
 
 
 Contributing
