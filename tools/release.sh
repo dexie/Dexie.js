@@ -38,11 +38,11 @@ validate_semver $next_version
 
 if echo "$next_version" | grep -q "-"; then
 	NPMTAG="next$master_suffix"
-    echo "Will use: npm publish --tag $NPMTAG"
 else
 	NPMTAG="latest$master_suffix"
-    echo "Will use: npm publish without any tag (production publish)"
 fi
+
+echo "Will use: npm publish --tag $NPMTAG"
 
 next_ref="v$next_version"
 
@@ -113,11 +113,7 @@ git push origin master$master_suffix:releases$master_suffix --follow-tags
 
 printf "Successful push to master$master_suffix:releases$master_suffix\n\n"
 
-if [ "$TAG" = "latest" ]; then
-	npm publish
-else
-  npm publish --tag $NPMTAG
-fi
+npm publish --tag $NPMTAG
 
 printf "Successful publish to npm.\n\n"
 
