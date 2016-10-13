@@ -151,7 +151,7 @@ db.transaction('rw', db.friends, function*() {
 If you to use async and await, you should install Dexie v2:
 
 ```
-npm install dexie@2.0.0-beta.2
+npm install dexie@^2.0.0-beta
 ```
 
 
