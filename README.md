@@ -147,7 +147,13 @@ db.transaction('rw', db.friends, function*() {
 *NOTE: db.transaction() will treat generator functions (function * ) so that it is possible to use `yield` for consuming promises. [Yield can be used outside transactions as well](https://github.com/dfahlander/Dexie.js/wiki/Simplify-with-yield).*
 
 #### async await
-ES7 async await can be used with Dexie promises, but not within transactions. The reason is that indexedDB and native Promise does not play in any browser other than chromium based. The TC39 group has tied the new async/await algorithms hard to native Promises. Together this makes it incompatible with IndexedDB as of September 2016. See [Issue 317](https://github.com/dfahlander/Dexie.js/issues/317).
+
+If you need to use async and await, install Dexie v2:
+
+```
+npm install dexie@^2.0.0-beta
+```
+
 
 Samples
 -------
