@@ -192,7 +192,7 @@ declare module Dexie {
         tables: { [type: string]: Table<any, any> };
         storeNames: Array<string>;
         on: {
-            (eventName: string, subscriber: () => any): void;
+            (eventName: string, subscriber: (...args:any[]) => any): void;
             (eventName: 'complete', subscriber: () => any): void;
             (eventName: 'abort', subscriber: () => any): void;
             (eventName: 'error', subscriber: (error:any) => any): void;
@@ -207,9 +207,9 @@ declare module Dexie {
     }
 
     interface DexieEvent {
-        subscribe(fn: () => any): void;
-        unsubscribe(fn: () => any): void;
-        fire(): any;
+        subscribe(fn: (...args:any[]) => any): void;
+        unsubscribe(fn: (...args:any[]) => any): void;
+        fire(...args:any[]): any;
     }
 
     interface DexieErrorEvent {
@@ -234,7 +234,11 @@ declare module Dexie {
         name: string;
         schema: TableSchema;
         hook: {
-            (eventName: string, subscriber: () => any): void;
+            (eventName: string, subscriber: (...args:any[]) => any): void;
+            (eventName: 'creating', subscriber: (primKey:Key, obj:T, transaction:Transaction) => any): void;
+            (eventName: 'reading', subscriber: (obj:T) => T | any): void;
+            (eventName: 'updating', subscriber: (modifications:Object, primKey:Key, obj:T, transaction:Transaction) => any): void;
+            (eventName: 'deleting', subscriber: (primKey:Key, obj:T, transaction:Transaction) => any): void;
             creating: DexieEvent;
             reading: DexieEvent;
             updating: DexieEvent;
