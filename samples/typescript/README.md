@@ -1,14 +1,14 @@
-﻿# Sample - Using Dexie.js with Typescript.
+﻿# Sample - Using Dexie.js with typescript 2.1 and async / await
 
 This is a sample on how to use Dexie.js with Typescript and babel. The following features are shown:
 
 * How to subclass Dexie and define tables in a type-safe manner.
 * How to create an entity with Dexie.
-* How to use async / await with Dexie.
+* How to use async / await within Dexie transactions.
 * How to create something similar to navigation properties on entities.
+* Compile directly to ES5 with just typescript 2.1 and rollup (no babel).
 
 ## Install
-Start a root / admin shell and write:
 ```
 npm install
 ```
