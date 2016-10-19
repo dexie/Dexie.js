@@ -9,7 +9,9 @@ This is a sample on how to use Dexie.js with Typescript and babel. The following
 
 ## Install
 Start a root / admin shell and write:
-sudo npm install  (on windows, run "npm install" as admin in this directory)
+```
+npm install
+```
 
 ## Build
 ```
@@ -18,10 +20,9 @@ npm run build
 
 ## Run
 ```
-npm install -g http-server
-http-server . -a localhost -p 8081
-Surf to http://localhost:8081/src/app.html
+npm test
 ```
+Surf to http://localhost:8081/src/app.html
 
 # The app
 The application stores a simple contact database using a relational database model, where each contact can have
@@ -34,9 +35,3 @@ The tables are mapped to typescript classes and interfaces.
 The sample shows how to subclass Dexie in typescript and define the tables.
 
 It also shows how to map a typescript class to a database table and call methods on database objects.
-
-# The build system
-npm run build will transpile the code in three steps:
-1. tsc      (typescript -&gt; es6)
-2. babel    (es6 -&gt; es5 commonJs)
-3. webpack  (commonJS -&gt; plain monolit minified js)
