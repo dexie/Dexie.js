@@ -1,7 +1,7 @@
 {
     "compilerOptions": {
         "module": "es6",
-        "target": "es6",
+        "target": "es5",
         "noImplicitAny": true,
         "removeComments": false,
         "sourceMap": true,
@@ -9,6 +9,7 @@
         "moduleResolution": "node"
     },
     "files": [
+        "node_modules/typescript/lib/lib.es6.d.ts",
         "src/console.ts",
         "src/appdb.ts",
         "src/app.ts"
