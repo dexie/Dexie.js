@@ -1,6 +1,6 @@
-﻿# Sample - Using Dexie.js with typescript 2.1 and async / await
+﻿# Sample - Using Dexie.js with Typescript 2.1
 
-This is a sample on how to use Dexie.js with Typescript. The following features are shown:
+This is a sample on how to use Dexie.js with Typescript 2.1. The following features are shown:
 
 * How to subclass Dexie and define tables in a type-safe manner.
 * How to create an entity with Dexie.
