@@ -1,4 +1,5 @@
 ﻿# Sample - Using Dexie.js with Typescript 2.1
+*NOTE: This sample requires beta versions of Dexie and Typescript. If you prefer stable packages, see [typescript-simple](https://github.com/dfahlander/Dexie.js/tree/master/samples/typescript-simple)*
 
 This is a sample on how to use Dexie.js with Typescript 2.1. The following features are shown:
 
