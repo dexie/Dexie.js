@@ -52,8 +52,24 @@ asyncTest("Should be able to use native async await", function() {
             ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of Dexie.Promise");
             await window.Promise.resolve();
             ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of global Promise");
-            await (async ()=>{})();
-            ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of native Promise");
+            await db.transaction('r', db.items, async() => {
+                return await db.items.get(1);
+            });
+            ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of sub transaction");
+            await (async ()=>{
+                return await db.items.get(1);
+            })();
+            ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of async function");
+            await (async ()=>{
+                await Promise.all([db.transaction('r', db.items, async() => {
+                    await db.items.get(1);
+                    await db.items.get(2);
+                }), db.transaction('r', db.items, async() => {
+                    return await db.items.get(1);
+                })]);
+            })();
+            ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of async function 2");
+
             await window.Promise.resolve().then(()=>{
                 ok(Dexie.currentTransaction === trans, "Transaction persisted after window.Promise.resolve().then()");
                 return (async ()=>{})(); // Resolve with native promise
@@ -109,7 +125,7 @@ asyncTest("Must not leak PSD zone", function() {
             function promiseFlow () {
                 return NativePromise.resolve().then(()=>{
                     if(Dexie.currentTransaction !== null) ok(false, "PSD zone leaked");
-                    return NativePromise.resolve();
+                    return new NativePromise(resolve => NativePromise.resolve().then(resolve));
                 });
             };
             otherZonePromise = promiseFlow();
@@ -124,13 +140,13 @@ asyncTest("Must not leak PSD zone", function() {
             // Make sure native async functions maintains the zone:
             let f = new Function('ok', 'equal', 'Dexie', 'trans', 'hiddenDiv', 'mutationObserverPromise','NativePromise',
             `return (async ()=>{
-                ok(Dexie.currentTransaction === trans, "Still same transaction 2");
-                await NativePromise.resolve();
-                ok(Dexie.currentTransaction === trans, "Still same transaction 3");
+                ok(Dexie.currentTransaction === trans, "Still same transaction 1.1");
+                await Promise.resolve();
+                ok(Dexie.currentTransaction === trans, "Still same transaction 1.2");
                 await Dexie.Promise.resolve();
-                ok(Dexie.currentTransaction === trans, "Still same transaction 4");
+                ok(Dexie.currentTransaction === trans, "Still same transaction 1.3");
                 await window.Promise.resolve();
-                ok(Dexie.currentTransaction === trans, "Still same transaction 5");
+                ok(Dexie.currentTransaction === trans, "Still same transaction 1.4");
                 hiddenDiv.setAttribute('i', '1'); // Trigger mutation observer
                 return mutationObserverPromise;
             })()`);
@@ -143,18 +159,18 @@ asyncTest("Must not leak PSD zone", function() {
                 ok(true, `This browser does not support native async functions`);
         }).then(()=>{
             // NativePromise
-            ok(Dexie.currentTransaction === trans, "Still same transaction");
+            ok(Dexie.currentTransaction === trans, "Still same transaction 2");
             return Promise.resolve();
         }).then(()=>{
             // window.Promise
-            ok(Dexie.currentTransaction === trans, "Still same transaction");
+            ok(Dexie.currentTransaction === trans, "Still same transaction 3");
             return Dexie.Promise.resolve();
         }).then(()=>{
             // Dexie.Promise
-            ok(Dexie.currentTransaction === trans, "Still same transaction");
+            ok(Dexie.currentTransaction === trans, "Still same transaction 4");
             return otherZonePromise; // wait for the foreign zone promise to complete.
         }).then(()=>{
-            ok(Dexie.currentTransaction === trans, "Still same transaction");
+            ok(Dexie.currentTransaction === trans, "Still same transaction 5");
         });
     }).catch(e => {
         ok(false, `Error: ${e.stack || e}`);
