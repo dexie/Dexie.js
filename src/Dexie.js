@@ -426,7 +426,7 @@ export default function Dexie(dbName, options) {
             }
             return dbReadyPromise.then(()=>tempTransaction(mode, storeNames, fn));
         } else {
-            var trans = db._createTransaction(mode, storeNames, globalSchema);
+            var trans = db._createTransaction(mode, storeNames, globalSchema).create();
             return trans._promise(mode, function (resolve, reject) {
                 newScope(function () { // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
                     PSD.trans = trans;
@@ -901,6 +901,7 @@ export default function Dexie(dbName, options) {
             var trans = PSD.trans;
             return trans && trans.db === db ?
                 trans._promise (mode, fn, writeLocked) :
+                //trans._lock (writeLocked, mode, fn, writeLocked) :
                 tempTransaction (mode, [this.name], fn);
         },
         _idbstore: function getIDBObjectStore(mode, fn, writeLocked) {
@@ -1401,6 +1402,7 @@ export default function Dexie(dbName, options) {
             return this._reculock && PSD.lockOwnerFor !== this;
         },
         create: function (idbtrans) {
+            if (!this.mode) return this;
             assert(!this.idbtrans);
             if (!idbtrans && !idbdb) {
                 switch (dbOpenError && dbOpenError.name) {
@@ -1444,7 +1446,6 @@ export default function Dexie(dbName, options) {
                     p = self.active ? new Promise(function (resolve, reject) {
                         if (mode === READWRITE && self.mode !== READWRITE)
                             throw new exceptions.ReadOnly("Transaction is readonly");
-                        if (!self.idbtrans && mode) self.create();
                         if (bWriteLock) self._lock(); // Write lock if write operation is requested
                         fn(resolve, reject, self);
                     }) : rejection(new exceptions.TransactionInactive());
