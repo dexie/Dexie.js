@@ -15,7 +15,9 @@ var dexieErrorNames = [
     'SubTransaction',
     'Unsupported',
     'Internal',
-    'DatabaseClosed'
+    'DatabaseClosed',
+    'PrematureCommit',
+    'ForeignAwait'
 ];
 
 var idbDomErrorNames = [

@@ -40,7 +40,7 @@ import {
 
 } from './utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
-import Promise, {wrap, PSD, newScope, usePSD, rejection} from './Promise';
+import Promise, {wrap, PSD, newScope, usePSD, rejection, AsyncFunction} from './Promise';
 import Events from './Events';
 import {
     nop,
@@ -787,8 +787,9 @@ export default function Dexie(dbName, options) {
                 // Let the transaction instance be part of a Promise-specific data (PSD) value.
                 var zoneProps = {
                     trans: trans,
-                    transless: transless
-                };                
+                    transless: transless,
+                    id: PSD.id + '.follow'
+                };
 
                 if (parentTransaction) {
                     // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
@@ -797,21 +798,34 @@ export default function Dexie(dbName, options) {
                     trans.create(); // Create the backend transaction so that complete() or error() will trigger even if no operation is made upon it.
                 }
                 
+                if (scopeFunc instanceof AsyncFunction || scopeFunc.isAsync) {
+                    if (!PSD.task) zoneProps.task = {count: 100, cancelled: false};
+                    zoneProps.onforeign = ()=>{throw new exceptions.ForeignAwait("Non-indexedDB task was awaited");};
+                }
+
                 var returnValue;
-                return Promise.follow(()=>{
+                var promiseFollowed = Promise.follow(()=>{
                     // Finally, call the scope function with our table and transaction arguments.
-                    returnValue = scopeFunc.call(trans, trans); // NOTE: returnValue is used in trans.on.complete() not as a returnValue to this func.
+                    //PSD.task.count = 100;
+                    returnValue = scopeFunc.call(trans, trans);
                     if (returnValue) {
                         if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
                             // scopeFunc returned an iterator with throw-support. Handle yield as await.
                             returnValue = awaitIterator(returnValue);
                         }
                     }
-                }, zoneProps).then(()=>{
-                    if (parentTransaction) trans._resolve(); // sub transactions don't react to idbtrans.oncomplete. We must trigger a acompletion.
-                    return trans._completion; // Even if WE believe everything is fine. Await IDBTransaction's oncomplete or onerror as well.
-                }).then(()=>{
-                    return returnValue;
+                }, zoneProps);
+                return Promise.resolve(returnValue).then(x => {
+                    if (PSD.task) {
+                        PSD.task.count = 0; // Cancel zone keeper.
+                        PSD.task.cancelled = true;
+                    }
+                    if (!trans.active)
+                        throw new exceptions.PrematureCommit("Transaction committed too early");
+
+                    return promiseFollowed.then(()=>{
+                        if (parentTransaction) trans._resolve(); // sub transactions don't react to idbtrans.oncomplete. We must trigger a acompletion.
+                    }).then(()=>trans._completion).then(()=>x);
                 }).catch (e => {
                     trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
                     return rejection(e);

@@ -52,8 +52,15 @@ asyncTest("Should be able to use native async await", function() {
             ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of Dexie.Promise");
             await window.Promise.resolve();
             ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of global Promise");
-            await db.transaction('r', db.items, async() => {
-                return await db.items.get(1);
+            await 3;
+            ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of primitive(!)");
+            await db.transaction('r', db.items, async innerTrans => {
+                ok(!!innerTrans, "SHould have inner transaction");
+                equal(Dexie.currentTransaction, innerTrans, "Inner transaction should be there");
+                equal(innerTrans.parent, trans, "Parent transaction should be correct");
+                let x = await db.items.get(1);
+                ok(Dexie.currentTransaction === innerTrans, "Transaction persisted in inner transaction");
+                console.log(">>Last line in sub transaction");
             });
             ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of sub transaction");
             await (async ()=>{
@@ -107,16 +114,10 @@ const NativePromise = (()=>{
 })();
 
 asyncTest("Must not leak PSD zone", function() {
-    ok(Dexie.currentTransaction === null, "Should not have an ongoing transaction to start with")
-    let hiddenDiv = document.createElement("div");
-    let mutationObserverPromise = new Promise(resolve=>{
-        (new MutationObserver(() => {
-            ok(Dexie.currentTransaction === null, "Must not leak zones in patched await microtasks");
-            resolve();
-        })).observe(hiddenDiv, { attributes: true });
-    });
-    
-    db.transaction('rw', db.items, ()=>{
+    ok(Dexie.currentTransaction === null, "Should not have an ongoing transaction to start with");
+
+    function TheAsyncFunction () 
+    {
         let trans = Dexie.currentTransaction;
         ok(trans !== null, "Should have a current transaction");
         let otherZonePromise;
@@ -138,19 +139,18 @@ asyncTest("Must not leak PSD zone", function() {
         return NativePromise.resolve().then(()=> {
             ok(Dexie.currentTransaction === trans, "Still same transaction 1");
             // Make sure native async functions maintains the zone:
-            let f = new Function('ok', 'equal', 'Dexie', 'trans', 'hiddenDiv', 'mutationObserverPromise','NativePromise',
+            let f = new Function('ok', 'equal', 'Dexie', 'trans','NativePromise',
             `return (async ()=>{
                 ok(Dexie.currentTransaction === trans, "Still same transaction 1.1");
+                debugger;
                 await Promise.resolve();
                 ok(Dexie.currentTransaction === trans, "Still same transaction 1.2");
                 await Dexie.Promise.resolve();
                 ok(Dexie.currentTransaction === trans, "Still same transaction 1.3");
                 await window.Promise.resolve();
                 ok(Dexie.currentTransaction === trans, "Still same transaction 1.4");
-                hiddenDiv.setAttribute('i', '1'); // Trigger mutation observer
-                return mutationObserverPromise;
             })()`);
-            return f(ok, equal, Dexie, trans, hiddenDiv, mutationObserverPromise, NativePromise);
+            return f(ok, equal, Dexie, trans, NativePromise);
         }).catch (e => {
             // Could not test native async functions in this browser.
             if (hasNativeAsyncFunctions)
@@ -172,6 +172,11 @@ asyncTest("Must not leak PSD zone", function() {
         }).then(()=>{
             ok(Dexie.currentTransaction === trans, "Still same transaction 5");
         });
+    }
+    TheAsyncFunction.isAsync = true;
+    debugger;
+    db.transaction('rw', db.items, TheAsyncFunction).then(()=>{
+        debugger;
     }).catch(e => {
         ok(false, `Error: ${e.stack || e}`);
     }).then(start);
