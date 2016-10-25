@@ -1464,14 +1464,17 @@ export default function Dexie(dbName, options) {
                         if (rv && rv.then) rv.then(resolve, reject);
                     });
                     p.finally(()=>this._unlock());
+                    p._lib = true;
                     return p;
                 });
 
             } else {
-                return new Promise((resolve, reject) => {
+                var p = new Promise((resolve, reject) => {
                     var rv = fn(resolve, reject, this);
                     if (rv && rv.then) rv.then(resolve, reject);
                 });
+                p._lib = true;
+                return p;
             }
         },
 
