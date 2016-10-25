@@ -428,9 +428,9 @@ export default function Dexie(dbName, options) {
         } else {
             var trans = db._createTransaction(mode, storeNames, globalSchema).create();
             return trans._promise(mode, function (resolve, reject) {
-                newScope(function () { // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
+                return newScope(function () { // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
                     PSD.trans = trans;
-                    fn(resolve, reject, trans);
+                    return fn(resolve, reject, trans);
                 });
             }).then(result => {
                 // Instead of resolving value directly, wait with resolving it until transaction has completed.
@@ -915,7 +915,6 @@ export default function Dexie(dbName, options) {
             var trans = PSD.trans;
             return trans && trans.db === db ?
                 trans._promise (mode, fn, writeLocked) :
-                //trans._lock (writeLocked, mode, fn, writeLocked) :
                 tempTransaction (mode, [this.name], fn);
         },
         _idbstore: function getIDBObjectStore(mode, fn, writeLocked) {
@@ -1251,7 +1250,6 @@ export default function Dexie(dbName, options) {
                 // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
                 obj = deepClone(obj);
                 return this._trans(READWRITE, (resolve, reject) => {
-                    debugger;
                     return this.where(":id").equals(effectiveKey).modify(function () {
                         // Replace extisting value with our object
                         // CRUD event firing handled in Collection.modify()
