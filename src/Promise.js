@@ -1,4 +1,4 @@
-import {doFakeAutoComplete, tryCatch, props,
+import {doFakeAutoComplete, tryCatch, props, override,
         setProp, _global, getPropertyDescriptor, getArrayOf, extend} from './utils';
 import {nop, callBoth, mirror} from './chaining-functions';
 import {debug, prettyStack, getErrorWithStack} from './debug';
@@ -55,7 +55,12 @@ const
     resolvedGlobalPromise = _global.Promise && _global.Promise.resolve(),
     nativePromiseThen = nativePromiseProto && nativePromiseProto.then;
 
-export const AsyncFunction = nativePromiseInstanceAndProto[2];
+export const NativePromise = resolvedNativePromise.constructor;
+export const AsyncFunction = nativePromiseInstanceAndProto[2]; // TODO: Remove.
+export const task = { awaits: 0, count: 0, id: 0}; 
+var taskCounter = 0;
+var bStackIsEmpty = true;
+var zoneStack = [];
     
 var stack_being_generated = false;
 
@@ -243,7 +248,8 @@ function Listener(onFulfilled, onRejected, resolve, reject, zone) {
 // Promise Static Properties
 props (Promise, {
     all: function () {
-        var values = getArrayOf.apply(null, arguments); // Supports iterables, implicit arguments and array-like.
+        var values = getArrayOf.apply(null, arguments) // Supports iterables, implicit arguments and array-like.
+            .map(onPossibleParallellAsync); // Handle parallell async/awaits 
         return new Promise(function (resolve, reject) {
             if (values.length === 0) resolve([]);
             var remaining = values.length;
@@ -265,7 +271,7 @@ props (Promise, {
     reject: PromiseReject,
     
     race: function () {
-        var values = getArrayOf.apply(null, arguments);
+        var values = getArrayOf.apply(null, arguments).map(onPossibleParallellAsync);
         return new Promise((resolve, reject) => {
             values.map(value => Promise.resolve(value).then(resolve, reject));
         });
@@ -613,7 +619,6 @@ export function newScope (fn, props, a1, a2) {
     return rv;
 }
 
-var bStackIsEmpty = true;
 var _spaces = '';
 function spaces(bEnteringZone) {
     if (bEnteringZone) _spaces = _spaces + "  ";
@@ -622,76 +627,61 @@ function spaces(bEnteringZone) {
     return rv;
 }
 
-function switchToZoneAsync(targetZone, bEnteringZone, expectedLeaveZone) {
-    bStackIsEmpty = true; // To detect possible native await calls in 'then' method.
-    if (targetZone === PSD) return console.log(`${bEnteringZone ? '>>' : '<<'} same-same: ${targetZone.id}`);
-    if (targetZone.ref > 0) {
-        if (bEnteringZone) {
-            console.log(`${spaces(bEnteringZone)}>>Entering zone ${targetZone.id} ${targetZone.trans ? targetZone.trans.parent ? '(subtrans)': '(roottrans)' : '(notrans)' }. OuterZone was: ${PSD.id}`);
-        } else {
-            //if (expectedLeaveZone !== PSD) console.log(`Expected to leave ${expectedLeaveZone.id} but now leaving ${PSD.id}`);
-            console.log(`${spaces(bEnteringZone)}<<Leaving zone ${PSD.id}. OuterZone will be: ${targetZone.id}`);
-        }
-        var task = targetZone.task;
-        if (bEnteringZone) {
-            if (task && task.cancelled) {
-                console.log("Zone-keeping was cancelled. Refcount: " + targetZone.ref); // Zone-keeping cancelled.
-                --targetZone.ref || targetZone.finalize(); // if ref reaches zero, call finalize();
-                task.cancelled = false;
-                return;
-            }
-            if (!task || task.count <= 0) {
-                console.log("No task thingie");
-                return;
-            }
-            if (--task.count <= 0) {
-                console.log("Too many times");
-                --targetZone.ref || targetZone.finalize(); // if ref reaches zero, call finalize();
-                return targetZone.onforeign && targetZone.onforeign(); // Foreign async call has occurred.
-            }
-            switchToZone(targetZone, true, true, expectedLeaveZone);
-        } else {
-            task = expectedLeaveZone.task;
-            if (!task || task.count > 0) {
-                switchToZone(targetZone, false, true, expectedLeaveZone);    
-            } else {
-                console.log("Zone-keeping was cancelled (leaving). Refcount: " + expectedLeaveZone.ref); // Zone-keeping cancelled.
-            }
-            --expectedLeaveZone.ref || expectedLeaveZone.finalize(); // if ref reaches zero, call finalize();
-        }
-    } else {
-        if (bEnteringZone) {
-            console.log(`${spaces(bEnteringZone)}>>Would enter zone ${targetZone.id} ${targetZone.trans ? targetZone.trans.parent ? '(subtrans)': '(roottrans)' : '(notrans)' }. OuterZone was: ${PSD.id}`);
-        } else {
-            console.log(`${spaces(bEnteringZone)}<<Would leave zone ${PSD.id}. OuterZone would be: ${targetZone.id}`);
-        }
-    }
-    bStackIsEmpty = true; // To detect possible native await calls in 'then' method.
+// Function to call before transaction scopeFunc is called.
+export function ensureTaskStarted() {
+    if (!task.id) task.id = ++taskCounter;
+    ++task.echoes; // Will be 1 by default.
 }
 
-function switchToZone (targetZone, bEnteringZone, nolog, expectedLeaveZone) {
+// Function to call if scopeFunc returns NativePromise
+// Also for each NativePromise in the arguments to Promise.all()
+export function incrementExpectedAwaits() {
+    if (!task.id) task.id = ++taskCounter;
+    task.echoes += 10;
+    ++task.awaits;
+    return task.id;
+}
+// Function to call when 'then' calls back on a native promise where onAwaitExpected() had been called.
+// Also call this when a native await calls then method on a promise. In that case, don't supply
+// sourceTaskId because we already know it refers to current task.
+export function decrementEspectedAwaits(sourceTaskId) {
+    if (sourceTaskId && sourceTaskId !== task.id) return;
+    if (--task.awaits === 0) {task.id = 0; task.echoes = 0;}
+    if (task.echoes > 10) task.echoes -= 10;
+}
+
+// Call from Promise.all() and Promise.race()
+export function onPossibleParallellAsync (possiblePromise) {
+    if (task.echoes && (possiblePromise instanceof NativePromise)) {
+        var taskId = incrementExpectedAwaits();
+        return possiblePromise.then(x => (decrementEspectedAwaits(taskId), x));
+    }
+    return possiblePromise;
+}
+
+function pushZone(targetZone) {
+    if (!task.echoes || --task.echoes === 0) {task.awaits = 0; task.id = 0};
+    console.log(`${spaces(true)}>> ${PSD.id} --> ${targetZone.id}`);
+    zoneStack.push(targetZone);
+    switchToZone(targetZone);
+    bStackIsEmpty = true;
+}
+
+function popZone() {
+    var zone = zoneStack.pop();
+    console.log(`${spaces(false)}<< ${PSD.id} --> ${targetZone.id}`);
+    switchToZone(zone);
+    bStackIsEmpty = true;
+}
+
+function switchToZone (targetZone, bEnteringZone) {
     bStackIsEmpty = false; // If not called from switchToZoneAsync, we're called by usePSD or wrap - we are in-stack!
     if (targetZone === PSD) return;
-    if (bEnteringZone && !nolog) {
-        if (targetZone.id == "global" && bEnteringZone) debugger;
-        console.log(`${spaces(bEnteringZone)}--Entering zone ${targetZone.id} ${targetZone.trans ? targetZone.trans.parent ? '(subtrans)': '(roottrans)' : '(notrans)' }. OuterZone was: ${PSD.id}`);
-    } else if (!nolog) {
-        console.log(`${spaces(bEnteringZone)}--Leaving zone ${PSD.id}. OuterZone will be: ${targetZone.id}`);
-    }
     var currentZone = PSD;
-    if (!expectedLeaveZone) expectedLeaveZone = currentZone;
-
-    var task = (bEnteringZone ? targetZone : currentZone).task;
-    if (task) {
-        if (task.count > 0) {
-            if (bEnteringZone) ++targetZone.ref;
-            //if (!bEnteringZone && currentZone.ref === 1) --currentZone.ref || currentZone.finalize(); // if ref reaches zero, call finalize();
-            enqueueNativeMicroTask(()=>{
-                // Enter or leave zone asynchronically as well, so that tasks initiated during current tick
-                // will be surrounded by the zone when they are invoked.
-                switchToZoneAsync(targetZone, bEnteringZone, expectedLeaveZone);
-            });
-        }
+    if (task.awaits && task.echoes) {
+        // Enter or leave zone asynchronically as well, so that tasks initiated during current tick
+        // will be surrounded by the zone when they are invoked.
+        enqueueNativeMicroTask(bEnteringZone ? pushZone.bind(null, targetZone) : popZone); 
     }
 
     PSD = targetZone;
@@ -748,9 +738,8 @@ function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
     return typeof fn !== 'function' ? fn : function () {
         if (fn.toString().indexOf('[native code]') !== -1) console.log("THEN CALLED BACK TO SYSTEM. PossibleAwait: " + possibleAwait);
         var outerZone = PSD;
-        if (possibleAwait && zone.task) {
-            zone.task.count = 100;
-            zone.task.cancelled = false;
+        if (possibleAwait) {
+            incrementExpectedAwaits();
         }
         switchToZone(zone, true);
         try {
@@ -764,10 +753,7 @@ function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
 function getPatchedPromiseThen (origThen, zone) {
     return function (onResolved, onRejected) {
         var possibleAwait = (zone !== PSD || bStackIsEmpty) && !!nativePromiseThen;
-        if (possibleAwait && zone.task) {
-            zone.task.count = 0; // Then was called - stop keeping microtasks in zone.
-            zone.task.cancelled = true;
-        }
+        if (possibleAwait) decrementEspectedAwaits();
         if (onResolved && onResolved.toString().indexOf('[native code]') !== -1) console.log(">>>THEN INVOKED FROM SYSTEM. PossibleAwait: " + possibleAwait + ". bStackIsEmpty: " + bStackIsEmpty + ". zone === PSD: " + (zone === PSD));
         return origThen.call(this,
             nativeAwaitCompatibleWrap(onResolved, zone, possibleAwait),
