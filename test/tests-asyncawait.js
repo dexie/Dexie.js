@@ -50,6 +50,8 @@ asyncTest("Should be able to use native async await", function() {
             ok(!!trans, "Should have a current transaction");
             await db.items.add({id: 'foo'});
             ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of Dexie.Promise");
+            await Dexie.Promise.resolve();
+            ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of Dexie.Promise synch");
             await window.Promise.resolve();
             ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of global Promise");
             await 3;
@@ -114,10 +116,75 @@ const NativePromise = (()=>{
 })();
 
 asyncTest("Must not leak PSD zone", function() {
+
+    let F = new Function('ok','equal', 'Dexie', 'db', `
+        ok(Dexie.currentTransaction === null, "Should not have an ongoing transaction to start with");
+        var trans1, trans2;
+        var p1 = db.transaction('r', db.items, async ()=> {
+            var trans = trans1 = Dexie.currentTransaction;
+            console.log("Before await 3");
+            await 3;
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.0 - after await 3");
+            await 4;
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.0 - after await 4");
+            await 5;
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.0 - after await 5");
+            await db.items.get(1);
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.1 - after db.items.get(1)");
+            await 6;
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.1 - after await 6");
+            await subFunc(1);
+            console.log("subFunc(1): After subFunc() returned. task: " + JSON.stringify(Dexie.Promise.task));
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.2 - after async subFunc()");
+            await Promise.all([subFunc(11), subFunc(12), subFunc(13)]);
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.3 - after Promise.all()");
+            await subFunc2_syncResult();
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.4 - after async subFunc_syncResult()");
+            await Promise.all([subFunc2_syncResult(), subFunc2_syncResult(), subFunc2_syncResult()]);
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.5 - after Promise.all(sync results)");
+        });
+        var p2 = db.transaction('r', db.items, async ()=> {
+            var trans = trans2 = Dexie.currentTransaction;
+            ok(trans1 !== trans2, "Parallell transactions must be different from each other");
+            await 3;
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 2.0 - after await 3");
+            await db.items.get(1);
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 2.1 - after db.items.get(1)");
+            await subFunc(2);
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 2.2 - after async subFunc()");
+            await Promise.all([subFunc(21), subFunc(22), subFunc(23)]);
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 2.3 - after Promise.all()");
+            await subFunc2_syncResult();
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 2.4 - after async subFunc_syncResult()");
+            await Promise.all([subFunc2_syncResult(), subFunc2_syncResult(), subFunc2_syncResult()]);
+            ok(Dexie.currentTransaction === trans, "Should still be in same transaction 2.5 - after Promise.all(sync results)");
+        });
+        //var p2 = Promise.resolve();
+        ok(Dexie.currentTransaction === null, "Should not have an ongoing transaction after transactions");
+
+        async function subFunc(n) {
+            console.log("subFunc("+n+"): before await 3, task: " + JSON.stringify(Dexie.Promise.task));
+            await 3;
+            console.log("subFunc("+n+"): before await db. task: " + JSON.stringify(Dexie.Promise.task));
+            let result = await db.items.get(2);
+            console.log("subFunc("+n+"): After await db. task: " + JSON.stringify(Dexie.Promise.task));
+            return result;
+        }
+
+        async function subFunc2_syncResult() {
+            let result = await 3;
+            return result;
+        }
+        
+        return Promise.all([p1, p2]);
+    `);
+    F(ok, equal, Dexie, db).catch(e => ok(false, e.stack || e)).then(start);
+});
+
+asyncTest("Must not leak PSD zone2", function() {
     ok(Dexie.currentTransaction === null, "Should not have an ongoing transaction to start with");
 
-    function TheAsyncFunction () 
-    {
+    db.transaction('rw', db.items, ()=>{
         let trans = Dexie.currentTransaction;
         ok(trans !== null, "Should have a current transaction");
         let otherZonePromise;
@@ -136,13 +203,12 @@ asyncTest("Must not leak PSD zone", function() {
         });
         // In parallell with the above 2*100 async tasks are being executed and verified,
         // maintain the transaction zone below:
-        return NativePromise.resolve().then(()=> {
+        return Promise.resolve().then(()=> {
             ok(Dexie.currentTransaction === trans, "Still same transaction 1");
             // Make sure native async functions maintains the zone:
             let f = new Function('ok', 'equal', 'Dexie', 'trans','NativePromise',
             `return (async ()=>{
                 ok(Dexie.currentTransaction === trans, "Still same transaction 1.1");
-                debugger;
                 await Promise.resolve();
                 ok(Dexie.currentTransaction === trans, "Still same transaction 1.2");
                 await Dexie.Promise.resolve();
@@ -172,13 +238,31 @@ asyncTest("Must not leak PSD zone", function() {
         }).then(()=>{
             ok(Dexie.currentTransaction === trans, "Still same transaction 5");
         });
-    }
-    TheAsyncFunction.isAsync = true;
-    debugger;
-    db.transaction('rw', db.items, TheAsyncFunction).then(()=>{
-        debugger;
     }).catch(e => {
         ok(false, `Error: ${e.stack || e}`);
+    }).then(start);
+});
+
+asyncTest("Should be able to await Promise.all()", ()=>{
+    (new Function('ok', 'equal', 'Dexie', 'db',
+    `return db.transaction('r', db.items, async (trans)=>{
+        ok(Dexie.currentTransaction === trans, "Correct initial transaction.");
+        await Promise.all([1,2,3, db.items.get(2)]);
+        ok(Dexie.currentTransaction === trans, "Still same transaction 1 - after Promise.all(1,2,3,db.items.get(2))");
+        await Promise.all([subAsync(), 2, 3, subAsync()]);
+        ok(Dexie.currentTransaction === trans, "Still same transaction 2 - after await Promise.all([subAsync(), 2, 3, subAsync()]);");
+        await db.items.get(1);
+        ok(Dexie.currentTransaction === trans, "Still same transaction 3 - after await db.items.get(1);");
+        await 3;
+        ok(Dexie.currentTransaction === trans, "Still same transaction 4 - after await 3;");
+    });
+
+    async function subAsync () {
+        await 1;
+        await db.items.get(77);
+    }`))(ok, equal, Dexie, db)
+    .catch(e => {
+        ok(false, e.stack || e);
     }).then(start);
 });
 
