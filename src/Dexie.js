@@ -426,11 +426,11 @@ export default function Dexie(dbName, options) {
             }
             return dbReadyPromise.then(()=>tempTransaction(mode, storeNames, fn));
         } else {
-            var trans = db._createTransaction(mode, storeNames, globalSchema);
+            var trans = db._createTransaction(mode, storeNames, globalSchema).create();
             return trans._promise(mode, function (resolve, reject) {
-                newScope(function () { // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
+                return newScope(function () { // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
                     PSD.trans = trans;
-                    fn(resolve, reject, trans);
+                    return fn(resolve, reject, trans);
                 });
             }).then(result => {
                 // Instead of resolving value directly, wait with resolving it until transaction has completed.
@@ -508,7 +508,7 @@ export default function Dexie(dbName, options) {
             
             var req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
             if (!req) throw new exceptions.MissingAPI("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
-            req.onerror = wrap(eventRejectHandler(reject));
+            req.onerror = eventRejectHandler(reject);
             req.onblocked = wrap(fireOnBlocked);
             req.onupgradeneeded = wrap (function (e) {
                 upgradeTransaction = req.transaction;
@@ -525,7 +525,7 @@ export default function Dexie(dbName, options) {
                         reject (new exceptions.NoSuchDatabase(`Database ${dbName} doesnt exist`));
                     });
                 } else {
-                    upgradeTransaction.onerror = wrap(eventRejectHandler(reject));
+                    upgradeTransaction.onerror = eventRejectHandler(reject);
                     var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
                     runUpgraders(oldVer / 10, upgradeTransaction, reject, req);
                 }
@@ -628,7 +628,7 @@ export default function Dexie(dbName, options) {
                     }
                     resolve();
                 });
-                req.onerror = wrap(eventRejectHandler(reject));
+                req.onerror = eventRejectHandler(reject);
                 req.onblocked = fireOnBlocked;
             }
         });
@@ -877,7 +877,7 @@ export default function Dexie(dbName, options) {
             if (!hasDeleteHook) {
                 for (var i=0; i < len; ++i) {
                     var req = idbstore.delete(keysOrTuples[i]);
-                    req.onerror = wrap(eventRejectHandler(reject));
+                    req.onerror = eventRejectHandler(reject);
                     if (i === lastItem) req.onsuccess = wrap(()=>resolve());
                 }
             } else {
@@ -1232,52 +1232,40 @@ export default function Dexie(dbName, options) {
             /// </summary>
             /// <param name="obj" type="Object">A javascript object to insert or update</param>
             /// <param name="key" optional="true">Primary key</param>
-            var self = this,
-                creatingHook = this.hook.creating.fire,
+            var creatingHook = this.hook.creating.fire,
                 updatingHook = this.hook.updating.fire;
             if (creatingHook !== nop || updatingHook !== nop) {
                 //
                 // People listens to when("creating") or when("updating") events!
                 // We must know whether the put operation results in an CREATE or UPDATE.
                 //
-                return this._trans(READWRITE, function (resolve, reject, trans) {
-                    // Since key is optional, make sure we get it from obj if not provided
-                    var effectiveKey = (key !== undefined) ? key : (self.schema.primKey.keyPath && getByKeyPath(obj, self.schema.primKey.keyPath));
-                    if (effectiveKey == null) { // "== null" means checking for either null or undefined.
-                        // No primary key. Must use add().
-                        self.add(obj).then(resolve, reject);
-                    } else {
-                        // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
-                        trans._lock(); // Needed because operation is splitted into modify() and add().
-                        // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
-                        obj = deepClone(obj);
-                        self.where(":id").equals(effectiveKey).modify(function () {
-                            // Replace extisting value with our object
-                            // CRUD event firing handled in Collection.modify()
-                            this.value = obj;
-                        }).then(function (count) {
-                            if (count === 0) {
-                                // Object's key was not found. Add the object instead.
-                                // CRUD event firing will be done in add()
-                                return self.add(obj, key); // Resolving with another Promise. Returned Promise will then resolve with the new key.
-                            } else {
-                                return effectiveKey; // Resolve with the provided key.
-                            }
-                        }).finally(function () {
-                            trans._unlock();
-                        }).then(resolve, reject);
-                    }
-                });
+                var keyPath = this.schema.primKey.keyPath;
+                var effectiveKey = (key !== undefined) ? key : (keyPath && getByKeyPath(obj, keyPath));
+                if (effectiveKey == null)  // "== null" means checking for either null or undefined.
+                    return this.add(obj);
+                
+                // Since key is optional, make sure we get it from obj if not provided
+                
+                // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
+                // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
+                obj = deepClone(obj);
+                return this._trans(READWRITE, (resolve, reject) => {
+                    return this.where(":id").equals(effectiveKey).modify(function () {
+                        // Replace extisting value with our object
+                        // CRUD event firing handled in Collection.modify()
+                        this.value = obj;
+                    }).then(count => count === 0 ? this.add(obj, key) : effectiveKey);//.then(resolve, reject);
+                }, "locked"); // Lock needed because operation is splitted into modify() and add().
             } else {
                 // Use the standard IDB put() method.
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
                     var req = key !== undefined ? idbstore.put(obj, key) : idbstore.put(obj);
                     req.onerror = eventRejectHandler(reject);
-                    req.onsuccess = function (ev) {
+                    req.onsuccess = wrap(function (ev) {
                         var keyPath = idbstore.keyPath;
                         if (keyPath) setByKeyPath(obj, keyPath, ev.target.result);
                         resolve(req.result);
-                    };
+                    });
                 });
             }
         },
@@ -1293,9 +1281,9 @@ export default function Dexie(dbName, options) {
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
                     var req = idbstore.delete(key);
                     req.onerror = eventRejectHandler(reject);
-                    req.onsuccess = function () {
+                    req.onsuccess = wrap(function () {
                         resolve(req.result);
-                    };
+                    });
                 });
             }
         },
@@ -1309,9 +1297,9 @@ export default function Dexie(dbName, options) {
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
                     var req = idbstore.clear();
                     req.onerror = eventRejectHandler(reject);
-                    req.onsuccess = function () {
+                    req.onsuccess = wrap(function () {
                         resolve(req.result);
-                    };
+                    });
                 });
             }
         },
@@ -1415,6 +1403,7 @@ export default function Dexie(dbName, options) {
             return this._reculock && PSD.lockOwnerFor !== this;
         },
         create: function (idbtrans) {
+            if (!this.mode) return this;
             assert(!this.idbtrans);
             if (!idbtrans && !idbdb) {
                 switch (dbOpenError && dbOpenError.name) {
@@ -1449,33 +1438,58 @@ export default function Dexie(dbName, options) {
             });
             return this;
         },
-        _promise: function (mode, fn, bWriteLock) {
-            var self = this;
-            return newScope(function() {
-                var p;
-                // Read lock always
-                if (!self._locked()) {
-                    p = self.active ? new Promise(function (resolve, reject) {
-                        if (mode === READWRITE && self.mode !== READWRITE)
-                            throw new exceptions.ReadOnly("Transaction is readonly");
-                        if (!self.idbtrans && mode) self.create();
-                        if (bWriteLock) self._lock(); // Write lock if write operation is requested
-                        fn(resolve, reject, self);
-                    }) : rejection(new exceptions.TransactionInactive());
-                    if (self.active && bWriteLock) p.finally(function () {
-                        self._unlock();
-                    });
-                } else {
-                    // Transaction is write-locked. Wait for mutex.
-                    p = new Promise(function (resolve, reject) {
-                        self._blockedFuncs.push(function () {
-                            self._promise(mode, fn, bWriteLock).then(resolve, reject);
-                        });
-                    });
+        /*lock: function (fn) { 
+            if (this._locked()) return new Promise ((resolve, reject) => {
+                this._blockedFuncs.push(()=>{
+                    this.lock(fn).then(resolve, reject);
+                });
+            });
+
+            return newScope(()=>{
+                this._lock();
+                try {
+                    return fn(this).finally(()=>this._unlock());
+                } catch(ex) {
+                    this._unlock();
+                    return rejection(ex);
                 }
+            });
+        },*/ // Remarked because it's not used. SHould be working though and could be a replacement of _promise(..., "locked").
+        _promise: function (mode, fn, bWriteLock) {
+
+            if (mode === READWRITE && this.mode !== READWRITE)
+                return rejection (new exceptions.ReadOnly("Transaction is readonly"));
+
+            if (!this.active)
+                return rejection (new exceptions.TransactionInactive());
+
+            if (this._locked()) {
+                return new Promise ((resolve, reject) => {
+                    this._blockedFuncs.push(()=>{
+                        this._promise(mode, fn, bWriteLock).then(resolve, reject);
+                    });
+                });
+
+            } else if (bWriteLock) {
+                return newScope(()=>{
+                    var p = new Promise((resolve, reject) => {
+                        this._lock();
+                        var rv = fn(resolve, reject, this);
+                        if (rv && rv.then) rv.then(resolve, reject);
+                    });
+                    p.finally(()=>this._unlock());
+                    p._lib = true;
+                    return p;
+                });
+
+            } else {
+                var p = new Promise((resolve, reject) => {
+                    var rv = fn(resolve, reject, this);
+                    if (rv && rv.then) rv.then(resolve, reject);
+                });
                 p._lib = true;
                 return p;
-            });
+            }
         },
 
         //
@@ -2099,9 +2113,9 @@ export default function Dexie(dbName, options) {
                         req.onerror = eventRejectHandler(reject);
                         req.onsuccess = readingHook === mirror ?
                             eventSuccessHandler(resolve) :
-                            wrap(eventSuccessHandler(res => {
+                            eventSuccessHandler(res => {
                                 try {resolve (res.map(readingHook));} catch(e) {reject(e);}
-                            }));
+                            });
                     } else {
                         // Getting array through a cursor.
                         var a = [];
@@ -2721,12 +2735,6 @@ function applyStructure(obj, structure) {
     return obj;
 }
 
-function eventSuccessHandler(done) {
-    return function (ev) {
-        done(ev.target.result);
-    }
-}
-
 function hookedEventSuccessHandler(resolve) {
     // wrap() is needed when calling hooks because the rare scenario of:
     //  * hook does a db operation that fails immediately (IDB throws exception)
@@ -2748,11 +2756,17 @@ function hookedEventSuccessHandler(resolve) {
 }
 
 function eventRejectHandler(reject) {
-    return function (event) {
+    return wrap(function (event) {
         preventDefault(event);
         reject (event.target.error);
         return false;
-    };
+    });
+}
+
+function eventSuccessHandler (resolve) {
+    return wrap(function (event){
+        resolve(event.target.result);
+    });
 }
 
 function hookedEventRejectHandler (reject) {
