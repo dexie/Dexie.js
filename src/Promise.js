@@ -44,15 +44,15 @@ const
     nativePromiseInstanceAndProto = (()=>{
         try {
             // Be able to patch native async functions
-            return new Function("let p=(async ()=>{})();return [p,Object.getPrototypeOf(p)];")();
+            return new Function("let p=(async ()=>{})();return [p,Object.getPrototypeOf(p),Promise.resolve()];")();
         } catch(e) {
             var P = _global.Promise;
-            return [P && P.resolve(), P && P.prototype, null]; // Support transpiled async functions 
+            return P ? [P.resolve(), P.prototype, P.resolve()] : []; // Support transpiled async functions 
         }
     })(),
     resolvedNativePromise = nativePromiseInstanceAndProto[0],
     nativePromiseProto = nativePromiseInstanceAndProto[1],
-    resolvedGlobalPromise = _global.Promise && _global.Promise.resolve(),
+    resolvedGlobalPromise = nativePromiseInstanceAndProto[2],
     nativePromiseThen = nativePromiseProto && nativePromiseProto.then;
 
 export const NativePromise = resolvedNativePromise.constructor;
@@ -60,8 +60,8 @@ export const task = { awaits: 0, echoes: 0, id: 0};
 var taskCounter = 0;
 var bStackIsEmpty = true;
 var zoneStack = [];
-var zoneEchoes = 0;
-    
+var zoneEchoes = 0; // zoneEchoes is a must in order to persist zones between native await expressions.
+
 var stack_being_generated = false;
 
 /* The default function used only for the very first promise in a promise chain.
@@ -72,7 +72,7 @@ var stack_being_generated = false;
    indexedDB-compatible emulated micro task loop.
 */
 var schedulePhysicalTick = resolvedGlobalPromise ?
-    () => {nativePromiseThen.call(resolvedNativePromise, physicalTick);}
+    () => {resolvedGlobalPromise.then(physicalTick);}
     :
     _global.setImmediate ? 
         // setImmediate supported. Those modern platforms also supports Function.bind().
@@ -566,7 +566,6 @@ function PromiseReject (reason) {
     return new Promise(INTERNAL, false, reason);
 }
 
-
 export function wrap (fn, errorCatcher) {
     var psd = PSD;
     return function() {
@@ -621,14 +620,6 @@ export function newScope (fn, props, a1, a2) {
     return rv;
 }
 
-var _spaces = '';
-function spaces(bEnteringZone) {
-    if (bEnteringZone) _spaces = _spaces + "  ";
-    var rv = _spaces;
-    if (!bEnteringZone) _spaces = _spaces.substr(0, _spaces.length - 2);
-    return rv;
-}
-
 // Function to call before transaction scopeFunc is called.
 export function ensureTaskStarted() {
     if (!task.id) task.id = ++taskCounter;
@@ -640,7 +631,6 @@ export function ensureTaskStarted() {
 export function incrementExpectedAwaits() {
     if (!task.id) task.id = ++taskCounter;
     ++task.awaits;
-    console.log("incrementExpectedAwait: " + task.awaits);
     task.echoes += 10;
     return task.id;
 }
@@ -648,13 +638,9 @@ export function incrementExpectedAwaits() {
 // Also call this when a native await calls then method on a promise. In that case, don't supply
 // sourceTaskId because we already know it refers to current task.
 export function decrementExpectedAwaits(sourceTaskId) {
-    if (!task.awaits || (sourceTaskId && sourceTaskId !== task.id)) {
-        console.log("decrementExpectedAwait (to late)");
-        return;
-    }
-    if (--task.awaits === 0) {task.id = 0;}
+    if (!task.awaits || (sourceTaskId && sourceTaskId !== task.id)) return;
+    if (--task.awaits === 0) task.id = 0;
     task.echoes = task.awaits * 10; // Will reset echoes to 0 if awaits is 0.
-    console.log("decrementExpectedAwait: " + task.awaits);
 }
 
 // Call from Promise.all() and Promise.race()
@@ -666,36 +652,30 @@ export function onPossibleParallellAsync (possiblePromise) {
     return possiblePromise;
 }
 
-function pushZone(targetZone) {
+function zoneEnterEcho(targetZone) {
     if (!task.echoes || --task.echoes === 0)
         task.echoes = task.id = 0; // Cancel zone echoing.
 
     zoneStack.push(PSD);
-    console.log(`${spaces(true)}>> ${PSD.id} --> ${targetZone.id}. Stack: ${zoneStack.map(z=>z.id)}. Echoes: ${task.echoes}`);
     switchToZone(targetZone, true);
     bStackIsEmpty = true;
 }
 
-function popZone() {
+function zoneLeaveEcho() {
     var zone = zoneStack[zoneStack.length-1];
-    console.log(`${spaces(false)}<< ${PSD.id} --> ${zone.id}. Stack: ${zoneStack.map(z=>z.id)}`);
     zoneStack.pop();
     switchToZone(zone, false);
     bStackIsEmpty = true;
 }
 
 function switchToZone (targetZone, bEnteringZone) {
-    console.log("switching to zone: " + targetZone.id);
     bStackIsEmpty = false; // If not called from switchToZoneAsync, we're called by usePSD or wrap - we are in-stack!
     var currentZone = PSD;
     if (bEnteringZone ? task.echoes : zoneEchoes) {
         bEnteringZone ? ++zoneEchoes : --zoneEchoes;
         // Enter or leave zone asynchronically as well, so that tasks initiated during current tick
         // will be surrounded by the zone when they are invoked.
-        console.log(bEnteringZone ? "Köar pushZone("+targetZone.id+")" : "Köar popZone()");
-        enqueueNativeMicroTask(bEnteringZone ? pushZone.bind(null, targetZone) : popZone); 
-    } else {
-        console.log("Didn't queue anything. task: " + JSON.stringify(task) + ". bEnteringZone: " + bEnteringZone + ". zoneEchoes: " + zoneEchoes);
+        enqueueNativeMicroTask(bEnteringZone ? zoneEnterEcho.bind(null, targetZone) : zoneLeaveEcho); 
     }
     if (targetZone === PSD) return;
 
@@ -747,11 +727,8 @@ function enqueueNativeMicroTask (job) {
 
 function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
     return typeof fn !== 'function' ? fn : function () {
-        if (fn.toString().indexOf('[native code]') !== -1) console.log("THEN CALLED BACK TO SYSTEM. PossibleAwait: " + possibleAwait);
         var outerZone = PSD;
-        if (possibleAwait) {
-            incrementExpectedAwaits();
-        }
+        if (possibleAwait) incrementExpectedAwaits();
         switchToZone(zone, true);
         try {
             return fn.apply(this, arguments);
@@ -763,9 +740,8 @@ function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
 
 function getPatchedPromiseThen (origThen, zone) {
     return function (onResolved, onRejected) {
-        var possibleAwait = (zone !== PSD || bStackIsEmpty) && !!nativePromiseThen;
+        var possibleAwait = (zone !== PSD || bStackIsEmpty);
         if (possibleAwait) decrementExpectedAwaits();
-        if (onResolved && onResolved.toString().indexOf('[native code]') !== -1) console.log(">>>THEN INVOKED FROM SYSTEM. PossibleAwait: " + possibleAwait + ". bStackIsEmpty: " + bStackIsEmpty + ". zone === PSD: " + (zone === PSD));
         return origThen.call(this,
             nativeAwaitCompatibleWrap(onResolved, zone, possibleAwait),
             nativeAwaitCompatibleWrap(onRejected, zone, possibleAwait));
