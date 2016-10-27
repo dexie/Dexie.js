@@ -40,7 +40,8 @@ import {
 
 } from './utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
-import Promise, {wrap, PSD, newScope, usePSD, rejection, AsyncFunction} from './Promise';
+import Promise, {wrap, PSD, newScope, usePSD, rejection, NativePromise, ensureTaskStarted,
+    incrementExpectedAwaits, decrementExpectedAwaits} from './Promise';
 import Events from './Events';
 import {
     nop,
@@ -788,7 +789,7 @@ export default function Dexie(dbName, options) {
                 var zoneProps = {
                     trans: trans,
                     transless: transless,
-                    id: PSD.id + '.follow'
+                    //id: PSD.id + '.follow'
                 };
 
                 if (parentTransaction) {
@@ -797,19 +798,21 @@ export default function Dexie(dbName, options) {
                 } else {
                     trans.create(); // Create the backend transaction so that complete() or error() will trigger even if no operation is made upon it.
                 }
-                
-                if (scopeFunc instanceof AsyncFunction || scopeFunc.isAsync) {
-                    if (!PSD.task) zoneProps.task = {count: 100, cancelled: false};
-                    zoneProps.onforeign = ()=>{throw new exceptions.ForeignAwait("Non-indexedDB task was awaited");};
-                }
 
+                ensureTaskStarted(); // Support for native async await.
                 var returnValue;
                 var promiseFollowed = Promise.follow(()=>{
                     // Finally, call the scope function with our table and transaction arguments.
-                    //PSD.task.count = 100;
                     returnValue = scopeFunc.call(trans, trans);
                     if (returnValue) {
-                        if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
+                        if (returnValue instanceof NativePromise) {
+                            // Suppor for native async await
+                            var taskId = incrementExpectedAwaits();
+                            returnValue = returnValue.then(x => {
+                                decrementExpectedAwaits(taskId);
+                                return x;
+                            });
+                        } else if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
                             // scopeFunc returned an iterator with throw-support. Handle yield as await.
                             returnValue = awaitIterator(returnValue);
                         }
