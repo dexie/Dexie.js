@@ -806,7 +806,7 @@ export default function Dexie(dbName, options) {
                     returnValue = scopeFunc.call(trans, trans);
                     if (returnValue) {
                         if (returnValue instanceof NativePromise) {
-                            // Suppor for native async await
+                            // Support for native async await
                             var taskId = incrementExpectedAwaits();
                             returnValue = returnValue.then(x => {
                                 decrementExpectedAwaits(taskId);
@@ -818,14 +818,10 @@ export default function Dexie(dbName, options) {
                         }
                     }
                 }, zoneProps);
-                return Promise.resolve(returnValue).then(x => {
-                    if (PSD.task) {
-                        PSD.task.count = 0; // Cancel zone keeper.
-                        PSD.task.cancelled = true;
-                    }
+                return Promise.resolve(returnValue).finally(()=>{
                     if (!trans.active)
-                        throw new exceptions.PrematureCommit("Transaction committed too early");
-
+                        throw new exceptions.PrematureCommit("Transaction committed too early. See http://bit.ly/2eVASrf");                    
+                }).then(x => {
                     return promiseFollowed.then(()=>{
                         if (parentTransaction) trans._resolve(); // sub transactions don't react to idbtrans.oncomplete. We must trigger a acompletion.
                     }).then(()=>trans._completion).then(()=>x);
