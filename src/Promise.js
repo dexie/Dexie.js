@@ -55,6 +55,7 @@ const
     resolvedGlobalPromise = nativePromiseInstanceAndProto[2],
     nativePromiseThen = nativePromiseProto && nativePromiseProto.then;
 
+export const GlobalPromise = _global.Promise;
 export const NativePromise = resolvedNativePromise.constructor;
 export const task = { awaits: 0, echoes: 0, id: 0}; 
 var taskCounter = 0;
@@ -120,8 +121,11 @@ export var globalPSD = {
     onunhandled: globalError,
     pgp: false,
     env: { // Environment globals snapshotted on leaving global zone
-        Promise: _global.Promise,
-        nc: nativePromiseProto && nativePromiseProto.constructor,
+        Promise: GlobalPromise,
+        all: GlobalPromise.all,
+        race: GlobalPromise.race,
+        resolve: GlobalPromise.resolve,
+        reject: GlobalPromise.reject,
         nthen: nativePromiseProto && nativePromiseProto.then,
         gthen: _global.Promise && _global.Promise.prototype.then,
         dthen: null // Will be set later on.
@@ -598,7 +602,10 @@ export function newScope (fn, props, a1, a2) {
     var globalEnv = globalPSD.env;
     psd.env = nativePromiseThen ? {
         Promise: Promise, // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
-        nc: Promise, 
+        all: Promise.all,
+        race: Promise.race,
+        resolve: Promise.resolve,
+        reject: Promise.reject,
         nthen: getPatchedPromiseThen (globalEnv.nthen, psd), // native then
         gthen: getPatchedPromiseThen (globalEnv.gthen, psd), // global then
         dthen: getPatchedPromiseThen (globalEnv.dthen, psd)  // dexie then
@@ -681,30 +688,38 @@ function switchToZone (targetZone, bEnteringZone) {
 
     PSD = targetZone;
 
+    var globalEnv = globalPSD.env,
+        targetEnv = targetZone.env,
+        GPromise = globalEnv.Promise;
+
     // Snapshot on every leave from global zone.
     if (currentZone === globalPSD && ('Promise' in _global)) {
-        var globalEnv = globalPSD.env;
-        globalEnv.Promise = _global.Promise; // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
+        globalEnv.Promise = GPromise; // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
+        globalEnv.all = GPromise.all;
+        globalEnv.race = GPromise.race;
+        globalEnv.resolve = GPromise.resolve;
+        globalEnv.reject = GPromise.reject;
         globalEnv.nthen = nativePromiseProto.then;
-        globalEnv.gthen = _global.Promise.prototype.then;
+        globalEnv.gthen = GPromise.prototype.then;
         globalEnv.dthen = Promise.prototype.then;
     }
     
     // Patch our own Promise to keep zones in it:
-    Promise.prototype.then = targetZone.env.dthen;
+    Promise.prototype.then = targetEnv.dthen;
     
     if (('Promise' in _global)) {
         // Swich environments
         
         // Set this Promise to window.Promise so that Typescript 2.0's async functions will work on Firefox, Safari and IE, as well as with Zonejs and angular.
-        _global.Promise = targetZone.env.Promise;
+        _global.Promise = targetEnv.Promise;
         
-        // Make native async functions work according to their standard specification but invoke our zones
-        // (https://github.com/tc39/ecmascript-asyncawait/issues/65)
-        nativePromiseProto.then = targetZone.env.nthen;
-        
-        // Also patch the global Promise in case it differs from native Promise (must work with transpilers and polyfills)
-        globalPSD.env.Promise.prototype.then = targetZone.env.gthen;
+        // Also patch the global and native Promise (need to patch both if using zone.js or has polyfilled Promise)
+        nativePromiseProto.then = targetEnv.nthen;
+        GPromise.prototype.then = targetEnv.gthen;
+        GPromise.all = targetEnv.all;
+        GPromise.race = targetEnv.race;
+        GPromise.resolve = targetEnv.resolve;
+        GPromise.reject = targetEnv.reject;
     }
 }
 
