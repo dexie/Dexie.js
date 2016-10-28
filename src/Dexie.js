@@ -788,8 +788,7 @@ export default function Dexie(dbName, options) {
                 // Let the transaction instance be part of a Promise-specific data (PSD) value.
                 var zoneProps = {
                     trans: trans,
-                    transless: transless,
-                    //id: PSD.id + '.follow'
+                    transless: transless
                 };
 
                 if (parentTransaction) {
@@ -1248,13 +1247,13 @@ export default function Dexie(dbName, options) {
                 // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
                 // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
                 obj = deepClone(obj);
-                return this._trans(READWRITE, (resolve, reject) => {
-                    return this.where(":id").equals(effectiveKey).modify(function () {
+                return this._trans(READWRITE, () =>
+                    this.where(":id").equals(effectiveKey).modify(function () {
                         // Replace extisting value with our object
                         // CRUD event firing handled in Collection.modify()
                         this.value = obj;
-                    }).then(count => count === 0 ? this.add(obj, key) : effectiveKey);//.then(resolve, reject);
-                }, "locked"); // Lock needed because operation is splitted into modify() and add().
+                    }).then(count => count === 0 ? this.add(obj, key) : effectiveKey),
+                    "locked"); // Lock needed because operation is splitted into modify() and add().
             } else {
                 // Use the standard IDB put() method.
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore) {

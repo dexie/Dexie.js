@@ -1,4 +1,4 @@
-import {doFakeAutoComplete, tryCatch, props, override,
+import {doFakeAutoComplete, tryCatch, props,
         setProp, _global, getPropertyDescriptor, getArrayOf, extend} from './utils';
 import {nop, callBoth, mirror} from './chaining-functions';
 import {debug, prettyStack, getErrorWithStack} from './debug';
@@ -586,14 +586,14 @@ export function wrap (fn, errorCatcher) {
 
 
 globalPSD.env.dthen = Promise.prototype.then;
-var __counter_zone = 0;
+var zone_id_counter = 0;
 export function newScope (fn, props, a1, a2) {
     var parent = PSD,
         psd = Object.create(parent);
     psd.parent = parent;
     psd.ref = 0;
     psd.global = false;
-    psd.id = parent.id + ('.' + (++__counter_zone));
+    psd.id = ++zone_id_counter;
     // Prepare for promise patching (done in usePSD):
     var globalEnv = globalPSD.env;
     psd.env = nativePromiseThen ? {
