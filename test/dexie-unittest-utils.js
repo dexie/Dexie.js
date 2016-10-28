@@ -128,3 +128,16 @@ export function spawnedTest (name, num, promiseGenerator) {
         });
     }
 }
+
+export function promisedTest (name, num, asyncFunction) {
+    if (!asyncFunction) {
+        asyncFunction = num;
+        asyncTest(name, ()=>asyncFunction()
+            .catch(e => ok(false, e.stack || e))
+            .then(start));
+    } else {
+        asyncTest(name, num, ()=>asyncFunction()
+            .catch(e => ok(false, e.stack || e))
+            .then(start));
+    }
+}

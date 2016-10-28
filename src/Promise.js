@@ -56,7 +56,7 @@ const
     nativePromiseThen = nativePromiseProto && nativePromiseProto.then;
 
 export const GlobalPromise = _global.Promise;
-export const NativePromise = resolvedNativePromise.constructor;
+export const NativePromise = resolvedNativePromise && resolvedNativePromise.constructor;
 export const task = { awaits: 0, echoes: 0, id: 0}; 
 var taskCounter = 0;
 var bStackIsEmpty = true;
@@ -120,16 +120,7 @@ export var globalPSD = {
     unhandleds: [],
     onunhandled: globalError,
     pgp: false,
-    env: { // Environment globals snapshotted on leaving global zone
-        Promise: GlobalPromise,
-        all: GlobalPromise.all,
-        race: GlobalPromise.race,
-        resolve: GlobalPromise.resolve,
-        reject: GlobalPromise.reject,
-        nthen: nativePromiseProto && nativePromiseProto.then,
-        gthen: _global.Promise && _global.Promise.prototype.then,
-        dthen: null // Will be set later on.
-    },
+    env: {},
     finalize: function () {
         this.unhandleds.forEach(uh => {
             try {
@@ -321,6 +312,22 @@ props (Promise, {
         });
     }
 });
+
+// Now that Promise.prototype is defined, we have all it takes to set globalPSD.env.
+// Environment globals snapshotted on leaving global zone
+if (GlobalPromise) {
+    globalPSD.env = {
+        Promise: GlobalPromise,
+        all: GlobalPromise.all,
+        race: GlobalPromise.race,
+        resolve: GlobalPromise.resolve,
+        reject: GlobalPromise.reject,
+        nthen: nativePromiseProto.then,
+        gthen: GlobalPromise.prototype.then,
+        dthen: Promise.prototype.then // Will be set later on.
+    }
+}
+
 
 /**
 * Take a potentially misbehaving resolver function and make sure
@@ -588,8 +595,6 @@ export function wrap (fn, errorCatcher) {
     };
 }
 
-
-globalPSD.env.dthen = Promise.prototype.then;
 var zone_id_counter = 0;
 export function newScope (fn, props, a1, a2) {
     var parent = PSD,
@@ -690,10 +695,11 @@ function switchToZone (targetZone, bEnteringZone) {
 
     var globalEnv = globalPSD.env,
         targetEnv = targetZone.env,
-        GPromise = globalEnv.Promise;
+        GPromise;
 
     // Snapshot on every leave from global zone.
-    if (currentZone === globalPSD && ('Promise' in _global)) {
+    if (GPromise && currentZone === globalPSD) {
+        GPromise = _global.Promise;
         globalEnv.Promise = GPromise; // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
         globalEnv.all = GPromise.all;
         globalEnv.race = GPromise.race;
@@ -702,14 +708,16 @@ function switchToZone (targetZone, bEnteringZone) {
         globalEnv.nthen = nativePromiseProto.then;
         globalEnv.gthen = GPromise.prototype.then;
         globalEnv.dthen = Promise.prototype.then;
+    } else {
+        GPromise = globalEnv.Promise;
     }
     
     // Patch our own Promise to keep zones in it:
     Promise.prototype.then = targetEnv.dthen;
     
-    if (('Promise' in _global)) {
+    if (GPromise) {
         // Swich environments
-        
+
         // Set this Promise to window.Promise so that Typescript 2.0's async functions will work on Firefox, Safari and IE, as well as with Zonejs and angular.
         _global.Promise = targetEnv.Promise;
         

@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, spawnedTest} from './dexie-unittest-utils';
+import {resetDatabase, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
 "use strict";
 
@@ -62,7 +62,6 @@ asyncTest("Should be able to use native async await", function() {
                 equal(innerTrans.parent, trans, "Parent transaction should be correct");
                 let x = await db.items.get(1);
                 ok(Dexie.currentTransaction === innerTrans, "Transaction persisted in inner transaction");
-                console.log(">>Last line in sub transaction");
             });
             ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of sub transaction");
             await (async ()=>{
@@ -126,7 +125,6 @@ asyncTest("Must not leak PSD zone", function() {
         var trans1, trans2;
         var p1 = db.transaction('r', db.items, async ()=> {
             var trans = trans1 = Dexie.currentTransaction;
-            console.log("Before await 3");
             await 3;
             ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.0 - after await 3");
             await 4;
@@ -138,7 +136,6 @@ asyncTest("Must not leak PSD zone", function() {
             await 6;
             ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.1 - after await 6");
             await subFunc(1);
-            console.log("subFunc(1): After subFunc() returned. task: " + JSON.stringify(Dexie.Promise.task));
             ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.2 - after async subFunc()");
             await Promise.all([subFunc(11), subFunc(12), subFunc(13)]);
             ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.3 - after Promise.all()");
@@ -167,11 +164,8 @@ asyncTest("Must not leak PSD zone", function() {
         ok(Dexie.currentTransaction === null, "Should not have an ongoing transaction after transactions");
 
         async function subFunc(n) {
-            console.log("subFunc("+n+"): before await 3, task: " + JSON.stringify(Dexie.Promise.task));
             await 3;
-            console.log("subFunc("+n+"): before await db. task: " + JSON.stringify(Dexie.Promise.task));
             let result = await db.items.get(2);
-            console.log("subFunc("+n+"): After await db. task: " + JSON.stringify(Dexie.Promise.task));
             return result;
         }
 
@@ -328,4 +322,68 @@ spawnedTest ("Sub Transactions with async await", function*() {
     } catch (e) {
         ok(e.name === 'SyntaxError', "No support for native async functions in this browser");        
     }
+});
+
+promisedTest ("Should patch global Promise within transaction scopes but leave them intact outside", async() => {
+    ok(Promise !== Dexie.Promise, "At global scope. Promise should not be Dexie.Promise");
+    ok(window.Promise !== Dexie.Promise, "At global scope. Promise should not be Dexie.Promise");
+    var GlobalPromise = Promise;
+    await db.transaction('rw', db.items, async() =>{
+        ok(Promise === Dexie.Promise, "Within transaction scope, Promise should be Dexie.Promise.");
+        ok(window.Promise === Dexie.Promise, "Within transaction scope, window.Promise should be Dexie.Promise.");
+        ok(GlobalPromise !== Promise, "Promises are different");
+        ok(GlobalPromise.resolve === Promise.resolve, "If holding a reference to the real global promise and doing Promise.resolve() it should be Dexie.Promise.resolve withing transaction scopes")   
+        ok(GlobalPromise.reject === Promise.reject, "If holding a reference to the real global promise and doing Promise.reject() it should be Dexie.Promise.reject withing transaction scopes")
+        ok(GlobalPromise.all === Promise.all, "If holding a reference to the real global promise and doing Promise.all() it should be Dexie.Promise.all withing transaction scopes")
+        ok(GlobalPromise.race === Promise.race, "If holding a reference to the real global promise and doing Promise.race() it should be Dexie.Promise.race withing transaction scopes")
+    });
+});
+
+promisedTest ("Should be able to use native transpiled async await", async () => {
+    await db.transaction('rw', db.items, async ()=>{
+        let trans = Dexie.currentTransaction;
+        ok(!!trans, "Should have a current transaction");
+        await db.items.add({id: 'foo'});
+        ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of Dexie.Promise");
+        await Promise.resolve();
+        ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of Promise.resolve()");
+        await 3;
+        ok(Dexie.currentTransaction === trans, "Transaction persisted after await 3");
+        await db.transaction('r', db.items, async (innerTrans) => {
+            ok(!!innerTrans, "Should have inner transaction");
+            equal(Dexie.currentTransaction, innerTrans, "Inner transaction should be there");
+            equal(innerTrans.parent, trans, "Parent transaction should be correct");
+            let x = await db.items.get(1);
+            ok(Dexie.currentTransaction === innerTrans, "Transaction persisted in inner transaction");
+        });
+        ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of sub transaction");
+        await (async ()=>{
+            return await db.items.get(1);
+        })();
+        ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of async function");
+        await (async ()=>{
+            await Promise.all([db.transaction('r', db.items, async() => {
+                await db.items.get(1);
+                await db.items.get(2);
+            }), db.transaction('r', db.items, async() => {
+                return await db.items.get(1);
+            })]);
+        })();
+        ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of async function 2");
+
+        await Promise.resolve().then(()=>{
+            ok(Dexie.currentTransaction === trans, "Transaction persisted after window.Promise.resolve().then()");
+            return (async ()=>{})(); // Resolve with native promise
+        }).then(()=>{
+            ok(Dexie.currentTransaction === trans, "Transaction persisted after native promise completion");
+            return Promise.resolve();
+        }).then(()=>{
+            ok(Dexie.currentTransaction === trans, "Transaction persisted after window.Promise.resolve().then()");
+            return (async ()=>{})();
+        });
+        ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of mixed promises");
+
+    }).catch ('PrematureCommitError', ()=> {
+        ok(true, "PROMISE IS INCOMPATIBLE WITH INDEXEDDB (https://github.com/dfahlander/Dexie.js/issues/317). Ignoring test.");
+    })
 });
