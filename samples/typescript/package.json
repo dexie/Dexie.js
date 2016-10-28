@@ -5,7 +5,7 @@
   "scripts": {
     "build": "npm run build:ts && npm run build:rollup",
     "build:ts": "node node_modules/typescript/bin/tsc",
-    "build:rollup": "node node_modules/rollup/bin/rollup out/ts/app.js -f iife -o out/bundle.js",
+    "build:rollup": "node node_modules/rollup/bin/rollup -c",
     "clean": "rm -rf out",
     "test": "http-server . -a localhost -p 8081"
   },
@@ -27,7 +27,9 @@
     "dexie": "^2.0.0-beta.2"
   },
   "devDependencies": {
-    "rollup": "0.20.5",
+    "rollup": "0.36.3",
+    "rollup-plugin-commonjs": "5.0.5",
+    "rollup-plugin-node-resolve": "2.0.0",
     "typescript": "2.1.0-dev.20161012"
   }
 }
