@@ -119,6 +119,7 @@ asyncTest("Must not leak PSD zone", function() {
     if (!hasNativeAsyncFunctions) {
         ok(true, "Browser doesnt support native async-await");
         start();
+        return;
     }
     let F = new Function('ok','equal', 'Dexie', 'db', `
         ok(Dexie.currentTransaction === null, "Should not have an ongoing transaction to start with");
@@ -250,6 +251,7 @@ asyncTest("Should be able to await Promise.all()", ()=>{
     if (!hasNativeAsyncFunctions) {
         ok(true, "Browser doesnt support native async-await");
         start();
+        return;
     }    
     (new Function('ok', 'equal', 'Dexie', 'db',
     `return db.transaction('r', db.items, async (trans)=>{
