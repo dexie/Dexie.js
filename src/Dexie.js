@@ -1400,8 +1400,8 @@ export default function Dexie(dbName, options) {
             if (--this._reculock === 0) {
                 if (!PSD.global) PSD.lockOwnerFor = null;
                 while (this._blockedFuncs.length > 0 && !this._locked()) {
-                    var fn = this._blockedFuncs.shift();
-                    try { fn(); } catch (e) { }
+                    var fnAndPSD = this._blockedFuncs.shift();
+                    try { usePSD(fnAndPSD[1], fnAndPSD[0]); } catch (e) { }
                 }
             }
             return this;
@@ -1456,31 +1456,29 @@ export default function Dexie(dbName, options) {
         },
         _promise: function (mode, fn, bWriteLock) {
             var self = this;
-            return newScope(function() {
-                var p;
-                // Read lock always
-                if (!self._locked()) {
-                    p = self.active ? new Promise(function (resolve, reject) {
+            var p = self._locked() ?
+                // Read lock always. Transaction is write-locked. Wait for mutex.
+                new Promise(function (resolve, reject) {
+                    self._blockedFuncs.push([function () {
+                        self._promise(mode, fn, bWriteLock).then(resolve, reject);
+                    }, PSD]);
+                }) :
+                newScope(function() {
+                    var p_ = self.active ? new Promise(function (resolve, reject) {
                         if (mode === READWRITE && self.mode !== READWRITE)
                             throw new exceptions.ReadOnly("Transaction is readonly");
                         if (!self.idbtrans && mode) self.create();
                         if (bWriteLock) self._lock(); // Write lock if write operation is requested
                         fn(resolve, reject, self);
                     }) : rejection(new exceptions.TransactionInactive());
-                    if (self.active && bWriteLock) p.finally(function () {
+                    if (self.active && bWriteLock) p_.finally(function () {
                         self._unlock();
                     });
-                } else {
-                    // Transaction is write-locked. Wait for mutex.
-                    p = new Promise(function (resolve, reject) {
-                        self._blockedFuncs.push(function () {
-                            self._promise(mode, fn, bWriteLock).then(resolve, reject);
-                        });
-                    });
-                }
-                p._lib = true;
-                return p.uncaught(dbUncaught);
-            });
+                    return p_;
+                });
+
+            p._lib = true;
+            return p.uncaught(dbUncaught);
         },
 
         //
