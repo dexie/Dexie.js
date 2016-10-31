@@ -1381,8 +1381,8 @@ export default function Dexie(dbName, options) {
             if (--this._reculock === 0) {
                 if (!PSD.global) PSD.lockOwnerFor = null;
                 while (this._blockedFuncs.length > 0 && !this._locked()) {
-                    var fn = this._blockedFuncs.shift();
-                    try { fn(); } catch (e) { }
+                    var fnAndPSD = this._blockedFuncs.shift();
+                    try { usePSD(fnAndPSD[1], fnAndPSD[0]); } catch (e) { }
                 }
             }
             return this;
@@ -1462,10 +1462,10 @@ export default function Dexie(dbName, options) {
                 return rejection (new exceptions.TransactionInactive());
 
             if (this._locked()) {
-                return new Promise ((resolve, reject) => {
-                    this._blockedFuncs.push(()=>{
-                        this._promise(mode, fn, bWriteLock).then(resolve, reject);
-                    });
+                return new Promise((resolve, reject) => {
+                    self._blockedFuncs.push([() => {
+                        self._promise(mode, fn, bWriteLock).then(resolve, reject);
+                    }, PSD]);
                 });
 
             } else if (bWriteLock) {
