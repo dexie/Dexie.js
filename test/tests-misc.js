@@ -180,3 +180,15 @@ asyncTest ("#323 @gitawego's post. Should not fail unexpectedly on readonly prop
     }).finally(start);
     
 });
+
+spawnedTest ("#360 DB unresponsive after multiple Table.update() or Collection.modify()", function* () {
+    const NUM_UPDATES = 2000;
+    let result = yield db.transaction('rw', db.foo, function* () {
+        yield db.foo.put({id: 1, value: 0});
+        for (var i=0;i<NUM_UPDATES;++i) {
+            db.foo.where('id').equals(1).modify(item => ++item.value);
+        }
+        return yield db.foo.get(1);
+    });
+    equal(result.value, NUM_UPDATES, `Should have updated id 1 a ${NUM_UPDATES} times`);
+});
