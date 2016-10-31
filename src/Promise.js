@@ -44,10 +44,12 @@ const
     nativePromiseInstanceAndProto = (()=>{
         try {
             // Be able to patch native async functions
-            return new Function("let p=(async ()=>{})();return [p,Object.getPrototypeOf(p),Promise.resolve()];")();
+            return new Function("let F=async ()=>{};let p=F();return [p,Object.getPrototypeOf(p),Promise.resolve(),F];")();
         } catch(e) {
             var P = _global.Promise;
-            return P ? [P.resolve(), P.prototype, P.resolve()] : []; // Support transpiled async functions 
+            return P ?
+                [P.resolve(), P.prototype, P.resolve()] :
+                []; 
         }
     })(),
     resolvedNativePromise = nativePromiseInstanceAndProto[0],
@@ -58,6 +60,7 @@ const
 export const GlobalPromise = _global.Promise;
 export const NativePromise = resolvedNativePromise && resolvedNativePromise.constructor;
 export const task = { awaits: 0, echoes: 0, id: 0}; 
+export const AsyncFunction = nativePromiseInstanceAndProto[3];
 var taskCounter = 0;
 var bStackIsEmpty = true;
 var zoneStack = [];
@@ -232,6 +235,19 @@ props(Promise.prototype, {
     }
 });
 
+// Now that Promise.prototype is defined, we have all it takes to set globalPSD.env.
+// Environment globals snapshotted on leaving global zone
+globalPSD.env = GlobalPromise ? {
+    Promise: GlobalPromise,
+    all: GlobalPromise.all,
+    race: GlobalPromise.race,
+    resolve: GlobalPromise.resolve,
+    reject: GlobalPromise.reject,
+    nthen: nativePromiseProto.then,
+    gthen: GlobalPromise.prototype.then,
+    dthen: Promise.prototype.then
+} : {dthen: Promise.prototype.then};
+
 function Listener(onFulfilled, onRejected, resolve, reject, zone) {
     this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
     this.onRejected = typeof onRejected === 'function' ? onRejected : null;
@@ -312,22 +328,6 @@ props (Promise, {
         });
     }
 });
-
-// Now that Promise.prototype is defined, we have all it takes to set globalPSD.env.
-// Environment globals snapshotted on leaving global zone
-if (GlobalPromise) {
-    globalPSD.env = {
-        Promise: GlobalPromise,
-        all: GlobalPromise.all,
-        race: GlobalPromise.race,
-        resolve: GlobalPromise.resolve,
-        reject: GlobalPromise.reject,
-        nthen: nativePromiseProto.then,
-        gthen: GlobalPromise.prototype.then,
-        dthen: Promise.prototype.then // Will be set later on.
-    }
-}
-
 
 /**
 * Take a potentially misbehaving resolver function and make sure
@@ -659,7 +659,15 @@ export function decrementExpectedAwaits(sourceTaskId) {
 export function onPossibleParallellAsync (possiblePromise) {
     if (task.echoes && (possiblePromise instanceof NativePromise)) {
         var taskId = incrementExpectedAwaits();
-        return possiblePromise.then(x => (decrementExpectedAwaits(taskId), x));
+        return possiblePromise.then(
+            x => {
+                decrementExpectedAwaits(taskId);
+                return x;
+            },
+            e => {
+                decrementExpectedAwaits(taskId);
+                return Promise.reject(e);
+            });
     }
     return possiblePromise;
 }
