@@ -41,7 +41,7 @@ import {
 } from './utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
 import Promise, {wrap, PSD, newScope, usePSD, rejection, NativePromise, ensureTaskStarted,
-    incrementExpectedAwaits, decrementExpectedAwaits} from './Promise';
+    incrementExpectedAwaits, decrementExpectedAwaits, AsyncFunction} from './Promise';
 import Events from './Events';
 import {
     nop,
@@ -798,19 +798,20 @@ export default function Dexie(dbName, options) {
                     trans.create(); // Create the backend transaction so that complete() or error() will trigger even if no operation is made upon it.
                 }
 
-                ensureTaskStarted(); // Support for native async await.
+                // Support for native async await.
+                var taskId;
+                if (scopeFunc.constructor === AsyncFunction) {
+                    taskId = incrementExpectedAwaits();
+                }
+
                 var returnValue;
                 var promiseFollowed = Promise.follow(()=>{
                     // Finally, call the scope function with our table and transaction arguments.
                     returnValue = scopeFunc.call(trans, trans);
                     if (returnValue) {
-                        if (returnValue instanceof NativePromise) {
-                            // Support for native async await
-                            var taskId = incrementExpectedAwaits();
-                            returnValue = returnValue.then(x => {
-                                decrementExpectedAwaits(taskId);
-                                return x;
-                            });
+                        if (taskId) {
+                            var decrementor = decrementExpectedAwaits.bind(null, taskId);
+                            returnValue.then(decrementor, decrementor);
                         } else if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
                             // scopeFunc returned an iterator with throw-support. Handle yield as await.
                             returnValue = awaitIterator(returnValue);
