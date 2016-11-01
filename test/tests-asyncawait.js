@@ -204,7 +204,7 @@ asyncTest("Must not leak PSD zone2", function() {
         return Promise.resolve().then(()=> {
             ok(Dexie.currentTransaction === trans, "Still same transaction 1");
             // Make sure native async functions maintains the zone:
-            let f = new Function('ok', 'equal', 'Dexie', 'trans','NativePromise',
+            let f = new Function('ok', 'equal', 'Dexie', 'trans','NativePromise', 'db',
             `return (async ()=>{
                 ok(Dexie.currentTransaction === trans, "Still same transaction 1.1");
                 await Promise.resolve();
@@ -213,8 +213,9 @@ asyncTest("Must not leak PSD zone2", function() {
                 ok(Dexie.currentTransaction === trans, "Still same transaction 1.3");
                 await window.Promise.resolve();
                 ok(Dexie.currentTransaction === trans, "Still same transaction 1.4");
+                await db.items.get(1);
             })()`);
-            return f(ok, equal, Dexie, trans, NativePromise);
+            return f(ok, equal, Dexie, trans, NativePromise, db);
         }).catch (e => {
             // Could not test native async functions in this browser.
             if (hasNativeAsyncFunctions)
@@ -250,20 +251,37 @@ asyncTest("Should be able to await Promise.all()", ()=>{
     (new Function('ok', 'equal', 'Dexie', 'db',
     `return db.transaction('r', db.items, async (trans)=>{
         ok(Dexie.currentTransaction === trans, "Correct initial transaction.");
+        var promises = [];
+        for (var i=0; i<50; ++i) {
+            promises.push(subAsync1(trans));
+        }
+        for (var i=0; i<50; ++i) {
+            promises.push(subAsync2(trans));
+        }
+        await Promise.all(promises);
+        ok(Dexie.currentTransaction === trans, "Still same transaction 1 - after await Promise.all([100 promises...]);");
         await Promise.all([1,2,3, db.items.get(2)]);
-        ok(Dexie.currentTransaction === trans, "Still same transaction 1 - after Promise.all(1,2,3,db.items.get(2))");
-        await Promise.all([subAsync(), 2, 3, subAsync()]);
-        ok(Dexie.currentTransaction === trans, "Still same transaction 2 - after await Promise.all([subAsync(), 2, 3, subAsync()]);");
+        ok(Dexie.currentTransaction === trans, "Still same transaction 2 - after Promise.all(1,2,3,db.items.get(2))");
         await db.items.get(1);
         ok(Dexie.currentTransaction === trans, "Still same transaction 3 - after await db.items.get(1);");
         await 3;
         ok(Dexie.currentTransaction === trans, "Still same transaction 4 - after await 3;");
     });
 
-    async function subAsync () {
+    async function subAsync1 (trans) {
         await 1;
-        await db.items.get(77);
-    }`))(ok, equal, Dexie, db)
+        await 2;
+        await 3;
+        if (Dexie.currentTransaction !== trans) ok(false, "Not in transaction");
+    }
+
+    async function subAsync2 (trans) {
+        await 1;
+        await 2;
+        if (Dexie.currentTransaction !== trans) ok(false, "Not in transaction 2");
+        await db.items.get(1);
+    }
+    `))(ok, equal, Dexie, db)
     .catch(e => {
         ok(false, e.stack || e);
     }).then(start);
@@ -339,7 +357,7 @@ promisedTest ("Should patch global Promise within transaction scopes but leave t
     });
 });
 
-promisedTest ("Should be able to use native transpiled async await", async () => {
+promisedTest ("Should be able to use transpiled async await", async () => {
     await db.transaction('rw', db.items, async ()=>{
         let trans = Dexie.currentTransaction;
         ok(!!trans, "Should have a current transaction");
@@ -386,4 +404,47 @@ promisedTest ("Should be able to use native transpiled async await", async () =>
     }).catch ('PrematureCommitError', ()=> {
         ok(true, "PROMISE IS INCOMPATIBLE WITH INDEXEDDB (https://github.com/dfahlander/Dexie.js/issues/317). Ignoring test.");
     })
+});
+
+promisedTest ("Should be able to use some simpe native async await even without zone echoing ", async () => {
+    if (!hasNativeAsyncFunctions) {
+        ok(true, "Browser doesnt support native async-await");
+        return;
+    }    
+    await (new Function('ok', 'equal', 'Dexie', 'db',
+    `return db.transaction('r', db.items, trans=> (async (trans) => {
+        ok(Dexie.currentTransaction === trans, "Correct initial transaction.");
+        await Promise.all([1,2,3, db.items.get(2), Promise.resolve()]);
+        ok(Dexie.currentTransaction === trans, "Still same transaction 1 - after Promise.all(1,2,3,db.items.get(2))");
+        await db.items.get(1);
+        ok(Dexie.currentTransaction === trans, "Still same transaction 2 - after await db.items.get(1);");
+    })(trans));`))(ok, equal, Dexie, db)
+});
+
+const GlobalPromise = Promise;
+promisedTest ("Should behave outside transactions as well", async () => {
+    if (!hasNativeAsyncFunctions) {
+        ok(true, "Browser doesnt support native async-await");
+        return;
+    }    
+    await (new Function('ok', 'equal', 'Dexie', 'db', 'GlobalPromise',
+    `async function doSomething() {
+        ok(!Dexie.currentTransaction, "Should be at global scope.");
+        ok(window.Promise !== Dexie.Promise, "window.Promise should be original");
+        ok(window.Promise === GlobalPromise, "window.Promise should be original indeed");
+        await db.items.get(1);
+        ok(!Dexie.currentTransaction, "Should be at global scope.");
+        await 3;
+        ok(!Dexie.currentTransaction, "Should be at global scope.");
+        await db.items.put({id:1, aj: "aj"});
+        ok(true, "Could put an item");
+        await db.items.update(1, {aj: "oj"});
+        ok(true, "Could query an item");
+        ok(!Dexie.currentTransaction, "Should be at global scope.");
+        await 4;
+        ok(!Dexie.currentTransaction, "Should be at global scope.");
+    }
+
+    return doSomething();
+    `))(ok, equal, Dexie, db, GlobalPromise)
 });

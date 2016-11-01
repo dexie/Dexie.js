@@ -1,31 +1,25 @@
-import {doFakeAutoComplete, tryCatch, props,
-        setProp, _global, getPropertyDescriptor, getArrayOf, extend} from './utils';
+import {doFakeAutoComplete, tryCatch, props, setProp, _global,
+    getPropertyDescriptor, getArrayOf, extend} from './utils';
 import {nop, callBoth, mirror} from './chaining-functions';
 import {debug, prettyStack, getErrorWithStack} from './debug';
 
 //
-// Promise Class for Dexie library
+// Promise and Zone (PSD) for Dexie library
 //
 // I started out writing this Promise class by copying promise-light (https://github.com/taylorhakes/promise-light) by
 // https://github.com/taylorhakes - an A+ and ECMASCRIPT 6 compliant Promise implementation.
 //
-// Modifications needed to be done to support indexedDB because it wont accept setTimeout()
-// (See discussion: https://github.com/promises-aplus/promises-spec/issues/45) .
-// This topic was also discussed in the following thread: https://github.com/promises-aplus/promises-spec/issues/45
-//
-// This implementation will not use setTimeout or setImmediate when it's not needed. The behavior is 100% Promise/A+ compliant since
-// the caller of new Promise() can be certain that the promise wont be triggered the lines after constructing the promise.
-//
 // In previous versions this was fixed by not calling setTimeout when knowing that the resolve() or reject() came from another
 // tick. In Dexie v1.4.0, I've rewritten the Promise class entirely. Just some fragments of promise-light is left. I use
-// another strategy now that simplifies everything a lot: to always execute callbacks in a new tick, but have an own microTick
-// engine that is used instead of setImmediate() or setTimeout().
+// another strategy now that simplifies everything a lot: to always execute callbacks in a new micro-task, but have an own micro-task
+// engine that is indexedDB compliant across all browsers.
 // Promise class has also been optimized a lot with inspiration from bluebird - to avoid closures as much as possible.
 // Also with inspiration from bluebird, asyncronic stacks in debug mode.
 //
 // Specific non-standard features of this Promise class:
-// * Async static context support (Promise.PSD)
-// * Promise.follow() method built upon PSD, that allows user to track all promises created from current stack frame
+// * Custom zone support (a.k.a. PSD) with ability to keep zones also when using native promises as well as
+//   native async / await.
+// * Promise.follow() method built upon the custom zone engine, that allows user to track all promises created from current stack frame
 //   and below + all promises that those promises creates or awaits.
 // * Detect any unhandled promise in a PSD-scope (PSD.onunhandled). 
 //
@@ -41,10 +35,11 @@ const
     LONG_STACKS_CLIP_LIMIT = 100,
     // When calling error.stack or promise.stack, limit the number of asyncronic stacks to print out. 
     MAX_LONG_STACKS = 20,
+    ZONE_ECHO_LIMIT = 7,
     nativePromiseInstanceAndProto = (()=>{
         try {
             // Be able to patch native async functions
-            return new Function("let F=async ()=>{};let p=F();return [p,Object.getPrototypeOf(p),Promise.resolve(),F.constructor];")();
+            return new Function(`let F=async ()=>{},p=F();return [p,Object.getPrototypeOf(p),Promise.resolve(),F.constructor];`)();
         } catch(e) {
             var P = _global.Promise;
             return P ?
@@ -57,14 +52,8 @@ const
     resolvedGlobalPromise = nativePromiseInstanceAndProto[2],
     nativePromiseThen = nativePromiseProto && nativePromiseProto.then;
 
-export const GlobalPromise = _global.Promise;
 export const NativePromise = resolvedNativePromise && resolvedNativePromise.constructor;
-export const task = { awaits: 0, echoes: 0, id: 0}; 
 export const AsyncFunction = nativePromiseInstanceAndProto[3];
-var taskCounter = 0;
-var bStackIsEmpty = true;
-var zoneStack = [];
-var zoneEchoes = 0; // zoneEchoes is a must in order to persist zones between native await expressions.
 
 var stack_being_generated = false;
 
@@ -178,16 +167,47 @@ export default function Promise(fn) {
     executePromiseTask(this, fn);
 }
 
-props(Promise.prototype, {
+// Prepare a property descriptor to put onto Promise.prototype.then
+const thenProp = {
+    get: function() {
+        var psd = PSD, microTaskId = totalEchoes;
 
-    then: function (onFulfilled, onRejected) {
-        var rv = new Promise((resolve, reject) => {
-            propagateToListener(this, new Listener(onFulfilled, onRejected, resolve, reject, PSD));
-        });
-        debug && (!this._prev || this._state === null) && linkToPreviousPromise(rv, this);
-        return rv;
+        function then (onFulfilled, onRejected) {
+            var possibleAwait = !psd.global && (psd !== PSD || microTaskId !== totalEchoes);
+            if (possibleAwait) decrementExpectedAwaits();
+            var rv = new Promise((resolve, reject) => {
+                propagateToListener(this, new Listener(
+                    nativeAwaitCompatibleWrap(onFulfilled, psd, possibleAwait),
+                    nativeAwaitCompatibleWrap(onRejected, psd, possibleAwait),
+                    resolve,
+                    reject,
+                    psd));
+            });
+            debug && (!this._prev || this._state === null) && linkToPreviousPromise(rv, this);
+            return rv;
+        }
+
+        then._tQzo = true; // For idempotense, see setter below.
+
+        return then;
     },
-        
+    // Be idempotent and allow another framework (such as zone.js or another instance of a Dexie.Promise module) to replace Promise.prototype.then
+    // and when that framework wants to restore the original property, we must identify that and restore the original property descriptor.
+    set: function (value) {
+        setProp (this, 'then', value && value._tQzo ?
+            thenProp : // Restore to original property descriptor.
+            {
+                get: function(){
+                    return value; // Getter returning provided value (behaves like value is just changed)
+                },
+                set: thenProp.set // Keep a setter that is prepared to restore original.
+            }
+        );
+    }
+};
+
+props(Promise.prototype, {
+    then: thenProp, // Defined above.
     _then: function (onFulfilled, onRejected) {
         // A little tinier version of then() that don't have to create a resulting promise.
         propagateToListener(this, new Listener(null, null, onFulfilled, onRejected, PSD));        
@@ -237,16 +257,7 @@ props(Promise.prototype, {
 
 // Now that Promise.prototype is defined, we have all it takes to set globalPSD.env.
 // Environment globals snapshotted on leaving global zone
-globalPSD.env = GlobalPromise ? {
-    Promise: GlobalPromise,
-    all: GlobalPromise.all,
-    race: GlobalPromise.race,
-    resolve: GlobalPromise.resolve,
-    reject: GlobalPromise.reject,
-    nthen: nativePromiseProto.then,
-    gthen: GlobalPromise.prototype.then,
-    dthen: Promise.prototype.then
-} : {dthen: Promise.prototype.then};
+globalPSD.env = snapShot();
 
 function Listener(onFulfilled, onRejected, resolve, reject, zone) {
     this.onFulfilled = typeof onFulfilled === 'function' ? onFulfilled : null;
@@ -293,7 +304,9 @@ props (Promise, {
         set: value => PSD = value
     },
 
-    task: {get: ()=>task},
+    //totalEchoes: {get: ()=>totalEchoes},
+
+    //task: {get: ()=>task},
     
     newPSD: newScope,
     
@@ -595,6 +608,17 @@ export function wrap (fn, errorCatcher) {
     };
 }
 
+
+//
+// variables used for native await support
+//
+const task = { awaits: 0, echoes: 0, id: 0}; // The ongoing macro-task when using zone-echoing.
+var taskCounter = 0; // ID counter for macro tasks.
+var zoneStack = []; // Stack of left zones to restore asynchronically.
+var zoneEchoes = 0; // zoneEchoes is a must in order to persist zones between native await expressions.
+var totalEchoes = 0; // ID counter for micro-tasks. Used to detect possible native await in our Promise.prototype.then.
+
+
 var zone_id_counter = 0;
 export function newScope (fn, props, a1, a2) {
     var parent = PSD,
@@ -612,11 +636,8 @@ export function newScope (fn, props, a1, a2) {
         resolve: Promise.resolve,
         reject: Promise.reject,
         nthen: getPatchedPromiseThen (globalEnv.nthen, psd), // native then
-        gthen: getPatchedPromiseThen (globalEnv.gthen, psd), // global then
-        dthen: getPatchedPromiseThen (globalEnv.dthen, psd)  // dexie then
-    } : {
-        dthen: getPatchedPromiseThen (globalEnv.dthen, psd)
-    };
+        gthen: getPatchedPromiseThen (globalEnv.gthen, psd) // global then
+    } : {};
     if (props) extend(psd, props);
     
     // unhandleds and onunhandled should not be specifically set here.
@@ -632,18 +653,12 @@ export function newScope (fn, props, a1, a2) {
     return rv;
 }
 
-// Function to call before transaction scopeFunc is called.
-export function ensureTaskStarted() {
-    if (!task.id) task.id = ++taskCounter;
-    ++task.echoes; // Will be 1 on first start (enough to prepare before knowing if we will expect an await in the task)
-}
-
 // Function to call if scopeFunc returns NativePromise
 // Also for each NativePromise in the arguments to Promise.all()
 export function incrementExpectedAwaits() {
     if (!task.id) task.id = ++taskCounter;
     ++task.awaits;
-    task.echoes += 10;
+    task.echoes += ZONE_ECHO_LIMIT;
     return task.id;
 }
 // Function to call when 'then' calls back on a native promise where onAwaitExpected() had been called.
@@ -652,91 +667,92 @@ export function incrementExpectedAwaits() {
 export function decrementExpectedAwaits(sourceTaskId) {
     if (!task.awaits || (sourceTaskId && sourceTaskId !== task.id)) return;
     if (--task.awaits === 0) task.id = 0;
-    task.echoes = task.awaits * 10; // Will reset echoes to 0 if awaits is 0.
+    task.echoes = task.awaits * ZONE_ECHO_LIMIT; // Will reset echoes to 0 if awaits is 0.
 }
 
 // Call from Promise.all() and Promise.race()
 export function onPossibleParallellAsync (possiblePromise) {
-    if (task.echoes && (possiblePromise instanceof NativePromise)) {
-        var taskId = incrementExpectedAwaits();
-        return possiblePromise.then(
-            x => {
-                decrementExpectedAwaits(taskId);
-                return x;
-            },
-            e => {
-                decrementExpectedAwaits(taskId);
-                return Promise.reject(e);
-            });
+    if (task.echoes && possiblePromise && possiblePromise.constructor === NativePromise) {
+        incrementExpectedAwaits(); 
+        return possiblePromise.then(x => {
+            decrementExpectedAwaits();
+            return x;
+        }, e => {
+            decrementExpectedAwaits();
+            return rejection(e);
+        });
     }
     return possiblePromise;
 }
 
 function zoneEnterEcho(targetZone) {
-    if (!task.echoes || --task.echoes === 0)
+    ++totalEchoes;
+    if (!task.echoes || --task.echoes === 0) {
         task.echoes = task.id = 0; // Cancel zone echoing.
+    }
 
     zoneStack.push(PSD);
     switchToZone(targetZone, true);
-    bStackIsEmpty = true;
 }
 
 function zoneLeaveEcho() {
     var zone = zoneStack[zoneStack.length-1];
     zoneStack.pop();
     switchToZone(zone, false);
-    bStackIsEmpty = true;
 }
 
 function switchToZone (targetZone, bEnteringZone) {
-    bStackIsEmpty = false; // If not called from switchToZoneAsync, we're called by usePSD or wrap - we are in-stack!
     var currentZone = PSD;
-    if (bEnteringZone ? task.echoes : zoneEchoes) {
-        bEnteringZone ? ++zoneEchoes : --zoneEchoes;
+    if (bEnteringZone ? task.echoes && (!zoneEchoes++ || targetZone !== PSD) : zoneEchoes && (!--zoneEchoes || targetZone !== PSD)) {
         // Enter or leave zone asynchronically as well, so that tasks initiated during current tick
         // will be surrounded by the zone when they are invoked.
-        enqueueNativeMicroTask(bEnteringZone ? zoneEnterEcho.bind(null, targetZone) : zoneLeaveEcho); 
+        enqueueNativeMicroTask(bEnteringZone ? zoneEnterEcho.bind(null, targetZone) : zoneLeaveEcho);
     }
     if (targetZone === PSD) return;
 
-    PSD = targetZone;
-
-    var globalEnv = globalPSD.env,
-        targetEnv = targetZone.env,
-        GPromise;
+    PSD = targetZone; // The actual zone switch occurs at this line.
 
     // Snapshot on every leave from global zone.
-    if (GPromise && currentZone === globalPSD) {
-        GPromise = _global.Promise;
-        globalEnv.Promise = GPromise; // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
-        globalEnv.all = GPromise.all;
-        globalEnv.race = GPromise.race;
-        globalEnv.resolve = GPromise.resolve;
-        globalEnv.reject = GPromise.reject;
-        globalEnv.nthen = nativePromiseProto.then;
-        globalEnv.gthen = GPromise.prototype.then;
-        globalEnv.dthen = Promise.prototype.then;
-    } else {
-        GPromise = globalEnv.Promise;
-    }
-    
-    // Patch our own Promise to keep zones in it:
-    Promise.prototype.then = targetEnv.dthen;
-    
-    if (GPromise) {
-        // Swich environments
+    if (currentZone === globalPSD) globalPSD.env = snapShot();
 
-        // Set this Promise to window.Promise so that Typescript 2.0's async functions will work on Firefox, Safari and IE, as well as with Zonejs and angular.
-        _global.Promise = targetEnv.Promise;
-        
-        // Also patch the global and native Promise (need to patch both if using zone.js or has polyfilled Promise)
+    var GlobalPromise = globalPSD.env.Promise;
+    if (GlobalPromise) {
+        // Global environment has a promise at this time. Polyfilled or not. Let's patch the global environment.
+        // Swich environments (may be PSD-zone or the global zone. Both apply.)
+        var targetEnv = targetZone.env;
+
+        // Change Promise.prototype.then for native and global Promise (they MAY differ on polyfilled environments, but both can be accessed)
+        // Must be done on each zone change because the patched method contains targetZone in its closure.
         nativePromiseProto.then = targetEnv.nthen;
-        GPromise.prototype.then = targetEnv.gthen;
-        GPromise.all = targetEnv.all;
-        GPromise.race = targetEnv.race;
-        GPromise.resolve = targetEnv.resolve;
-        GPromise.reject = targetEnv.reject;
+        GlobalPromise.prototype.then = targetEnv.gthen;
+
+        if (currentZone.global || targetZone.global) {
+            // Leaving or entering global zone. It's time to patch / restore global Promise.
+
+            // Set this Promise to window.Promise so that transiled async functions will work on Firefox, Safari and IE, as well as with Zonejs and angular.
+            _global.Promise = targetEnv.Promise;
+
+            // Support Promise.all() etc to work indexedDB-safe also when people are including es6-promise as a module (they might
+            // not be accessing global.Promise but a local reference to it)
+            GlobalPromise.all = targetEnv.all;
+            GlobalPromise.race = targetEnv.race;
+            GlobalPromise.resolve = targetEnv.resolve;
+            GlobalPromise.reject = targetEnv.reject;
+        }
     }
+}
+
+function snapShot () {
+    var GlobalPromise = _global.Promise;
+    return GlobalPromise ? {
+        Promise: GlobalPromise,
+        all: GlobalPromise.all,
+        race: GlobalPromise.race,
+        resolve: GlobalPromise.resolve,
+        reject: GlobalPromise.reject,
+        nthen: nativePromiseProto.then,
+        gthen: GlobalPromise.prototype.then
+    } : {};
 }
 
 export function usePSD (psd, fn, a1, a2, a3) {
@@ -771,11 +787,9 @@ function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
 
 function getPatchedPromiseThen (origThen, zone) {
     return function (onResolved, onRejected) {
-        var possibleAwait = (zone !== PSD || bStackIsEmpty);
-        if (possibleAwait) decrementExpectedAwaits();
         return origThen.call(this,
-            nativeAwaitCompatibleWrap(onResolved, zone, possibleAwait),
-            nativeAwaitCompatibleWrap(onRejected, zone, possibleAwait));
+            nativeAwaitCompatibleWrap(onResolved, zone, false),
+            nativeAwaitCompatibleWrap(onRejected, zone, false));
     };
 }
 
