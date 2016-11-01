@@ -1463,8 +1463,8 @@ export default function Dexie(dbName, options) {
 
             if (this._locked()) {
                 return new Promise((resolve, reject) => {
-                    self._blockedFuncs.push([() => {
-                        self._promise(mode, fn, bWriteLock).then(resolve, reject);
+                    this._blockedFuncs.push([() => {
+                        this._promise(mode, fn, bWriteLock).then(resolve, reject);
                     }, PSD]);
                 });
 
