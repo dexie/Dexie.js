@@ -40,7 +40,7 @@ import {
 
 } from './utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
-import Promise, {wrap, PSD, newScope, usePSD, rejection, NativePromise, ensureTaskStarted,
+import Promise, {wrap, PSD, newScope, usePSD, rejection, NativePromise,
     incrementExpectedAwaits, decrementExpectedAwaits, AsyncFunction} from './Promise';
 import Events from './Events';
 import {
@@ -799,9 +799,8 @@ export default function Dexie(dbName, options) {
                 }
 
                 // Support for native async await.
-                var taskId;
                 if (scopeFunc.constructor === AsyncFunction) {
-                    taskId = incrementExpectedAwaits();
+                    incrementExpectedAwaits();
                 }
 
                 var returnValue;
@@ -809,8 +808,8 @@ export default function Dexie(dbName, options) {
                     // Finally, call the scope function with our table and transaction arguments.
                     returnValue = scopeFunc.call(trans, trans);
                     if (returnValue) {
-                        if (taskId) {
-                            var decrementor = decrementExpectedAwaits.bind(null, taskId);
+                        if (returnValue.constructor === NativePromise) {
+                            var decrementor = decrementExpectedAwaits.bind(null, null);
                             returnValue.then(decrementor, decrementor);
                         } else if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
                             // scopeFunc returned an iterator with throw-support. Handle yield as await.
