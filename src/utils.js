@@ -184,6 +184,18 @@ export function shallowClone(obj) {
     return rv;
 }
 
+const concat = [].concat;
+export function flatten (a) {
+    return concat.apply([], a);
+}
+
+//https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm
+var intrinsicTypes =
+    "Boolean,String,Date,RegExp,Blob,File,FileList,ArrayBuffer,DataView,Uint8ClampedArray,ImageData,Map,Set"
+    .split(',').concat(
+        flatten([8,16,32,64].map(num=>["Int","Uint","Float"].map(t=>t+num+"Array")))
+    ).filter(t=>_global[t]).map(t=>_global[t])
+
 export function deepClone(any) {
     if (!any || typeof any !== 'object') return any;
     var rv;
@@ -192,9 +204,8 @@ export function deepClone(any) {
         for (var i = 0, l = any.length; i < l; ++i) {
             rv.push(deepClone(any[i]));
         }
-    } else if (any instanceof Date) {
-        rv = new Date();
-        rv.setTime(any.getTime());
+    } else if (intrinsicTypes.indexOf(any.constructor) >= 0) {
+        rv = any;
     } else {
         rv = any.constructor ? Object.create(any.constructor.prototype) : {};
         for (var prop in any) {
@@ -272,9 +283,4 @@ export function getArrayOf (arrayLike) {
     a = new Array(i);
     while (i--) a[i] = arguments[i];
     return a;
-}
-
-const concat = [].concat;
-export function flatten (a) {
-    return concat.apply([], a);
 }
