@@ -453,7 +453,7 @@ export default function Dexie(dbName, options) {
     }
 
     this._whenReady = function (fn) {
-        return new Promise (fake || openComplete || PSD.letThrough ? fn : (resolve, reject) => {
+        return fake || openComplete || PSD.letThrough ? fn() : new Promise ((resolve, reject) => {
             if (!isBeingOpened) {
                 if (!autoOpen) {
                     reject(new exceptions.DatabaseClosed());
@@ -462,7 +462,7 @@ export default function Dexie(dbName, options) {
                 db.open().catch(nop); // Open in background. If if fails, it will be catched by the final promise anyway.
             }
             dbReadyPromise.then(()=>{
-                fn(resolve, reject);
+                fn().then(resolve, reject);
             });
         });
     };
@@ -777,11 +777,10 @@ export default function Dexie(dbName, options) {
             parentTransaction._promise(mode, enterTransactionScope, "lock") :
             db._whenReady (enterTransactionScope));
             
-        function enterTransactionScope(resolve) {
-            var parentPSD = PSD;
-            resolve(Promise.resolve().then(()=>{
+        function enterTransactionScope() {
+            return Promise.resolve().then(()=>{
                 // Keep a pointer to last non-transactional PSD to use if someone calls Dexie.ignoreTransaction().
-                var transless = PSD.transless || parentPSD;
+                var transless = PSD.transless || PSD;
                 // Our transaction.
                 //return new Promise((resolve, reject) => {
                 var trans = db._createTransaction(mode, storeNames, globalSchema, parentTransaction);
@@ -828,7 +827,7 @@ export default function Dexie(dbName, options) {
                     trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
                     return rejection(e);
                 });
-            }));
+            });
         }
     };
 
@@ -920,7 +919,7 @@ export default function Dexie(dbName, options) {
             var trans = PSD.trans,
                 tableName = this.name;
             function supplyIdbStore (resolve, reject, trans) {
-                fn(resolve, reject, trans.idbtrans.objectStore(tableName), trans);
+                return fn(resolve, reject, trans.idbtrans.objectStore(tableName), trans);
             }
             return trans && trans.db === db ?
                 trans._promise (mode, supplyIdbStore, writeLocked) :
@@ -1998,17 +1997,15 @@ export default function Dexie(dbName, options) {
 
             _read: function (fn, cb) {
                 var ctx = this._ctx;
-                if (ctx.error)
-                    return ctx.table._trans(null, function rejector(resolve, reject) { reject(ctx.error); });
-                else
-                    return ctx.table._idbstore(READONLY, fn).then(cb);
+                return ctx.error ?
+                    ctx.table._trans(null, rejection.bind(null, ctx.error)) :
+                    ctx.table._idbstore(READONLY, fn).then(cb);
             },
             _write: function (fn) {
                 var ctx = this._ctx;
-                if (ctx.error)
-                    return ctx.table._trans(null, function rejector(resolve, reject) { reject(ctx.error); });
-                else
-                    return ctx.table._idbstore(READWRITE, fn, "locked"); // When doing write operations on collections, always lock the operation so that upcoming operations gets queued.
+                return ctx.error ?
+                    ctx.table._trans(null, rejection.bind(null, ctx.error)) :
+                    ctx.table._idbstore(READWRITE, fn, "locked"); // When doing write operations on collections, always lock the operation so that upcoming operations gets queued.
             },
             _addAlgorithm: function (fn) {
                 var ctx = this._ctx;
