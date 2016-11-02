@@ -2,8 +2,6 @@ import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
 import {resetDatabase, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
-"use strict";
-
 const hasNativeAsyncFunctions = false;
 try {
     hasNativeAsyncFunctions = !!new Function(`return (async ()=>{})();`)().then;
