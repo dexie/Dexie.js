@@ -920,7 +920,7 @@ export default function Dexie(dbName, options) {
                 tableName = this.name;
             function supplyIdbStore (resolve, reject, trans) {
                 if (trans.storeNames.indexOf(tableName) === -1)
-                    throw new exceptions.InvalidTable("Table" + tableName + " not part of transaction");
+                    throw new exceptions.NotFound("Table" + tableName + " not part of transaction");
                 return fn(resolve, reject, trans.idbtrans.objectStore(tableName), trans);
             }
             return trans && trans.db === db ?
