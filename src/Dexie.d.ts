@@ -11,7 +11,9 @@ interface Thenable<R> {
 }
 
 declare type IndexableTypePart = string | number | Date | Array<Array<void>>;
-declare type IndexableType = IndexableTypePart | Array<IndexableTypePart>;
+declare type IndexableTypeArray = Array<IndexableTypePart>;
+declare type IndexableTypeArrayReadonly = ReadonlyArray<IndexableTypePart>;
+declare type IndexableType = IndexableTypePart | IndexableTypeArrayReadonly;
 
 declare class Dexie {
     constructor(databaseName: string, options?: {
@@ -247,7 +249,7 @@ declare module Dexie {
             deleting: DexieEvent;
         }
 
-        get(key: Key): Promise<T>;
+        get(key: Key): Promise<T | undefined>;
         where(index: string): WhereClause<T, Key>;
 
         filter(fn: (obj: T) => boolean): Collection<T, Key>;
@@ -275,16 +277,16 @@ declare module Dexie {
         put(item: T, key?: Key): Promise<Key>;
         delete(key: Key): Promise<void>;
         clear(): Promise<void>;
-        bulkAdd(items: T[], keys?: IndexableType[]): Promise<Key>;
-        bulkPut(items: T[], keys?: IndexableType[]): Promise<Key>;
-        bulkDelete(keys: IndexableType[]) : Promise<void>;
+        bulkAdd(items: T[], keys?: IndexableTypeArrayReadonly): Promise<Key>;
+        bulkPut(items: T[], keys?: IndexableTypeArrayReadonly): Promise<Key>;
+        bulkDelete(keys: IndexableTypeArrayReadonly) : Promise<void>;
     }
 
     interface WhereClause<T, Key> {
         above(key: IndexableType): Collection<T, Key>;
         aboveOrEqual(key: IndexableType): Collection<T, Key>;
-        anyOf(keys: IndexableType[]): Collection<T, Key>;
-        anyOf(...keys: IndexableType[]): Collection<T, Key>;
+        anyOf(keys: IndexableTypeArrayReadonly): Collection<T, Key>;
+        anyOf(...keys: IndexableTypeArrayReadonly): Collection<T, Key>;
         anyOfIgnoreCase(keys: string[]): Collection<T, Key>;
         anyOfIgnoreCase(...keys: string[]): Collection<T, Key>;
         below(key: IndexableType): Collection<T, Key>;
@@ -292,7 +294,7 @@ declare module Dexie {
         between(lower: IndexableType, upper: IndexableType, includeLower?: boolean, includeUpper?: boolean): Collection<T, Key>;
         equals(key: IndexableType): Collection<T, Key>;
         equalsIgnoreCase(key: string): Collection<T, Key>;
-        inAnyRange(ranges: Array<IndexableType[]>): Collection<T, Key>;
+        inAnyRange(ranges: Array<IndexableTypeArrayReadonly>): Collection<T, Key>;
         startsWith(key: string): Collection<T, Key>;
         startsWithAnyOf(prefixes: string[]): Collection<T, Key>;
         startsWithAnyOf(...prefixes: string[]): Collection<T, Key>;
@@ -315,18 +317,18 @@ declare module Dexie {
         eachPrimaryKey(callback: (key: Key, cursor: {key: IndexableType, primaryKey: Key}) => any): Promise<void>;
         eachUniqueKey(callback: (key: IndexableType, cursor: {key: IndexableType, primaryKey: Key}) => any): Promise<void>;
         filter(filter: (x: T) => boolean): Collection<T, Key>;
-        first(): Promise<T>;
-        first<U>(onFulfilled: (value: T) => Thenable<U>): Promise<U>;
-        first<U>(onFulfilled: (value: T) => U): Promise<U>;
-        keys(): Promise<IndexableType[]>;
-        keys<U>(onFulfilled: (value: IndexableType[]) => Thenable<U>): Promise<U>;
-        keys<U>(onFulfilled: (value: IndexableType[]) => U): Promise<U>;
+        first(): Promise<T | undefined>;
+        first<U>(onFulfilled: (value: T | undefined) => Thenable<U>): Promise<U>;
+        first<U>(onFulfilled: (value: T | undefined) => U): Promise<U>;
+        keys(): Promise<IndexableTypeArray>;
+        keys<U>(onFulfilled: (value: IndexableTypeArray) => Thenable<U>): Promise<U>;
+        keys<U>(onFulfilled: (value: IndexableTypeArray) => U): Promise<U>;
         primaryKeys(): Promise<Key[]>;
         primaryKeys<U>(onFulfilled: (value: Key[]) => Thenable<U>): Promise<U>;
         primaryKeys<U>(onFulfilled: (value: Key[]) => U): Promise<U>;
-        last(): Promise<T>;
-        last<U>(onFulfilled: (value: T) => Thenable<U>): Promise<U>;
-        last<U>(onFulfilled: (value: T) => U): Promise<U>;
+        last(): Promise<T | undefined>;
+        last<U>(onFulfilled: (value: T | undefined) => Thenable<U>): Promise<U>;
+        last<U>(onFulfilled: (value: T | undefined) => U): Promise<U>;
         limit(n: number): Collection<T, Key>;
         offset(n: number): Collection<T, Key>;
         or(indexOrPrimayKey: string): WhereClause<T, Key>;
@@ -338,9 +340,9 @@ declare module Dexie {
         toArray(): Promise<Array<T>>;
         toArray<U>(onFulfilled: (value: Array<T>) => Thenable<U>): Promise<U>;
         toArray<U>(onFulfilled: (value: Array<T>) => U): Promise<U>;
-        uniqueKeys(): Promise<IndexableType[]>;
-        uniqueKeys<U>(onFulfilled: (value: IndexableType[]) => Thenable<U>): Promise<U>;
-        uniqueKeys<U>(onFulfilled: (value: IndexableType[]) => U): Promise<U>;
+        uniqueKeys(): Promise<IndexableTypeArray>;
+        uniqueKeys<U>(onFulfilled: (value: IndexableTypeArray) => Thenable<U>): Promise<U>;
+        uniqueKeys<U>(onFulfilled: (value: IndexableTypeArray) => U): Promise<U>;
         until(filter: (value: T) => boolean, includeStopEntry?: boolean): Collection<T, Key>;
         // WriteableCollection:
         delete(): Promise<number>;
@@ -415,9 +417,9 @@ declare module Dexie {
     }
     
     class ModifyError extends DexieError{
-        constructor (msg?:string, failures?: any[], successCount?: number, failedKeys?: IndexableType[]);
+        constructor (msg?:string, failures?: any[], successCount?: number, failedKeys?: IndexableTypeArrayReadonly);
         failures: Array<any>;
-        failedKeys: Array<IndexableType>;
+        failedKeys: IndexableTypeArrayReadonly;
         successCount: number;
     }
     
