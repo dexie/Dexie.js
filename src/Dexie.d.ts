@@ -10,7 +10,12 @@ interface Thenable<R> {
     then<U>(onFulfilled?: (value: R) => U, onRejected?: (error: any) => U): Thenable<U>;
 }
 
-declare type IndexableTypePart = string | number | Date | Array<Array<void>>;
+declare type IndexableTypePart =
+    string | number | Date | Array<Array<void>> | ArrayBuffer |
+    Uint8Array | Uint16Array | Uint32Array | Int8Array | Int16Array | Int32Array |
+    Float32Array | Float64Array |
+    Uint8ClampedArray | DataView;
+
 declare type IndexableTypeArray = Array<IndexableTypePart>;
 declare type IndexableTypeArrayReadonly = ReadonlyArray<IndexableTypePart>;
 declare type IndexableType = IndexableTypePart | IndexableTypeArrayReadonly;
