@@ -104,8 +104,16 @@ export function supports (features) {
                 return result && (hasPolyfillIE || (!isIE && !isEdge)); // Should add Safari to
             case "multientry":
                 return result && (hasPolyfillIE || (!isIE && !isEdge)); // Should add Safari to
-            case "versionchange": return true;
+            case "versionchange":
+                return true;
                 //return result && (!isIE && !isEdge); // Should add Safari to
+            case "binarykeys":
+                try {
+                    return indexedDB.cmp(new Uint8Array([1]), new Uint8Array([1])) === 0;
+                } catch (e) {
+                    return false;
+                }
+
             default:
                 throw new Error ("Unknown feature: " + feature);
         }
