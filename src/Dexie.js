@@ -59,6 +59,7 @@ var DEXIE_VERSION = '{version}',
     // maxKey is an Array<Array> if indexedDB implementations supports array keys (not supported by IE,Edge or Safari at the moment)
     // Otherwise maxKey is maxString. This is handy when needing an open upper border without limit.
     maxKey = (function(){try {IDBKeyRange.only([[]]);return [[]];}catch(e){return maxString;}})(),
+    minKey = -Infinity,
     INVALID_KEY_ARGUMENT = "Invalid key provided. Keys must be of type string, number, Date or Array<string | number | Date>.",
     STRING_EXPECTED = "String expected.",
     connections = [],
@@ -1731,15 +1732,15 @@ export default function Dexie(dbName, options) {
             },
 
             notEqual: function(value) {
-                return this.inAnyRange([[-Infinity, value],[value, maxKey]], {includeLowers: false, includeUppers: false});
+                return this.inAnyRange([[minKey, value],[value, maxKey]], {includeLowers: false, includeUppers: false});
             },
 
             noneOf: function() {
                 var set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
                 if (set.length === 0) return new Collection (this); // Return entire collection.
                 try { set.sort(ascending); } catch(e) { return fail(this, INVALID_KEY_ARGUMENT);}
-                // Transform ["a","b","c"] to a set of ranges for between/above/below: [[-Infinity,"a"], ["a","b"], ["b","c"], ["c",maxKey]]
-                var ranges = set.reduce(function (res, val) { return res ? res.concat([[res[res.length - 1][1], val]]) : [[-Infinity, val]]; }, null);
+                // Transform ["a","b","c"] to a set of ranges for between/above/below: [[minKey,"a"], ["a","b"], ["b","c"], ["c",maxKey]]
+                var ranges = set.reduce(function (res, val) { return res ? res.concat([[res[res.length - 1][1], val]]) : [[minKey, val]]; }, null);
                 ranges.push([set[set.length - 1], maxKey]);
                 return this.inAnyRange(ranges, {includeLowers: false, includeUppers: false});
             },
@@ -3046,6 +3047,7 @@ props(Dexie, {
     getObjectDiff: getObjectDiff,
     asap: asap,
     maxKey: maxKey,
+    minKey: minKey,
     // Addon registry
     addons: [],
     // Global DB connection list

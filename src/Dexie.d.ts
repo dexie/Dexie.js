@@ -10,7 +10,8 @@ interface Thenable<R> {
     then<U>(onFulfilled?: (value: R) => U, onRejected?: (error: any) => U): Thenable<U>;
 }
 
-declare type IndexableType = string | number | Date | Array<string | number | Date>;
+declare type IndexableTypePart = string | number | Date | Array<Array<void>>;
+declare type IndexableType = IndexableTypePart | Array<IndexableTypePart>;
 
 declare class Dexie {
     constructor(databaseName: string, options?: {
@@ -49,7 +50,8 @@ declare class Dexie {
     
     static asap(fn: Function) : void;
     
-    static maxKey: Array<string>;
+    static maxKey: Array<Array<void>> | string;
+    static minKey: number;
     
     static dependencies: {
         indexedDB: IDBFactory,
