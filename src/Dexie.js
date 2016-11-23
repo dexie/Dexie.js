@@ -938,7 +938,7 @@ export default function Dexie(dbName, options) {
             var self = this;
             return this._idbstore(READONLY, function (resolve, reject, idbstore) {
                 fake && resolve(self.schema.instanceTemplate);
-                var req = idbstore.get(key);
+                var req = idbstore.get(keyOrCrit);
                 req.onerror = eventRejectHandler(reject);
                 req.onsuccess = wrap(function () {
                     resolve(self.hook.reading.fire(req.result));
@@ -974,7 +974,7 @@ export default function Dexie(dbName, options) {
                     .equals(compoundIndex.keyPath.map(kp => indexOrCrit[kp]));
 
             if (!compoundIndex) console.warn(
-                `The query ${indexOrCrit} on ${this.name} would benefit of a `
+                `The query ${indexOrCrit} on ${this.name} would benefit of a ` +
                 `compound index [${keyPaths.join('+')}]`);
                 
             // Ok, now let's fallback to finding at least one matching index
