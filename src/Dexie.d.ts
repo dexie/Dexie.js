@@ -10,10 +10,7 @@ interface Thenable<R> {
 }
 
 declare type IndexableTypePart =
-    string | number | Date | Array<Array<void>> | ArrayBuffer |
-    Uint8Array | Uint16Array | Uint32Array | Int8Array | Int16Array | Int32Array |
-    Float32Array | Float64Array |
-    Uint8ClampedArray | DataView;
+    string | number | Date | ArrayBuffer | ArrayBufferView | DataView | Array<Array<void>>;
 
 declare type IndexableTypeArray = Array<IndexableTypePart>;
 declare type IndexableTypeArrayReadonly = ReadonlyArray<IndexableTypePart>;
@@ -292,7 +289,7 @@ declare module Dexie {
         above(key: IndexableType): Collection<T, Key>;
         aboveOrEqual(key: IndexableType): Collection<T, Key>;
         anyOf(keys: IndexableTypeArrayReadonly): Collection<T, Key>;
-        anyOf(...keys: IndexableTypeArrayReadonly): Collection<T, Key>;
+        anyOf(...keys: IndexableTypeArray): Collection<T, Key>;
         anyOfIgnoreCase(keys: string[]): Collection<T, Key>;
         anyOfIgnoreCase(...keys: string[]): Collection<T, Key>;
         below(key: IndexableType): Collection<T, Key>;

@@ -39,10 +39,16 @@
                             UPDATE = 2,
                             DELETE = 3;
 
-                        onChangesAccepted();
+                        onChangesAccepted().catch('DatabaseClosedError', function () {
+                            console.log("Got DatabaseClosedError while calling onChangesAccepted()");
+                        });
 
-                        applyRemoteChanges([], "ServerRevision" + dummyRev++, true, false);
-                        applyRemoteChanges([], "ServerRevision" + dummyRev++, false, false);
+                        applyRemoteChanges([], "ServerRevision" + dummyRev++, true, false).catch('DatabaseClosedError', function() {
+                            console.log("Got DatabaseClosedError while calling applyRemoteChanges()");
+                        });
+                        applyRemoteChanges([], "ServerRevision" + dummyRev++, false, false).catch('DatabaseClosedError', function(){
+                            console.log("Got DatabaseClosedError while calling applyRemoteChanges()");
+                        })
 
                         /*var dummyPoller = setInterval(function(){
                         applyRemoteChanges([], "ServerRevision" + dummyRev++, true, false);

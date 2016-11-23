@@ -392,6 +392,8 @@ asyncTest("Issue #67 - Regression test - Transaction still fails if error in key
 });
 
 asyncTest("Issue #69 Global exception handler for promises", function () {
+    //
+    Dexie.debug = true;
     var errorList = [];
     function globalRejectionHandler(ev) {
         console.log("Got error: " + ev.reason);
@@ -449,7 +451,7 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
             db.version(1).stores({ table1: "id" });
             db.open().then(function() {
                 console.log("before");
-                throw "FOO"; // Here a generic error is thrown (not a DB error)
+                throw new Error("FOO"); // Here a generic error is thrown (not a DB error)
                 //console.log("after");
             });
             db.delete().finally(function() {
@@ -459,7 +461,10 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
                 equal(errorList[2], "Simple error 1", "Simple error 1");
                 equal(errorList[3].message, "Converting a rejected standard promise to Dexie.Promise but don't catch it", "Converting a rejected standard promise to Dexie.Promise but don't catch it");
                 equal(errorList[4], "forth error (uncatched but with finally)", "forth error (uncatched but with finally)");
-                equal(errorList[5], "FOO", "FOO");
+                equal(errorList[5].message, "FOO", "FOO");
+                errorList.slice(6).forEach((e,i) => {
+                    console.error (i + ": " + e.stack);
+                });
                 // cleanup:
                 window.removeEventListener('unhandledrejection', globalRejectionHandler);
                 start();

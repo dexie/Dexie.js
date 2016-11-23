@@ -155,6 +155,8 @@ export default function Dexie(dbName, options) {
         versionInstance = new Version(versionNumber);
         versions.push(versionInstance);
         versions.sort(lowerVersionFirst);
+        // Disable autoschema mode, as at least one version is specified.
+        autoSchema = false;
         return versionInstance;
     };
 
@@ -405,14 +407,6 @@ export default function Dexie(dbName, options) {
 
     this._allTables = allTables;
 
-    this._tableFactory = function createTable(mode, tableSchema) {
-        // Todo: This _tableFactory is meaningless as of Dexie 1.4, but it is used by
-        // Dexie.Observable to hook into CRUD operations. Should Change Dexie.Observable
-        // to use another strategy than overloading db._tableFactory. Then, we could
-        // also remove this method and instead just do new Table() where it is called upon.
-        return new Table(tableSchema.name, tableSchema);
-    };
-
     this._createTransaction = function (mode, storeNames, dbschema, parentTransaction) {
         return new Transaction(mode, storeNames, dbschema, parentTransaction);
     };
@@ -462,10 +456,8 @@ export default function Dexie(dbName, options) {
                 }
                 db.open().catch(nop); // Open in background. If if fails, it will be catched by the final promise anyway.
             }
-            dbReadyPromise.then(()=>{
-                fn().then(resolve, reject);
-            });
-        });
+            dbReadyPromise.then(resolve, reject);
+        }).then(fn);
     };
     
     //
@@ -494,9 +486,6 @@ export default function Dexie(dbName, options) {
         
         return Promise.race([openCanceller, new Promise((resolve, reject) => {
             doFakeAutoComplete(()=>resolve());
-            
-            // Make sure caller has specified at least one version
-            if (versions.length > 0) autoSchema = false;
             
             // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
             // IE fails when deleting objectStore after reading from it.
@@ -846,10 +835,11 @@ export default function Dexie(dbName, options) {
     //
     //
     //
-    function Table(name, tableSchema) {
+    function Table(name, tableSchema, optionalTrans) {
         /// <param name="name" type="String"></param>
         this.name = name;
         this.schema = tableSchema;
+        this._tx = optionalTrans;
         this.hook = allTables[name] ? allTables[name].hook : Events(null, {
             "creating": [hookCreatingChain, nop],
             "reading": [pureFunctionChain, mirror],
@@ -910,23 +900,22 @@ export default function Dexie(dbName, options) {
         //
 
         _trans: function getTransaction(mode, fn, writeLocked) {
-            var trans = PSD.trans;
+            var trans = this._tx || PSD.trans;
             return trans && trans.db === db ?
-                trans._promise (mode, fn, writeLocked) :
+                trans === PSD.trans ?
+                    trans._promise (mode, fn, writeLocked) :
+                    newScope(()=>trans._promise(mode, fn, writeLocked), {trans: trans, transless: PSD.transless || PSD}) :
                 tempTransaction (mode, [this.name], fn);
         },
         _idbstore: function getIDBObjectStore(mode, fn, writeLocked) {
             if (fake) return new Promise(fn); // Simplify the work for Intellisense/Code completion.
-            var trans = PSD.trans,
-                tableName = this.name;
+            var tableName = this.name;
             function supplyIdbStore (resolve, reject, trans) {
                 if (trans.storeNames.indexOf(tableName) === -1)
                     throw new exceptions.NotFound("Table" + tableName + " not part of transaction");
                 return fn(resolve, reject, trans.idbtrans.objectStore(tableName), trans);
             }
-            return trans && trans.db === db ?
-                trans._promise (mode, supplyIdbStore, writeLocked) :
-                tempTransaction (mode, [this.name], supplyIdbStore);
+            return this._trans(mode, supplyIdbStore, writeLocked);
         },
 
         //
@@ -1489,23 +1478,6 @@ export default function Dexie(dbName, options) {
             });
             return this;
         },
-        /*lock: function (fn) { 
-            if (this._locked()) return new Promise ((resolve, reject) => {
-                this._blockedFuncs.push(()=>{
-                    this.lock(fn).then(resolve, reject);
-                });
-            });
-
-            return newScope(()=>{
-                this._lock();
-                try {
-                    return fn(this).finally(()=>this._unlock());
-                } catch(ex) {
-                    this._unlock();
-                    return rejection(ex);
-                }
-            });
-        },*/ // Remarked because it's not used. SHould be working though and could be a replacement of _promise(..., "locked").
         _promise: function (mode, fn, bWriteLock) {
 
             if (mode === READWRITE && this.mode !== READWRITE)
@@ -1555,7 +1527,10 @@ export default function Dexie(dbName, options) {
             get: Debug.deprecated ("Transaction.tables", ()=>allTables)
         },
 
-        table: Debug.deprecated ("Transaction.table()", name => allTables[name])
+        table: function (name) {
+            var table = db.table(name); // Don't check that table is part of transaction. It must fail lazily!
+            return new Table(name, table.schema, this);
+        }
     });
 
     //
@@ -2579,11 +2554,18 @@ export default function Dexie(dbName, options) {
 
     function setApiOnPlace(objs, tableNames, dbschema) {
         tableNames.forEach(function (tableName) {
-            // Deprecate: In versions > 3.0, don't call _tableFactory anymore. Now just do it for bacward compatibility.
-            // Instead do new Table()
-            var tableInstance = db._tableFactory(READWRITE, dbschema[tableName]);
-            objs.forEach(function (obj) {
-                tableName in obj || (obj[tableName] = tableInstance);
+            var schema = dbschema[tableName];
+            objs.forEach(obj => {
+                if (!(tableName in obj)) {
+                    if (obj === Transaction.prototype || obj instanceof Transaction) {
+                        // obj is a Transaction prototype (or prototype of a subclass to Transaction)
+                        // Make the API a getter that returns this.table(tableName)
+                        setProp(obj, tableName, {get() { return this.table(tableName); }});
+                    } else {
+                        // Table will not be bound to a transaction (will use Dexie.currentTransaction)
+                        obj[tableName] = new Table(tableName, schema);
+                    }
+                }
             });
         });
     }

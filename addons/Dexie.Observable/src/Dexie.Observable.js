@@ -84,6 +84,7 @@ export default function Observable(db) {
 
 
     var mySyncNode = null;
+    var hooksAdded = false;
 
     // Allow other addons to access the local sync node. May be needed by Dexie.Syncable.
     Object.defineProperty(db, "_localSyncNode", {
@@ -139,22 +140,6 @@ export default function Observable(db) {
                     dbSchema[tableName].observable = true;
                 }
             });
-        };
-    });
-
-    //
-    // Make sure to subscribe to "creating", "updating" and "deleting" hooks for all observable tables that were created in the stores() method.
-    //
-    db._tableFactory = override(db._tableFactory, function(origCreateTable) {
-        return function createTable(mode, tableSchema, transactionPromiseFactory) {
-            var table = origCreateTable.apply(this, arguments);
-            if (table.schema.observable && transactionPromiseFactory === db._transPromiseFactory) { // Only crudMonitor when creating 
-                crudMonitor(table);
-            }
-            if (table.name === "_syncNodes" && transactionPromiseFactory === db._transPromiseFactory) {
-                table.mapToClass(SyncNode);
-            }
-            return table;
         };
     });
 
@@ -405,6 +390,22 @@ export default function Observable(db) {
     // When db opens, make sure to start monitor any changes before other db operations will start.
     db.on("ready", function startObserving() {
         if (db.dynamicallyOpened()) return db; // Don't observe dynamically opened databases.
+        if (!hooksAdded) {
+            //
+            // Make sure to subscribe to "creating", "updating" and "deleting" hooks for all observable tables that were created in the stores() method.
+            //
+            Object.keys(db._allTables).forEach(tableName => {
+                let table = db._allTables[tableName];
+                if (table.schema.observable) { 
+                    crudMonitor(table);
+                }
+                if (table.name === "_syncNodes") {
+                    table.mapToClass(SyncNode);
+                }
+            });
+            hooksAdded = true;
+        }
+        
         return db.table("_changes").orderBy("rev").last(function(lastChange) {
             // Since startObserving() is called before database open() method, this will be the first database operation enqueued to db.
             // Therefore we know that the retrieved value will be This query will
