@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, test, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, supports, spawnedTest} from './dexie-unittest-utils';
+import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
 const async = Dexie.async;
 
@@ -751,3 +751,39 @@ asyncTest("startsWithAnyOfIgnoreCase()", function () {
     }).finally(start);
 });
 
+promisedTest("get({key: value})", async ()=>{
+    let readme = await db.files.get({filename: "README"});
+    ok (readme, 'Should get a result for db.files.get({filename: "README"});');
+    equal (readme.extension, ".TXT", "Should get README.TXT");
+    readme = await db.files.get({filename: "README", extension: ".TXT"});
+    ok (readme, 'Should get a result for db.files.get({filename: "README", extension: ".TXT"});');
+    let noResult = await db.files.get({filename: "apa", extension: "otto"});
+    ok (!noResult, "Should not get a result when querying non-existing stuff");
+
+    // Friends have single indexes on "name" and "age"
+    await db.friends.add({name: "Ulla Bella", number: 888, age: 88});
+    // People have compound index for [name, number]
+    await db.people.add({name: "Ulla Bella", number: 888, age: 88});
+    // Folders haven't indexed any of "name", "number" or "age"
+    await db.folders.add({name: "Ulla Bella", number: 888, age: 88});
+
+    let ullaBella1 = await db.friends.get({name: "Ulla Bella", number: 888});
+    ok(!!ullaBella1, "Should be able to query multiple columns even when only one of them is indexed");
+    let ullaBella2 = await db.people.get({name: "Ulla Bella", number: 888});
+    ok(!!ullaBella2, "Should be able to query multiple columns. This time utilizing compound index.");
+    let ullaBella3 = await db.people.get({number: 888, name: "Ulla Bella"});
+    ok(!!ullaBella3, "Should be able to utilize compound index no matter the order of criterias.");
+    await db.folders.get({name: "Ulla Bella", number: 888}).then(ulla => {
+        ok(false, "Should not get Ulla Bella when no index was found");
+    }).catch('SchemaError', e => {
+        ok(true, "Got SchemaError because we're not utilizing any index at all: " + e);
+    });
+});
+
+promisedTest("orderBy(['idx1','idx2'])", async () => {
+    db.files.add({filename: "hello", extension: ".bat"});
+    let files = await db.files.orderBy(["filename", "extension"]).toArray();
+    equal (files.length, 5, "Should be 5 files in total that has both filename and extension");
+    equal (files.map(f=>f.filename+f.extension).join(','), "README.TXT,hello.bat,hello.exe,hello-there.exe,world.js",
+        'Files should be ordered according to the orderBy query');
+});

@@ -950,11 +950,11 @@ export default function Dexie(dbName, options) {
             // Multiple criterias.
             // Let's try finding a compound index that matches all keyPaths in
             // arbritary order:
-            var compoundIndex = this.schema.indexes.filter(ix =>
+            var compoundIndex = this.schema.indexes.concat(this.schema.primKey).filter(ix =>
                 ix.compound &&
                 keyPaths.every(keyPath => ix.keyPath.indexOf(keyPath) >= 0) &&
                 ix.keyPath.every(keyPath => keyPaths.indexOf(keyPath) >= 0))[0];
-            
+
             if (compoundIndex && maxKey !== maxString)
                 // Cool! We found such compound index
                 // and this browser supports compound indexes (maxKey !== maxString)!
@@ -963,24 +963,26 @@ export default function Dexie(dbName, options) {
                     .equals(compoundIndex.keyPath.map(kp => indexOrCrit[kp]));
 
             if (!compoundIndex) console.warn(
-                `The query ${indexOrCrit} on ${this.name} would benefit of a ` +
+                `The query ${JSON.stringify(indexOrCrit)} on ${this.name} would benefit of a ` +
                 `compound index [${keyPaths.join('+')}]`);
                 
             // Ok, now let's fallback to finding at least one matching index
             // and filter the rest.
-            var simpleIndex = keyPaths
-                .map(kp => this.schema.idxByName[kp]).reduce((p,idx)=>[
-                    p[0] || idx,
-                    p[0] || !idx ?
-                        combine(
-                            p[1],
-                            x =>''+getByKeyPath(x, idx.keyPath) ==
-                                ''+indexOrCrit[idx.keyPath])
-                        : p[1]
-                    ], [null, null]);
+            var idxByName = this.schema.idxByName;
+            var simpleIndex = keyPaths.reduce((r,keyPath)=>[
+                r[0] || idxByName[keyPath],
+                r[0] || !idxByName[keyPath] ?
+                    combine(
+                        r[1],
+                        x =>''+getByKeyPath(x, keyPath) ==
+                            ''+indexOrCrit[keyPath])
+                    : r[1]
+                ], [null, null]);
     
+            var idx = simpleIndex[0];
             return this
-                .where(simpleIndex[0] ? simpleIndex[0].name : keyPaths)
+                .where(idx ? idx.name : keyPaths)
+                .equals(idx ? indexOrCrit[idx.keyPath] : '')
                 .filter(simpleIndex[1]);
         },
         count: function (cb) {
