@@ -254,7 +254,9 @@ declare module Dexie {
         }
 
         get(key: Key): Promise<T | undefined>;
-        where(index: string): WhereClause<T, Key>;
+        get(equalityCriterias: {[key:string]:IndexableType}): Promise<T | undefined>;
+        where(index: string | string[]): WhereClause<T, Key>;
+        where(equalityCriterias: {[key:string]:IndexableType}): Collection<T, Key>;
 
         filter(fn: (obj: T) => boolean): Collection<T, Key>;
 
@@ -273,7 +275,7 @@ declare module Dexie {
         toArray<U>(onFulfilled: (value: Array<T>) => U): Promise<U>;
 
         toCollection(): Collection<T, Key>;
-        orderBy(index: string): Collection<T, Key>;
+        orderBy(index: string | string[]): Collection<T, Key>;
         reverse(): Collection<T, Key>;
         mapToClass(constructor: Function): Function;
         add(item: T, key?: Key): Promise<Key>;

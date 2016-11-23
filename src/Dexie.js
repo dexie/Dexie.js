@@ -932,7 +932,9 @@ export default function Dexie(dbName, options) {
         //
         // Table Public Methods
         //
-        get: function (key, cb) {
+        get: function (keyOrCrit, cb) {
+            if (keyOrCrit && keyOrCrit.constructor === Object)
+                return this.where(keyOrCrit).first(cb);
             var self = this;
             return this._idbstore(READONLY, function (resolve, reject, idbstore) {
                 fake && resolve(self.schema.instanceTemplate);
@@ -943,8 +945,54 @@ export default function Dexie(dbName, options) {
                 }, reject);
             }).then(cb);
         },
-        where: function (indexName) {
-            return new WhereClause(this, indexName);
+        where: function (indexOrCrit) {
+            if (typeof indexOrCrit === 'string')
+                return new WhereClause(this, indexOrCrit);
+            if (isArray(indexOrCrit))
+                return new WhereClause(this, `[${indexOrCrit.join('+')}]`);
+            // indexOrCrit is an object map of {[keyPath]:value} 
+            var keyPaths = keys(indexOrCrit);
+            if (keyPaths.length === 1)
+                // Only one critera. This was the easy case:
+                return this
+                    .where(keyPaths[0])
+                    .equals(indexOrCrit[keyPaths[0]]);
+            
+            // Multiple criterias.
+            // Let's try finding a compound index that matches all keyPaths in
+            // arbritary order:
+            var compoundIndex = this.schema.indexes.filter(ix =>
+                ix.compound &&
+                keyPaths.every(keyPath => ix.keyPath.indexOf(keyPath) >= 0) &&
+                ix.keyPath.every(keyPath => keyPaths.indexOf(keyPath) >= 0))[0];
+            
+            if (compoundIndex && maxKey !== maxString)
+                // Cool! We found such compound index
+                // and this browser supports compound indexes (maxKey !== maxString)!
+                return this
+                    .where(compoundIndex.name)
+                    .equals(compoundIndex.keyPath.map(kp => indexOrCrit[kp]));
+
+            if (!compoundIndex) console.warn(
+                `The query ${indexOrCrit} on ${this.name} would benefit of a `
+                `compound index [${keyPaths.join('+')}]`);
+                
+            // Ok, now let's fallback to finding at least one matching index
+            // and filter the rest.
+            var simpleIndex = keyPaths
+                .map(kp => this.schema.idxByName[kp]).reduce((p,idx)=>[
+                    p[0] || idx,
+                    p[0] || !idx ?
+                        combine(
+                            p[1],
+                            x =>''+getByKeyPath(x, idx.keyPath) ==
+                                ''+indexOrCrit[idx.keyPath])
+                        : p[1]
+                    ], [null, null]);
+    
+            return this
+                .where(simpleIndex[0] ? simpleIndex[0].name : keyPaths)
+                .filter(simpleIndex[1]);
         },
         count: function (cb) {
             return this.toCollection().count(cb);
@@ -968,7 +1016,10 @@ export default function Dexie(dbName, options) {
             return this.toCollection().toArray(cb);
         },
         orderBy: function (index) {
-            return new Collection(new WhereClause(this, index));
+            return new Collection(
+                new WhereClause(this, isArray(index) ?
+                    `[${index.join('+')}]` :
+                    index));
         },
 
         toCollection: function () {
