@@ -23,7 +23,8 @@ import "dexie-observable";
 var override = Dexie.override,
     Promise = Dexie.Promise,
     setByKeyPath = Dexie.setByKeyPath,
-    Observable = Dexie.Observable;
+    Observable = Dexie.Observable,
+    DatabaseClosedError = Dexie.DatabaseClosedError;
 
 export default function Syncable (db) {
     /// <param name="db" type="Dexie"></param>
@@ -313,10 +314,11 @@ export default function Syncable (db) {
             function changeStatusTo(newStatus) {
                 if (node.status !== newStatus) {
                     node.status = newStatus;
-                    node.save();
-                    db.syncable.on.statusChanged.fire(newStatus, url);
-                    // Also broadcast message to other nodes about the status
-                    db.broadcastMessage("syncStatusChanged", { newStatus: newStatus, url: url }, false);
+                    node.save().then(()=>{
+                        db.syncable.on.statusChanged.fire(newStatus, url);
+                        // Also broadcast message to other nodes about the status
+                        db.broadcastMessage("syncStatusChanged", { newStatus: newStatus, url: url }, false);
+                    }).catch('DatabaseClosedError', ()=>{});                    
                 }
             }
 
@@ -387,11 +389,11 @@ export default function Syncable (db) {
                         function onChangesAccepted() {
                             Object.keys(nodeModificationsOnAck).forEach(function(keyPath) {
                                 Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
-                            });
-                            node.save();
+                            }); 
                             // We dont know if onSuccess() was called by provider yet. If it's already called, finalPromise.then() will execute immediately,
                             // otherwise it will execute when finalSyncPromise resolves.
                             finalSyncPromise.then(continueSendingChanges);
+                            return node.save();
                         }
                     });
                 }, dbAliveID);
@@ -635,7 +637,7 @@ export default function Syncable (db) {
                         });
                     }).then(function() {
                         node.appliedRemoteRevision = remoteRevision;
-                        node.save();
+                        node.save().catch(e=>{}); // Fail silently. If failed to save node, we're still idempotent.
                     });
                 }
 
@@ -948,13 +950,13 @@ export default function Syncable (db) {
             if (db.isOpen()) {
                 return _enque();
             } else {
-                return Promise.reject(new Error("Database was closed"));
+                return Promise.reject(new DatabaseClosedError());
             }
         } else if (db._localSyncNode && instanceID === db._localSyncNode.id) {
             // DB is already open but queuer doesnt want it to be queued if database has been closed (request bound to current instance of DB)
             return _enque();
         } else {
-            return Promise.reject(new Error("Database was closed"));
+            return Promise.reject(new DatabaseClosedError());
         }
     }
 

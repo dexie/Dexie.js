@@ -147,7 +147,6 @@ export default function Promise(fn) {
         this._stackHolder = getErrorWithStack();
         this._prev = null;
         this._numPrev = 0; // Number of previous promises (for long stacks)
-        linkToPreviousPromise(this, currentFulfiller);
     }
     
     if (typeof fn !== 'function') {
@@ -183,7 +182,7 @@ const thenProp = {
                     reject,
                     psd));
             });
-            debug && (!this._prev || this._state === null) && linkToPreviousPromise(rv, this);
+            debug && linkToPreviousPromise(rv, this);
             return rv;
         }
 
@@ -287,7 +286,9 @@ props (Promise, {
         if (value && typeof value.then === 'function') return new Promise((resolve, reject)=>{
             value.then(resolve, reject);
         });
-        return new Promise(INTERNAL, true, value);
+        var rv = new Promise(INTERNAL, true, value);
+        linkToPreviousPromise(rv, currentFulfiller);
+        return rv;
     },
     
     reject: PromiseReject,
