@@ -933,12 +933,8 @@ export default function Syncable (db) {
                     return Dexie.vip(function() {
                         return fn();
                     });
-                }).then(function(res) {
+                }).finally(()=> {
                     delete context.ongoingOperation;
-                    return res;
-                }, function(rej){
-                	delete context.ongoingOperation;
-                    return rej;
                 });
             } else {
                 context.ongoingOperation = context.ongoingOperation.then(function() {
