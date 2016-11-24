@@ -806,13 +806,20 @@ export default function Dexie(dbName, options) {
                         }
                     }
                 }, zoneProps);
-                return Promise.resolve(returnValue).finally(()=>{
-                    if (!trans.active)
-                        throw new exceptions.PrematureCommit("Transaction committed too early. See http://bit.ly/2eVASrf");                    
-                }).then(x => {
-                    return promiseFollowed.then(()=>{
-                        if (parentTransaction) trans._resolve(); // sub transactions don't react to idbtrans.oncomplete. We must trigger a acompletion.
-                    }).then(()=>trans._completion).then(()=>x);
+                return (returnValue && typeof returnValue.then === 'function' ?
+                    // Promise returned. User uses promise-style transactions.
+                    Promise.resolve(returnValue).then(x => trans.active ?
+                        x // Transaction still active. Continue.
+                        : rejection(new exceptions.PrematureCommit(
+                            "Transaction committed too early. See http://bit.ly/2eVASrf")))
+                    // No promise returned. Wait for all outstanding promises before continuing. 
+                    : promiseFollowed.then(()=>returnValue)
+                ).then(x => {
+                    // sub transactions don't react to idbtrans.oncomplete. We must trigger a completion:
+                    if (parentTransaction) trans._resolve();
+                    // wait for trans._completion
+                    // (if root transaction, this means 'complete' event. If sub-transaction, we've just fired it ourselves)
+                    return trans._completion.then(()=>x);
                 }).catch (e => {
                     trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
                     return rejection(e);
