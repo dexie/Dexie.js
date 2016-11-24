@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, spawnedTest} from './dexie-unittest-utils';
+import {resetDatabase, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
 "use strict";
 
@@ -788,4 +788,90 @@ asyncTest("Dexie.currentTransaction in CRUD hooks", 53, function () {
         db.users.hook.deleting.unsubscribe(onDeleting);
         start();
     });
+});
+
+function sleep (ms) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+promisedTest("waitFor()", async ()=>{
+    await db.transaction('rw', db.users, async trans =>{
+        // Wait for a promise:
+        await trans.waitFor(sleep(100));
+        // Do an operation on transaction
+        await trans.users.put({username: "testingtesting"});
+        await trans.waitFor(sleep(100));
+        let result = await trans.users.get("testingtesting");
+        ok(result && result.username === "testingtesting", "Should be able to continue transaction after waiting for non-indexedDB promise");
+        ok(true, `Waiting spin count:${trans._spinCount}`);
+
+        // With timeout
+        await Dexie.waitFor(sleep(2000), 10) // Timeout of 10 ms.
+            .then (()=>ok(false, "Should have timed out!"))
+            .catch('TimeoutError', ex => ok(true, "Timed out as expected"));
+        
+        // Wait for function
+        await Dexie.waitFor(async ()=>{ 
+            ok(Dexie.currentTransaction === null,
+                "We should not be in the transaction zone here because transaction can be in a temporary inactive state here");
+            await sleep(10);
+            ok (true, "Slept 10 ms")
+            // Let's test if we can access the transaction from here.
+            // The transaction should be alive indeed but not in an active state.
+            await trans.users.count().then(()=>{
+                // This happens on IE11
+                ok(true, "Could access transaction within the wait callback. Nice for you, but you were just lucky!");
+            }).catch(ex => {
+                // This happens on Firefox and Chrome
+                ok(true, "Could NOT access transaction within the wait callback. As expected. Error: " + ex);
+            });
+            ok(Dexie.currentTransaction === null,
+                "We should not be in the transaction zone here because transaction can be in inactive state here");
+        });
+        
+        result = await trans.users.get("testingtesting");
+        ok(result && result.username === "testingtesting", "Should still be able to operate on the transaction");
+        ok(true, `Waiting spin count:${trans._spinCount}`);
+        ok(Dexie.currentTransaction === trans, "Zone info should still be correct");
+
+        // Subtransaction
+        await db.transaction('r', db.users, function* (subTrans) {
+            ok(subTrans !== trans, "Should be in a sub transaction");
+            ok(Dexie.currentTransaction === subTrans, "Should be in a sub transaction");
+            let count = yield trans.users.count();
+            ok(true, "Should be able to operate on sub transaction. User count = " + count);
+            yield subTrans.waitFor(sleep(10));
+            ok(true, "Should be able to call waitFor() on sub transaction");
+            count = yield trans.users.count();
+            ok(true, "Should be able to operate on sub transaction. User count = " + count);
+        });
+
+        // Calling waitFor multiple times in parallell
+        await Promise.all([
+            trans.waitFor(sleep(10)),
+            trans.waitFor(sleep(10)),
+            trans.waitFor(sleep(10))]);
+        ok (true, "Could wait for several tasks in parallell");
+        
+        result = await trans.users.get("testingtesting");
+        ok(result && result.username === "testingtesting", "Should still be able to operate on the transaction");
+        //await sleep(100);
+        //ok(true, `Waiting spin count:${trans._spinCount}`);
+    }).then(()=>ok(true, "Transaction committed"));
+});
+
+promisedTest("Dexie.waitFor() outside transaction", async ()=> {
+    // Test that waitFor can be called when not in a transaction as well.
+    // The meaning of this is that sometimes a function does db operations without
+    // a transaction, but should be able to call also within the caller's transaction.
+    // A function should therefore be able to call Dexie.waitFor() no matter if is executing
+    // within a transaction or not.
+    let result = await Dexie.waitFor(sleep(10).then(()=>true));
+    ok(result, "Could call waitFor outside a transaction as well");
+    let codeExecuted = false;
+    await Dexie.waitFor(async ()=>{
+        await sleep(10);
+        codeExecuted = true;
+    });
+    ok(codeExecuted, "Could call waitFor(function) outside a transation as well");
 });

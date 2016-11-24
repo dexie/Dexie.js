@@ -1387,13 +1387,13 @@ export default function Dexie(dbName, options) {
         this.on = Events(this, "complete", "error", "abort");
         this.parent = parent || null;
         this.active = true;
-        this._tables = null;
         this._reculock = 0;
         this._blockedFuncs = [];
-        this._psd = null;
-        this._dbschema = dbschema;
         this._resolve = null;
         this._reject = null;
+        this._waitingFor = null;
+        this._waitingQueue = null;
+        this._spinCount = 0; // Just for debugging waitFor()
         this._completion = new Promise ((resolve, reject) => {
             this._resolve = resolve;
             this._reject = reject;
@@ -1517,6 +1517,45 @@ export default function Dexie(dbName, options) {
                 p._lib = true;
                 return p;
             }
+        },
+
+        _root: function () {
+            return this.parent ? this.parent._root() : this;
+        },
+
+        waitFor (promise) {
+            // Always operate on the root transaction (in case this is a sub stransaction)
+            var root = this._root();
+            // For stability reasons, convert parameter to promise no matter what type is passed to waitFor().
+            // (We must be able to call .then() on it.)
+            promise = Promise.resolve(promise);
+            if (root._waitingFor) {
+                // Already called waitFor(). Wait for both to complete.
+                root._waitingFor = root._waitingFor.then(()=>promise);
+            } else {
+                // We're not in waiting state. Start waiting state.
+                root._waitingFor = promise;
+                root._waitingQueue = [];
+                // Start interacting with indexedDB until promise completes:
+                var store = root.idbtrans.objectStore(root.storeNames[0]);
+                (function spin(){
+                    ++root._spinCount; // For debugging only
+                    while (root._waitingQueue.length) (root._waitingQueue.shift())();
+                    if (root._waitingFor) store.get(-Infinity).onsuccess = spin;
+                }());
+            }
+            var currentWaitPromise = root._waitingFor;
+            return new Promise ((resolve, reject) => {
+                promise.then (
+                    res => root._waitingQueue.push(wrap(resolve.bind(null, res))),
+                    err => root._waitingQueue.push(wrap(reject.bind(null, err)))
+                ).finally(() => {
+                    if (root._waitingFor === currentWaitPromise) {
+                        // No one added a wait after us. Safe to stop the spinning.
+                        root._waitingFor = null;
+                    }
+                });
+            });
         },
 
         //
@@ -3052,6 +3091,17 @@ props(Dexie, {
     // Dexie.currentTransaction property
     currentTransaction: {
         get: () => PSD.trans || null
+    },
+
+    waitFor: function (promiseOrFunction, optionalTimeout) {
+        // If a function is provided, invoke it and pass the returning value to Transaction.waitFor()
+        var promise = Promise.resolve(
+            typeof promiseOrFunction === 'function' ? Dexie.ignoreTransaction(promiseOrFunction) : promiseOrFunction)
+            .timeout(optionalTimeout || 60000); // Default the timeout to one minute. Caller may specify Infinity if required.       
+
+        // Run given promise on current transaction. If no current transaction, just return a Dexie promise based
+        // on given value.
+        return PSD.trans ? PSD.trans.waitFor(promise) : promise;
     },
     
     // Export our Promise implementation since it can be handy as a standalone Promise implementation
