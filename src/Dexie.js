@@ -921,19 +921,71 @@ export default function Dexie(dbName, options) {
         //
         // Table Public Methods
         //
-        get: function (key, cb) {
+        get: function (keyOrCrit, cb) {
+            if (keyOrCrit && keyOrCrit.constructor === Object)
+                return this.where(keyOrCrit).first(cb);
             var self = this;
             return this._idbstore(READONLY, function (resolve, reject, idbstore) {
                 fake && resolve(self.schema.instanceTemplate);
-                var req = idbstore.get(key);
+                var req = idbstore.get(keyOrCrit);
                 req.onerror = eventRejectHandler(reject);
                 req.onsuccess = wrap(function () {
                     resolve(self.hook.reading.fire(req.result));
                 }, reject);
             }).then(cb);
         },
-        where: function (indexName) {
-            return new WhereClause(this, indexName);
+        where: function (indexOrCrit) {
+            if (typeof indexOrCrit === 'string')
+                return new WhereClause(this, indexOrCrit);
+            if (isArray(indexOrCrit))
+                return new WhereClause(this, `[${indexOrCrit.join('+')}]`);
+            // indexOrCrit is an object map of {[keyPath]:value} 
+            var keyPaths = keys(indexOrCrit);
+            if (keyPaths.length === 1)
+                // Only one critera. This was the easy case:
+                return this
+                    .where(keyPaths[0])
+                    .equals(indexOrCrit[keyPaths[0]]);
+            
+            // Multiple criterias.
+            // Let's try finding a compound index that matches all keyPaths in
+            // arbritary order:
+            var compoundIndex = this.schema.indexes.concat(this.schema.primKey).filter(ix =>
+                ix.compound &&
+                keyPaths.every(keyPath => ix.keyPath.indexOf(keyPath) >= 0) &&
+                ix.keyPath.every(keyPath => keyPaths.indexOf(keyPath) >= 0))[0];
+
+            if (compoundIndex && maxKey !== maxString)
+                // Cool! We found such compound index
+                // and this browser supports compound indexes (maxKey !== maxString)!
+                return this
+                    .where(compoundIndex.name)
+                    .equals(compoundIndex.keyPath.map(kp => indexOrCrit[kp]));
+
+            if (!compoundIndex) console.warn(
+                `The query ${JSON.stringify(indexOrCrit)} on ${this.name} would benefit of a ` +
+                `compound index [${keyPaths.join('+')}]`);
+                
+            // Ok, now let's fallback to finding at least one matching index
+            // and filter the rest.
+            var idxByName = this.schema.idxByName;
+            var simpleIndex = keyPaths.reduce((r,keyPath)=>[
+                r[0] || idxByName[keyPath],
+                r[0] || !idxByName[keyPath] ?
+                    combine(
+                        r[1],
+                        x =>''+getByKeyPath(x, keyPath) ==
+                            ''+indexOrCrit[keyPath])
+                    : r[1]
+                ], [null, null]);
+    
+            var idx = simpleIndex[0];
+            return idx ?
+                this.where(idx.name).equals(indexOrCrit[idx.keyPath])
+                    .filter(simpleIndex[1]) :
+                compoundIndex ?
+                    this.filter(simpleIndex[1]) : // Has compound but browser bad. Allow filter.
+                    this.where(keyPaths).equals(''); // No index at all. Fail lazily.
         },
         count: function (cb) {
             return this.toCollection().count(cb);
@@ -957,7 +1009,10 @@ export default function Dexie(dbName, options) {
             return this.toCollection().toArray(cb);
         },
         orderBy: function (index) {
-            return new Collection(new WhereClause(this, index));
+            return new Collection(
+                new WhereClause(this, isArray(index) ?
+                    `[${index.join('+')}]` :
+                    index));
         },
 
         toCollection: function () {
