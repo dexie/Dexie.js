@@ -10,7 +10,8 @@ db.version(1).stores({
     files: "++id,filename,extension,[filename+extension],folderId",
     people: "[name+number],name,number",
     friends: "++id,name,age",
-    chart: '[patno+row+col], patno'
+    chart: '[patno+row+col], patno',
+    chaps: "++id,[name+number]"
 });
 
 var Folder = db.folders.defineClass({
@@ -751,8 +752,8 @@ asyncTest("startsWithAnyOfIgnoreCase()", function () {
     }).finally(start);
 });
 
-promisedTest("get({key: value})", async ()=>{
-    let readme = await db.files.get({filename: "README"});
+promisedTest("where({key: value})", async ()=>{
+    let readme = await db.files.where({filename: "README"}).first();
     ok (readme, 'Should get a result for db.files.get({filename: "README"});');
     equal (readme.extension, ".TXT", "Should get README.TXT");
     readme = await db.files.get({filename: "README", extension: ".TXT"});
@@ -763,15 +764,15 @@ promisedTest("get({key: value})", async ()=>{
     // Friends have single indexes on "name" and "age"
     await db.friends.add({name: "Ulla Bella", number: 888, age: 88});
     // People have compound index for [name, number]
-    await db.people.add({name: "Ulla Bella", number: 888, age: 88});
+    await db.chaps.add({name: "Ulla Bella", number: 888, age: 88});
     // Folders haven't indexed any of "name", "number" or "age"
     await db.folders.add({name: "Ulla Bella", number: 888, age: 88});
 
     let ullaBella1 = await db.friends.get({name: "Ulla Bella", number: 888});
     ok(!!ullaBella1, "Should be able to query multiple columns even when only one of them is indexed");
-    let ullaBella2 = await db.people.get({name: "Ulla Bella", number: 888});
+    let ullaBella2 = await db.chaps.get({name: "Ulla Bella", number: 888});
     ok(!!ullaBella2, "Should be able to query multiple columns. This time utilizing compound index.");
-    let ullaBella3 = await db.people.get({number: 888, name: "Ulla Bella"});
+    let ullaBella3 = await db.chaps.get({number: 888, name: "Ulla Bella"});
     ok(!!ullaBella3, "Should be able to utilize compound index no matter the order of criterias.");
     await db.folders.get({name: "Ulla Bella", number: 888}).then(ulla => {
         ok(false, "Should not get Ulla Bella when no index was found");
@@ -781,6 +782,10 @@ promisedTest("get({key: value})", async ()=>{
 });
 
 promisedTest("orderBy(['idx1','idx2'])", async () => {
+    if (!supports("compound")) {
+        ok(true, "Browser does not support compound indexes. Ignoring test.");
+        return;
+    }
     db.files.add({filename: "hello", extension: ".bat"});
     let files = await db.files.orderBy(["filename", "extension"]).toArray();
     equal (files.length, 5, "Should be 5 files in total that has both filename and extension");

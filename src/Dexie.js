@@ -980,10 +980,12 @@ export default function Dexie(dbName, options) {
                 ], [null, null]);
     
             var idx = simpleIndex[0];
-            return this
-                .where(idx ? idx.name : keyPaths)
-                .equals(idx ? indexOrCrit[idx.keyPath] : '')
-                .filter(simpleIndex[1]);
+            return idx ?
+                this.where(idx.name).equals(indexOrCrit[idx.keyPath])
+                    .filter(simpleIndex[1]) :
+                compoundIndex ?
+                    this.filter(simpleIndex[1]) : // Has compound but browser bad. Allow filter.
+                    this.where(keyPaths).equals(''); // No index at all. Fail lazily.
         },
         count: function (cb) {
             return this.toCollection().count(cb);
