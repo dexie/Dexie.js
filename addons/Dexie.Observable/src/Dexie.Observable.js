@@ -84,7 +84,6 @@ export default function Observable(db) {
 
 
     var mySyncNode = null;
-    var hooksAdded = false;
 
     // Allow other addons to access the local sync node. May be needed by Dexie.Syncable.
     Object.defineProperty(db, "_localSyncNode", {
@@ -222,6 +221,24 @@ export default function Observable(db) {
         }
     }
 
+    db.open = override(db.open, origOpen => {
+        return function () {
+            //
+            // Make sure to subscribe to "creating", "updating" and "deleting" hooks for all observable tables that were created in the stores() method.
+            //
+            Object.keys(db._allTables).forEach(tableName => {
+                let table = db._allTables[tableName];
+                if (table.schema.observable) { 
+                    crudMonitor(table);
+                }
+                if (table.name === "_syncNodes") {
+                    table.mapToClass(SyncNode);
+                }
+            });
+            return origOpen.apply(this, arguments);            
+        }
+    });
+
     db.close = override(db.close, function(origClose) {
         return function () {
             if (db.dynamicallyOpened()) return origClose.apply(this, arguments); // Don't observe dynamically opened databases.
@@ -262,13 +279,17 @@ export default function Observable(db) {
         };
     });
 
+    
+
     //
     // The Creating/Updating/Deleting hook will make sure any change is stored to the changes table
     //
     function crudMonitor(table) {
         /// <param name="table" type="db.Table"></param>
-        var tableName = table.name;
+        if (table.hook._observing) return;
+        table.hook._observing = true;
 
+        var tableName = table.name;
         table.hook('creating').subscribe(function(primKey, obj, trans) {
             /// <param name="trans" type="db.Transaction"></param>
             var rv = undefined;
@@ -390,21 +411,6 @@ export default function Observable(db) {
     // When db opens, make sure to start monitor any changes before other db operations will start.
     db.on("ready", function startObserving() {
         if (db.dynamicallyOpened()) return db; // Don't observe dynamically opened databases.
-        if (!hooksAdded) {
-            //
-            // Make sure to subscribe to "creating", "updating" and "deleting" hooks for all observable tables that were created in the stores() method.
-            //
-            Object.keys(db._allTables).forEach(tableName => {
-                let table = db._allTables[tableName];
-                if (table.schema.observable) { 
-                    crudMonitor(table);
-                }
-                if (table.name === "_syncNodes") {
-                    table.mapToClass(SyncNode);
-                }
-            });
-            hooksAdded = true;
-        }
         
         return db.table("_changes").orderBy("rev").last(function(lastChange) {
             // Since startObserving() is called before database open() method, this will be the first database operation enqueued to db.
