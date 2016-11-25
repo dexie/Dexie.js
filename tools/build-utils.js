@@ -122,6 +122,8 @@ async function rollupAndMinify(rollupInfo) {
         entry: rollupInfo.entry,
         onwarn: msg =>
             !/Treating .* as external dependency/i.test(msg) &&
+            // Babel transforms to using this at top-level, which rollup complains about:
+            !/The .this. keyword is equivalent to .undefined. at the top level of an ES module/i.test(msg) &&
             console.warn(msg)
     });
 
