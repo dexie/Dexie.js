@@ -2,6 +2,7 @@ import {doFakeAutoComplete, tryCatch, props, setProp, _global,
     getPropertyDescriptor, getArrayOf, extend} from './utils';
 import {nop, callBoth, mirror} from './chaining-functions';
 import {debug, prettyStack, getErrorWithStack} from './debug';
+import {exceptions} from './errors';
 
 //
 // Promise and Zone (PSD) for Dexie library
@@ -251,6 +252,14 @@ props(Promise.prototype, {
                 stack_being_generated = false;
             }
         }
+    },
+
+    timeout: function (ms, msg) {
+        return ms < Infinity ?
+            new Promise((resolve, reject) => {
+                var handle = setTimeout(() => reject(new exceptions.Timeout(msg)), ms);
+                this.then(resolve, reject).finally(clearTimeout.bind(null, handle));
+            }) : this;
     }
 });
 
@@ -299,7 +308,7 @@ props (Promise, {
             values.map(value => Promise.resolve(value).then(resolve, reject));
         });
     },
-    
+
     PSD: {
         get: ()=>PSD,
         set: value => PSD = value
