@@ -101,7 +101,7 @@ export function supports (features) {
     return features.split('+').reduce((result,feature)=>{
         switch (feature.toLowerCase()) {
             case "compound":
-                return result && (hasPolyfillIE || (!isIE && !isEdge)); // Should add Safari to
+                return Array.isArray(Dexie.maxKey);
             case "multientry":
                 return result && (hasPolyfillIE || (!isIE && !isEdge)); // Should add Safari to
             case "versionchange":

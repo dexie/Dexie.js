@@ -32,6 +32,8 @@ declare class Dexie {
     static version: number;
     static semVer: string;
     static currentTransaction: Dexie.Transaction;
+    static waitFor<T> (promise: Promise<T>) : Promise<T>;
+    static waitFor<T> (promise: Promise<T>, timeoutMilliseconds: number) : Promise<T>;
 
     static getDatabaseNames(): Dexie.Promise<Array<string>>;
 
