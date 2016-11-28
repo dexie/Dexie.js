@@ -875,3 +875,20 @@ promisedTest("Dexie.waitFor() outside transaction", async ()=> {
     });
     ok(codeExecuted, "Could call waitFor(function) outside a transation as well");
 });
+
+promisedTest("Dexie.waitFor() TransactionInactiveError", async() => {
+    await db.transaction('r', db.users, async ()=>{
+        await sleep(100); // Force transaction to become inactive
+        try {
+            await Dexie.waitFor(sleep(10));
+            ok(false, 'After sleeping, transaction just cannot be alive.');
+        } catch (err) {
+            ok(err.name == 'TransactionInactiveError' || err.name == 'InvalidStateError',
+            `Got TransactionInactiveError or InvalidStateError as expected`);
+        }
+    }).then (()=>{
+        ok(false, 'The transaction should not possibly succeed even though catching, because it was too late.');
+    }).catch ('PrematureCommitError', err => {
+        ok(true, 'Got PrematureCommitError as expected');
+    });
+});
