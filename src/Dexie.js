@@ -1492,7 +1492,7 @@ export default function Dexie(dbName, options) {
         tables: {
             get: Debug.deprecated ("Transaction.tables", function () {
                 return arrayToObject(this.storeNames, name => [name, allTables[name]]);
-            }, "Use db.tables()")
+            }, "Use trans.storeNames.map(name => trans.table(name)) ")
         },
 
         complete: Debug.deprecated ("Transaction.complete()", function (cb) {
@@ -1503,11 +1503,16 @@ export default function Dexie(dbName, options) {
             return this.on("error", cb);
         }),
         
-        table: Debug.deprecated ("Transaction.table()", function (name) {
+        table: function (name) {
             if (this.storeNames.indexOf(name) === -1)
                 throw new exceptions.InvalidTable("Table " + name + " not in transaction");
+            // Bug: Leverating a table that is not actually bound to the transaction.
+            // This has been corrected in Dexie 2.0.0-beta.5 where tables optionally can be
+            // bound to a transaction. For now, leaving the behavior as
+            // it has been since v1.4.0 - Tables cannot be bound to a transaction, so we can 
+            // just return the singleton Table instance here.
             return allTables[name];
-        })
+        }
         
     });
 
