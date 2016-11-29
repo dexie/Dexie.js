@@ -1,6 +1,6 @@
 {
   "name": "dexie",
-  "version": "2.0.0-beta.5",
+  "version": "2.0.0-beta.6",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "jsnext:main": "dist/dexie.es6.js",
@@ -70,7 +70,7 @@
     "karma-qunit": "^1.2.1",
     "node-watch": "^0.4.0",
     "qunit": "^0.7.7",
-    "qunitjs": "^1.14.0",
+    "qunitjs": "^1.23.1",
     "rollup": "^0.36.1",
     "serve-static": "^1.11.1",
     "uglify-js": "^2.7.3"

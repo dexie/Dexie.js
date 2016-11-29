@@ -1,5 +1,29 @@
 ﻿import Dexie from 'dexie';
-import {ok, start, asyncTest} from 'QUnit';
+import {ok, start, test, config} from 'QUnit';
+
+// Custom QUnit config options.
+config.urlConfig.push({
+    id: "polyfillIE",
+	label: "Include IE Polyfill",
+    tooltip: "Enabling this will include the idb-iegap polyfill that makes" +
+    " IE10&IE11 support multiEntry and compound indexes as well as compound" +
+    " primary keys"
+}, {
+    id: "indexedDBShim",
+    label: "IndexedDBShim (UseWebSQL as backend)",
+    tooltip: "Enable this in Safari browsers without indexedDB support or" +
+    " with poor indexedDB support"
+}, {
+    id: "dontoptimize",
+    label: "Dont optimize tests",
+    tooltip: "Always delete and recreate the DB between each test"
+}, {
+    id: "longstacks",
+    label: "Long async stacks",
+    tooltip: "Set Dexie.debug=true, turning on long async stacks on all" +
+    " errors (Actually we use Dexie.debug='dexie' so that frames from" +
+    " dexie.js are also included)"
+ });
 
 Dexie.debug = window.location.search.indexOf('longstacks=true') !== -1 ? 'dexie' : false;
 if (window.location.search.indexOf('longstacks=tests') !== -1) Dexie.debug = true; // Don't include stuff from dexie.js.
@@ -123,16 +147,18 @@ export function supports (features) {
 export function spawnedTest (name, num, promiseGenerator) {
     if (!promiseGenerator) {
         promiseGenerator = num;
-        asyncTest(name, function(){
+        test(name, function(assert) {
+            let done = assert.async();
             Dexie.spawn(promiseGenerator)
                 .catch(e => ok(false, e.stack || e))
-                .then(start);
+                .then(done);
         });
     } else {
-        asyncTest(name, num, function(){
+        test(name, num, function(assert) {
+            let done = assert.async();
             Dexie.spawn(promiseGenerator)
                 .catch(e => ok(false, e.stack || e))
-                .then(start);
+                .then(done);
         });
     }
 }
@@ -140,12 +166,18 @@ export function spawnedTest (name, num, promiseGenerator) {
 export function promisedTest (name, num, asyncFunction) {
     if (!asyncFunction) {
         asyncFunction = num;
-        asyncTest(name, ()=>Promise.resolve().then(asyncFunction)
-            .catch(e => ok(false, e.stack || e))
-            .then(start));
+        test(name, (assert) => {
+            let done = assert.async();
+            Promise.resolve().then(asyncFunction)
+              .catch(e => ok(false, e.stack || e))
+              .then(done);
+        });
     } else {
-        asyncTest(name, num, ()=>Promise.resolve().then(asyncFunction)
-            .catch(e => ok(false, e.stack || e))
-            .then(start));
+        test(name, num, (assert) => {
+            let done = assert.async();
+            Promise.resolve().then(asyncFunction)
+              .catch(e => ok(false, e.stack || e))
+              .then(done);
+        });
     }
 }

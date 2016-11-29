@@ -16,7 +16,7 @@ module.exports = function(config) {
 
     files: [
       'test/babel-polyfill/polyfill.min.js',
-      'test/qunit.js',
+      'node_modules/qunitjs/qunit/qunit.js',
       'test/karma-env.js',
       'dist/dexie.js',
       'test/bundle.js',

@@ -26,8 +26,7 @@ buildAndWatch([{
         "test/worker.js",
         "test/karma-env.js",
         "test/karma.conf.js",
-        "test/require.js",
-        "test/qunit.js"
+        "test/require.js"
     ]
 
 }]).then(()=>{
