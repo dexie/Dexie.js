@@ -109,7 +109,7 @@ export function supports (features) {
                 //return result && (!isIE && !isEdge); // Should add Safari to
             case "binarykeys":
                 try {
-                    return indexedDB.cmp(new Uint8Array([1]), new Uint8Array([1])) === 0;
+                    return Array.isArray(Dexie.maxKey) && indexedDB.cmp(new Uint8Array([1]), new Uint8Array([1])) === 0;
                 } catch (e) {
                     return false;
                 }
