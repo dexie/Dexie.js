@@ -1,5 +1,5 @@
 import Dexie from 'dexie';
-import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
+import {module, test, equal, ok} from 'QUnit';
 import {resetDatabase, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
 const hasNativeAsyncFunctions = false;
@@ -13,17 +13,18 @@ db.version(1).stores({
 });
 
 module("asyncawait", {
-    setup: function () {
-        stop();
+    setup: function (assert) {
+        let done = assert.async();
         resetDatabase(db).catch(function (e) {
             ok(false, "Error resetting database: " + e.stack);
-        }).finally(start);
+        }).finally(done);
     },
     teardown: function () {
     }
 });
 
-asyncTest("Should be able to use global Promise within transaction scopes", function(){
+test("Should be able to use global Promise within transaction scopes", function(assert) {
+    let done = assert.async();
     db.transaction('rw', db.items, trans => {
         return window.Promise.resolve().then(()=> {
             ok(Dexie.currentTransaction == trans, "Transaction scopes should persist through Promise.resolve()");
@@ -38,10 +39,11 @@ asyncTest("Should be able to use global Promise within transaction scopes", func
         equal(foobar.id, 'foobar', "Transaction should have lived throughout the Promise.resolve() chain");
     }).catch (e => {
         ok(false, `Error: ${e.stack || e}`);
-    }).finally(start);
+    }).finally(done);
 });
 
-asyncTest("Should be able to use native async await", function() {
+test("Should be able to use native async await", function(assert) {
+    let done = assert.async();
     Promise.resolve().then(()=>{
         let f = new Function('ok','equal', 'Dexie', 'db', `return db.transaction('rw', db.items, async ()=>{
             let trans = Dexie.currentTransaction;
@@ -101,7 +103,7 @@ asyncTest("Should be able to use native async await", function() {
             ok(false, `Error: ${e.stack || e}`);
         else 
             ok(true, `This browser does not support native async functions`);
-    }).then(start);
+    }).then(done);
 });
 
 const NativePromise = (()=>{
@@ -112,10 +114,11 @@ const NativePromise = (()=>{
     }
 })();
 
-asyncTest("Must not leak PSD zone", function() {
+test("Must not leak PSD zone", function(assert) {
+    let done = assert.async();
     if (!hasNativeAsyncFunctions) {
         ok(true, "Browser doesnt support native async-await");
-        start();
+        done();
         return;
     }
     let F = new Function('ok','equal', 'Dexie', 'db', `
@@ -174,10 +177,11 @@ asyncTest("Must not leak PSD zone", function() {
         
         return Promise.all([p1, p2]);
     `);
-    F(ok, equal, Dexie, db).catch(e => ok(false, e.stack || e)).then(start);
+    F(ok, equal, Dexie, db).catch(e => ok(false, e.stack || e)).then(done);
 });
 
-asyncTest("Must not leak PSD zone2", function() {
+test("Must not leak PSD zone2", function(assert) {
+    let done = assert.async();
     ok(Dexie.currentTransaction === null, "Should not have an ongoing transaction to start with");
 
     db.transaction('rw', db.items, ()=>{
@@ -237,13 +241,14 @@ asyncTest("Must not leak PSD zone2", function() {
         });
     }).catch(e => {
         ok(false, `Error: ${e.stack || e}`);
-    }).then(start);
+    }).then(done);
 });
 
-asyncTest("Should be able to await Promise.all()", ()=>{
+test("Should be able to await Promise.all()", (assert) => {
+    let done = assert.async();
     if (!hasNativeAsyncFunctions) {
         ok(true, "Browser doesnt support native async-await");
-        start();
+        done();
         return;
     }    
     (new Function('ok', 'equal', 'Dexie', 'db',
@@ -282,7 +287,7 @@ asyncTest("Should be able to await Promise.all()", ()=>{
     `))(ok, equal, Dexie, db)
     .catch(e => {
         ok(false, e.stack || e);
-    }).then(start);
+    }).then(done);
 });
 
 spawnedTest("Should use Promise.all where applicable", function* (){
