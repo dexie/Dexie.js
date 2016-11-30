@@ -892,3 +892,42 @@ promisedTest("Dexie.waitFor() TransactionInactiveError", async() => {
         ok(true, 'Got PrematureCommitError as expected');
     });
 });
+
+promisedTest("Promise.follow() should omit promises spawned under Dexie.ignoreTransaction()", async ()=>{
+    let resolve, reject;
+    const p = new Promise((res, rej) => { resolve = res; reject = rej; });
+    const log = [];
+
+    await db.transaction('r', db.users, function () {
+        // Since we do not return a promise here,
+        // Promise.follow() will be used for awaitint all tasks.
+        // However, tasks spawned under Dexie.ignoreTransacion() should not be included in promises to wait for.
+        Dexie.ignoreTransaction(()=>{
+            return new Dexie.Promise(resolve => setTimeout(resolve, 50)).then(()=>{
+                return db.pets.put({kind: "dog"});
+            }).then(()=>{
+                return db.pets.count();
+            }).then(numPets => {
+                ok(true, `num pets: ${numPets}`);
+                log.push("inner-task-done");
+            }).then(resolve, reject);
+        });
+        // The following promise should be awaited for though (because new Promise is spawned from withing a zone or sub-zone to current transaction.)
+        new Dexie.Promise(resolve => setTimeout(resolve, 25)).then(()=>{
+            //return db.users.get(1);
+        }).then(()=>{
+            ok(true, "followed promise done");
+            log.push("spawned-promise-done");
+        }).catch(e => {
+            ok(false, e);
+        });
+    });
+
+    log.push("outer-task-done");
+    ok(true, "transaction done");
+
+    await p;
+
+    equal(log.join(','), "spawned-promise-done,outer-task-done,inner-task-done", "outer-task-done should have happened before inner-task-done");
+
+});
