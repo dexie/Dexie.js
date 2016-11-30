@@ -189,7 +189,7 @@ asyncTest("open database without specifying version or schema", Dexie.Observable
     });
 });
 
-asyncTest("Dexie.getDatabaseNames", 11, function () {
+asyncTest("Dexie.getDatabaseNames", 13, function () {
     var defaultDatabases = [];
     var db1, db2;
     Dexie.getDatabaseNames(function (names) {
@@ -226,6 +226,13 @@ asyncTest("Dexie.getDatabaseNames", 11, function () {
     }).then(function (names) {
         equal(names.length, defaultDatabases.length, "All of our databases have been deleted");
         ok(!names.indexOf("TestDB2") !== -1, "TestDB2 not in database list anymore");
+    }).then(function (names) {
+        return Dexie.exists("nonexistingDB");
+    }).then(function (exists) {
+        ok(!exists, "'nonexistingDB' should not exist indeed");
+        return Dexie.getDatabaseNames();
+    }).then(function (names) {
+        ok(!names.indexOf("nonexistingDB") !== -1, "nonexistingDB must not have been recorded when calling Dexie.exists()");
     }).catch(function (err) {
         ok(false, err.stack || err);
     }).finally(function () {
