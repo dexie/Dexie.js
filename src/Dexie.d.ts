@@ -69,14 +69,11 @@ declare class Dexie {
     version(versionNumber: Number): Dexie.Version;
 
     on: {
-        (eventName: string, subscriber: Function, ...args : any[]): void;
         (eventName: 'ready', subscriber: () => any, bSticky: boolean): void;
-        (eventName: 'error', subscriber: (error: any) => any): void;
         (eventName: 'populate', subscriber: () => any): void;
         (eventName: 'blocked', subscriber: () => any): void;
         (eventName: 'versionchange', subscriber: (event: IDBVersionChangeEvent) => any): void;
         ready: Dexie.DexieOnReadyEvent;
-        error: Dexie.DexieErrorEvent;
         populate: Dexie.DexieEvent;
         blocked: Dexie.DexieEvent;
         versionchange: Dexie.DexieVersionChangeEvent;
