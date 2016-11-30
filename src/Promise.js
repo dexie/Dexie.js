@@ -55,6 +55,7 @@ const
 
 export const NativePromise = resolvedNativePromise && resolvedNativePromise.constructor;
 export const AsyncFunction = nativePromiseInstanceAndProto[3];
+const patchGlobalPromise = !!resolvedGlobalPromise;
 
 var stack_being_generated = false;
 
@@ -187,14 +188,14 @@ const thenProp = {
             return rv;
         }
 
-        then._tQzo = true; // For idempotense, see setter below.
+        then.prototype = INTERNAL; // For idempotense, see setter below.
 
         return then;
     },
     // Be idempotent and allow another framework (such as zone.js or another instance of a Dexie.Promise module) to replace Promise.prototype.then
     // and when that framework wants to restore the original property, we must identify that and restore the original property descriptor.
     set: function (value) {
-        setProp (this, 'then', value && value._tQzo ?
+        setProp (this, 'then', value && value.prototype === INTERNAL ?
             thenProp : // Restore to original property descriptor.
             {
                 get: function(){
@@ -639,7 +640,7 @@ export function newScope (fn, props, a1, a2) {
     psd.id = ++zone_id_counter;
     // Prepare for promise patching (done in usePSD):
     var globalEnv = globalPSD.env;
-    psd.env = nativePromiseThen ? {
+    psd.env = patchGlobalPromise ? {
         Promise: Promise, // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
         all: Promise.all,
         race: Promise.race,
@@ -725,9 +726,9 @@ function switchToZone (targetZone, bEnteringZone) {
     // Snapshot on every leave from global zone.
     if (currentZone === globalPSD) globalPSD.env = snapShot();
 
-    var GlobalPromise = globalPSD.env.Promise;
-    if (GlobalPromise) {
-        // Global environment has a promise at this time. Polyfilled or not. Let's patch the global environment.
+    if (patchGlobalPromise) {
+        // Let's patch the global and native Promises (may be same or may be different)
+        var GlobalPromise = globalPSD.env.Promise;
         // Swich environments (may be PSD-zone or the global zone. Both apply.)
         var targetEnv = targetZone.env;
 
@@ -754,7 +755,7 @@ function switchToZone (targetZone, bEnteringZone) {
 
 function snapShot () {
     var GlobalPromise = _global.Promise;
-    return GlobalPromise ? {
+    return patchGlobalPromise ? {
         Promise: GlobalPromise,
         all: GlobalPromise.all,
         race: GlobalPromise.race,
