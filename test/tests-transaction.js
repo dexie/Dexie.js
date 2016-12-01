@@ -931,3 +931,31 @@ promisedTest("Promise.follow() should omit promises spawned under Dexie.ignoreTr
     equal(log.join(','), "spawned-promise-done,outer-task-done,inner-task-done", "outer-task-done should have happened before inner-task-done");
 
 });
+
+promisedTest("db.transaction() should not wait for non-awaited new top-level transactions to commit", async ()=>{
+    let resolve, reject;
+    const p = new Promise((res, rej) => { resolve = res; reject = rej; });
+    const log = [];
+
+    await db.transaction('r', db.users, () => {
+        // Since we do not return a promise here,
+        // Promise.follow() will be used for awaitint all tasks.
+        // However, if we spawn a new top-level transaction. It should be omitted and not waited for:
+        db.transaction('rw!', db.pets, () => {
+            return db.pets.put({kind: "dog"}).then(()=>{
+                return db.pets.count();
+            }).then(numPets => {
+                ok(true, `num pets: ${numPets}`);
+            }).then(()=>{
+                log.push("inner-transaction-done");
+            }).then(resolve, reject);
+        });
+    });
+
+    log.push("outer-transaction-done");
+    ok(true, "transaction done");
+
+    await p;
+
+    equal(log.join(','), "outer-transaction-done,inner-transaction-done", "outer-transaction-done should have happened before inner-transaction-done");
+});

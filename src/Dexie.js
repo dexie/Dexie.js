@@ -765,7 +765,12 @@ export default function Dexie(dbName, options) {
         // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
         return (parentTransaction ?
             parentTransaction._promise(mode, enterTransactionScope, "lock") :
-            db._whenReady (enterTransactionScope));
+            PSD.trans ?
+                // no parent transaction despite PSD.trans exists. Make sure also
+                // that the zone we create is not a sub-zone of current, because
+                // Promise.follow() should not wait for it if so.
+                usePSD(PSD.transless, ()=>db._whenReady(enterTransactionScope)) :
+                db._whenReady (enterTransactionScope));
             
         function enterTransactionScope() {
             return Promise.resolve().then(()=>{
