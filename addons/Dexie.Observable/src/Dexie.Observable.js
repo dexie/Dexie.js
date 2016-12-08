@@ -218,7 +218,7 @@ export default function Observable(db) {
             // We need a storage event to wakeup other windwos.
             // Since indexedDB lacks storage events, let's use the storage event from WebStorage just for
             // the purpose to wakeup db instances in other windows.
-            localStorage.setItem('Dexie.Observable/latestRevision/' + db.name, lastWrittenRevision); // In IE, this will also wakeup our own window. However, onLatestRevisionIncremented will work around this by only running once per revision id.
+            if (localStorage) localStorage.setItem('Dexie.Observable/latestRevision/' + db.name, lastWrittenRevision); // In IE, this will also wakeup our own window. However, onLatestRevisionIncremented will work around this by only running once per revision id.
         }
     }
 
@@ -256,7 +256,9 @@ export default function Observable(db) {
             if (mySyncNode && mySyncNode.id) {
                 Observable.on.suicideNurseCall.fire(db.name, mySyncNode.id);
                 // Inform other windows as well:
-                localStorage.setItem('Dexie.Observable/deadnode:' + mySyncNode.id.toString() + '/' + db.name, "dead"); // In IE, this will also wakeup our own window. cleanup() may trigger twice per other db instance. But that doesnt to anything.
+                if (localStorage) {
+                    localStorage.setItem('Dexie.Observable/deadnode:' + mySyncNode.id.toString() + '/' + db.name, "dead"); // In IE, this will also wakeup our own window. cleanup() may trigger twice per other db instance. But that doesnt to anything.
+                }
                 mySyncNode.deleteTimeStamp = 1; // One millisecond after 1970. Makes it occur in the past but still keeps it truthy.
                 mySyncNode.lastHeartBeat = 0;
                 db._syncNodes.put(mySyncNode); // This async operation may be cancelled since the browser is closing down now.
@@ -604,7 +606,9 @@ export default function Observable(db) {
                     // Delete the node.
                     delete this.value;
                     // Cleanup localStorage "deadnode:" entry for this node (localStorage API was used to wakeup other windows (onstorage event) - an event type missing in indexedDB.)
-                    localStorage.removeItem('Dexie.Observable/deadnode:' + node.id + '/' + db.name);
+                    if (localStorage) {
+                        localStorage.removeItem('Dexie.Observable/deadnode:' + node.id + '/' + db.name);
+                    }
                     // Check if we are deleting a master node
                     if (node.isMaster) {
                         // The node we are deleting is master. We must take over that role.
@@ -642,7 +646,9 @@ export default function Observable(db) {
         db._syncNodes.put(mySyncNode); // This async operation may be cancelled since the browser is closing down now.
         Observable.wereTheOneDying = true; // If other nodes in same window wakes up by this call, make sure they dont start taking over mastership and stuff...
         // Inform other windows that we're gone, so that they may take over our role if needed. Setting localStorage item below will trigger Observable.onStorage, which will trigger onSuicie() below:
-        localStorage.setItem('Dexie.Observable/deadnode:' + mySyncNode.id.toString() + '/' + db.name, "dead"); // In IE, this will also wakeup our own window. However, that is doublechecked in nursecall subscriber below.
+        if (localStorage) {
+            localStorage.setItem('Dexie.Observable/deadnode:' + mySyncNode.id.toString() + '/' + db.name, "dead"); // In IE, this will also wakeup our own window. However, that is doublechecked in nursecall subscriber below.
+        }
     }
 
     function onSuicide(dbname, nodeID) {
@@ -708,7 +714,9 @@ export default function Observable(db) {
                         requestsWaitingForReply[messageId.toString()] = { resolve: resolve, reject: reject };
                     });
                 }
-                localStorage.setItem("Dexie.Observable/intercomm/" + db.name, messageId.toString());
+                if (localStorage) {
+                    localStorage.setItem("Dexie.Observable/intercomm/" + db.name, messageId.toString());
+                }
                 Observable.on.intercomm.fire(db.name);
                 return rv;
             });
@@ -886,7 +894,9 @@ Observable._onBeforeUnload = function() {
     Observable.on.beforeunload.fire();
 };
 
-Observable.localStorageImpl = global.localStorage;
+try {
+    Observable.localStorageImpl = global.localStorage;
+} catch (ex){}
 
 //
 // Map window events to static events in Dexie.Observable:
