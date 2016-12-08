@@ -825,9 +825,9 @@ Observable.createUUID = function() {
 
 Observable.deleteOldChanges = function(db) {
     // This is a background job and should never be done within
-    // a caller's transaction. Use 'rw!' to ensure that.
+    // a caller's transaction. Use Dexie.ignoreTransaction() to ensure that.
     // We should not return the Promise but catch it ourselves instead.
-    db.transaction('rw!', db._syncNodes, () => {
+    Dexie.ignoreTransaction(()=>{
         return db._syncNodes.orderBy("myRevision").first(oldestNode => {
             let timeout = Date.now() + 300,
                 hasTimedOut = false,
@@ -839,9 +839,9 @@ Observable.deleteOldChanges = function(db) {
                 .delete()
                 .then(() => {
                     // If not done garbage collecting, reschedule a continuation of it until done.
-                    if (hasTimedOut) setTimeout(() => Observable.deleteOldChanges(db), 300);
+                    if (hasTimedOut) setTimeout(() => db.isOpen() && Observable.deleteOldChanges(db), 300);
                 });
-        })
+        });
     }).catch(()=>{
         // The operation is not cruzial. A failure could almost only be due to that database has been closed.
         // No need to log this.

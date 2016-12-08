@@ -29,11 +29,13 @@
                 start();
             }).catch(function (e) {
                 ok(false, "Could not delete database");
-                debugger;
             });
         },
         teardown: function () {
-            stop(); Dexie.Promise.all(Dexie.delete("SyncProviderTest"), Dexie.delete("OtherClientDB")).then(start);
+            stop(); Dexie.Promise.all(Dexie.delete("SyncProviderTest"), Dexie.delete("OtherClientDB")
+            ).catch('DatabaseClosedError', function () {}).then(function(){
+                start();
+            });
         }
     });
 
@@ -122,11 +124,13 @@
         }).then(function () {
             ok(true, "The DELETE of friend 'Ylva' was sent all the way around as well");
             // Now send 1100 create requests
-            db2.transaction('rw', db2.pets, function () {
-                for (var i = 0; i < 1100; ++i) {
-                    db.pets.add({name: "Josephina" + (i + 1), kind: "Dog"});
-                }
-            });
+            var petsToAdd = new Array(1100);
+            for (var i = 0; i < petsToAdd.length; ++i) {
+                petsToAdd[i] = {name: "Josephina" + (i + 1), kind: "Dog"};
+            }
+            return db2.pets.bulkAdd(petsToAdd);
+        }).then(function(){
+            ok(true, "Successfully added 1100 pets into db2. Now wait for the last change to be synced into db1.");
             return waitFor(db, { type: CREATE, name: "Josephina1100" });
         }).then(function () {
             ok(true, "All 1100 dogs where sent all the way around (db2-->db this time)");
@@ -139,16 +143,17 @@
                 equal(count, 0, "DB2 has no uncommitted changes anymore");
             });
         }).then(function () {
-            // Now send 1000 create this time (exact number of max changes per chunk)
-            db.transaction('rw', db.pets, function () {
-                for (var i = 0; i < 1000; ++i) {
-                    db.pets.add({ name: "Tito" + (i + 1), kind: "Cat" });
-                }
-            });
-            return waitFor(db, { type: CREATE, name: "Tito1000" });
+            ok (true, "Now send 1000 create this time (exact number of max changes per chunk)");
+            var petsToAdd = new Array(1000);
+            for (var i = 0; i < petsToAdd.length; ++i) {
+                petsToAdd[i] = { name: "Tito" + (i + 1), kind: "Cat" };
+            }
+            return db.pets.bulkAdd(petsToAdd);
+        }).then(function () {
+            ok (true, "Successfully added 1000 cats. Now wait for them to arrive in db2.");
+            return waitFor(db2, { type: CREATE, name: "Tito1000" });
         }).then(function () {
             ok(true, "All 1000 cats where sent all the way around (db-->db2 this time)");
-
         }).finally(function () {
             console.log("Closing down");
             db.close();
