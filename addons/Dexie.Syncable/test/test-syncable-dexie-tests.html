@@ -88,7 +88,7 @@
                         return origFunc.apply(this, arguments);
                     }
                 });
-                db.close = Dexie.override(db.close, origFunc => {
+                db.close = Dexie.override(db.close, function (origFunc) {
                     return function() {
                         db.connectAlreadyCalled = false;
                         return origFunc.apply(this, arguments);
