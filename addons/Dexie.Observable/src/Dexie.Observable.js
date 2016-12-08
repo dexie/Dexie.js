@@ -599,7 +599,7 @@ export default function Observable(db) {
             // Because client may have been in hybernate mode and recently woken up. That would lead to deletion of all nodes.
             // Instead, we should mark any old nodes for deletion in a minute or so. If they still dont wakeup after that minute we could consider them dead.
             var weBecameMaster = false;
-            db._syncNodes.where("lastHeartBeat").below(Date.now() - NODE_TIMEOUT).and(function(node) { return node.type === 'local'; }).modify(function(node) {
+            db._syncNodes.where("lastHeartBeat").below(Date.now() - NODE_TIMEOUT).filter(node => node.type === 'local').modify(function(node) {
                 if (node.deleteTimeStamp && node.deleteTimeStamp < Date.now()) {
                     // Delete the node.
                     delete this.value;
@@ -612,17 +612,14 @@ export default function Observable(db) {
                         db._syncNodes.update(ourSyncNode, { isMaster: 1 });
                         weBecameMaster = true;
                     }
-                    // Cleanup intercomm messages destinated to the node being deleted:
-                    db._intercomm.where("destinationNode").equals(node.id).modify(function(msg) {
-                        // OK to call intercomm. No need to call Dexie.vip() because intercomm is opened in existing transaction!
-                        // Delete the message from DB and if someone is waiting for reply, let ourselved answer the request.
-                        delete this.value;
-                        if (msg.wantReply) {
-                            // Message wants a reply, meaning someone must take over its messages when it dies. Let us be that one!
-                            Dexie.ignoreTransaction(function() {
-                                consumeMessage(msg);
-                            });
-                        }
+                    // Cleanup intercomm messages destinated to the node being deleted.
+                    // Those that waits for reply should be redirected to us.
+                    db._intercomm.where({destinationNode: node.id}).modify(function(msg) {
+                        if (msg.wantReply)
+                            msg.destinationNode = ourSyncNode.id;
+                        else
+                            // Delete the message from DB and if someone is waiting for reply, let ourselved answer the request.
+                            delete this.value;
                     });
                 } else if (!node.deleteTimeStamp) {
                     // Mark the node for deletion
@@ -745,7 +742,7 @@ export default function Observable(db) {
         // Check if we got messages:
         if (!mySyncNode) return Promise.reject(new Dexie.DatabaseClosedError());
         return Dexie.ignoreTransaction(()=>{
-            return db._intercomm.where({destinationNode: mySyncNodeId}).toArray(messages => {
+            return db._intercomm.where({destinationNode: mySyncNode.id}).toArray(messages => {
                 messages.forEach(msg => consumeMessage(msg));
                 return db._intercomm.where('id').anyOf(messages.map(msg => msg.id)).delete();
             });

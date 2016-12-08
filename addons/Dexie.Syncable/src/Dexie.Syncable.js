@@ -405,6 +405,12 @@ export default function Syncable (db) {
 
                         return finalSyncPromise.then(function() {
                             // Resolve caller of db.syncable.connect() with undefined. Not with continuation!
+                            return undefined;
+                        }).finally(()=>{
+                            // In case error happens after connect, don't try reject the connect promise anymore.
+                            // This is important. A Dexie unit test that verifies unhandled rejections will fail when Dexie.Syncable addon
+                            // is active and this happens. It would fire unhandledrejection but that we do not want.
+                            rejectConnectPromise = null;
                         });
 
                         function onChangesAccepted() {
@@ -454,7 +460,7 @@ export default function Syncable (db) {
                         Object.keys(nodeModificationsOnAck).forEach(function(keyPath) {
                             Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
                         });
-                        node.save();
+                        node.save().catch('DatabaseClosedError', ex=>{});
                         return getLocalChangesForNode(node, autoAck);
                     } else {
                         return cb(changes, remoteBaseRevision, partial, nodeModificationsOnAck);
@@ -624,7 +630,10 @@ export default function Syncable (db) {
                         var changes = Object.keys(changeSet).map(function(key) { return changeSet[key]; });
                         hasMoreToGive = partial;
                         return cb(changes, partial, { myRevision: nextRevision });
-                    });
+                    });/*.catch(ex => {
+                        console.error(`Here and there... '${ex.message}'.`);
+                        //return Promise.reject(ex);
+                    });*/
                 }
             }
 
@@ -837,7 +846,7 @@ export default function Syncable (db) {
                                 Object.keys(nodeModificationsOnAck).forEach(function(keyPath) {
                                     Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
                                 });
-                                node.save();
+                                node.save().catch('DatabaseClosedError', ex=>{});
                                 // More changes may be waiting:
                                 reactToChanges();
                             });
@@ -851,7 +860,10 @@ export default function Syncable (db) {
                                 changeStatusTo(Statuses.ONLINE);
                             }
                         }
-                    }).catch(abortTheProvider);
+                    }).catch(ex => {
+                        console.error(`Got ${ex.message} caught by reactToChanges`);
+                        abortTheProvider(ex);
+                    });
                 }
 
                 reactToChanges();
@@ -869,7 +881,7 @@ export default function Syncable (db) {
                             Object.keys(nodeModificationsOnAck).forEach(function(keyPath) {
                                 Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
                             });
-                            node.save();
+                            node.save().catch('DatabaseClosedError', ex=>{});
                         }
 
                         function onSuccess(continuation) {
