@@ -495,7 +495,7 @@ export default function Observable(db) {
         var partial = false;
         var ourSyncNode = mySyncNode; // Because mySyncNode can suddenly be set to null on database close, and worse, can be set to a new value if database is reopened.
         if (!ourSyncNode) {
-            return Promise.reject("Database closed");
+            return Promise.reject(new Dexie.DatabaseClosedError());
         }
         var LIMIT = 1000;
         var promise = db._changes.where("rev").above(ourSyncNode.myRevision).limit(LIMIT).toArray(function (changes) {
@@ -591,7 +591,7 @@ export default function Observable(db) {
     
     function cleanup() {
         var ourSyncNode = mySyncNode;
-        if (!ourSyncNode) return Promise.reject("Database closed");
+        if (!ourSyncNode) return Promise.reject(new Dexie.DatabaseClosedError());
         return db.transaction('rw', '_syncNodes', '_changes', '_intercomm', function() {
             // Cleanup dead local nodes that has no heartbeat for over a minute
             // Dont do the following:
@@ -743,12 +743,11 @@ export default function Observable(db) {
 
     function consumeIntercommMessages() {
         // Check if we got messages:
-        if (!mySyncNode) return Promise.reject("Database closed");
-        return db.table('_intercomm').where("destinationNode").equals(mySyncNode.id).modify(function(msg) {
-            // For each message, fire the event and remove message.
-            delete this.value;
-            Dexie.ignoreTransaction(function() {
-                consumeMessage(msg);
+        if (!mySyncNode) return Promise.reject(new Dexie.DatabaseClosedError());
+        return Dexie.ignoreTransaction(()=>{
+            return db._intercomm.where({destinationNode: mySyncNodeId}).toArray(messages => {
+                messages.forEach(msg => consumeMessage(msg));
+                return db._intercomm.where('id').anyOf(messages.map(msg => msg.id)).delete();
             });
         });
     }
@@ -783,7 +782,7 @@ export default function Observable(db) {
     function onIntercomm(dbname) {
         // When storage event trigger us to check
         if (dbname === db.name) {
-            consumeIntercommMessages();
+            consumeIntercommMessages().catch('DatabaseClosedError', ()=>{});
         }
     }
 
