@@ -155,7 +155,9 @@ declare module Dexie {
 
         finally(onFinally: () => any): Promise<R>;
 
-        onuncatched: () => any;
+        timeout(milliseconds: number): Promise<R>;
+
+        [Symbol.toStringTag]: 'Promise'; 
     }
 
     module Promise {
