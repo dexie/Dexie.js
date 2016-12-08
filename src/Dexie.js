@@ -93,6 +93,7 @@ export default function Dexie(dbName, options) {
     var idbdb = null; // Instance of IDBDatabase
     var dbOpenError = null;
     var isBeingOpened = false;
+    var onReadyBeingFired = null;
     var openComplete = false;
     var READONLY = "readonly", READWRITE = "readwrite";
     var db = this;
@@ -552,12 +553,22 @@ export default function Dexie(dbName, options) {
                 resolve();
 
             }, reject);
-        })]).then(()=>{
+        })]).then(() => {
             // Before finally resolving the dbReadyPromise and this promise,
             // call and await all on('ready') subscribers:
             // Dexie.vip() makes subscribers able to use the database while being opened.
             // This is a must since these subscribers take part of the opening procedure.
-            return Dexie.vip(db.on.ready.fire);
+            onReadyBeingFired = [];
+            return Promise.resolve(Dexie.vip(db.on.ready.fire)).then(function fireRemainders() {
+                if (onReadyBeingFired.length > 0) {
+                    // In case additional subscribers to db.on('ready') were added during the time db.on.ready.fire was executed.
+                    let remainders = onReadyBeingFired.reduce(promisableChain, nop);
+                    onReadyBeingFired = [];
+                    return Promise.resolve(Dexie.vip(remainders)).then(fireRemainders)
+                }
+            });
+        }).finally(()=>{
+            onReadyBeingFired = null;
         }).then(()=>{
             // Resolve the db.open() with the db instance.
             isBeingOpened = false;
@@ -664,7 +675,11 @@ export default function Dexie(dbName, options) {
                     // Database already open. Call subscriber asap.
                     if (!dbOpenError) Promise.resolve().then(subscriber);
                     // bSticky: Also subscribe to future open sucesses (after close / reopen) 
-                    if (bSticky) subscribe(subscriber); 
+                    if (bSticky) subscribe(subscriber);
+                } else if (onReadyBeingFired) {
+                    // db.on('ready') subscribers are currently being executed and have not yet resolved or rejected
+                    onReadyBeingFired.push(subscriber);
+                    if (bSticky) subscribe(subscriber);
                 } else {
                     // Database not yet open. Subscribe to it.
                     subscribe(subscriber);
@@ -756,6 +771,10 @@ export default function Dexie(dbName, options) {
                         }
                     });
                 }
+                if (onlyIfCompatible && parentTransaction && !parentTransaction.active) {
+                    // '?' mode should not keep using an inactive transaction.
+                    parentTransaction = null;
+                }
             }
         } catch (e) {
             return parentTransaction ?
@@ -765,7 +784,12 @@ export default function Dexie(dbName, options) {
         // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
         return (parentTransaction ?
             parentTransaction._promise(mode, enterTransactionScope, "lock") :
-            db._whenReady (enterTransactionScope));
+            PSD.trans ?
+                // no parent transaction despite PSD.trans exists. Make sure also
+                // that the zone we create is not a sub-zone of current, because
+                // Promise.follow() should not wait for it if so.
+                usePSD(PSD.transless, ()=>db._whenReady(enterTransactionScope)) :
+                db._whenReady (enterTransactionScope));
             
         function enterTransactionScope() {
             return Promise.resolve().then(()=>{
@@ -1407,13 +1431,17 @@ export default function Dexie(dbName, options) {
         });
         
         this._completion.then(
-            ()=> {this.on.complete.fire();},
+            ()=> {
+                this.active = false;
+                this.on.complete.fire();
+            },
             e => {
+                var wasActive = this.active;
+                this.active = false;
                 this.on.error.fire(e);
                 this.parent ?
                     this.parent._reject(e) :
-                    this.active && this.idbtrans && this.idbtrans.abort();
-                this.active = false;
+                    wasActive && this.idbtrans && this.idbtrans.abort();
                 return rejection(e); // Indicate we actually DO NOT catch this error.
             });
     }

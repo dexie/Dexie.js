@@ -16,7 +16,7 @@
 	        db1.close();
 	        db2.close();
 			stop();
-			deletePromise.then(start);
+			deletePromise.then(function(){start()});
 		},
 		teardown: function () {
 		}
@@ -50,13 +50,7 @@
 				db1.objects.update(key, {name: "four"});
 			});
 		});
-		window.addEventListener('unhandledrejection', onError);
-		function onError (ev) {
-			window.removeEventListener('unhandledrejection', onError);
-			db1.close();
-			ok(false, ev.reason);
-			start();
-		}
+		
 		db1.syncable.on('statusChanged', function (newStatus) {
 			ok(true, "Status changed to " + Dexie.Syncable.StatusTexts[newStatus]);
 		});
@@ -119,8 +113,10 @@
 			db1.objects.get("apa2", function (seven) {
 				equal(seven.name, "seven", "Have got the change from the server. If not, check that promise does not fire until all changes have committed.");
 			});
-		}).catch(function (err) {
-			alert(err.stack || err);
+		}).catch('DatabaseClosedError', function () {
+			console.warn("DatabaseClosedError");
+		}).catch(function (ex) {
+			ok(false, "Could not connect. Error: " + (ex.stack || ex));
 		});
 
 		callbacks.push(function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
@@ -222,36 +218,10 @@
 					equal(status, Dexie.Syncable.Statuses.ONLINE, "Status is ONLINE");
 				}).then(function () {
 					// Close and open again and it will be status connected at once
-					db1.close();
-					db1 = new Dexie("db1");
-					db1.version(1).stores({objects: "$$"});
-
-					var providerWasCalled = false;
-					callbacks.push(function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
-						providerWasCalled = true;
-						// changes
-						equal(changes.length, 0, "Got zero changes after reconnect.");
-						applyRemoteChanges([], "revision three", false, false);
-						db1.syncable.getStatus("http://dummy.local", function (status) {
-							equal(status, Dexie.Syncable.Statuses.CONNECTING, "Status is CONNECTING now when being in provider and DB is currently being reopened.");
-						}).then(function () {
-							onSuccess({ again: 100000 });
-						}).catch(function (err) {
-							alert(err.stack || err);
-						});
-					});
-					db1.open().then(function () {
-						ok(providerWasCalled, "Provider was called before open() resolved");
-
-						// For now, stop here. TODO:
-						//   1. Test delete(url): Call delete() and then connect again. You should now get ALL data from local (the 1001 objects plus the others)
-						//   2. Test setFilter(): Call delete() again, set a filter that ignores all objects but one. Then call connect() again and you should get just the one object.
-						//   3. Test list(): Do it early in this asyncTest after first connect. Do it after disconnect() to make sure it's still there. And after delete() to make sure it's gone.
-						db1.delete().then(start);
-					}).catch(function (err) {
-						alert(err.stack || err);
-					});
-				});
+					return db1.delete();
+				}).catch(function (err) {
+					ok(false, "Got error: " + err);
+				}).finally(start);
 			}, 100);
 		});
 
