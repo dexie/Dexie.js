@@ -125,15 +125,17 @@ export function supports (features) {
     return features.split('+').reduce((result,feature)=>{
         switch (feature.toLowerCase()) {
             case "compound":
-                return Array.isArray(Dexie.maxKey);
+                return result && Array.isArray(Dexie.maxKey);
             case "multientry":
                 return result && (hasPolyfillIE || (!isIE && !isEdge)); // Should add Safari to
+            case "deleteobjectstoreafterread":
+                return result && (!isIE && !isEdge);
             case "versionchange":
-                return true;
+                return result;
                 //return result && (!isIE && !isEdge); // Should add Safari to
             case "binarykeys":
                 try {
-                    return Array.isArray(Dexie.maxKey) && indexedDB.cmp(new Uint8Array([1]), new Uint8Array([1])) === 0;
+                    return result && Array.isArray(Dexie.maxKey) && indexedDB.cmp(new Uint8Array([1]), new Uint8Array([1])) === 0;
                 } catch (e) {
                     return false;
                 }
