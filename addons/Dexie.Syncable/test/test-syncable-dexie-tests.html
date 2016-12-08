@@ -76,7 +76,8 @@
             Dexie.addons.push(function (db) {
                 db.open = Dexie.override(db.open, function (origFunc) {
                     return function () {
-                        if (!db.dynamicallyOpened()) {
+                        if (!db.dynamicallyOpened() && !db.connectAlreadyCalled) {
+                            db.connectAlreadyCalled = true;
                             console.log("Calling db.sync() on " + db.name);
                             db.syncable.connect("logger", "logger").then(function() {
                                 console.log("connect() promise was resolved (database=" + db.name + ")");
@@ -84,6 +85,12 @@
                                 console.error("Error from connect() (database=" + db.name + "): " + err.stack || err);
                             });
                         }
+                        return origFunc.apply(this, arguments);
+                    }
+                });
+                db.close = Dexie.override(db.close, origFunc => {
+                    return function() {
+                        db.connectAlreadyCalled = false;
                         return origFunc.apply(this, arguments);
                     }
                 });

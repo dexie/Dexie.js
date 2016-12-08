@@ -756,6 +756,10 @@ export default function Dexie(dbName, options) {
                         }
                     });
                 }
+                if (onlyIfCompatible && parentTransaction && !parentTransaction.active) {
+                    // '?' mode should not keep using an inactive transaction.
+                    parentTransaction = null;
+                }
             }
         } catch (e) {
             return parentTransaction ?
@@ -1412,13 +1416,17 @@ export default function Dexie(dbName, options) {
         });
         
         this._completion.then(
-            ()=> {this.on.complete.fire();},
+            ()=> {
+                this.active = false;
+                this.on.complete.fire();
+            },
             e => {
+                var wasActive = this.active;
+                this.active = false;
                 this.on.error.fire(e);
                 this.parent ?
                     this.parent._reject(e) :
-                    this.active && this.idbtrans && this.idbtrans.abort();
-                this.active = false;
+                    wasActive && this.idbtrans && this.idbtrans.abort();
                 return rejection(e); // Indicate we actually DO NOT catch this error.
             });
     }

@@ -60,41 +60,60 @@ export default function Syncable (db) {
     db.on('cleanup', function(weBecameMaster) {
         // A cleanup (done in Dexie.Observable) may result in that a master node is removed and we become master.
         if (weBecameMaster) {
-            // We took over the master role in Observable's cleanup method
-            db._syncNodes.where('type').equals('remote')
-                .and(function(node) { return node.status !== Statuses.OFFLINE && node.status !== Statuses.ERROR; })
-                .each(function(connectedRemoteNode) {
-                    // There are connected remote nodes that we must take over
-                    // Since we may be in the on(ready) event, we must get VIPed to continue
-                    Dexie.ignoreTransaction(function() {
-                        Dexie.vip(function() {
-                            db.syncable.connect(connectedRemoteNode.syncProtocol, connectedRemoteNode.url, connectedRemoteNode.syncOptions);
-                        });
-                    });
-                });
+            // We took over the master role in Observable's cleanup method.
+            // We should connect to remote servers now.
+            // TODO: Check if ignoreTransaction and vip are required here. They wont harm though.
+            Dexie.ignoreTransaction(()=>Dexie.vip(()=>{    
+                db._syncNodes.where('type').equals('remote')
+                    .and(node => node.status !== Statuses.OFFLINE && node.status !== Statuses.ERROR)
+                    .toArray(connectedRemoteNodes => connectedRemoteNodes.map(node => 
+                        db.syncable.connect(node.syncProtocol, node.url, node.syncOptions).catch(e => {
+                            console.warn(`Dexie.Syncable: Could not connect to ${node.url}. ${e.stack || e}`);
+                        })
+                    ).catch(err => {
+                        console.warn(`Dexie.Syncable: Could not take over mastership: ${err.stack || err}`);
+                    }));
+            }));
         }
     });
 
+    // "ready" subscriber for the master node that makes sure it will always connect to sync server
+    // when the database opens. It will not wait for the connection to complete, just initiate the
+    // connection so that it will continue syncing as long as the database is open.
+
+    // Dexie.Observable's 'ready' subscriber will have been invoked prior to this, making sure
+    // that db._localSyncNode exists and persisted before this subscriber kicks in.
     db.on('ready', function onReady() {
         // Again, in onReady: If we ARE master, make sure to connect to remote servers that is in a connected state.
         if (db._localSyncNode && db._localSyncNode.isMaster) {
             // Make sure to connect to remote servers that is in a connected state (NOT OFFLINE or ERROR!)
-            return db._syncNodes.where('type').equals('remote')
-                .and(function(node) { return node.status !== Statuses.OFFLINE && node.status !== Statuses.ERROR; })
-                .toArray(function(connectedRemoteNodes) {
-                    // There are connected remote nodes that we must take over
-                    if (connectedRemoteNodes.length > 0) {
-                        return Promise.all(connectedRemoteNodes.map(function(node) {
-                            return db.syncable.connect(node.syncProtocol, node.url, node.syncOptions)
-                                .catch(function(err) {
-                                    return undefined; // If a node fails to connect, don't make db.open() reject. Accept it!
-                                });
-                        }));
-                    }
+            // This "ready" subscriber will never be the one performing the initial sync request, because
+            // even after calling db.syncable.connect(), there won't exist any "remote" sync node yet.
+            // Instead, db.syncable.connect() will subscribe to "ready" also, and that subscriber will be
+            // called after this one. There, in that subscriber, the initial sync request will take place
+            // and the "remote" node will be created so that this "ready" subscriber can auto-connect the
+            // next time this database is opened.
+            // CONCLUSION: We can always assume that the local DB has been in sync with the server at least
+            // once in the past for each "connectedRemoteNode" we find in quert below:
+            return db._syncNodes
+                .where('type').equals('remote')
+                .and(node =>
+                    node.status !== Statuses.OFFLINE &&
+                    node.status !== Statuses.ERROR)
+                .toArray(connectedRemoteNodes => {
+                    // There are connected remote nodes that we must manage (or take over to manage)
+                    connectedRemoteNodes.forEach(
+                            node => db.syncable.connect(
+                                node.syncProtocol,
+                                node.url,
+                                node.syncOptions)     
+                            .catch (err => console.warn(
+                                `Dexie.Syncable: Failed to connect to ${node.url}: ${err.stack || err}`
+                            ))
+                    );
                 });
         }
     }, true); // True means the ready event will survive a db reopen - db.close()/db.open()
-
 
     db.syncable = {};
 
@@ -119,18 +138,22 @@ export default function Syncable (db) {
     db.syncable.on = Dexie.Events(db, { statusChanged: "asap" });
 
     db.syncable.disconnect = function(url) {
-        if (db._localSyncNode && db._localSyncNode.isMaster) {
-            activePeers.filter(function(peer) { return peer.url === url; }).forEach(function(peer) {
-                peer.disconnect(Statuses.OFFLINE);
+        return Dexie.ignoreTransaction(()=>{
+            return Promise.resolve().then(()=>{
+                if (db._localSyncNode && db._localSyncNode.isMaster) {
+                    return Promise.all(activePeers.filter(peer => peer.url === url).map(peer => {
+                        return peer.disconnect(Statuses.OFFLINE);
+                    }));
+                } else {
+                    return db._syncNodes.where('isMaster').above(0).first(masterNode => {
+                        return db.sendMessage('disconnect', { url: url }, masterNode.id, {wantReply: true});
+                    });
+                }
+            }).then(()=>{
+                return db._syncNodes.where("url").equals(url).modify(node => {
+                    node.status = Statuses.OFFLINE;
+                });
             });
-        } else {
-            db._syncNodes.where('isMaster').above(0).first(function(masterNode) {
-                db.sendMessage('disconnect', { url: url }, masterNode.id, { wantReply: true });
-            });
-        }
-
-        return db._syncNodes.where("url").equals(url).modify(function(node) {
-            node.status = Statuses.OFFLINE;
         });
     };
 
@@ -147,16 +170,15 @@ export default function Syncable (db) {
                 } else {
                     // We are not master node
                     // Request master node to do the connect:
-                    db.table('_syncNodes').where('isMaster').above(0).first(function(masterNode) {
+                    return db.table('_syncNodes').where('isMaster').above(0).first(function(masterNode) {
                         // There will always be a master node. In theory we may self have become master node when we come here. But that's ok. We'll request ourselves.
                         return db.sendMessage('connect', { protocolName: protocolName, url: url, options: options }, masterNode.id, { wantReply: true });
                     });
-                    return Promise.resolve();
                 }
             } else {
                 // Database not yet open
                 // Wait for it to open
-                return new Promise(function(resolve, reject) {
+                let promise = new Promise(function(resolve, reject) {
                     db.on("ready", function syncWhenReady() {
                         return Dexie.vip(function() {
                             return db.syncable.connect(protocolName, url, options).then(resolve).catch(function(err) {
@@ -167,38 +189,37 @@ export default function Syncable (db) {
                         });
                     });
                 });
+                //if (!)
+                db.open().catch(()=>{}); // Force open() to happen. Otherwise connect() could be waiting forever.
+                return promise;
             }
         } else {
             throw new Error("ISyncProtocol '" + protocolName + "' is not registered in Dexie.Syncable.registerSyncProtocol()");
-            return new Promise(); // For code completion
         }
     };
 
     db.syncable.delete = function(url) {
-        // Notice: Caller should call db.syncable.disconnect(url) and wait for it to finish before calling db.syncable.delete(url)
-        // Surround with a readwrite-transaction
-        return db.transaction('rw', db._syncNodes, db._changes, db._uncommittedChanges, function() {
-            // Find the node
-            db._syncNodes.where("url").equals(url).toArray(function(nodes) {
-                // If it's found (or even several found, as detected by @martindiphoorn),
-                // let's delete it (or them) and cleanup _changes and _uncommittedChanges
+        return db.syncable.disconnect(url).then(()=>{
+            return db.transaction('rw!', db._syncNodes, db._changes, db._uncommittedChanges, ()=>{
+                // Find the node(s)
+                // Several can be found, as detected by @martindiphoorn,
+                // let's delete them and cleanup _uncommittedChanges and _changes 
                 // accordingly.
-                if (nodes.length > 0) {
-                    var nodeIDs = nodes.map(function(node) { return node.id; });
-                    // The following 'return' statement is not needed right now, but I leave it 
-                    // there because if we would like to add a 'then()' statement to the main ,
-                    // operation above ( db._syncNodes.where("url").equals(url).toArray(...) ) , 
-                    // this return statement will asure that the whole chain is waited for 
-                    // before entering the then() callback.
-                    return db._syncNodes.where('id').anyOf(nodeIDs).delete().then(function() {
-                        // When theese nodes are gone, let's clear the _changes table
-                        // from all revisions older than the oldest node.
-                        // Delete all changes older than revision of oldest node:
-                        Observable.deleteOldChanges();
-                        // Also don't forget to delete all uncommittedChanges for the deleted node:
-                        return db._uncommittedChanges.where('node').anyOf(nodeIDs).delete();
-                    });
-                }
+                return db._syncNodes
+                    .where("url").equals(url)
+                    .toArray(nodes => nodes.map(node => node.id))
+                    .then(nodeIDs =>
+                        // Delete the syncNode that represents the remote endpoint.
+                        db._syncNodes.where('id').anyOf(nodeIDs).delete())
+                    .then (() =>
+                        // In case there were uncommittedChanges belonging to this, delete them as well
+                        db._uncommittedChanges.where('node').anyOf(nodeIDs).delete());
+            }).then(()=> {
+                // Spawn background job to delete old changes, now that a node has been deleted,
+                // there might be changes in _changes table that is not needed to keep anymore.
+                // This is done in its own transaction, or possible several transaction to prohibit
+                // starvation
+                Observable.deleteOldChanges();
             });
         });
     };
@@ -231,11 +252,11 @@ export default function Syncable (db) {
             connectPromise: connectPromise,
             on: Dexie.Events(null, "disconnect"),
             disconnect: function(newStatus, error) {
+                var pos = activePeers.indexOf(activePeer);
+                if (pos >= 0) activePeers.splice(pos, 1);
+                if (error && rejectConnectPromise) rejectConnectPromise(error);
                 if (!disconnected) {
                     activePeer.on.disconnect.fire(newStatus, error);
-                    var pos = activePeers.indexOf(activePeer);
-                    if (pos >= 0) activePeers.splice(pos, 1);
-                    if (error && rejectConnectPromise) rejectConnectPromise(error);
                 }
                 disconnected = true;
             }
@@ -368,7 +389,7 @@ export default function Syncable (db) {
                                             setTimeout(function() {
                                                 if (stillAlive()) {
                                                     changeStatusTo(Statuses.SYNCING);
-                                                    doSync();
+                                                    doSync().catch('DatabaseClosedError', abortTheProvider);
                                                 }
                                             }, again);
                                             changeStatusTo(Statuses.ERROR_WILL_RETRY, error);
@@ -532,10 +553,8 @@ export default function Syncable (db) {
                     var ignoreSource = node.id;
                     var nextRevision = revision;
                     return db.transaction('r', db._changes, function() {
-                        var query = (maxRevision === Infinity ?
-                            db._changes.where('rev').above(revision) :
-                            db._changes.where('rev').between(revision, maxRevision, false, true));
-                        query.until(function() {
+                        var query = db._changes.where('rev').between(revision, maxRevision, false, true);
+                        return query.until(() => {
                             if (numChanges === maxChanges) {
                                 partial = true;
                                 return true;
@@ -612,7 +631,7 @@ export default function Syncable (db) {
 
             function applyRemoteChanges(remoteChanges, remoteRevision, partial, clear) {
                 return enque(applyRemoteChanges, function() {
-                    if (!stillAlive()) return Promise.reject("Database not open");
+                    if (!stillAlive()) return Promise.reject(new Dexie.DatabaseClosedError());
                     // FIXTHIS: Check what to do if clear() is true!
                     return (partial ? saveToUncommitedChanges(remoteChanges) : finallyCommitAllChanges(remoteChanges, remoteRevision))
                         .catch(function(error) {
@@ -623,36 +642,38 @@ export default function Syncable (db) {
 
 
                 function saveToUncommitedChanges(changes) {
-                    return db.transaction('rw', db._uncommittedChanges, function() {
-                        changes.forEach(function(change) {
-                            var changeToAdd = {
+                    return db.transaction('rw!', db._uncommittedChanges, () => {
+                        return db._uncommittedChanges.bulkAdd(changes.map(change => {
+                            let changeWithNodeId = {
                                 node: node.id,
                                 type: change.type,
                                 table: change.table,
                                 key: change.key
                             };
-                            if (change.obj) changeToAdd.obj = change.obj;
-                            if (change.mods) changeToAdd.mods = change.mods;
-                            db._uncommittedChanges.add(changeToAdd);
-                        });
-                    }).then(function() {
+                            if (change.obj) changeWithNodeId.obj = change.obj;
+                            if (change.mods) changeWithNodeId.mods = change.mods;
+                            return changeWithNodeId;
+                        }));
+                    }).then(() => {
                         node.appliedRemoteRevision = remoteRevision;
-                        node.save().catch(e=>{}); // Fail silently. If failed to save node, we're still idempotent.
+                        return node.save();
                     });
                 }
 
                 function finallyCommitAllChanges(changes, remoteRevision) {
-                    //alert("finallyCommitAllChanges() will now start its job.");
-                    //var tick = Date.now();
-
                     // 1. Open a write transaction on all tables in DB
-                    return db.transaction('rw', db.tables.filter(function(table) { return table.name === '_changes' || table.name === '_uncommittedChanges' || table.schema.observable; }), function() {
+                    const tablesToIncludeInTrans = db.tables.filter(table =>
+                        table.name === '_changes' ||
+                        table.name === '_uncommittedChanges' ||
+                        table.schema.observable);
+
+                    return db.transaction('rw!', tablesToIncludeInTrans, () => {
                         var trans = Dexie.currentTransaction;
                         var localRevisionBeforeChanges = 0;
-                        db._changes.orderBy('rev').last(function(lastChange) {
+                        return db._changes.orderBy('rev').last(function(lastChange) {
                             // Store what revision we were at before committing the changes
                             localRevisionBeforeChanges = (lastChange && lastChange.rev) || 0;
-                        }).then(function() {
+                        }).then(() => {
                             // Specify the source. Important for the change consumer to ignore changes originated from self!
                             trans.source = node.id;
                             // 2. Apply uncommitted changes and delete each uncommitted change
@@ -687,58 +708,62 @@ export default function Syncable (db) {
                                     }
                                 }
                             }
-                            node.save(); // We are not including _syncNodes in transaction, so this save() call will execute in its own transaction.
-                            //var tock = Date.now();
-                            //alert("finallyCommitAllChanges() has done its job. " + changes.length + " changes applied in " + ((tock - tick) / 1000) + "seconds");
+                            // We are not including _syncNodes in transaction, so this save() call will execute in its own transaction.
+                            node.save().catch(err=>{
+                                console.warn("Dexie.Syncable: Unable to save SyncNode after applying remote changes: " + (err.stack || err));
+                            });
                         });
 
                         function applyChanges(changes, offset) {
-                            /// <param name="changes" type="Array" elementType="IDatabaseChange"></param>
-                            /// <param name="offset" type="Number"></param>
-                            var lastChangeType = 0;
-                            var lastCreatePromise = null;
-                            if (offset >= changes.length) return Promise.resolve(null);
-                            var change = changes[offset];
-                            var table = db.table(change.table);
-                            while (change && change.type === CREATE) {
-                                // Optimize CREATE changes because on initial sync with server, the entire DB will be downloaded in forms of CREATE changes.
-                                // Instead of waiting for each change to resolve, do all CREATE changes in bulks until another type of change is stepped upon.
-                                // This case is the only case that allows i to increment and the for-loop to continue since it does not return anything.
-                                var specifyKey = !table.schema.primKey.keyPath;
-                                lastCreatePromise = (function(change, table, specifyKey) {
-                                    return (specifyKey ? table.add(change.obj, change.key) : table.add(change.obj)).catch("ConstraintError", function(e) {
-                                        return (specifyKey ? table.put(change.obj, change.key) : table.put(change.obj));
-                                    });
-                                })(change, table, specifyKey);
-                                change = changes[++offset];
-                                if (change) table = db.table(change.table);
+                            const length = changes.length;
+                            if (offset >= length) return Promise.resolve(null);
+                            const firstChange = changes[offset];
+                            let i, change;
+                            for (i=offset + 1; i < length; ++i) {
+                                change = changes[i];
+                                if (change.type !== firstChange.type ||
+                                    change.table !== firstChange.table)
+                                    break;
                             }
+                            const table = db.table(firstChange.table);
+                            const specifyKeys = !table.schema.primKey.keyPath;
+                            const changesToApply = changes.slice(offset, i);
+                            const changeType = firstChange.type;
+                            const bulkPromise =
+                                changeType === CREATE ?
+                                    table.bulkPut(changesToApply.map(c => c.obj), specifyKeys ?
+                                        changesToApply.map(c => c.key) : undefined) :
+                                changeType === UPDATE ?
+                                    bulkUpdate(table, changesToApply) :
+                                changeType === DELETE ?
+                                    table.bulkDelete(changesToApply.map(c => c.key)) :
+                                    Promise.resolve(null);
 
-                            if (lastCreatePromise) {
-                                // We did some CREATE changes but now stumbled upon another type of change.
-                                // Let's wait for the last CREATE change to resolve and then call applyChanges again at current position. Next time, lastCreatePromise will be null and a case below will happen.
-                                return lastCreatePromise.then(function() {
-                                    return (offset < changes.length ? applyChanges(changes, offset) : null);
+                            return bulkPromise.then(()=>applyChanges(changes, i));
+                        }
+
+                        function bulkUpdate(table, changes) {
+                            let keys = changes.map(c => c.key);
+                            let map = {};
+                            // Retrieve current object of each change to update and map each
+                            // found object's primary key to the existing object:
+                            return table.where(':id').anyOf(keys).raw().each((obj, cursor) => {
+                                map[cursor.primaryKey+''] = obj;
+                            }).then(()=>{
+                                // Filter away changes where whos key wasnt found in local database
+                                // (we couldn't update them if we do not know the existing values)
+                                let updatesThatApply = changes.filter(c => map.hasOwnProperty(c.key+''));
+                                // Apply modifications onto each existing object (in memory)
+                                // and generate array of resulting objects to put using bulkPut():
+                                let objsToPut = updatesThatApply.map (c => {
+                                    let curr = map[c.key+''];
+                                    Object.keys(c.mods).forEach(keyPath => {
+                                        setByKeyPath(curr, keyPath, c.mods[keyPath]);
+                                    });
+                                    return curr;
                                 });
-                            }
-
-                            if (change) {
-                                if (change.type === UPDATE) {
-                                    return table.update(change.key, change.mods).then(function() {
-                                        // Wait for update to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
-                                        return applyChanges(changes, offset + 1);
-                                    });
-                                }
-
-                                if (change.type === DELETE) {
-                                    return table.delete(change.key).then(function() {
-                                        // Wait for delete to resolve before taking next change. Why? Because it will lock transaction anyway since we are listening to CRUD events here.
-                                        return applyChanges(changes, offset + 1);
-                                    });
-                                }
-                            }
-
-                            return Promise.resolve(null); // Will return null or a Promise and make the entire applyChanges promise finally resolve.
+                                return table.bulkPut(objsToPut);
+                            });
                         }
                     });
                 }
@@ -797,7 +822,6 @@ export default function Syncable (db) {
 
                 db.on('changes', onChanges);
 
-                // Override disconnect() to also unsubscribe to onChanges.
                 activePeer.on('disconnect', function() {
                     db.on.changes.unsubscribe(onChanges);
                 });
@@ -920,9 +944,8 @@ export default function Syncable (db) {
 
     var syncNodeSaveQueContexts = {};
     db.observable.SyncNode.prototype.save = function() {
-        var self = this;
-        return db.transaction('rw?', db._syncNodes, function() {
-            db._syncNodes.put(self);
+        return db.transaction('rw?', db._syncNodes, () => {
+            return db._syncNodes.put(this);
         });
     };
 

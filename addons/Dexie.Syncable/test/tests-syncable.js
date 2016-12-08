@@ -119,8 +119,10 @@
 			db1.objects.get("apa2", function (seven) {
 				equal(seven.name, "seven", "Have got the change from the server. If not, check that promise does not fire until all changes have committed.");
 			});
-		}).catch(function (err) {
-			alert(err.stack || err);
+		}).catch('DatabaseClosedError', ()=>{
+			console.warn("DatabaseClosedError");
+		}).catch(ex => {
+			ok(false, `Could not connect. Error: ${ex.stack || ex}`);
 		});
 
 		callbacks.push(function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {

@@ -47,6 +47,7 @@ export default function Observable(db) {
         // LOCAL_POLL: The time to wait before polling local db for changes and cleaning up old nodes. 
         // Polling for changes is a fallback only needed in certain circomstances (when the onstorage event doesnt reach all listeners - when different browser windows doesnt share the same process)
         LOCAL_POLL = 2000, // 1 second. In real-world there will be this value + the time it takes to poll().
+        HEARTBEAT_INTERVAL = NODE_TIMEOUT - 5000,
         CREATE = 1,
         UPDATE = 2,
         DELETE = 3;
@@ -432,27 +433,34 @@ export default function Observable(db) {
                 });
             }
             // Add new sync node or if this is a reopening of the database after a close() call, update it.
-            return db.transaction('rw', '_syncNodes', function() {
-                db._syncNodes.where('isMaster').equals(1).count(function(anyMasterNode) {
-                    if (!anyMasterNode) {
-                        // There's no master node. Let's take that role then.
-                        mySyncNode.isMaster = 1;
-                    }
-                    // Add our node to DB and start subscribing to events
-                    db._syncNodes.add(mySyncNode).then(function() {
-                        Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
-                        Observable.on('beforeunload', onBeforeUnload);
-                        Observable.on('suicideNurseCall', onSuicide);
-                        Observable.on('intercomm', onIntercomm);
-                        // Start polling for changes and do cleanups:
-                        pollHandle = setTimeout(poll, LOCAL_POLL);
-                    });
+            return db.transaction('rw', '_syncNodes', () => {
+                return db._syncNodes
+                    .where('isMaster').equals(1)
+                    .first(currentMaster => {
+                        if (!currentMaster) {
+                            // There's no master. We must be the master
+                            mySyncNode.isMaster = 1;
+                        } else if (currentMaster.lastHeartBeat < Date.now() - NODE_TIMEOUT) {
+                            // Master have been inactive for too long
+                            // Take over mastership
+                            mySyncNode.isMaster = 1;
+                            currentMaster.isMaster = 0;
+                            return db._syncNodes.put(currentMaster);
+                        }
+                    }).then(()=>{
+                        // Add our node to DB and start subscribing to events
+                        return db._syncNodes.add(mySyncNode).then(function() {
+                            Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
+                            Observable.on('beforeunload', onBeforeUnload);
+                            Observable.on('suicideNurseCall', onSuicide);
+                            Observable.on('intercomm', onIntercomm);
+                            // Start polling for changes and do cleanups:
+                            pollHandle = setTimeout(poll, LOCAL_POLL);
+                        });
                 });
             }).then(function () {
                 cleanup();
             });
-            //cleanup();
-            //});
         });
     }, true); // True means the on(ready) event will survive a db reopening (db.close() / db.open()).
 
@@ -502,13 +510,15 @@ export default function Observable(db) {
                 db.on('changes').fire([], false);
             }
 
-            return db.table("_syncNodes").update(ourSyncNode, {
-                lastHeartBeat: Date.now(),
-                deleteTimeStamp: null, // Reset "deleteTimeStamp" flag if it was there.
-                myRevision: ourSyncNode.myRevision
-            });
-        }).then(function(nodeWasUpdated) {
-            if (!nodeWasUpdated) {
+            let ourNodeStillExists = false;
+            return db._syncNodes.where(':id').equals(ourSyncNode.id).modify(syncNode => {
+                ourNodeStillExists = true;
+                syncNode.lastHeartBeat = Date.now(); // Update heart beat (not nescessary, but why not!)
+                syncNode.deleteTimeStamp = null; // Reset "deleteTimeStamp" flag if it was there.
+                syncNode.myRevision = Math.max(syncNode.myRevision, ourSyncNode.myRevision);
+            }).then(()=>ourNodeStillExists);
+        }).then(ourNodeStillExists =>{
+            if (!ourNodeStillExists) {
                 // My node has been deleted. We must have been lazy and got removed by another node.
                 if (browserIsShuttingDown) {
                     throw new Error("Browser is shutting down");
@@ -538,10 +548,29 @@ export default function Observable(db) {
         return promise;
     }
 
+    function heartbeat() {
+        var ourSyncNodeId = mySyncNode && mySyncNode.id;
+        if (!ourSyncNodeId) return;
+        db.transaction('rw!', db._syncNodes, ()=>{
+            db._syncNodes.where({id: ourSyncNodeId}).first(ourSyncNode => {
+                if (!ourSyncNode) {
+                    // We do not exist anymore. Call db.close() to teardown polls etc.
+                    if (db.isOpen()) db.close();
+                    return;
+                }
+                ourSyncNode.lastHeartBeat = Date.now();
+                ourSyncNode.deleteTimeStamp = null; // Reset "deleteTimeStamp" flag if it was there.
+                return db._syncNodes.put(ourSyncNode);
+            });
+        }).then(()=>{
+            setTimeout(heartbeat, HEARTBEAT_INTERVAL);
+        });
+    }
 
     function poll() {
         pollHandle = null;
-        var currentInstance = mySyncNode.id;
+        var currentInstance = mySyncNode && mySyncNode.id;
+        if (!currentInstance) return;
         Dexie.vip(function() { // VIP ourselves. Otherwise we might not be able to consume intercomm messages from master node before database has finished opening. This would make DB stall forever. Cannot rely on storage-event since it may not always work in some browsers of different processes.
             readChanges(Observable.latestRevision[db.name]).then(cleanup).then(consumeIntercommMessages)
             .catch('DatabaseClosedError', e=>{
@@ -637,56 +666,75 @@ export default function Observable(db) {
 
     var requestsWaitingForReply = {};
 
+    /**
+     * @param {string} type Type of message
+     * @param message Message to send
+     * @param {number} destinationNode ID of destination node
+     * @param {{wantReply: boolean, isFailure: boolean, requestId: number}} options If {wantReply: true}, the returned promise will complete with the reply from remote. Otherwise it will complete when message has been successfully sent.</param>
+     */
     db.sendMessage = function(type, message, destinationNode, options) {
         /// <param name="type" type="String">Type of message</param>
         /// <param name="message">Message to send</param>
         /// <param name="destinationNode" type="Number">ID of destination node</param>
         /// <param name="options" type="Object" optional="true">{wantReply: Boolean, isFailure: Boolean, requestId: Number}. If wantReply, the returned promise will complete with the reply from remote. Otherwise it will complete when message has been successfully sent.</param>
-        if (!mySyncNode) return Promise.reject("Database closed");
         options = options || {};
         var msg = { message: message, destinationNode: destinationNode, sender: mySyncNode.id, type: type };
         Dexie.extend(msg, options); // wantReply: wantReply, success: !isFailure, requestId: ...
-        var tables = ["_intercomm"];
-        if (options.wantReply) tables.push("_syncNodes"); // If caller wants a reply, include "_syncNodes" in transaction to check that there's a reciever there. Otherwise, new master will get it.
-        return db.transaction('rw?', tables, function() {
-            if (options.wantReply) {
-                // Check that there is a reciever there to take the request.
-                return db._syncNodes.where('id').equals(destinationNode).count(function(recieverAlive) {
-                    if (recieverAlive)
-                        return addMessage(msg);
-                    else
-                        return db._syncNodes.where('isMaster').above(0).first(function(masterNode) {
-                            msg.destinationNode = masterNode.id;
-                            return addMessage(msg);
-                        });
-                });
-            } else {
-                addMessage(msg); // No need to return Promise. Caller dont need a reply.
-            }
+        if (!mySyncNode)
+            return options.wantReply ?
+                Promise.reject(new Dexie.DatabaseClosedError()) :
+                Promise.resolve(); // If caller dont want reply, it wont catch errors either.
 
-            function addMessage(msg) {
-                return db._intercomm.add(msg).then(function(messageId) {
-                    localStorage.setItem("Dexie.Observable/intercomm/" + db.name, messageId.toString());
-                    Dexie.ignoreTransaction(function() {
-                        Observable.on.intercomm.fire(db.name);
+        return Dexie.ignoreTransaction(()=>{
+            var tables = ["_intercomm"];
+            if (options.wantReply) tables.push("_syncNodes"); // If caller wants a reply, include "_syncNodes" in transaction to check that there's a reciever there. Otherwise, new master will get it.
+            var promise = db.transaction('rw', tables, () => {
+                if (options.wantReply) {
+                    // Check that there is a reciever there to take the request.
+                    return db._syncNodes.where('id').equals(destinationNode).count(recieverAlive => {
+                        if (recieverAlive)
+                            return db._intercomm.add(msg);
+                        else
+                            return db._syncNodes.where('isMaster').above(0).first(function(masterNode) {
+                                msg.destinationNode = masterNode.id;
+                                return db._intercomm.add(msg)
+                            });
                     });
-                    if (options.wantReply) {
-                        return new Promise(function(resolve, reject) {
-                            requestsWaitingForReply[messageId.toString()] = { resolve: resolve, reject: reject };
-                        });
-                    }
-                });
+                } else {
+                    // If caller doesnt need a response, we must not make sure to get one.
+                    return db._intercomm.add(msg); 
+                }
+            }).then (messageId => {
+                var rv = null;
+                if (options.wantReply) {
+                    rv = new Promise(function(resolve, reject) {
+                        requestsWaitingForReply[messageId.toString()] = { resolve: resolve, reject: reject };
+                    });
+                }
+                localStorage.setItem("Dexie.Observable/intercomm/" + db.name, messageId.toString());
+                Observable.on.intercomm.fire(db.name);
+                return rv;
+            });
+
+            if (!options.wantReply) {
+                promise.catch(()=>{});
+                return;
+            } else {
+                // Forward rejection to caller if it waits for reply.
+                return promise;
             }
         });
     };
 
     db.broadcastMessage = function(type, message, bIncludeSelf) {
-        if (!mySyncNode) return Promise.reject("Database closed");
+        if (!mySyncNode) return;
         var mySyncNodeId = mySyncNode.id;
-        db._syncNodes.each(function(node) {
-            if (node.type === 'local' && (bIncludeSelf || node.id !== mySyncNodeId)) {
-                db.sendMessage(type, message, node.id);
-            }
+        Dexie.ignoreTransaction(()=>{
+            db._syncNodes.toArray(nodes => {
+                return Promise.all(nodes
+                    .filter(node => node.type === 'local' && (bIncludeSelf || node.id !== mySyncNodeId))
+                    .map(node => db.sendMessage(type, message, node.id))); 
+            }).catch(()=>{});
         });
     };
 
@@ -780,18 +828,27 @@ Observable.createUUID = function() {
 };
 
 Observable.deleteOldChanges = function(db) {
-    db._syncNodes.orderBy("myRevision").first(function (oldestNode) {
-        var timeout = Date.now() + 300,
-            timedout = false;
-        db._changes.where("rev").below(oldestNode.myRevision)
-            .until(function () { return (timedout = (Date.now() > timeout)); })
-            .delete()
-            .then(function () {
-                // If not done garbage collecting, reschedule a continuation of it until done.
-                if (timedout) setTimeout(function() {
-                    Observable.deleteOldChanges(db);
-                }, 10);
-            });
+    // This is a background job and should never be done within
+    // a caller's transaction. Use 'rw!' to ensure that.
+    // We should not return the Promise but catch it ourselves instead.
+    db.transaction('rw!', db._syncNodes, () => {
+        return db._syncNodes.orderBy("myRevision").first(oldestNode => {
+            let timeout = Date.now() + 300,
+                hasTimedOut = false,
+                timedout = () => (hasTimedOut = (Date.now() > timeout));
+
+            return db._changes
+                .where("rev").below(oldestNode.myRevision)
+                .until(timedout)
+                .delete()
+                .then(() => {
+                    // If not done garbage collecting, reschedule a continuation of it until done.
+                    if (hasTimedOut) setTimeout(() => Observable.deleteOldChanges(db), 300);
+                });
+        })
+    }).catch(()=>{
+        // The operation is not cruzial. A failure could almost only be due to that database has been closed.
+        // No need to log this.
     });
 }
 
