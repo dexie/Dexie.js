@@ -62,18 +62,15 @@ export default function Syncable (db) {
         if (weBecameMaster) {
             // We took over the master role in Observable's cleanup method.
             // We should connect to remote servers now.
-            // TODO: Check if ignoreTransaction and vip are required here. They wont harm though.
-            Dexie.ignoreTransaction(()=>Dexie.vip(()=>{    
-                db._syncNodes.where('type').equals('remote')
-                    .and(node => node.status !== Statuses.OFFLINE && node.status !== Statuses.ERROR)
-                    .toArray(connectedRemoteNodes => connectedRemoteNodes.map(node => 
+            Dexie.ignoreTransaction(()=>Dexie.vip(()=>{
+                return db._syncNodes.where({type: 'remote'})
+                    .filter(node => node.status !== Statuses.OFFLINE && node.status !== Statuses.ERROR)
+                    .toArray(connectedRemoteNodes => Promise.all(connectedRemoteNodes.map(node => 
                         db.syncable.connect(node.syncProtocol, node.url, node.syncOptions).catch(e => {
                             console.warn(`Dexie.Syncable: Could not connect to ${node.url}. ${e.stack || e}`);
                         })
-                    ).catch(err => {
-                        console.warn(`Dexie.Syncable: Could not take over mastership: ${err.stack || err}`);
-                    }));
-            }));
+                    )));
+            })).catch('DatabaseClosedError', ()=>{});
         }
     });
 
