@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {spawnedTest, supports} from './dexie-unittest-utils';
+import {promisedTest, spawnedTest, supports} from './dexie-unittest-utils';
 
 const async = Dexie.async;
 
@@ -469,4 +469,29 @@ asyncTest("#306 db.on('ready') subscriber should be called also if db is already
     }).catch (err => {
         ok(false, err.stack || err);
     }).finally(start);
+});
+
+promisedTest("#392 db.on('ready') don't fire if subscribed while waiting other promise-returning subscriber", async ()=>{
+    //const sleep = ms => new Promise(resolve => setTimeout(resolve, ms));
+    let db = new Dexie('TestDB');
+    db.version(1).stores({foobar: 'id'});
+    let first = false, second = false, third = false;
+
+    // first is registered before open
+    db.on('ready', async ()=> {
+        first = true;
+        // second is registered while first is executing
+        db.on('ready', ()=>{
+            second = true;
+        });
+    });
+
+    await db.open();
+    db.on('ready', ()=>third = true);
+    await Dexie.Promise.resolve();
+
+    ok(first, "First subscriber should have been called");
+    ok(second, "Second subscriber should have been called");
+    ok(third, "Third subscriber should have been called");
+    
 });
