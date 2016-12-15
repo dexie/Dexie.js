@@ -2,44 +2,44 @@
 // Project: https://github.com/dfahlander/Dexie.js
 // Definitions by: David Fahlander <http://github.com/dfahlander>
 
-interface Thenable<R> {
-    then<U>(onFulfilled: (value: R) => Thenable<U>, onRejected: (error: any) => Thenable<U>): Thenable<U>;
-    then<U>(onFulfilled: (value: R) => Thenable<U>, onRejected?: (error: any) => U): Thenable<U>;
-    then<U>(onFulfilled: (value: R) => U, onRejected: (error: any) => Thenable<U>): Thenable<U>;
-    then<U>(onFulfilled?: (value: R) => U, onRejected?: (error: any) => U): Thenable<U>;
-}
-
 declare type IndexableTypePart =
     string | number | Date | ArrayBuffer | ArrayBufferView | DataView | Array<Array<void>>;
 
 declare type IndexableTypeArray = Array<IndexableTypePart>;
 declare type IndexableTypeArrayReadonly = ReadonlyArray<IndexableTypePart>;
-declare type IndexableType = IndexableTypePart | IndexableTypeArrayReadonly;
+export declare type IndexableType = IndexableTypePart | IndexableTypeArrayReadonly;
+
+declare type ThenShortcut<T,TResult> =  (value: T) => TResult | PromiseLike<TResult>;
+
+declare type TransactionMode = 'r' | 'r!' | 'r?' | 'rw' | 'rw!' | 'rw?';
+
+interface ProbablyError {
+    name?: string;
+    stack?: string;
+    message?: string;
+}
 
 declare class Dexie {
     constructor(databaseName: string, options?: {
         addons?: Array<(db: Dexie) => void>,
         autoOpen?: boolean,
         indexedDB?: IDBFactory,
-        IDBKeyRange?: IDBKeyRange
+        IDBKeyRange?: {new(): IDBKeyRange}
     });
 
-    name: string;
-    tables: Dexie.Table<any, any>[];
-    verno: number;
+    readonly name: string;
+    readonly tables: Dexie.Table<any, any>[];
+    readonly verno: number;
 
     static addons: Array<(db: Dexie) => void>;
     static version: number;
     static semVer: string;
     static currentTransaction: Dexie.Transaction;
-    static waitFor<T> (promise: Promise<T>) : Promise<T>;
-    static waitFor<T> (promise: Promise<T>, timeoutMilliseconds: number) : Promise<T>;
+    static waitFor<T> (promise: PromiseLike<T> | T) : Dexie.Promise<T>;
+    static waitFor<T> (promise: PromiseLike<T> | T, timeoutMilliseconds: number) : Dexie.Promise<T>;
 
-    static getDatabaseNames(): Dexie.Promise<Array<string>>;
-
-    static getDatabaseNames<U>(onFulfilled: (value: Array<string>) => Thenable<U>): Dexie.Promise<U>;
-
-    static getDatabaseNames<U>(onFulfilled: (value: Array<string>) => U): Dexie.Promise<U>;
+    static getDatabaseNames(): Dexie.Promise<string[]>;
+    static getDatabaseNames<R>(thenShortcut: ThenShortcut<string[],R>): Dexie.Promise<R>;
 
     static override<F> (origFunc:F, overridedFactory: (fn:any)=>any) : F;
     
@@ -87,21 +87,17 @@ declare class Dexie {
 
     table<T, Key>(tableName: string): Dexie.Table<T, Key>;
 
-    transaction<U>(mode: string, table: Dexie.Table<any, any>, scope: () => Thenable<U>): Dexie.Promise<U>;
+    transaction<U>(mode: TransactionMode, table: Dexie.Table<any, any>, scope: () => PromiseLike<U> | U): Dexie.Promise<U>;
 
-    transaction<U>(mode: string, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, scope: () => Thenable<U>): Dexie.Promise<U>;
+    transaction<U>(mode: TransactionMode, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, scope: () => PromiseLike<U> | U): Dexie.Promise<U>;
 
-    transaction<U>(mode: string, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, table3: Dexie.Table<any, any>, scope: () => Thenable<U>): Dexie.Promise<U>;
+    transaction<U>(mode: TransactionMode, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, table3: Dexie.Table<any, any>, scope: () => PromiseLike<U> | U): Dexie.Promise<U>;
 
-    transaction<U>(mode: string, tables: Dexie.Table<any, any>[], scope: () => Thenable<U>): Dexie.Promise<U>;
+    transaction<U>(mode: TransactionMode, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, table3: Dexie.Table<any, any>, table4: Dexie.Table<any,any>, scope: () => PromiseLike<U> | U): Dexie.Promise<U>;
 
-    transaction<U>(mode: string, table: Dexie.Table<any, any>, scope: () => U): Dexie.Promise<U>;
+    transaction<U>(mode: TransactionMode, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, table3: Dexie.Table<any, any>, table4: Dexie.Table<any,any>, table5: Dexie.Table<any,any>, scope: () => PromiseLike<U> | U): Dexie.Promise<U>;
 
-    transaction<U>(mode: string, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, scope: () => U): Dexie.Promise<U>;
-
-    transaction<U>(mode: string, table: Dexie.Table<any, any>, table2: Dexie.Table<any, any>, table3: Dexie.Table<any, any>, scope: () => U): Dexie.Promise<U>;
-
-    transaction<U>(mode: string, tables: Dexie.Table<any, any>[], scope: () => U): Dexie.Promise<U>;
+    transaction<U>(mode: TransactionMode, tables: Dexie.Table<any, any>[], scope: () => PromiseLike<U> | U): Dexie.Promise<U>;
 
     close(): void;
 
@@ -128,62 +124,98 @@ declare class Dexie {
 
 declare module Dexie {
 
-    class Promise<R> implements Thenable<R> {
-        constructor(callback: (resolve: (value?: Thenable<R>) => void, reject: (error?: any) => void) => void);
-
-        constructor(callback: (resolve: (value?: R) => void, reject: (error?: any) => void) => void);
-
-        then<U>(onFulfilled: (value: R) => Thenable<U>, onRejected: (error: any) => Thenable<U>): Promise<U>;
-
-        then<U>(onFulfilled: (value: R) => Thenable<U>, onRejected?: (error: any) => U): Promise<U>;
-
-        then<U>(onFulfilled: (value: R) => U, onRejected: (error: any) => Thenable<U>): Promise<U>;
-
-        then<U>(onFulfilled?: (value: R) => U, onRejected?: (error: any) => U): Promise<U>;
+    interface Promise<T> {
+        // From Promise<T> in lib.es2015.d.ts and lib.es2015.symbol.wellknown.d.ts but with return type Dexie.Promise<T>:
+        then<TResult1, TResult2>(onfulfilled: (value: T) => TResult1 | PromiseLike<TResult1>, onrejected: (reason: any) => TResult2 | PromiseLike<TResult2>): Dexie.Promise<TResult1 | TResult2>;
+        then<TResult>(onfulfilled: (value: T) => TResult | PromiseLike<TResult>, onrejected: (reason: any) => TResult | PromiseLike<TResult>): Dexie.Promise<TResult>;
+        then<TResult>(onfulfilled: (value: T) => TResult | PromiseLike<TResult>): Dexie.Promise<TResult>;
+        then(): Dexie.Promise<T>;
+        catch<TResult>(onrejected: (reason: ProbablyError) => TResult | PromiseLike<TResult>): Dexie.Promise<T | TResult>;
+        catch(onrejected: (reason: ProbablyError) => T | PromiseLike<T>): Dexie.Promise<T>;
+        readonly [Symbol.toStringTag]: "Promise";
         
-        catch<U>(onRejected: (error: any) => Thenable<U>): Promise<R|U>;
-        
-        catch<U>(onRejected: (error: any) => U): Promise<R|U>;
-        
-        catch<U,ET>(ExceptionType: (new() => ET), onRejected: (error: ET) => Promise<U>): Promise<R|U>;
+        // Extended methods provided by Dexie.Promise:
 
-        catch<U,ET>(ExceptionType: (new() => ET), onRejected: (error: ET) => U): Promise<R|U>;
+        /**
+         * Catch errors where error => error.name === errorName. Other errors will remain uncaught.
+         * 
+         * @param errorName Name of the type of error to catch such as 'RangeError', 'TypeError', 'DatabaseClosedError', etc.
+         * @param onrejected The callback to execute when the Promise is rejected.
+         * @returns A Promise for the completion of the callback.
+         */
+        catch<TResult>(errorName: string, onrejected: (reason: Error) => TResult | PromiseLike<TResult>): Dexie.Promise<T | TResult>;
 
-        catch<U>(errorName: string, onRejected: (error: {name: string}) => Promise<U>): Promise<R|U>;
+        /**
+         * Catch errors where error => error.name === errorName. Other errors will remain uncaught.
+         * 
+         * @param errorName Name of the type of error to catch such as 'RangeError', 'TypeError', 'DatabaseClosedError', etc.
+         * @param onrejected The callback to execute when the Promise is rejected.
+         * @returns A Promise for the completion of the callback.
+         */
+        catch(errorName: string, onrejected: (reason: Error) => T | PromiseLike<T>): Dexie.Promise<T>;
 
-        catch<U>(errorName: string, onRejected: (error: {name: string}) => U): Promise<R|U>;
+        /**
+         * Catch errors where error => error instanceof errorConstructor. Other errors will remain uncaught.
+         * 
+         * @param errorConstructor Type of error to catch such as RangeError, TypeError, etc.
+         * @param onrejected The callback to execute when the Promise is rejected.
+         * @returns A Promise for the completion of the callback.
+         */
+        catch<TResult,TError>(errorConstructor: {new():TError}, onrejected: (reason: TError) => TResult | PromiseLike<TResult>): Dexie.Promise<T | TResult>;
 
-        finally(onFinally: () => any): Promise<R>;
+        /**
+         * Catch errors where error => error instanceof errorConstructor. Other errors will remain uncaught.
+         * 
+         * @param errorConstructor Type of error to catch such as RangeError, TypeError, etc.
+         * @param onrejected The callback to execute when the Promise is rejected.
+         * @returns A Promise for the completion of the callback.
+         */
+        catch<TError>(errorConstructor: {new():TError}, onrejected: (reason: TError) => T | PromiseLike<T>): Dexie.Promise<T>;
 
-        timeout(milliseconds: number): Promise<R>;
+        /**
+         * Attaches a callback to be executed when promise is settled no matter if it was rejected
+         * or resolved.
+         * 
+         * @param onFinally The callback to execute when promise is settled.
+         * @returns A Promise for the completion of the callback.
+         */
+        finally(onFinally: () => void): Dexie.Promise<T>;
 
-        [Symbol.toStringTag]: 'Promise'; 
+        /**
+         * Apply a timeout limit for the promise. If timeout is reached before promise is settled,
+         * the returned promise will reject with an Error object where name='TimeoutError'.
+         * 
+         * @param milliseconds Number of milliseconds for the timeout.
+         * @returns A Promise that will resolve or reject identically to current Promise, but if timeout is reached,
+         *          it will reject with TimeoutError.
+         */
+        timeout(milliseconds: number): Dexie.Promise<T>;    
     }
 
-    module Promise {
-        function resolve<R>(value?: Thenable<R>): Promise<R>;
-
-        function resolve<R>(value?: R): Promise<R>;
-
-        function reject(error: any): Promise<any>;
-
-        function all<R>(promises: Thenable<R>[]): Promise<R[]>;
-
-        function all<R>(...promises: Thenable<R>[]): Promise<R[]>;
-
-        function race<R>(promises: Thenable<R>[]): Promise<R>;
-
-        function newPSD<R>(scope: () => R): R;
-
-        var PSD: any;
-
-        var on: {
-            (eventName: string, subscriber: Function): void;
-            (eventName: 'error', subscriber: (error: any) => any): void;
-            error: DexieErrorEvent;
-        }
+    interface DexiePromiseConstructor {
+        // From lib.es6.d.ts:
+        all<TAll>(values: Iterable<TAll | PromiseLike<TAll>>): Dexie.Promise<TAll[]>;
+        race<T>(values: Iterable<T | PromiseLike<T>>): Dexie.Promise<T>;
+        readonly prototype: Dexie.Promise<any>;
+        new <T>(executor: (resolve: (value?: T | PromiseLike<T>) => void, reject: (reason?: any) => void) => void): Dexie.Promise<T>;
+        all<T1, T2, T3, T4, T5, T6, T7, T8, T9, T10>(values: [T1 | PromiseLike<T1>, T2 | PromiseLike<T2>, T3 | PromiseLike<T3>, T4 | PromiseLike <T4>, T5 | PromiseLike<T5>, T6 | PromiseLike<T6>, T7 | PromiseLike<T7>, T8 | PromiseLike<T8>, T9 | PromiseLike<T9>, T10 | PromiseLike<T10>]): Dexie.Promise<[T1, T2, T3, T4, T5, T6, T7, T8, T9, T10]>;
+        all<T1, T2, T3, T4, T5, T6, T7, T8, T9>(values: [T1 | PromiseLike<T1>, T2 | PromiseLike<T2>, T3 | PromiseLike<T3>, T4 | PromiseLike <T4>, T5 | PromiseLike<T5>, T6 | PromiseLike<T6>, T7 | PromiseLike<T7>, T8 | PromiseLike<T8>, T9 | PromiseLike<T9>]): Dexie.Promise<[T1, T2, T3, T4, T5, T6, T7, T8, T9]>;
+        all<T1, T2, T3, T4, T5, T6, T7, T8>(values: [T1 | PromiseLike<T1>, T2 | PromiseLike<T2>, T3 | PromiseLike<T3>, T4 | PromiseLike <T4>, T5 | PromiseLike<T5>, T6 | PromiseLike<T6>, T7 | PromiseLike<T7>, T8 | PromiseLike<T8>]): Dexie.Promise<[T1, T2, T3, T4, T5, T6, T7, T8]>;
+        all<T1, T2, T3, T4, T5, T6, T7>(values: [T1 | PromiseLike<T1>, T2 | PromiseLike<T2>, T3 | PromiseLike<T3>, T4 | PromiseLike <T4>, T5 | PromiseLike<T5>, T6 | PromiseLike<T6>, T7 | PromiseLike<T7>]): Dexie.Promise<[T1, T2, T3, T4, T5, T6, T7]>;
+        all<T1, T2, T3, T4, T5, T6>(values: [T1 | PromiseLike<T1>, T2 | PromiseLike<T2>, T3 | PromiseLike<T3>, T4 | PromiseLike <T4>, T5 | PromiseLike<T5>, T6 | PromiseLike<T6>]): Dexie.Promise<[T1, T2, T3, T4, T5, T6]>;
+        all<T1, T2, T3, T4, T5>(values: [T1 | PromiseLike<T1>, T2 | PromiseLike<T2>, T3 | PromiseLike<T3>, T4 | PromiseLike <T4>, T5 | PromiseLike<T5>]): Dexie.Promise<[T1, T2, T3, T4, T5]>;
+        all<T1, T2, T3, T4>(values: [T1 | PromiseLike<T1>, T2 | PromiseLike<T2>, T3 | PromiseLike<T3>, T4 | PromiseLike <T4>]): Dexie.Promise<[T1, T2, T3, T4]>;
+        all<T1, T2, T3>(values: [T1 | PromiseLike<T1>, T2 | PromiseLike<T2>, T3 | PromiseLike<T3>]): Dexie.Promise<[T1, T2, T3]>;
+        all<T1, T2>(values: [T1 | PromiseLike<T1>, T2 | PromiseLike<T2>]): Dexie.Promise<[T1, T2]>;
+        all<T>(values: (T | PromiseLike<T>)[]): Dexie.Promise<T[]>;
+        reject(reason: any): Dexie.Promise<never>;
+        reject<T>(reason: any): Dexie.Promise<T>;
+        resolve<T>(value: T | PromiseLike<T>): Dexie.Promise<T>;
+        resolve(): Dexie.Promise<void>;
     }
+    
 
+    var Promise: DexiePromiseConstructor;
 
     interface Version {
         stores(schema: { [key: string]: string }): Version;
@@ -252,15 +284,16 @@ declare module Dexie {
         }
 
         get(key: Key): Promise<T | undefined>;
+        get<R>(key: Key, thenShortcut: ThenShortcut<T | undefined,R>): Promise<R>;
         get(equalityCriterias: {[key:string]:IndexableType}): Promise<T | undefined>;
+        get<R>(equalityCriterias: {[key:string]:IndexableType}, thenShortcut: ThenShortcut<T | undefined, R>): Promise<R>;
         where(index: string | string[]): WhereClause<T, Key>;
         where(equalityCriterias: {[key:string]:IndexableType}): Collection<T, Key>;
 
         filter(fn: (obj: T) => boolean): Collection<T, Key>;
 
         count(): Promise<number>;
-        count<U>(onFulfilled: (value: number) => Thenable<U>): Promise<U>;
-        count<U>(onFulfilled: (value: number) => U): Promise<U>;
+        count<R>(thenShortcut: ThenShortcut<number, R>): Promise<R>;
 
         offset(n: number): Collection<T, Key>;
 
@@ -269,8 +302,7 @@ declare module Dexie {
         each(callback: (obj: T, cursor: {key: IndexableType, primaryKey: Key}) => any): Promise<void>;
 
         toArray(): Promise<Array<T>>;
-        toArray<U>(onFulfilled: (value: Array<T>) => Thenable<U>): Promise<U>;
-        toArray<U>(onFulfilled: (value: Array<T>) => U): Promise<U>;
+        toArray<R>(thenShortcut: ThenShortcut<T[], R>): Promise<R>;
 
         toCollection(): Collection<T, Key>;
         orderBy(index: string | string[]): Collection<T, Key>;
@@ -313,8 +345,7 @@ declare module Dexie {
         and(filter: (x: T) => boolean): Collection<T, Key>;
         clone(props?: Object): Collection<T, Key>;
         count(): Promise<number>;
-        count<U>(onFulfilled: (value: number) => Thenable<U>): Promise<U>;
-        count<U>(onFulfilled: (value: number) => U): Promise<U>;
+        count<R>(thenShortcut: ThenShortcut<number, R>): Promise<R>;
         distinct(): Collection<T, Key>;
         each(callback: (obj: T, cursor: {key: IndexableType, primaryKey: Key}) => any): Promise<void>;
         eachKey(callback: (key: IndexableType, cursor: {key: IndexableType, primaryKey: Key}) => any): Promise<void>;
@@ -322,33 +353,26 @@ declare module Dexie {
         eachUniqueKey(callback: (key: IndexableType, cursor: {key: IndexableType, primaryKey: Key}) => any): Promise<void>;
         filter(filter: (x: T) => boolean): Collection<T, Key>;
         first(): Promise<T | undefined>;
-        first<U>(onFulfilled: (value: T | undefined) => Thenable<U>): Promise<U>;
-        first<U>(onFulfilled: (value: T | undefined) => U): Promise<U>;
+        first<R>(thenShortcut: ThenShortcut<T | undefined, R>): Promise<R>;
         keys(): Promise<IndexableTypeArray>;
-        keys<U>(onFulfilled: (value: IndexableTypeArray) => Thenable<U>): Promise<U>;
-        keys<U>(onFulfilled: (value: IndexableTypeArray) => U): Promise<U>;
+        keys<R>(thenShortcut: ThenShortcut<IndexableTypeArray, R>): Promise<R>;
         primaryKeys(): Promise<Key[]>;
-        primaryKeys<U>(onFulfilled: (value: Key[]) => Thenable<U>): Promise<U>;
-        primaryKeys<U>(onFulfilled: (value: Key[]) => U): Promise<U>;
+        primaryKeys<R>(thenShortcut: ThenShortcut<Key[], R>): Promise<R>;
         last(): Promise<T | undefined>;
-        last<U>(onFulfilled: (value: T | undefined) => Thenable<U>): Promise<U>;
-        last<U>(onFulfilled: (value: T | undefined) => U): Promise<U>;
+        last<R>(thenShortcut: ThenShortcut<T | undefined, R>): Promise<R>;
         limit(n: number): Collection<T, Key>;
         offset(n: number): Collection<T, Key>;
         or(indexOrPrimayKey: string): WhereClause<T, Key>;
         raw(): Collection<T, Key>;
         reverse(): Collection<T, Key>;
         sortBy(keyPath: string): Promise<T[]>;
-        sortBy<U>(keyPath: string, onFulfilled: (value: T[]) => Thenable<U>): Promise<U>;
-        sortBy<U>(keyPath: string, onFulfilled: (value: T[]) => U): Promise<U>;
+        sortBy<R>(keyPath: string, thenShortcut: ThenShortcut<T[], R>) : Promise<R>;
         toArray(): Promise<Array<T>>;
-        toArray<U>(onFulfilled: (value: Array<T>) => Thenable<U>): Promise<U>;
-        toArray<U>(onFulfilled: (value: Array<T>) => U): Promise<U>;
+        toArray<R>(keyPath: string, thenShortcut: ThenShortcut<T[], R>) : Promise<R>;
         uniqueKeys(): Promise<IndexableTypeArray>;
-        uniqueKeys<U>(onFulfilled: (value: IndexableTypeArray) => Thenable<U>): Promise<U>;
-        uniqueKeys<U>(onFulfilled: (value: IndexableTypeArray) => U): Promise<U>;
+        uniqueKeys<R>(thenShortcut: ThenShortcut<IndexableTypeArray, R>): Promise<R>;
         until(filter: (value: T) => boolean, includeStopEntry?: boolean): Collection<T, Key>;
-        // WriteableCollection:
+        // Mutating methods
         delete(): Promise<number>;
         modify(changeCallback: (obj: T, ctx:{value: T}) => void): Promise<number>;
         modify(changes: { [keyPath: string]: any } ): Promise<number>;
