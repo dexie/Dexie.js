@@ -216,7 +216,7 @@ export default function Dexie(dbName, options) {
         _update: function () {
             let source = versions.map(v => v._cfg.storesSource)
                 .reduce((target, current) => {
-                    return Object.assign(target, current);
+                    return extend(target, current);
                 });
             let schema = TableSchema.fromVersionStores(source);
             // We set the table API here to enable working with the latest version, under the assumpti
@@ -376,20 +376,17 @@ export default function Dexie(dbName, options) {
         } else {
             next = Promise.resolve();
         }
-        // TODO: Make table deletion after upgrade function but also after no
-        // upgrade function.
+
         return next.then(() => {
             // Dont delete old tables if ieBug is present and a content upgrader has run.
-            // TODO: Add intermediate stopover version that can delete these.
-            // It would be necessary to identify that there was the bug beforehand and that some
-            // object stores would be impacted by the upgrade.
+            // TODO: Add intermediate version to delete these if IE bug is present, see #1.
             if (!contentUpgraderHasRun || !hasIEDeleteObjectStoreBug) {
                 // Delete old tables
                 deleteRemovedTables(diff.del, idbtrans);
             }
         }).then(() => {
-            // At last, make sure to create any missing tables. (Needed by addons that add stores to DB without specifying version)
-            // TODO: resolve this in the context of stepped upgrades.
+            // At last, make sure to create any missing tables. (Needed by
+            // addons that add stores to DB without specifying version)
             createMissingTables(globalSchema, idbtrans);
         });
     }
@@ -429,32 +426,6 @@ export default function Dexie(dbName, options) {
             unique: idx.unique,
             multiEntry: idx.multi
         });
-    }
-
-    // Read the schema from the database itself.
-    function readGlobalSchema() {
-        db.verno = idbdb.version / 10;
-        db._dbSchema = globalSchema = {};
-        dbStoreNames = slice(idbdb.objectStoreNames, 0);
-        // Database contains no stores.
-        if (dbStoreNames.length === 0) return;
-        var trans = idbdb.transaction(safariMultiStoreFix(dbStoreNames), 'readonly');
-        dbStoreNames.forEach(function (storeName) {
-            var store = trans.objectStore(storeName),
-                keyPath = store.keyPath,
-                dotted = keyPath && typeof keyPath === 'string' && keyPath.indexOf('.') !== -1;
-            var primKey = new IndexSpec(keyPath, keyPath || "", false, false, !!store.autoIncrement, keyPath && typeof keyPath !== 'string', dotted);
-            var indexes = [];
-            for (var j = 0; j < store.indexNames.length; ++j) {
-                var idbindex = store.index(store.indexNames[j]);
-                keyPath = idbindex.keyPath;
-                dotted = keyPath && typeof keyPath === 'string' && keyPath.indexOf('.') !== -1;
-                var index = new IndexSpec(idbindex.name, keyPath, !!idbindex.unique, !!idbindex.multiEntry, false, keyPath && typeof keyPath !== 'string', dotted);
-                indexes.push(index);
-            }
-            globalSchema[storeName] = new TableSchema(storeName, primKey, indexes, {});
-        });
-        setApiOnPlace([allTables], keys(globalSchema), globalSchema);
     }
 
     //
@@ -578,21 +549,7 @@ export default function Dexie(dbName, options) {
         // Used for emulating versionchange event on IE/Edge/Safari.
         connections.push(db);
 
-        // TODO: Set the database and transaction tables for the final
-        // db schema.
         setInterfaces(idbdb);
-
-        // TODO: Needed?
-        /*
-        if (autoSchema) readGlobalSchema();
-        else if (idbdb.objectStoreNames.length > 0) {
-            try {
-                adjustToExistingIndexNames(globalSchema,
-                    idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
-            } catch (e) {
-                // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
-            }
-        }*/
         
         idbdb.onversionchange = wrap(ev => {
             // detect implementations that not support versionchange (IE/Edge/Safari)
@@ -693,7 +650,7 @@ export default function Dexie(dbName, options) {
                     resolve(db._open(next_version, max_version));
                 } else if (dexie_version > max_version) {
                     throw new exceptions.OpenFailed(
-                        `Max desired version ${max_version} is higher than` +
+                        `Max desired version ${max_version} is lower than` +
                         ` existing database version ${dexie_version}`);
                 } else {
                     // No upgrades to do.
@@ -2789,9 +2746,9 @@ export default function Dexie(dbName, options) {
 
     function setApiOnPlace(objs, schema) {
         let names = keys(schema);
-        for (let name of names) {
+        names.forEach((name) => {
             let table = schema[name];
-            for (let obj of objs) {
+            objs.forEach((obj) => {
                 if (!(name in obj)) {
                     if (obj === Transaction.prototype || obj instanceof Transaction) {
                         // obj is a Transaction prototype (or prototype of a subclass to Transaction)
@@ -2802,8 +2759,8 @@ export default function Dexie(dbName, options) {
                         obj[name] = new Table(name, table);
                     }
                 }
-            }
-        }
+            });
+        });
     }
 
     function removeTablesApi(objs) {
@@ -3170,11 +3127,11 @@ extend(TableSchema, {
     fromVersionStores: (stores) => {
         let result = {};
         let tables = keys(stores);
-        for (let name of tables) {
+        tables.forEach((name) => {
             let table = stores[name];
             if (table === null) {
                 result[name] = null;
-                continue;
+                return;
             }
             var instanceTemplate = {};
             var indexes = IndexSpec.parse(table);
@@ -3183,15 +3140,15 @@ extend(TableSchema, {
                 throw new exceptions.Schema("Primary key cannot be multi-valued");
             if (primKey.keyPath)
                 setByKeyPath(instanceTemplate, primKey.keyPath, primKey.auto ? 0 : primKey.keyPath);
-            for (let index of indexes) {
+            indexes.forEach((index) => {
                 if (index.auto)
                     throw new exceptions.Schema("Only primary key can be marked as autoIncrement (++)");
                 if (!index.keyPath)
                     throw new exceptions.Schema("Index must have a name and cannot be an empty string");
                 setByKeyPath(instanceTemplate, index.keyPath, index.compound ? index.keyPath.map(() => "") : "");
-            }
+            });
             result[name] = new TableSchema(name, primKey, indexes, instanceTemplate);
-        }
+        });
         return result;
     },
     // Don't use during upgrade transaction.'
@@ -3212,13 +3169,14 @@ extend(TableSchema, {
         let schema = {};
         let storeNames = [...idbtrans.db.objectStoreNames];
         if (!storeNames.length) return schema;
-        for (let name of storeNames) {
+        storeNames.forEach((name) => {
             let store = idbtrans.objectStore(name);
             let keyPath = store.keyPath;
             let dotted = keyPath && typeof keyPath === 'string' && keyPath.includes('.');
             var primKey = new IndexSpec(getNameFromPath(keyPath), keyPath || "", false, false, !!store.autoIncrement, keyPath && typeof keyPath !== 'string', dotted);
             var indexes = [];
-            for (let indexName of store.indexNames) {
+            for (let i = 0; i < store.indexNames.length; i++) {
+                let indexName = store.indexNames[i];
                 var idbindex = store.index(indexName);
                 keyPath = idbindex.keyPath;
                 dotted = keyPath && typeof keyPath === 'string' && keyPath.includes('.');
@@ -3226,7 +3184,7 @@ extend(TableSchema, {
                 indexes.push(index);
             }
             schema[name] = new TableSchema(name, primKey, indexes, {});
-        }
+        });
         return schema;
     }
 });

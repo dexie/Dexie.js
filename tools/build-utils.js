@@ -210,8 +210,8 @@ export function babelTransform(source, destination) {
                 "transform-es2015-classes",
                 "transform-es2015-computed-properties",
                 "transform-es2015-constants",
-                //"transform-es2015-destructuring", // Requires big __restructurer function to occupy space onto the result.
-                "transform-es2015-for-of",
+                "transform-es2015-destructuring", // Requires big __restructurer function to occupy space onto the result.
+                //"transform-es2015-for-of",
                 //"transform-es2015-function-name",         // Slightly increases the code size, but could improve debugging experience a bit.
                 "transform-es2015-literals",
                 //"transform-es2015-modules-commonjs"       // Let rollup fix the moduling instead.
