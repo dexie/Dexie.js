@@ -947,6 +947,8 @@ promisedTest("db.transaction() should not wait for non-awaited new top-level tra
             }).then(numPets => {
                 ok(true, `num pets: ${numPets}`);
             }).then(()=>{
+                return Dexie.waitFor(sleep(50)); // In IE, it sometimes happens that outer transaction is slow to commit (even though it doesnt to anything)
+            }).then(()=>{
                 log.push("inner-transaction-done");
             }).then(resolve, reject);
         });
