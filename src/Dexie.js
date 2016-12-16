@@ -66,8 +66,10 @@ var DEXIE_VERSION = '{version}',
     isIEOrEdge = typeof navigator !== 'undefined' && /(MSIE|Trident|Edge)/.test(navigator.userAgent),
     hasIEDeleteObjectStoreBug = isIEOrEdge,
     hangsOnDeleteLargeKeyRange = isIEOrEdge,
-    dexieStackFrameFilter = frame => !/(dexie\.js|dexie\.min\.js)/.test(frame);
+    dexieStackFrameFilter = frame => !/(dexie\.js|dexie\.min\.js)/.test(frame),
+    dbNamesDB;// Global database for backing Dexie.getDatabaseNames() on browser without indexedDB.webkitGetDatabaseNames() 
 
+// Init debug
 Debug.setDebug(Debug.debug, dexieStackFrameFilter);
 
 export default function Dexie(dbName, options) {
@@ -543,13 +545,10 @@ export default function Dexie(dbName, options) {
                     db.on("versionchange").fire(ev);
                 });
                 
-                if (!hasNativeGetDatabaseNames) {
-                    // Update localStorage with list of database names
-                    globalDatabaseList(function (databaseNames) {
-                        if (databaseNames.indexOf(dbName) === -1) return databaseNames.push(dbName);
-                    });
+                if (!hasNativeGetDatabaseNames && dbName !== '__dbnames') {
+                    dbNamesDB.dbnames.put({name: dbName}).catch(nop);
                 }
-                
+
                 resolve();
 
             }, reject);
@@ -623,10 +622,7 @@ export default function Dexie(dbName, options) {
                 var req = indexedDB.deleteDatabase(dbName);
                 req.onsuccess = wrap(function () {
                     if (!hasNativeGetDatabaseNames) {
-                        globalDatabaseList(function(databaseNames) {
-                            var pos = databaseNames.indexOf(dbName);
-                            if (pos >= 0) return databaseNames.splice(pos, 1);
-                        });
+                        dbNamesDB.dbnames.delete(dbName).catch(nop);
                     }
                     resolve();
                 });
@@ -2900,20 +2896,6 @@ function preventDefault(event) {
         event.preventDefault();
 }
 
-function globalDatabaseList(cb) {
-    var val,
-        localStorage = Dexie.dependencies.localStorage;
-    if (!localStorage) return cb([]); // Envs without localStorage support
-    try {
-        val = JSON.parse(localStorage.getItem('Dexie.DatabaseNames') || "[]");
-    } catch (e) {
-        val = [];
-    }
-    if (cb(val)) {
-        localStorage.setItem('Dexie.DatabaseNames', JSON.stringify(val));
-    }
-}
-
 function awaitIterator (iterator) {
     var callNext = result => iterator.next(result),
         doThrow = error => iterator.throw(error),
@@ -3021,21 +3003,14 @@ props(Dexie, {
     // Static method for retrieving a list of all existing databases at current host.
     //
     getDatabaseNames: function (cb) {
-        return new Promise(function (resolve, reject) {
-            var getDatabaseNames = getNativeGetDatabaseNamesFn(indexedDB);
-            if (getDatabaseNames) { // In case getDatabaseNames() becomes standard, let's prepare to support it:
-                var req = getDatabaseNames();
-                req.onsuccess = function (event) {
-                    resolve(slice(event.target.result, 0)); // Converst DOMStringList to Array<String>
-                };
-                req.onerror = eventRejectHandler(reject);
-            } else {
-                globalDatabaseList(function (val) {
-                    resolve(val);
-                    return false;
-                });
-            }
-        }).then(cb);
+        var getDatabaseNames = getNativeGetDatabaseNamesFn(Dexie.dependencies.indexedDB);
+        return getDatabaseNames ? new Promise((resolve, reject) => {
+            var req = getDatabaseNames();
+            req.onsuccess = function (event) {
+                resolve(slice(event.target.result, 0)); // Converst DOMStringList to Array<String>
+            };
+            req.onerror = eventRejectHandler(reject);
+        }) : dbNamesDB.dbnames.toCollection().primaryKeys(cb);
     },
     
     defineClass: function (structure) {
@@ -3215,13 +3190,6 @@ props(Dexie, {
     Dexie: Dexie
 });
 
-tryCatch(()=>{
-    // Optional dependencies
-    // localStorage
-    Dexie.dependencies.localStorage =
-        ((typeof chrome !== "undefined" && chrome !== null ? chrome.storage : void 0) != null ? null : _global.localStorage);
-});
-
 // Map DOMErrors and DOMExceptions to corresponding Dexie errors. May change in Dexie v2.0.
 Promise.rejectionMapper = mapError;
 
@@ -3230,3 +3198,18 @@ doFakeAutoComplete(function() {
     Dexie.fakeAutoComplete = fakeAutoComplete = doFakeAutoComplete;
     Dexie.fake = fake = true;
 });
+
+// Initialize dbNamesDB (won't ever be opened on chromium browsers')
+dbNamesDB = new Dexie('__dbnames'); 
+dbNamesDB.version(1).stores({dbnames: 'name'});
+
+(()=>{
+    // Migrate from Dexie 1.x database names stored in localStorage:
+    var DBNAMES = 'Dexie.DatabaseNames';
+    if (typeof localStorage !== undefined && _global.document !== undefined) try {
+        // Have localStorage and is not executing in a worker. Lets migrate from Dexie 1.x.
+        JSON.parse(localStorage.getItem(DBNAMES) || "[]")
+            .forEach(name => dbNamesDB.put({name: name}).catch(nop));
+        localStorage.removeItem(DBNAMES);
+    } catch (_e) {}
+})();
