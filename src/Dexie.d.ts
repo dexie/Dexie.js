@@ -19,7 +19,10 @@ interface ProbablyError {
     message?: string;
 }
 
-declare class Dexie {
+// Dexie is actually default exported at the end of this file.
+// Still, need to keep this explicit export anyway. Needed in order for
+// Typescript 2.1 to allow extension of the Dexie API.
+export declare class Dexie {
     constructor(databaseName: string, options?: {
         addons?: Array<(db: Dexie) => void>,
         autoOpen?: boolean,
@@ -68,16 +71,7 @@ declare class Dexie {
     
     version(versionNumber: Number): Dexie.Version;
 
-    on: {
-        (eventName: 'ready', subscriber: () => any, bSticky: boolean): void;
-        (eventName: 'populate', subscriber: () => any): void;
-        (eventName: 'blocked', subscriber: () => any): void;
-        (eventName: 'versionchange', subscriber: (event: IDBVersionChangeEvent) => any): void;
-        ready: Dexie.DexieOnReadyEvent;
-        populate: Dexie.DexieEvent;
-        blocked: Dexie.DexieEvent;
-        versionchange: Dexie.DexieVersionChangeEvent;
-    }
+    on: Dexie.DbEvents;
 
     open(): Dexie.Promise<Dexie>;
 
@@ -122,7 +116,7 @@ declare class Dexie {
     Collection: new()=>Dexie.Collection<any,any>;
 }
 
-declare module Dexie {
+export declare module Dexie {
 
     interface Promise<T> {
         // From Promise<T> in lib.es2015.d.ts and lib.es2015.symbol.wellknown.d.ts but with return type Dexie.Promise<T>:
@@ -229,15 +223,7 @@ declare module Dexie {
         idbtrans: IDBTransaction;
         tables: { [type: string]: Table<any, any> };
         storeNames: Array<string>;
-        on: {
-            (eventName: string, subscriber: (...args:any[]) => any): void;
-            (eventName: 'complete', subscriber: () => any): void;
-            (eventName: 'abort', subscriber: () => any): void;
-            (eventName: 'error', subscriber: (error:any) => any): void;
-            complete: DexieEvent;
-            abort: DexieEvent;
-            error: DexieEvent;
-        }
+        on: TransactionEvents;
         abort(): void;
         table(tableName: string): Table<any, any>;
         table<T>(tableName: string): Table<T, any>;
@@ -245,9 +231,10 @@ declare module Dexie {
     }
 
     interface DexieEvent {
+        subscribers: Function[];
+        fire(...args:any[]): any;
         subscribe(fn: (...args:any[]) => any): void;
         unsubscribe(fn: (...args:any[]) => any): void;
-        fire(...args:any[]): any;
     }
 
     interface DexieErrorEvent {
@@ -268,20 +255,53 @@ declare module Dexie {
         fire(): any;
     }
 
+    interface DexieEventSet {
+        (eventName: string): DexieEvent; // To be able to unsubscribe.
+
+        addEventType (
+            eventName: string,
+            chainFunction?: (f1:Function,f2:Function)=>Function,
+            defaultFunction?: Function):Dexie.DexieEvent;
+        addEventType (
+            events: {[eventName:string]: ('asap' | [(f1:Function,f2:Function)=>Function, Function])})
+            : Dexie.DexieEvent;    
+    }
+
+    interface DbEvents extends DexieEventSet {
+        (eventName: 'ready', subscriber: () => any, bSticky: boolean): void;
+        (eventName: 'populate', subscriber: () => any): void;
+        (eventName: 'blocked', subscriber: () => any): void;
+        (eventName: 'versionchange', subscriber: (event: IDBVersionChangeEvent) => any): void;
+        ready: Dexie.DexieOnReadyEvent;
+        populate: Dexie.DexieEvent;
+        blocked: Dexie.DexieEvent;
+        versionchange: Dexie.DexieVersionChangeEvent;        
+    }
+
+    interface TableHooks<T,Key> extends DexieEventSet {
+        (eventName: 'creating', subscriber: (primKey:Key, obj:T, transaction:Transaction) => any): void;
+        (eventName: 'reading', subscriber: (obj:T) => T | any): void;
+        (eventName: 'updating', subscriber: (modifications:Object, primKey:Key, obj:T, transaction:Transaction) => any): void;
+        (eventName: 'deleting', subscriber: (primKey:Key, obj:T, transaction:Transaction) => any): void;
+        creating: DexieEvent;
+        reading: DexieEvent;
+        updating: DexieEvent;
+        deleting: DexieEvent;
+    }
+
+    interface TransactionEvents extends DexieEventSet {
+        (eventName: 'complete', subscriber: () => any): void;
+        (eventName: 'abort', subscriber: () => any): void;
+        (eventName: 'error', subscriber: (error:any) => any): void;
+        complete: DexieEvent;
+        abort: DexieEvent;
+        error: DexieEvent;
+    }    
+
     interface Table<T, Key> {
         name: string;
         schema: TableSchema;
-        hook: {
-            (eventName: string, subscriber: (...args:any[]) => any): void;
-            (eventName: 'creating', subscriber: (primKey:Key, obj:T, transaction:Transaction) => any): void;
-            (eventName: 'reading', subscriber: (obj:T) => T | any): void;
-            (eventName: 'updating', subscriber: (modifications:Object, primKey:Key, obj:T, transaction:Transaction) => any): void;
-            (eventName: 'deleting', subscriber: (primKey:Key, obj:T, transaction:Transaction) => any): void;
-            creating: DexieEvent;
-            reading: DexieEvent;
-            updating: DexieEvent;
-            deleting: DexieEvent;
-        }
+        hook: TableHooks<T, Key>;
 
         get(key: Key): Promise<T | undefined>;
         get<R>(key: Key, thenShortcut: ThenShortcut<T | undefined,R>): Promise<R>;

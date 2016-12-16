@@ -4,6 +4,7 @@
  */
 
 import Dexie from '../../src/Dexie'; // Imports the source Dexie.d.ts file
+import './test-extend-dexie';
 
 // constructor overloads:
 {
@@ -30,24 +31,13 @@ import Dexie from '../../src/Dexie'; // Imports the source Dexie.d.ts file
     // verno
     (()=>{let x:number = db.verno;});
 
-    // addons + extend typings interface
-    Dexie.addons.push(db => {
-        db.Table.prototype.newMethod = function() {};
-    });
-
-    // Extend Dexie
-    /*declare module '../../src/Dexie' {
-        interface Dexie {
-
-        }
-    }
-
-    // DOESNT WORK. Need to change how Dexie.d.ts declares its interface, without module Dexie and instead use var Dexie : DexieConstructor.
-
-
-    new Dexie('').table('someTable').newMethod();
-    */
-
+    //
+    // Use extended API from './test-extend-dexie.ts'
+    //
+    db.table('someTable').extendedTableMethod();
+    db.on.customEvent2.subscribe(x => {});
+    db.on('customEvent2', ()=>{});
+    Dexie.extendedStaticMethod('foo').toLowerCase();
 
     // Promise compatibility
     {
@@ -101,6 +91,13 @@ import Dexie from '../../src/Dexie'; // Imports the source Dexie.d.ts file
 
     let db = new MyDatabase();
 
+    // Extended table method
+    db.friends.extendedTableMethod();
+    // Extended DB method
+    db.extendedDBMethod();
+    // Extended event
+    db.on('customEvent2', ()=>{});
+
     // Table.get
     db.friends.get(1).then(friend => friend && friend.address.city);
     db.friends.get(2, friend => friend ? friend.address.city : "otherString")
@@ -135,5 +132,4 @@ import Dexie from '../../src/Dexie'; // Imports the source Dexie.d.ts file
     db.friends.toCollection().eachPrimaryKey(key => key.toExponential());
     // Table.orderBy
     db.friends.orderBy('name').eachPrimaryKey(key => key.toFixed());
-    
 }
