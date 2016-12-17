@@ -3,7 +3,7 @@
 /// <reference path="../../addons/Dexie.Syncable/Dexie.Syncable.SyncProtocolAPI.js" />
 /// <reference path="includes/jquery-2.1.0.js" />
 
-Dexie.Syncable.Remote.registerSyncProtocol("sample_protocol", {
+Dexie.Syncable.registerSyncProtocol("sample_protocol", {
 
     sync: function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
         /// <param name="context" type="IPersistedContext"></param>
