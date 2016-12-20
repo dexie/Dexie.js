@@ -347,11 +347,11 @@ function resolveConflicts(clientChanges, serverChangeSet) {
                     // Server and client has updated the same obejct. Just remove any overlapping keyPaths and only apply non-conflicting parts.
                     Object.keys(serverChange.mods).forEach(function (keyPath) {
                         // Remote this property from the client change
-                        delete clientChange[keyPath];
+                        delete clientChange.mods[keyPath];
                         // Also, remote all changes to nestled objects under this keyPath from the client change:
                         Object.keys(clientChange.mods).forEach(function (clientKeyPath) {
                             if (clientKeyPath.indexOf(keyPath + '.') == 0) {
-                                delete clientChange[clientKeyPath];
+                                delete clientChange.mods[clientKeyPath];
                             }
                         });
                     });
