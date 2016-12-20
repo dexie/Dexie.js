@@ -18,13 +18,6 @@
     "sample"
   ],
   "author": "David Fahlander",
-  "contributors": [
-    "Christopher Hunt <chrahunt@gmail.com>",
-    "Nikolas Poniros <https://github.com/nponiros>",
-    "Anders Ekdahl <https://github.com/andersekdahl>",
-    "Yury Solovyov <https://github.com/YurySolovyov>",
-    "Martin Diphoorn <https://github.com/martindiphoorn>"
-  ],
   "license": "Apache-2.0",
   "devDependencies": {
     "http-server": "^0.9.0",

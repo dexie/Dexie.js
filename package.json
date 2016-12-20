@@ -20,7 +20,14 @@
     "browser",
     "database"
   ],
-  "author": "David Fahlander",
+  "author": "David Fahlander <https://github.com/dfahlander>",
+  "contributors": [
+    "Christopher Hunt <https://github.com/chrahunt>",
+    "Nikolas Poniros <https://github.com/nponiros>",
+    "Anders Ekdahl <https://github.com/andersekdahl>",
+    "Yury Solovyov <https://github.com/YurySolovyov>",
+    "Martin Diphoorn <https://github.com/martindiphoorn>"
+  ],
   "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/dfahlander/Dexie.js/issues"
