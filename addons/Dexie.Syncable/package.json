@@ -28,7 +28,8 @@
   },
   "scripts": {
     "build": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator tools/build.js",
-    "watch": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator tools/watch.js"
+    "watch": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator tools/watch.js",
+    "test:typings": "tsc -p test/test-typings/"
   },
   "homepage": "http://dexie.org",
   "dependencies": {
