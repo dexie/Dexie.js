@@ -388,7 +388,7 @@ export declare module Dexie {
         sortBy(keyPath: string): Promise<T[]>;
         sortBy<R>(keyPath: string, thenShortcut: ThenShortcut<T[], R>) : Promise<R>;
         toArray(): Promise<Array<T>>;
-        toArray<R>(keyPath: string, thenShortcut: ThenShortcut<T[], R>) : Promise<R>;
+        toArray<R>(thenShortcut: ThenShortcut<T[], R>) : Promise<R>;
         uniqueKeys(): Promise<IndexableTypeArray>;
         uniqueKeys<R>(thenShortcut: ThenShortcut<IndexableTypeArray, R>): Promise<R>;
         until(filter: (value: T) => boolean, includeStopEntry?: boolean): Collection<T, Key>;
