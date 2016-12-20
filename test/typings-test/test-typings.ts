@@ -132,4 +132,45 @@ import './test-extend-dexie';
     db.friends.toCollection().eachPrimaryKey(key => key.toExponential());
     // Table.orderBy
     db.friends.orderBy('name').eachPrimaryKey(key => key.toFixed());
+
+    // Hooks
+    db.friends.hook('creating', (key, friend) => {
+        key.toFixed();
+        friend.isGoodFriend;
+        friend.address.city;
+    });
+    db.friends.hook('reading', friend => {friend.isGoodFriend = true; return friend; });
+    db.friends.hook('updating', (mods, key, friend) => {
+        mods.valueOf();
+        key.toExponential();
+        friend.isGoodFriend;
+        friend.address.city;
+    });
+    db.friends.hook('deleting', (key, friend) => {
+        key.toExponential();
+        friend.isGoodFriend;
+        friend.address.city;
+    });
+
+    // Issue #404
+    class NotFoundError extends Error {
+        constructor() {
+            super ("Not found");
+        }
+        get name() {
+            return "NotFoundError";
+        }
+    }
+
+    db.friends.get({keyPath1: 'value1', keyPath2: 'value2'}, friend => {
+        if (!friend) throw new NotFoundError();
+        return friend;
+    }).then (friend => {
+        console.log(friend.address.city);
+    }).catch (NotFoundError, err => {
+        console.log("Could not find the friend");
+    }).catch (err => {
+        console.log(`Error: ${err}`);
+    });
 }
+

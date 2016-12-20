@@ -32,7 +32,8 @@
     "eslint": "eslint src",
     "test:local": "node_modules/.bin/karma start test/karma.conf.js --single-run",
     "test:release": "node_modules/.bin/karma start test/karma.release.conf.js --single-run",
-    "test:debug": "node_modules/.bin/karma start test/karma.conf.js --log-level debug"
+    "test:debug": "node_modules/.bin/karma start test/karma.conf.js --log-level debug",
+    "test:typings": "node_modules/.bin/tsc -p test/typings-test/"
   },
   "engines": {
     "node": ">=4.2"
@@ -73,6 +74,7 @@
     "qunitjs": "^1.23.1",
     "rollup": "^0.36.1",
     "serve-static": "^1.11.1",
+    "typescript": "^2.1.4",
     "uglify-js": "^2.7.3"
   },
   "dependencies": {}

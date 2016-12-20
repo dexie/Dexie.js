@@ -127,8 +127,10 @@ export default function Syncable (db) {
     };
 
     db.syncable.list = function() {
-        return db._syncNodes.where('type').equals('remote').toArray(function(a) {
-            return a.map(function(node) { return node.url; });
+        return db.transaction('r?', db._syncNodes, ()=>{
+            return db._syncNodes.where('type').equals('remote').toArray(function(a) {
+                return a.map(function(node) { return node.url; });
+            });
         });
     };
 
@@ -178,7 +180,7 @@ export default function Syncable (db) {
                 let promise = new Promise(function(resolve, reject) {
                     db.on("ready", function syncWhenReady() {
                         return Dexie.vip(function() {
-                            return db.syncable.connect(protocolName, url, options).then(resolve).catch(function(err) {
+                            return db.syncable.connect(protocolName, url, options).then(resolve).catch(err => {
                                 // Reject the promise returned to the caller of db.syncable.connect():
                                 reject(err);
                                 // but resolve the promise that db.on("ready") waits for, because database should succeed to open even if the connect operation fails!
@@ -186,7 +188,6 @@ export default function Syncable (db) {
                         });
                     });
                 });
-                //if (!)
                 db.open().catch(()=>{}); // Force open() to happen. Otherwise connect() could be waiting forever.
                 return promise;
             }

@@ -10,6 +10,9 @@ build([{
             "dist/dexie-syncable.js.map",
             "dist/dexie-syncable.min.js",
             "dist/dexie-syncable.min.js.map"
+        ],
+        "src/Dexie.Syncable.d.ts": [
+            "dist/dexie-syncable.d.ts"
         ]
     }
 }]).then(()=> {
