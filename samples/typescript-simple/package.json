@@ -25,6 +25,6 @@
     "typescript": "^2.1.4"
   },
   "dependencies": {
-    "dexie": "^1.3.2"
+    "dexie": "^2.0.0-beta.6"
   }
 }
