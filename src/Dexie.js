@@ -3010,7 +3010,7 @@ props(Dexie, {
                 resolve(slice(event.target.result, 0)); // Converst DOMStringList to Array<String>
             };
             req.onerror = eventRejectHandler(reject);
-        }) : dbNamesDB.dbnames.toCollection().primaryKeys(cb);
+        }).then(cb) : dbNamesDB.dbnames.toCollection().primaryKeys(cb);
     },
     
     defineClass: function (structure) {
