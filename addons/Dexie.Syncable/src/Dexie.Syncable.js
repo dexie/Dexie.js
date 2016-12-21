@@ -23,6 +23,8 @@ import "dexie-observable";
 import getBaseRevisionAndMaxClientRevision from './get-base-revision-and-max-client-revision.js';
 import mergeChange from './merge-change';
 import { CREATE, UPDATE, DELETE } from './change_types';
+import applyChanges from './apply-changes';
+import globals from './globals';
 
 var override = Dexie.override,
     Promise = Dexie.Promise,
@@ -32,6 +34,9 @@ var override = Dexie.override,
 
 export default function Syncable (db) {
     /// <param name="db" type="Dexie"></param>
+
+    // Make db globally available to all modules of Dexie.Syncable
+    globals.db = db;
 
     var activePeers = [];
 
@@ -703,58 +708,6 @@ export default function Syncable (db) {
                                 console.warn("Dexie.Syncable: Unable to save SyncNode after applying remote changes: " + (err.stack || err));
                             });
                         });
-
-                        function applyChanges(changes, offset) {
-                            const length = changes.length;
-                            if (offset >= length) return Promise.resolve(null);
-                            const firstChange = changes[offset];
-                            let i, change;
-                            for (i=offset + 1; i < length; ++i) {
-                                change = changes[i];
-                                if (change.type !== firstChange.type ||
-                                    change.table !== firstChange.table)
-                                    break;
-                            }
-                            const table = db.table(firstChange.table);
-                            const specifyKeys = !table.schema.primKey.keyPath;
-                            const changesToApply = changes.slice(offset, i);
-                            const changeType = firstChange.type;
-                            const bulkPromise =
-                                changeType === CREATE ?
-                                    table.bulkPut(changesToApply.map(c => c.obj), specifyKeys ?
-                                        changesToApply.map(c => c.key) : undefined) :
-                                changeType === UPDATE ?
-                                    bulkUpdate(table, changesToApply) :
-                                changeType === DELETE ?
-                                    table.bulkDelete(changesToApply.map(c => c.key)) :
-                                    Promise.resolve(null);
-
-                            return bulkPromise.then(()=>applyChanges(changes, i));
-                        }
-
-                        function bulkUpdate(table, changes) {
-                            let keys = changes.map(c => c.key);
-                            let map = {};
-                            // Retrieve current object of each change to update and map each
-                            // found object's primary key to the existing object:
-                            return table.where(':id').anyOf(keys).raw().each((obj, cursor) => {
-                                map[cursor.primaryKey+''] = obj;
-                            }).then(()=>{
-                                // Filter away changes where whose key wasn't found in the local database
-                                // (we can't update them if we do not know the existing values)
-                                let updatesThatApply = changes.filter(c => map.hasOwnProperty(c.key+''));
-                                // Apply modifications onto each existing object (in memory)
-                                // and generate array of resulting objects to put using bulkPut():
-                                let objsToPut = updatesThatApply.map (c => {
-                                    let curr = map[c.key+''];
-                                    Object.keys(c.mods).forEach(keyPath => {
-                                        setByKeyPath(curr, keyPath, c.mods[keyPath]);
-                                    });
-                                    return curr;
-                                });
-                                return table.bulkPut(objsToPut);
-                            });
-                        }
                     });
                 }
             }
