@@ -425,7 +425,8 @@ export default function Dexie(dbName, options) {
             }
             return dbReadyPromise.then(()=>tempTransaction(mode, storeNames, fn));
         } else {
-            var trans = db._createTransaction(mode, storeNames, globalSchema).create();
+            var trans = db._createTransaction(mode, storeNames, globalSchema);
+            try { trans.create(); } catch (ex) { return rejection(ex); }
             return trans._promise(mode, function (resolve, reject) {
                 return newScope(function () { // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
                     PSD.trans = trans;
