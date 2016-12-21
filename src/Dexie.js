@@ -425,7 +425,8 @@ export default function Dexie(dbName, options) {
             }
             return dbReadyPromise.then(()=>tempTransaction(mode, storeNames, fn));
         } else {
-            var trans = db._createTransaction(mode, storeNames, globalSchema).create();
+            var trans = db._createTransaction(mode, storeNames, globalSchema);
+            try { trans.create(); } catch (ex) { return rejection(ex); }
             return trans._promise(mode, function (resolve, reject) {
                 return newScope(function () { // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
                     PSD.trans = trans;
@@ -639,6 +640,9 @@ export default function Dexie(dbName, options) {
     this.isOpen = function () {
         return idbdb !== null;
     };
+    this.hasBeenClosed = function () {
+        return dbOpenError && (dbOpenError instanceof exceptions.DatabaseClosed);
+    }
     this.hasFailed = function () {
         return dbOpenError !== null;
     };
@@ -652,10 +656,12 @@ export default function Dexie(dbName, options) {
     this.name = dbName;
 
     // db.tables - an array of all Table instances.
-    setProp(this, "tables", {
-        get: function () {
-            /// <returns type="Array" elementType="Table" />
-            return keys(allTables).map(function (name) { return allTables[name]; });
+    props(this, {
+        tables: {
+            get () {
+                /// <returns type="Array" elementType="Table" />
+                return keys(allTables).map(function (name) { return allTables[name]; });
+            }
         }
     });
 
@@ -3010,7 +3016,7 @@ props(Dexie, {
                 resolve(slice(event.target.result, 0)); // Converst DOMStringList to Array<String>
             };
             req.onerror = eventRejectHandler(reject);
-        }) : dbNamesDB.dbnames.toCollection().primaryKeys(cb);
+        }).then(cb) : dbNamesDB.dbnames.toCollection().primaryKeys(cb);
     },
     
     defineClass: function (structure) {
@@ -3209,7 +3215,7 @@ dbNamesDB.version(1).stores({dbnames: 'name'});
     if (typeof localStorage !== undefined && _global.document !== undefined) try {
         // Have localStorage and is not executing in a worker. Lets migrate from Dexie 1.x.
         JSON.parse(localStorage.getItem(DBNAMES) || "[]")
-            .forEach(name => dbNamesDB.put({name: name}).catch(nop));
+            .forEach(name => dbNamesDB.dbnames.put({name: name}).catch(nop));
         localStorage.removeItem(DBNAMES);
     } catch (_e) {}
 })();

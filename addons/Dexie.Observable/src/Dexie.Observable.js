@@ -119,7 +119,7 @@ export default function Observable(db) {
         return function(stores, dbSchema) {
             // Create the _changes and _syncNodes tables
             stores["_changes"] = "++rev";
-            stores["_syncNodes"] = "++id,myRevision,lastHeartBeat,url,isMaster,type,status";
+            stores["_syncNodes"] = "++id,myRevision,lastHeartBeat,&url,isMaster,type,status";
             stores["_intercomm"] = "++id,destinationNode";
             stores["_uncommittedChanges"] = "++id,node"; // For remote syncing when server returns a partial result.
             // Call default implementation. Will populate the dbSchema structures.

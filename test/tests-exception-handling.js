@@ -392,8 +392,6 @@ asyncTest("Issue #67 - Regression test - Transaction still fails if error in key
 });
 
 asyncTest("Issue #69 Global exception handler for promises", function () {
-    //
-    Dexie.debug = true;
     var errorList = [];
     function globalRejectionHandler(ev) {
         console.log("Got error: " + ev.reason);
@@ -462,8 +460,9 @@ asyncTest("Issue #69 Global exception handler for promises", function () {
                 equal(errorList[3].message, "Converting a rejected standard promise to Dexie.Promise but don't catch it", "Converting a rejected standard promise to Dexie.Promise but don't catch it");
                 equal(errorList[4], "forth error (uncatched but with finally)", "forth error (uncatched but with finally)");
                 equal(errorList[5].message, "FOO", "FOO");
-                errorList.slice(6).forEach((e,i) => {
-                    console.error (i + ": " + e.stack);
+                errorList.slice(6).map((e, i)=>`Unexpected error: ${(i+6) + ": " + e.stack}`).forEach(txt => {
+                    console.error(txt);
+                    ok(false, txt);
                 });
                 // cleanup:
                 window.removeEventListener('unhandledrejection', globalRejectionHandler);

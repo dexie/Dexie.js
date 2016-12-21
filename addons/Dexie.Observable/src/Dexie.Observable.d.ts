@@ -31,6 +31,8 @@ declare module 'dexie' {
         // (makes it valid to do new db.observable.SyncNode())
         observable: {SyncNode: Dexie.Observable.SyncNodeConstructor}
 
+        readonly _localSyncNode: Dexie.Observable.SyncNode;
+
         _changes: Dexie.Table<Dexie.Observable.IDatabaseChange & {rev: number}, number>;
         _syncNodes: Dexie.Table<Dexie.Observable.SyncNode, number>;
         _intercomm: Dexie.Table<any, number>;
