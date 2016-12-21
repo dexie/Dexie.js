@@ -1,0 +1,1 @@
+QUnit.config.autostart = false;
