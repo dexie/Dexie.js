@@ -740,8 +740,8 @@ export default function Syncable (db) {
                             return table.where(':id').anyOf(keys).raw().each((obj, cursor) => {
                                 map[cursor.primaryKey+''] = obj;
                             }).then(()=>{
-                                // Filter away changes where whos key wasnt found in local database
-                                // (we couldn't update them if we do not know the existing values)
+                                // Filter away changes where whose key wasn't found in the local database
+                                // (we can't update them if we do not know the existing values)
                                 let updatesThatApply = changes.filter(c => map.hasOwnProperty(c.key+''));
                                 // Apply modifications onto each existing object (in memory)
                                 // and generate array of resulting objects to put using bulkPut():
@@ -961,14 +961,14 @@ export default function Syncable (db) {
         }
 
         if (!instanceID) {
-            // Caller wants to enque it until database becomes open.
+            // Caller wants to enqueue it until database becomes open.
             if (db.isOpen()) {
                 return _enque();
             } else {
                 return Promise.reject(new DatabaseClosedError());
             }
         } else if (db._localSyncNode && instanceID === db._localSyncNode.id) {
-            // DB is already open but queuer doesnt want it to be queued if database has been closed (request bound to current instance of DB)
+            // DB is already open but queue doesn't want it to be queued if database has been closed (request bound to current instance of DB)
             return _enque();
         } else {
             return Promise.reject(new DatabaseClosedError());
@@ -998,7 +998,7 @@ Syncable.registeredProtocols = {}; // Map<String,ISyncProviderFactory> when key 
 
 Syncable.registerSyncProtocol = function(name, protocolInstance) {
     /// <summary>
-    ///    Register a syncronization protocol that can syncronize databases with remote servers.
+    ///    Register a synchronization protocol that can synchronize databases with remote servers.
     /// </summary>
     /// <param name="name" type="String">Provider name</param>
     /// <param name="protocolInstance" type="ISyncProtocol">Implementation of ISyncProtocol</param>
