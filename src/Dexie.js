@@ -3209,7 +3209,7 @@ dbNamesDB.version(1).stores({dbnames: 'name'});
     if (typeof localStorage !== undefined && _global.document !== undefined) try {
         // Have localStorage and is not executing in a worker. Lets migrate from Dexie 1.x.
         JSON.parse(localStorage.getItem(DBNAMES) || "[]")
-            .forEach(name => dbNamesDB.put({name: name}).catch(nop));
+            .forEach(name => dbNamesDB.dbnames.put({name: name}).catch(nop));
         localStorage.removeItem(DBNAMES);
     } catch (_e) {}
 })();
