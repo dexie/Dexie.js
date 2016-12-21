@@ -640,6 +640,9 @@ export default function Dexie(dbName, options) {
     this.isOpen = function () {
         return idbdb !== null;
     };
+    this.hasBeenClosed = function () {
+        return dbOpenError && (dbOpenError instanceof exceptions.DatabaseClosed);
+    }
     this.hasFailed = function () {
         return dbOpenError !== null;
     };
@@ -653,10 +656,12 @@ export default function Dexie(dbName, options) {
     this.name = dbName;
 
     // db.tables - an array of all Table instances.
-    setProp(this, "tables", {
-        get: function () {
-            /// <returns type="Array" elementType="Table" />
-            return keys(allTables).map(function (name) { return allTables[name]; });
+    props(this, {
+        tables: {
+            get () {
+                /// <returns type="Array" elementType="Table" />
+                return keys(allTables).map(function (name) { return allTables[name]; });
+            }
         }
     });
 

@@ -101,7 +101,11 @@ export declare class Dexie {
 
     isOpen(): boolean;
 
+    hasBeenClosed(): boolean;
+
     hasFailed(): boolean;
+
+    dynamicallyOpened(): boolean;
 
     backendDB(): IDBDatabase;
 
