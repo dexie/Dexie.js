@@ -18,7 +18,10 @@ import Dexie from "dexie";
 // To support both ES6,AMD,CJS and UMD (plain script), we just import it and then access it as "Dexie.Observable".
 // That way, our plugin works in all UMD cases.
 // If target platform would only be module based (ES6/AMD/CJS), we could have done 'import Observable from "dexie-observable"'.
-import "dexie-observable"; 
+import "dexie-observable";
+
+import combineCreateAndUpdate from './combine-create-and-update.js';
+import combineUpdateAndUpdate from './combine-update-and-update.js';
 
 var override = Dexie.override,
     Promise = Dexie.Promise,
@@ -1031,36 +1034,6 @@ export default function Syncable (db) {
         } else {
             return Promise.reject(new DatabaseClosedError());
         }
-    }
-
-    function combineCreateAndUpdate(prevChange, nextChange) {
-        var clonedChange = Dexie.deepClone(prevChange); // Clone object before modifying since the earlier change in db.changes[] would otherwise be altered.
-        Object.keys(nextChange.mods).forEach(function (keyPath) {
-            setByKeyPath(clonedChange.obj, keyPath, nextChange.mods[keyPath]);
-        });
-        return clonedChange;
-    }
-
-    function combineUpdateAndUpdate(prevChange, nextChange) {
-        var clonedChange = Dexie.deepClone(prevChange); // Clone object before modifying since the earlier change in db.changes[] would otherwise be altered.
-        Object.keys(nextChange.mods).forEach(function (keyPath) {
-            // If prev-change was changing a parent path of this keyPath, we must update the parent path rather than adding this keyPath
-            var hadParentPath = false;
-            Object.keys(prevChange.mods).filter(function (parentPath) { return keyPath.indexOf(parentPath + '.') === 0; }).forEach(function (parentPath) {
-                setByKeyPath(clonedChange.mods[parentPath], keyPath.substr(parentPath.length + 1), nextChange.mods[keyPath]);
-                hadParentPath = true;
-            });
-            if (!hadParentPath) {
-                // Add or replace this keyPath and its new value
-                clonedChange.mods[keyPath] = nextChange.mods[keyPath];
-            }
-            // In case prevChange contained sub-paths to the new keyPath, we must make sure that those sub-paths are removed since
-            // we must mimic what would happen if applying the two changes after each other:
-            Object.keys(prevChange.mods).filter(function (subPath) { return subPath.indexOf(keyPath + '.') === 0; }).forEach(function (subPath) {
-                delete clonedChange.mods[subPath];
-            });
-        });
-        return clonedChange;
     }
 };
 
