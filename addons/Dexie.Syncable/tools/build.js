@@ -15,6 +15,20 @@ build([{
             "dist/dexie-syncable.d.ts"
         ]
     }
+},{
+    //
+    // Tests
+    //
+    dirs: ["test/unit/"],
+    bundles: {
+        "test/unit/unit-tests-all.js": [
+            "test/unit/bundle.js",
+            "test/unit/bundle.js.map"
+        ]
+    },
+    excludes: [
+        "test/unit/karma.conf.js"
+    ]
 }]).then(()=> {
     console.log("All files successfully built.");
 }).catch(err => {
