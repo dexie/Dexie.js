@@ -91,8 +91,10 @@ export default function Syncable (db) {
             // and the "remote" node will be created so that this "ready" subscriber can auto-connect the
             // next time this database is opened.
             // CONCLUSION: We can always assume that the local DB has been in sync with the server at least
-            // once in the past for each "connectedRemoteNode" we find in quert below:
-            return db._syncNodes
+            // once in the past for each "connectedRemoteNode" we find in query below.
+
+            // Don't halt db.ready while connecting (i.e. we do not return a promise here!)
+            db._syncNodes
                 .where('type').equals('remote')
                 .and(node =>
                     node.status !== Statuses.OFFLINE &&
@@ -104,11 +106,9 @@ export default function Syncable (db) {
                                 node.syncProtocol,
                                 node.url,
                                 node.syncOptions)     
-                            .catch (err => console.warn(
-                                `Dexie.Syncable: Failed to connect to ${node.url}: ${err.stack || err}`
-                            ))
+                            .catch (()=>{}) // A failure will be triggered in on('statusChanged'). We can ignore.
                     );
-                });
+                }).catch('DatabaseClosedError', ()=>{});
         }
     }, true); // True means the ready event will survive a db reopen - db.close()/db.open()
 
@@ -161,8 +161,11 @@ export default function Syncable (db) {
         var protocolInstance = Syncable.registeredProtocols[protocolName];
 
         if (protocolInstance) {
-            if (db.isOpen() && db._localSyncNode) {
+            if (db.isOpen()) {
                 // Database is open
+                if (!db._localSyncNode)
+                    throw new Error("Precondition failed: local sync node is missing. Make sure Dexie.Observable is active!");
+
                 if (db._localSyncNode.isMaster) {
                     // We are master node
                     return connect(protocolInstance, protocolName, url, options, db._localSyncNode.id);
@@ -176,19 +179,32 @@ export default function Syncable (db) {
                 }
             } else {
                 // Database not yet open
-                // Wait for it to open
-                let promise = new Promise(function(resolve, reject) {
-                    db.on("ready", function syncWhenReady() {
-                        return Dexie.vip(function() {
-                            return db.syncable.connect(protocolName, url, options).then(resolve).catch(err => {
-                                // Reject the promise returned to the caller of db.syncable.connect():
-                                reject(err);
-                                // but resolve the promise that db.on("ready") waits for, because database should succeed to open even if the connect operation fails!
-                            });
+                // Wait for it to open, then connect.
+                var promise = new Promise(function(resolve, reject) {
+                    db.on("ready", () => {
+                        let connectPromise = db.syncable.connect(protocolName, url, options);
+                        return db._syncNodes.get({url: url}, node => {
+                            if (node && node.appliedRemoteRevision) {
+                                // The very first initial sync has been done so we need not wait
+                                // for the connect promise to complete. It can continue in background.
+                                // Returning here will resume db.on('ready') and resume all queries that
+                                // the application has put to the database.
+                                return;
+                            }
+                            // If this is the very first time we connect to the remote server,
+                            // we must make sure that the initial sync request succeeeds before resuming
+                            // database queries that the application code puts onto the database.
+                            // If OFFLINE or other error, don't allow the application to proceed.
+                            // We are assuming that an initial sync is essential for the application to
+                            // function correctly.
+                            return connectPromise;
                         });
+                        // Resolve the returned promise.
+                        connectPromise.then(resolve, reject);
                     });
+                    // Force open() to happen. Otherwise connect() may stall forever.
+                    db.open().catch(reject); // If open fails, db.on('ready') may not have been called.
                 });
-                db.open().catch(()=>{}); // Force open() to happen. Otherwise connect() could be waiting forever.
                 return promise;
             }
         } else {
