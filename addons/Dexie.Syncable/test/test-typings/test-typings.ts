@@ -2,6 +2,7 @@
 import Dexie from 'dexie';
 import 'dexie-observable';
 import '../../src/Dexie.Syncable';
+import {IDatabaseChange, DatabaseChangeType} from '../../api';
 
 //
 // Typings for registerSyncProtocol():
@@ -22,16 +23,16 @@ Dexie.Syncable.registerSyncProtocol("myProtocol", {
             context.save().catch(ex=>{});
             url.toLowerCase();
             changes.forEach(change => {
-                if (change.type === Dexie.Observable.DatabaseChangeType.Create) {
+                if (change.type === DatabaseChangeType.Create) {
                     change.obj.hello; // Should be able to access custom props on change.obj.
                     change.key;
                     change.table.toLowerCase();
                     change.type.toExponential();
-                } else if (change.type === Dexie.Observable.DatabaseChangeType.Update) {
+                } else if (change.type === DatabaseChangeType.Update) {
                     Object.keys(change.mods).forEach(keyPath => {
                         change.mods[keyPath];
                     });
-                } else if (change.type === Dexie.Observable.DatabaseChangeType.Delete) {
+                } else if (change.type === DatabaseChangeType.Delete) {
                     change.key;
                     change.table;
                 }
