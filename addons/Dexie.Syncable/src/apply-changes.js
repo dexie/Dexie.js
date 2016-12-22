@@ -1,10 +1,11 @@
+import Dexie from 'dexie';
 import { CREATE, DELETE, UPDATE } from './change_types';
 import bulkUpdate from './bulk-update';
 
 export default function initApplyChanges(db) {
   return function applyChanges(changes, offset) {
     const length = changes.length;
-    if (offset >= length) return Promise.resolve(null);
+    if (offset >= length) return Dexie.Promise.resolve(null);
     const firstChange = changes[offset];
     let i, change;
     for (i=offset + 1; i < length; ++i) {
@@ -25,7 +26,7 @@ export default function initApplyChanges(db) {
                 bulkUpdate(table, changesToApply) :
                 changeType === DELETE ?
                     table.bulkDelete(changesToApply.map(c => c.key)) :
-                    Promise.resolve(null);
+                    Dexie.Promise.resolve(null);
 
     return bulkPromise.then(()=>applyChanges(changes, i));
   };
