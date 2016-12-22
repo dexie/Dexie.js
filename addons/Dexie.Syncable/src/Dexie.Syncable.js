@@ -22,12 +22,11 @@ import "dexie-observable";
 
 import getBaseRevisionAndMaxClientRevision from './get-base-revision-and-max-client-revision.js';
 import mergeChange from './merge-change';
-import { CREATE, UPDATE, DELETE } from './change_types';
+import { CREATE, UPDATE } from './change_types';
 import initApplyChanges from './apply-changes';
 
 var override = Dexie.override,
     Promise = Dexie.Promise,
-    setByKeyPath = Dexie.setByKeyPath,
     Observable = Dexie.Observable,
     DatabaseClosedError = Dexie.DatabaseClosedError;
 
@@ -246,15 +245,18 @@ export default function Syncable (db) {
                 // Several can be found, as detected by @martindiphoorn,
                 // let's delete them and cleanup _uncommittedChanges and _changes 
                 // accordingly.
+                let nodeIDsToDelete;
                 return db._syncNodes
                     .where("url").equals(url)
                     .toArray(nodes => nodes.map(node => node.id))
-                    .then(nodeIDs =>
+                    .then(nodeIDs => {
+                        nodeIDsToDelete = nodeIDs;
                         // Delete the syncNode that represents the remote endpoint.
-                        db._syncNodes.where('id').anyOf(nodeIDs).delete())
+                        return db._syncNodes.where('id').anyOf(nodeIDs).delete()
+                    })
                     .then (() =>
                         // In case there were uncommittedChanges belonging to this, delete them as well
-                        db._uncommittedChanges.where('node').anyOf(nodeIDs).delete());
+                        db._uncommittedChanges.where('node').anyOf(nodeIDsToDelete).delete());
             }).then(()=> {
                 // Spawn background job to delete old changes, now that a node has been deleted,
                 // there might be changes in _changes table that is not needed to keep anymore.
@@ -477,7 +479,7 @@ export default function Syncable (db) {
                         Object.keys(nodeModificationsOnAck).forEach(function(keyPath) {
                             Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
                         });
-                        node.save().catch('DatabaseClosedError', ex=>{});
+                        node.save().catch('DatabaseClosedError', ()=>{});
                         return getLocalChangesForNode(node, autoAck);
                     } else {
                         return cb(changes, remoteBaseRevision, partial, nodeModificationsOnAck);
@@ -517,10 +519,10 @@ export default function Syncable (db) {
                             return getTableObjectsAsChanges(dbUploadState, [], collection);
                         });
                     } else if (node.dbUploadState.currentKey) {
-                        var collection = db.table(node.dbUploadState.currentTable).where(':id').above(node.dbUploadState.currentKey);
+                        const collection = db.table(node.dbUploadState.currentTable).where(':id').above(node.dbUploadState.currentKey);
                         return getTableObjectsAsChanges(Dexie.deepClone(node.dbUploadState), [], collection);
                     } else {
-                        var collection = db.table(dbUploadState.currentTable).orderBy(':id');
+                        const collection = db.table(dbUploadState.currentTable).orderBy(':id');
                         return getTableObjectsAsChanges(Dexie.deepClone(node.dbUploadState), [], collection);
                     }
                 }
@@ -622,7 +624,7 @@ export default function Syncable (db) {
             }
 
 
-            function applyRemoteChanges(remoteChanges, remoteRevision, partial, clear) {
+            function applyRemoteChanges(remoteChanges, remoteRevision, partial/*, clear*/) {
                 return enque(applyRemoteChanges, function() {
                     if (!stillAlive()) return Promise.reject(new Dexie.DatabaseClosedError());
                     // FIXTHIS: Check what to do if clear() is true!
@@ -778,7 +780,7 @@ export default function Syncable (db) {
                                 Object.keys(nodeModificationsOnAck).forEach(function(keyPath) {
                                     Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
                                 });
-                                node.save().catch('DatabaseClosedError', ex=>{});
+                                node.save().catch('DatabaseClosedError', ()=>{});
                                 // More changes may be waiting:
                                 reactToChanges();
                             });
@@ -813,7 +815,7 @@ export default function Syncable (db) {
                             Object.keys(nodeModificationsOnAck).forEach(function(keyPath) {
                                 Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
                             });
-                            node.save().catch('DatabaseClosedError', ex=>{});
+                            node.save().catch('DatabaseClosedError', ()=>{});
                         }
 
                         function onSuccess(continuation) {
@@ -886,7 +888,6 @@ export default function Syncable (db) {
         };
     });
 
-    var syncNodeSaveQueContexts = {};
     db.observable.SyncNode.prototype.save = function() {
         return db.transaction('rw?', db._syncNodes, () => {
             return db._syncNodes.put(this);
@@ -925,7 +926,7 @@ export default function Syncable (db) {
             return Promise.reject(new DatabaseClosedError());
         }
     }
-};
+}
 
 Syncable.Statuses = {
     ERROR: -1, // An irrepairable error occurred and the sync provider is dead.
