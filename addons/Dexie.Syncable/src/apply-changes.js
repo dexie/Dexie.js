@@ -5,6 +5,7 @@ import bulkUpdate from './bulk-update';
 export default function initApplyChanges(db) {
   return function applyChanges(changes, offset) {
     const length = changes.length;
+    // This is the base case for the recursion
     if (offset >= length) return Dexie.Promise.resolve(null);
     const firstChange = changes[offset];
     let i, change;
