@@ -24,6 +24,7 @@ import getBaseRevisionAndMaxClientRevision from './get-base-revision-and-max-cli
 import mergeChange from './merge-change';
 import { CREATE, UPDATE } from './change_types';
 import initApplyChanges from './apply-changes';
+import initGetOrCreateSyncNode from './get-or-create-sync-node';
 
 var override = Dexie.override,
     Promise = Dexie.Promise,
@@ -282,6 +283,7 @@ export default function Syncable (db) {
             return existingPeer[0].connectPromise;
         }
 
+        const getOrCreateSyncNode = initGetOrCreateSyncNode(db, protocolName, url);
         var connectPromise = getOrCreateSyncNode(options).then(function(node) {
             return connectProtocol(node);
         });
@@ -312,64 +314,6 @@ export default function Syncable (db) {
             // A better method than doing db.isOpen() because the same db instance may have been reopened, but then this sync call should be dead
             // because the new instance should be considered a fresh instance and will have another local node.
             return db._localSyncNode && db._localSyncNode.id === dbAliveID;
-        }
-
-        function getOrCreateSyncNode(options) {
-            return db.transaction('rw', db._syncNodes, function() {
-                if (!url) throw new Error("Url cannot be empty");
-                // Returning a promise from transaction scope will make the transaction promise resolve with the value of that promise.
-
-
-                return db._syncNodes.where("url").equalsIgnoreCase(url).first(function(node) {
-                    //
-                    // PersistedContext : IPersistedContext
-                    //
-                    function PersistedContext(nodeID, otherProps) {
-                        this.nodeID = nodeID;
-                        if (otherProps) Dexie.extend(this, otherProps);
-                    }
-
-                    PersistedContext.prototype.save = function () {
-                        // Store this instance in the syncContext property of the node it belongs to.
-                        return Dexie.vip(function () {
-                            return node.save();
-                        });
-                    };
-
-                    if (node) {
-                        // Node already there. Make syncContext become an instance of PersistedContext:
-                        node.syncContext = new PersistedContext(node.id, node.syncContext);
-                        node.syncProtocol = protocolName; // In case it was changed (would be very strange but...) could happen...
-                        db._syncNodes.put(node);
-                    } else {
-                        // Create new node and sync everything
-                        node = new db.observable.SyncNode();
-                        node.myRevision = -1;
-                        node.appliedRemoteRevision = null;
-                        node.remoteBaseRevisions = [];
-                        node.type = "remote";
-                        node.syncProtocol = protocolName;
-                        node.url = url;
-                        node.syncOptions = options;
-                        node.lastHeartBeat = Date.now();
-                        node.dbUploadState = null;
-                        Promise.resolve(function () {
-                            // If options.initialUpload is explicitely false, set myRevision to currentRevision.
-                            if (options.initialUpload === false)
-                                return db._changes.lastKey(function(currentRevision) {
-                                    node.myRevision = currentRevision;
-                                });
-                        }).then(function() {
-                            db._syncNodes.add(node).then(function (nodeId) {
-                                node.syncContext = new PersistedContext(nodeId); // Update syncContext in db with correct nodeId.
-                                db._syncNodes.put(node);
-                            });
-                        });
-                    }
-
-                    return node; // returning node will make the db.transaction()-promise resolve with this value.
-                });
-            });
         }
 
         function connectProtocol(node) {
