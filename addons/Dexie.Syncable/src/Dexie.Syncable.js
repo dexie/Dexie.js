@@ -23,8 +23,7 @@ import "dexie-observable";
 import getBaseRevisionAndMaxClientRevision from './get-base-revision-and-max-client-revision.js';
 import mergeChange from './merge-change';
 import { CREATE, UPDATE, DELETE } from './change_types';
-import applyChanges from './apply-changes';
-import globals from './globals';
+import initApplyChanges from './apply-changes';
 
 var override = Dexie.override,
     Promise = Dexie.Promise,
@@ -35,8 +34,7 @@ var override = Dexie.override,
 export default function Syncable (db) {
     /// <param name="db" type="Dexie"></param>
 
-    // Make db globally available to all modules of Dexie.Syncable
-    globals.db = db;
+    const applyChanges = initApplyChanges(db);
 
     var activePeers = [];
 
