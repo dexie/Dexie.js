@@ -12,6 +12,21 @@ buildAndWatch([{
             "dist/dexie-syncable.min.js.map"
         ]
     }
+},{
+    //
+    // Tests
+    //
+    dirs: ["test/unit/"],
+    bundles: {
+        "test/unit/unit-tests-all.js": [
+            "test/unit/bundle.js",
+            "test/unit/bundle.js.map"
+        ]
+    },
+    excludes: [
+        "test/karma-env.js",
+        "test/unit/karma.conf.js"
+    ]
 }]).then(()=> {
     console.log("All files successfully built. Now watching...");
 }).catch(err => {
