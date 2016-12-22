@@ -1,7 +1,7 @@
 
 import Dexie from 'dexie';
 import '../../src/Dexie.Observable';
-import Observable from '../../src/Dexie.Observable'; // Optional - will get Dexie.Observable into Observable.
+import { IDatabaseChange, DatabaseChangeType } from '../../api';
 
 interface Foo {
     id: string;
@@ -33,17 +33,17 @@ db.broadcastMessage('myBroadcastMsgType', {foo2: 'bar2'}, false);
 db.on('changes', changes => {
     changes.forEach(change => {
         switch (change.type) {
-            case Observable.DatabaseChangeType.Create:
+            case DatabaseChangeType.Create:
                 change.table.toLowerCase();
                 change.key;
                 change.obj;                
                 break;
-            case Observable.DatabaseChangeType.Update:
+            case DatabaseChangeType.Update:
                 change.table.toLowerCase();
                 change.key;
                 change.mods;
                 break;
-            case Observable.DatabaseChangeType.Delete:
+            case DatabaseChangeType.Delete:
                 change.table.toLowerCase();
                 change.key;
                 break;
@@ -61,7 +61,7 @@ Dexie.Observable.on('suicideNurseCall', (dbName, nodeId)=>{dbName.toLowerCase();
 Dexie.Observable.on('intercomm', dbName=>{dbName.toLowerCase()});
 Dexie.Observable.on('beforeunload', ()=>{});
 
-Observable.on('latestRevisionIncremented').unsubscribe(()=>{});
-var x: Observable.IDatabaseChange = {key: 1, table: "", type: Observable.DatabaseChangeType.Delete};
+Dexie.Observable.on('latestRevisionIncremented').unsubscribe(()=>{});
+var x: IDatabaseChange = {key: 1, table: "", type: DatabaseChangeType.Delete};
 x.key;
 x.type;

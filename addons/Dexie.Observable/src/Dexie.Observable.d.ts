@@ -3,6 +3,7 @@
 // Definitions by: David Fahlander <http://github.com/dfahlander>
 
 import Dexie from 'dexie';
+import { IDatabaseChange } from '../api';
 
 //
 // Extend Dexie interface
@@ -33,7 +34,7 @@ declare module 'dexie' {
 
         readonly _localSyncNode: Dexie.Observable.SyncNode;
 
-        _changes: Dexie.Table<Dexie.Observable.IDatabaseChange & {rev: number}, number>;
+        _changes: Dexie.Table<IDatabaseChange & {rev: number}, number>;
         _syncNodes: Dexie.Table<Dexie.Observable.SyncNode, number>;
         _intercomm: Dexie.Table<any, number>;
     }
@@ -41,7 +42,7 @@ declare module 'dexie' {
     module Dexie {
         // Extended events db.on('changes', subscriber), ...
         interface DbEvents {
-            (eventName: 'changes', subscriber: (changes: Observable.IDatabaseChange[], partial: boolean)=>void): void;
+            (eventName: 'changes', subscriber: (changes: IDatabaseChange[], partial: boolean)=>void): void;
             (eventName: 'cleanup', subscriber: ()=>any): void;
             (eventName: 'message', subscriber: (msg: any)=>any): void;
         }
@@ -91,34 +92,6 @@ declare module 'dexie' {
                 deleteTimeStamp: number, // In case lastHeartBeat is too old, a value of now + HIBERNATE_GRACE_PERIOD will be set here. If reached before node wakes up, node will be deleted.
                 isMaster: number // 1 if true. Not using Boolean because it's not possible to index Booleans.
             }
-
-            enum DatabaseChangeType {
-                Create = 1,
-                Update = 2,
-                Delete = 3
-            }
-
-            interface ICreateChange {
-                type: DatabaseChangeType.Create,
-                table: string;
-                key: any;
-                obj: any;
-            }
-
-            interface IUpdateChange {
-                type: DatabaseChangeType.Update;
-                table: string;
-                key: any;
-                mods: {[keyPath: string]:any | undefined};
-            }
-
-            interface IDeleteChange {
-                type: DatabaseChangeType.Delete;
-                table: string;
-                key: any;
-            }
-
-            type IDatabaseChange = ICreateChange | IUpdateChange | IDeleteChange; 
 
             interface ObservableEventSet extends Dexie.DexieEventSet {
                 (eventName: 'latestRevisionIncremented', subscriber: (dbName: string, latestRevision: number) => void): void;
