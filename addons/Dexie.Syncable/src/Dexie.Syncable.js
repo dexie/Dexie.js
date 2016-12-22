@@ -832,11 +832,18 @@ export default function Syncable (db) {
         };
     });
 
-    db.observable.SyncNode.prototype.save = function() {
-        return db.transaction('rw?', db._syncNodes, () => {
-            return db._syncNodes.put(this);
-        });
-    };
+    Object.defineProperty(
+        db.observable.SyncNode.prototype,
+        'save', {
+            enumerable: false,
+            configurable: true,
+            writable: true,
+            value() {
+                return db.transaction('rw?', db._syncNodes, () => {
+                    return db._syncNodes.put(this);
+            });
+        }
+     });
 
     function enque(context, fn, instanceID) {
         function _enque() {
