@@ -18,6 +18,7 @@ module.exports = function(config) {
       './test/babel-polyfill/polyfill.min.js',
       'node_modules/qunitjs/qunit/qunit.js',
       'dist/dexie.js',
+      'addons/Dexie.Observable/dist/dexie-observable.js',
       'addons/Dexie.Syncable/test/unit/bundle.js',
       { pattern: '**/*.map', watched: false, included: false, served: true}
     ],
