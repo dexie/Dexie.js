@@ -8,7 +8,7 @@ export default function bulkUpdate(table, changes) {
   return table.where(':id').anyOf(keys).raw().each((obj, cursor) => {
     map[cursor.primaryKey+''] = obj;
   }).then(()=>{
-    // Filter away changes where whose key wasn't found in the local database
+    // Filter away changes whose key wasn't found in the local database
     // (we can't update them if we do not know the existing values)
     let updatesThatApply = changes.filter(c => map.hasOwnProperty(c.key+''));
     // Apply modifications onto each existing object (in memory)
