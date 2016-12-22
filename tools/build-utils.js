@@ -297,8 +297,15 @@ function fileExists (file) {
 }
 
 async function mkdir (dir) {
-    if (!await fileExists(dir))
+    const parentDirExists = await fileExists(path.dirname(dir));
+    if (parentDirExists && !await fileExists(dir)) {
         await fs.mkdirAsync(dir);
+    } else if (!parentDirExists) {
+        // parent does not exist. We need to recursively add each non-existing parent folder
+        await mkdir(path.dirname(dir));
+        // now create the last folder in the path
+        await mkdir(dir);
+    }
 }
 
 function ext(filename) {
