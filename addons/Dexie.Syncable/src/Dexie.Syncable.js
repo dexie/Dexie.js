@@ -25,16 +25,17 @@ import mergeChange from './merge-change';
 import { CREATE, UPDATE } from './change_types';
 import initApplyChanges from './apply-changes';
 import initGetOrCreateSyncNode from './get-or-create-sync-node';
+import initEnqueue from './enqueue';
 
 var override = Dexie.override,
     Promise = Dexie.Promise,
-    Observable = Dexie.Observable,
-    DatabaseClosedError = Dexie.DatabaseClosedError;
+    Observable = Dexie.Observable;
 
 export default function Syncable (db) {
     /// <param name="db" type="Dexie"></param>
 
     const applyChanges = initApplyChanges(db);
+    const enqueue = initEnqueue(db);
 
     var activePeers = [];
 
@@ -339,8 +340,8 @@ export default function Syncable (db) {
             return doSync();
 
             function doSync() {
-                // Use enque() to ensure only a single promise execution at a time.
-                return enque(doSync, function() {
+                // Use enqueue() to ensure only a single promise execution at a time.
+                return enqueue(doSync, function() {
                     // By returning the Promise returned by getLocalChangesForNode() a final catch() on the sync() method will also catch error occurring in entire sequence.
                     return getLocalChangesForNode_autoAckIfEmpty(node, function sendChangesToProvider(changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
                         // Create a final Promise for the entire sync() operation that will resolve when provider calls onSuccess().
@@ -569,7 +570,7 @@ export default function Syncable (db) {
 
 
             function applyRemoteChanges(remoteChanges, remoteRevision, partial/*, clear*/) {
-                return enque(applyRemoteChanges, function() {
+                return enqueue(applyRemoteChanges, function() {
                     if (!stillAlive()) return Promise.reject(new Dexie.DatabaseClosedError());
                     // FIXTHIS: Check what to do if clear() is true!
                     return (partial ? saveToUncommitedChanges(remoteChanges) : finallyCommitAllChanges(remoteChanges, remoteRevision))
@@ -844,39 +845,6 @@ export default function Syncable (db) {
             });
         }
      });
-
-    function enque(context, fn, instanceID) {
-        function _enque() {
-            if (!context.ongoingOperation) {
-                context.ongoingOperation = Dexie.ignoreTransaction(function() {
-                    return Dexie.vip(function() {
-                        return fn();
-                    });
-                }).finally(()=> {
-                    delete context.ongoingOperation;
-                });
-            } else {
-                context.ongoingOperation = context.ongoingOperation.then(function() {
-                    return enque(context, fn, instanceID);
-                });
-            }
-            return context.ongoingOperation;
-        }
-
-        if (!instanceID) {
-            // Caller wants to enqueue it until database becomes open.
-            if (db.isOpen()) {
-                return _enque();
-            } else {
-                return Promise.reject(new DatabaseClosedError());
-            }
-        } else if (db._localSyncNode && instanceID === db._localSyncNode.id) {
-            // DB is already open but queue doesn't want it to be queued if database has been closed (request bound to current instance of DB)
-            return _enque();
-        } else {
-            return Promise.reject(new DatabaseClosedError());
-        }
-    }
 }
 
 Syncable.Statuses = {
