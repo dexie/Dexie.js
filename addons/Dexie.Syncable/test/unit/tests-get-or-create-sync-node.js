@@ -2,7 +2,7 @@ import Dexie from 'dexie';
 import 'dexie-observable';
 // Add this so we have the SyncNode.prototype.save method
 import '../../src/Dexie.Syncable';
-import {module, asyncTest, test, start, stop, propEqual, deepEqual, ok} from 'QUnit';
+import {module, asyncTest, test, start, stop, propEqual, deepEqual, strictEqual, ok} from 'QUnit';
 import {resetDatabase} from '../../../../../../test/dexie-unittest-utils';
 import initGetOrCreateSyncNode from '../../src/get-or-create-sync-node';
 
