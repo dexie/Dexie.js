@@ -6,3 +6,4 @@ import './tests-get-base-revision-and-max-client-revision.js';
 import './tests-get-or-create-sync-node.js';
 import './tests-merge-change.js';
 import './tests-PersistedContext.js';
+import './tests-save-to-uncommitted-changes.js';
