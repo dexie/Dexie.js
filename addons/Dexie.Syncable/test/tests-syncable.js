@@ -58,9 +58,9 @@
 			ok(true, "Status changed to " + Dexie.Syncable.StatusTexts[newStatus]);
 		});
 
-		var connectPromise = db1.syncable.connect("testProtocol", "http://dummy.local", { option1: "option1" });
-
 		db1.open();
+
+		var connectPromise = db1.syncable.connect("testProtocol", "http://dummy.local", { option1: "option1" });
 
 		callbacks.push(function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
 			// url
