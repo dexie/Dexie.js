@@ -26,7 +26,7 @@ asyncTest('should resolve with "null" if the offset is equal to the number of ch
   // Base case for the recursion
   applyChanges([], 0)
     .then((val) => {
-      equal(val, null);
+      strictEqual(val, null);
     })
     .catch(function(err) {
       ok(false, "Error: " + err);
