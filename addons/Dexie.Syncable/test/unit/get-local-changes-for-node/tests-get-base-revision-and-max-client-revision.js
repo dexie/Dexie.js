@@ -1,5 +1,5 @@
 import {module, test, deepEqual, equal, ok} from 'QUnit';
-import getBaseRevisionAndMaxClientRevision from '../../src/get-base-revision-and-max-client-revision';
+import getBaseRevisionAndMaxClientRevision from '../../../src/get-local-changes-for-node/get-base-revision-and-max-client-revision';
 
 module('getBaseRevisionAndMaxClientRevision', {
   setup: () => {

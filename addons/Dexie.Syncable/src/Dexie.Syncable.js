@@ -20,13 +20,11 @@ import Dexie from "dexie";
 // If target platform would only be module based (ES6/AMD/CJS), we could have done 'import Observable from "dexie-observable"'.
 import "dexie-observable";
 
-import getBaseRevisionAndMaxClientRevision from './get-base-revision-and-max-client-revision.js';
-import mergeChange from './merge-change';
-import { CREATE, UPDATE } from './change_types';
 import initGetOrCreateSyncNode from './get-or-create-sync-node';
 import initEnqueue from './enqueue';
 import initSaveToUncommittedChanges from './save-to-uncommitted-changes';
 import initFinallyCommitAllChanges from './finally-commit-all-changes';
+import initGetLocalChangesForNode from './get-local-changes-for-node/get-local-changes-for-node';
 
 var override = Dexie.override,
     Promise = Dexie.Promise,
@@ -41,8 +39,6 @@ export default function Syncable (db) {
 
     // Statuses
     var Statuses = Syncable.Statuses;
-
-    var MAX_CHANGES_PER_CHUNK = 1000;
 
     db.on('message', function(msg) {
         // Message from other local node arrives...
@@ -291,7 +287,7 @@ export default function Syncable (db) {
 
         var rejectConnectPromise = null;
         var disconnected = false;
-        var hasMoreToGive = true;
+        var hasMoreToGive = { hasMoreToGive: true };
         var activePeer = {
             url: url,
             status: Statuses.OFFLINE,
@@ -319,6 +315,7 @@ export default function Syncable (db) {
 
         function connectProtocol(node) {
             /// <param name="node" type="db.observable.SyncNode"></param>
+            const getLocalChangesForNode = initGetLocalChangesForNode(db, hasMoreToGive);
 
             function changeStatusTo(newStatus) {
                 if (node.status !== newStatus) {
@@ -343,75 +340,77 @@ export default function Syncable (db) {
                 // Use enqueue() to ensure only a single promise execution at a time.
                 return enqueue(doSync, function() {
                     // By returning the Promise returned by getLocalChangesForNode() a final catch() on the sync() method will also catch error occurring in entire sequence.
-                    return getLocalChangesForNode_autoAckIfEmpty(node, function sendChangesToProvider(changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
-                        // Create a final Promise for the entire sync() operation that will resolve when provider calls onSuccess().
-                        // By creating finalPromise before calling protocolInstance.sync() it is possible for provider to call onError() immediately if it wants.
-                        var finalSyncPromise = new Promise(function(resolve, reject) {
-                            rejectConnectPromise = function(err) {
-                                reject(err);
-                            };
-                            Dexie.asap(function() {
-                                try {
-                                    protocolInstance.sync(
-                                        node.syncContext,
-                                        url,
-                                        options,
-                                        remoteBaseRevision,
-                                        node.appliedRemoteRevision,
-                                        changes,
-                                        partial,
-                                        applyRemoteChanges,
-                                        onChangesAccepted,
-                                        function(continuation) {
-                                            resolve(continuation);
-                                        },
-                                        onError);
-                                } catch (ex) {
-                                    onError(ex, Infinity);
-                                }
+                    return getLocalChangesForNode_autoAckIfEmpty(node, sendChangesToProvider);
+                }, dbAliveID);
+            }
 
-                                function onError(error, again) {
-                                    reject(error);
-                                    if (stillAlive()) {
-                                        if (!isNaN(again) && again < Infinity) {
-                                            setTimeout(function() {
-                                                if (stillAlive()) {
-                                                    changeStatusTo(Statuses.SYNCING);
-                                                    doSync().catch('DatabaseClosedError', abortTheProvider);
-                                                }
-                                            }, again);
-                                            changeStatusTo(Statuses.ERROR_WILL_RETRY, error);
-                                            if (connectedContinuation && connectedContinuation.disconnect) connectedContinuation.disconnect();
-                                            connectedContinuation = null;
-                                        } else {
-                                            abortTheProvider(error); // Will fire ERROR on statusChanged event.
+            function sendChangesToProvider(changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
+                // Create a final Promise for the entire sync() operation that will resolve when provider calls onSuccess().
+                // By creating finalPromise before calling protocolInstance.sync() it is possible for provider to call onError() immediately if it wants.
+                var finalSyncPromise = new Promise(function(resolve, reject) {
+                    rejectConnectPromise = function(err) {
+                        reject(err);
+                    };
+                    Dexie.asap(function() {
+                        try {
+                            protocolInstance.sync(
+                                node.syncContext,
+                                url,
+                                options,
+                                remoteBaseRevision,
+                                node.appliedRemoteRevision,
+                                changes,
+                                partial,
+                                applyRemoteChanges,
+                                onChangesAccepted,
+                                function(continuation) {
+                                    resolve(continuation);
+                                },
+                                onError);
+                        } catch (ex) {
+                            onError(ex, Infinity);
+                        }
+
+                        function onError(error, again) {
+                            reject(error);
+                            if (stillAlive()) {
+                                if (!isNaN(again) && again < Infinity) {
+                                    setTimeout(function() {
+                                        if (stillAlive()) {
+                                            changeStatusTo(Statuses.SYNCING);
+                                            doSync().catch('DatabaseClosedError', abortTheProvider);
                                         }
-                                    }
+                                    }, again);
+                                    changeStatusTo(Statuses.ERROR_WILL_RETRY, error);
+                                    if (connectedContinuation && connectedContinuation.disconnect) connectedContinuation.disconnect();
+                                    connectedContinuation = null;
+                                } else {
+                                    abortTheProvider(error); // Will fire ERROR on statusChanged event.
                                 }
-                            });
-                        });
-
-                        return finalSyncPromise.then(function() {
-                            // Resolve caller of db.syncable.connect() with undefined. Not with continuation!
-                            return undefined;
-                        }).finally(()=>{
-                            // In case error happens after connect, don't try reject the connect promise anymore.
-                            // This is important. A Dexie unit test that verifies unhandled rejections will fail when Dexie.Syncable addon
-                            // is active and this happens. It would fire unhandledrejection but that we do not want.
-                            rejectConnectPromise = null;
-                        });
-
-                        function onChangesAccepted() {
-                            Object.keys(nodeModificationsOnAck).forEach(function(keyPath) {
-                                Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
-                            }); 
-                            // We dont know if onSuccess() was called by provider yet. If it's already called, finalPromise.then() will execute immediately,
-                            // otherwise it will execute when finalSyncPromise resolves.
-                            finalSyncPromise.then(continueSendingChanges);
-                            return node.save();
+                            }
                         }
                     });
-                }, dbAliveID);
+                });
+
+                return finalSyncPromise.then(function() {
+                    // Resolve caller of db.syncable.connect() with undefined. Not with continuation!
+                    return undefined;
+                }).finally(()=>{
+                    // In case error happens after connect, don't try reject the connect promise anymore.
+                    // This is important. A Dexie unit test that verifies unhandled rejections will fail when Dexie.Syncable addon
+                    // is active and this happens. It would fire unhandledrejection but that we do not want.
+                    rejectConnectPromise = null;
+                });
+
+                function onChangesAccepted() {
+                    Object.keys(nodeModificationsOnAck).forEach(function(keyPath) {
+                        Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
+                    });
+                    // We dont know if onSuccess() was called by provider yet. If it's already called, finalPromise.then() will execute immediately,
+                    // otherwise it will execute when finalSyncPromise resolves.
+                    finalSyncPromise.then(continueSendingChanges);
+                    return node.save();
+                }
             }
 
             function abortTheProvider(error) {
@@ -431,143 +430,6 @@ export default function Syncable (db) {
                     }
                 });
             }
-
-            function getLocalChangesForNode(node, cb) {
-                /// <summary>
-                ///     Based on given node's current revision and state, this function makes sure to retrieve next chunk of changes
-                ///     for that node.
-                /// </summary>
-                /// <param name="node"></param>
-                /// <param name="cb" value="function(changes, remoteBaseRevision, partial, nodeModificationsOnAck) {}">Callback that will retrieve next chunk of changes and a boolean telling if it's a partial result or not. If truthy, result is partial and there are more changes to come. If falsy, these changes are the final result.</param>
-
-                if (node.myRevision >= 0) {
-                    // Node is based on a revision in our local database and will just need to get the changes that has occurred since that revision.
-                    var brmcr = getBaseRevisionAndMaxClientRevision(node);
-                    return getChangesSinceRevision(node.myRevision, MAX_CHANGES_PER_CHUNK, brmcr.maxClientRevision, function(changes, partial, nodeModificationsOnAck) {
-                        return cb(changes, brmcr.remoteBaseRevision, partial, nodeModificationsOnAck);
-                    });
-                } else {
-                    // Node hasn't got anything from our local database yet. We will need to upload entire DB to the node in the form of CREATE changes.
-                    // Check if we're in the middle of already doing that:
-                    if (node.dbUploadState === null) {
-                        // Initiatalize dbUploadState
-                        var tablesToUpload = db.tables.filter(function(table) { return table.schema.observable; }).map(function(table) { return table.name; });
-                        if (tablesToUpload.length === 0) return Promise.resolve(cb([], null, false, {})); // There are no synched tables at all.
-                        var dbUploadState = {
-                            tablesToUpload: tablesToUpload,
-                            currentTable: tablesToUpload.shift(),
-                            currentKey: null
-                        };
-                        return db._changes.orderBy('rev').last(function(lastChange) {
-                            dbUploadState.localBaseRevision = (lastChange && lastChange.rev) || 0;
-                            var collection = db.table(dbUploadState.currentTable).orderBy(':id');
-                            return getTableObjectsAsChanges(dbUploadState, [], collection);
-                        });
-                    } else if (node.dbUploadState.currentKey) {
-                        const collection = db.table(node.dbUploadState.currentTable).where(':id').above(node.dbUploadState.currentKey);
-                        return getTableObjectsAsChanges(Dexie.deepClone(node.dbUploadState), [], collection);
-                    } else {
-                        const collection = db.table(dbUploadState.currentTable).orderBy(':id');
-                        return getTableObjectsAsChanges(Dexie.deepClone(node.dbUploadState), [], collection);
-                    }
-                }
-
-                function getTableObjectsAsChanges(state, changes, collection) {
-                    /// <param name="state" value="{tablesToUpload:[''],currentTable:'_changes',currentKey:null,localBaseRevision:0}"></param>
-                    /// <param name="changes" type="Array" elementType="IDatabaseChange"></param>
-                    /// <param name="collection" type="db.Collection"></param>
-                    var limitReached = false;
-                    return collection.until(function() {
-                        if (changes.length === MAX_CHANGES_PER_CHUNK) {
-                            limitReached = true;
-                            return true;
-                        }
-                    }).each(function(item, cursor) {
-                        changes.push({
-                            type: CREATE,
-                            table: state.currentTable,
-                            key: cursor.key,
-                            obj: cursor.value
-                        });
-                        state.currentKey = cursor.key;
-                    }).then(function() {
-                        if (limitReached) {
-                            // Limit reached. Send partial result.
-                            hasMoreToGive = true;
-                            return cb(changes, null, true, { dbUploadState: state });
-                        } else {
-                            // Done iterating this table. Check if there are more tables to go through:
-                            if (state.tablesToUpload.length === 0) {
-                                // Done iterating all tables
-                                // Now append changes occurred during our dbUpload:
-                                var brmcr = getBaseRevisionAndMaxClientRevision(node);
-                                return getChangesSinceRevision(state.localBaseRevision, MAX_CHANGES_PER_CHUNK - changes.length, brmcr.maxClientRevision, function(additionalChanges, partial, nodeModificationsOnAck) {
-                                    changes = changes.concat(additionalChanges);
-                                    nodeModificationsOnAck.dbUploadState = null;
-                                    return cb(changes, brmcr.remoteBaseRevision, partial, nodeModificationsOnAck);
-                                });
-                            } else {
-                                // Not done iterating all tables. Continue on next table:
-                                state.currentTable = state.tablesToUpload.shift();
-                                return getTableObjectsAsChanges(state, changes, db.table(state.currentTable).orderBy(':id'));
-                            }
-                        }
-                    });
-                }
-
-                function getChangesSinceRevision(revision, maxChanges, maxRevision, cb) {
-                    /// <param name="cb" value="function(changes, partial, nodeModificationsOnAck) {}">Callback that will retrieve next chunk of changes and a boolean telling if it's a partial result or not. If truthy, result is partial and there are more changes to come. If falsy, these changes are the final result.</param>
-                    var changeSet = {};
-                    var numChanges = 0;
-                    var partial = false;
-                    var ignoreSource = node.id;
-                    var nextRevision = revision;
-                    return db.transaction('r', db._changes, function() {
-                        var query = db._changes.where('rev').between(revision, maxRevision, false, true);
-                        return query.until(() => {
-                            if (numChanges === maxChanges) {
-                                partial = true;
-                                return true;
-                            }
-                        }).each(function(change) {
-                            // Note the revision in nextRevision:
-                            nextRevision = change.rev;
-                            if (change.source === ignoreSource) return;
-                            // Our _changes table contains more info than required (old objs, source etc). Just make sure to include the nescessary info:
-                            var changeToSend = {
-                                type: change.type,
-                                table: change.table,
-                                key: change.key
-                            };
-                            if (change.type === CREATE)
-                                changeToSend.obj = change.obj;
-                            else if (change.type === UPDATE)
-                                changeToSend.mods = change.mods;
-
-                            var id = change.table + ":" + change.key;
-                            var prevChange = changeSet[id];
-                            if (!prevChange) {
-                                // This is the first change on this key. Add it unless it comes from the source that we are working against
-                                changeSet[id] = changeToSend;
-                                ++numChanges;
-                            } else {
-                                // Merge the oldchange with the new change
-                                var nextChange = changeToSend;
-                                var mergedChange = mergeChange(prevChange, nextChange);
-                                changeSet[id] = mergedChange;
-                            }
-                        });
-                    }).then(function() {
-                        var changes = Object.keys(changeSet).map(function(key) { return changeSet[key]; });
-                        hasMoreToGive = partial;
-                        return cb(changes, partial, { myRevision: nextRevision });
-                    });/*.catch(ex => {
-                        console.error(`Here and there... '${ex.message}'.`);
-                        //return Promise.reject(ex);
-                    });*/
-                }
-            }
-
 
             function applyRemoteChanges(remoteChanges, remoteRevision, partial/*, clear*/) {
                 const saveToUncommittedChanges = initSaveToUncommittedChanges(db, node);
@@ -736,7 +598,7 @@ export default function Syncable (db) {
                     }).catch(abortTheProvider);
                 }
 
-                if (hasMoreToGive) {
+                if (hasMoreToGive.hasMoreToGive) {
                     syncAgain();
                 } else if (connectedContinuation && !isNaN(connectedContinuation.again) && connectedContinuation.again < Infinity) {
                     changeStatusTo(Statuses.ONLINE);

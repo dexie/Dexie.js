@@ -3,7 +3,7 @@
 console.log("Building...");
 
 build([{
-    dirs: ["src/"],
+    dirs: ["src/", "src/get-local-changes-for-node/"],
     bundles: {
         "src/Dexie.Syncable.js": [
             "dist/dexie-syncable.js",
@@ -19,7 +19,7 @@ build([{
     //
     // Tests
     //
-    dirs: ["test/unit/"],
+    dirs: ["test/unit/", "test/unit/get-local-changes-for-node/"],
     bundles: {
         "test/unit/unit-tests-all.js": [
             "test/unit/bundle.js",
