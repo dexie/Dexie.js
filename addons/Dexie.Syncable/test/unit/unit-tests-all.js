@@ -1,9 +1,11 @@
+import './get-local-changes-for-node/tests-get-base-revision-and-max-client-revision.js';
+import './get-local-changes-for-node/tests-get-changes-since-revision.js';
+import './get-local-changes-for-node/tests-get-local-changes-for-node.js';
 import './tests-apply-changes.js';
 import './tests-bulk-update.js';
 import './tests-combine-create-and-update.js';
 import './tests-combine-update-and-update.js';
 import './tests-finally-commit-all-changes.js';
-import './tests-get-base-revision-and-max-client-revision.js';
 import './tests-get-or-create-sync-node.js';
 import './tests-merge-change.js';
 import './tests-PersistedContext.js';
