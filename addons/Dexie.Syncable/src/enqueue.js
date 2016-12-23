@@ -4,7 +4,6 @@ export default function initEnqueue(db) {
   return function enqueue(context, fn, instanceID) {
     function _enqueue() {
       if (!context.ongoingOperation) {
-        console.log('here')
         context.ongoingOperation = Dexie.ignoreTransaction(function () {
           return Dexie.vip(function () {
             return fn();
@@ -13,7 +12,6 @@ export default function initEnqueue(db) {
           delete context.ongoingOperation;
         });
       } else {
-        console.log(context)
         context.ongoingOperation = context.ongoingOperation.then(function () {
           return enqueue(context, fn, instanceID);
         });
