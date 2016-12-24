@@ -32,7 +32,10 @@
     "test": "npm run eslint && npm run build && npm run test:local",
     "eslint": "eslint src",
     "eslint:test": "eslint test/unit --ignore-pattern bundle.js --ignore-pattern karma-env.js",
-    "test:local": "node_modules/.bin/karma start test/unit/karma.conf.js --single-run",
+    "test:unit": "npm run build && node_modules/.bin/karma start test/unit/karma.conf.js --single-run",
+    "test:local": "node_modules/.bin/karma start test/karma.conf.js --single-run",
+    "test:release": "node_modules/.bin/karma start test/karma.release.conf.js --single-run",
+    "test:debug": "node_modules/.bin/karma start test/karma.conf.js --log-level debug",
     "test:typings": "tsc -p test/test-typings/"
   },
   "homepage": "http://dexie.org",

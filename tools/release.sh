@@ -26,7 +26,7 @@ echo "Master branch is: '$master_branch'"
 if ! [[ $master_branch =~ ^master ]]; then
     echo >&2 "Error: Must be on a branch prefixed 'master'";
     exit 1;
-fi  
+fi
 master_suffix="${master_branch##master}"
 
 
@@ -66,6 +66,10 @@ printf "Running eslint src\n"
 eslint src
 printf "eslint ok.\n"
 
+printf "Running eslint Dexie.Syncable src\n"
+$(npm bin)/eslint --config "addons/Dexie.Syncable/src/.eslintrc.json" "addons/Dexie.Syncable/src"
+printf "eslint ok.\n\n"
+
 #
 # Rebuild
 #
@@ -83,7 +87,6 @@ for dir in addons/*/
 do
     cd ${dir}
     npm run build
-    # npm test
     cd -
 done
 
@@ -96,6 +99,18 @@ npm run test:release > karma-release.log
 kill $TAIL_PID
 
 printf "Browserstack tests passed.\n"
+
+# test Dexie.Syncable
+printf "Testing Dexie.Syncable on browserstack\n"
+cd addons/Dexie.Syncable
+echo . > karma-release.log
+tail -f karma-release.log &
+TAIL_PID=$!
+npm run test:release > karma-release.log
+kill $TAIL_PID
+cd -
+
+printf "Dexie.Syncable Browserstack tests passed.\n"
 
 # Force adding/removing dist files
 rm -rf dist/*.gz

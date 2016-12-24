@@ -27,7 +27,7 @@ build([{
         ]
     },
     excludes: [
-        "test/karma-env.js",
+        "test/unit/karma-env.js",
         "test/unit/karma.conf.js"
     ]
 }]).then(()=> {
