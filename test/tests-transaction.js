@@ -749,29 +749,31 @@ asyncTest("Dexie.currentTransaction in CRUD hooks", 53, function () {
     db.users.hook.deleting.subscribe(onDeleting);
 
     function doTheTests() {
-        db.users.add({ username: "monkey1" });
-        db.users.add({ username: "monkey1" }).catch(function(ex) {
+        let promises = [];
+        promises.push(db.users.add({ username: "monkey1" }));
+        promises.push(db.users.add({ username: "monkey1" }).catch(function(ex) {
             ok(true, "Should fail adding a second monkey1");
-        }); // Trigger creating.onerror
+        })); // Trigger creating.onerror
         // Test bulkAdd as well:
         ok(true, "Testing bulkAdd");
-        db.users.bulkAdd([{ username: "monkey1" }, { username: "monkey2" }])
+        promises.push(db.users.bulkAdd([{ username: "monkey1" }, { username: "monkey2" }])
             .then(()=>ok(false, "Should get error on one of the adds"))
             .catch(Dexie.BulkError, e=>{
                 ok(true, "Got BulkError");
                 ok(e.failures.length === 1, "One error out of two: " + e);
-            });
-        db.users.where("username").equals("monkey1").modify({
+        }));
+        promises.push(db.users.where("username").equals("monkey1").modify({
             name: "Monkey 1"
-        });
-        db.users.where("username").equals("monkey1").modify(function (user) {
+        }));
+        promises.push(db.users.where("username").equals("monkey1").modify(function (user) {
             user.username = "monkey2";// trigger updating.onerror
         }).catch(function(ex) {
             ok(true, "Should fail modifying primary key");
-        });
-        db.users.toArray();
-        db.users.delete("monkey2");
-        return db.users.delete("monkey1");
+        }));
+        promises.push(db.users.toArray());
+        promises.push(db.users.delete("monkey2"));
+        promises.push(db.users.delete("monkey1"));
+        return Dexie.Promise.all(promises);
     };
 
     doTheTests().then(function () {
