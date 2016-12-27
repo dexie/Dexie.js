@@ -190,7 +190,7 @@ export default function Syncable (db) {
                 // there might be changes in _changes table that is not needed to keep anymore.
                 // This is done in its own transaction, or possible several transaction to prohibit
                 // starvation
-                Observable.deleteOldChanges();
+                Observable.deleteOldChanges(db);
             });
         });
     };
