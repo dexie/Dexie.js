@@ -319,6 +319,10 @@ export default function initConnectProtocol(db, protocolInstance, dbAliveID, opt
             syncAgain();
           }
         }, connectedContinuation.again);
+      } else {
+        // Provider seems finished polling. Since we are never going to poll again,
+        // disconnect provider and set status to OFFLINE until another call to db.syncable.connect().
+        activePeer.disconnect(Statuses.OFFLINE);
       }
     }
   };
