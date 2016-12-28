@@ -58,6 +58,7 @@ export enum DatabaseChangeType {
  * 
  */
 export interface ISyncProtocol {
+    partialsThreshold?: number;
     sync (
         context: IPersistedContext,
         url: string,

@@ -9,4 +9,5 @@ import './tests-finally-commit-all-changes.js';
 import './tests-get-or-create-sync-node.js';
 import './tests-merge-change.js';
 import './tests-PersistedContext.js';
+import './tests-register-sync-protocol.js';
 import './tests-save-to-uncommitted-changes.js';
