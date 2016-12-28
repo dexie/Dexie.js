@@ -2,8 +2,6 @@
 
 Observe changes to database - even when they happen in another browser window.
 
-**NOTE: This addon is still in alpha development**
-
 ### Install
 ```
 npm install dexie --save

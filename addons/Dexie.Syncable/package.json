@@ -1,6 +1,6 @@
 {
   "name": "dexie-syncable",
-  "version": "0.9.2",
+  "version": "1.0.0-beta.1",
   "description": "Addon to Dexie that makes it possible to sync indexeDB with remote databases.",
   "main": "dist/dexie-syncable.js",
   "jsnext:main": "src/Dexie.Syncable.js",
@@ -21,7 +21,11 @@
     "database",
     "sync"
   ],
-  "author": "David Fahlander",
+  "author": "David Fahlander <https://github.com/dfahlander>",
+  "contributors": [
+    "Nikolas Poniros <https://github.com/nponiros>",
+    "Martin Diphoorn <https://github.com/martindiphoorn>"
+  ],
   "license": "Apache-2.0",
   "bugs": {
     "url": "https://github.com/dfahlander/Dexie.js/issues"
