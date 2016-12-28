@@ -20,7 +20,7 @@ export default function initConnectProtocol(db, protocolInstance, dbAliveID, opt
 
   return function connectProtocol(node, activePeer) {
     /// <param name="node" type="db.observable.SyncNode"></param>
-    const getLocalChangesForNode = initGetLocalChangesForNode(db, hasMoreToGive);
+    const getLocalChangesForNode = initGetLocalChangesForNode(db, hasMoreToGive, protocolInstance.partialsThreshold);
 
     const url = activePeer.url;
 

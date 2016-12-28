@@ -225,11 +225,67 @@ asyncTest('should set hasMoreToGive to true if we have more changes than maxChan
   const revision = 1;
   const maxChanges = 2;
   const maxRevision = 4;
+  hasMoreToGive.hasMoreToGive = false;
   function cb(changes, partial, revisionObject) {
     strictEqual(revisionObject.myRevision, createChange3.rev, 'myRevision');
     strictEqual(partial, true, 'is a partial change');
     strictEqual(changes.length, 2, 'get only 2 changes');
-    deepEqual(hasMoreToGive, {hasMoreToGive: true}, 'hasMoreToGive remains false');
+    deepEqual(hasMoreToGive, {hasMoreToGive: true}, 'hasMoreToGive is true');
+  }
+  const changesToAdd = [createChange1, createChange2, createChange3, createChange4];
+  db._changes.bulkAdd(changesToAdd)
+      .then(() => {
+        return getChangesSinceRevision(revision, maxChanges, maxRevision, cb)
+      })
+      .catch(function(err) {
+        ok(false, "Error: " + err);
+      })
+      .finally(start);
+});
+
+
+asyncTest('should set hasMoreToGive to true but give no changes if maxChanges is 0', () => {
+  const createChange1 = {
+    rev: 1,
+    key: 1,
+    type: CREATE,
+    source: 2,
+    table: 'foo',
+    obj: {foo: 'bar'}
+  };
+  const createChange2 = {
+    rev: 2,
+    key: 2,
+    type: CREATE,
+    source: 2,
+    table: 'foo',
+    obj: {foo: 'bar'}
+  };
+  const createChange3 = {
+    rev: 3,
+    key: 3,
+    type: CREATE,
+    source: 2,
+    table: 'foo',
+    obj: {foo: 'bar'}
+  };
+  const createChange4 = {
+    rev: 4,
+    key: 4,
+    type: CREATE,
+    source: 2,
+    table: 'foo',
+    obj: {foo: 'bar'}
+  };
+  const revision = 1;
+  const maxChanges = 0;
+  const maxRevision = 4;
+  hasMoreToGive.hasMoreToGive = false;
+  function cb(changes, partial, revisionObject) {
+    strictEqual(revisionObject.myRevision, revision, 'revision should not change');
+    strictEqual(partial, true, 'is a partial change');
+    strictEqual(changes.length, 0, 'get no changes');
+    deepEqual(hasMoreToGive, {hasMoreToGive: true}, 'hasMoreToGive is true');
   }
   const changesToAdd = [createChange1, createChange2, createChange3, createChange4];
   db._changes.bulkAdd(changesToAdd)

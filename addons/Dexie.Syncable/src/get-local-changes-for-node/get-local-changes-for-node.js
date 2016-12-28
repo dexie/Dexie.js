@@ -4,8 +4,8 @@ import getBaseRevisionAndMaxClientRevision from './get-base-revision-and-max-cli
 import initGetChangesSinceRevision from './get-changes-since-revision';
 import initGetTableObjectsAsChanges from './get-table-objects-as-changes';
 
-export default function initGetLocalChangesForNode(db, hasMoreToGive) {
-  var MAX_CHANGES_PER_CHUNK = 1000;
+export default function initGetLocalChangesForNode(db, hasMoreToGive, partialsThreshold) {
+  var MAX_CHANGES_PER_CHUNK = partialsThreshold;
 
   return function getLocalChangesForNode(node, cb) {
     /// <summary>

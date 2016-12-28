@@ -37,7 +37,8 @@
 			            start();
 			        }
 			    });
-			}
+			},
+			partialsThreshold: 1000
 		});
 
 		db1.version(1).stores({ objects: "$$" });
@@ -227,4 +228,41 @@
 
 	});
 
+	asyncTest('partialsThreshold is zero', () => {
+		var testNo = 0;
+		var callbacks = [];
+		Dexie.Syncable.registerSyncProtocol("testProtocol", {
+			sync: function (context, url, options, baseRevision, syncedRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError) {
+				var thiz = this, args = arguments;
+				Dexie.vip(function () {
+					try {
+						callbacks[testNo++].apply(thiz, args);
+					} catch (err) {
+						db1.close();
+						ok(false, err);
+						start();
+					}
+				});
+			},
+			partialsThreshold: 0
+		});
+
+		db1.version(1).stores({ objects: "$$" });
+
+		db1.on('populate', function () {
+			db1.objects.add({ name: "one" });
+			db1.objects.add({ name: "two" });
+		});
+
+		db1.open();
+
+		var connectPromise = db1.syncable.connect("testProtocol", "http://dummy.local", { option1: "option1" });
+
+		callbacks.push(function (context, url, options, baseRevision, syncedRevision, changes, partial) {
+			// changes
+			equal(changes.length, 0, "No changes");
+			equal(partial, true, "Partial since threshold is 0");
+			start();
+		});
+	});
 })();

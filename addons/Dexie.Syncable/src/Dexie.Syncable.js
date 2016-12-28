@@ -236,6 +236,17 @@ Syncable.registerSyncProtocol = function(name, protocolInstance) {
     /// </summary>
     /// <param name="name" type="String">Provider name</param>
     /// <param name="protocolInstance" type="ISyncProtocol">Implementation of ISyncProtocol</param>
+    const partialsThreshold = protocolInstance.partialsThreshold;
+    if (typeof partialsThreshold === 'number') {
+        // Don't allow NaN or negative threshold
+        if (isNaN(partialsThreshold) || partialsThreshold < 0) {
+            throw new Error('The given number for the threshold is not supported');
+        }
+        // If the threshold is 0 we will not send any client changes but will get server changes
+    } else {
+        // Use Infinity as the default so simple protocols don't have to care about partial synchronization
+        protocolInstance.partialsThreshold = Infinity;
+    }
     Syncable.registeredProtocols[name] = protocolInstance;
 };
 

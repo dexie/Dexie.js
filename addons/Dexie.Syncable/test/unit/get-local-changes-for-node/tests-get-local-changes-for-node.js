@@ -33,7 +33,7 @@ asyncTest('should get the contents of our tables and create CREATE changes if no
   syncNode.myRevision = -1;
   syncNode.dbUploadState = null;
   syncNode.remoteBaseRevisions = [];
-  const getLocalChangesForNode = initGetLocalChangesForNode(db, hasMoreToGive);
+  const getLocalChangesForNode = initGetLocalChangesForNode(db, hasMoreToGive, 10);
   const fooTableObject = {
     id: 1,
     foo: 'bar'
@@ -74,7 +74,7 @@ asyncTest('should return changes in _changes if myRevision >= 0', () => {
   syncNode.myRevision = -1;
   syncNode.dbUploadState = null;
   syncNode.remoteBaseRevisions = [];
-  const getLocalChangesForNode = initGetLocalChangesForNode(db, hasMoreToGive);
+  const getLocalChangesForNode = initGetLocalChangesForNode(db, hasMoreToGive, 10);
   const fooTableObject1 = {
     id: 1,
     foo: 'bar'
@@ -107,4 +107,68 @@ asyncTest('should return changes in _changes if myRevision >= 0', () => {
       ok(false, "Error: " + err);
     })
     .finally(start);
+});
+
+asyncTest('should return partial changes in _changes if myRevision >= 0 and threshold was reached', () => {
+  syncNode.myRevision = -1;
+  syncNode.dbUploadState = null;
+  syncNode.remoteBaseRevisions = [];
+  hasMoreToGive.hasMoreToGive = false;
+  const getLocalChangesForNode = initGetLocalChangesForNode(db, hasMoreToGive, 1);
+  const fooTableObject1 = {
+    id: 1,
+    foo: 'bar'
+  };
+  const fooTableObject2 = {
+    id: 2,
+    foo: 'foobar'
+  };
+  function cb(changes/*, remoteBaseRevision, partial, nodeModificationsOnAck*/) {
+    strictEqual(changes.length, 1, 'We have 1 change');
+    deepEqual(changes, [{
+      key: 1,
+      obj: fooTableObject1,
+      type: CREATE,
+      table: 'foo'
+    }], 'Changes match the objects in the tables');
+    deepEqual(hasMoreToGive, {hasMoreToGive: true}, 'it should change hasMoreToGive');
+  }
+  // This also adds changes to _changes
+  db.foo.bulkAdd([fooTableObject1, fooTableObject2])
+      .then(() => {
+        return getLocalChangesForNode(syncNode, cb);
+      })
+      .catch(function(err) {
+        ok(false, "Error: " + err);
+      })
+      .finally(start);
+});
+
+asyncTest('should not return any changed if the threshold is 0 but should set hasMoreToGive to true', () => {
+  syncNode.myRevision = -1;
+  syncNode.dbUploadState = null;
+  syncNode.remoteBaseRevisions = [];
+  hasMoreToGive.hasMoreToGive = false;
+  const getLocalChangesForNode = initGetLocalChangesForNode(db, hasMoreToGive, 0);
+  const fooTableObject1 = {
+    id: 1,
+    foo: 'bar'
+  };
+  const fooTableObject2 = {
+    id: 2,
+    foo: 'foobar'
+  };
+  function cb(changes/*, remoteBaseRevision, partial, nodeModificationsOnAck*/) {
+    strictEqual(changes.length, 0, 'We have 0 changes');
+    deepEqual(hasMoreToGive, {hasMoreToGive: true}, 'it should change hasMoreToGive');
+  }
+  // This also adds changes to _changes
+  db.foo.bulkAdd([fooTableObject1, fooTableObject2])
+      .then(() => {
+        return getLocalChangesForNode(syncNode, cb);
+      })
+      .catch(function(err) {
+        ok(false, "Error: " + err);
+      })
+      .finally(start);
 });
