@@ -127,9 +127,6 @@ export interface ReactiveContinuation {
 }
 
 export enum SyncStatus {
-    /** An error occured such as net down but the sync provider will retry to connect. */
-    ERROR_WILL_RETRY = -2,
-
     /** An irrepairable error occurred and the sync provider is dead. */
     ERROR = -1,
 
@@ -144,5 +141,8 @@ export enum SyncStatus {
 
     /** Syncing with server. For poll pattern, this is every poll call.
      * For react pattern, this is when local changes are being sent to server. */
-    SYNCING = 3
+    SYNCING = 3,
+
+    /** An error occured such as net down but the sync provider will retry to connect. */
+    ERROR_WILL_RETRY = 4
 }
