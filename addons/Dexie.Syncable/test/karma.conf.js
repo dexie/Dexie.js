@@ -29,6 +29,7 @@ module.exports = function(config) {
 
       // Integration tests for Dexie.Syncable
       'addons/Dexie.Syncable/test/tests-syncable.js',
+      'addons/Dexie.Syncable/test/tests-syncable-partials.js',
       'addons/Dexie.Syncable/test/tests-syncprovider.js',
       'addons/Dexie.Syncable/test/tests-WebSocketSyncServer.js',
 
