@@ -21,7 +21,11 @@ import initDeletingHook from './hooks/deleting';
 import initOverrideCreateTransaction from './override-create-transaction';
 import initWakeupObservers from './wakeup-observers';
 
+import initOnStorage from './on-storage';
+
 import overrideParseStoresSpec from './override-parse-stores-spec';
+
+import deleteOldChanges from './delete-old-changes';
 
 var global = self;
 
@@ -612,64 +616,9 @@ Observable.latestRevision = {}; // Latest revision PER DATABASE. Example: Observ
 Observable.on = Dexie.Events(null, "latestRevisionIncremented", "suicideNurseCall", "intercomm", "beforeunload"); // fire(dbname, value);
 Observable.createUUID = createUUID;
 
-Observable.deleteOldChanges = function(db) {
-    // This is a background job and should never be done within
-    // a caller's transaction. Use Dexie.ignoreTransaction() to ensure that.
-    // We should not return the Promise but catch it ourselves instead.
+Observable.deleteOldChanges = deleteOldChanges;
 
-    // To prohibit starving the database we want to lock transactions as short as possible
-    // and since we're not in a hurry, we could do this job in chunks and reschedule a 
-    // continuation every 500 ms.
-    const CHUNK_SIZE = 100;
-
-    Dexie.ignoreTransaction(()=>{
-        return db._syncNodes.orderBy("myRevision").first(oldestNode => {
-            return db._changes
-                .where("rev").below(oldestNode.myRevision)
-                .limit(CHUNK_SIZE)
-                .primaryKeys();
-        }).then(keysToDelete => {
-            if (keysToDelete.length === 0) return; // Done.
-            return db._changes.bulkDelete(keysToDelete).then(()=> {
-                // If not done garbage collecting, reschedule a continuation of it until done.
-                if (keysToDelete.length === CHUNK_SIZE) {
-                    // Limit reached. Changes are there are more job to do. Schedule again:
-                    setTimeout(() => db.isOpen() && Observable.deleteOldChanges(db), 500);
-                }
-            });
-        });
-    }).catch(()=>{
-        // The operation is not crucial. A failure could almost only be due to that database has been closed.
-        // No need to log this.
-    });
-};
-
-Observable._onStorage = function onStorage(event) {
-    // We use the onstorage event to trigger onLatestRevisionIncremented since we will wake up when other windows modify the DB as well!
-    if (event.key.indexOf("Dexie.Observable/") === 0) { // For example "Dexie.Observable/latestRevision/FriendsDB"
-        var parts = event.key.split('/');
-        var prop = parts[1];
-        var dbname = parts[2];
-        if (prop === 'latestRevision') {
-            var rev = parseInt(event.newValue, 10);
-            if (!isNaN(rev) && rev > Observable.latestRevision[dbname]) {
-                Observable.latestRevision[dbname] = rev;
-                Dexie.ignoreTransaction(function() {
-                    Observable.on('latestRevisionIncremented').fire(dbname, rev);
-                });
-            }
-        } else if (prop.indexOf("deadnode:") === 0) {
-            var nodeID = parseInt(prop.split(':')[1], 10);
-            if (event.newValue) {
-                Observable.on.suicideNurseCall.fire(dbname, nodeID);
-            }
-        } else if (prop === 'intercomm') {
-            if (event.newValue) {
-                Observable.on.intercomm.fire(dbname);
-            }
-        }
-    }
-};
+Observable._onStorage = initOnStorage(Observable);
 
 Observable._onBeforeUnload = function() {
     Observable.on.beforeunload.fire();
