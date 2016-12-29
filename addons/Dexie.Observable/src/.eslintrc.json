@@ -1,0 +1,35 @@
+{
+  "extends": "eslint:recommended",
+  "parserOptions": {
+    "ecmaVersion": 6,
+    "sourceType": "module",
+    "ecmaFeatures": {
+    }
+  },
+  "rules": {
+    "no-undef": ["error"],
+    "no-unused-vars": 1,
+    "no-console": 0,
+    "no-empty": 0
+  },
+  "globals": {
+    "indexedDB": false,
+    "IDBKeyRange": false,
+    "setTimeout": false,
+    "clearTimeout": false,
+    "Symbol": false,
+    "setImmediate": false,
+    "console": false,
+    "self": false,
+    "window": false,
+    "global": false,
+    "navigator": false,
+    "location": false,
+    "chrome": false,
+    "document": false,
+    "MutationObserver": false,
+    "CustomEvent": false,
+    "dispatchEvent": false,
+    "localStorage": false
+  }
+}

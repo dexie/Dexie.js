@@ -3,7 +3,7 @@
 console.log("Building...");
 
 build([{
-    dirs: ["src/"],
+    dirs: ["src/", "src/hooks/"],
     bundles: {
         "src/Dexie.Observable.js": [
             "dist/dexie-observable.js",
@@ -15,6 +15,21 @@ build([{
             "dist/dexie-observable.d.ts"
         ]
     }
+},{
+    //
+    // Tests
+    //
+    dirs: ["test/unit/", "test/unit/hooks/"],
+    bundles: {
+        "test/unit/unit-tests-all.js": [
+            "test/unit/bundle.js",
+            "test/unit/bundle.js.map"
+        ]
+    },
+    excludes: [
+        "test/unit/karma-env.js",
+        "test/unit/karma.conf.js"
+    ]
 }]).then(()=> {
     console.log("All files successfully built.");
 }).catch(err => {
