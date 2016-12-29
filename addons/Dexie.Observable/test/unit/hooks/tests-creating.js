@@ -51,6 +51,7 @@ asyncTest('should create a UUID key if $$ was given', () => {
           strictEqual(changes[0].key, resKey, 'Key should match');
           strictEqual(changes[0].type, CREATE, 'CREATE type');
           strictEqual(changes[0].table, 'bar', 'bar table');
+          // Normally $$ would be removed from the id in overrideParseStoresSpec
           deepEqual(changes[0].obj, {foo: 'bar', $$id: resKey}, 'obj should match');
           strictEqual(changes[0].source, null, 'We have no source');
           ok(typeof trans._lastWrittenRevision !== 'undefined', '_lastWrittenRevision should be defined');
