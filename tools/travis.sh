@@ -11,6 +11,10 @@ printf "Running eslint Dexie.Syncable src\n"
 $(npm bin)/eslint --config "addons/Dexie.Syncable/src/.eslintrc.json" "addons/Dexie.Syncable/src"
 printf "eslint ok.\n\n"
 
+printf "Running eslint Dexie.Observable src\n"
+$(npm bin)/eslint --config "addons/Dexie.Observable/src/.eslintrc.json" "addons/Dexie.Observable/src"
+printf "eslint ok.\n\n"
+
 #
 # Build
 #
@@ -41,17 +45,15 @@ printf "Testing Dexie\n"
 $(npm bin)/karma start test/karma.travis.conf.js --single-run
 printf "Dexie tests done.\n\n"
 
-## TODO: add Dexie.Observable once we have tests for it
-#for addon in "${addons[@]}"
-#do
-addon="Dexie.Syncable"
-
-dir="${ADDONS_DIR}${addon}"
-cd ${dir}
-printf "Testing ${addon}\n"
-$(npm bin)/karma start test/karma.travis.conf.js --single-run
-printf "${addon} tests done.\n\n"
-cd -
-#done
+# Run tests for addons
+for addon in "${addons[@]}"
+do
+    dir="${ADDONS_DIR}${addon}"
+    cd ${dir}
+    printf "Testing ${addon}\n"
+    $(npm bin)/karma start test/karma.travis.conf.js --single-run
+    printf "${addon} tests done.\n\n"
+    cd -
+done
 
 printf "Done.\n"
