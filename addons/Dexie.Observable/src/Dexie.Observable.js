@@ -14,14 +14,11 @@
 import Dexie from 'dexie';
 import { nop, promisableChain, createUUID } from './utils';
 
-import initCreatingHook from './hooks/creating';
-import initUpdatingHook from './hooks/updating';
-import initDeletingHook from './hooks/deleting';
-
 import initOverrideCreateTransaction from './override-create-transaction';
 import initWakeupObservers from './wakeup-observers';
-
+import initCrudMonitor from './hooks/crud-monitor';
 import initOnStorage from './on-storage';
+import initOverrideOpen from './override-open';
 
 import overrideParseStoresSpec from './override-parse-stores-spec';
 
@@ -43,7 +40,6 @@ var DatabaseChange = Dexie.defineClass({
     mods: Object, // UPDATE: mods contains the modifications made to the object.
     oldObj: Object // DELETE: oldObj contains the object deleted. UPDATE: oldObj contains the old object before updates applied.
 });
-
 
 // Import some usable helper functions
 var override = Dexie.override;
@@ -96,6 +92,8 @@ export default function Observable(db) {
 
     const wakeupObservers = initWakeupObservers(db, Observable, localStorage);
     const overrideCreateTransaction = initOverrideCreateTransaction(db, wakeupObservers);
+    const crudMonitor = initCrudMonitor(db);
+    const overrideOpen = initOverrideOpen(db, SyncNode, crudMonitor);
 
     var mySyncNode = null;
 
@@ -148,23 +146,10 @@ export default function Observable(db) {
     // window with the same database name has been created already, this static property will already be set correctly.
     Observable.latestRevision[db.name] = Observable.latestRevision[db.name] || 0;
 
-    db.open = override(db.open, origOpen => {
-        return function () {
-            //
-            // Make sure to subscribe to "creating", "updating" and "deleting" hooks for all observable tables that were created in the stores() method.
-            //
-            Object.keys(db._allTables).forEach(tableName => {
-                let table = db._allTables[tableName];
-                if (table.schema.observable) { 
-                    crudMonitor(table);
-                }
-                if (table.name === "_syncNodes") {
-                    table.mapToClass(SyncNode);
-                }
-            });
-            return origOpen.apply(this, arguments);            
-        }
-    });
+    //
+    // Override open to setup hooks for db changes and map the _syncNodes table to class
+    //
+    db.open = override(db.open, overrideOpen);
 
     db.close = override(db.close, function(origClose) {
         return function () {
@@ -207,24 +192,6 @@ export default function Observable(db) {
             });
         };
     });
-
-    
-
-    //
-    // The Creating/Updating/Deleting hook will make sure any change is stored to the changes table
-    //
-    function crudMonitor(table) {
-        /// <param name="table" type="db.Table"></param>
-        if (table.hook._observing) return;
-        table.hook._observing = true;
-
-        const tableName = table.name;
-        table.hook('creating').subscribe(initCreatingHook(db, table));
-
-        table.hook('updating').subscribe(initUpdatingHook(db, tableName));
-
-        table.hook('deleting').subscribe(initDeletingHook(db, tableName));
-    }
 
     // When db opens, make sure to start monitor any changes before other db operations will start.
     db.on("ready", function startObserving() {
