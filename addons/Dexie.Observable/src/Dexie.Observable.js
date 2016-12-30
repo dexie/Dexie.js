@@ -463,13 +463,13 @@ export default function Observable(db) {
         /// <param name="destinationNode" type="Number">ID of destination node</param>
         /// <param name="options" type="Object" optional="true">{wantReply: Boolean, isFailure: Boolean, requestId: Number}. If wantReply, the returned promise will complete with the reply from remote. Otherwise it will complete when message has been successfully sent.</param>
         options = options || {};
-        var msg = { message: message, destinationNode: destinationNode, sender: mySyncNode.id, type: type };
-        Dexie.extend(msg, options); // wantReply: wantReply, success: !isFailure, requestId: ...
         if (!mySyncNode)
             return options.wantReply ?
                 Promise.reject(new Dexie.DatabaseClosedError()) :
                 Promise.resolve(); // If caller dont want reply, it wont catch errors either.
-
+        
+        var msg = { message: message, destinationNode: destinationNode, sender: mySyncNode.id, type: type };
+        Dexie.extend(msg, options); // wantReply: wantReply, success: !isFailure, requestId: ...
         return Dexie.ignoreTransaction(()=>{
             var tables = ["_intercomm"];
             if (options.wantReply) tables.push("_syncNodes"); // If caller wants a reply, include "_syncNodes" in transaction to check that there's a reciever there. Otherwise, new master will get it.
