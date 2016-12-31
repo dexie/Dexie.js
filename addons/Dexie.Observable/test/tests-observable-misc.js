@@ -99,7 +99,7 @@
     let senderID;
     let receiverID;
     db2.on('message', (msg) => {
-      strictEqual(msg.foo, 'foobar', 'We got the correct message');
+      strictEqual(msg.message, 'foobar', 'We got the correct message');
       strictEqual(msg.sender, senderID, 'We got the right sender ID');
       strictEqual(msg.type, 'request', 'We got the correct type');
       strictEqual(msg.destinationNode, receiverID, 'We got the correct destination node');
@@ -117,7 +117,7 @@
         })
         .then((arr) => {
           receiverID = arr.filter((node) => node.id !== senderID)[0].id;
-          db1.observable.sendMessage('request', {foo: 'foobar'}, receiverID, {});
+          db1.observable.sendMessage('request', 'foobar', receiverID, {});
         })
         .catch((e) => {
           ok(false, 'Error: ' + e);
@@ -128,7 +128,7 @@
     const db1 = createDB();
     let senderID;
     db1.on('message', (msg) => {
-      strictEqual(msg.foo, 'foobar', 'We got the correct message');
+      deepEqual(msg.message, {foo: 'foobar'}, 'We got the correct message');
       strictEqual(msg.sender, senderID, 'We got the right sender ID');
       strictEqual(msg.type, 'request', 'We got the correct type');
       strictEqual(msg.destinationNode, senderID, 'We got the correct destination node');
@@ -203,7 +203,7 @@
     let senderID;
     let receiverID;
     db2.on('message', (msg) => {
-      strictEqual(msg.foo, 'foobar', 'We got the correct message');
+      deepEqual(msg.message, {foo: 'foobar'}, 'We got the correct message');
       strictEqual(msg.sender, senderID, 'We got the right sender ID');
       strictEqual(msg.type, 'request', 'We got the correct type');
       strictEqual(msg.destinationNode, receiverID, 'We got the correct destination node');
@@ -235,7 +235,7 @@
     let receiverID;
 
     db1.on('message', (msg) => {
-        strictEqual(msg.foo, 'foobar', 'We got the correct message');
+        deepEqual(msg.message, {foo: 'foobar'}, 'We got the correct message');
         strictEqual(msg.sender, senderID, 'We got the right sender ID');
         strictEqual(msg.type, 'broadcast', 'We got the correct type');
         strictEqual(msg.destinationNode, senderID, 'We got the correct destination node');
@@ -265,7 +265,7 @@
     let senderID;
     let receiverID;
     db2.on('message', (msg) => {
-      strictEqual(msg.foo, 'foobar', 'We got the correct message');
+      deepEqual(msg.message, {foo: 'foobar'}, 'We got the correct message');
       strictEqual(msg.sender, senderID, 'We got the right sender ID');
       strictEqual(msg.type, 'request', 'We got the correct type');
       strictEqual(msg.destinationNode, receiverID, 'We got the correct destination node');

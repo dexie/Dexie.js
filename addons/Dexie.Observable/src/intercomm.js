@@ -121,9 +121,6 @@ export default function initIntercomm(db, Observable, SyncNode, mySyncNode, loca
       msg.reject = function (error) {
         db.observable.sendMessage('response', {error: error.toString()}, msg.sender, {isFailure: true, requestId: msg.id});
       };
-      var message = msg.message;
-      delete msg.message;
-      Dexie.extend(msg, message);
       db.on.message.fire(msg);
     }
   }
