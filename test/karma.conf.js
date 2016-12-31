@@ -26,7 +26,7 @@ module.exports = function(config) {
 
     port: 19144,
     //captureTimeout: 30 * 1000,
-    //browserNoActivityTimeout: 10 * 60 * 1000,
+    browserNoActivityTimeout: 2 * 60 * 1000,
     colors: true,
 
     // level of logging

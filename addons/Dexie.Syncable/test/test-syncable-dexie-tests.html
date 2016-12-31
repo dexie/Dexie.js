@@ -81,6 +81,7 @@
                             console.log("Calling db.sync() on " + db.name);
                             db.syncable.connect("logger", "logger").then(function() {
                                 console.log("connect() promise was resolved (database=" + db.name + ")");
+                            }).catch('DatabaseClosedError', function(){
                             }).catch(function(err) {
                                 console.error("Error from connect() (database=" + db.name + "): " + err.stack || err);
                             });

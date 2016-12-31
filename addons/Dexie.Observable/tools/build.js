@@ -10,6 +10,9 @@ build([{
             "dist/dexie-observable.js.map",
             "dist/dexie-observable.min.js",
             "dist/dexie-observable.min.js.map"
+        ],
+        "src/Dexie.Observable.d.ts": [
+            "dist/dexie-observable.d.ts"
         ]
     }
 }]).then(()=> {

@@ -347,11 +347,11 @@ function resolveConflicts(clientChanges, serverChangeSet) {
                     // Server and client has updated the same obejct. Just remove any overlapping keyPaths and only apply non-conflicting parts.
                     Object.keys(serverChange.mods).forEach(function (keyPath) {
                         // Remote this property from the client change
-                        delete clientChange[keyPath];
+                        delete clientChange.mods[keyPath];
                         // Also, remote all changes to nestled objects under this keyPath from the client change:
                         Object.keys(clientChange.mods).forEach(function (clientKeyPath) {
                             if (clientKeyPath.indexOf(keyPath + '.') == 0) {
-                                delete clientChange[clientKeyPath];
+                                delete clientChange.mods[clientKeyPath];
                             }
                         });
                     });
@@ -394,7 +394,7 @@ function combineUpdateAndUpdate(prevChange, nextChange) {
         // If prev-change was changing a parent path of this keyPath, we must update the parent path rather than adding this keyPath
         var hadParentPath = false;
         Object.keys(prevChange.mods).filter(function (parentPath) { return keyPath.indexOf(parentPath + '.') === 0 }).forEach(function (parentPath) {
-            setByKeyPath(clonedChange[parentPath], keyPath.substr(parentPath.length + 1), nextChange.mods[keyPath]);
+            setByKeyPath(clonedChange.mods[parentPath], keyPath.substr(parentPath.length + 1), nextChange.mods[keyPath]);
             hadParentPath = true;
         });
         if (!hadParentPath) {
@@ -404,7 +404,7 @@ function combineUpdateAndUpdate(prevChange, nextChange) {
         // In case prevChange contained sub-paths to the new keyPath, we must make sure that those sub-paths are removed since
         // we must mimic what would happen if applying the two changes after each other:
         Object.keys(prevChange.mods).filter(function (subPath) { return subPath.indexOf(keyPath + '.') === 0 }).forEach(function (subPath) {
-            delete clonedChange[subPath];
+            delete clonedChange.mods[subPath];
         });
     });
     return clonedChange;

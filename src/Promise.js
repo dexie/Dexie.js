@@ -264,6 +264,9 @@ props(Promise.prototype, {
     }
 });
 
+if (typeof Symbol !== 'undefined' && Symbol.toStringTag)
+    setProp(Promise.prototype, Symbol.toStringTag, 'Promise');
+
 // Now that Promise.prototype is defined, we have all it takes to set globalPSD.env.
 // Environment globals snapshotted on leaving global zone
 globalPSD.env = snapShot();
