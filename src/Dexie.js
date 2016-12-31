@@ -90,7 +90,10 @@ export default function Dexie(dbName, options) {
     var globalSchema = this._dbSchema = {};
     var versions = [];
     var dbStoreNames = [];
+	// Store of currently-accessible Tables.
     var allTables = {};
+	// Repository for previously-defined tables.
+	var tableCache = {};
     ///<var type="IDBDatabase" />
     var idbdb = null; // Instance of IDBDatabase
     var dbOpenError = null;
@@ -979,12 +982,13 @@ export default function Dexie(dbName, options) {
         this.name = name;
         this.schema = tableSchema;
         this._tx = optionalTrans;
-        this.hook = allTables[name] ? allTables[name].hook : Events(null, {
+        this.hook = tableCache[name] ? tableCache[name].hook : Events(null, {
             "creating": [hookCreatingChain, nop],
             "reading": [pureFunctionChain, mirror],
             "updating": [hookUpdatingChain, nop],
             "deleting": [hookDeletingChain, nop]
         });
+		tableCache[this.name] = this;
     }
 
     function BulkErrorHandlerCatchAll(errorList, done, supportHooks) {
