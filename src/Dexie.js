@@ -90,10 +90,10 @@ export default function Dexie(dbName, options) {
     var globalSchema = this._dbSchema = {};
     var versions = [];
     var dbStoreNames = [];
-	// Store of currently-accessible Tables.
+    // Store of currently-accessible Tables.
     var allTables = {};
-	// Repository for previously-defined tables.
-	var tableCache = {};
+    // Repository for previously-defined tables.
+    var tableCache = {};
     ///<var type="IDBDatabase" />
     var idbdb = null; // Instance of IDBDatabase
     var dbOpenError = null;
@@ -272,10 +272,10 @@ export default function Dexie(dbName, options) {
             return version / 10;
         }
     });
-    
+
     // Takes oldVersion number, upgrade transaction, and rejection callback.
     // oldVersion is Dexie db number
-    function doUpgrade(version, idbtrans, reject) { 
+    function doUpgrade(version, idbtrans, reject) {
         let trans = db._createTransaction("readwrite", []);
         trans.create(idbtrans);
         trans._completion.catch(reject);
@@ -299,7 +299,7 @@ export default function Dexie(dbName, options) {
         let stores = relevantVersions
             .map(v => Version.get(v)._cfg.storesSource)
             .reduce((target, current) => {
-                return Object.assign(target, current);
+                return extend(target, current);
             });
         let schema = TableSchema.fromVersionStores(stores);
         // Set the API here for the on.populate call.
@@ -310,16 +310,16 @@ export default function Dexie(dbName, options) {
         trans.create(idbtrans);
         trans._completion.catch(reject);
         var rejectTransaction = trans._reject.bind(trans);
-        newScope(function () {
-            PSD.trans = trans;
-            // Create tables:
-            for (let name in schema) {
-                let table = schema[name];
-                createTable(idbtrans, name, table.primKey, table.indexes);
-            }
+        newScope(() => {
+            // Diff with empty initial db.
+            let diff = TableSchema.diff({}, schema);
+            // Add tables
+            diff.add.forEach((tuple) => {
+                createTable(idbtrans, tuple[0], tuple[1].primKey, tuple[1].indexes);
+            });
             Promise.follow(() => db.on.populate.fire(trans))
                 .catch(rejectTransaction);
-        });
+        }, { trans: trans });
     }
 
     /**
@@ -491,7 +491,7 @@ export default function Dexie(dbName, options) {
             dbReadyPromise.then(resolve, reject);
         }).then(fn);
     };
-    
+
     //
     //
     //
@@ -528,7 +528,7 @@ export default function Dexie(dbName, options) {
                 // Do subsequent upgrades.
                 if (next_version) {
                     // Close database and then open at next version.
-                    db._close();
+                    db._close(idbdb);
                     resolve(db._open(next_version, max_version));
                 } else {
                     resolve(idbdb);
@@ -541,6 +541,16 @@ export default function Dexie(dbName, options) {
     function setInterfaces(idbdb) {
         db.verno = Version.dbToDexie(idbdb.version);
         let schema = TableSchema.fromDb(idbdb);
+        if (idbdb.objectStoreNames.length > 0) {
+            try {
+                let storeNames = safariMultiStoreFix(idbdb.objectStoreNames);
+                adjustToExistingIndexNames(schema,
+                    idbdb.transaction(storeNames, READONLY));
+            } catch (e) {
+                // Safari may bail out if > 1 store names. However, this shouldnt be
+                // a showstopper. Issue #120.
+            }
+        }
         db._dbSchema = schema;
         removeTablesApi([allTables, db, Transaction.prototype]);
         setApiOnPlace([allTables, db, Transaction.prototype], schema);
@@ -553,13 +563,13 @@ export default function Dexie(dbName, options) {
         connections.push(db);
 
         setInterfaces(idbdb);
-        
+
         idbdb.onversionchange = wrap(ev => {
             // detect implementations that not support versionchange (IE/Edge/Safari)
             db._vcFired = true;
             db.on("versionchange").fire(ev);
         });
-        
+
         if (!hasNativeGetDatabaseNames) {
             // Update localStorage with list of database names
             globalDatabaseList((databaseNames) => {
@@ -579,9 +589,9 @@ export default function Dexie(dbName, options) {
         dbOpenError = null;
         // Let stacks point to when open() was called rather than where new Dexie() was called.
         Debug.debug && (openCanceller._stackHolder = Debug.getErrorWithStack());
-        
+
         openComplete = false;
-        
+
         // Function pointers to call when the core opening process completes.
         var resolveDbReady = dbReadyResolve;
         // Either we get closed or the open/upgrade finishes.
@@ -603,7 +613,7 @@ export default function Dexie(dbName, options) {
                 // Set to be aborted if needed later on.
                 upgradeTransaction = req.transaction;
                 let latestVersion = Version.getMax(max_version);
-                
+
                 if (latestVersion) {
                     // Set up the database with the given version.
                     create(latestVersion, upgradeTransaction, reject);
@@ -639,7 +649,7 @@ export default function Dexie(dbName, options) {
                     // allow the empty database.
                 }
             }, reject);
-            
+
             // Database is open, upgrade through versions if needed.
             req.onsuccess = wrap((e) => {
                 upgradeTransaction = null;
@@ -698,7 +708,7 @@ export default function Dexie(dbName, options) {
             resolveDbReady();
         });
     };
-    
+
     // Internal close.
     this._close = function (db) {
         db.close();
@@ -706,7 +716,7 @@ export default function Dexie(dbName, options) {
 
     this.close = function () {
         var idx = connections.indexOf(db);
-        if (idx >= 0) connections.splice(idx, 1);        
+        if (idx >= 0) connections.splice(idx, 1);
         if (idbdb) {
             try {idbdb.close();} catch(e){}
             idbdb = null;
@@ -724,7 +734,7 @@ export default function Dexie(dbName, options) {
             cancelOpen = reject;
         });
     };
-    
+
     this.delete = function () {
         var hasArguments = arguments.length > 0;
         return new Promise(function (resolve, reject) {
@@ -790,7 +800,7 @@ export default function Dexie(dbName, options) {
                 if (openComplete) {
                     // Database already open. Call subscriber asap.
                     if (!dbOpenError) Promise.resolve().then(subscriber);
-                    // bSticky: Also subscribe to future open sucesses (after close / reopen) 
+                    // bSticky: Also subscribe to future open sucesses (after close / reopen)
                     if (bSticky) subscribe(subscriber);
                 } else if (onReadyBeingFired) {
                     // db.on('ready') subscribers are currently being executed and have not yet resolved or rejected
@@ -808,7 +818,7 @@ export default function Dexie(dbName, options) {
             });
         }
     });
-    
+
     this.transaction = function () {
         /// <summary>
         ///
@@ -820,7 +830,7 @@ export default function Dexie(dbName, options) {
         var args = extractTransactionArgs.apply(this, arguments);
         return this._transaction.apply(this, args);
     }
-    
+
     function extractTransactionArgs (mode, _tableArgs_, scopeFunc) {
         // Let table arguments be all arguments between mode and last argument.
         var i = arguments.length;
@@ -841,7 +851,7 @@ export default function Dexie(dbName, options) {
         if (!parentTransaction || parentTransaction.db !== db || mode.indexOf('!') !== -1) parentTransaction = null;
         var onlyIfCompatible = mode.indexOf('?') !== -1;
         mode = mode.replace('!', '').replace('?', ''); // Ok. Will change arguments[0] as well but we wont touch arguments henceforth.
-        
+
         try {
             //
             // Get storeNames from arguments. Either through given table instances, or through given table names.
@@ -867,7 +877,7 @@ export default function Dexie(dbName, options) {
                 if (parentTransaction.mode === READONLY && mode === READWRITE) {
                     if (onlyIfCompatible) {
                         // Spawn new transaction instead.
-                        parentTransaction = null; 
+                        parentTransaction = null;
                     }
                     else throw new exceptions.SubTransaction("Cannot enter a sub-transaction with READWRITE mode when parent transaction is READONLY");
                 }
@@ -876,7 +886,7 @@ export default function Dexie(dbName, options) {
                         if (parentTransaction && parentTransaction.storeNames.indexOf(storeName) === -1) {
                             if (onlyIfCompatible) {
                                 // Spawn new transaction instead.
-                                parentTransaction = null; 
+                                parentTransaction = null;
                             }
                             else throw new exceptions.SubTransaction("Table " + storeName +
                                 " not included in parent transaction.");
@@ -902,7 +912,7 @@ export default function Dexie(dbName, options) {
                 // Promise.follow() should not wait for it if so.
                 usePSD(PSD.transless, ()=>db._whenReady(enterTransactionScope)) :
                 db._whenReady (enterTransactionScope));
-            
+
         function enterTransactionScope() {
             return Promise.resolve().then(()=>{
                 // Keep a pointer to last non-transactional PSD to use if someone calls Dexie.ignoreTransaction().
@@ -948,7 +958,7 @@ export default function Dexie(dbName, options) {
                         x // Transaction still active. Continue.
                         : rejection(new exceptions.PrematureCommit(
                             "Transaction committed too early. See http://bit.ly/2eVASrf")))
-                    // No promise returned. Wait for all outstanding promises before continuing. 
+                    // No promise returned. Wait for all outstanding promises before continuing.
                     : promiseFollowed.then(()=>returnValue)
                 ).then(x => {
                     // sub transactions don't react to idbtrans.oncomplete. We must trigger a completion:
@@ -988,7 +998,7 @@ export default function Dexie(dbName, options) {
             "updating": [hookUpdatingChain, nop],
             "deleting": [hookDeletingChain, nop]
         });
-		tableCache[this.name] = this;
+        tableCache[this.name] = this;
     }
 
     function BulkErrorHandlerCatchAll(errorList, done, supportHooks) {
@@ -1034,7 +1044,7 @@ export default function Dexie(dbName, options) {
                 });
             }
         });
-    }    
+    }
 
     props(Table.prototype, {
 
@@ -1082,14 +1092,14 @@ export default function Dexie(dbName, options) {
                 return new WhereClause(this, indexOrCrit);
             if (isArray(indexOrCrit))
                 return new WhereClause(this, `[${indexOrCrit.join('+')}]`);
-            // indexOrCrit is an object map of {[keyPath]:value} 
+            // indexOrCrit is an object map of {[keyPath]:value}
             var keyPaths = keys(indexOrCrit);
             if (keyPaths.length === 1)
                 // Only one critera. This was the easy case:
                 return this
                     .where(keyPaths[0])
                     .equals(indexOrCrit[keyPaths[0]]);
-            
+
             // Multiple criterias.
             // Let's try finding a compound index that matches all keyPaths in
             // arbitrary order:
@@ -1108,7 +1118,7 @@ export default function Dexie(dbName, options) {
             if (!compoundIndex) console.warn(
                 `The query ${JSON.stringify(indexOrCrit)} on ${this.name} would benefit of a ` +
                 `compound index [${keyPaths.join('+')}]`);
-                
+
             // Ok, now let's fallback to finding at least one matching index
             // and filter the rest.
             var idxByName = this.schema.idxByName;
@@ -1121,7 +1131,7 @@ export default function Dexie(dbName, options) {
                             ''+indexOrCrit[keyPath])
                     : r[1]
                 ], [null, null]);
-    
+
             var idx = simpleIndex[0];
             return idx ?
                 this.where(idx.name).equals(indexOrCrit[idx.keyPath])
@@ -1253,7 +1263,7 @@ export default function Dexie(dbName, options) {
                 } else {
                     var effectiveKeys = keys || idbstore.keyPath && objects.map(o=>getByKeyPath(o, idbstore.keyPath));
                     // Generate map of {[key]: object}
-                    var objectLookup = effectiveKeys && arrayToObject(effectiveKeys, (key, i) => key != null && [key, objects[i]]); 
+                    var objectLookup = effectiveKeys && arrayToObject(effectiveKeys, (key, i) => key != null && [key, objects[i]]);
                     var promise = !effectiveKeys ?
 
                         // Auto-incremented key-less objects only without any keys argument.
@@ -1430,9 +1440,9 @@ export default function Dexie(dbName, options) {
                 var effectiveKey = (key !== undefined) ? key : (keyPath && getByKeyPath(obj, keyPath));
                 if (effectiveKey == null)  // "== null" means checking for either null or undefined.
                     return this.add(obj);
-                
+
                 // Since key is optional, make sure we get it from obj if not provided
-                
+
                 // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
                 // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
                 obj = deepClone(obj);
@@ -1514,7 +1524,7 @@ export default function Dexie(dbName, options) {
         // Store classes to be reset on Table initialization.
         _class_cache: {}
     });
-    
+
     //
     //
     //
@@ -1546,7 +1556,7 @@ export default function Dexie(dbName, options) {
             this._resolve = resolve;
             this._reject = reject;
         });
-        
+
         this._completion.then(
             ()=> {
                 this.active = false;
@@ -1761,7 +1771,7 @@ export default function Dexie(dbName, options) {
             var collection = collectionOrWhereClause instanceof WhereClause ?
                 new Collection (collectionOrWhereClause) :
                 collectionOrWhereClause;
-                
+
             collection._ctx.error = T ? new T(err) : new TypeError(err);
             return collection;
         }
@@ -2132,11 +2142,11 @@ export default function Dexie(dbName, options) {
             valueMapper: table.hook.reading.fire
         };
     }
-    
+
     function isPlainKeyRange (ctx, ignoreLimitFilter) {
         return !(ctx.filter || ctx.algorithm || ctx.or) &&
             (ignoreLimitFilter ? ctx.justLimit : !ctx.replayFilter);
-    }    
+    }
 
     props(Collection.prototype, function () {
 
@@ -2167,7 +2177,8 @@ export default function Dexie(dbName, options) {
          **/
         function getIndexOrStore(ctx, store) {
             if (ctx.isPrimKey) return store;
-            var indexSpec = ctx.table.schema.idxByName[ctx.index];
+            var indexSpec = ctx.table.schema.idxByName[ctx.index] ||
+                            ctx.table.schema.idxByKeyPath[ctx.index];
             if (!indexSpec) throw new exceptions.Schema("KeyPath " + ctx.index + " on object store " + store.name + " is not indexed");
             return store.index(indexSpec.name);
         }
@@ -2217,7 +2228,7 @@ export default function Dexie(dbName, options) {
         function getInstanceTemplate(ctx) {
             return ctx.table.schema.instanceTemplate;
         }
-        
+
         return {
 
             //
@@ -2272,7 +2283,7 @@ export default function Dexie(dbName, options) {
                         primaryKey = getByKeyPath(item, primKeyPath);
                     fn(item, {key: key, primaryKey: primaryKey});
                 }
-                
+
                 return this._read(function (resolve, reject, idbstore) {
                     iter(ctx, fn, resolve, reject, idbstore);
                 });
@@ -2418,10 +2429,10 @@ export default function Dexie(dbName, options) {
                 });
                 // match filters not used in Dexie.js but can be used by 3rd part libraries to test a
                 // collection for a match without querying DB. Used by Dexie.Observable.
-                addMatchFilter(this._ctx, filterFunction); 
+                addMatchFilter(this._ctx, filterFunction);
                 return this;
             },
-            
+
             and: function (filterFunction) {
                 return this.filter(filterFunction);
             },
@@ -2450,7 +2461,7 @@ export default function Dexie(dbName, options) {
                 this._ctx.unique = "unique";
                 return this.eachKey(cb);
             },
-            
+
             eachPrimaryKey: function (cb) {
                 var ctx = this._ctx;
                 ctx.keysOnly = !ctx.isMatch;
@@ -2467,7 +2478,7 @@ export default function Dexie(dbName, options) {
                     return a;
                 }).then(cb);
             },
-            
+
             primaryKeys: function (cb) {
                 var ctx = this._ctx;
                 if (hasGetAll && ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
@@ -2776,12 +2787,12 @@ export default function Dexie(dbName, options) {
     }
 
     function iterate(req, filter, fn, resolve, reject, valueMapper) {
-        
+
         // Apply valueMapper (hook('reading') or mappped class)
         var mappedFn = valueMapper ? (x,c,a) => fn(valueMapper(x),c,a) : fn;
         // Wrap fn with PSD and microtick stuff from Promise.
         var wrappedFn = wrap(mappedFn, reject);
-        
+
         if (!req.onerror) req.onerror = eventRejectHandler(reject);
         if (filter) {
             req.onsuccess = trycatcher(function filter_record() {
@@ -2952,7 +2963,7 @@ function eventSuccessHandler (resolve) {
 function hookedEventRejectHandler (reject) {
     return wrap(function (event) {
         // See comment on hookedEventSuccessHandler() why wrap() is needed only when supporting hooks.
-        
+
         var req = event.target,
             err = req.error,
             ctx = req._hookCtx,// Contains the hook error handler. Put here instead of closure to boost performance.
@@ -3067,6 +3078,8 @@ function TableSchema(name, primKey, indexes, instanceTemplate) {
     this.instanceTemplate = instanceTemplate;
     this.mappedClass = null;
     this.idxByName = arrayToObject(indexes, index => [index.name, index]);
+    this.idxByKeyPath = arrayToObject(indexes,
+        index => [index.compound ? index.src : index.keyPath, index]);
 }
 
 extend(TableSchema, {
@@ -3211,9 +3224,9 @@ props(Dexie, fullNameExceptions); // Dexie.XXXError = class XXXError {...};
 
 //
 // Static methods and properties
-// 
+//
 props(Dexie, {
-    
+
     //
     // Static delete() method.
     //
@@ -3226,7 +3239,7 @@ props(Dexie, {
         };
         return promise;
     },
-    
+
     //
     // Static exists() method.
     //
@@ -3236,7 +3249,7 @@ props(Dexie, {
             return true;
         }).catch(Dexie.NoSuchDatabaseError, () => false);
     },
-    
+
     //
     // Static method for retrieving a list of all existing databases at current host.
     //
@@ -3257,7 +3270,7 @@ props(Dexie, {
             }
         }).then(cb);
     },
-    
+
     defineClass: function (structure) {
         /// <summary>
         ///     Create a javascript constructor based on given template for which properties to expect in the class.
@@ -3274,9 +3287,9 @@ props(Dexie, {
         }
         return Class;
     },
-    
+
     applyStructure: applyStructure,
-    
+
     ignoreTransaction: function (scopeFunc) {
         // In case caller is within a transaction but needs to create a separate transaction.
         // Example of usage:
@@ -3303,7 +3316,7 @@ props(Dexie, {
             usePSD(PSD.transless, scopeFunc) : // Use the closest parent that was non-transactional.
             scopeFunc(); // No need to change scope because there is no ongoing transaction.
     },
-    
+
     vip: function (fn) {
         // To be used by subscribers to the on('ready') event.
         // This will let caller through to access DB even when it is blocked while the db.ready() subscribers are firing.
@@ -3342,7 +3355,7 @@ props(Dexie, {
             return rejection(e);
         }
     },
-    
+
     // Dexie.currentTransaction property
     currentTransaction: {
         get: () => PSD.trans || null
@@ -3352,16 +3365,16 @@ props(Dexie, {
         // If a function is provided, invoke it and pass the returning value to Transaction.waitFor()
         var promise = Promise.resolve(
             typeof promiseOrFunction === 'function' ? Dexie.ignoreTransaction(promiseOrFunction) : promiseOrFunction)
-            .timeout(optionalTimeout || 60000); // Default the timeout to one minute. Caller may specify Infinity if required.       
+            .timeout(optionalTimeout || 60000); // Default the timeout to one minute. Caller may specify Infinity if required.
 
         // Run given promise on current transaction. If no current transaction, just return a Dexie promise based
         // on given value.
         return PSD.trans ? PSD.trans.waitFor(promise) : promise;
     },
-    
+
     // Export our Promise implementation since it can be handy as a standalone Promise implementation
     Promise: Promise,
-    
+
     // Dexie.debug proptery:
     // Dexie.debug = false
     // Dexie.debug = true
@@ -3372,7 +3385,7 @@ props(Dexie, {
             Debug.setDebug(value, value === 'dexie' ? ()=>true : dexieStackFrameFilter);
         }
     },
-    
+
     // Export our derive/extend/override methodology
     derive: derive,
     extend: extend,
@@ -3394,14 +3407,14 @@ props(Dexie, {
     addons: [],
     // Global DB connection list
     connections: connections,
-    
+
     MultiModifyError: exceptions.Modify, // Backward compatibility 0.9.8. Deprecate.
     errnames: errnames,
-    
+
     // Export other static classes
     IndexSpec: IndexSpec,
     TableSchema: TableSchema,
-    
+
     //
     // Dependencies
     //
@@ -3416,14 +3429,14 @@ props(Dexie, {
         IDBKeyRange: idbshim.IDBKeyRange || _global.IDBKeyRange || _global.webkitIDBKeyRange,
         IDBObjectStore: idbshim.IDBObjectStore || _global.IDBObjectStore || _global.mozIDBObjectStore || _global.webkitIDBObjectStore
     },
-    
+
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
     semVer: DEXIE_VERSION,
     version: DEXIE_VERSION.split('.')
         .map(n => parseInt(n))
         .reduce((p,c,i) => p + (c/Math.pow(10,i*2))),
     fakeAutoComplete: fakeAutoComplete,
-    
+
     // https://github.com/dfahlander/Dexie.js/issues/186
     // typescript compiler tsc in mode ts-->es5 & commonJS, will expect require() to return
     // x.default. Workaround: Set Dexie.default = Dexie.
