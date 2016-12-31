@@ -26,9 +26,9 @@ syncNode.myRevision.toFixed();
 
 db.on('message', msg => {
 });
-db.sendMessage('myMsgType', {foo: 'bar'}, 13, {wantReply: true});
+db.observable.sendMessage('myMsgType', {foo: 'bar'}, 13, {wantReply: true});
 
-db.broadcastMessage('myBroadcastMsgType', {foo2: 'bar2'}, false);
+db.observable.broadcastMessage('myBroadcastMsgType', {foo2: 'bar2'}, false);
 
 db.on('changes', changes => {
     changes.forEach(change => {

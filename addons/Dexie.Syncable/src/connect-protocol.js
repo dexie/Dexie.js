@@ -30,7 +30,7 @@ export default function initConnectProtocol(db, protocolInstance, dbAliveID, opt
         node.save().then(()=> {
           db.syncable.on.statusChanged.fire(newStatus, url);
           // Also broadcast message to other nodes about the status
-          db.broadcastMessage("syncStatusChanged", {newStatus: newStatus, url: url}, false);
+          db.observable.broadcastMessage("syncStatusChanged", {newStatus: newStatus, url: url}, false);
         }).catch('DatabaseClosedError', ()=> {
         });
       }

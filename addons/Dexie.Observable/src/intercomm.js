@@ -16,7 +16,7 @@ export default function initIntercomm(db, Observable, SyncNode, mySyncNode, loca
    * @param {number} destinationNode ID of destination node
    * @param {{wantReply: boolean, isFailure: boolean, requestId: number}} options If {wantReply: true}, the returned promise will complete with the reply from remote. Otherwise it will complete when message has been successfully sent.</param>
    */
-  db.sendMessage = function (type, message, destinationNode, options) {
+  db.observable.sendMessage = function (type, message, destinationNode, options) {
     /// <param name="type" type="String">Type of message</param>
     /// <param name="message">Message to send</param>
     /// <param name="destinationNode" type="Number">ID of destination node</param>
@@ -74,14 +74,14 @@ export default function initIntercomm(db, Observable, SyncNode, mySyncNode, loca
   };
 
   // Send a message to all local _syncNodes
-  db.broadcastMessage = function (type, message, bIncludeSelf) {
+  db.observable.broadcastMessage = function (type, message, bIncludeSelf) {
     if (!mySyncNode.node) return;
     var mySyncNodeId = mySyncNode.node.id;
     Dexie.ignoreTransaction(()=> {
       db._syncNodes.toArray(nodes => {
         return Promise.all(nodes
             .filter(node => node.type === 'local' && (bIncludeSelf || node.id !== mySyncNodeId))
-            .map(node => db.sendMessage(type, message, node.id)));
+            .map(node => db.observable.sendMessage(type, message, node.id)));
       }).catch(()=> {
       });
     });
@@ -116,10 +116,10 @@ export default function initIntercomm(db, Observable, SyncNode, mySyncNode, loca
     } else {
       // This is a message or request. Fire the event and add an API for the subscriber to use if reply is requested
       msg.resolve = function (result) {
-        db.sendMessage('response', {result: result}, msg.sender, {requestId: msg.id});
+        db.observable.sendMessage('response', {result: result}, msg.sender, {requestId: msg.id});
       };
       msg.reject = function (error) {
-        db.sendMessage('response', {error: error.toString()}, msg.sender, {isFailure: true, requestId: msg.id});
+        db.observable.sendMessage('response', {error: error.toString()}, msg.sender, {isFailure: true, requestId: msg.id});
       };
       var message = msg.message;
       delete msg.message;

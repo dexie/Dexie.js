@@ -11,26 +11,27 @@ import { IDatabaseChange } from '../api';
 declare module 'dexie' {
     // Extend methods on db (db.sendMessage(), ...)
     interface Dexie {
-        sendMessage(
-            type: string,
-            message: any,
-            destinationNode: number,
-            options: {
-                wantReply?: boolean,
-                isFailure?: boolean,
-                requestId?: number
-            })
-        : Promise<any>;
-
-        broadcastMessage(
-            type: string,
-            message: any,
-            bIncludeSelf: boolean
-        ): void;
-
         // Placeholder where to access the SyncNode class constructor.
         // (makes it valid to do new db.observable.SyncNode())
-        observable: {SyncNode: Dexie.Observable.SyncNodeConstructor}
+        observable: {
+            SyncNode: Dexie.Observable.SyncNodeConstructor;
+            sendMessage(
+                type: string,
+                message: any,
+                destinationNode: number,
+                options: {
+                    wantReply?: boolean,
+                    isFailure?: boolean,
+                    requestId?: number
+                })
+                : Promise<any>;
+
+            broadcastMessage(
+                type: string,
+                message: any,
+                bIncludeSelf: boolean
+            ): void;
+        }
 
         readonly _localSyncNode: Dexie.Observable.SyncNode;
 

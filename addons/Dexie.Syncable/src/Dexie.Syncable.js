@@ -143,7 +143,7 @@ export default function Syncable (db) {
                     }));
                 } else {
                     return db._syncNodes.where('isMaster').above(0).first(masterNode => {
-                        return db.sendMessage('disconnect', { url: url }, masterNode.id, {wantReply: true});
+                        return db.observable.sendMessage('disconnect', { url: url }, masterNode.id, {wantReply: true});
                     });
                 }
             }).then(()=>{
