@@ -117,7 +117,7 @@
         })
         .then((arr) => {
           receiverID = arr.filter((node) => node.id !== senderID)[0].id;
-          db1.sendMessage('request', {foo: 'foobar'}, receiverID, {});
+          db1.observable.sendMessage('request', {foo: 'foobar'}, receiverID, {});
         })
         .catch((e) => {
           ok(false, 'Error: ' + e);
@@ -139,7 +139,7 @@
         .then((arr) => {
           senderID = arr[0].id;
           strictEqual(arr[0].isMaster, 1, 'We are master');
-          db1.sendMessage('request', {foo: 'foobar'}, 10, {wantReply: true});
+          db1.observable.sendMessage('request', {foo: 'foobar'}, 10, {wantReply: true});
         })
         .catch((e) => {
           ok(false, 'Error: ' + e);
@@ -162,7 +162,7 @@
         })
         .then((arr) => {
           receiverID = arr.filter((node) => node.id !== senderID)[0].id;
-          return db1.sendMessage('request', {foo: 'foobar'}, receiverID, {wantReply: true});
+          return db1.observable.sendMessage('request', {foo: 'foobar'}, receiverID, {wantReply: true});
         })
         .then((result) => {
           strictEqual(result, 'reply msg', 'We got the correct result msg');
@@ -189,7 +189,7 @@
         })
         .then((arr) => {
           receiverID = arr.filter((node) => node.id !== senderID)[0].id;
-          return db1.sendMessage('request', {foo: 'foobar'}, receiverID, {wantReply: true});
+          return db1.observable.sendMessage('request', {foo: 'foobar'}, receiverID, {wantReply: true});
         })
         .catch((msg) => {
           strictEqual(msg, 'error msg');
@@ -221,7 +221,7 @@
         })
         .then((arr) => {
           receiverID = arr.filter((node) => node.id !== senderID)[0].id;
-          db1.broadcastMessage('request', {foo: 'foobar'});
+          db1.observable.broadcastMessage('request', {foo: 'foobar'});
         })
         .catch((e) => {
           ok(false, 'Error: ' + e);
@@ -250,7 +250,7 @@
         .then((arr) => {
           receiverID = arr.filter((node) => node.id !== senderID)[0].id;
           const bIncludeSelf = true;
-          db1.broadcastMessage('broadcast', {foo: 'foobar'}, bIncludeSelf);
+          db1.observable.broadcastMessage('broadcast', {foo: 'foobar'}, bIncludeSelf);
         })
         .catch((e) => {
           ok(false, 'Error: ' + e);
@@ -279,10 +279,10 @@
         })
         .then((arr) => {
           receiverID = arr.filter((node) => node.id !== senderID)[0].id;
-          db1.sendMessage('request', {foo: 'foobar'}, receiverID, {});
+          db1.observable.sendMessage('request', {foo: 'foobar'}, receiverID, {});
           // Send messages for receivers that don't exist
-          db1.sendMessage('request', {foo: 'foobar'}, 'foobar', {});
-          db1.sendMessage('request', {foo: 'foobar'}, 'barbaz', {});
+          db1.observable.sendMessage('request', {foo: 'foobar'}, 'foobar', {});
+          db1.observable.sendMessage('request', {foo: 'foobar'}, 'barbaz', {});
         })
         .catch((e) => {
           ok(false, 'Error: ' + e);

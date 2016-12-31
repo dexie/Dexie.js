@@ -91,6 +91,9 @@ export default function Observable(db) {
         }
     });
 
+    db.observable = {};
+    db.observable.SyncNode = SyncNode;
+
     const wakeupObservers = initWakeupObservers(db, Observable, localStorage);
     const overrideCreateTransaction = initOverrideCreateTransaction(db, wakeupObservers);
     const crudMonitor = initCrudMonitor(db);
@@ -101,9 +104,6 @@ export default function Observable(db) {
     const intercomm = initIntercomm(db, Observable, SyncNode, mySyncNode, localStorage);
     const onIntercomm = intercomm.onIntercomm;
     const consumeIntercommMessages = intercomm.consumeIntercommMessages;
-
-    db.observable = {};
-    db.observable.SyncNode = SyncNode;
 
     // Allow other addons to access the local sync node. May be needed by Dexie.Syncable.
     Object.defineProperty(db, "_localSyncNode", {
