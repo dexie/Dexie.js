@@ -216,7 +216,7 @@ asyncTest("exception in upgrader", function () {
         db = new Dexie("TestUpgrader");
         return db.open();
     }).then(function (){
-        equal(db.verno, 2, "Database is on version 2 since upgrade failed for version 3.");
+        equal(db.verno, 1, "Database is still on version 1 since it failed to upgrade to version 2.");
     }).finally(function () {
         db.delete().then(start);
     });
