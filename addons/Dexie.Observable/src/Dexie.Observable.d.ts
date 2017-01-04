@@ -11,26 +11,26 @@ import { IDatabaseChange } from '../api';
 declare module 'dexie' {
     // Extend methods on db (db.sendMessage(), ...)
     interface Dexie {
-        sendMessage(
-            type: string,
-            message: any,
-            destinationNode: number,
-            options: {
-                wantReply?: boolean,
-                isFailure?: boolean,
-                requestId?: number
-            })
-        : Promise<any>;
-
-        broadcastMessage(
-            type: string,
-            message: any,
-            bIncludeSelf: boolean
-        ): void;
-
         // Placeholder where to access the SyncNode class constructor.
         // (makes it valid to do new db.observable.SyncNode())
-        observable: {SyncNode: Dexie.Observable.SyncNodeConstructor}
+        observable: {
+            SyncNode: Dexie.Observable.SyncNodeConstructor;
+            Foo: Dexie.Observable.MessageEvent;
+            sendMessage(
+                type: string, // Don't use 'response' as it is used internally by the framework
+                message: any, // anything that can be saved by IndexedDB
+                destinationNode: number,
+                options: {
+                    wantReply?: boolean;
+                }
+            ): Promise<any> | void; // When wantReply is undefined or false return is void
+
+            broadcastMessage(
+                type: string,
+                message: any, // anything that can be saved by IndexedDB
+                bIncludeSelf: boolean
+            ): void;
+        }
 
         readonly _localSyncNode: Dexie.Observable.SyncNode;
 
@@ -44,7 +44,7 @@ declare module 'dexie' {
         interface DbEvents {
             (eventName: 'changes', subscriber: (changes: IDatabaseChange[], partial: boolean)=>void): void;
             (eventName: 'cleanup', subscriber: ()=>any): void;
-            (eventName: 'message', subscriber: (msg: any)=>any): void;
+            (eventName: 'message', subscriber: (msg: Dexie.Observable.MessageEvent)=>any): void;
         }
 
         // Extended IndexSpec with uuid boolean for primary key.
@@ -98,6 +98,17 @@ declare module 'dexie' {
                 (eventName: 'suicideNurseCall', subscriber: (dbName: string, nodeID: number) => void): void;
                 (eventName: 'intercomm', subscriber: (dbName: string) => void): void;
                 (eventName: 'beforeunload', subscriber: () => void): void;
+            }
+
+            // Object received by on('message') after sendMessage() or broadcastMessage()
+            interface MessageEvent {
+                id: number;
+                type: string;
+                message: any;
+                destinationNode: number;
+                wantReply?: boolean;
+                resolve(result: any): void;
+                reject(error: any): void;
             }
         }
     }

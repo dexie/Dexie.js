@@ -41,13 +41,13 @@ export default function Syncable (db) {
         Dexie.vip(function() {
             if (msg.type === 'connect') {
                 // We are master node and another non-master node wants us to do the connect.
-                db.syncable.connect(msg.protocolName, msg.url, msg.options).then(msg.resolve, msg.reject);
+                db.syncable.connect(msg.message.protocolName, msg.message.url, msg.message.options).then(msg.resolve, msg.reject);
             } else if (msg.type === 'disconnect') {
-                db.syncable.disconnect(msg.url).then(msg.resolve, msg.reject);
+                db.syncable.disconnect(msg.message.url).then(msg.resolve, msg.reject);
             } else if (msg.type === 'syncStatusChanged') {
                 // We are client and a master node informs us about syncStatus change.
                 // Lookup the connectedProvider and call its event
-                db.syncable.on.statusChanged.fire(msg.newStatus, msg.url);
+                db.syncable.on.statusChanged.fire(msg.message.newStatus, msg.message.url);
             }
         });
     });
@@ -143,7 +143,7 @@ export default function Syncable (db) {
                     }));
                 } else {
                     return db._syncNodes.where('isMaster').above(0).first(masterNode => {
-                        return db.sendMessage('disconnect', { url: url }, masterNode.id, {wantReply: true});
+                        return db.observable.sendMessage('disconnect', { url: url }, masterNode.id, {wantReply: true});
                     });
                 }
             }).then(()=>{

@@ -12,6 +12,18 @@
  *
  */
 import Dexie from 'dexie';
+import { nop, promisableChain, createUUID } from './utils';
+
+import initOverrideCreateTransaction from './override-create-transaction';
+import initWakeupObservers from './wakeup-observers';
+import initCrudMonitor from './hooks/crud-monitor';
+import initOnStorage from './on-storage';
+import initOverrideOpen from './override-open';
+import initIntercomm from './intercomm';
+
+import overrideParseStoresSpec from './override-parse-stores-spec';
+
+import deleteOldChanges from './delete-old-changes';
 
 var global = self;
 
@@ -30,7 +42,6 @@ var DatabaseChange = Dexie.defineClass({
     oldObj: Object // DELETE: oldObj contains the object deleted. UPDATE: oldObj contains the old object before updates applied.
 });
 
-
 // Import some usable helper functions
 var override = Dexie.override;
 var Promise = Dexie.Promise;
@@ -46,11 +57,8 @@ export default function Observable(db) {
         HIBERNATE_GRACE_PERIOD = 20000, // 20 seconds
         // LOCAL_POLL: The time to wait before polling local db for changes and cleaning up old nodes. 
         // Polling for changes is a fallback only needed in certain circomstances (when the onstorage event doesnt reach all listeners - when different browser windows doesnt share the same process)
-        LOCAL_POLL = 2000, // 1 second. In real-world there will be this value + the time it takes to poll().
-        HEARTBEAT_INTERVAL = NODE_TIMEOUT - 5000,
-        CREATE = 1,
-        UPDATE = 2,
-        DELETE = 3;
+        LOCAL_POLL = 2000; // 1 second. In real-world there will be this value + the time it takes to poll().
+        //HEARTBEAT_INTERVAL = NODE_TIMEOUT - 5000;
 
     var localStorage = Observable.localStorageImpl;
 
@@ -83,12 +91,23 @@ export default function Observable(db) {
         }
     });
 
+    db.observable = {};
+    db.observable.SyncNode = SyncNode;
 
-    var mySyncNode = null;
+    const wakeupObservers = initWakeupObservers(db, Observable, localStorage);
+    const overrideCreateTransaction = initOverrideCreateTransaction(db, wakeupObservers);
+    const crudMonitor = initCrudMonitor(db);
+    const overrideOpen = initOverrideOpen(db, SyncNode, crudMonitor);
+
+    var mySyncNode = {node: null};
+
+    const intercomm = initIntercomm(db, Observable, SyncNode, mySyncNode, localStorage);
+    const onIntercomm = intercomm.onIntercomm;
+    const consumeIntercommMessages = intercomm.consumeIntercommMessages;
 
     // Allow other addons to access the local sync node. May be needed by Dexie.Syncable.
     Object.defineProperty(db, "_localSyncNode", {
-        get: function() { return mySyncNode; }
+        get: function() { return mySyncNode.node; }
     });
 
     var pollHandle = null;
@@ -104,7 +123,7 @@ export default function Observable(db) {
         });
         db._syncNodes.mapToClass(SyncNode);
         db._changes.mapToClass(DatabaseChange);
-        mySyncNode = new SyncNode({
+        mySyncNode.node = new SyncNode({
             myRevision: 0,
             type: "local",
             lastHeartBeat: Date.now(),
@@ -114,34 +133,9 @@ export default function Observable(db) {
 
     //
     // Override parsing the stores to add "_changes" and "_syncNodes" tables.
+    // It also adds UUID support for the primary key and sets tables as observable tables.
     //
-    db.Version.prototype._parseStoresSpec = override(db.Version.prototype._parseStoresSpec, function(origFunc) {
-        return function(stores, dbSchema) {
-            // Create the _changes and _syncNodes tables
-            stores["_changes"] = "++rev";
-            stores["_syncNodes"] = "++id,myRevision,lastHeartBeat,&url,isMaster,type,status";
-            stores["_intercomm"] = "++id,destinationNode";
-            stores["_uncommittedChanges"] = "++id,node"; // For remote syncing when server returns a partial result.
-            // Call default implementation. Will populate the dbSchema structures.
-            origFunc.call(this, stores, dbSchema);
-            // Allow UUID primary keys using $$ prefix on primary key or indexes
-            Object.keys(dbSchema).forEach(function(tableName) {
-                var schema = dbSchema[tableName];
-                if (schema.primKey.name.indexOf('$$') === 0) {
-                    schema.primKey.uuid = true;
-                    schema.primKey.name = schema.primKey.name.substr(2);
-                    schema.primKey.keyPath = schema.primKey.keyPath.substr(2);
-                }
-            });
-            // Now mark all observable tables
-            Object.keys(dbSchema).forEach(function(tableName) {
-                // Marked observable tables with "observable" in their TableSchema.
-                if (tableName.indexOf('_') !== 0 && tableName.indexOf('$') !== 0) {
-                    dbSchema[tableName].observable = true;
-                }
-            });
-        };
-    });
+    db.Version.prototype._parseStoresSpec = override(db.Version.prototype._parseStoresSpec, overrideParseStoresSpec);
 
     // changes event on db:
     db.on.addEventType({
@@ -151,94 +145,19 @@ export default function Observable(db) {
     });
 
     //
-    // Overide transaction creation to always include the "_changes" store when any observable store is involved.
+    // Override transaction creation to always include the "_changes" store when any observable store is involved.
     //
-    db._createTransaction = override(db._createTransaction, function (origFunc) {
-        return function (mode, storenames, dbschema, parent) {
-            if (db.dynamicallyOpened()) return origFunc.apply(this, arguments); // Don't observe dynamically opened databases.
-            var addChanges = false;
-            if (mode === 'readwrite' && storenames.some(function(storeName) { return dbschema[storeName] && dbschema[storeName].observable; })) {
-                // At least one included store is a observable store. Make sure to also include the _changes store.
-                addChanges = true;
-                storenames = storenames.slice(0); // Clone
-                if (storenames.indexOf("_changes") === -1)
-                    storenames.push("_changes"); // Otherwise, firefox will hang... (I've reported the bug to Mozilla@Bugzilla)
-            }
-            // Call original db._createTransaction()
-            var trans = origFunc.call(this, mode, storenames, dbschema, parent);
-            // If this transaction is bound to any observable table, make sure to add changes when transaction completes.
-            if (addChanges) {
-                trans._lastWrittenRevision = 0;
-                trans.on('complete', function() {
-                    if (trans._lastWrittenRevision) {
-                        // Changes were written in this transaction.
-                        if (!parent) {
-                            // This is root-level transaction, i.e. a physical commit has happened.
-                            // Delay-trigger a wakeup call:
-                            if (wakeupObservers.timeoutHandle) clearTimeout(wakeupObservers.timeoutHandle);
-                            wakeupObservers.timeoutHandle = setTimeout(function() {
-                                delete wakeupObservers.timeoutHandle;
-                                wakeupObservers(trans._lastWrittenRevision);
-                            }, 25);
-                        } else {
-                            // This is just a virtual commit of a sub transaction.
-                            // Wait with waking up observers until root transaction has committed.
-                            // Make sure to mark root transaction so that it will wakeup observers upon commit.
-                            var rootTransaction = (function findRootTransaction(trans) {
-                                return trans.parent ? findRootTransaction(trans.parent) : trans;
-                            })(parent);
-                            rootTransaction._lastWrittenRevision = Math.max(
-                                trans._lastWrittenRevision,
-                                rootTransaction.lastWrittenRevision || 0);
-                        }
-                    }
-                });
-                // Derive "source" property from parent transaction by default
-                if (trans.parent && trans.parent.source) trans.source = trans.parent.source;
-            }
-            return trans;
-        };
-    });
+    db._createTransaction = override(db._createTransaction, overrideCreateTransaction);
 
     // If Observable.latestRevsion[db.name] is undefined, set it to 0 so that comparing against it always works.
     // You might think that it will always be undefined before this call, but in case another Dexie instance in the same
     // window with the same database name has been created already, this static property will already be set correctly.
     Observable.latestRevision[db.name] = Observable.latestRevision[db.name] || 0;
 
-    function wakeupObservers(lastWrittenRevision) {
-        // Make sure Observable.latestRevision[db.name] is still below our value, now when some time has elapsed and other db instances in same window possibly could have made changes too.
-        if (Observable.latestRevision[db.name] < lastWrittenRevision) {
-            // Set the static property lastRevision[db.name] to the revision of the last written change.
-            Observable.latestRevision[db.name] = lastWrittenRevision;
-            // Wakeup ourselves, and any other db instances on this window:
-            Dexie.ignoreTransaction(function() {
-                Observable.on('latestRevisionIncremented').fire(db.name, lastWrittenRevision);
-            });
-            // Observable.on.latestRevisionIncremented will only wakeup db's in current window.
-            // We need a storage event to wakeup other windwos.
-            // Since indexedDB lacks storage events, let's use the storage event from WebStorage just for
-            // the purpose to wakeup db instances in other windows.
-            if (localStorage) localStorage.setItem('Dexie.Observable/latestRevision/' + db.name, lastWrittenRevision); // In IE, this will also wakeup our own window. However, onLatestRevisionIncremented will work around this by only running once per revision id.
-        }
-    }
-
-    db.open = override(db.open, origOpen => {
-        return function () {
-            //
-            // Make sure to subscribe to "creating", "updating" and "deleting" hooks for all observable tables that were created in the stores() method.
-            //
-            Object.keys(db._allTables).forEach(tableName => {
-                let table = db._allTables[tableName];
-                if (table.schema.observable) { 
-                    crudMonitor(table);
-                }
-                if (table.name === "_syncNodes") {
-                    table.mapToClass(SyncNode);
-                }
-            });
-            return origOpen.apply(this, arguments);            
-        }
-    });
+    //
+    // Override open to setup hooks for db changes and map the _syncNodes table to class
+    //
+    db.open = override(db.open, overrideOpen);
 
     db.close = override(db.close, function(origClose) {
         return function () {
@@ -253,16 +172,16 @@ export default function Observable(db) {
             Observable.on('intercomm').unsubscribe(onIntercomm);
             Observable.on('beforeunload').unsubscribe(onBeforeUnload);
             // Inform other db instances in same window that we are dying:
-            if (mySyncNode && mySyncNode.id) {
-                Observable.on.suicideNurseCall.fire(db.name, mySyncNode.id);
+            if (mySyncNode.node && mySyncNode.node.id) {
+                Observable.on.suicideNurseCall.fire(db.name, mySyncNode.node.id);
                 // Inform other windows as well:
                 if (localStorage) {
-                    localStorage.setItem('Dexie.Observable/deadnode:' + mySyncNode.id.toString() + '/' + db.name, "dead"); // In IE, this will also wakeup our own window. cleanup() may trigger twice per other db instance. But that doesnt to anything.
+                    localStorage.setItem('Dexie.Observable/deadnode:' + mySyncNode.node.id.toString() + '/' + db.name, "dead"); // In IE, this will also wakeup our own window. cleanup() may trigger twice per other db instance. But that doesnt to anything.
                 }
-                mySyncNode.deleteTimeStamp = 1; // One millisecond after 1970. Makes it occur in the past but still keeps it truthy.
-                mySyncNode.lastHeartBeat = 0;
-                db._syncNodes.put(mySyncNode); // This async operation may be cancelled since the browser is closing down now.
-                mySyncNode = null;
+                mySyncNode.node.deleteTimeStamp = 1; // One millisecond after 1970. Makes it occur in the past but still keeps it truthy.
+                mySyncNode.node.lastHeartBeat = 0;
+                db._syncNodes.put(mySyncNode.node); // This async operation may be cancelled since the browser is closing down now.
+                mySyncNode.node = null;
             }
 
             if (pollHandle) clearTimeout(pollHandle);
@@ -282,135 +201,6 @@ export default function Observable(db) {
         };
     });
 
-    
-
-    //
-    // The Creating/Updating/Deleting hook will make sure any change is stored to the changes table
-    //
-    function crudMonitor(table) {
-        /// <param name="table" type="db.Table"></param>
-        if (table.hook._observing) return;
-        table.hook._observing = true;
-
-        var tableName = table.name;
-        table.hook('creating').subscribe(function(primKey, obj, trans) {
-            /// <param name="trans" type="db.Transaction"></param>
-            var rv = undefined;
-            if (primKey === undefined && table.schema.primKey.uuid) {
-                primKey = rv = Observable.createUUID();
-                if (table.schema.primKey.keyPath) {
-                    Dexie.setByKeyPath(obj, table.schema.primKey.keyPath, primKey);
-                }
-            }
-
-            var change = {
-                source: trans.source || null, // If a "source" is marked on the transaction, store it. Useful for observers that want to ignore their own changes.
-                table: tableName,
-                key: primKey === undefined ? null : primKey,
-                type: CREATE,
-                obj: obj
-            };
-
-            var promise = db._changes.add(change).then(function(rev) {
-                trans._lastWrittenRevision = Math.max(trans._lastWrittenRevision, rev);
-                return rev;
-            });
-
-            // Wait for onsuccess so that we have the primKey if it is auto-incremented and update the change item if so.
-            this.onsuccess = function(resultKey) {
-                if (primKey != resultKey)
-                    promise._then(function() {
-                        change.key = resultKey;
-                        db._changes.put(change);
-                    });
-            }
-            this.onerror = function(err) {
-                // If the main operation fails, make sure to regret the change
-                promise._then(function(rev) {
-                    // Will only happen if app code catches the main operation error to prohibit transaction from aborting.
-                    db._changes.delete(rev);
-                });
-            }
-
-            return rv;
-        });
-
-        table.hook('updating').subscribe(function(mods, primKey, oldObj, trans) {
-            /// <param name="trans" type="db.Transaction"></param>
-            // mods may contain property paths with undefined as value if the property
-            // is being deleted. Since we cannot persist undefined we need to act
-            // like those changes is setting the value to null instead.
-            var modsWithoutUndefined = {};
-            // As of current Dexie version (1.0.3) hook may be called even if it wouldnt really change.
-            // Therefore we may do that kind of optimization here - to not add change entries if
-            // there's nothing to change.
-            var anythingChanged = false;
-            var newObj = Dexie.deepClone(oldObj);
-            for (var propPath in mods) {
-                var mod = mods[propPath];
-                if (typeof mod === 'undefined') {
-                    Dexie.delByKeyPath(newObj, propPath);
-                    modsWithoutUndefined[propPath] = null; // Null is as close we could come to deleting a property when not allowing undefined.
-                    anythingChanged = true;
-                } else {
-                    var currentValue = Dexie.getByKeyPath(oldObj, propPath);
-                    if (mod !== currentValue && JSON.stringify(mod) !== JSON.stringify(currentValue)) {
-                        Dexie.setByKeyPath(newObj, propPath, mod);
-                        modsWithoutUndefined[propPath] = mod;
-                        anythingChanged = true;
-                    }
-                }
-            }
-            if (anythingChanged) {
-                var change = {
-                    source: trans.source || null, // If a "source" is marked on the transaction, store it. Useful for observers that want to ignore their own changes.
-                    table: tableName,
-                    key: primKey,
-                    type: UPDATE,
-                    mods: modsWithoutUndefined,
-                    oldObj: oldObj,
-                    obj: newObj
-                };
-                var promise = db._changes.add(change); // Just so we get the correct revision order of the update...
-                this.onsuccess = function() {
-                    promise._then(function(rev) {
-                        trans._lastWrittenRevision = Math.max(trans._lastWrittenRevision, rev);
-                    });
-                };
-                this.onerror = function(err) {
-                    // If the main operation fails, make sure to regret the change.
-                    promise._then(function(rev) {
-                        // Will only happen if app code catches the main operation error to prohibit transaction from aborting.
-                        db._changes.delete(rev);
-                    });
-                };
-            }
-        });
-
-        table.hook('deleting').subscribe(function(primKey, obj, trans) {
-            /// <param name="trans" type="db.Transaction"></param>
-            var promise = db._changes.add({
-                source: trans.source || null, // If a "source" is marked on the transaction, store it. Useful for observers that want to ignore their own changes.
-                table: tableName,
-                key: primKey,
-                type: DELETE,
-                oldObj: obj
-            }).then(function(rev) {
-                trans._lastWrittenRevision = Math.max(trans._lastWrittenRevision, rev);
-                return rev;
-            });
-            this.onerror = function() {
-                // If the main operation fails, make sure to regret the change.
-                // Using _then because if promise is already fullfilled, the standard then() would
-                // do setTimeout() and we would loose the transaction.
-                promise._then(function(rev) {
-                    // Will only happen if app code catches the main operation error to prohibit transaction from aborting.
-                    db._changes.delete(rev);
-                });
-            };
-        });
-    }
-
     // When db opens, make sure to start monitor any changes before other db operations will start.
     db.on("ready", function startObserving() {
         if (db.dynamicallyOpened()) return db; // Don't observe dynamically opened databases.
@@ -419,7 +209,7 @@ export default function Observable(db) {
             // Since startObserving() is called before database open() method, this will be the first database operation enqueued to db.
             // Therefore we know that the retrieved value will be This query will
             var latestRevision = (lastChange ? lastChange.rev : 0);
-            mySyncNode = new SyncNode({
+            mySyncNode.node = new SyncNode({
                 myRevision: latestRevision,
                 type: "local",
                 lastHeartBeat: Date.now(),
@@ -441,17 +231,17 @@ export default function Observable(db) {
                     .first(currentMaster => {
                         if (!currentMaster) {
                             // There's no master. We must be the master
-                            mySyncNode.isMaster = 1;
+                            mySyncNode.node.isMaster = 1;
                         } else if (currentMaster.lastHeartBeat < Date.now() - NODE_TIMEOUT) {
                             // Master have been inactive for too long
                             // Take over mastership
-                            mySyncNode.isMaster = 1;
+                            mySyncNode.node.isMaster = 1;
                             currentMaster.isMaster = 0;
                             return db._syncNodes.put(currentMaster);
                         }
                     }).then(()=>{
                         // Add our node to DB and start subscribing to events
-                        return db._syncNodes.add(mySyncNode).then(function() {
+                        return db._syncNodes.add(mySyncNode.node).then(function() {
                             Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
                             Observable.on('beforeunload', onBeforeUnload);
                             Observable.on('suicideNurseCall', onSuicide);
@@ -473,7 +263,7 @@ export default function Observable(db) {
             if (handledRevision >= latestRevision) return; // Make sure to only run once per revision. (Workaround for IE triggering storage event on same window)
             handledRevision = latestRevision;
             Dexie.vip(function() {
-                readChanges(latestRevision).catch('DatabaseClosedError', e=>{
+                readChanges(latestRevision).catch('DatabaseClosedError', ()=>{
                     // Handle database closed error gracefully while reading changes.
                     // Don't trigger 'unhandledrejection'.
                     // Even though we intercept the close() method, it might be called when in the middle of
@@ -495,7 +285,7 @@ export default function Observable(db) {
         }
 
         var partial = false;
-        var ourSyncNode = mySyncNode; // Because mySyncNode can suddenly be set to null on database close, and worse, can be set to a new value if database is reopened.
+        var ourSyncNode = mySyncNode.node; // Because mySyncNode can suddenly be set to null on database close, and worse, can be set to a new value if database is reopened.
         if (!ourSyncNode) {
             return Promise.reject(new Dexie.DatabaseClosedError());
         }
@@ -550,8 +340,8 @@ export default function Observable(db) {
         return promise;
     }
 
-    function heartbeat() {
-        var ourSyncNodeId = mySyncNode && mySyncNode.id;
+    /*function heartbeat() {
+        var ourSyncNodeId = mySyncNode.node && mySyncNode.node.id;
         if (!ourSyncNodeId) return;
         db.transaction('rw!', db._syncNodes, ()=>{
             db._syncNodes.where({id: ourSyncNodeId}).first(ourSyncNode => {
@@ -567,15 +357,15 @@ export default function Observable(db) {
         }).then(()=>{
             setTimeout(heartbeat, HEARTBEAT_INTERVAL);
         });
-    }
+    }*/
 
     function poll() {
         pollHandle = null;
-        var currentInstance = mySyncNode && mySyncNode.id;
+        var currentInstance = mySyncNode.node && mySyncNode.node.id;
         if (!currentInstance) return;
         Dexie.vip(function() { // VIP ourselves. Otherwise we might not be able to consume intercomm messages from master node before database has finished opening. This would make DB stall forever. Cannot rely on storage-event since it may not always work in some browsers of different processes.
             readChanges(Observable.latestRevision[db.name]).then(cleanup).then(consumeIntercommMessages)
-            .catch('DatabaseClosedError', e=>{
+            .catch('DatabaseClosedError', ()=>{
                 // Handle database closed error gracefully while reading changes.
                 // Don't trigger 'unhandledrejection'.
                 // Even though we intercept the close() method, it might be called when in the middle of
@@ -583,7 +373,7 @@ export default function Observable(db) {
             })
             .finally(function() {
                 // Poll again in given interval:
-                if (mySyncNode && mySyncNode.id === currentInstance) {
+                if (mySyncNode.node && mySyncNode.node.id === currentInstance) {
                     pollHandle = setTimeout(poll, LOCAL_POLL);
                 }
             });
@@ -592,7 +382,7 @@ export default function Observable(db) {
 
     
     function cleanup() {
-        var ourSyncNode = mySyncNode;
+        var ourSyncNode = mySyncNode.node;
         if (!ourSyncNode) return Promise.reject(new Dexie.DatabaseClosedError());
         return db.transaction('rw', '_syncNodes', '_changes', '_intercomm', function() {
             // Cleanup dead local nodes that has no heartbeat for over a minute
@@ -637,17 +427,17 @@ export default function Observable(db) {
         });
     }
 
-    function onBeforeUnload(event) {
+    function onBeforeUnload() {
         // Mark our own sync node for deletion.
-        if (!mySyncNode) return;
+        if (!mySyncNode.node) return;
         browserIsShuttingDown = true;
-        mySyncNode.deleteTimeStamp = 1; // One millisecond after 1970. Makes it occur in the past but still keeps it truthy.
-        mySyncNode.lastHeartBeat = 0;
-        db._syncNodes.put(mySyncNode); // This async operation may be cancelled since the browser is closing down now.
+        mySyncNode.node.deleteTimeStamp = 1; // One millisecond after 1970. Makes it occur in the past but still keeps it truthy.
+        mySyncNode.node.lastHeartBeat = 0;
+        db._syncNodes.put(mySyncNode.node); // This async operation may be cancelled since the browser is closing down now.
         Observable.wereTheOneDying = true; // If other nodes in same window wakes up by this call, make sure they dont start taking over mastership and stuff...
         // Inform other windows that we're gone, so that they may take over our role if needed. Setting localStorage item below will trigger Observable.onStorage, which will trigger onSuicie() below:
         if (localStorage) {
-            localStorage.setItem('Dexie.Observable/deadnode:' + mySyncNode.id.toString() + '/' + db.name, "dead"); // In IE, this will also wakeup our own window. However, that is doublechecked in nursecall subscriber below.
+            localStorage.setItem('Dexie.Observable/deadnode:' + mySyncNode.node.id.toString() + '/' + db.name, "dead"); // In IE, this will also wakeup our own window. However, that is doublechecked in nursecall subscriber below.
         }
     }
 
@@ -662,156 +452,6 @@ export default function Observable(db) {
         }
     }
 
-    //
-    // Intercommunication between nodes
-    //
-    // Enable inter-process communication between browser windows
-
-    var requestsWaitingForReply = {};
-
-    /**
-     * @param {string} type Type of message
-     * @param message Message to send
-     * @param {number} destinationNode ID of destination node
-     * @param {{wantReply: boolean, isFailure: boolean, requestId: number}} options If {wantReply: true}, the returned promise will complete with the reply from remote. Otherwise it will complete when message has been successfully sent.</param>
-     */
-    db.sendMessage = function(type, message, destinationNode, options) {
-        /// <param name="type" type="String">Type of message</param>
-        /// <param name="message">Message to send</param>
-        /// <param name="destinationNode" type="Number">ID of destination node</param>
-        /// <param name="options" type="Object" optional="true">{wantReply: Boolean, isFailure: Boolean, requestId: Number}. If wantReply, the returned promise will complete with the reply from remote. Otherwise it will complete when message has been successfully sent.</param>
-        options = options || {};
-        var msg = { message: message, destinationNode: destinationNode, sender: mySyncNode.id, type: type };
-        Dexie.extend(msg, options); // wantReply: wantReply, success: !isFailure, requestId: ...
-        if (!mySyncNode)
-            return options.wantReply ?
-                Promise.reject(new Dexie.DatabaseClosedError()) :
-                Promise.resolve(); // If caller dont want reply, it wont catch errors either.
-
-        return Dexie.ignoreTransaction(()=>{
-            var tables = ["_intercomm"];
-            if (options.wantReply) tables.push("_syncNodes"); // If caller wants a reply, include "_syncNodes" in transaction to check that there's a reciever there. Otherwise, new master will get it.
-            var promise = db.transaction('rw', tables, () => {
-                if (options.wantReply) {
-                    // Check that there is a reciever there to take the request.
-                    return db._syncNodes.where('id').equals(destinationNode).count(recieverAlive => {
-                        if (recieverAlive)
-                            return db._intercomm.add(msg);
-                        else
-                            return db._syncNodes.where('isMaster').above(0).first(function(masterNode) {
-                                msg.destinationNode = masterNode.id;
-                                return db._intercomm.add(msg)
-                            });
-                    });
-                } else {
-                    // If caller doesnt need a response, we must not make sure to get one.
-                    return db._intercomm.add(msg); 
-                }
-            }).then (messageId => {
-                var rv = null;
-                if (options.wantReply) {
-                    rv = new Promise(function(resolve, reject) {
-                        requestsWaitingForReply[messageId.toString()] = { resolve: resolve, reject: reject };
-                    });
-                }
-                if (localStorage) {
-                    localStorage.setItem("Dexie.Observable/intercomm/" + db.name, messageId.toString());
-                }
-                Observable.on.intercomm.fire(db.name);
-                return rv;
-            });
-
-            if (!options.wantReply) {
-                promise.catch(()=>{});
-                return;
-            } else {
-                // Forward rejection to caller if it waits for reply.
-                return promise;
-            }
-        });
-    };
-
-    db.broadcastMessage = function(type, message, bIncludeSelf) {
-        if (!mySyncNode) return;
-        var mySyncNodeId = mySyncNode.id;
-        Dexie.ignoreTransaction(()=>{
-            db._syncNodes.toArray(nodes => {
-                return Promise.all(nodes
-                    .filter(node => node.type === 'local' && (bIncludeSelf || node.id !== mySyncNodeId))
-                    .map(node => db.sendMessage(type, message, node.id))); 
-            }).catch(()=>{});
-        });
-    };
-
-    db.observable = {};
-    db.observable.SyncNode = SyncNode;
-
-    function consumeIntercommMessages() {
-        // Check if we got messages:
-        if (!mySyncNode) return Promise.reject(new Dexie.DatabaseClosedError());
-        return Dexie.ignoreTransaction(()=>{
-            return db._intercomm.where({destinationNode: mySyncNode.id}).toArray(messages => {
-                messages.forEach(msg => consumeMessage(msg));
-                return db._intercomm.where('id').anyOf(messages.map(msg => msg.id)).delete();
-            });
-        });
-    }
-
-    function consumeMessage(msg) {
-        if (msg.type === 'response') {
-            // This is a response. Lookup pending request and fulfill it's promise.
-            var request = requestsWaitingForReply[msg.requestId.toString()];
-            if (request) {
-                if (msg.isFailure) {
-                    request.reject(msg.message.error);
-                } else {
-                    request.resolve(msg.message.result);
-                }
-                delete requestsWaitingForReply[msg.requestId.toString()];
-            }
-        } else {
-            // This is a message or request. Fire the event and add an API for the subscriber to use if reply is requested
-            msg.resolve = function(result) {
-                db.sendMessage('response', { result: result }, msg.sender, { requestId: msg.id });
-            };
-            msg.reject = function(error) {
-                db.sendMessage('response', { error: error.toString() }, msg.sender, { isFailure: true, requestId: msg.id });
-            };
-            var message = msg.message;
-            delete msg.message;
-            Dexie.extend(msg, message);
-            db.on.message.fire(msg);
-        }
-    }
-
-    function onIntercomm(dbname) {
-        // When storage event trigger us to check
-        if (dbname === db.name) {
-            consumeIntercommMessages().catch('DatabaseClosedError', ()=>{});
-        }
-    }
-
-}
-
-
-//
-// Help functions
-//
-
-function nop() {};
-
-function promisableChain(f1, f2) {
-    if (f1 === nop) return f2;
-    return function() {
-        var res = f1.apply(this, arguments);
-        if (res && typeof res.then === 'function') {
-            var thiz = this, args = arguments;
-            return res.then(function() {
-                return f2.apply(thiz, args);
-            });
-        }
-        return f2.apply(this, arguments);
-    };
 }
 
 //
@@ -820,75 +460,11 @@ function promisableChain(f1, f2) {
 
 Observable.latestRevision = {}; // Latest revision PER DATABASE. Example: Observable.latestRevision.FriendsDB = 37;
 Observable.on = Dexie.Events(null, "latestRevisionIncremented", "suicideNurseCall", "intercomm", "beforeunload"); // fire(dbname, value);
-Observable.createUUID = function() {
-    // Decent solution from http://stackoverflow.com/questions/105034/how-to-create-a-guid-uuid-in-javascript
-    var d = Date.now();
-    var uuid = 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, function(c) {
-        var r = (d + Math.random() * 16) % 16 | 0;
-        d = Math.floor(d / 16);
-        return (c === 'x' ? r : (r & 0x7 | 0x8)).toString(16);
-    });
-    return uuid;
-};
+Observable.createUUID = createUUID;
 
-Observable.deleteOldChanges = function(db) {
-    // This is a background job and should never be done within
-    // a caller's transaction. Use Dexie.ignoreTransaction() to ensure that.
-    // We should not return the Promise but catch it ourselves instead.
+Observable.deleteOldChanges = deleteOldChanges;
 
-    // To prohibit starving the database we want to lock transactions as short as possible
-    // and since we're not in a hurry, we could do this job in chunks and reschedule a 
-    // continuation every 500 ms.
-    const CHUNK_SIZE = 100;
-
-    Dexie.ignoreTransaction(()=>{
-        return db._syncNodes.orderBy("myRevision").first(oldestNode => {
-            return db._changes
-                .where("rev").below(oldestNode.myRevision)
-                .limit(CHUNK_SIZE)
-                .primaryKeys();
-        }).then(keysToDelete => {
-            if (keysToDelete.length === 0) return; // Done.
-            return db._changes.bulkDelete(keysToDelete).then(()=> {
-                // If not done garbage collecting, reschedule a continuation of it until done.
-                if (keysToDelete.length === CHUNK_SIZE) {
-                    // Limit reached. Changes are there are more job to do. Schedule again:
-                    setTimeout(() => db.isOpen() && Observable.deleteOldChanges(db), 500);
-                }
-            });
-        });
-    }).catch(()=>{
-        // The operation is not cruzial. A failure could almost only be due to that database has been closed.
-        // No need to log this.
-    });
-}
-
-Observable._onStorage = function onStorage(event) {
-    // We use the onstorage event to trigger onLatestRevisionIncremented since we will wake up when other windows modify the DB as well!
-    if (event.key.indexOf("Dexie.Observable/") === 0) { // For example "Dexie.Observable/latestRevision/FriendsDB"
-        var parts = event.key.split('/');
-        var prop = parts[1];
-        var dbname = parts[2];
-        if (prop === 'latestRevision') {
-            var rev = parseInt(event.newValue, 10);
-            if (!isNaN(rev) && rev > Observable.latestRevision[dbname]) {
-                Observable.latestRevision[dbname] = rev;
-                Dexie.ignoreTransaction(function() {
-                    Observable.on('latestRevisionIncremented').fire(dbname, rev);
-                });
-            }
-        } else if (prop.indexOf("deadnode:") === 0) {
-            var nodeID = parseInt(prop.split(':')[1], 10);
-            if (event.newValue) {
-                Observable.on.suicideNurseCall.fire(dbname, nodeID);
-            }
-        } else if (prop === 'intercomm') {
-            if (event.newValue) {
-                Observable.on.intercomm.fire(dbname);
-            }
-        }
-    }
-};
+Observable._onStorage = initOnStorage(Observable);
 
 Observable._onBeforeUnload = function() {
     Observable.on.beforeunload.fire();

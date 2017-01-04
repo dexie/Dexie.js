@@ -17,7 +17,7 @@ export default function initSyncableConnect(db, connect) {
         // Request master node to do the connect:
         return db.table('_syncNodes').where('isMaster').above(0).first(function (masterNode) {
           // There will always be a master node. In theory we may self have become master node when we come here. But that's ok. We'll request ourselves.
-          return db.sendMessage('connect', {
+          return db.observable.sendMessage('connect', {
             protocolName: protocolName,
             url: url,
             options: options

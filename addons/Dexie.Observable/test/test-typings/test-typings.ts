@@ -25,10 +25,17 @@ syncNode.lastHeartBeat.toExponential();
 syncNode.myRevision.toFixed();
 
 db.on('message', msg => {
+    msg.type;
+    msg.message;
+    msg.destinationNode * 1;
+    msg.wantReply;
+    msg.resolve('foo');
+    msg.reject(new Error('Foo'));
 });
-db.sendMessage('myMsgType', {foo: 'bar'}, 13, {wantReply: true});
+db.observable.sendMessage('myMsgType', {foo: 'bar'}, 13, {wantReply: true}).then(() => {});
+db.observable.sendMessage('myMsgType', 'foobar', 13, {wantReply: false});
 
-db.broadcastMessage('myBroadcastMsgType', {foo2: 'bar2'}, false);
+db.observable.broadcastMessage('myBroadcastMsgType', {foo2: 'bar2'}, false);
 
 db.on('changes', changes => {
     changes.forEach(change => {

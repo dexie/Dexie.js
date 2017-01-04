@@ -19,26 +19,16 @@ module.exports = function(config) {
       'node_modules/qunitjs/qunit/qunit.js', // Use qunit from Dexie node_modules
       'test/karma-env.js',
       'dist/dexie.js',
+      'addons/Dexie.Observable/test/unit/bundle.js',
+
+      // Integration tests for Dexie.Observable
       'addons/Dexie.Observable/dist/dexie-observable.js',
-      'addons/Dexie.Syncable/test/unit/bundle.js',
-
-      // Needed for integration tests
-      'samples/remote-sync/websocket/WebSocketSyncProtocol.js',
-      'samples/remote-sync/websocket/websocketserver-shim.js',
-      'samples/remote-sync/websocket/WebSocketSyncServer.js',
-
-      // Integration tests for Dexie.Syncable
-      'addons/Dexie.Syncable/test/tests-syncable.js',
-      'addons/Dexie.Syncable/test/tests-syncable-partials.js',
-      'addons/Dexie.Syncable/test/tests-syncprovider.js',
-      'addons/Dexie.Syncable/test/tests-WebSocketSyncServer.js',
+      'addons/Dexie.Observable/test/tests-observable-misc.js',
 
       { pattern: '**/*.map', watched: false, included: false, served: true},
 
       // Needed for the Dexie tests
       { pattern: 'test/worker.js', included: false },
-
-      'addons/Dexie.Syncable/test/tests-syncable-dexie.js',
 
       // Run Dexie tests
       'test/bundle.js'
