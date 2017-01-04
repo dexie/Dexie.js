@@ -57,7 +57,7 @@ export default function Observable(db) {
         HIBERNATE_GRACE_PERIOD = 20000, // 20 seconds
         // LOCAL_POLL: The time to wait before polling local db for changes and cleaning up old nodes. 
         // Polling for changes is a fallback only needed in certain circomstances (when the onstorage event doesnt reach all listeners - when different browser windows doesnt share the same process)
-        LOCAL_POLL = 2000, // 2 seconds. In real-world there will be this value + the time it takes to poll().
+        LOCAL_POLL = 500, // 500 ms. In real-world there will be this value + the time it takes to poll(). A small value is needed in Workers where we cannot rely on storage event.
         HEARTBEAT_INTERVAL = NODE_TIMEOUT - 5000;
 
     var localStorage = Observable.localStorageImpl;
@@ -372,17 +372,12 @@ export default function Observable(db) {
                 ourSyncNode.deleteTimeStamp = null; // Reset "deleteTimeStamp" flag if it was there.
                 return db._syncNodes.put(ourSyncNode);
             });
-        }).then(()=>{
-            heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
         }).catch('DatabaseClosedError', () => {
-            // Ignore silently and stop the heartbeat.
-        }).catch(err => {
-            console.warn (`Error encountered in heartbeat: ${err.stack || err}`);
-            // Should we continue heartbeat or close down everything?
-            // Taking the safest step here and assume some temporary error could have occurred such
-            // as browser-specific transaction timeout (chrome) or temporary instability in indexedDB,
-            // so assume we should continue the heartbeat.
-            heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
+            // Ignore silently
+        }).finally(() => {
+            if (mySyncNode.node && mySyncNode.node.id === currentInstance && db.isOpen()) {
+                heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
+            }
         });
     }
 
@@ -400,7 +395,7 @@ export default function Observable(db) {
             })
             .finally(function() {
                 // Poll again in given interval:
-                if (mySyncNode.node && mySyncNode.node.id === currentInstance) {
+                if (mySyncNode.node && mySyncNode.node.id === currentInstance && db.isOpen()) {
                     pollHandle = setTimeout(poll, LOCAL_POLL);
                 }
             });
