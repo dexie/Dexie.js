@@ -57,8 +57,8 @@ export default function Observable(db) {
         HIBERNATE_GRACE_PERIOD = 20000, // 20 seconds
         // LOCAL_POLL: The time to wait before polling local db for changes and cleaning up old nodes. 
         // Polling for changes is a fallback only needed in certain circomstances (when the onstorage event doesnt reach all listeners - when different browser windows doesnt share the same process)
-        LOCAL_POLL = 2000; // 1 second. In real-world there will be this value + the time it takes to poll().
-        //HEARTBEAT_INTERVAL = NODE_TIMEOUT - 5000;
+        LOCAL_POLL = 2000, // 2 seconds. In real-world there will be this value + the time it takes to poll().
+        HEARTBEAT_INTERVAL = NODE_TIMEOUT - 5000;
 
     var localStorage = Observable.localStorageImpl;
 
@@ -110,7 +110,8 @@ export default function Observable(db) {
         get: function() { return mySyncNode.node; }
     });
 
-    var pollHandle = null;
+    var pollHandle = null,
+        heartbeatHandle = null;
 
     if (Dexie.fake) {
         // This code will never run.
@@ -186,6 +187,8 @@ export default function Observable(db) {
 
             if (pollHandle) clearTimeout(pollHandle);
             pollHandle = null;
+            if (heartbeatHandle) clearTimeout(heartbeatHandle);
+            heartbeatHandle = null;
             return origClose.apply(this, arguments);
         };
     });
@@ -248,6 +251,8 @@ export default function Observable(db) {
                             Observable.on('intercomm', onIntercomm);
                             // Start polling for changes and do cleanups:
                             pollHandle = setTimeout(poll, LOCAL_POLL);
+                            // Start heartbeat
+                            heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
                         });
                 });
             }).then(function () {
@@ -340,7 +345,20 @@ export default function Observable(db) {
         return promise;
     }
 
-    /*function heartbeat() {
+    /**
+     * The reason we need heartbeat in parallell with poll() is due to the risk of long-running
+     * transactions while syncing changes from server to client in Dexie.Syncable. That transaction will
+     * include _changes (which will block readChanges()) but not _syncNodes. So this heartbeat will go on
+     * during that changes are being applied and update our lastHeartBeat property while poll() is waiting.
+     * When cleanup() (who also is blocked by the sync) wakes up, it won't kill the master node because this
+     * heartbeat job will have updated the master node's heartbeat during the long-running sync transaction.
+     * 
+     * If we did not have this heartbeat, and a server send lots of changes that took more than NODE_TIMEOUT
+     * (20 seconds), another node waking up after the sync would kill the master node and take over because
+     * it would believe it was dead.
+     */
+    function heartbeat() {
+        heartbeatHandle = null;
         var ourSyncNodeId = mySyncNode.node && mySyncNode.node.id;
         if (!ourSyncNodeId) return;
         db.transaction('rw!', db._syncNodes, ()=>{
@@ -355,9 +373,18 @@ export default function Observable(db) {
                 return db._syncNodes.put(ourSyncNode);
             });
         }).then(()=>{
-            setTimeout(heartbeat, HEARTBEAT_INTERVAL);
+            heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
+        }).catch('DatabaseClosedError', () => {
+            // Ignore silently and stop the heartbeat.
+        }).catch(err => {
+            console.warn (`Error encountered in heartbeat: ${err.stack || err}`);
+            // Should we continue heartbeat or close down everything?
+            // Taking the safest step here and assume some temporary error could have occurred such
+            // as browser-specific transaction timeout (chrome) or temporary instability in indexedDB,
+            // so assume we should continue the heartbeat.
+            heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
         });
-    }*/
+    }
 
     function poll() {
         pollHandle = null;
