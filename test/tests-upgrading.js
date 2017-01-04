@@ -6,6 +6,48 @@ module("upgrading");
 
 var Promise = Dexie.Promise;
 
+// Ensure Dexie verno and backing IDB version are as expected.
+function checkDBVersion(db, version) {
+    equal(db.verno, version, `DB should be version ${version}`);
+    equal(db.backendDB().version, version * 10,
+          `idb should be version ${version * 10}`);
+}
+
+// Ensure object store names are as expected.
+function checkDBObjectStores(db, baseTables, expected) {
+    // Add baseTables.
+    expected = expected.concat(baseTables).sort();
+    // Already sorted.
+    var idbNames = [...db.backendDB().objectStoreNames];
+    var dexieNames = db.tables.map(t => t.name).sort();
+    deepEqual(dexieNames,
+              expected,
+              "Dexie.tables must match expected.");
+    if (supports("deleteObjectStoreAfterRead")) {
+        // Special treatment for IE/Edge where Dexie avoids deleting
+        // the actual store to avoid a bug.
+        // This special treatment in the unit tests may not need to
+        // be here if we can work around Dexie issue #1.
+        deepEqual(idbNames,
+                expected,
+                "IDB object stores must match expected.");
+    }
+}
+
+function checkTransactionObjectStores(t, baseTables, expected) {
+    // Add baseTables.
+    expected = expected.concat(baseTables).sort();
+    deepEqual(t.storeNames.slice().sort(),
+              expected,
+              "Transaction stores must match expected.");
+}
+
+// Get tables not matching expected.
+function getBaseTables(db, expected = []) {
+    let tables = db.tables.map(t => t.name);
+    return tables.filter(t => !expected.includes(t));
+}
+
 // tests:
 // * separate tests with a commented line of --- up to column 80.
 // * put test result checking as a then of the relevant db.open call.
@@ -27,71 +69,34 @@ test("upgrade", (assert) => {
     // V Reverse order of specifying versions
     // V Delete DB and open it with ALL version specs specified (check it will run in sequence)
     // V Delete DB and open it with all version specs again but in reverse order
-    var DBNAME = "Upgrade-test";
+    var DBNAME = "TestDBUpgrade";
     var db = null;
     // Instead of expecting an empty database to have 0 tables, we read
     // how many an empty database has.
     // Reason: Addons may add meta tables.
-    var baseNumberOfTables = 0;
     var baseTables = [];
 
-    // Ensure Dexie verno and backing IDB version are as expected.
-    function checkVersion(version) {
-        equal(db.verno, version, `DB should be version ${version}`);
-        equal(db.backendDB().version, version * 10,
-              `idb should be version ${version * 10}`);
-    }
 
-    // Ensure object store names are as expected.
-    function checkObjectStores(expected) {
-        // Add baseTables.
-        expected = expected.concat(baseTables).sort();
-        // Already sorted.
-        var idbNames = [...db.backendDB().objectStoreNames];
-        var dexieNames = db.tables.map(t => t.name).sort();
-        deepEqual(dexieNames,
-                  expected,
-                  "Dexie.tables must match expected.");
-        if (supports("deleteObjectStoreAfterRead")) {
-            // Special treatment for IE/Edge where Dexie avoids deleting the actual store to avoid a bug.
-            // This special treatment in the unit tests may not need to be here if we can work around Dexie issue #1.
-            deepEqual(idbNames,
-                    expected,
-                    "IDB object stores must match expected.");
-        }
-    }
-
-    function checkTransactionObjectStores(t, expected) {
-        // Add baseTables.
-        expected = expected.concat(baseTables).sort();
-        deepEqual(t.storeNames.slice().sort(),
-                  expected,
-                  "Transaction stores must match expected.");
-    }
-
-    Promise.resolve(() => {
-        return Dexie.delete(DBNAME);
-    }).then(() => {
+    Dexie.delete(DBNAME).then(() => {
         // --------------------------------------------------------------------
         // Test: Empty schema
         db = new Dexie(DBNAME);
         db.version(1).stores({});
-        return db.open().then(function () {
+        return db.open().then(() => {
             ok(true, "Could create empty database without any schema");
             // Set so add-on tables don't invalidate checks.
-            baseNumberOfTables = db.tables.length;
-            baseTables = db.tables.map(t => t.name);
+            baseTables = getBaseTables(db);
         });
     }).then(() => {
+        db.close();
         // --------------------------------------------------------------------
         // Test: Adding version.
         db = new Dexie(DBNAME);
         db.version(1).stores({});
         db.version(2).stores({ store1: "++id" });
-        return db.open().then(function () {
+        return db.open().then(() => {
             ok(true, "Could upgrade to version 2");
-            checkVersion(2);
-            //equal(db.verno, 2, "DB should be version 2");
+            checkDBVersion(db, 2);
             equal(db.table("store1").schema.primKey.name, "id",
                   "Primary key is 'id'");
         });
@@ -106,7 +111,7 @@ test("upgrade", (assert) => {
         db.version(3).stores({ store1: "++id,name" });
         return db.open().then(() => {
             ok(true, "Could upgrade to version 3 (adding an index to a store)");
-            checkVersion(3);
+            checkDBVersion(db, 3);
         });
     }).then(() => {
         // Testing that the added index is working indeed:
@@ -130,7 +135,7 @@ test("upgrade", (assert) => {
         db.version(1).stores({});
         return db.open().then(() => {
             ok(true, "Could upgrade to version 4 (removing an index)");
-            checkVersion(4);
+            checkDBVersion(db, 4);
             equal(db.tables[0].schema.indexes.length, 0, "No indexes in schema now when 'name' index was removed");
         });
     }).then(() => {
@@ -151,7 +156,7 @@ test("upgrade", (assert) => {
         });
         return db.open().then(() => {
             ok(true, "Could upgrade to version 5 where an upgrader function was applied");
-            checkVersion(5);
+            checkDBVersion(db, 5);
             equal(upgraders, 1, "1 upgrade function should have run.");
         });
     }).then(() => {
@@ -178,8 +183,8 @@ test("upgrade", (assert) => {
         }); 
         return db.open().then(() => {
             ok(true, "Could upgrade to version 6");
-            checkVersion(6);
-            checkObjectStores(["store1"]);
+            checkDBVersion(db, 6);
+            checkDBObjectStores(db, baseTables, ["store1"]);
         });
     }).then(() => {
         return db.table('store1').get(1, function (apaUser) {
@@ -205,8 +210,8 @@ test("upgrade", (assert) => {
         db.version(7).stores({ store2: "uuid" });
         return db.open().then(() => {
             ok(true, "Could upgrade to version 7");
-            checkVersion(7);
-            checkObjectStores(["store1", "store2"]);
+            checkDBVersion(db, 7);
+            checkDBObjectStores(db, baseTables, ["store1", "store2"]);
         });
     }).then(() => {
         db.close();
@@ -221,26 +226,27 @@ test("upgrade", (assert) => {
         db.version(8).stores({ store1: null });
         return db.open().then(() => {
             ok(true, "Could upgrade to version 8 - deleting an object store");
-            checkVersion(8);
-            checkObjectStores(["store2"]);
+            checkDBVersion(db, 8);
+            checkDBObjectStores(db, baseTables, ["store2"]);
         });
     }).then(() => {
+        db.close();
         // --------------------------------------------------------------------
         // Test: Use a removed object store while running an upgrade function.
-        /*db = new Dexie(DBNAME);
+        db = new Dexie(DBNAME);
         db.version(7).stores({ store2: "uuid" });
         db.version(8).stores({ store1: null });
         db.version(9).stores({ store1: "++id,email" });
         db.version(10).stores({ store1: null }).upgrade(t => {
-            checkTransactionObjectStores(t, ["store1"]);
+            checkTransactionObjectStores(t, baseTables, ["store1", "store2"]);
             // TODO: actually use the object store.
             ok(true, "Upgrade transaction contains deleted store.");
         });
         return db.open().then(() => {
             ok(true, "Could upgrade to version 10 - deleting an object store with upgrade function");
-            checkVersion(10);
-            checkObjectStores(["store2"]);
-        });*/
+            checkDBVersion(db, 10);
+            checkDBObjectStores(db, baseTables, ["store2"]);
+        });
     }).then(() => {
         // Reset.
         return db.delete();
@@ -250,13 +256,18 @@ test("upgrade", (assert) => {
         // 1. Upgrade transactions should have the correct object
         //    stores available. (future version)
         db = new Dexie(DBNAME);
-        
         db.version(1).stores({
             store1: "++id,name"
         });
+        let names = [
+            "A B",
+            "C D",
+            "E F",
+            "G H"
+        ];
         return db.open().then(() => {
             // Populate db.
-            return db.store1.put({ name: "A B" });
+            return db.store1.bulkPut(names.map(name => ({ name: name })));
         });
     }).then(() => {
         db.close();
@@ -266,26 +277,37 @@ test("upgrade", (assert) => {
         db.version(2).stores({
             store2: "++id,firstname,lastname"
         }).upgrade(t => {
-            /*checkTransactionObjectStores(t,
-                ["store1", "store2"]);*/
+            checkTransactionObjectStores(t, baseTables,
+                ["store1", "store2"]);
             ok(true, "Upgrade transaction has stores deleted later.");
+            db.store1;
+            t.store1.each((item) => {
+                let [first_name, last_name] = item.name.split(' ');
+                t.store2.put({ firstname: first_name, lastname: last_name });
+            });
             upgraders++;
-            // TODO: copy value to store2.
         });
         db.version(3).stores({
             store1: null,
-            store3: "++id"
+            store3: "++id,person_id"
         }).upgrade(t => {
-            /*checkTransactionObjectStores(t,
-                ["store1", "store2", "store3"]);*/
+            checkTransactionObjectStores(t, baseTables,
+                ["store1", "store2", "store3"]);
+            t.store1.count().then((n) => {
+                equal(n, 4, "Number of objects in deleted object store is as expected");
+            })
+            t.store2.each((item) => {
+                t.store3.put({ person_id: item.id, age: Math.random() * 100 });
+            });
             upgraders++;
-            // TODO: Add some value to store3.
         });
         return db.open().then(() => {
-            checkVersion(3);
+            checkDBVersion(db, 3);
             equal(upgraders, 2, "2 upgrade functions should have run.");
-            checkObjectStores(["store2", "store3"]);
-            // TODO: Check that the data is as-expected.
+            checkDBObjectStores(db, baseTables, ["store2", "store3"]);
+            db.table('store2').where('firstname').equals('A').count().then((n) => {
+                equal(n, 1, "Object could be retrieved from new object store.");
+            });
         });
     }).then(() => {
         return db.delete();
@@ -319,8 +341,8 @@ test("upgrade", (assert) => {
         db.version(8).stores({ store1: null });
         return db.open().then(() => {
             ok(true, "Could create new database");
-            checkVersion(8);
-            checkObjectStores(["store2"]);
+            checkDBVersion(db, 8);
+            checkDBObjectStores(db, baseTables, ["store2"]);
             equal(db.table("store2").schema.primKey.name, "uuid", "The prim key is uuid");
         });
     }).then(() => {
@@ -349,16 +371,69 @@ test("upgrade", (assert) => {
         db.version(1).stores({});
         return db.open().then(() => {
             ok(true, "Could create new database");
-            checkVersion(8);
-            checkObjectStores(["store2"]);
+            checkDBVersion(db, 8);
+            checkDBObjectStores(db, baseTables, ["store2"]);
             equal(db.table("store2").schema.primKey.name, "uuid", "The prim key is uuid");
         });
     }).catch((err) => {
-        ok(false, "Error: " + err);
+        ok(false, `Error: ${err}\n${err.stack}`);
     }).finally(() => {
         if (db) db.close();
-        Dexie.delete(DBNAME).then(done);
+        done();
     });
+});
+
+test("Previous definitions not needed for upgrade", (assert) => {
+    let done = assert.async();
+    let name = "upgrade";
+    let baseTables;
+    let db;
+    let data = [
+        { name: 'a' },
+        { name: 'b' },
+        { name: 'c' }
+    ];
+
+    Dexie.delete(name).then(() => {
+        db = new Dexie(name);
+        db.version(1).stores({
+            person: 'id++,name'
+        });
+        return db.open().then(() => {
+            baseTables = getBaseTables(db, ['person']);
+            checkDBVersion(db, 1);
+            checkDBObjectStores(db, baseTables, ['person']);
+            return db.person.bulkAdd(data);
+        });
+    }).then(() => {
+        db.close();
+        let expected = ['person', 'users'];
+        // Recreate so previous instance state is gone.
+        db = new Dexie(name);
+        // Only define latest version.
+        db.version(2).stores({
+            users: 'id++,name,age'
+        }).upgrade((t) => {
+            checkTransactionObjectStores(t, baseTables, expected);
+            t.table('person').each((record) => {
+                t.users.add({
+                    name: record.name
+                });
+            });
+        });
+
+        return db.open().then(() => {
+            checkDBVersion(db, 2);
+            checkDBObjectStores(db, baseTables, expected);
+            return Promise.all([db.users.count(), db.person.count()])
+            .then((counts) => {
+                equal(counts[0], data.length,
+                    'Users table should have all records');
+                equal(counts[1], data.length,
+                    'Person table should have all records');
+            });
+        });
+    }).then(done);
 });
 
 test("Issue #30 - Problem with existing db", (assert) => {

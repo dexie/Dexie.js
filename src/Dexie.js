@@ -77,20 +77,24 @@ export default function Dexie(dbName, options) {
     var deps = Dexie.dependencies;
     var opts = extend({
         // Default Options
-        addons: Dexie.addons,           // Pick statically registered addons by default
-        autoOpen: true,                 // Don't require db.open() explicitely.
-        indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to IDBShim or browser env.
-        IDBKeyRange: deps.IDBKeyRange   // Backend IDBKeyRange api. Default to IDBShim or browser env.
+        addons: Dexie.addons,               // Pick statically registered addons by default
+        autoOpen: true,                     // Don't require db.open() explicitly.
+        indexedDB: deps.indexedDB,          // Backend IndexedDB api. Default to IDBShim or browser env.
+        IDBKeyRange: deps.IDBKeyRange,      // Backend IDBKeyRange api. Default to IDBShim or browser env.
+        IDBObjectStore: deps.IDBObjectStore // Backend IDBKeyRange api. Default to IDBShim or browser env.
     }, options);
     var addons = opts.addons,
         autoOpen = opts.autoOpen,
         indexedDB = opts.indexedDB,
-        IDBKeyRange = opts.IDBKeyRange;
+        IDBKeyRange = opts.IDBKeyRange,
+        IDBObjectStore = opts.IDBObjectStore;
 
     var globalSchema = this._dbSchema = {};
     var versions = [];
-    var dbStoreNames = [];
+    // Store of currently-accessible Tables.
     var allTables = {};
+    // Repository for previously-defined tables.
+    var tableCache = {};
     ///<var type="IDBDatabase" />
     var idbdb = null; // Instance of IDBDatabase
     var dbOpenError = null;
@@ -107,9 +111,8 @@ export default function Dexie(dbName, options) {
         openCanceller = new Promise((_, reject) => {
             cancelOpen = reject;
         });
-    var autoSchema = true;
     var hasNativeGetDatabaseNames = !!getNativeGetDatabaseNamesFn(indexedDB),
-        hasGetAll;
+        hasGetAll = IDBObjectStore && 'getAll' in IDBObjectStore.prototype;
 
     function init() {
         // Default subscribers to "versionchange" and "blocked".
@@ -151,27 +154,27 @@ export default function Dexie(dbName, options) {
     this.version = function (versionNumber) {
         /// <param name="versionNumber" type="Number"></param>
         /// <returns type="Version"></returns>
-        if (idbdb || isBeingOpened) throw new exceptions.Schema("Cannot add version when database is open");
-        this.verno = Math.max(this.verno, versionNumber);
-        var versionInstance = versions.filter(function (v) { return v._cfg.version === versionNumber; })[0];
+        if (idbdb || isBeingOpened)
+            throw new exceptions.Schema(
+                "Cannot add version when database is open");
+        if (!versionNumber)
+            throw new exceptions.InvalidArgument(
+                "Version must be a number greater than 0");
+        let versionInstance = Version.get(versionNumber);
         if (versionInstance) return versionInstance;
         versionInstance = new Version(versionNumber);
         versions.push(versionInstance);
-        versions.sort(lowerVersionFirst);
-        // Disable autoschema mode, as at least one version is specified.
-        autoSchema = false;
+        versions.sort(Version.sort);
         return versionInstance;
     };
 
     function Version(versionNumber) {
         this._cfg = {
             version: versionNumber,
-            storesSource: null,
+            storesSource: {},
             dbschema: {},
-            tables: {},
             contentUpgrade: null
         };
-        this.stores({}); // Derive earlier schemas by default.
     }
 
     extend(Version.prototype, {
@@ -190,193 +193,216 @@ export default function Dexie(dbName, options) {
             ///  "*"  means value is multiEntry, <br/>
             ///  "++" means auto-increment and only applicable for primary key <br/>
             /// </param>
-            this._cfg.storesSource = this._cfg.storesSource ? extend(this._cfg.storesSource, stores) : stores;
+            this._cfg.storesSource = extend(this._cfg.storesSource, stores);
 
-            // Derive stores from earlier versions if they are not explicitely specified as null or a new syntax.
-            var storesSpec = {};
-            versions.forEach(function (version) { // 'versions' is always sorted by lowest version first.
+            // These checks ensure versions are self-consistent.
+            // Derive stores from earlier versions if they are not explicitly specified as null or a new syntax.
+            var storesSpec = this._cfg.storesSource;
+            // TODO: Check that there's no conflict with previous versions
+             // 'versions' is always sorted by lowest version first.
+             /*
+            versions.forEach(function (version) {
                 extend(storesSpec, version._cfg.storesSource);
             });
+            */
 
-            var dbschema = (this._cfg.dbschema = {});
-            this._parseStoresSpec(storesSpec, dbschema);
-            // Update the latest schema to this version
-            // Update API
-            globalSchema = db._dbSchema = dbschema;
-            removeTablesApi([allTables, db, Transaction.prototype]); // Keep Transaction.prototype even though it should be depr.
-            setApiOnPlace([allTables, db, Transaction.prototype, this._cfg.tables], keys(dbschema), dbschema);
-            dbStoreNames = keys(dbschema);
+            this._cfg.dbschema = TableSchema.fromVersionStores(storesSpec);
+            this._update();
             return this;
         },
         upgrade: function (upgradeFunction) {
             /// <param name="upgradeFunction" optional="true">Function that performs upgrading actions.</param>
-            var self = this;
-            fakeAutoComplete(function () {
-                upgradeFunction(db._createTransaction(READWRITE, keys(self._cfg.dbschema), self._cfg.dbschema));// BUGBUG: No code completion for prev version's tables wont appear.
-            });
             this._cfg.contentUpgrade = upgradeFunction;
             return this;
         },
-        _parseStoresSpec: function (stores, outSchema) {
-            keys(stores).forEach(function (tableName) {
-                if (stores[tableName] !== null) {
-                    var instanceTemplate = {};
-                    var indexes = parseIndexSyntax(stores[tableName]);
-                    var primKey = indexes.shift();
-                    if (primKey.multi) throw new exceptions.Schema("Primary key cannot be multi-valued");
-                    if (primKey.keyPath) setByKeyPath(instanceTemplate, primKey.keyPath, primKey.auto ? 0 : primKey.keyPath);
-                    indexes.forEach(function (idx) {
-                        if (idx.auto) throw new exceptions.Schema("Only primary key can be marked as autoIncrement (++)");
-                        if (!idx.keyPath) throw new exceptions.Schema("Index must have a name and cannot be an empty string");
-                        setByKeyPath(instanceTemplate, idx.keyPath, idx.compound ? idx.keyPath.map(function () { return ""; }) : "");
-                    });
-                    outSchema[tableName] = new TableSchema(tableName, primKey, indexes, instanceTemplate);
-                }
-            });
+        // Called to update global Dexie state after version update.
+        _update: function () {
+            let source = versions.map(v => v._cfg.storesSource)
+                .reduce((target, current) => {
+                    return extend(target, current);
+                });
+            let schema = TableSchema.fromVersionStores(source);
+            // We set the table API here to enable working with the latest version, under the assumpti
+            removeTablesApi([allTables, db, Transaction.prototype]);
+            setApiOnPlace([allTables, db, Transaction.prototype], schema);
         }
     });
-    
-    function runUpgraders (oldVersion, idbtrans, reject) {
-        var trans = db._createTransaction(READWRITE, dbStoreNames, globalSchema);
+
+    extend(Version, {
+        sort: (a, b) => a._cfg.version - b._cfg.version,
+        // These functions rely on the versions being kept sorted in ascending
+        // order by version number.
+        // Get the last version up to and including the provided limit.
+        getMax: (limit = Infinity) => {
+            for (let i = versions.length - 1; i >= 0; i--) {
+                let version = versions[i];
+                if (version._cfg.version <= limit) {
+                    return version._cfg.version;
+                }
+            }
+        },
+        getLowerThan: (version) => {
+            return versions.map(v => v._cfg.version)
+                .filter(v => v < version);
+        },
+        // Get next version number.
+        getNext: (version, limit = Infinity) => {
+            if (version >= limit) return;
+            let next = versions.map(v => v._cfg.version)
+                .find(v => version < v);
+            if (!next) return;
+            if (next <= limit) return next;
+        },
+        // Get version object.
+        get: (version) => {
+            return versions.find(v => version === v._cfg.version);
+        },
+        // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
+        // IE fails when deleting objectStore after reading from it.
+        // A future version of Dexie.js will stopover an intermediate version to workaround this.
+        // At that point, we want to be backward compatible. Could have been
+        // multiplied with 2, but by using 10, it is easier to map the number
+        // to the real version number.
+        // Map from Dexie version to database.
+        dexieToDb: (version) => {
+            return version * 10;
+        },
+        // Map from database version to Dexie.
+        dbToDexie: (version) => {
+            return version / 10;
+        }
+    });
+
+    // Takes oldVersion number, upgrade transaction, and rejection callback.
+    // oldVersion is Dexie db number
+    function doUpgrade(version, idbtrans, reject) {
+        let trans = db._createTransaction("readwrite", []);
+        trans.create(idbtrans);
+        trans._completion.catch(reject);
+        let versionSpec = Version.get(version);
+        let current = TableSchema.fromTransaction(idbtrans);
+        let next = versionSpec._cfg.dbschema;
+        newScope(() => {
+            upgrade(current, next, versionSpec, trans).catch((err) => {
+                trans._reject(err);
+            });
+        }, { trans: trans });
+    }
+
+    // Initial database population skips the step-by-step upgrade and
+    // instead jumps to the end, creating the final database tables
+    // and then calling on.populate.
+    function create(version, idbtrans, reject) {
+        // Derive the schema resulting from all specified versions.
+        let relevantVersions = Version.getLowerThan(version);
+        relevantVersions.push(version);
+        let stores = relevantVersions
+            .map(v => Version.get(v)._cfg.storesSource)
+            .reduce((target, current) => {
+                return extend(target, current);
+            });
+        let schema = TableSchema.fromVersionStores(stores);
+        // Set the API here for the on.populate call.
+        removeTablesApi([allTables, db, Transaction.prototype]);
+        setApiOnPlace([allTables, db, Transaction.prototype], schema);
+        // Execute initialization.
+        var trans = db._createTransaction(READWRITE, keys(schema), schema);
         trans.create(idbtrans);
         trans._completion.catch(reject);
         var rejectTransaction = trans._reject.bind(trans);
-        newScope(function () {
-            PSD.trans = trans;
-            if (oldVersion === 0) {
-                // Create tables:
-                keys(globalSchema).forEach(function (tableName) {
-                    createTable(idbtrans, tableName, globalSchema[tableName].primKey, globalSchema[tableName].indexes);
-                });
-                Promise.follow(()=>db.on.populate.fire(trans)).catch(rejectTransaction);
-            } else
-                updateTablesAndIndexes(oldVersion, trans, idbtrans).catch(rejectTransaction);
-        });
+        newScope(() => {
+            // Diff with empty initial db.
+            let diff = TableSchema.diff({}, schema);
+            // Add tables
+            diff.add.forEach((tuple) => {
+                createTable(idbtrans, tuple[0], tuple[1].primKey, tuple[1].indexes);
+            });
+            Promise.follow(() => db.on.populate.fire(trans))
+                .catch(rejectTransaction);
+        }, { trans: trans });
     }
 
-    function updateTablesAndIndexes (oldVersion, trans, idbtrans) {
-        // Upgrade version to version, step-by-step from oldest to newest version.
-        // Each transaction object will contain the table set that was current in that version (but also not-yet-deleted tables from its previous version)
-        var queue = [];
-        var oldVersionStruct = versions.filter(version => version._cfg.version === oldVersion)[0];
-        if (!oldVersionStruct) throw new exceptions.Upgrade("Dexie specification of currently installed DB version is missing");
-        globalSchema = db._dbSchema = oldVersionStruct._cfg.dbschema;
-        var anyContentUpgraderHasRun = false;
-
-        var versToRun = versions.filter(v => v._cfg.version > oldVersion);
-        versToRun.forEach(function (version) {
-            /// <param name="version" type="Version"></param>
-            queue.push(()=>{
-                var oldSchema = globalSchema;
-                var newSchema = version._cfg.dbschema;
-                adjustToExistingIndexNames(oldSchema, idbtrans);
-                adjustToExistingIndexNames(newSchema, idbtrans);
-                globalSchema = db._dbSchema = newSchema;
-                var diff = getSchemaDiff(oldSchema, newSchema);     
-                // Add tables           
-                diff.add.forEach(function (tuple) {
-                    createTable(idbtrans, tuple[0], tuple[1].primKey, tuple[1].indexes);
-                });
-                // Change tables
-                diff.change.forEach(function (change) {
-                    if (change.recreate) {
-                        throw new exceptions.Upgrade("Not yet support for changing primary key");
-                    } else {
-                        var store = idbtrans.objectStore(change.name);
-                        // Add indexes
-                        change.add.forEach(function (idx) {
-                            addIndex(store, idx);
-                        });
-                        // Update indexes
-                        change.change.forEach(function (idx) {
-                            store.deleteIndex(idx.name);
-                            addIndex(store, idx);
-                        });
-                        // Delete indexes
-                        change.del.forEach(function (idxName) {
-                            store.deleteIndex(idxName);
-                        });
-                    }
-                });
-                if (version._cfg.contentUpgrade) {
-                    anyContentUpgraderHasRun = true;
-                    return Promise.follow(()=>{
-                        version._cfg.contentUpgrade(trans);
-                    });
-                }
-            });
-            queue.push(function (idbtrans) {
-                if (!anyContentUpgraderHasRun || !hasIEDeleteObjectStoreBug) { // Dont delete old tables if ieBug is present and a content upgrader has run. Let tables be left in DB so far. This needs to be taken care of.
-                    var newSchema = version._cfg.dbschema;
-                    // Delete old tables
-                    deleteRemovedTables(newSchema, idbtrans);
-                }
-            });
+    /**
+     * Upgrade from old schema (which should reflect current db) to
+     * new schema.
+     * @param {Object} old_schema
+     * @param {Object} new_schema
+     * @param {Version} version - the version being upgraded to.
+     * @param {Transaction} trans
+     */
+    function upgrade(old_schema, new_schema, version, trans) {
+        adjustToExistingIndexNames(old_schema, trans.idbtrans);
+        adjustToExistingIndexNames(new_schema, trans.idbtrans);
+        let diff = TableSchema.diff(old_schema, new_schema);
+        let idbtrans = trans.idbtrans;
+        // Add tables
+        diff.add.forEach(function (tuple) {
+            createTable(idbtrans, tuple[0], tuple[1].primKey, tuple[1].indexes);
         });
-
-        // Now, create a queue execution engine
-        function runQueue () {
-            return queue.length ? Promise.resolve(queue.shift()(trans.idbtrans)).then(runQueue) :
-                Promise.resolve();
-        }
-        
-        return runQueue().then(()=>{
-            createMissingTables(globalSchema, idbtrans); // At last, make sure to create any missing tables. (Needed by addons that add stores to DB without specifying version)
-        });
-    }
-
-    function getSchemaDiff(oldSchema, newSchema) {
-        var diff = {
-            del: [], // Array of table names
-            add: [], // Array of [tableName, newDefinition]
-            change: [] // Array of {name: tableName, recreate: newDefinition, del: delIndexNames, add: newIndexDefs, change: changedIndexDefs}
-        };
-        for (var table in oldSchema) {
-            if (!newSchema[table]) diff.del.push(table);
-        }
-        for (table in newSchema) {
-            var oldDef = oldSchema[table],
-                newDef = newSchema[table];
-            if (!oldDef) {
-                diff.add.push([table, newDef]);
+        // Change tables
+        diff.change.forEach(function (change) {
+            if (change.recreate) {
+                throw new exceptions.Upgrade("No support yet for changing primary key");
             } else {
-                var change = {
-                    name: table,
-                    def: newDef,
-                    recreate: false,
-                    del: [],
-                    add: [],
-                    change: []
-                };
-                if (oldDef.primKey.src !== newDef.primKey.src) {
-                    // Primary key has changed. Remove and re-add table.
-                    change.recreate = true;
-                    diff.change.push(change);
-                } else {
-                    // Same primary key. Just find out what differs:
-                    var oldIndexes = oldDef.idxByName;
-                    var newIndexes = newDef.idxByName;
-                    for (var idxName in oldIndexes) {
-                        if (!newIndexes[idxName]) change.del.push(idxName);
-                    }
-                    for (idxName in newIndexes) {
-                        var oldIdx = oldIndexes[idxName],
-                            newIdx = newIndexes[idxName];
-                        if (!oldIdx) change.add.push(newIdx);
-                        else if (oldIdx.src !== newIdx.src) change.change.push(newIdx);
-                    }
-                    if (change.del.length > 0 || change.add.length > 0 || change.change.length > 0) {
-                        diff.change.push(change);
-                    }
-                }
+                var store = idbtrans.objectStore(change.name);
+                // Add indexes
+                change.add.forEach(function (idx) {
+                    addIndex(store, idx);
+                });
+                // Update indexes
+                change.change.forEach(function (idx) {
+                    store.deleteIndex(idx.name);
+                    addIndex(store, idx);
+                });
+                // Delete indexes
+                change.del.forEach(function (idxName) {
+                    store.deleteIndex(idxName);
+                });
             }
+        });
+        let contentUpgraderHasRun = false;
+        let next;
+        // Run upgrader if it is present.
+        // Each transaction object will contain the table set that was
+        // current in that version (but also not-yet-deleted tables from
+        // its previous version)
+        let schema = TableSchema.fromTransaction(idbtrans);
+        // Update visible store names in transaction.
+        trans.storeNames = keys(schema);
+        removeTablesApi([allTables, db, Transaction.prototype]);
+        setApiOnPlace([allTables, db, Transaction.prototype], schema);
+        if (version._cfg.contentUpgrade) {
+            contentUpgraderHasRun = true;
+            next = Promise.follow(() => {
+                version._cfg.contentUpgrade(trans);
+            });
+        } else {
+            next = Promise.resolve();
         }
-        return diff;
+
+        return next.then(() => {
+            // Dont delete old tables if ieBug is present and a content upgrader has run.
+            // TODO: Add intermediate version to delete these if IE bug is present, see #1.
+            if (!contentUpgraderHasRun || !hasIEDeleteObjectStoreBug) {
+                // Delete old tables
+                deleteRemovedTables(diff.del, idbtrans);
+            }
+        }).then(() => {
+            // At last, make sure to create any missing tables. (Needed by
+            // addons that add stores to DB without specifying version)
+            createMissingTables(globalSchema, idbtrans);
+        });
     }
 
     function createTable(idbtrans, tableName, primKey, indexes) {
         /// <param name="idbtrans" type="IDBTransaction"></param>
-        var store = idbtrans.db.createObjectStore(tableName, primKey.keyPath ? { keyPath: primKey.keyPath, autoIncrement: primKey.auto } : { autoIncrement: primKey.auto });
+        let objectStoreSpec = {
+            autoIncrement: primKey.auto
+        };
+        if (primKey.keyPath) {
+            objectStoreSpec.keyPath = primKey.keyPath;
+        }
+        var store = idbtrans.db.createObjectStore(tableName, objectStoreSpec);
         indexes.forEach(function (idx) { addIndex(store, idx); });
         return store;
     }
@@ -389,17 +415,20 @@ export default function Dexie(dbName, options) {
         });
     }
 
-    function deleteRemovedTables(newSchema, idbtrans) {
+    function deleteRemovedTables(names, idbtrans) {
         for (var i = 0; i < idbtrans.db.objectStoreNames.length; ++i) {
             var storeName = idbtrans.db.objectStoreNames[i];
-            if (newSchema[storeName] == null) {
+            if (names.includes(storeName)) {
                 idbtrans.db.deleteObjectStore(storeName);
             }
         }
     }
 
     function addIndex(store, idx) {
-        store.createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multi });
+        store.createIndex(idx.name, idx.keyPath, {
+            unique: idx.unique,
+            multiEntry: idx.multi
+        });
     }
 
     //
@@ -452,7 +481,7 @@ export default function Dexie(dbName, options) {
     }
 
     this._whenReady = function (fn) {
-        return fake || openComplete || PSD.letThrough ? fn() : new Promise ((resolve, reject) => {
+        return fake || openComplete || PSD.letThrough ? fn() : new Promise((resolve, reject) => {
             if (!isBeingOpened) {
                 if (!autoOpen) {
                     reject(new exceptions.DatabaseClosed());
@@ -463,7 +492,7 @@ export default function Dexie(dbName, options) {
             dbReadyPromise.then(resolve, reject);
         }).then(fn);
     };
-    
+
     //
     //
     //
@@ -475,89 +504,172 @@ export default function Dexie(dbName, options) {
 
     this.verno = 0;
 
-    this.open = function () {
+    // upgradeTransaction to abort on failure.
+    var upgradeTransaction;
+    // Internal open function used in upgrading.
+    // @param {number} version  the Dexie version to open the database at
+    // @param {number} max_version  the maximum Dexie version to open the db to
+    this._open = function(version, max_version) {
+        return new Promise((resolve, reject) => {
+            let req = indexedDB.open(dbName, Version.dexieToDb(version));
+            req.onerror = eventRejectHandler(reject);
+            req.onblocked = wrap(fireOnBlocked);
+            req.onupgradeneeded = wrap((e) => {
+                upgradeTransaction = e.target.transaction;
+                let db = e.target.result;
+                let version = Version.dbToDexie(db.version);
+                doUpgrade(version, upgradeTransaction, reject);
+            }, reject);
+
+            req.onsuccess = wrap((e) => {
+                upgradeTransaction = null;
+                let idbdb = e.target.result;
+                let dexie_version = Version.dbToDexie(idbdb.version);
+                let next_version = Version.getNext(dexie_version, max_version);
+                // Do subsequent upgrades.
+                if (next_version) {
+                    // Close database and then open at next version.
+                    db._close(idbdb);
+                    resolve(db._open(next_version, max_version));
+                } else {
+                    resolve(idbdb);
+                }
+            });
+        });
+    };
+
+    // Given db, set public interfaces.
+    function setInterfaces(idbdb) {
+        db.verno = Version.dbToDexie(idbdb.version);
+        let schema = TableSchema.fromDb(idbdb);
+        if (idbdb.objectStoreNames.length > 0) {
+            try {
+                let storeNames = safariMultiStoreFix(idbdb.objectStoreNames);
+                adjustToExistingIndexNames(schema,
+                    idbdb.transaction(storeNames, READONLY));
+            } catch (e) {
+                // Safari may bail out if > 1 store names. However, this shouldnt be
+                // a showstopper. Issue #120.
+            }
+        }
+        db._dbSchema = schema;
+        removeTablesApi([allTables, db, Transaction.prototype]);
+        setApiOnPlace([allTables, db, Transaction.prototype], schema);
+    }
+
+    // Use provided db to set instance properties.
+    function onOpen(opened_idb) {
+        idbdb = opened_idb;
+        // Used for emulating versionchange event on IE/Edge/Safari.
+        connections.push(db);
+
+        setInterfaces(idbdb);
+
+        idbdb.onversionchange = wrap(ev => {
+            // detect implementations that not support versionchange (IE/Edge/Safari)
+            db._vcFired = true;
+            db.on("versionchange").fire(ev);
+        });
+
+        if (!hasNativeGetDatabaseNames && dbName !== '__dbnames') {
+            dbNamesDB.dbnames.put({name: dbName}).catch(nop);
+        }
+    }
+
+    // Open a database. Runs all upgraders up to the given max version.
+    // The provided version should correspond to the Dexie version.
+    this.open = (max_version = Infinity) => {
+        // If we're already being opened, resolve to the result of that operation.
         if (isBeingOpened || idbdb)
-            return dbReadyPromise.then(()=> dbOpenError ? rejection (dbOpenError) : db);
-        Debug.debug && (openCanceller._stackHolder = Debug.getErrorWithStack()); // Let stacks point to when open() was called rather than where new Dexie() was called.
+            return dbReadyPromise.then(() => dbOpenError ? Promise.reject(dbOpenError) : db);
         isBeingOpened = true;
         dbOpenError = null;
+        // Let stacks point to when open() was called rather than where new Dexie() was called.
+        Debug.debug && (openCanceller._stackHolder = Debug.getErrorWithStack());
+
         openComplete = false;
-        
+
         // Function pointers to call when the core opening process completes.
-        var resolveDbReady = dbReadyResolve,
-            // upgradeTransaction to abort on failure.
-            upgradeTransaction = null;
-        
+        var resolveDbReady = dbReadyResolve;
+        // Either we get closed or the open/upgrade finishes.
         return Promise.race([openCanceller, new Promise((resolve, reject) => {
-            doFakeAutoComplete(()=>resolve());
-            
-            // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
-            // IE fails when deleting objectStore after reading from it.
-            // A future version of Dexie.js will stopover an intermediate version to workaround this.
-            // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
-            
             // If no API, throw!
             if (!indexedDB) throw new exceptions.MissingAPI(
                 "indexedDB API not found. If using IE10+, make sure to run your code on a server URL "+
                 "(not locally). If using old Safari versions, make sure to include indexedDB polyfill.");
-            
-            var req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
-            if (!req) throw new exceptions.MissingAPI("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
+            // We open the database without a version to get the initial schema
+            // and initiate upgrade if needed.
+            let req = indexedDB.open(dbName);
+            // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
+            if (!req) throw new exceptions.MissingAPI("IndexedDB API not available");
             req.onerror = eventRejectHandler(reject);
             req.onblocked = wrap(fireOnBlocked);
-            req.onupgradeneeded = wrap (function (e) {
+            // Should only be called when we are creating a database for
+            // the first time since we don't specify a version in open.
+            req.onupgradeneeded = wrap((e) => {
+                // Set to be aborted if needed later on.
                 upgradeTransaction = req.transaction;
-                if (autoSchema && !db._allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
-                    // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
-                    // If onupgradeneeded is called it means database did not exist. Reject the open() promise and make sure that we
-                    // do not create a new database by accident here.
-                    req.onerror = preventDefault; // Prohibit onabort error from firing before we're done!
-                    upgradeTransaction.abort(); // Abort transaction (would hope that this would make DB disappear but it doesnt.)
-                    // Close database and delete it.
-                    req.result.close();
-                    var delreq = indexedDB.deleteDatabase(dbName); // The upgrade transaction is atomic, and javascript is single threaded - meaning that there is no risk that we delete someone elses database here!
-                    delreq.onsuccess = delreq.onerror = wrap(function () {
-                        reject (new exceptions.NoSuchDatabase(`Database ${dbName} doesnt exist`));
-                    });
+                let latestVersion = Version.getMax(max_version);
+
+                if (latestVersion) {
+                    // Set up the database with the given version.
+                    create(latestVersion, upgradeTransaction, reject);
                 } else {
-                    upgradeTransaction.onerror = eventRejectHandler(reject);
-                    var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
-                    runUpgraders(oldVer / 10, upgradeTransaction, reject, req);
-                }
-            }, reject);
-            
-            req.onsuccess = wrap (function () {
-                // Core opening procedure complete. Now let's just record some stuff.
-                upgradeTransaction = null;
-                idbdb = req.result;
-                connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.
-
-                if (autoSchema) readGlobalSchema();
-                else if (idbdb.objectStoreNames.length > 0) {
-                    try {
-                        adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
-                    } catch (e) {
-                        // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
+                    // Either the max version provided is too low or we don't have
+                    // any versions defined.
+                    // Unless an addon has specified db._allowEmptyDB, lets make
+                    // the call fail.
+                    if (!db._allowEmptyDB) {
+                        // Caller did not specify a version or schema. Doing
+                        // that is only acceptable for opening already existing
+                        // databases.
+                        // If onupgradeneeded is called it means database did
+                        // not exist. Reject the open() promise and make sure
+                        // that we do not create a new database by accident here.
+                        // Prohibit onabort error from firing before we're done!
+                        req.onerror = preventDefault;
+                        // Abort transaction (would hope that this would make DB
+                        // disappear but it doesnt.)
+                        upgradeTransaction.abort();
+                        // Close database and delete it.
+                        req.result.close();
+                        // The upgrade transaction is atomic, and javascript is
+                        // single threaded - meaning that there is no risk that
+                        // we delete someone else's database here!
+                        var delreq = indexedDB.deleteDatabase(dbName);
+                        delreq.onsuccess = delreq.onerror = wrap(function () {
+                            reject(new exceptions.NoSuchDatabase(`Database ${dbName} doesnt exist`));
+                        });
                     }
+                    // At this pont either the transaction has been
+                    // aborted or we will continue with opening and
+                    // allow the empty database.
                 }
-                
-                idbdb.onversionchange = wrap(ev => {
-                    db._vcFired = true; // detect implementations that not support versionchange (IE/Edge/Safari)
-                    db.on("versionchange").fire(ev);
-                });
-                
-                if (!hasNativeGetDatabaseNames && dbName !== '__dbnames') {
-                    dbNamesDB.dbnames.put({name: dbName}).catch(nop);
-                }
-
-                resolve();
-
             }, reject);
-        })]).then(() => {
-            // Before finally resolving the dbReadyPromise and this promise,
-            // call and await all on('ready') subscribers:
-            // Dexie.vip() makes subscribers able to use the database while being opened.
-            // This is a must since these subscribers take part of the opening procedure.
+
+            // Database is open, upgrade through versions if needed.
+            req.onsuccess = wrap((e) => {
+                upgradeTransaction = null;
+                // Check if there is a specified version that is lower than the max version.
+                let idbdb = e.target.result;
+                let dexie_version = Version.dbToDexie(idbdb.version);
+                let next_version = Version.getNext(dexie_version, max_version);
+                if (next_version) {
+                    // Close database and then open at next version.
+                    db._close(idbdb);
+                    resolve(db._open(next_version, max_version));
+                } else if (dexie_version > max_version) {
+                    throw new exceptions.OpenFailed(
+                        `Max desired version ${max_version} is lower than` +
+                        ` existing database version ${dexie_version}`);
+                } else {
+                    // No upgrades to do.
+                    resolve(idbdb);
+                }
+            }, reject);
+        })]).then((opened_db) => {
+            return onOpen(opened_db);
+        }).then(() => {
             onReadyBeingFired = [];
             return Promise.resolve(Dexie.vip(db.on.ready.fire)).then(function fireRemainders() {
                 if (onReadyBeingFired.length > 0) {
@@ -578,20 +690,30 @@ export default function Dexie(dbName, options) {
                 // Did we fail within onupgradeneeded? Make sure to abort the upgrade transaction so it doesnt commit.
                 upgradeTransaction && upgradeTransaction.abort();
             } catch (e) { }
-            isBeingOpened = false; // Set before calling db.close() so that it doesnt reject openCanceller again (leads to unhandled rejection event).
-            db.close(); // Closes and resets idbdb, removes connections, resets dbReadyPromise and openCanceller so that a later db.open() is fresh.
+            // Set before calling db.close() so that it doesnt reject openCanceller again (leads to unhandled rejection event).
+            isBeingOpened = false;
+            // Closes and resets idbdb, removes connections, resets dbReadyPromise and openCanceller so that a later db.open() is fresh.
+            db.close();
             // A call to db.close() may have made on-ready subscribers fail. Use dbOpenError if set, since err could be a follow-up error on that.
-            dbOpenError = err; // Record the error. It will be used to reject further promises of db operations.
+            // Record the error. It will be used to reject further promises of db operations.
+            dbOpenError = err;
             return rejection (dbOpenError);
-        }).finally(()=>{
+        }).finally(() => {
             openComplete = true;
-            resolveDbReady(); // dbReadyPromise is resolved no matter if open() rejects or resolved. It's just to wake up waiters.
+            // dbReadyPromise is resolved no matter if open() rejects or
+            // resolves. It's just to wake up waiters.
+            resolveDbReady();
         });
     };
-    
+
+    // Internal close.
+    this._close = function (db) {
+        db.close();
+    };
+
     this.close = function () {
         var idx = connections.indexOf(db);
-        if (idx >= 0) connections.splice(idx, 1);        
+        if (idx >= 0) connections.splice(idx, 1);
         if (idbdb) {
             try {idbdb.close();} catch(e){}
             idbdb = null;
@@ -604,11 +726,12 @@ export default function Dexie(dbName, options) {
         dbReadyPromise = new Promise(resolve => {
             dbReadyResolve = resolve;
         });
+        // Reset openCanceller.
         openCanceller = new Promise((_, reject) => {
             cancelOpen = reject;
         });
     };
-    
+
     this.delete = function () {
         var hasArguments = arguments.length > 0;
         return new Promise(function (resolve, reject) {
@@ -647,7 +770,7 @@ export default function Dexie(dbName, options) {
         return dbOpenError !== null;
     };
     this.dynamicallyOpened = function() {
-        return autoSchema;
+        return true;
     };
 
     //
@@ -660,7 +783,7 @@ export default function Dexie(dbName, options) {
         tables: {
             get () {
                 /// <returns type="Array" elementType="Table" />
-                return keys(allTables).map(function (name) { return allTables[name]; });
+                return keys(allTables).map((name) => allTables[name]);
             }
         }
     });
@@ -676,7 +799,7 @@ export default function Dexie(dbName, options) {
                 if (openComplete) {
                     // Database already open. Call subscriber asap.
                     if (!dbOpenError) Promise.resolve().then(subscriber);
-                    // bSticky: Also subscribe to future open sucesses (after close / reopen) 
+                    // bSticky: Also subscribe to future open sucesses (after close / reopen)
                     if (bSticky) subscribe(subscriber);
                 } else if (onReadyBeingFired) {
                     // db.on('ready') subscribers are currently being executed and have not yet resolved or rejected
@@ -695,10 +818,6 @@ export default function Dexie(dbName, options) {
         }
     });
 
-    fakeAutoComplete(function () {
-        db.on("populate").fire(db._createTransaction(READWRITE, dbStoreNames, globalSchema));
-    });
-    
     this.transaction = function () {
         /// <summary>
         ///
@@ -710,7 +829,7 @@ export default function Dexie(dbName, options) {
         var args = extractTransactionArgs.apply(this, arguments);
         return this._transaction.apply(this, args);
     }
-    
+
     function extractTransactionArgs (mode, _tableArgs_, scopeFunc) {
         // Let table arguments be all arguments between mode and last argument.
         var i = arguments.length;
@@ -731,7 +850,7 @@ export default function Dexie(dbName, options) {
         if (!parentTransaction || parentTransaction.db !== db || mode.indexOf('!') !== -1) parentTransaction = null;
         var onlyIfCompatible = mode.indexOf('?') !== -1;
         mode = mode.replace('!', '').replace('?', ''); // Ok. Will change arguments[0] as well but we wont touch arguments henceforth.
-        
+
         try {
             //
             // Get storeNames from arguments. Either through given table instances, or through given table names.
@@ -757,7 +876,7 @@ export default function Dexie(dbName, options) {
                 if (parentTransaction.mode === READONLY && mode === READWRITE) {
                     if (onlyIfCompatible) {
                         // Spawn new transaction instead.
-                        parentTransaction = null; 
+                        parentTransaction = null;
                     }
                     else throw new exceptions.SubTransaction("Cannot enter a sub-transaction with READWRITE mode when parent transaction is READONLY");
                 }
@@ -766,7 +885,7 @@ export default function Dexie(dbName, options) {
                         if (parentTransaction && parentTransaction.storeNames.indexOf(storeName) === -1) {
                             if (onlyIfCompatible) {
                                 // Spawn new transaction instead.
-                                parentTransaction = null; 
+                                parentTransaction = null;
                             }
                             else throw new exceptions.SubTransaction("Table " + storeName +
                                 " not included in parent transaction.");
@@ -792,7 +911,7 @@ export default function Dexie(dbName, options) {
                 // Promise.follow() should not wait for it if so.
                 usePSD(PSD.transless, ()=>db._whenReady(enterTransactionScope)) :
                 db._whenReady (enterTransactionScope));
-            
+
         function enterTransactionScope() {
             return Promise.resolve().then(()=>{
                 // Keep a pointer to last non-transactional PSD to use if someone calls Dexie.ignoreTransaction().
@@ -838,7 +957,7 @@ export default function Dexie(dbName, options) {
                         x // Transaction still active. Continue.
                         : rejection(new exceptions.PrematureCommit(
                             "Transaction committed too early. See http://bit.ly/2eVASrf")))
-                    // No promise returned. Wait for all outstanding promises before continuing. 
+                    // No promise returned. Wait for all outstanding promises before continuing.
                     : promiseFollowed.then(()=>returnValue)
                 ).then(x => {
                     // sub transactions don't react to idbtrans.oncomplete. We must trigger a completion:
@@ -856,7 +975,6 @@ export default function Dexie(dbName, options) {
 
     this.table = function (tableName) {
         /// <returns type="Table"></returns>
-        if (fake && autoSchema) return new Table(tableName);
         if (!hasOwn(allTables, tableName)) { throw new exceptions.InvalidTable(`Table ${tableName} does not exist`); }
         return allTables[tableName];
     };
@@ -873,12 +991,13 @@ export default function Dexie(dbName, options) {
         this.name = name;
         this.schema = tableSchema;
         this._tx = optionalTrans;
-        this.hook = allTables[name] ? allTables[name].hook : Events(null, {
+        this.hook = tableCache[name] ? tableCache[name].hook : Events(null, {
             "creating": [hookCreatingChain, nop],
             "reading": [pureFunctionChain, mirror],
             "updating": [hookUpdatingChain, nop],
             "deleting": [hookDeletingChain, nop]
         });
+        tableCache[this.name] = this;
     }
 
     function BulkErrorHandlerCatchAll(errorList, done, supportHooks) {
@@ -924,7 +1043,7 @@ export default function Dexie(dbName, options) {
                 });
             }
         });
-    }    
+    }
 
     props(Table.prototype, {
 
@@ -972,17 +1091,17 @@ export default function Dexie(dbName, options) {
                 return new WhereClause(this, indexOrCrit);
             if (isArray(indexOrCrit))
                 return new WhereClause(this, `[${indexOrCrit.join('+')}]`);
-            // indexOrCrit is an object map of {[keyPath]:value} 
+            // indexOrCrit is an object map of {[keyPath]:value}
             var keyPaths = keys(indexOrCrit);
             if (keyPaths.length === 1)
                 // Only one critera. This was the easy case:
                 return this
                     .where(keyPaths[0])
                     .equals(indexOrCrit[keyPaths[0]]);
-            
+
             // Multiple criterias.
             // Let's try finding a compound index that matches all keyPaths in
-            // arbritary order:
+            // arbitrary order:
             var compoundIndex = this.schema.indexes.concat(this.schema.primKey).filter(ix =>
                 ix.compound &&
                 keyPaths.every(keyPath => ix.keyPath.indexOf(keyPath) >= 0) &&
@@ -998,7 +1117,7 @@ export default function Dexie(dbName, options) {
             if (!compoundIndex) console.warn(
                 `The query ${JSON.stringify(indexOrCrit)} on ${this.name} would benefit of a ` +
                 `compound index [${keyPaths.join('+')}]`);
-                
+
             // Ok, now let's fallback to finding at least one matching index
             // and filter the rest.
             var idxByName = this.schema.idxByName;
@@ -1011,7 +1130,7 @@ export default function Dexie(dbName, options) {
                             ''+indexOrCrit[keyPath])
                     : r[1]
                 ], [null, null]);
-    
+
             var idx = simpleIndex[0];
             return idx ?
                 this.where(idx.name).equals(indexOrCrit[idx.keyPath])
@@ -1143,7 +1262,7 @@ export default function Dexie(dbName, options) {
                 } else {
                     var effectiveKeys = keys || idbstore.keyPath && objects.map(o=>getByKeyPath(o, idbstore.keyPath));
                     // Generate map of {[key]: object}
-                    var objectLookup = effectiveKeys && arrayToObject(effectiveKeys, (key, i) => key != null && [key, objects[i]]); 
+                    var objectLookup = effectiveKeys && arrayToObject(effectiveKeys, (key, i) => key != null && [key, objects[i]]);
                     var promise = !effectiveKeys ?
 
                         // Auto-incremented key-less objects only without any keys argument.
@@ -1320,9 +1439,9 @@ export default function Dexie(dbName, options) {
                 var effectiveKey = (key !== undefined) ? key : (keyPath && getByKeyPath(obj, keyPath));
                 if (effectiveKey == null)  // "== null" means checking for either null or undefined.
                     return this.add(obj);
-                
+
                 // Since key is optional, make sure we get it from obj if not provided
-                
+
                 // Primary key exist. Lock transaction and try modifying existing. If nothing modified, call add().
                 // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
                 obj = deepClone(obj);
@@ -1399,7 +1518,12 @@ export default function Dexie(dbName, options) {
             }
         }
     });
-    
+
+    extend(Table, {
+        // Store classes to be reset on Table initialization.
+        _class_cache: {}
+    });
+
     //
     //
     //
@@ -1415,7 +1539,7 @@ export default function Dexie(dbName, options) {
         /// <param name="storeNames" type="Array">Array of table names to operate on</param>
         this.db = db;
         this.mode = mode;
-        this.storeNames = storeNames;
+        this._storeNames = storeNames;
         this.idbtrans = null;
         this.on = Events(this, "complete", "error", "abort");
         this.parent = parent || null;
@@ -1427,11 +1551,11 @@ export default function Dexie(dbName, options) {
         this._waitingFor = null;
         this._waitingQueue = null;
         this._spinCount = 0; // Just for debugging waitFor()
-        this._completion = new Promise ((resolve, reject) => {
+        this._completion = new Promise((resolve, reject) => {
             this._resolve = resolve;
             this._reject = reject;
         });
-        
+
         this._completion.then(
             ()=> {
                 this.active = false;
@@ -1582,7 +1706,7 @@ export default function Dexie(dbName, options) {
                 }());
             }
             var currentWaitPromise = root._waitingFor;
-            return new Promise ((resolve, reject) => {
+            return new Promise((resolve, reject) => {
                 promise.then (
                     res => root._waitingQueue.push(wrap(resolve.bind(null, res))),
                     err => root._waitingQueue.push(wrap(reject.bind(null, err)))
@@ -1601,6 +1725,13 @@ export default function Dexie(dbName, options) {
         abort: function () {
             this.active && this._reject(new exceptions.Abort());
             this.active = false;
+        },
+
+        storeNames: {
+            get: function () { return this._storeNames },
+            set: function (storeNames) {
+                this._storeNames = storeNames;
+            }
         },
 
         tables: {
@@ -1639,7 +1770,7 @@ export default function Dexie(dbName, options) {
             var collection = collectionOrWhereClause instanceof WhereClause ?
                 new Collection (collectionOrWhereClause) :
                 collectionOrWhereClause;
-                
+
             collection._ctx.error = T ? new T(err) : new TypeError(err);
             return collection;
         }
@@ -1968,8 +2099,6 @@ export default function Dexie(dbName, options) {
     });
 
 
-
-
     //
     //
     //
@@ -2012,11 +2141,11 @@ export default function Dexie(dbName, options) {
             valueMapper: table.hook.reading.fire
         };
     }
-    
+
     function isPlainKeyRange (ctx, ignoreLimitFilter) {
         return !(ctx.filter || ctx.algorithm || ctx.or) &&
             (ignoreLimitFilter ? ctx.justLimit : !ctx.replayFilter);
-    }    
+    }
 
     props(Collection.prototype, function () {
 
@@ -2047,7 +2176,8 @@ export default function Dexie(dbName, options) {
          **/
         function getIndexOrStore(ctx, store) {
             if (ctx.isPrimKey) return store;
-            var indexSpec = ctx.table.schema.idxByName[ctx.index];
+            var indexSpec = ctx.table.schema.idxByName[ctx.index] ||
+                            ctx.table.schema.idxByKeyPath[ctx.index];
             if (!indexSpec) throw new exceptions.Schema("KeyPath " + ctx.index + " on object store " + store.name + " is not indexed");
             return store.index(indexSpec.name);
         }
@@ -2097,7 +2227,7 @@ export default function Dexie(dbName, options) {
         function getInstanceTemplate(ctx) {
             return ctx.table.schema.instanceTemplate;
         }
-        
+
         return {
 
             //
@@ -2152,7 +2282,7 @@ export default function Dexie(dbName, options) {
                         primaryKey = getByKeyPath(item, primKeyPath);
                     fn(item, {key: key, primaryKey: primaryKey});
                 }
-                
+
                 return this._read(function (resolve, reject, idbstore) {
                     iter(ctx, fn, resolve, reject, idbstore);
                 });
@@ -2298,10 +2428,10 @@ export default function Dexie(dbName, options) {
                 });
                 // match filters not used in Dexie.js but can be used by 3rd part libraries to test a
                 // collection for a match without querying DB. Used by Dexie.Observable.
-                addMatchFilter(this._ctx, filterFunction); 
+                addMatchFilter(this._ctx, filterFunction);
                 return this;
             },
-            
+
             and: function (filterFunction) {
                 return this.filter(filterFunction);
             },
@@ -2330,7 +2460,7 @@ export default function Dexie(dbName, options) {
                 this._ctx.unique = "unique";
                 return this.eachKey(cb);
             },
-            
+
             eachPrimaryKey: function (cb) {
                 var ctx = this._ctx;
                 ctx.keysOnly = !ctx.isMatch;
@@ -2347,7 +2477,7 @@ export default function Dexie(dbName, options) {
                     return a;
                 }).then(cb);
             },
-            
+
             primaryKeys: function (cb) {
                 var ctx = this._ctx;
                 if (hasGetAll && ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
@@ -2628,22 +2758,19 @@ export default function Dexie(dbName, options) {
     //
     //
 
-    function lowerVersionFirst(a, b) {
-        return a._cfg.version - b._cfg.version;
-    }
-
-    function setApiOnPlace(objs, tableNames, dbschema) {
-        tableNames.forEach(function (tableName) {
-            var schema = dbschema[tableName];
-            objs.forEach(obj => {
-                if (!(tableName in obj)) {
+    function setApiOnPlace(objs, schema) {
+        let names = keys(schema);
+        names.forEach((name) => {
+            let table = schema[name];
+            objs.forEach((obj) => {
+                if (!(name in obj)) {
                     if (obj === Transaction.prototype || obj instanceof Transaction) {
                         // obj is a Transaction prototype (or prototype of a subclass to Transaction)
                         // Make the API a getter that returns this.table(tableName)
-                        setProp(obj, tableName, {get() { return this.table(tableName); }});
+                        setProp(obj, name, {get() { return this.table(name); }});
                     } else {
                         // Table will not be bound to a transaction (will use Dexie.currentTransaction)
-                        obj[tableName] = new Table(tableName, schema);
+                        obj[name] = new Table(name, table);
                     }
                 }
             });
@@ -2659,12 +2786,12 @@ export default function Dexie(dbName, options) {
     }
 
     function iterate(req, filter, fn, resolve, reject, valueMapper) {
-        
+
         // Apply valueMapper (hook('reading') or mappped class)
         var mappedFn = valueMapper ? (x,c,a) => fn(valueMapper(x),c,a) : fn;
         // Wrap fn with PSD and microtick stuff from Promise.
         var wrappedFn = wrap(mappedFn, reject);
-        
+
         if (!req.onerror) req.onerror = eventRejectHandler(reject);
         if (filter) {
             req.onsuccess = trycatcher(function filter_record() {
@@ -2690,29 +2817,6 @@ export default function Dexie(dbName, options) {
                 }
             }, reject);
         }
-    }
-
-    function parseIndexSyntax(indexes) {
-        /// <param name="indexes" type="String"></param>
-        /// <returns type="Array" elementType="IndexSpec"></returns>
-        var rv = [];
-        indexes.split(',').forEach(function (index) {
-            index = index.trim();
-            var name = index.replace(/([&*]|\+\+)/g, ""); // Remove "&", "++" and "*"
-            // Let keyPath of "[a+b]" be ["a","b"]:
-            var keyPath = /^\[/.test(name) ? name.match(/^\[(.*)\]$/)[1].split('+') : name;
-
-            rv.push(new IndexSpec(
-                name,
-                keyPath || null,
-                /\&/.test(index),
-                /\*/.test(index),
-                /\+\+/.test(index),
-                isArray(keyPath),
-                /\./.test(index)
-            ));
-        });
-        return rv;
     }
 
     function cmp(key1, key2) {
@@ -2751,30 +2855,6 @@ export default function Dexie(dbName, options) {
             filter2;
     }
 
-    function readGlobalSchema() {
-        db.verno = idbdb.version / 10;
-        db._dbSchema = globalSchema = {};
-        dbStoreNames = slice(idbdb.objectStoreNames, 0);
-        if (dbStoreNames.length === 0) return; // Database contains no stores.
-        var trans = idbdb.transaction(safariMultiStoreFix(dbStoreNames), 'readonly');
-        dbStoreNames.forEach(function (storeName) {
-            var store = trans.objectStore(storeName),
-                keyPath = store.keyPath,
-                dotted = keyPath && typeof keyPath === 'string' && keyPath.indexOf('.') !== -1;
-            var primKey = new IndexSpec(keyPath, keyPath || "", false, false, !!store.autoIncrement, keyPath && typeof keyPath !== 'string', dotted);
-            var indexes = [];
-            for (var j = 0; j < store.indexNames.length; ++j) {
-                var idbindex = store.index(store.indexNames[j]);
-                keyPath = idbindex.keyPath;
-                dotted = keyPath && typeof keyPath === 'string' && keyPath.indexOf('.') !== -1;
-                var index = new IndexSpec(idbindex.name, keyPath, !!idbindex.unique, !!idbindex.multiEntry, false, keyPath && typeof keyPath !== 'string', dotted);
-                indexes.push(index);
-            }
-            globalSchema[storeName] = new TableSchema(storeName, primKey, indexes, {});
-        });
-        setApiOnPlace([allTables], keys(globalSchema), globalSchema);
-    }
-
     function adjustToExistingIndexNames(schema, idbtrans) {
         /// <summary>
         /// Issue #30 Problem with existing db - adjust to existing index names when migrating from non-dexie db
@@ -2785,7 +2865,6 @@ export default function Dexie(dbName, options) {
         for (var i = 0; i < storeNames.length; ++i) {
             var storeName = storeNames[i];
             var store = idbtrans.objectStore(storeName);
-            hasGetAll = 'getAll' in store;
             for (var j = 0; j < store.indexNames.length; ++j) {
                 var indexName = store.indexNames[j];
                 var keyPath = store.index(indexName).keyPath;
@@ -2883,7 +2962,7 @@ function eventSuccessHandler (resolve) {
 function hookedEventRejectHandler (reject) {
     return wrap(function (event) {
         // See comment on hookedEventSuccessHandler() why wrap() is needed only when supporting hooks.
-        
+
         var req = event.target,
             err = req.error,
             ctx = req._hookCtx,// Contains the hook error handler. Put here instead of closure to boost performance.
@@ -2945,6 +3024,31 @@ function IndexSpec(name, keyPath, unique, multi, auto, compound, dotted) {
     this.src = (unique ? '&' : '') + (multi ? '*' : '') + (auto ? "++" : "") + keyPathSrc;
 }
 
+extend(IndexSpec, {
+    parse: (indexes) => {
+        /// <param name="indexes" type="String"></param>
+        /// <returns type="Array" elementType="IndexSpec"></returns>
+        var rv = [];
+        indexes.split(',').forEach(function (index) {
+            index = index.trim();
+            var name = index.replace(/([&*]|\+\+)/g, ""); // Remove "&", "++" and "*"
+            // Let keyPath of "[a+b]" be ["a","b"]:
+            var keyPath = /^\[/.test(name) ? name.match(/^\[(.*)\]$/)[1].split('+') : name;
+
+            rv.push(new IndexSpec(
+                name,
+                keyPath || "",
+                /\&/.test(index),
+                /\*/.test(index),
+                /\+\+/.test(index),
+                isArray(keyPath),
+                /\./.test(index)
+            ));
+        });
+        return rv;
+    }
+});
+
 //
 // TableSchema struct
 //
@@ -2959,7 +3063,133 @@ function TableSchema(name, primKey, indexes, instanceTemplate) {
     this.instanceTemplate = instanceTemplate;
     this.mappedClass = null;
     this.idxByName = arrayToObject(indexes, index => [index.name, index]);
+    this.idxByKeyPath = arrayToObject(indexes,
+        index => [index.compound ? index.src : index.keyPath, index]);
 }
+
+extend(TableSchema, {
+    // Get the operation differences between two versions.
+    // Assumes the new schema is as it was specified in the original version declaration, no pre-processing
+    // has been done.
+    // Diff between two schemas containing TableSchemas
+    diff: (a, b) => {
+        let diff = {
+            // Array of table names
+            del: [],
+            // Array of [tableName, newDefinition]
+            add: [],
+            // Array of {name: tableName, recreate: newDefinition, del: delIndexNames, add: newIndexDefs, change: changedIndexDefs}
+            change: []
+        };
+        for (let table in a) {
+            if (b[table] === null) diff.del.push(table);
+        }
+        for (let table in b) {
+            let current = a[table];
+            let spec = b[table];
+            // Deleted table.
+            if (!spec) continue;
+            if (!current) {
+                diff.add.push([table, spec]);
+                continue;
+            }
+            let change = {
+                name: table,
+                def: spec,
+                recreate: false,
+                del: [],
+                add: [],
+                change: []
+            };
+            if (current.primKey.src !== spec.primKey.src) {
+                // Primary key has changed. Remove and re-add table.
+                change.recreate = true;
+                diff.change.push(change);
+            } else {
+                // Same primary key. Just find out what differs:
+                let oldIndexes = current.idxByName;
+                let newIndexes = spec.idxByName;
+                for (let idxName in oldIndexes) {
+                    if (!newIndexes[idxName]) change.del.push(idxName);
+                }
+                for (let idxName in newIndexes) {
+                    var oldIdx = oldIndexes[idxName],
+                        newIdx = newIndexes[idxName];
+                    if (!oldIdx) change.add.push(newIdx);
+                    else if (oldIdx.src !== newIdx.src) change.change.push(newIdx);
+                }
+                if (change.del.length > 0 || change.add.length > 0 || change.change.length > 0) {
+                    diff.change.push(change);
+                }
+            }
+        }
+        return diff;
+    },
+    // Derive from Version stores object.
+    fromVersionStores: (stores) => {
+        let result = {};
+        let tables = keys(stores);
+        tables.forEach((name) => {
+            let table = stores[name];
+            if (table === null) {
+                result[name] = null;
+                return;
+            }
+            var instanceTemplate = {};
+            var indexes = IndexSpec.parse(table);
+            var primKey = indexes.shift();
+            if (primKey.multi)
+                throw new exceptions.Schema("Primary key cannot be multi-valued");
+            if (primKey.keyPath)
+                setByKeyPath(instanceTemplate, primKey.keyPath, primKey.auto ? 0 : primKey.keyPath);
+            indexes.forEach((index) => {
+                if (index.auto)
+                    throw new exceptions.Schema("Only primary key can be marked as autoIncrement (++)");
+                if (!index.keyPath)
+                    throw new exceptions.Schema("Index must have a name and cannot be an empty string");
+                setByKeyPath(instanceTemplate, index.keyPath, index.compound ? index.keyPath.map(() => "") : "");
+            });
+            result[name] = new TableSchema(name, primKey, indexes, instanceTemplate);
+        });
+        return result;
+    },
+    // Don't use during upgrade transaction.'
+    fromDb: (db) => {
+        let storeNames = [...db.objectStoreNames];
+        if (!storeNames.length) return {};
+        let trans = db.transaction(safariMultiStoreFix(storeNames), 'readonly');
+        return TableSchema.fromTransaction(trans);
+    },
+    fromTransaction: (idbtrans) => {
+        function getNameFromPath(keyPath) {
+            if (Array.isArray(keyPath)) {
+                return `[${keyPath.join('+')}]`;
+            } else {
+                return keyPath;
+            }
+        }
+        let schema = {};
+        let storeNames = [...idbtrans.db.objectStoreNames];
+        if (!storeNames.length) return schema;
+        storeNames.forEach((name) => {
+            let store = idbtrans.objectStore(name);
+            let keyPath = store.keyPath;
+            let dotted = keyPath && typeof keyPath === 'string' && keyPath.includes('.');
+            var primKey = new IndexSpec(getNameFromPath(keyPath), keyPath || "", false, false, !!store.autoIncrement, keyPath && typeof keyPath !== 'string', dotted);
+            var indexes = [];
+            for (let i = 0; i < store.indexNames.length; i++) {
+                let indexName = store.indexNames[i];
+                var idbindex = store.index(indexName);
+                keyPath = idbindex.keyPath;
+                dotted = keyPath && typeof keyPath === 'string' && keyPath.includes('.');
+                var index = new IndexSpec(idbindex.name, keyPath, !!idbindex.unique, !!idbindex.multiEntry, false, keyPath && typeof keyPath !== 'string', dotted);
+                indexes.push(index);
+            }
+            schema[name] = new TableSchema(name, primKey, indexes, {});
+        });
+        return schema;
+    }
+});
 
 // Used in when defining dependencies later...
 // (If IndexedDBShim is loaded, prefer it before standard indexedDB)
@@ -2979,9 +3209,9 @@ props(Dexie, fullNameExceptions); // Dexie.XXXError = class XXXError {...};
 
 //
 // Static methods and properties
-// 
+//
 props(Dexie, {
-    
+
     //
     // Static delete() method.
     //
@@ -2994,7 +3224,7 @@ props(Dexie, {
         };
         return promise;
     },
-    
+
     //
     // Static exists() method.
     //
@@ -3004,7 +3234,7 @@ props(Dexie, {
             return true;
         }).catch(Dexie.NoSuchDatabaseError, () => false);
     },
-    
+
     //
     // Static method for retrieving a list of all existing databases at current host.
     //
@@ -3018,7 +3248,7 @@ props(Dexie, {
             req.onerror = eventRejectHandler(reject);
         }).then(cb) : dbNamesDB.dbnames.toCollection().primaryKeys(cb);
     },
-    
+
     defineClass: function (structure) {
         /// <summary>
         ///     Create a javascript constructor based on given template for which properties to expect in the class.
@@ -3035,9 +3265,9 @@ props(Dexie, {
         }
         return Class;
     },
-    
+
     applyStructure: applyStructure,
-    
+
     ignoreTransaction: function (scopeFunc) {
         // In case caller is within a transaction but needs to create a separate transaction.
         // Example of usage:
@@ -3064,7 +3294,7 @@ props(Dexie, {
             usePSD(PSD.transless, scopeFunc) : // Use the closest parent that was non-transactional.
             scopeFunc(); // No need to change scope because there is no ongoing transaction.
     },
-    
+
     vip: function (fn) {
         // To be used by subscribers to the on('ready') event.
         // This will let caller through to access DB even when it is blocked while the db.ready() subscribers are firing.
@@ -3103,7 +3333,7 @@ props(Dexie, {
             return rejection(e);
         }
     },
-    
+
     // Dexie.currentTransaction property
     currentTransaction: {
         get: () => PSD.trans || null
@@ -3113,16 +3343,16 @@ props(Dexie, {
         // If a function is provided, invoke it and pass the returning value to Transaction.waitFor()
         var promise = Promise.resolve(
             typeof promiseOrFunction === 'function' ? Dexie.ignoreTransaction(promiseOrFunction) : promiseOrFunction)
-            .timeout(optionalTimeout || 60000); // Default the timeout to one minute. Caller may specify Infinity if required.       
+            .timeout(optionalTimeout || 60000); // Default the timeout to one minute. Caller may specify Infinity if required.
 
         // Run given promise on current transaction. If no current transaction, just return a Dexie promise based
         // on given value.
         return PSD.trans ? PSD.trans.waitFor(promise) : promise;
     },
-    
+
     // Export our Promise implementation since it can be handy as a standalone Promise implementation
     Promise: Promise,
-    
+
     // Dexie.debug proptery:
     // Dexie.debug = false
     // Dexie.debug = true
@@ -3133,7 +3363,7 @@ props(Dexie, {
             Debug.setDebug(value, value === 'dexie' ? ()=>true : dexieStackFrameFilter);
         }
     },
-    
+
     // Export our derive/extend/override methodology
     derive: derive,
     extend: extend,
@@ -3155,14 +3385,14 @@ props(Dexie, {
     addons: [],
     // Global DB connection list
     connections: connections,
-    
+
     MultiModifyError: exceptions.Modify, // Backward compatibility 0.9.8. Deprecate.
     errnames: errnames,
-    
+
     // Export other static classes
     IndexSpec: IndexSpec,
     TableSchema: TableSchema,
-    
+
     //
     // Dependencies
     //
@@ -3174,16 +3404,17 @@ props(Dexie, {
     dependencies: {
         // Required:
         indexedDB: idbshim.shimIndexedDB || _global.indexedDB || _global.mozIndexedDB || _global.webkitIndexedDB || _global.msIndexedDB,
-        IDBKeyRange: idbshim.IDBKeyRange || _global.IDBKeyRange || _global.webkitIDBKeyRange
+        IDBKeyRange: idbshim.IDBKeyRange || _global.IDBKeyRange || _global.webkitIDBKeyRange,
+        IDBObjectStore: idbshim.IDBObjectStore || _global.IDBObjectStore || _global.mozIDBObjectStore || _global.webkitIDBObjectStore
     },
-    
+
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
     semVer: DEXIE_VERSION,
     version: DEXIE_VERSION.split('.')
         .map(n => parseInt(n))
         .reduce((p,c,i) => p + (c/Math.pow(10,i*2))),
     fakeAutoComplete: fakeAutoComplete,
-    
+
     // https://github.com/dfahlander/Dexie.js/issues/186
     // typescript compiler tsc in mode ts-->es5 & commonJS, will expect require() to return
     // x.default. Workaround: Set Dexie.default = Dexie.
