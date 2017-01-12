@@ -1,7 +1,7 @@
 # See http://help.github.com/ignore-files/ for more about ignoring files.
 
 # compiled output
-/dist
+#/dist - this is the demo branch. We want to checkin the output
 /tmp
 
 # dependencies
