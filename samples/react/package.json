@@ -15,5 +15,6 @@
     "build": "react-scripts build",
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject"
-  }
+  },
+  "homepage": "https://cdn.rawgit.com/dfahlander/Dexie.js/tree/demo/samples/react/build"
 }
