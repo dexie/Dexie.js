@@ -16,5 +16,5 @@
     "test": "react-scripts test --env=jsdom",
     "eject": "react-scripts eject"
   },
-  "homepage": "https://cdn.rawgit.com/dfahlander/Dexie.js/demo/samples/react/build"
+  "homepage": "https://rawgit.com/dfahlander/Dexie.js/demo/samples/react/build/"
 }
