@@ -216,7 +216,7 @@ export declare module Dexie {
     var Promise: DexiePromiseConstructor;
 
     interface Version {
-        stores(schema: { [key: string]: string }): Version;
+        stores(schema: { [key: string]: string | null }): Version;
         upgrade(fn: (trans: Transaction) => void): Version;
     }
 
