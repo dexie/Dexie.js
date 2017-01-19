@@ -89,7 +89,7 @@
     "babel-cli": "^6.18.0",
     "babel-plugin-transform-regenerator": "^6.21.0",
     "eslint": "^3.7.1",
-    "just-build": "^0.9.4",
+    "just-build": "^0.9.5",
     "karma": "^0.13.22",
     "karma-browserstack-launcher": "^1.1.1",
     "karma-chrome-launcher": "^2.0.0",
