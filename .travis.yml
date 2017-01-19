@@ -10,6 +10,5 @@ before_script:
   - export DISPLAY=:99.0
   - sh -e /etc/init.d/xvfb start
 script:
-  - npm install
   - npm run build dev
   - node_modules/.bin/karma start test/karma.travis.conf.js --single-run

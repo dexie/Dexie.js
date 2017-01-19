@@ -33,14 +33,14 @@
     "url": "https://github.com/dfahlander/Dexie.js/issues"
   },
   "scripts": {
-    "build": "just-build",
-    "watch": "just-build --watch",
+    "build": "node_modules/.bin/just-build",
+    "watch": "node_modules/.bin/just-build --watch",
     "test": "npm run build dev && npm run test:local",
-    "eslint": "eslint src",
-    "test:local": "karma start test/karma.conf.js --single-run",
-    "test:release": "karma start test/karma.release.conf.js --single-run",
-    "test:debug": "karma start test/karma.conf.js --log-level debug",
-    "test:typings": "tsc -p test/typings-test/"
+    "eslint": "node_modules/.bin/eslint src",
+    "test:local": "node_modules/.bin/karma start test/karma.conf.js --single-run",
+    "test:release": "node_modules/.bin/karma start test/karma.release.conf.js --single-run",
+    "test:debug": "node_modules/.bin/karma start test/karma.conf.js --log-level debug",
+    "test:typings": "node_modules/.bin/tsc -p test/typings-test/"
   },
   "just-build": {
     "default": [
