@@ -25,6 +25,10 @@ module("transaction", {
 var NativePromise = window.Promise;
 
 asyncTest("Transaction should work when returning native Promise in transaction scope", function() {
+    if (!NativePromise) {
+        ok(true, "Current Browser doesn't have a native Promise");
+        return start();
+    }
     db.transaction('rw', db.users, trans => {
         ok(Dexie.currentTransaction === trans, "First argument to transaction callback should be the transaction instance itself");
         return NativePromise.resolve().then(()=> {

@@ -47,7 +47,7 @@ test("upgrade", (assert) => {
         // Add baseTables.
         expected = expected.concat(baseTables).sort();
         // Already sorted.
-        var idbNames = [...db.backendDB().objectStoreNames];
+        var idbNames = [].slice.call(db.backendDB().objectStoreNames);
         var dexieNames = db.tables.map(t => t.name).sort();
         deepEqual(dexieNames,
                   expected,
