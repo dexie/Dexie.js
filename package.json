@@ -33,14 +33,14 @@
     "url": "https://github.com/dfahlander/Dexie.js/issues"
   },
   "scripts": {
-    "build": "./node_modules/.bin/just-build",
-    "watch": "./node_modules/.bin/just-build --watch",
+    "build": "just-build",
+    "watch": "just-build --watch",
     "test": "npm run build dev && npm run test:local",
-    "eslint": "node_modules/.bin/eslint src",
-    "test:local": "node_modules/.bin/karma start test/karma.conf.js --single-run",
-    "test:release": "node_modules/.bin/karma start test/karma.release.conf.js --single-run",
-    "test:debug": "node_modules/.bin/karma start test/karma.conf.js --log-level debug",
-    "test:typings": "node_modules/.bin/tsc -p test/typings-test/"
+    "eslint": "eslint src",
+    "test:local": "karma start test/karma.conf.js --single-run",
+    "test:release": "karma start test/karma.release.conf.js --single-run",
+    "test:debug": "karma start test/karma.conf.js --log-level debug",
+    "test:typings": "tsc -p test/typings-test/"
   },
   "just-build": {
     "default": [
@@ -51,7 +51,8 @@
       "# Build es5 output",
       "tsc --allowJs -t es5 -m es2015 --outDir tmp/es5/src/ --sourceMap src/Dexie.js [--watch 'Compilation complete.']",
       "rollup -c tools/build-configs/rollup.config.js",
-      "node tools/replaceVersionAndDate.js dist/dexie.js"
+      "node tools/replaceVersionAndDate.js dist/dexie.js",
+      "eslint src"      
     ],
     "dexie-es6": [
       "tsc --allowJs -t es2015 -m es2015 --outDir tmp/es6/src/ --sourceMap src/Dexie.js [--watch 'Compilation complete.']",
@@ -66,8 +67,7 @@
     ],
     "dev": [
       "# Build ES5 module and the tests",
-      "just-build dexie test",
-      "eslint src"
+      "just-build dexie test"
     ],
     "gzip": [
       "# Optionally gzip to find the size of the minified & gzipped version",
