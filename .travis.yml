@@ -3,7 +3,6 @@ addons:
   firefox: "47.0"
 node_js:
   - "6"
-  - "4"
 matrix:
   fast_finish: true
 before_script:

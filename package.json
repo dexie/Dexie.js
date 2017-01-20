@@ -82,7 +82,7 @@
     ]
   },
   "engines": {
-    "node": ">=4.2"
+    "node": ">=6.0"
   },
   "homepage": "http://dexie.org",
   "devDependencies": {
