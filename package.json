@@ -52,7 +52,7 @@
       "tsc --allowJs -t es5 -m es2015 --outDir tmp/es5/src/ --sourceMap src/Dexie.js [--watch 'Compilation complete.']",
       "rollup -c tools/build-configs/rollup.config.js",
       "node tools/replaceVersionAndDate.js dist/dexie.js",
-      "eslint src"      
+      "eslint src"
     ],
     "dexie-es6": [
       "tsc --allowJs -t es2015 -m es2015 --outDir tmp/es6/src/ --sourceMap src/Dexie.js [--watch 'Compilation complete.']",
@@ -89,7 +89,7 @@
     "babel-cli": "^6.18.0",
     "babel-plugin-transform-regenerator": "^6.21.0",
     "eslint": "^3.7.1",
-    "just-build": "^0.9.6",
+    "just-build": "^0.9.11",
     "karma": "^0.13.22",
     "karma-browserstack-launcher": "^1.1.1",
     "karma-chrome-launcher": "^2.0.0",
