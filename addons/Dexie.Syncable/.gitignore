@@ -3,3 +3,4 @@ dist/*.map
 dist/*.ts
 dist/*.gz
 tools/tmp/
+.eslintcache

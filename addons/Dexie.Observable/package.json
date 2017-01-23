@@ -35,7 +35,7 @@
   "scripts": {
     "build": "just-build",
     "watch": "just-build --watch",
-    "test": "npm run build && npm run test:typings && npm run test:local && test:unit",
+    "test": "npm run build && npm run test:typings && npm run test:local && npm run test:unit",
     "eslint": "eslint src",
     "eslint:test": "eslint test/unit --ignore-pattern bundle.js --ignore-pattern karma-env.js",
     "test:unit": "karma start test/unit/karma.conf.js --single-run",
