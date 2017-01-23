@@ -2,4 +2,4 @@ dist/*.js
 dist/*.map
 dist/*.ts
 dist/*.gz
-tools/tmp/
+**/tmp/

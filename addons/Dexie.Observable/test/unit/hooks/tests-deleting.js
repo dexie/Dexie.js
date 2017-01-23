@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import {module, asyncTest, start, stop, strictEqual, deepEqual, ok} from 'QUnit';
-import {resetDatabase} from '../../../../../../../test/dexie-unittest-utils';
+import {resetDatabase} from '../../../../../test/dexie-unittest-utils';
 import initDeletingHook from '../../../src/hooks/deleting';
 import initWakeupObservers from '../../../src/wakeup-observers';
 import initOverrideCreateTransaction from '../../../src/override-create-transaction';

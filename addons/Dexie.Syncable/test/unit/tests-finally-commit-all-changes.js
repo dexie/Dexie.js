@@ -1,7 +1,7 @@
 import Dexie from 'dexie';
 import 'dexie-observable';
 import {module, asyncTest, start, stop, strictEqual, deepEqual, ok} from 'QUnit';
-import {resetDatabase} from '../../../../../../test/dexie-unittest-utils';
+import {resetDatabase} from '../../../../test/dexie-unittest-utils';
 import initFinallyCommitAllChanges from '../../src/finally-commit-all-changes';
 import {CREATE, DELETE, UPDATE} from '../../src/change_types';
 

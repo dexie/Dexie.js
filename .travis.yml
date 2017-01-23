@@ -3,13 +3,12 @@ addons:
   firefox: "47.0"
 node_js:
   - "6"
-  - "4"
 matrix:
   fast_finish: true
 before_script:
   - export DISPLAY=:99.0
   - sh -e /etc/init.d/xvfb start
 script:
-  - eslint src
   - npm run build
+  - npm run test:typings
   - node_modules/.bin/karma start test/karma.travis.conf.js --single-run

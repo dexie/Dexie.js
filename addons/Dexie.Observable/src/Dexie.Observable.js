@@ -1,15 +1,23 @@
-/// <reference path="../../../dist/dexie.js" />
-
-/**
- * Dexie.Observable.js
- * ===================
- * Dexie addon for observing database changes not just on local db instance but also on other instances and windows.
+/* ========================================================================== 
+ *                           dexie-observable.js
+ * ==========================================================================
  *
- * version: {version} Alpha, {date}
+ * Dexie addon for observing database changes not just on local db instance
+ * but also on other instances, tabs and windows.
  *
- * Disclaimber: This addon is in alpha status meaning that
- * its API and behavior may change.
+ * Comprises a base framework for dexie-syncable.js
  *
+ * By David Fahlander, david.fahlander@gmail.com,
+ *    Nikolas Poniros, https://github.com/nponiros
+ *
+ * ==========================================================================
+ *
+ * Version {version}, {date}
+ *
+ * http://dexie.org
+ *
+ * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
+ * 
  */
 import Dexie from 'dexie';
 import { nop, promisableChain, createUUID } from './utils';

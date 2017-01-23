@@ -3,7 +3,7 @@ import 'dexie-observable';
 // Add this so we have the SyncNode.prototype.save method
 import '../../src/Dexie.Syncable';
 import {module, asyncTest, test, start, stop, propEqual, deepEqual, ok} from 'QUnit';
-import {resetDatabase} from '../../../../../../test/dexie-unittest-utils';
+import {resetDatabase} from '../../../../test/dexie-unittest-utils';
 import initPersistedContext from '../../src/PersistedContext';
 
 const db = new Dexie('TestDBTable');

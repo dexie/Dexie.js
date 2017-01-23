@@ -25,6 +25,10 @@ module("transaction", {
 var NativePromise = window.Promise;
 
 asyncTest("Transaction should work when returning native Promise in transaction scope", function() {
+    if (!NativePromise) {
+        ok(true, "Current Browser doesn't have a native Promise");
+        return start();
+    }
     db.transaction('rw', db.users, trans => {
         ok(Dexie.currentTransaction === trans, "First argument to transaction callback should be the transaction instance itself");
         return NativePromise.resolve().then(()=> {
@@ -748,42 +752,40 @@ asyncTest("Dexie.currentTransaction in CRUD hooks", 53, function () {
     db.users.hook.updating.subscribe(onUpdating);
     db.users.hook.deleting.subscribe(onDeleting);
 
-    function doTheTests() {
-        let promises = [];
-        promises.push(db.users.add({ username: "monkey1" }));
-        promises.push(db.users.add({ username: "monkey1" }).catch(function(ex) {
+    async function doTheTests() {
+        await db.users.add({ username: "monkey1" });
+        await db.users.add({ username: "monkey1" }).catch(function(ex) {
             ok(true, "Should fail adding a second monkey1");
-        })); // Trigger creating.onerror
+        }); // Trigger creating.onerror
         // Test bulkAdd as well:
         ok(true, "Testing bulkAdd");
-        promises.push(db.users.bulkAdd([{ username: "monkey1" }, { username: "monkey2" }])
+        await db.users.bulkAdd([{ username: "monkey1" }, { username: "monkey2" }])
             .then(()=>ok(false, "Should get error on one of the adds"))
             .catch(Dexie.BulkError, e=>{
                 ok(true, "Got BulkError");
                 ok(e.failures.length === 1, "One error out of two: " + e);
-        }));
-        promises.push(db.users.where("username").equals("monkey1").modify({
+        });
+        await db.users.where("username").equals("monkey1").modify({
             name: "Monkey 1"
-        }));
-        promises.push(db.users.where("username").equals("monkey1").modify(function (user) {
+        });
+        await db.users.where("username").equals("monkey1").modify(user => {
             user.username = "monkey2";// trigger updating.onerror
         }).catch(function(ex) {
             ok(true, "Should fail modifying primary key");
-        }));
-        promises.push(db.users.toArray());
-        promises.push(db.users.delete("monkey2"));
-        promises.push(db.users.delete("monkey1"));
-        return Dexie.Promise.all(promises);
+        });
+        await db.users.toArray();
+        await db.users.delete("monkey2");
+        await db.users.delete("monkey1");
     };
 
     doTheTests().then(function () {
         ok(true, "Now in an explicit transaction block...");
-        return db.transaction('rw', db.users, function() {
-            doTheTests();
+        return db.transaction('rw', db.users, async () => {
+            await doTheTests();
         });
     }).catch(function(ex) {
         ok(false, ex);
-    }).finally(function() {
+    }).then(() => {
         db.users.hook.creating.unsubscribe(onCreating);
         db.users.hook.reading.unsubscribe(onReading);
         db.users.hook.updating.unsubscribe(onUpdating);
