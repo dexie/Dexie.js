@@ -367,10 +367,10 @@ export default function Observable(db) {
      */
     function heartbeat() {
         heartbeatHandle = null;
-        var ourSyncNodeId = mySyncNode.node && mySyncNode.node.id;
-        if (!ourSyncNodeId) return;
+        var currentInstance = mySyncNode.node && mySyncNode.node.id;
+        if (!currentInstance) return;
         db.transaction('rw!', db._syncNodes, ()=>{
-            db._syncNodes.where({id: ourSyncNodeId}).first(ourSyncNode => {
+            db._syncNodes.where({id: currentInstance}).first(ourSyncNode => {
                 if (!ourSyncNode) {
                     // We do not exist anymore. Call db.close() to teardown polls etc.
                     if (db.isOpen()) db.close();
