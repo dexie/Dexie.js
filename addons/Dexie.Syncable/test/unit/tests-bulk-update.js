@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import {module, asyncTest, start, stop, strictEqual, deepEqual, ok} from 'QUnit';
-import {resetDatabase} from '../../../../../../test/dexie-unittest-utils';
+import {resetDatabase} from '../../../../test/dexie-unittest-utils';
 import bulkUpdate from '../../src/bulk-update';
 import {UPDATE} from '../../src/change_types';
 

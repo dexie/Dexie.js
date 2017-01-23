@@ -31,17 +31,42 @@
     "url": "https://github.com/dfahlander/Dexie.js/issues"
   },
   "scripts": {
-    "build": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator tools/build.js",
-    "watch": "babel-node --presets es2015 --plugins syntax-async-functions,transform-regenerator tools/watch.js",
-    "test": "npm run eslint && npm run build && npm run test:local",
+    "build": "just-build",
+    "watch": "just-build --watch",
+    "test": "npm run build && npm run test:typings && npm run test:local && npm run test:unit",
     "eslint": "eslint src",
     "eslint:test": "eslint test/unit --ignore-pattern bundle.js --ignore-pattern karma-env.js",
-    "test:unit": "npm run build && node_modules/.bin/karma start test/unit/karma.conf.js --single-run",
-    "test:local": "node_modules/.bin/karma start test/karma.conf.js --single-run",
-    "test:release": "node_modules/.bin/karma start test/karma.release.conf.js --single-run",
-    "test:debug": "node_modules/.bin/karma start test/karma.conf.js --log-level debug",
+    "test:unit": "karma start test/unit/karma.conf.js --single-run",
+    "test:local": "karma start test/karma.conf.js --single-run",
+    "test:release": "npm run test:typings && karma start test/karma.release.conf.js --single-run",
+    "test:debug": "karma start test/karma.conf.js --log-level debug",
     "test:typings": "tsc -p test/test-typings/"
   },
+  "just-build": {
+    "default": [
+      "just-build release"
+    ],
+    "dev": [
+      "just-build dexie-syncable"
+    ],
+    "dexie-syncable": [
+      "# Build UMD module and the tests (two bundles)",
+      "tsc --allowJs --moduleResolution node --lib es2015,dom -t es5 -m es2015 --outDir tmp/es5 --rootDir ../.. --sourceMap src/Dexie.Syncable.js test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
+      "rollup -c tools/build-configs/rollup.config.js",
+      "rollup -c tools/build-configs/rollup.tests.config.js",
+      "node tools/replaceVersionAndDate.js dist/dexie-syncable.js",
+      "# eslint ",
+      "eslint src --cache"
+    ],
+    "release": [
+      "just-build dexie-syncable",
+      "# Copy Dexie.Syncable.d.ts to dist and replace version in it",
+      "node -e \"fs.writeFileSync('dist/dexie-syncable.d.ts', fs.readFileSync('src/Dexie.Syncable.d.ts'))\"",
+      "node tools/replaceVersionAndDate.js dist/dexie-syncable.d.ts",
+      "# Minify the default ES5 UMD module",
+      "uglifyjs dist/dexie-syncable.js -m -c -o dist/dexie-syncable.min.js --source-map dist/dexie-syncable.min.js.map  --in-source-map dist/dexie-syncable.js.map"
+    ]
+  },  
   "homepage": "http://dexie.org",
   "dependencies": {
     "dexie": "^2.0.0-beta.7",
@@ -52,13 +77,17 @@
     "dexie-observable": "^0.9.2"
   },
   "devDependencies": {
-    "babel-cli": "^6.7.7",
-    "eslint": "^3.7.1",
+    "eslint": "^3.14.0",
+    "just-build": "^0.9.12",
     "karma": "^0.13.22",
     "karma-browserstack-launcher": "^1.1.1",
     "karma-chrome-launcher": "^2.0.0",
     "karma-firefox-launcher": "^1.0.0",
     "karma-mocha-reporter": "^2.2.0",
-    "karma-qunit": "^1.2.1"
+    "karma-qunit": "^1.2.1",
+    "rollup": "^0.41.4",
+    "rollup-plugin-sourcemaps": "^0.4.1",
+    "typescript": "^2.1.5",
+    "uglifyjs": "^2.4.10"
   }
 }

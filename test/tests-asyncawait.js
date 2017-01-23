@@ -183,7 +183,7 @@ test("Must not leak PSD zone", function(assert) {
 test("Must not leak PSD zone2", function(assert) {
     let done = assert.async();
     ok(Dexie.currentTransaction === null, "Should not have an ongoing transaction to start with");
-
+    
     db.transaction('rw', db.items, ()=>{
         let trans = Dexie.currentTransaction;
         ok(trans !== null, "Should have a current transaction");
@@ -202,7 +202,7 @@ test("Must not leak PSD zone2", function(assert) {
             }
         });
         // In parallell with the above 2*100 async tasks are being executed and verified,
-        // maintain the transaction zone below:
+        // maintain the transaction zone below:        
         return Promise.resolve().then(()=> {
             ok(Dexie.currentTransaction === trans, "Still same transaction 1");
             // Make sure native async functions maintains the zone:
@@ -348,7 +348,7 @@ spawnedTest ("Sub Transactions with async await", function*() {
 promisedTest ("Should patch global Promise within transaction scopes but leave them intact outside", async() => {
     ok(Promise !== Dexie.Promise, "At global scope. Promise should not be Dexie.Promise");
     ok(window.Promise !== Dexie.Promise, "At global scope. Promise should not be Dexie.Promise");
-    var GlobalPromise = Promise;
+    var GlobalPromise = window.Promise;
     await db.transaction('rw', db.items, async() =>{
         ok(Promise === Dexie.Promise, "Within transaction scope, Promise should be Dexie.Promise.");
         ok(window.Promise === Dexie.Promise, "Within transaction scope, window.Promise should be Dexie.Promise.");
@@ -424,7 +424,7 @@ promisedTest ("Should be able to use some simpe native async await even without 
     })(trans));`))(ok, equal, Dexie, db)
 });
 
-const GlobalPromise = Promise;
+const GlobalPromise = window.Promise;
 promisedTest ("Should behave outside transactions as well", async () => {
     if (!hasNativeAsyncFunctions) {
         ok(true, "Browser doesnt support native async-await");

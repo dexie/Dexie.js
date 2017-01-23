@@ -1,14 +1,4 @@
-﻿/*
- * Dexie.js - a minimalistic wrapper for IndexedDB
- * ===============================================
- *
- * By David Fahlander, david.fahlander@gmail.com
- *
- * Version {version}, {date}
- * www.dexie.org
- * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
- */
-export var keys = Object.keys;
+﻿export var keys = Object.keys;
 export var isArray = Array.isArray;
 export var _global =
     typeof self !== 'undefined' ? self :

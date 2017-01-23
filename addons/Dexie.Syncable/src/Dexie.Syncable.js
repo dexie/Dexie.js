@@ -1,16 +1,20 @@
-/// <reference path="../../../dist/dexie.js" />
-/// <reference path="../../Dexie.Observable/dist/dexie-observable.js" />
-/// <reference path="../Dexie.Syncable.SyncProtocolAPI.js" />
-/**
- * Dexie.Syncable.js
- * ===================
+/* ========================================================================== 
+ *                           dexie-syncable.js
+ * ==========================================================================
+ *
  * Dexie addon for syncing indexedDB with remote endpoints.
  *
- * version: {version} Alpha, {date}
+ * By David Fahlander, david.fahlander@gmail.com,
+ *    Nikolas Poniros, https://github.com/nponiros
  *
- * Disclaimber: This addon is in alpha status meaning that
- * its API and behavior may change.
+ * ==========================================================================
  *
+ * Version {version}, {date}
+ *
+ * http://dexie.org
+ *
+ * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
+ * 
  */
 
 import Dexie from "dexie";
