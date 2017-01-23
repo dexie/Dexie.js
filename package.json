@@ -3,6 +3,7 @@
   "version": "2.0.0-beta.7",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
+  "module": "dist/dexie.es6.js",
   "jsnext:main": "dist/dexie.es6.js",
   "typings": "dist/dexie.d.ts",
   "jspm": {
@@ -37,9 +38,9 @@
     "watch": "just-build --watch",
     "test": "npm run build dev && npm run test:local",
     "eslint": "eslint src",
-    "test:local": "karma start test/karma.conf.js --single-run",
-    "test:release": "karma start test/karma.release.conf.js --single-run",
-    "test:debug": "karma start test/karma.conf.js --log-level debug",
+    "test:local": "npm run test:typings && karma start test/karma.conf.js --single-run",
+    "test:release": "npm run test:typings karma start test/karma.release.conf.js --single-run",
+    "test:debug": "npm run test:typings karma start test/karma.conf.js --log-level debug",
     "test:typings": "tsc -p test/typings-test/"
   },
   "just-build": {
@@ -62,6 +63,9 @@
     "release": [
       "# Build ES5 umd module as well as the es6 module.",
       "just-build dexie dexie-es6",
+      "# Copy Dexie.d.ts to dist and replace version in it",
+      "node -e \"fs.writeFileSync('dist/dexie.d.ts', fs.readFileSync('src/Dexie.d.ts'))\"",
+      "node tools/replaceVersionAndDate.js dist/dexie.d.ts",
       "# Minify the default ES5 UMD module",
       "uglifyjs dist/dexie.js -m -c -o dist/dexie.min.js --source-map dist/dexie.min.js.map  --in-source-map dist/dexie.js.map"
     ],
