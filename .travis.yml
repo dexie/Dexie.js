@@ -10,4 +10,5 @@ before_script:
   - sh -e /etc/init.d/xvfb start
 script:
   - npm run build
+  - npm run test:typings
   - node_modules/.bin/karma start test/karma.travis.conf.js --single-run
