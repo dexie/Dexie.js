@@ -66,7 +66,7 @@
       "# Minify the default ES5 UMD module",
       "uglifyjs dist/dexie-syncable.js -m -c -o dist/dexie-syncable.min.js --source-map dist/dexie-syncable.min.js.map  --in-source-map dist/dexie-syncable.js.map"
     ]
-  },  
+  },
   "homepage": "http://dexie.org",
   "dependencies": {
     "dexie": "^2.0.0-beta.7",
@@ -78,13 +78,14 @@
   },
   "devDependencies": {
     "eslint": "^3.14.0",
-    "just-build": "^0.9.12",
+    "just-build": "^0.9.13",
     "karma": "^0.13.22",
     "karma-browserstack-launcher": "^1.1.1",
     "karma-chrome-launcher": "^2.0.0",
     "karma-firefox-launcher": "^1.0.0",
     "karma-mocha-reporter": "^2.2.0",
     "karma-qunit": "^1.2.1",
+    "qunitjs": "^2.1.1",
     "rollup": "^0.41.4",
     "rollup-plugin-sourcemaps": "^0.4.1",
     "typescript": "^2.1.5",
