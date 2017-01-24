@@ -2,8 +2,8 @@
 */
 
 const browserSuiteToUse = process.env.TRAVIS ?
-  process.env.TRAVIS_PULL_REQUEST === 'false' && process.env.BROWSER_STACK_USERNAME ?
-    "ciBrowserstack" : // CI push requests to master
+  isNaN(process.env.TRAVIS_PULL_REQUEST) && process.env.BROWSER_STACK_USERNAME ?
+    "ci" :             // CI pushs to master
     "ciLocal" :        // CI pull request or has no browserstack credentials.
     process.env.NPM_PUBLISH === 'true' ?
       "full" :         // npm publish should test against the full suite of browsers
