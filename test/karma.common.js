@@ -42,6 +42,7 @@ module.exports = {
     'test/babel-polyfill/polyfill.min.js',
     'node_modules/qunitjs/qunit/qunit.js',
     'test/karma-env.js',
+    { pattern: 'test/worker.js', watched: true, included: false, served: true },
     { pattern: '!(node_modules|tmp)*/*.map', watched: false, included: false, served: true}
   ],
   

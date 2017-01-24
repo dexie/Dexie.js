@@ -66,7 +66,7 @@
       "uglifyjs dist/dexie-observable.js -m -c -o dist/dexie-observable.min.js --source-map dist/dexie-observable.min.js.map  --in-source-map dist/dexie-observable.js.map"
     ],
     "test": [
-      "# Build the test suite",
+      "# Build the unit tests (integration tests need no build)",
       "tsc --allowJs --moduleResolution node --lib es2015,dom -t es5 -m es2015 --outDir test/tmp/es5 --rootDir ../.. --sourceMap test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
       "rollup -c tools/build-configs/rollup.tests.config.js",
       "eslint test/unit --cache --ignore-pattern bundle.js"

@@ -4,13 +4,14 @@ const karmaCommon = require('../../../../test/karma.common');
 module.exports = function (config) {
   config.set(Object.assign({}, karmaCommon, {
     // Base path should point at the root 
-    basePath: '..../../../',
+    basePath: '../../../../',
+    port: karmaCommon.port + 1,
     files: karmaCommon.files.concat([
       'dist/dexie.js',
+      'addons/Dexie.Observable/test/integration/karma-env.js',
       'addons/Dexie.Observable/dist/dexie-observable.js',
-      'addons/Dexie.Observable/test/integration/bundle.js',
-      // TODO: Include map files!
-      { watched: true, included: false, served: true, pattern: 'test/worker.js' }, // Only integration have this!
+      'test/bundle.js',
+      { pattern: 'addons/Dexie.Observable/dist/*.map', watched: false, included: false }
     ])
   }));
 }
