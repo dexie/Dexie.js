@@ -9,10 +9,11 @@ before_script:
   - export DISPLAY=:99.0
   - sh -e /etc/init.d/xvfb start
 env:
-  - TESTFOLDER=.
-  - TESTFOLDER=addons/Dexie.Observable/
+  - TESTFOLDER=test
+  - TESTFOLDER=addons/Dexie.Observable/test/unit/
+  - TESTFOLDER=addons/Dexie.Observable/test/integration/
 script:
-  - npm run build release
+  - npm run build
   - cd $TESTFOLDER
   - pwd
-  - bash travis.sh
+  - bash ./travis.sh

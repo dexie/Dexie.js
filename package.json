@@ -36,12 +36,10 @@
   "scripts": {
     "build": "just-build",
     "watch": "just-build --watch",
-    "test": "npm run build dev && npm run test:local",
-    "eslint": "eslint src",
-    "test:local": "npm run test:typings && karma start test/karma.conf.js --single-run",
-    "test:release": "npm run test:typings karma start test/karma.release.conf.js --single-run",
-    "test:debug": "npm run test:typings karma start test/karma.conf.js --log-level debug",
-    "test:typings": "tsc -p test/typings-test/"
+    "test": "npm run build && npm run test:typings && npm run test:unit",
+    "test:unit": "karma start test/karma.conf.js --single-run",
+    "test:typings": "tsc -p test/typings-test/",
+    "test:debug": "karma start test/karma.conf.js --log-level debug"
   },
   "just-build": {
     "default": [

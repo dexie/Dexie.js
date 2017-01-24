@@ -35,14 +35,12 @@
   "scripts": {
     "build": "just-build",
     "watch": "just-build --watch",
-    "test": "npm run build && npm run test:typings && npm run test:local && npm run test:unit",
-    "eslint": "eslint src",
-    "eslint:test": "eslint test/unit --ignore-pattern bundle.js --ignore-pattern karma-env.js",
+    "test": "npm run build && npm run test:typings && npm run test:unit && npm run test:integration",
     "test:unit": "karma start test/unit/karma.conf.js --single-run",
-    "test:local": "karma start test/karma.conf.js --single-run",
-    "test:release": "npm run test:typings && karma start test/karma.release.conf.js --single-run",
-    "test:debug": "karma start test/karma.conf.js --log-level debug",
-    "test:typings": "tsc -p test/test-typings/"
+    "test:integration": "karma start test/integration/karma.conf.js --single-run",
+    "test:typings": "tsc -p test/test-typings/",
+    "test:unit:debug": "karma start test/unit/karma.conf.js --log-level debug",
+    "test:integration:debug": "karma start test/integrations/karma.conf.js --log-level debug"
   },
   "just-build": {
     "default": [
@@ -57,7 +55,7 @@
       "rollup -c tools/build-configs/rollup.config.js",
       "node tools/replaceVersionAndDate.js dist/dexie-observable.js",
       "# eslint ",
-      "eslint src"
+      "eslint src --cache"
     ],
     "release": [
       "just-build dexie-observable",
@@ -68,9 +66,10 @@
       "uglifyjs dist/dexie-observable.js -m -c -o dist/dexie-observable.min.js --source-map dist/dexie-observable.min.js.map  --in-source-map dist/dexie-observable.js.map"
     ],
     "test": [
-      "# Build the test suite (for now only test/unit. test should also be ES6-ified and built. They should merge)",
+      "# Build the test suite",
       "tsc --allowJs --moduleResolution node --lib es2015,dom -t es5 -m es2015 --outDir test/tmp/es5 --rootDir ../.. --sourceMap test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
-      "rollup -c tools/build-configs/rollup.tests.config.js"
+      "rollup -c tools/build-configs/rollup.tests.config.js",
+      "eslint test/unit --cache --ignore-pattern bundle.js"
     ]
   },
   "homepage": "http://dexie.org",

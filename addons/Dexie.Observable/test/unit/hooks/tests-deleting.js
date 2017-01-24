@@ -6,7 +6,7 @@ import initWakeupObservers from '../../../src/wakeup-observers';
 import initOverrideCreateTransaction from '../../../src/override-create-transaction';
 import {DELETE} from '../../../src/change_types';
 
-const db = new Dexie('TestDBTable');
+const db = new Dexie('TestDBTable', {addons: []});
 db.version(1).stores({
   foo: "id",
   _changes: "++rev"
