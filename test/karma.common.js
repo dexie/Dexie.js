@@ -28,7 +28,7 @@ module.exports = {
   
   colors: true,
 
-  browserNoActivityTimeout: 1 * 60 * 1000,
+  browserNoActivityTimeout: 3 * 60 * 1000,
 
   plugins: [
     'karma-qunit',
