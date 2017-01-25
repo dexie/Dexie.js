@@ -46,7 +46,7 @@ module.exports = {
     { pattern: '!(node_modules|tmp)*/*.map', watched: false, included: false, served: true}
   ],
   
-  browserstack: require('./karma.browserstack.js').browserstack,
+  browserStack: require('./karma.browserstack.js').browserStack,
 
   customLaunchers: require('./karma.browserstack.js').customLaunchers,
 
