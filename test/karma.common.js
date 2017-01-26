@@ -1,55 +1,67 @@
 /* Base karma configurations to require and extend from other karma.conf.js
 */
+const karmaCommon = {
+    frameworks: [
+      'qunit'
+    ],
 
-const browserSuiteToUse = process.env.TRAVIS ?
-  isNaN(process.env.TRAVIS_PULL_REQUEST) && process.env.BROWSER_STACK_USERNAME ?
-    "ci" :             // CI pushs to master
-    "ciLocal" :        // CI pull request or has no browserstack credentials.
-    process.env.NPM_PUBLISH === 'true' ?
-      "full" :         // npm publish should test against the full suite of browsers
-      "local";         // Local test
+    reporters: [
+      'mocha'
+    ],
 
-console.log("browser-suite: " + browserSuiteToUse);
+    client: {
+      captureConsole: false
+    },
 
-module.exports = {
-  frameworks: [
-    'qunit'
-  ],
+    port: 19144,
+    
+    colors: true,
 
-  reporters: [
-    'mocha'
-  ],
+    browserNoActivityTimeout: 2 * 60 * 1000,
 
-  client: {
-    captureConsole: false
-  },
+    plugins: [
+      'karma-qunit',
+      'karma-mocha-reporter',
+      'karma-chrome-launcher',
+      'karma-firefox-launcher',
+      'karma-browserstack-launcher',
+    ],
 
-  port: 19144,
-  
-  colors: true,
+    files: [
+      'test/babel-polyfill/polyfill.min.js',
+      'node_modules/qunitjs/qunit/qunit.js',
+      'test/karma-env.js',
+      { pattern: 'test/worker.js', watched: true, included: false, served: true },
+      { pattern: '!(node_modules|tmp)*/*.map', watched: false, included: false, served: true}
+    ],
+    
+    browserStack: require('./karma.browserstack.js').browserStack,
 
-  browserNoActivityTimeout: 3 * 60 * 1000,
+    customLaunchers: require('./karma.browserstack.js').customLaunchers
+};
 
-  plugins: [
-    'karma-qunit',
-    'karma-mocha-reporter',
-    'karma-chrome-launcher',
-    'karma-firefox-launcher',
-    'karma-browserstack-launcher',
-  ],
+const browserSuiteToUse = process.env.NODE_ENV === 'release' ?
+  "full" :
+  process.env.TRAVIS ?
+    isNaN(process.env.TRAVIS_PULL_REQUEST) && process.env.BROWSER_STACK_USERNAME ?
+      "ci" :              // CI pushs to master and browserstack credentials exists
+      "ciLocal" :         // CI pull request or has no browserstack credentials.
+  "local";                // Developer local machine
 
-  files: [
-    'test/babel-polyfill/polyfill.min.js',
-    'node_modules/qunitjs/qunit/qunit.js',
-    'test/karma-env.js',
-    { pattern: 'test/worker.js', watched: true, included: false, served: true },
-    { pattern: '!(node_modules|tmp)*/*.map', watched: false, included: false, served: true}
-  ],
-  
-  browserStack: require('./karma.browserstack.js').browserStack,
+const defaultBrowserMatrix = require('./karma.browsers.matrix');
 
-  customLaunchers: require('./karma.browserstack.js').customLaunchers,
-
-  browsers: require ('./karma.browsers.matrix')[browserSuiteToUse]
+/**
+ * @param browserMatrixOverrides {{full: string[], ci: string[]}}
+ *  Map between browser suite and array of browser to test.
+ * @param configOverrides {Object} configOverrides to the common template
+ */
+function getKarmaConfig (browserMatrixOverrides, configOverrides) {
+  console.log("Browser-suite: " + browserSuiteToUse);
+  browserMatrixOverrides = Object.assign({}, defaultBrowserMatrix, browserMatrixOverrides);
+  const browsers = browserMatrixOverrides[browserSuiteToUse];
+  console.log("Browsers to test: " + browsers.join(', '));
+  const finalConfig = Object.assign({}, karmaCommon, configOverrides, {browsers});
+  return finalConfig;
 }
 
+module.exports = {karmaCommon, getKarmaConfig, browserSuiteToUse, defaultBrowserMatrix};

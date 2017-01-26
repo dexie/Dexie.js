@@ -1,5 +1,5 @@
 /** This module comprises the list of browsers
- * to run tests on before accepting a new NPM release.
+ * to run tests on depending on environment.
  *
  * Browsers listed here must also be defined in
  * karma.browserstack.js

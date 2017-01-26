@@ -1,5 +1,7 @@
 #!/bin/bash -e
 
+export NODE_ENV=release
+
 if ! [ -e tools/release.sh ]; then
   echo >&2 "Please run tools/release.sh from the repo root"
   exit 1

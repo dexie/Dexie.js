@@ -1,8 +1,15 @@
 // Include common configuration
-const karmaCommon = require('../../../../test/karma.common');
+const {karmaCommon, getKarmaConfig, defaultBrowserMatrix} = require('../../../../test/karma.common');
 
 module.exports = function (config) {
-  config.set(Object.assign({}, karmaCommon, {
+  const browserMatrixOverrides = {
+    // Be fine with testing on local travis firefox.
+    ci: ["Firefox"],
+    // IE indexedDB hangs sporadically. Be fine with testing it once on Dexie main suite.
+    full: defaultBrowserMatrix.full.filter(b => !/bs_ie/i.test(b))
+  };
+
+  const cfg = getKarmaConfig(browserMatrixOverrides, {
     // Base path should point at the root 
     basePath: '../../../../',
     files: karmaCommon.files.concat([
@@ -12,5 +19,7 @@ module.exports = function (config) {
       { pattern: 'addons/Dexie.Observable/test/unit/*.map', watched: false, included: false },
       { pattern: 'addons/Dexie.Observable/dist/*.map', watched: false, included: false }
     ])
-  }));
+  });
+
+  config.set(cfg);
 }
