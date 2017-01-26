@@ -1,48 +1,25 @@
-module.exports = function(config) {
-  const configuration = {
-    basePath: '../../../../',
+// Include common configuration
+const {karmaCommon, getKarmaConfig, defaultBrowserMatrix} = require('../../../../test/karma.common');
 
-    frameworks: [
-      'qunit'
-    ],
-
-    reporters: [
-      'mocha'
-    ],
-
-    client: {
-      captureConsole: true
-    },
-
-    files: [
-      './test/babel-polyfill/polyfill.min.js',
-      'node_modules/qunitjs/qunit/qunit.js',
-      'test/karma-env.js',
-      'dist/dexie.js',
-      'addons/Dexie.Observable/test/unit/bundle.js',
-      { pattern: '**/*.map', watched: false, included: false, served: true}
-    ],
-
-    port: 19144,
-    //captureTimeout: 30 * 1000,
-    //browserNoActivityTimeout: 10 * 60 * 1000,
-    colors: true,
-
-    // level of logging
-    // possible values: config.LOG_DISABLE || config.LOG_ERROR || config.LOG_WARN || config.LOG_INFO || config.LOG_DEBUG
-    //logLevel: config.LOG_DEBUG,
-
-    browsers: [
-        'Chrome'
-    ],
-
-    plugins: [
-      'karma-qunit',
-      'karma-mocha-reporter',
-      'karma-chrome-launcher',
-      //'karma-firefox-launcher'
-    ]
+module.exports = function (config) {
+  const browserMatrixOverrides = {
+    // Be fine with testing on local travis firefox.
+    ci: ["Firefox"],
+    // IE indexedDB hangs sporadically. Be fine with testing it once on Dexie main suite.
+    full: defaultBrowserMatrix.full.filter(b => !/bs_ie/i.test(b))
   };
 
-  config.set(configuration);
-};
+  const cfg = getKarmaConfig(browserMatrixOverrides, {
+    // Base path should point at the root 
+    basePath: '../../../../',
+    files: karmaCommon.files.concat([
+      'dist/dexie.js',
+      'addons/Dexie.Observable/dist/dexie-observable.js',
+      'addons/Dexie.Observable/test/unit/bundle.js',
+      { pattern: 'addons/Dexie.Observable/test/unit/*.map', watched: false, included: false },
+      { pattern: 'addons/Dexie.Observable/dist/*.map', watched: false, included: false }
+    ])
+  });
+
+  config.set(cfg);
+}

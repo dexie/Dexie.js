@@ -2,8 +2,6 @@
 
 Enables two-way synchronization with remote database.
 
-**NOTE: This addon is still in alpha development**
-
 ### Install
 ```
 npm install dexie --save
@@ -123,8 +121,10 @@ The implementation of that API defines how client- and server- changes are trans
 (such as ajax calls) and direct reaction pattern (such as WebSocket or long-polling methods). See samples below for each pattern.
 
 ### Sample [ISyncProtocol](Dexie.Syncable.ISyncProtocol) Implementations
+ * [https://github.com/nponiros/sync_client](https://github.com/nponiros/sync_client)
  * [AjaxSyncProtocol.js](https://github.com/dfahlander/Dexie.js/blob/master/samples/remote-sync/ajax/AjaxSyncProtocol.js)
  * [WebSocketSyncProtocol.js](https://github.com/dfahlander/Dexie.js/blob/master/samples/remote-sync/websocket/WebSocketSyncProtocol.js)
 
 ### Sample Sync Servers
+ * [https://github.com/nponiros/sync_server](https://github.com/nponiros/sync_server)
  * [WebSocketSyncServer.js](https://github.com/dfahlander/Dexie.js/blob/master/samples/remote-sync/websocket/WebSocketSyncServer.js)

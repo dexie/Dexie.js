@@ -15,7 +15,6 @@ declare module 'dexie' {
         // (makes it valid to do new db.observable.SyncNode())
         observable: {
             SyncNode: Dexie.Observable.SyncNodeConstructor;
-            Foo: Dexie.Observable.MessageEvent;
             sendMessage(
                 type: string, // Don't use 'response' as it is used internally by the framework
                 message: any, // anything that can be saved by IndexedDB
