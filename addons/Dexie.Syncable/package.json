@@ -33,14 +33,12 @@
   "scripts": {
     "build": "just-build",
     "watch": "just-build --watch",
-    "test": "npm run build && npm run test:typings && npm run test:local && npm run test:unit",
-    "eslint": "eslint src",
-    "eslint:test": "eslint test/unit --ignore-pattern bundle.js --ignore-pattern karma-env.js",
+    "test": "npm run build && npm run test:typings && npm run test:unit && npm run test:integration",
     "test:unit": "karma start test/unit/karma.conf.js --single-run",
-    "test:local": "karma start test/karma.conf.js --single-run",
-    "test:release": "npm run test:typings && karma start test/karma.release.conf.js --single-run",
-    "test:debug": "karma start test/karma.conf.js --log-level debug",
-    "test:typings": "tsc -p test/test-typings/"
+    "test:integration": "karma start test/integration/karma.conf.js --single-run",
+    "test:typings": "tsc -p test/test-typings/",
+    "test:unit:debug": "karma start test/unit/karma.conf.js --log-level debug",
+    "test:integration:debug": "karma start test/integrations/karma.conf.js --log-level debug"
   },
   "just-build": {
     "default": [
@@ -79,13 +77,13 @@
   "devDependencies": {
     "eslint": "^3.14.0",
     "just-build": "^0.9.13",
-    "karma": "^0.13.22",
+    "karma": "^1.4.0",
     "karma-browserstack-launcher": "^1.1.1",
     "karma-chrome-launcher": "^2.0.0",
     "karma-firefox-launcher": "^1.0.0",
     "karma-mocha-reporter": "^2.2.0",
     "karma-qunit": "^1.2.1",
-    "qunitjs": "^2.1.1",
+    "qunitjs": "^1.23.1",
     "rollup": "^0.41.4",
     "rollup-plugin-sourcemaps": "^0.4.1",
     "typescript": "^2.1.5",
