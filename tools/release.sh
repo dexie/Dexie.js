@@ -125,6 +125,9 @@ do
     addonPublishedVersion=$(npm show $addonNpmName version)
     addonLocalVersion=$(node -p "require('./package').version")
 
+    printf "Installing dependencies for ${addonNpmName}"
+    npm install
+
     printf "Building and testing ${addon} on browserstack\n"
 
     npm run test
