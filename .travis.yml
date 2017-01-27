@@ -14,6 +14,7 @@ env:
   - TF=addons/Dexie.Observable/test/integration
   - TF=addons/Dexie.Syncable/test/unit
   - TF=addons/Dexie.Syncable/test/integration
+  - TF=test/integrations/dexie-relationships
 script:
   - npm run build
   - cd $TF
