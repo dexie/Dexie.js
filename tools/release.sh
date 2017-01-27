@@ -134,7 +134,8 @@ do
     if [ "${autoPublishAddons}" = "Y" ]; then
       if ! [ "${addonPublishedVersion}" = "${addonLocalVersion}" ]; then
         printf "Publishing ${addonNpmName} ${addonLocalVersion} on npm\n"
-        echo "Would now invoke npm publish from $(pwd)!"
+        #echo "Would now invoke npm publish from $(pwd)!"
+        npm publish
       fi
     fi
     cd -
@@ -150,23 +151,23 @@ git commit -am "Build output" 2>/dev/null
 # Tag the release
 git tag -a -m "$next_ref" $next_ref
 # Now, push the changes to the releases branch
-#git push origin master$master_suffix:releases$master_suffix --follow-tags
-echo "Would now git push to releases"
+#echo "Would now git push to releases"
+git push origin master$master_suffix:releases$master_suffix --follow-tags
 
 printf "Successful push to master$master_suffix:releases$master_suffix\n\n"
 
-#npm publish --tag $NPMTAG
-echo "Would now invoke npm publish --tag $NPMTAG from $(pwd)"
+#echo "Would now invoke npm publish --tag $NPMTAG from $(pwd)"
+npm publish --tag $NPMTAG
 
 printf "Successful publish to npm.\n\n"
 
 # Push the update of package.json to master
 printf "Pushing Release-commit to master$master_suffix (with updated version in package.json)\n"
-#git push origin $master_release_commit:master$master_suffix
 echo "Would now git push new package.json to master"
+git push origin $master_release_commit:master$master_suffix
 
 printf "Resetting to origin/master$master_suffix\n"
-#git reset --hard origin/master$master_suffix
-echo "Would now git reset --hard"
+#echo "Would now git reset --hard"
+git reset --hard origin/master$master_suffix
 
 printf "Done."
