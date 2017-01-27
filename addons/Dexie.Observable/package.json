@@ -73,9 +73,6 @@
     ]
   },
   "homepage": "http://dexie.org",
-  "dependencies": {
-    "dexie": "^2.0.0-beta.7"
-  },
   "peerDependencies": {
     "dexie": "^2.0.0-beta.7"
   },
