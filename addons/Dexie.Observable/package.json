@@ -33,14 +33,14 @@
     "url": "https://github.com/dfahlander/Dexie.js/issues"
   },
   "scripts": {
-    "build": "../../node_modules/.bin/just-build",
-    "watch": "../../node_modules/.bin/just-build --watch",
+    "build": "just-build",
+    "watch": "just-build --watch",
     "test": "npm run build && npm run test:typings && npm run test:unit && npm run test:integration",
-    "test:unit": "../../node_modules/.bin/karma start test/unit/karma.conf.js --single-run",
-    "test:integration": "../../node_modules/.bin/karma start test/integration/karma.conf.js --single-run",
-    "test:typings": "../../node_modules/.bin/tsc -p test/test-typings/",
-    "test:unit:debug": "../../node_modules/.bin/karma start test/unit/karma.conf.js --log-level debug",
-    "test:integration:debug": "../../node_modules/.bin/karma start test/integrations/karma.conf.js --log-level debug"
+    "test:unit": "karma start test/unit/karma.conf.js --single-run",
+    "test:integration": "karma start test/integration/karma.conf.js --single-run",
+    "test:typings": "tsc -p test/test-typings/",
+    "test:unit:debug": "karma start test/unit/karma.conf.js --log-level debug",
+    "test:integration:debug": "karma start test/integrations/karma.conf.js --log-level debug"
   },
   "just-build": {
     "default": [
@@ -73,7 +73,25 @@
     ]
   },
   "homepage": "http://dexie.org",
+  "dependencies": {
+    "dexie": "^2.0.0-beta.7"
+  },
   "peerDependencies": {
     "dexie": "^2.0.0-beta.7"
+  },
+  "devDependencies": {
+    "eslint": "^3.14.0",
+    "just-build": "^0.9.13",
+    "karma": "^1.4.0",
+    "karma-browserstack-launcher": "^1.1.1",
+    "karma-chrome-launcher": "^2.0.0",
+    "karma-firefox-launcher": "^1.0.0",
+    "karma-mocha-reporter": "^2.2.0",
+    "karma-qunit": "^1.2.1",
+    "qunitjs": "^1.23.1",
+    "rollup": "^0.41.4",
+    "rollup-plugin-sourcemaps": "^0.4.1",
+    "typescript": "^2.1.5",
+    "uglifyjs": "^2.4.10"
   }
 }
