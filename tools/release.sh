@@ -25,8 +25,8 @@ current_version=$(node -p "require('./package').version")
 master_branch="$(git symbolic-ref HEAD)"
 master_branch=${master_branch##refs/heads/}
 echo "Master branch is: '$master_branch'"
-if ! [[ $master_branch =~ ^master ]]; then
-    echo >&2 "Error: Must be on a branch prefixed 'master'";
+if ! [[ $master_branch =~ ^temp ]]; then
+    echo >&2 "Error: Must be on a branch prefixed 'master bugbug! FIXTHIS!'";
     exit 1;
 fi
 master_suffix="${master_branch##master}"
