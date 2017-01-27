@@ -5,7 +5,7 @@ import path from 'path';
 const version = require(path.resolve(__dirname, '../../package.json')).version;
 
 export default {
-  entry: 'tmp/es5/src/Dexie.Observable.js',
+  entry: 'tools/tmp/es5/src/Dexie.Observable.js',
   dest: 'dist/dexie-observable.js',
   format: 'umd',
   sourceMap: true,

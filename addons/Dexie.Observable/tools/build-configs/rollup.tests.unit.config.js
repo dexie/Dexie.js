@@ -7,7 +7,7 @@ const ERRORS_TO_IGNORE = [
 ];
 
 export default {
-  entry: 'test/tmp/es5/addons/Dexie.Observable/test/unit/unit-tests-all.js',
+  entry: 'tools/tmp/es5/test/addons/Dexie.Observable/test/unit/unit-tests-all.js',
   dest: 'test/unit/bundle.js',
   format: 'umd',
   sourceMap: true,

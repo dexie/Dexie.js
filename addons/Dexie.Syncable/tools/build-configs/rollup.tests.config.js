@@ -7,7 +7,7 @@ const ERRORS_TO_IGNORE = [
 ];
 
 export default {
-  entry: 'tmp/es5/addons/Dexie.Syncable/test/unit/unit-tests-all.js',
+  entry: 'tools/tmp/es5/addons/Dexie.Syncable/test/unit/unit-tests-all.js',
   dest: 'test/unit/bundle.js',
   format: 'umd',
   sourceMap: true,

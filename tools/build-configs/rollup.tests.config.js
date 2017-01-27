@@ -7,8 +7,8 @@ const ERRORS_TO_IGNORE = [
 ];
 
 export default {
-  entry: 'tmp/es5/test/tests-all.js',
-  dest: 'tmp/es5/test/bundle.js',
+  entry: 'tools/tmp/es5/test/tests-all.js',
+  dest: 'tools/tmp/es5/test/bundle.js',
   format: 'umd',
   sourceMap: true,
   moduleName: 'dexieTests',

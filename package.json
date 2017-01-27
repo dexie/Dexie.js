@@ -48,13 +48,13 @@
     ],
     "dexie": [
       "# Build es5 output",
-      "tsc --allowJs -t es5 -m es2015 --outDir tmp/es5/src/ --sourceMap src/Dexie.js [--watch 'Compilation complete.']",
+      "tsc --allowJs -t es5 -m es2015 --outDir tools/tmp/es5/src/ --sourceMap src/Dexie.js [--watch 'Compilation complete.']",
       "rollup -c tools/build-configs/rollup.config.js",
       "node tools/replaceVersionAndDate.js dist/dexie.js",
       "eslint src"
     ],
     "dexie-es6": [
-      "tsc --allowJs -t es2015 -m es2015 --outDir tmp/es6/src/ --sourceMap src/Dexie.js [--watch 'Compilation complete.']",
+      "tsc --allowJs -t es2015 -m es2015 --outDir tools/tmp/es6/src/ --sourceMap src/Dexie.js [--watch 'Compilation complete.']",
       "rollup -c tools/build-configs/rollup.config.es6.js",
       "node tools/replaceVersionAndDate.js dist/dexie.es6.js"
     ],
@@ -77,10 +77,10 @@
     ],
     "test": [
       "# Build the test suite. Typescript transpiles all but not generators...",
-      "tsc --allowJs -t es5 -m es2015 --outDir tmp/es5/test/ --sourceMap test/tests-all.js [--watch 'Compilation complete.']",
+      "tsc --allowJs -t es5 -m es2015 --outDir tools/tmp/es5/test/ --sourceMap test/tests-all.js [--watch 'Compilation complete.']",
       "rollup -c tools/build-configs/rollup.tests.config.js",
       "# As a last step, let babel transpile the generators....",
-      "babel tmp/es5/test/bundle.js -o test/bundle.js --plugins transform-regenerator --source-maps"
+      "babel tools/tmp/es5/test/bundle.js -o test/bundle.js --plugins transform-regenerator --source-maps"
     ]
   },
   "engines": {

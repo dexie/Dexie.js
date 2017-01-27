@@ -5,7 +5,7 @@ import path from 'path';
 const version = require(path.resolve(__dirname, '../../package.json')).version;
 
 export default {
-  entry: 'tmp/es5/addons/Dexie.Syncable/src/Dexie.Syncable.js',
+  entry: 'tools/tmp/es5/addons/Dexie.Syncable/src/Dexie.Syncable.js',
   dest: 'dist/dexie-syncable.js',
   format: 'umd',
   sourceMap: true,

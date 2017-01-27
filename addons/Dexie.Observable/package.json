@@ -38,7 +38,7 @@
     "test": "npm run build && npm run test:typings && npm run test:unit && npm run test:integration",
     "test:unit": "karma start test/unit/karma.conf.js --single-run",
     "test:integration": "karma start test/integration/karma.conf.js --single-run",
-    "test:typings": "tsc -p test/test-typings/",
+    "test:typings": "tsc -p test/typings/",
     "test:unit:debug": "karma start test/unit/karma.conf.js --log-level debug",
     "test:integration:debug": "karma start test/integrations/karma.conf.js --log-level debug"
   },
@@ -51,7 +51,7 @@
     ],
     "dexie-observable": [
       "# Build UMD module",
-      "tsc --allowJs -t es5 -m es2015 --outDir tmp/es5/src/ --sourceMap src/Dexie.Observable.js [--watch 'Compilation complete.']",
+      "tsc --allowJs -t es5 -m es2015 --outDir tools/tmp/es5/src/ --sourceMap src/Dexie.Observable.js [--watch 'Compilation complete.']",
       "rollup -c tools/build-configs/rollup.config.js",
       "node tools/replaceVersionAndDate.js dist/dexie-observable.js",
       "# eslint ",
@@ -67,7 +67,7 @@
     ],
     "test": [
       "# Build the unit tests (integration tests need no build)",
-      "tsc --allowJs --moduleResolution node --lib es2015,dom -t es5 -m es2015 --outDir test/tmp/es5 --rootDir ../.. --sourceMap test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
+      "tsc --allowJs --moduleResolution node --lib es2015,dom -t es5 -m es2015 --outDir tools/tmp/es5/test --rootDir ../.. --sourceMap test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
       "rollup -c tools/build-configs/rollup.tests.config.js",
       "eslint test/unit --cache --ignore-pattern bundle.js"
     ]

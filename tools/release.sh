@@ -35,7 +35,6 @@ master_suffix="${master_branch##master}"
 # Next version?
 printf "Next version (current is $current_version)? "
 read next_version
-
 validate_semver $next_version
 
 if echo "$next_version" | grep -q "-"; then
@@ -47,6 +46,38 @@ fi
 echo "Will use: npm publish --tag $NPMTAG"
 
 next_ref="v$next_version"
+
+# Auto-publish addons?
+ADDONS_DIR="addons/"
+# Use an array to make sure that Observable is built before Syncable
+addons=("Dexie.Observable" "Dexie.Syncable")
+
+autoPublishAddons=false
+# build addons
+for addon in "${addons[@]}"
+do
+    dir="${ADDONS_DIR}${addon}"
+    cd ${dir}
+    addonNpmName=$(node -p "require('./package').name")
+    addonPublishedVersion=$(npm show $addonNpmName version)
+    addonLocalVersion=$(node -p "require('./package').version")
+    if ! [ "${addonPublishedVersion}" = "${addonLocalVersion}" ]; then
+      printf "$addonNpmName version ($addonLocalVersion) differs from its published version ($addonPublishedVersion)\n"
+      autoPublishAddons=true
+    fi
+    cd -
+done
+
+if [ "${autoPublishAddons}" = "true" ]; then
+  printf "Do you want to publish these addons if all tests pass (Y/n)? ";
+  read autoPublishAddons
+fi
+
+if [ "${autoPublishAddons}" = "Y" ]; then
+  echo "Will publish updated addons to npm if tests pass."
+else
+  echo "Will not publish any addons."
+fi
 
 update_version 'package.json' $next_version
 update_version 'bower.json' $next_version
@@ -62,21 +93,6 @@ master_release_commit=$(git rev-parse HEAD)
 git merge --no-edit -s ours origin/releases$master_suffix
 
 #
-# eslint
-#
-printf "Running eslint src\n"
-eslint src
-printf "eslint ok.\n"
-
-printf "Running eslint Dexie.Syncable src\n"
-$(npm bin)/eslint --config "addons/Dexie.Syncable/src/.eslintrc.json" "addons/Dexie.Syncable/src"
-printf "eslint ok.\n\n"
-
-printf "Running eslint Dexie.Observable src\n"
-$(npm bin)/eslint --config "addons/Dexie.Observable/src/.eslintrc.json" "addons/Dexie.Observable/src"
-printf "eslint ok.\n\n"
-
-#
 # Rebuild
 #
 
@@ -88,50 +104,44 @@ rm -rf addons/*/dist/*
 
 # build
 npm run build
-# build addons (for bower packages)
-for dir in addons/*/
-do
-    cd ${dir}
-    npm run build
-    cd -
-done
 
 # test
 printf "Testing on browserstack\n"
-echo . > karma-release.log
-tail -f karma-release.log &
-TAIL_PID=$!
-npm run test:release > karma-release.log
-kill $TAIL_PID
+npm run test
 
-printf "Browserstack tests passed.\n"
+printf "Browserstack tests for Dexie.js passed.\n"
 
-# test Dexie.Syncable
-printf "Testing Dexie.Observable on browserstack\n"
-cd addons/Dexie.Observable
-echo . > karma-release.log
-tail -f karma-release.log &
-TAIL_PID=$!
-npm run test:release > karma-release.log
-kill $TAIL_PID
-cd -
+#
+# Addons
+#
 
-printf "Dexie.Observable Browserstack tests passed.\n"
+# Build, test and eventually release addons
+for addon in "${addons[@]}"
+do
+    dir="${ADDONS_DIR}${addon}"
+    cd ${dir}
 
-# test Dexie.Syncable
-printf "Testing Dexie.Syncable on browserstack\n"
-cd addons/Dexie.Syncable
-echo . > karma-release.log
-tail -f karma-release.log &
-TAIL_PID=$!
-npm run test:release > karma-release.log
-kill $TAIL_PID
-cd -
+    addonNpmName=$(node -p "require('./package').name")
+    addonPublishedVersion=$(npm show $addonNpmName version)
+    addonLocalVersion=$(node -p "require('./package').version")
 
-printf "Dexie.Syncable Browserstack tests passed.\n"
+    printf "Building and testing ${addon} on browserstack\n"
+
+    npm run test
+
+    printf "${addon} Browserstack tests passed.\n"
+    
+    if [ "${autoPublishAddons}" = "Y" ]; then
+      if ! [ "${addonPublishedVersion}" = "${addonLocalVersion}" ]; then
+        printf "Publishing ${addonNpmName} ${addonLocalVersion} on npm\n"
+        #echo "Would now invoke npm publish from $(pwd)!"
+        npm publish
+      fi
+    fi
+    cd -
+done
 
 # Force adding/removing dist files
-rm -rf dist/*.gz
 git add -A --no-ignore-removal -f dist/ 2>/dev/null
 git add -A --no-ignore-removal -f addons/*/dist/ 2>/dev/null
 git add -A --no-ignore-removal -f test/bundle.js 2>/dev/null
@@ -141,19 +151,23 @@ git commit -am "Build output" 2>/dev/null
 # Tag the release
 git tag -a -m "$next_ref" $next_ref
 # Now, push the changes to the releases branch
+#echo "Would now git push to releases"
 git push origin master$master_suffix:releases$master_suffix --follow-tags
 
 printf "Successful push to master$master_suffix:releases$master_suffix\n\n"
 
+#echo "Would now invoke npm publish --tag $NPMTAG from $(pwd)"
 npm publish --tag $NPMTAG
 
 printf "Successful publish to npm.\n\n"
 
 # Push the update of package.json to master
 printf "Pushing Release-commit to master$master_suffix (with updated version in package.json)\n"
+echo "Would now git push new package.json to master"
 git push origin $master_release_commit:master$master_suffix
 
 printf "Resetting to origin/master$master_suffix\n"
+#echo "Would now git reset --hard"
 git reset --hard origin/master$master_suffix
 
 printf "Done."
