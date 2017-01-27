@@ -49,7 +49,7 @@
     ],
     "dexie-syncable": [
       "# Build UMD module and the tests (two bundles)",
-      "tsc --allowJs --moduleResolution node --lib es2015,dom -t es5 -m es2015 --outDir tmp/es5 --rootDir ../.. --sourceMap src/Dexie.Syncable.js test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
+      "tsc --allowJs --moduleResolution node --lib es2015,dom -t es5 -m es2015 --outDir tools/tmp/es5 --rootDir ../.. --sourceMap src/Dexie.Syncable.js test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
       "rollup -c tools/build-configs/rollup.config.js",
       "rollup -c tools/build-configs/rollup.tests.config.js",
       "node tools/replaceVersionAndDate.js dist/dexie-syncable.js",
