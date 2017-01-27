@@ -1,5 +1,6 @@
 {
   "name": "dexie",
+  "version": "2.0.0-beta.7",
   "homepage": "http://dexie.org",
   "authors": [
     "David Fahlander"
@@ -30,6 +31,5 @@
     "src",
     "test",
     "tools"
-  ],
-  "version": "2.0.0-beta.8"
+  ]
 }
