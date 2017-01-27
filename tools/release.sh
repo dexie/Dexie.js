@@ -25,8 +25,8 @@ current_version=$(node -p "require('./package').version")
 master_branch="$(git symbolic-ref HEAD)"
 master_branch=${master_branch##refs/heads/}
 echo "Master branch is: '$master_branch'"
-if ! [[ $master_branch =~ ^temp ]]; then
-    echo >&2 "Error: Must be on a branch prefixed 'master bugbug! FIXTHIS!'";
+if ! [[ $master_branch =~ ^master ]]; then
+    echo >&2 "Error: Must be on a branch prefixed 'master'";
     exit 1;
 fi
 master_suffix="${master_branch##master}"
@@ -68,12 +68,12 @@ do
     cd -
 done
 
-if ["${autoPublishAddons}" = "true"]; then
-  printf "Do you want to publish these addons if all tests pass? (Y/n)";
+if [ "${autoPublishAddons}" = "true"]; then
+  printf "Do you want to publish these addons if all tests pass (Y/n)? ";
   read autoPublishAddons
 fi
 
-if [ "${autoPublishAddons}" = "Y" ] then;
+if [ "${autoPublishAddons}" = "Y" ]; then
   echo "Will publish updated addons to npm if tests pass."
 else
   echo "Will not publish any addons."
@@ -131,7 +131,7 @@ do
 
     printf "${addon} Browserstack tests passed.\n"
     
-    if [ "${autoPublishAddons}" = "Y" ] then;
+    if [ "${autoPublishAddons}" = "Y" ]; then
       if ! [ "${addonPublishedVersion}" = "${addonLocalVersion}" ]; then
         printf "Publishing ${addonNpmName} ${addonLocalVersion} on npm\n"
         echo "Would now invoke npm publish from $(pwd)!"
