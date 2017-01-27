@@ -77,6 +77,7 @@
     "dexie": "^2.0.0-beta.7"
   },
   "devDependencies": {
+    "dexie": "^2.0.0-beta.7",
     "eslint": "^3.14.0",
     "just-build": "^0.9.13",
     "karma": "^1.4.0",

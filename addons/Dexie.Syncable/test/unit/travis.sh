@@ -10,4 +10,5 @@ npm install >/dev/null
 echo "Building dexie-syncable"
 npm run build
 
+npm run test:typings
 npm run test:unit
