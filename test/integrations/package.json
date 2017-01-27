@@ -1,0 +1,34 @@
+{
+  "name": "dexie-integration-tests",
+  "version": "1.0.0",
+  "description": "A collection of integration tests to run as part of CI to ensure dexie keep up the compatibility with 3rd part addons and other work that depends on dexie",
+  "main": "tests-bundle.js",
+  "module": "index.js",
+  "scripts": {
+    "test": "npm run test:dexie-relationships",
+    "test:dexie-relationships": "../../node_modules/.bin/just-build dexie-relationships"
+  },
+  "just-build": {
+    "dexie-relationships": [
+      "# Transpile JS to ES5",
+      "tsc --allowJs --moduleResolution node --lib es2015,dom -t es5 -m es2015 --outDir tmp/es5 --rootDir .. --sourceMap dexie-relationships/index.js [--watch 'Compilation complete.']",
+      "# Generate UMD module bundle",
+      "rollup -c dexie-relationships/rollup.config.js",
+      "# Start the tests",
+      "karma start dexie-relationships/karma.conf.js --single-run"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dfahlander/Dexie.js.git"
+  },
+  "author": "",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/dfahlander/Dexie.js/issues"
+  },
+  "homepage": "https://github.com/dfahlander/Dexie.js#readme",
+  "dependencies": {
+    "dexie-relationships": "1.2.1"
+  }
+}
