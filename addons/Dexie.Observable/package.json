@@ -38,7 +38,7 @@
     "test": "npm run build && npm run test:typings && npm run test:unit && npm run test:integration",
     "test:unit": "karma start test/unit/karma.conf.js --single-run",
     "test:integration": "karma start test/integration/karma.conf.js --single-run",
-    "test:typings": "tsc -p test/test-typings/",
+    "test:typings": "tsc -p test/typings/",
     "test:unit:debug": "karma start test/unit/karma.conf.js --log-level debug",
     "test:integration:debug": "karma start test/integrations/karma.conf.js --log-level debug"
   },
