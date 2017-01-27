@@ -68,7 +68,7 @@ do
     cd -
 done
 
-if [ "${autoPublishAddons}" = "true"]; then
+if [ "${autoPublishAddons}" = "true" ]; then
   printf "Do you want to publish these addons if all tests pass (Y/n)? ";
   read autoPublishAddons
 fi
