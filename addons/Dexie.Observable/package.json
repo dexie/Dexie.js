@@ -33,8 +33,8 @@
     "url": "https://github.com/dfahlander/Dexie.js/issues"
   },
   "scripts": {
-    "build": "just-build",
-    "watch": "just-build --watch",
+    "build": "../../node_modules/.bin/just-build",
+    "watch": "../../node_modules/.bin/just-build --watch",
     "test": "npm run build && npm run test:typings && npm run test:unit && npm run test:integration",
     "test:unit": "karma start test/unit/karma.conf.js --single-run",
     "test:integration": "karma start test/integration/karma.conf.js --single-run",
