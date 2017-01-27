@@ -4,3 +4,7 @@ addons/
 *.njsproj
 .*
 *.log
+test/
+tools/
+bower.json
+src/

@@ -3,3 +3,4 @@ src/
 .*
 tmp/
 **/tmp/
+test
