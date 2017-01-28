@@ -73,6 +73,7 @@ asyncTest('should return an existing node if one exists for the given URL', () =
       ok(node instanceof db.observable.SyncNode, 'returned node is instance of SyncNode');
       strictEqual(node.id, addedNodeID, 'We got the correct node back');
       propEqual(node.syncContext, {nodeID: addedNodeID}, 'syncContext contains the correct nodeID');
+      propEqual(node.syncOptions, nodeOpts, 'node contains the given options');
       return db._syncNodes.get(addedNodeID);
     })
     .then((node) => {
@@ -83,7 +84,6 @@ asyncTest('should return an existing node if one exists for the given URL', () =
     })
     .finally(start);
 });
-
 
 asyncTest('should set myRevision to the last _changes if initialUpload is false', () => {
   const nodeOpts = {initialUpload: false};

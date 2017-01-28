@@ -16,6 +16,7 @@ export default function initGetOrCreateSyncNode(db, protocolName, url) {
           // Node already there. Make syncContext become an instance of PersistedContext:
           node.syncContext = new PersistedContext(node.id, node.syncContext);
           node.syncProtocol = protocolName; // In case it was changed (would be very strange but...) could happen...
+          node.syncOptions = options; // Options could have been changed
           db._syncNodes.put(node);
         } else {
           // Create new node and sync everything

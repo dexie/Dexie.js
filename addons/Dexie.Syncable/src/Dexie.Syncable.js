@@ -128,6 +128,14 @@ export default function Syncable (db) {
         }
     };
 
+    db.syncable.getOptions = function(url, cb) {
+        return db.transaction('r?', db._syncNodes, () => {
+            return db._syncNodes.where('url').equals(url).first(function(node) {
+                return node.syncOptions;
+            }).then(cb);
+        });
+    };
+
     db.syncable.list = function() {
         return db.transaction('r?', db._syncNodes, ()=>{
             return db._syncNodes.where('type').equals('remote').toArray(function(a) {
