@@ -1,11 +1,11 @@
 import Dexie from 'dexie';
-import 'dexie-observable';
+import observable from 'dexie-observable';
 import {module, asyncTest, start, stop, strictEqual, deepEqual, ok} from 'QUnit';
 import {resetDatabase} from '../../../../test/dexie-unittest-utils';
 import initFinallyCommitAllChanges from '../../src/finally-commit-all-changes';
 import {CREATE, DELETE, UPDATE} from '../../src/change_types';
 
-const db = new Dexie('TestDBTable');
+const db = new Dexie('TestDBTable', {addons: [observable]});
 db.version(1).stores({
   foo: "id"
 });

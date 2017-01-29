@@ -4,7 +4,7 @@ import {resetDatabase} from '../../../../test/dexie-unittest-utils';
 import bulkUpdate from '../../src/bulk-update';
 import {UPDATE} from '../../src/change_types';
 
-const db = new Dexie('TestDBTable');
+const db = new Dexie('TestDBTable', {addons: []});
 db.version(1).stores({
   foo: "id"
 });
