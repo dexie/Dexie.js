@@ -108,6 +108,9 @@ Ignore certain objects from being synced defined by the given filter.
 [db.syncable.getStatus (url)](https://github.com/dfahlander/Dexie.js/wiki/db.syncable.getStatus())
 Get sync status for the given URL.
 
+[db.syncable.getOptions (url)](https://github.com/dfahlander/Dexie.js/wiki/db.syncable.getOptions())
+Get the options object for the given URL.
+
 
 ### Source
 
