@@ -3,8 +3,8 @@
   "version": "2.0.0-beta.9",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
-  "module": "dist/dexie.jsm",
-  "jsnext:main": "dist/dexie.jsm",
+  "module": "dist/dexie.es.js",
+  "jsnext:main": "dist/dexie.es.js",
   "typings": "dist/dexie.d.ts",
   "jspm": {
     "format": "cjs",
