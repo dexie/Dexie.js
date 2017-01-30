@@ -6,8 +6,13 @@ const version = require(path.resolve(__dirname, '../../package.json')).version;
 
 export default {
   entry: 'tools/tmp/es5/addons/Dexie.Syncable/src/Dexie.Syncable.js',
-  dest: 'dist/dexie-syncable.js',
-  format: 'umd',
+  targets: [{
+    dest: 'dist/dexie-syncable.js',
+    format: 'umd',
+  },{
+    dest: 'dist/dexie-syncable.jsm',
+    format: 'es'
+  }],
   sourceMap: true,
   banner: readFileSync(path.resolve(__dirname, 'banner.txt'))+""
     .replace(/{version}/g, version)
