@@ -14,6 +14,15 @@ Dexie solves three main issues with the native IndexedDB API:
 
 Dexie provides a neat database API with a well thought-through API design, robust error handling, extendability, change tracking awareness and extended KeyRange support (case insensitive search, set matches and OR operations).
 
+#### Features
+
+* Promise-based API towards indexedDB (supports all IDB features)
+* Works with any framework such as React or Angular2
+* Client/Server synchronization via [sync-client](https://www.npmjs.com/package/sync-client). Can adapt to custom sync backends via [dexie-syncable](https://www.npmjs.com/package/dexie-syncable)
+* MongoDB like API via [dexie-mongoify](https://www.npmjs.com/package/dexie-mongoify)
+* Relational DB via [dexie-relationships](https://www.npmjs.com/package/dexie-relationships)
+* Typescript definitions built-in
+
 #### Hello World
 
 ```html
