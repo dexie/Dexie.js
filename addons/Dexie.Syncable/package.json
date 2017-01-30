@@ -3,7 +3,9 @@
   "version": "1.0.0-beta.2",
   "description": "Addon to Dexie that makes it possible to sync indexeDB with remote databases.",
   "main": "dist/dexie-syncable.js",
-  "jsnext:main": "src/Dexie.Syncable.js",
+  "module": "dist/dexie-syncable.jsm",
+  "jsnext:main": "dist/dexie-syncable.jsm",
+  "typings": "dist/dexie-syncable.d.ts",
   "jspm": {
     "format": "cjs",
     "ignore": [

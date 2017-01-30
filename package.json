@@ -3,8 +3,8 @@
   "version": "2.0.0-beta.9",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
-  "module": "dist/dexie.es6.js",
-  "jsnext:main": "dist/dexie.es6.js",
+  "module": "dist/dexie.jsm",
+  "jsnext:main": "dist/dexie.jsm",
   "typings": "dist/dexie.d.ts",
   "jspm": {
     "format": "cjs",
@@ -53,14 +53,9 @@
       "node tools/replaceVersionAndDate.js dist/dexie.js",
       "eslint src"
     ],
-    "dexie-es6": [
-      "tsc --allowJs -t es2015 -m es2015 --outDir tools/tmp/es6/src/ --sourceMap src/Dexie.js [--watch 'Compilation complete.']",
-      "rollup -c tools/build-configs/rollup.config.es6.js",
-      "node tools/replaceVersionAndDate.js dist/dexie.es6.js"
-    ],
     "release": [
       "# Build ES5 umd module as well as the es6 module.",
-      "just-build dexie dexie-es6",
+      "just-build dexie",
       "# Copy Dexie.d.ts to dist and replace version in it",
       "node -e \"fs.writeFileSync('dist/dexie.d.ts', fs.readFileSync('src/Dexie.d.ts'))\"",
       "node tools/replaceVersionAndDate.js dist/dexie.d.ts",

@@ -6,8 +6,13 @@ const version = require(path.resolve(__dirname, '../../package.json')).version;
 
 export default {
   entry: 'tools/tmp/es5/src/Dexie.js',
-  dest: 'dist/dexie.js',
-  format: 'umd',
+  targets: [{
+    dest: 'dist/dexie.js',
+    format: 'umd',
+  },{
+    dest: 'dist/dexie.es.js',
+    format: 'es'
+  }],
   sourceMap: true,
   banner: readFileSync(path.resolve(__dirname, 'banner.txt'))+""
     .replace(/{version}/g, version)
