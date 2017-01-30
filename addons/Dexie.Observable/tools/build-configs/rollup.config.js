@@ -10,7 +10,7 @@ export default {
     dest: 'dist/dexie-observable.js',
     format: 'umd',
   },{
-    dest: 'dist/dexie-observable.jsm',
+    dest: 'dist/dexie-observable.es.js',
     format: 'es'
   }],
   sourceMap: true,

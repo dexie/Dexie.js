@@ -10,7 +10,7 @@ export default {
     dest: 'dist/dexie.js',
     format: 'umd',
   },{
-    dest: 'dist/dexie.jsm',
+    dest: 'dist/dexie.es.js',
     format: 'es'
   }],
   sourceMap: true,

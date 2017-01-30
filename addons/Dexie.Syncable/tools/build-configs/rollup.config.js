@@ -10,7 +10,7 @@ export default {
     dest: 'dist/dexie-syncable.js',
     format: 'umd',
   },{
-    dest: 'dist/dexie-syncable.jsm',
+    dest: 'dist/dexie-syncable.es.js',
     format: 'es'
   }],
   sourceMap: true,
