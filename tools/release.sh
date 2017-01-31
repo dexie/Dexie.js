@@ -152,7 +152,7 @@ git add -A --no-ignore-removal -f test/bundle.js 2>/dev/null
 # Commit all changes (still locally)
 git commit -am "Build output" 2>/dev/null
 # Tag the release
-git tag -a -m "$next_ref" $next_ref
+git tag -f -a -m "$next_ref" $next_ref
 # Now, push the changes to the releases branch
 #echo "Would now git push to releases"
 git push origin master$master_suffix:releases$master_suffix --follow-tags
@@ -166,7 +166,7 @@ printf "Successful publish to npm.\n\n"
 
 # Push the update of package.json to master
 printf "Pushing Release-commit to master$master_suffix (with updated version in package.json)\n"
-echo "Would now git push new package.json to master"
+#echo "Would now git push new package.json to master"
 git push origin $master_release_commit:master$master_suffix
 
 printf "Resetting to origin/master$master_suffix\n"
