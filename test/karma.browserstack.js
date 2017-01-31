@@ -19,10 +19,24 @@ module.exports = {
       os: 'OS X',
       os_version: 'El Capitan'
     },
-    bs_edge: {
+    bs_edge_13: {
       base: 'BrowserStack',
       browser: "Edge",
       browser_version: '13',
+      os: 'Windows',
+      os_version: '10'
+    },
+    bs_edge: {
+      base: 'BrowserStack',
+      browser: "Edge",
+      browser_version: '14',
+      os: 'Windows',
+      os_version: '10'
+    },
+    bs_edge_latest: {
+      base: 'BrowserStack',
+      browser: 'Edge',
+      browser_version: 'latest',
       os: 'Windows',
       os_version: '10'
     },

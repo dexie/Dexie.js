@@ -24,7 +24,7 @@ module.exports = {
         'bs_chrome_latest',
         'bs_firefox',
         'bs_firefox_latest',
-        'bs_edge',
-        'bs_ie11'
+        'bs_edge_latest', // Know that edge 13 has been sporadically instable. Might be better on Edge 14 or later. Restart of tests often needed.
+        'bs_ie11' // Know that IE11 has been sporadically instable. Restart of tests often needed.
     ]
 }
