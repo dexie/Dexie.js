@@ -837,7 +837,7 @@ export default function Dexie(dbName, options) {
                     Promise.resolve(returnValue).then(x => trans.active ?
                         x // Transaction still active. Continue.
                         : rejection(new exceptions.PrematureCommit(
-                            "Transaction committed too early. See http://bit.ly/2eVASrf")))
+                            "Transaction committed too early. See http://bit.ly/2kdckMn")))
                     // No promise returned. Wait for all outstanding promises before continuing. 
                     : promiseFollowed.then(()=>returnValue)
                 ).then(x => {
