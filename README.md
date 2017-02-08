@@ -29,7 +29,7 @@ Dexie provides a neat database API with a well thought-through API design, robus
    db.version(1).stores({
      friends: "++id,name,age"
    });
-   
+
    //
    // Manipulate and Query Database
    //
@@ -46,15 +46,15 @@ Dexie provides a neat database API with a well thought-through API design, robus
 ```
 Yes, it's that simple.
 
-[Tutorial](https://github.com/dfahlander/Dexie.js/wiki/Tutorial)
+[Tutorial](http://dexie.org/docs/Tutorial)
 
-[API Reference](https://github.com/dfahlander/Dexie.js/wiki/API-Reference)
+[API Reference](http://dexie.org/docs/API-Reference)
 
-[Samples](https://github.com/dfahlander/Dexie.js/wiki/Samples)
+[Samples](http://dexie.org/docs/Samples)
 
 ### Performance
 
-Dexie has a kick-ass performance. It's [bulk methods](https://github.com/dfahlander/Dexie.js/wiki/WriteableTable.bulkPut()) take advantage of a not well known feature in indexedDB that makes it possible to store stuff without listening to every onsuccess event. This speeds up the performance to a maximum.
+Dexie has a kick-ass performance. It's [bulk methods](http://dexie.org/docs/Table/Table.bulkPut()) take advantage of a not well known feature in indexedDB that makes it possible to store stuff without listening to every onsuccess event. This speeds up the performance to a maximum.
 
 #### Supported operations
 ```js
@@ -108,11 +108,11 @@ uniqueKeys(): Promise;
 until(filter: (value) => boolean, includeStopEntry?: boolean): Collection;
 update(key: Key, changes: { [keyPath: string]: any }): Promise;
 ```
-This is a mix of methods from [WhereClause](https://github.com/dfahlander/Dexie.js/wiki/WhereClause), [Table](https://github.com/dfahlander/Dexie.js/wiki/Table) and [Collection](https://github.com/dfahlander/Dexie.js/wiki/Collection). Dive into the [API reference](https://github.com/dfahlander/Dexie.js/wiki/API-Reference) to see the details.
+This is a mix of methods from [WhereClause](http://dexie.org/docs/WhereClause/WhereClause), [Table](http://dexie.org/docs/Table/Table) and [Collection](http://dexie.org/docs/Collection/Collection). Dive into the [API reference](http://dexie.org/docs/API-Reference) to see the details.
 
 #### Hello World (ES2015 / ES6)
 
-This sample shows how to use Dexie with ES6 compliant environments and npm module resolution. With ES6, the `yield` keyword can be  used instead of calling `.then()` on every database operation. The `yield` keyword and generator functions are already supported today (March 2016) in Chrome, Firefox, Edge and Opera without a transpiler (though this example also uses import statements which still needs transpilation). Dive into this? Read **[SIMPLIFY WITH YIELD](https://github.com/dfahlander/Dexie.js/wiki/Simplify-with-yield)**!
+This sample shows how to use Dexie with ES6 compliant environments and npm module resolution. With ES6, the `yield` keyword can be  used instead of calling `.then()` on every database operation. The `yield` keyword and generator functions are already supported today (March 2016) in Chrome, Firefox, Edge and Opera without a transpiler (though this example also uses import statements which still needs transpilation). Dive into this? Read **[SIMPLIFY WITH YIELD](http://dexie.org/docs/Simplify-with-yield)**!
 
 ```js
 import Dexie from 'dexie';
@@ -133,18 +133,18 @@ db.transaction('rw', db.friends, function*() {
         let id = yield db.friends.add({name: "Josephine", age: 21});
         alert (`Addded friend with id ${id}`);
     }
-    
+
     // Query:
     let youngFriends = yield db.friends.where("age").below(25).toArray();
-        
+
     // Show result:
     alert ("My young friends: " + JSON.stringify(youngFriends));
-    
+
 }).catch(e => {
     alert(e.stack || e);
 });
 ```
-*NOTE: db.transaction() will treat generator functions (function * ) so that it is possible to use `yield` for consuming promises. [Yield can be used outside transactions as well](https://github.com/dfahlander/Dexie.js/wiki/Simplify-with-yield).*
+*NOTE: db.transaction() will treat generator functions (function * ) so that it is possible to use `yield` for consuming promises. [Yield can be used outside transactions as well](http://dexie.org/docs/Simplify-with-yield).*
 
 #### Hello World (ES2016 / ES7)
 ```js
@@ -163,13 +163,13 @@ db.transaction('rw', db.friends, async() => {
         let id = await db.friends.add({name: "Josephine", age: 21});
         alert (`Addded friend with id ${id}`);
     }
-    
+
     // Query:
     let youngFriends = await db.friends.where("age").below(25).toArray();
-        
+
     // Show result:
     alert ("My young friends: " + JSON.stringify(youngFriends));
-    
+
 }).catch(e => {
     alert(e.stack || e);
 });
@@ -194,7 +194,7 @@ interface IFriend {
 //
 class FriendDatabase extends Dexie {
     friends: Dexie.Table<IFriend,number>;
-    
+
     constructor() {
         super("FriendDatabase");
         this.version(1).stores({
@@ -212,13 +212,13 @@ db.transaction('rw', db.friends, async() => {
         let id = await db.friends.add({name: "Josephine", age: 21});
         alert (`Addded friend with id ${id}`);
     }
-    
+
     // Query:
     let youngFriends = await db.friends.where("age").below(25).toArray();
-        
+
     // Show result:
     alert ("My young friends: " + JSON.stringify(youngFriends));
-    
+
 }).catch(e => {
     alert(e.stack || e);
 });
@@ -226,13 +226,13 @@ db.transaction('rw', db.friends, async() => {
 
 Samples
 -------
-https://github.com/dfahlander/Dexie.js/wiki/Samples
+http://dexie.org/docs/Samples
 
 https://github.com/dfahlander/Dexie.js/tree/master/samples
 
 Knowledge Base
 -----
-[https://github.com/dfahlander/Dexie.js/wiki/Questions-and-Answers](https://github.com/dfahlander/Dexie.js/wiki/Questions-and-Answers)
+[http://dexie.org/docs/Questions-and-Answers](http://dexie.org/docs/Questions-and-Answers)
 
 Website
 -------
