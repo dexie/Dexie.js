@@ -4,7 +4,7 @@
  *
  * By David Fahlander, david.fahlander@gmail.com
  *
- * Version 1.5.1, Tue Nov 01 2016
+ * Version 1.5.2, Sat Mar 11 2017
  * www.dexie.com
  * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
  */
@@ -81,7 +81,7 @@ function assert (b) {
 }
 
 function asap(fn) {
-    if (_global.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
+    if (_global.setImmediate) _global.setImmediate(fn); else setTimeout(fn, 0);
 }
 
 
@@ -705,7 +705,7 @@ var stack_being_generated = false;
 */
 var schedulePhysicalTick = (_global.setImmediate ? 
     // setImmediate supported. Those modern platforms also supports Function.bind().
-    setImmediate.bind(null, physicalTick) :
+    _global.setImmediate.bind(null, physicalTick) :
     _global.MutationObserver ?
         // MutationObserver supported
         () => {
@@ -1417,14 +1417,14 @@ function rejection (err, uncaughtHandler) {
  *
  * By David Fahlander, david.fahlander@gmail.com
  *
- * Version 1.5.1, Tue Nov 01 2016
+ * Version 1.5.2, Sat Mar 11 2017
  *
  * http://dexie.org
  *
  * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
  */
 
-var DEXIE_VERSION = '1.5.1';
+var DEXIE_VERSION = '1.5.2';
 var maxString = String.fromCharCode(65535);
 var maxKey = (function(){try {IDBKeyRange.only([[]]);return [[]];}catch(e){return maxString;}})();
 var INVALID_KEY_ARGUMENT = "Invalid key provided. Keys must be of type string, number, Date or Array<string | number | Date>.";

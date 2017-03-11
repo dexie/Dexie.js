@@ -1,4 +1,4 @@
-﻿// Type definitions for Dexie v1.5.1
+﻿// Type definitions for Dexie v1.5.2
 // Project: https://github.com/dfahlander/Dexie.js
 // Definitions by: David Fahlander <http://github.com/dfahlander>
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
