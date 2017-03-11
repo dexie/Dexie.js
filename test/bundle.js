@@ -2022,31 +2022,33 @@ QUnit.asyncTest("Catching error prevents transaction from aborting", 5, async$2(
                 case 3:
                     QUnit.ok(true, "Should come here - transaction committed because we caught the error");
 
-                    _context5.next = 6;
+                    _context5.t0 = QUnit.ok;
+                    _context5.next = 7;
                     return db$2.pets.get(1);
 
-                case 6:
-                    _context5.t0 = _context5.sent;
-                    QUnit.ok(_context5.t0, "A pet with ID 1 exists in DB");
-                    _context5.next = 10;
+                case 7:
+                    _context5.t1 = _context5.sent;
+                    (0, _context5.t0)(_context5.t1, "A pet with ID 1 exists in DB");
+                    _context5.t2 = QUnit.equal;
+                    _context5.next = 12;
                     return db$2.pets.get(1);
-
-                case 10:
-                    _context5.t1 = _context5.sent.name;
-                    QUnit.equal(_context5.t1, "Tidi", "It was Tidi in the first position");
 
                 case 12:
-                    _context5.prev = 12;
+                    _context5.t3 = _context5.sent.name;
+                    (0, _context5.t2)(_context5.t3, "Tidi", "It was Tidi in the first position");
+
+                case 14:
+                    _context5.prev = 14;
 
                     QUnit.start();
-                    return _context5.finish(12);
+                    return _context5.finish(14);
 
-                case 15:
+                case 17:
                 case 'end':
                     return _context5.stop();
             }
         }
-    }, _callee5, this, [[0,, 12, 15]]);
+    }, _callee5, this, [[0,, 14, 17]]);
 })));
 
 QUnit.asyncTest("Transaction not committing when not catching error event", 4, async$2(regeneratorRuntime.mark(function _callee7() {
@@ -2084,7 +2086,7 @@ QUnit.asyncTest("Transaction not committing when not catching error event", 4, a
                 case 3:
                     QUnit.ok(false, "Should not come here");
 
-                    _context7.next = 14;
+                    _context7.next = 15;
                     break;
 
                 case 6:
@@ -2094,25 +2096,26 @@ QUnit.asyncTest("Transaction not committing when not catching error event", 4, a
 
                     QUnit.ok(true, "Transaction should fail");
                     QUnit.equal(_context7.t0.name, "ConstraintError", "Error caught was a ConstraintError!");
-                    _context7.next = 12;
+                    _context7.t1 = QUnit.equal;
+                    _context7.next = 13;
                     return db$2.pets.count();
 
-                case 12:
-                    _context7.t1 = _context7.sent;
-                    QUnit.equal(_context7.t1, 0, "Pets table should still be empty because transaction failed");
+                case 13:
+                    _context7.t2 = _context7.sent;
+                    (0, _context7.t1)(_context7.t2, 0, "Pets table should still be empty because transaction failed");
 
-                case 14:
-                    _context7.prev = 14;
+                case 15:
+                    _context7.prev = 15;
 
                     QUnit.start();
-                    return _context7.finish(14);
+                    return _context7.finish(15);
 
-                case 17:
+                case 18:
                 case 'end':
                     return _context7.stop();
             }
         }
-    }, _callee7, this, [[0, 6, 14, 17]]);
+    }, _callee7, this, [[0, 6, 15, 18]]);
 })));
 
 QUnit.asyncTest("Should allow yielding a non-promise", async$2(regeneratorRuntime.mark(function _callee8() {
@@ -4379,84 +4382,88 @@ spawnedTest("bulkAdd-catching errors", regeneratorRuntime.mark(function _callee3
                     });
 
                 case 2:
-                    _context3.next = 4;
+                    _context3.t0 = QUnit.equal;
+                    _context3.next = 5;
                     return db$5.users.where("username").startsWith('aper').count();
 
-                case 4:
-                    _context3.t0 = _context3.sent;
-                    QUnit.equal(_context3.t0, 3, "Previous transaction committed");
+                case 5:
+                    _context3.t1 = _context3.sent;
+                    (0, _context3.t0)(_context3.t1, 3, "Previous transaction committed");
                     newUsersX = [{ first: "Xke1", last: "Persbrant1", username: "xper1", email: ["xper1@persbrant.net"] }, { first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"] }, { first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"] }, // Should fail
                     { first: "Xke3", last: "Persbrant3", username: "xper3", email: ["xper3@persbrant.net"] }];
-                    _context3.prev = 7;
-                    _context3.next = 10;
+                    _context3.prev = 8;
+                    _context3.next = 11;
                     return db$5.transaction("rw", db$5.users, function () {
                         db$5.users.bulkAdd(newUsersX).then(function () {
                             QUnit.ok(false, "Should not resolve");
                         });
                     });
 
-                case 10:
+                case 11:
                     QUnit.ok(false, "Should not come here");
-                    _context3.next = 16;
+                    _context3.next = 17;
                     break;
 
-                case 13:
-                    _context3.prev = 13;
-                    _context3.t1 = _context3['catch'](7);
+                case 14:
+                    _context3.prev = 14;
+                    _context3.t2 = _context3['catch'](8);
 
-                    QUnit.ok(true, "Got: " + _context3.t1);
+                    QUnit.ok(true, "Got: " + _context3.t2);
 
-                case 16:
-                    _context3.next = 18;
+                case 17:
+                    _context3.t3 = QUnit.equal;
+                    _context3.next = 20;
                     return db$5.users.where('username').startsWith('xper').count();
 
-                case 18:
-                    _context3.t2 = _context3.sent;
-                    QUnit.equal(_context3.t2, 0, "0 users! Good, means that previous transaction did not commit");
-                    _context3.next = 22;
+                case 20:
+                    _context3.t4 = _context3.sent;
+                    (0, _context3.t3)(_context3.t4, 0, "0 users! Good, means that previous transaction did not commit");
+                    _context3.next = 24;
                     return db$5.users.bulkAdd(newUsersX).catch(function (e) {
                         QUnit.ok(true, "Got error. Catching it should make the successors work.");
                     });
 
-                case 22:
-                    _context3.next = 24;
+                case 24:
+                    _context3.t5 = QUnit.equal;
+                    _context3.next = 27;
                     return db$5.users.where('username').startsWith('xper').count();
 
-                case 24:
-                    _context3.t3 = _context3.sent;
-                    QUnit.equal(_context3.t3, 3, "3 users! Good - means that previous operation catched and therefore committed");
+                case 27:
+                    _context3.t6 = _context3.sent;
+                    (0, _context3.t5)(_context3.t6, 3, "3 users! Good - means that previous operation catched and therefore committed");
                     newUsersY = [{ first: "Yke1", last: "Persbrant1", username: "yper1", email: ["yper1@persbrant.net"] }, { first: "Yke2", last: "Persbrant2", username: "yper2", email: ["yper2@persbrant.net"] }, { first: "Yke2", last: "Persbrant2", username: "yper2", email: ["yper2@persbrant.net"] }, // Should fail
                     { first: "Yke3", last: "Persbrant3", username: "yper3", email: ["yper3@persbrant.net"] }];
 
                     // Now check that catching the operation via try..catch should also make it succeed.
 
-                    _context3.prev = 27;
-                    _context3.next = 30;
+                    _context3.prev = 30;
+                    _context3.next = 33;
                     return db$5.users.bulkAdd(newUsersY);
 
-                case 30:
-                    _context3.next = 35;
+                case 33:
+                    _context3.next = 38;
                     break;
 
-                case 32:
-                    _context3.prev = 32;
-                    _context3.t4 = _context3['catch'](27);
-
-                    QUnit.ok(true, "Got: " + _context3.t4);
-
                 case 35:
-                    _context3.next = 37;
+                    _context3.prev = 35;
+                    _context3.t7 = _context3['catch'](30);
+
+                    QUnit.ok(true, "Got: " + _context3.t7);
+
+                case 38:
+                    _context3.t8 = QUnit.equal;
+                    _context3.next = 41;
                     return db$5.users.where('username').startsWith('yper').count();
 
-                case 37:
-                    _context3.t5 = _context3.sent;
-                    QUnit.equal(_context3.t5, 3, "3 users! Good - means that previous operation catched (via try..yield..catch this time, and therefore committed");
+                case 41:
+                    _context3.t9 = _context3.sent;
+                    (0, _context3.t8)(_context3.t9, 3, "3 users! Good - means that previous operation catched (via try..yield..catch this time, and therefore committed");
 
 
                     // Now check that catching and rethrowing should indeed make it fail
                     newUsersZ = [{ first: "Zke1", last: "Persbrant1", username: "zper1", email: ["zper1@persbrant.net"] }, { first: "Zke2", last: "Persbrant2", username: "zper2", email: ["zper2@persbrant.net"] }, { first: "Zke2", last: "Persbrant2", username: "zper2", email: ["zper2@persbrant.net"] }, // Should fail
                     { first: "Zke3", last: "Persbrant3", username: "zper3", email: ["zper3@persbrant.net"] }];
-                    _context3.next = 42;
+                    _context3.next = 46;
                     return db$5.transaction('rw', db$5.users, regeneratorRuntime.mark(function _callee2() {
                         return regeneratorRuntime.wrap(function _callee2$(_context2) {
                             while (1) {
@@ -4485,20 +4492,21 @@ spawnedTest("bulkAdd-catching errors", regeneratorRuntime.mark(function _callee3
                         QUnit.ok(true, "Got rethrown BulkError: " + e.stack);
                     });
 
-                case 42:
-                    _context3.next = 44;
+                case 46:
+                    _context3.t10 = QUnit.equal;
+                    _context3.next = 49;
                     return db$5.users.where('username').startsWith('zper').count();
 
-                case 44:
-                    _context3.t6 = _context3.sent;
-                    QUnit.equal(_context3.t6, 0, "0 users! Good - means that previous operation rethrown (via try..yield..catch--throw this time, and therefore not committed");
+                case 49:
+                    _context3.t11 = _context3.sent;
+                    (0, _context3.t10)(_context3.t11, 0, "0 users! Good - means that previous operation rethrown (via try..yield..catch--throw this time, and therefore not committed");
 
-                case 46:
+                case 51:
                 case 'end':
                     return _context3.stop();
             }
         }
-    }, _callee3, this, [[7, 13], [27, 32]]);
+    }, _callee3, this, [[8, 14], [30, 35]]);
 }));
 
 spawnedTest("bulkAdd-non-inbound-autoincrement", regeneratorRuntime.mark(function _callee4() {
@@ -4510,20 +4518,22 @@ spawnedTest("bulkAdd-non-inbound-autoincrement", regeneratorRuntime.mark(functio
                     return db$5.folks.bulkAdd([{ first: "Foo", last: "Bar" }, { first: "Foo", last: "Bar2" }, { first: "Foo", last: "Bar3" }, { first: "Foo", last: "Bar4" }]);
 
                 case 2:
-                    _context4.next = 4;
+                    _context4.t0 = QUnit.equal;
+                    _context4.next = 5;
                     return db$5.folks.where('first').equals('Foo').count();
 
-                case 4:
-                    _context4.t0 = _context4.sent;
-                    QUnit.equal(_context4.t0, 4, "Should be 4 Foos");
-                    _context4.next = 8;
+                case 5:
+                    _context4.t1 = _context4.sent;
+                    (0, _context4.t0)(_context4.t1, 4, "Should be 4 Foos");
+                    _context4.t2 = QUnit.equal;
+                    _context4.next = 10;
                     return db$5.folks.where('last').equals('Bar').count();
 
-                case 8:
-                    _context4.t1 = _context4.sent;
-                    QUnit.equal(_context4.t1, 1, "Shoudl be 1 Bar");
-
                 case 10:
+                    _context4.t3 = _context4.sent;
+                    (0, _context4.t2)(_context4.t3, 1, "Shoudl be 1 Bar");
+
+                case 12:
                 case 'end':
                     return _context4.stop();
             }
@@ -4552,14 +4562,15 @@ spawnedTest("bulkAdd-catch sub transaction", regeneratorRuntime.mark(function _c
                     });
 
                 case 2:
-                    _context5.next = 4;
+                    _context5.t0 = QUnit.equal;
+                    _context5.next = 5;
                     return db$5.users.where('username').startsWith('aper').count();
 
-                case 4:
-                    _context5.t0 = _context5.sent;
-                    QUnit.equal(_context5.t0, 0, "0 users! Good, means that inner transaction did not commit");
+                case 5:
+                    _context5.t1 = _context5.sent;
+                    (0, _context5.t0)(_context5.t1, 0, "0 users! Good, means that inner transaction did not commit");
 
-                case 6:
+                case 7:
                 case 'end':
                     return _context5.stop();
             }
@@ -4682,87 +4693,91 @@ spawnedTest("bulkPut-catching errors", regeneratorRuntime.mark(function _callee9
                     });
 
                 case 2:
-                    _context9.next = 4;
+                    _context9.t0 = QUnit.equal;
+                    _context9.next = 5;
                     return db$5.users.where("username").startsWith('aper').count();
 
-                case 4:
-                    _context9.t0 = _context9.sent;
-                    QUnit.equal(_context9.t0, 3, "Previous transaction committed");
+                case 5:
+                    _context9.t1 = _context9.sent;
+                    (0, _context9.t0)(_context9.t1, 3, "Previous transaction committed");
                     newUsersX = [{ first: "Xke1", last: "Persbrant1", username: "xper1", email: ["xper1@persbrant.net"] }, { id: idOfLastUser, first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"] }, { first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"] }, // Should fail (add)
                     { id: idOfFirstUser, first: "Xke2", last: "Persbrant2", username: "xper2", email: ["xper2@persbrant.net"] }, // Should fail (update)
                     { first: "Xke3", last: "Persbrant3", username: "xper3", email: ["xper3@persbrant.net"] }];
-                    _context9.prev = 7;
-                    _context9.next = 10;
+                    _context9.prev = 8;
+                    _context9.next = 11;
                     return db$5.transaction("rw", db$5.users, function () {
                         db$5.users.bulkPut(newUsersX).then(function () {
                             QUnit.ok(false, "Should not resolve");
                         });
                     });
 
-                case 10:
+                case 11:
                     QUnit.ok(false, "Should not come here");
-                    _context9.next = 16;
+                    _context9.next = 17;
                     break;
 
-                case 13:
-                    _context9.prev = 13;
-                    _context9.t1 = _context9['catch'](7);
+                case 14:
+                    _context9.prev = 14;
+                    _context9.t2 = _context9['catch'](8);
 
-                    QUnit.ok(true, "Got: " + _context9.t1);
+                    QUnit.ok(true, "Got: " + _context9.t2);
 
-                case 16:
-                    _context9.next = 18;
+                case 17:
+                    _context9.t3 = QUnit.equal;
+                    _context9.next = 20;
                     return db$5.users.where('username').startsWith('xper').count();
 
-                case 18:
-                    _context9.t2 = _context9.sent;
-                    QUnit.equal(_context9.t2, 0, "0 users! Good, means that previous transaction did not commit");
-                    _context9.next = 22;
+                case 20:
+                    _context9.t4 = _context9.sent;
+                    (0, _context9.t3)(_context9.t4, 0, "0 users! Good, means that previous transaction did not commit");
+                    _context9.next = 24;
                     return db$5.users.bulkPut(newUsersX).catch(function (e) {
                         QUnit.ok(true, "Got error. Catching it should make the successors work.");
                     });
 
-                case 22:
-                    _context9.next = 24;
+                case 24:
+                    _context9.t5 = QUnit.equal;
+                    _context9.next = 27;
                     return db$5.users.where('username').startsWith('xper').count();
 
-                case 24:
-                    _context9.t3 = _context9.sent;
-                    QUnit.equal(_context9.t3, 3, "Should count to 3 users because previous operation was catched and therefore should have been committed");
+                case 27:
+                    _context9.t6 = _context9.sent;
+                    (0, _context9.t5)(_context9.t6, 3, "Should count to 3 users because previous operation was catched and therefore should have been committed");
                     newUsersY = [{ first: "Yke1", last: "Persbrant1", username: "yper1", email: ["yper1@persbrant.net"] }, { first: "Yke2", last: "Persbrant2", username: "yper2", email: ["yper2@persbrant.net"] }, { id: idOfFirstUser, first: "Yke2", last: "Persbrant2", username: "yper2", email: ["yper2@persbrant.net"] }, // Should fail
                     { first: "Yke2", last: "Persbrant2", username: "yper2", email: ["yper2@persbrant.net"] }, // Should fail
                     { first: "Yke3", last: "Persbrant3", username: "yper3", email: ["yper3@persbrant.net"] }];
 
                     // Now check that catching the operation via try..catch should also make it succeed.
 
-                    _context9.prev = 27;
-                    _context9.next = 30;
+                    _context9.prev = 30;
+                    _context9.next = 33;
                     return db$5.users.bulkPut(newUsersY);
 
-                case 30:
-                    _context9.next = 35;
+                case 33:
+                    _context9.next = 38;
                     break;
 
-                case 32:
-                    _context9.prev = 32;
-                    _context9.t4 = _context9['catch'](27);
-
-                    QUnit.ok(true, "Got: " + _context9.t4);
-
                 case 35:
-                    _context9.next = 37;
+                    _context9.prev = 35;
+                    _context9.t7 = _context9['catch'](30);
+
+                    QUnit.ok(true, "Got: " + _context9.t7);
+
+                case 38:
+                    _context9.t8 = QUnit.equal;
+                    _context9.next = 41;
                     return db$5.users.where('username').startsWith('yper').count();
 
-                case 37:
-                    _context9.t5 = _context9.sent;
-                    QUnit.equal(_context9.t5, 3, "Should count to 3 users because previous previous operation catched (via try..yield..catch this time, and therefore should have been committed");
+                case 41:
+                    _context9.t9 = _context9.sent;
+                    (0, _context9.t8)(_context9.t9, 3, "Should count to 3 users because previous previous operation catched (via try..yield..catch this time, and therefore should have been committed");
 
 
                     // Now check that catching and rethrowing should indeed make it fail
                     newUsersZ = [{ first: "Zke1", last: "Persbrant1", username: "zper1", email: ["zper1@persbrant.net"] }, { first: "Zke2", last: "Persbrant2", username: "zper2", email: ["zper2@persbrant.net"] }, { first: "Zke2", last: "Persbrant2", username: "zper2", email: ["zper2@persbrant.net"] }, // Should fail
                     { id: idOfLastUser, first: "Zke2", last: "Persbrant2", username: "zper2", email: ["zper2@persbrant.net"] }, // Should fail
                     { first: "Zke3", last: "Persbrant3", username: "zper3", email: ["zper3@persbrant.net"] }];
-                    _context9.next = 42;
+                    _context9.next = 46;
                     return db$5.transaction('rw', db$5.users, regeneratorRuntime.mark(function _callee8() {
                         return regeneratorRuntime.wrap(function _callee8$(_context8) {
                             while (1) {
@@ -4791,20 +4806,21 @@ spawnedTest("bulkPut-catching errors", regeneratorRuntime.mark(function _callee9
                         QUnit.ok(true, "Got rethrown BulkError: " + e.stack);
                     });
 
-                case 42:
-                    _context9.next = 44;
+                case 46:
+                    _context9.t10 = QUnit.equal;
+                    _context9.next = 49;
                     return db$5.users.where('username').startsWith('zper').count();
 
-                case 44:
-                    _context9.t6 = _context9.sent;
-                    QUnit.equal(_context9.t6, 0, "0 users! Good - means that previous operation rethrown (via try..yield..catch--throw this time, and therefore not committed");
+                case 49:
+                    _context9.t11 = _context9.sent;
+                    (0, _context9.t10)(_context9.t11, 0, "0 users! Good - means that previous operation rethrown (via try..yield..catch--throw this time, and therefore not committed");
 
-                case 46:
+                case 51:
                 case 'end':
                     return _context9.stop();
             }
         }
-    }, _callee9, this, [[7, 13], [27, 32]]);
+    }, _callee9, this, [[8, 14], [30, 35]]);
 }));
 
 spawnedTest("bulkPut-non-inbound-autoincrement", regeneratorRuntime.mark(function _callee10() {
@@ -4816,20 +4832,22 @@ spawnedTest("bulkPut-non-inbound-autoincrement", regeneratorRuntime.mark(functio
                     return db$5.folks.bulkPut([{ first: "Foo", last: "Bar" }, { first: "Foo", last: "Bar2" }, { first: "Foo", last: "Bar3" }, { first: "Foo", last: "Bar4" }]);
 
                 case 2:
-                    _context10.next = 4;
+                    _context10.t0 = QUnit.equal;
+                    _context10.next = 5;
                     return db$5.folks.where('first').equals('Foo').count();
 
-                case 4:
-                    _context10.t0 = _context10.sent;
-                    QUnit.equal(_context10.t0, 4, "Should be 4 Foos");
-                    _context10.next = 8;
+                case 5:
+                    _context10.t1 = _context10.sent;
+                    (0, _context10.t0)(_context10.t1, 4, "Should be 4 Foos");
+                    _context10.t2 = QUnit.equal;
+                    _context10.next = 10;
                     return db$5.folks.where('last').equals('Bar').count();
 
-                case 8:
-                    _context10.t1 = _context10.sent;
-                    QUnit.equal(_context10.t1, 1, "Should be 1 Bar");
-
                 case 10:
+                    _context10.t3 = _context10.sent;
+                    (0, _context10.t2)(_context10.t3, 1, "Should be 1 Bar");
+
+                case 12:
                 case 'end':
                     return _context10.stop();
             }
@@ -4848,45 +4866,49 @@ spawnedTest("bulkPut - mixed inbound autoIncrement", regeneratorRuntime.mark(fun
 
                 case 2:
                     lastId = _context11.sent;
-                    _context11.next = 5;
+                    _context11.t0 = QUnit.equal;
+                    _context11.next = 6;
                     return db$5.users.where('first').equals('Foo').count();
 
-                case 5:
-                    _context11.t0 = _context11.sent;
-                    QUnit.equal(_context11.t0, 4, "Should be 4 Foos");
-                    _context11.next = 9;
+                case 6:
+                    _context11.t1 = _context11.sent;
+                    (0, _context11.t0)(_context11.t1, 4, "Should be 4 Foos");
+                    _context11.t2 = QUnit.equal;
+                    _context11.next = 11;
                     return db$5.users.where('last').equals('Bar').count();
 
-                case 9:
-                    _context11.t1 = _context11.sent;
-                    QUnit.equal(_context11.t1, 1, "Should be 1 Bar");
-                    _context11.next = 13;
+                case 11:
+                    _context11.t3 = _context11.sent;
+                    (0, _context11.t2)(_context11.t3, 1, "Should be 1 Bar");
+                    _context11.next = 15;
                     return db$5.users.bulkPut([{ id: lastId - 3, first: "Foo2", last: "BarA" }, // Will update "Foo Bar" to "Foo2 BarA"
                     { first: "Foo2", last: "BarB" }, // Will create
                     { id: lastId - 1, first: "Foo2", last: "BarC" }, // Will update "Foo Bar3" to "Foo2 BarC"
                     { first: "Foo2", last: "BarD" } // Will create
                     ]);
 
-                case 13:
+                case 15:
                     newLastId = _context11.sent;
 
                     QUnit.equal(newLastId, lastId + 2, "Should have incremented last ID twice now");
-                    _context11.next = 17;
+                    _context11.t4 = QUnit.equal;
+                    _context11.next = 20;
                     return db$5.users.where('first').equals('Foo').count();
 
-                case 17:
-                    _context11.t2 = _context11.sent;
-                    QUnit.equal(_context11.t2, 2, "Should be 2 Foos now");
-                    _context11.next = 21;
+                case 20:
+                    _context11.t5 = _context11.sent;
+                    (0, _context11.t4)(_context11.t5, 2, "Should be 2 Foos now");
+                    _context11.t6 = QUnit.equal;
+                    _context11.next = 25;
                     return db$5.users.where('first').equals('Foo2').count();
 
-                case 21:
-                    _context11.t3 = _context11.sent;
-                    QUnit.equal(_context11.t3, 4, "Should be 4 Foo2s now");
-                    _context11.next = 25;
+                case 25:
+                    _context11.t7 = _context11.sent;
+                    (0, _context11.t6)(_context11.t7, 4, "Should be 4 Foo2s now");
+                    _context11.next = 29;
                     return db$5.users.where('first').equals('Foo2').toArray();
 
-                case 25:
+                case 29:
                     foo2s = _context11.sent;
 
                     QUnit.equal(foo2s[0].last, "BarA", "BarA should be first (updated previous ID)");
@@ -4894,7 +4916,7 @@ spawnedTest("bulkPut - mixed inbound autoIncrement", regeneratorRuntime.mark(fun
                     QUnit.equal(foo2s[2].last, "BarB", "BarB should be third (got new key)");
                     QUnit.equal(foo2s[3].last, "BarD", "BarD should be forth (got new key)");
 
-                case 30:
+                case 34:
                 case 'end':
                     return _context11.stop();
             }
@@ -4923,14 +4945,15 @@ spawnedTest("bulkPut-catch sub transaction", regeneratorRuntime.mark(function _c
                     });
 
                 case 2:
-                    _context12.next = 4;
+                    _context12.t0 = QUnit.equal;
+                    _context12.next = 5;
                     return db$5.users.where('username').startsWith('aper').count();
 
-                case 4:
-                    _context12.t0 = _context12.sent;
-                    QUnit.equal(_context12.t0, 0, "0 users! Good, means that inner transaction did not commit");
+                case 5:
+                    _context12.t1 = _context12.sent;
+                    (0, _context12.t0)(_context12.t1, 0, "0 users! Good, means that inner transaction did not commit");
 
-                case 6:
+                case 7:
                 case 'end':
                     return _context12.stop();
             }
@@ -7013,13 +7036,14 @@ spawnedTest("transaction should abort on collection error", regeneratorRuntime.m
                     });
 
                 case 2:
-                    _context2.next = 4;
+                    _context2.t0 = QUnit.equal;
+                    _context2.next = 5;
                     return db$7.users.where('first').equals("Foo").count();
 
-                case 4:
-                    _context2.t0 = _context2.sent;
-                    QUnit.equal(_context2.t0, 0, "Should not have succeeded to add when transaction was aborted");
-                    _context2.next = 8;
+                case 5:
+                    _context2.t1 = _context2.sent;
+                    (0, _context2.t0)(_context2.t1, 0, "Should not have succeeded to add when transaction was aborted");
+                    _context2.next = 9;
                     return db$7.transaction("rw", db$7.users, function () {
                         db$7.users.add({ id: 3, first: "Foo", last: "Bar", username: "foobar" });
                         db$7.users.where('id').equals(null).toArray(function (res) {
@@ -7031,15 +7055,16 @@ spawnedTest("transaction should abort on collection error", regeneratorRuntime.m
                         QUnit.ok(true, "Got error because WhereClause.equals(null) should throw TypeError");
                     });
 
-                case 8:
-                    _context2.next = 10;
+                case 9:
+                    _context2.t2 = QUnit.equal;
+                    _context2.next = 12;
                     return db$7.users.where('first').equals("Foo").count();
 
-                case 10:
-                    _context2.t1 = _context2.sent;
-                    QUnit.equal(_context2.t1, 0, "Should not have succeeded to add when transaction was aborted");
-
                 case 12:
+                    _context2.t3 = _context2.sent;
+                    (0, _context2.t2)(_context2.t3, 0, "Should not have succeeded to add when transaction was aborted");
+
+                case 14:
                 case 'end':
                     return _context2.stop();
             }

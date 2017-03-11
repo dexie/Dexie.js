@@ -81,7 +81,7 @@ export function assert (b) {
 }
 
 export function asap(fn) {
-    if (_global.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
+    if (_global.setImmediate) _global.setImmediate(fn); else setTimeout(fn, 0);
 }
 
 export function getUniqueArray(a) {
