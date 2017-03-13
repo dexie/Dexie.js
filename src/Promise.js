@@ -52,7 +52,7 @@ var LONG_STACKS_CLIP_LIMIT = 100,
 */
 var schedulePhysicalTick = (_global.setImmediate ? 
     // setImmediate supported. Those modern platforms also supports Function.bind().
-    setImmediate.bind(null, physicalTick) :
+    _global.setImmediate.bind(null, physicalTick) :
     _global.MutationObserver ?
         // MutationObserver supported
         () => {
