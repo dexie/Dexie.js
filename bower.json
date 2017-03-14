@@ -6,7 +6,7 @@
     "David Fahlander"
   ],
   "description": "Minimalistic IndexedDB API with bullet proof transactions",
-  "main": "dist/dexie.min.js",
+  "main": "dist/dexie.js",
   "moduleType": [
     "amd",
     "es6",
