@@ -60,6 +60,10 @@ export declare class Dexie {
     
     static maxKey: Array<Array<void>> | string;
     static minKey: number;
+
+    static exists(dbName: string) : Dexie.Promise<boolean>;
+
+    static delete(dbName: string): Dexie.Promise<void>;
     
     static dependencies: {
         indexedDB: IDBFactory,
@@ -96,8 +100,6 @@ export declare class Dexie {
     close(): void;
 
     delete(): Dexie.Promise<void>;
-
-    exists(name : string) : Dexie.Promise<boolean>;
 
     isOpen(): boolean;
 
