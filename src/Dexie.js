@@ -79,8 +79,8 @@ export default function Dexie(dbName, options) {
         // Default Options
         addons: Dexie.addons,           // Pick statically registered addons by default
         autoOpen: true,                 // Don't require db.open() explicitely.
-        indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to IDBShim or browser env.
-        IDBKeyRange: deps.IDBKeyRange   // Backend IDBKeyRange api. Default to IDBShim or browser env.
+        indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to browser env.
+        IDBKeyRange: deps.IDBKeyRange   // Backend IDBKeyRange api. Default to browser env.
     }, options);
     var addons = opts.addons,
         autoOpen = opts.autoOpen,
@@ -2961,10 +2961,6 @@ function TableSchema(name, primKey, indexes, instanceTemplate) {
     this.idxByName = arrayToObject(indexes, index => [index.name, index]);
 }
 
-// Used in when defining dependencies later...
-// (If IndexedDBShim is loaded, prefer it before standard indexedDB)
-var idbshim = _global.idbModules && _global.idbModules.shimIndexedDB ? _global.idbModules : {};
-
 function safariMultiStoreFix(storeNames) {
     return storeNames.length === 1 ? storeNames[0] : storeNames;
 }
@@ -3173,8 +3169,8 @@ props(Dexie, {
     //
     dependencies: {
         // Required:
-        indexedDB: idbshim.shimIndexedDB || _global.indexedDB || _global.mozIndexedDB || _global.webkitIndexedDB || _global.msIndexedDB,
-        IDBKeyRange: idbshim.IDBKeyRange || _global.IDBKeyRange || _global.webkitIDBKeyRange
+        indexedDB: _global.indexedDB || _global.mozIndexedDB || _global.webkitIndexedDB || _global.msIndexedDB,
+        IDBKeyRange: _global.IDBKeyRange || _global.webkitIDBKeyRange
     },
     
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
