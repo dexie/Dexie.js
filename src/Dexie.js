@@ -1509,7 +1509,7 @@ export default function Dexie(dbName, options) {
             });
             idbtrans.onabort = wrap(ev => {
                 preventDefault(ev);
-                this.active && this._reject(new exceptions.Abort());
+                this.active && this._reject(new exceptions.Abort(idbtrans.error));
                 this.active = false;
                 this.on("abort").fire(ev);
             });
