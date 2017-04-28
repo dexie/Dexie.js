@@ -7,7 +7,7 @@ const ERRORS_TO_IGNORE = [
 ];
 
 export default {
-  entry: 'tools/tmp/es5/test/tests-all.js',
+  entry: 'tools/tmp/es5/test/test/tests-all.js',
   dest: 'tools/tmp/es5/test/bundle.js',
   format: 'umd',
   sourceMap: true,
