@@ -72,7 +72,7 @@
     ],
     "test": [
       "# Build the test suite. Typescript transpiles all but not generators...",
-      "tsc --allowJs -t es5 -m es2015 --outDir tools/tmp/es5/test/ --sourceMap test/tests-all.js [--watch 'Compilation complete.']",
+      "tsc --allowJs -t es5 -m es2015 --outDir tools/tmp/es5/test/ --rootDir . --sourceMap test/tests-all.js [--watch 'Compilation complete.']",
       "rollup -c tools/build-configs/rollup.tests.config.js",
       "# As a last step, let babel transpile the generators....",
       "babel tools/tmp/es5/test/bundle.js -o test/bundle.js --plugins transform-regenerator --source-maps"
