@@ -125,12 +125,12 @@ export declare module Dexie {
 
     interface Promise<T> {
         // From Promise<T> in lib.es2015.d.ts and lib.es2015.symbol.wellknown.d.ts but with return type Dexie.Promise<T>:
+        then(onfulfilled?: ((value: T) => T | PromiseLike<T>) | undefined | null, onrejected?: ((reason: any) => T | PromiseLike<T>) | undefined | null): Dexie.Promise<T>;
+        then<TResult>(onfulfilled: ((value: T) => T | PromiseLike<T>) | undefined | null, onrejected: (reason: any) => TResult | PromiseLike<TResult>): Dexie.Promise<T | TResult>;
+        then<TResult>(onfulfilled: (value: T) => TResult | PromiseLike<TResult>, onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): Dexie.Promise<TResult>;
         then<TResult1, TResult2>(onfulfilled: (value: T) => TResult1 | PromiseLike<TResult1>, onrejected: (reason: any) => TResult2 | PromiseLike<TResult2>): Dexie.Promise<TResult1 | TResult2>;
-        then<TResult>(onfulfilled: (value: T) => TResult | PromiseLike<TResult>, onrejected: (reason: any) => TResult | PromiseLike<TResult>): Dexie.Promise<TResult>;
-        then<TResult>(onfulfilled: (value: T) => TResult | PromiseLike<TResult>): Dexie.Promise<TResult>;
-        then(): Dexie.Promise<T>;
-        catch<TResult>(onrejected: (reason: ProbablyError) => TResult | PromiseLike<TResult>): Dexie.Promise<T | TResult>;
-        catch(onrejected: (reason: ProbablyError) => T | PromiseLike<T>): Dexie.Promise<T>;
+        catch(onrejected?: ((reason: any) => T | PromiseLike<T>) | undefined | null): Dexie.Promise<T>;
+        catch<TResult>(onrejected: (reason: any) => TResult | PromiseLike<TResult>): Dexie.Promise<T | TResult>;
         readonly [Symbol.toStringTag]: "Promise";
         
         // Extended methods provided by Dexie.Promise:
