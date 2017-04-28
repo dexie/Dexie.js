@@ -67,8 +67,7 @@ export declare class Dexie {
     
     static dependencies: {
         indexedDB: IDBFactory,
-        IDBKeyRange: IDBKeyRange,
-        localStorage?: Storage
+        IDBKeyRange: IDBKeyRange
     };
         
     static default: Dexie;
