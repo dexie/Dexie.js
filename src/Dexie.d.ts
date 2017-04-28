@@ -124,15 +124,13 @@ export declare class Dexie {
 export declare module Dexie {
 
     interface Promise<T> {
-        // From Promise<T> in lib.es2015.d.ts and lib.es2015.symbol.wellknown.d.ts but with return type Dexie.Promise<T>:
-        then<TResult1, TResult2>(onfulfilled: (value: T) => TResult1 | PromiseLike<TResult1>, onrejected: (reason: any) => TResult2 | PromiseLike<TResult2>): Dexie.Promise<TResult1 | TResult2>;
-        then<TResult>(onfulfilled: (value: T) => TResult | PromiseLike<TResult>, onrejected: (reason: any) => TResult | PromiseLike<TResult>): Dexie.Promise<TResult>;
-        then<TResult>(onfulfilled: (value: T) => TResult | PromiseLike<TResult>): Dexie.Promise<TResult>;
-        then(): Dexie.Promise<T>;
-        catch<TResult>(onrejected: (reason: ProbablyError) => TResult | PromiseLike<TResult>): Dexie.Promise<T | TResult>;
-        catch(onrejected: (reason: ProbablyError) => T | PromiseLike<T>): Dexie.Promise<T>;
+        // From Promise<T> in lib.es5.d.ts (in typescript 2.3.1) but with return type Dexie.Promise
+        then<TResult1 = T, TResult2 = never>(onfulfilled?: ((value: T) => TResult1 | PromiseLike<TResult1>) | undefined | null, onrejected?: ((reason: any) => TResult2 | PromiseLike<TResult2>) | undefined | null): Dexie.Promise<TResult1 | TResult2>;
+        catch<TResult = never>(onrejected?: ((reason: any) => TResult | PromiseLike<TResult>) | undefined | null): Dexie.Promise<T | TResult>;
+
+        // From Promise<T> lib.es2015.symbol.wellknown.d.ts
         readonly [Symbol.toStringTag]: "Promise";
-        
+
         // Extended methods provided by Dexie.Promise:
 
         /**
@@ -142,16 +140,7 @@ export declare module Dexie {
          * @param onrejected The callback to execute when the Promise is rejected.
          * @returns A Promise for the completion of the callback.
          */
-        catch<TResult>(errorName: string, onrejected: (reason: Error) => TResult | PromiseLike<TResult>): Dexie.Promise<T | TResult>;
-
-        /**
-         * Catch errors where error => error.name === errorName. Other errors will remain uncaught.
-         * 
-         * @param errorName Name of the type of error to catch such as 'RangeError', 'TypeError', 'DatabaseClosedError', etc.
-         * @param onrejected The callback to execute when the Promise is rejected.
-         * @returns A Promise for the completion of the callback.
-         */
-        catch(errorName: string, onrejected: (reason: Error) => T | PromiseLike<T>): Dexie.Promise<T>;
+        catch<TResult = never>(errorName: string, onrejected: ((reason: Error) => TResult | PromiseLike<TResult>) | undefined | null): Dexie.Promise<T | TResult>;
 
         /**
          * Catch errors where error => error instanceof errorConstructor. Other errors will remain uncaught.
@@ -160,16 +149,7 @@ export declare module Dexie {
          * @param onrejected The callback to execute when the Promise is rejected.
          * @returns A Promise for the completion of the callback.
          */
-        catch<TResult,TError>(errorConstructor: {new():TError}, onrejected: (reason: TError) => TResult | PromiseLike<TResult>): Dexie.Promise<T | TResult>;
-
-        /**
-         * Catch errors where error => error instanceof errorConstructor. Other errors will remain uncaught.
-         * 
-         * @param errorConstructor Type of error to catch such as RangeError, TypeError, etc.
-         * @param onrejected The callback to execute when the Promise is rejected.
-         * @returns A Promise for the completion of the callback.
-         */
-        catch<TError>(errorConstructor: {new():TError}, onrejected: (reason: TError) => T | PromiseLike<T>): Dexie.Promise<T>;
+        catch<TError, TResult = never>(errorConstructor: {new():TError}, onrejected: (reason: TError) => TResult | PromiseLike<TResult>): Dexie.Promise<T | TResult>;
 
         /**
          * Attaches a callback to be executed when promise is settled no matter if it was rejected

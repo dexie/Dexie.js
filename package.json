@@ -100,7 +100,7 @@
     "rollup-plugin-node-resolve": "^2.0.0",
     "rollup-plugin-sourcemaps": "^0.4.1",
     "serve-static": "^1.11.1",
-    "typescript": "^2.1.4",
+    "typescript": "^2.3.1",
     "uglify-js": "^2.7.5"
   },
   "dependencies": {}
