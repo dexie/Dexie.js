@@ -392,7 +392,7 @@ export default function Dexie(dbName, options) {
     function deleteRemovedTables(newSchema, idbtrans) {
         for (var i = 0; i < idbtrans.db.objectStoreNames.length; ++i) {
             var storeName = idbtrans.db.objectStoreNames[i];
-            if (newSchema[storeName] == null) {
+            if (newSchema[storeName] === null) {
                 idbtrans.db.deleteObjectStore(storeName);
             }
         }
