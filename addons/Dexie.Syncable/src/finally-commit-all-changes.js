@@ -1,8 +1,10 @@
 import Dexie from 'dexie';
 import initApplyChanges from './apply-changes';
+import initUpdateNode from './update-node';
 
 export default function initFinallyCommitAllChanges(db, node) {
   const applyChanges = initApplyChanges(db);
+  const updateNode = initUpdateNode(db);
 
   return function finallyCommitAllChanges(changes, remoteRevision) {
     // 1. Open a write transaction on all tables in DB
@@ -34,25 +36,17 @@ export default function initFinallyCommitAllChanges(db, node) {
       }).then(function (lastChange) {
         var currentLocalRevision = (lastChange && lastChange.rev) || 0;
         // 4. Update node states (appliedRemoteRevision, remoteBaseRevisions and eventually myRevision)
-        node.appliedRemoteRevision = remoteRevision;
-        node.remoteBaseRevisions.push({remote: remoteRevision, local: currentLocalRevision});
+        var nodeUpdates = {
+          appliedRemoteRevision: remoteRevision,
+          add_remoteBaseRevisions: {remote: remoteRevision, local: currentLocalRevision},
+        };
         if (node.myRevision === localRevisionBeforeChanges) {
           // If server was up-to-date before we added new changes from the server, update myRevision to last change
           // because server is still up-to-date! This is also important in order to prohibit getLocalChangesForNode() from
           // ever sending an empty change list to server, which would otherwise be done every second time it would send changes.
-          node.myRevision = currentLocalRevision;
+          nodeUpdates.myRevision = currentLocalRevision;
         }
-        // Garbage collect remoteBaseRevisions not in use anymore:
-        if (node.remoteBaseRevisions.length > 1) {
-          for (var i = node.remoteBaseRevisions.length - 1; i > 0; --i) {
-            if (node.myRevision >= node.remoteBaseRevisions[i].local) {
-              node.remoteBaseRevisions.splice(0, i);
-              break;
-            }
-          }
-        }
-        // We are not including _syncNodes in transaction, so this save() call will execute in its own transaction.
-        node.save().catch(err=> {
+        updateNode(node, nodeUpdates).catch(err=> {
           console.warn("Dexie.Syncable: Unable to save SyncNode after applying remote changes: " + (err.stack || err));
         });
       });

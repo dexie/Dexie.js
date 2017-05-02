@@ -12,7 +12,7 @@ export default function initGetOrCreateSyncNode(db, protocolName, url) {
         // If we found a node it will be instanceof SyncNode as Dexie.Observable
         // maps to class
         if (node) {
-          const PersistedContext = initPersistedContext(node);
+          const PersistedContext = initPersistedContext(db);
           // Node already there. Make syncContext become an instance of PersistedContext:
           node.syncContext = new PersistedContext(node.id, node.syncContext);
           node.syncProtocol = protocolName; // In case it was changed (would be very strange but...) could happen...
@@ -30,7 +30,7 @@ export default function initGetOrCreateSyncNode(db, protocolName, url) {
           node.syncOptions = options;
           node.lastHeartBeat = Date.now();
           node.dbUploadState = null;
-          const PersistedContext = initPersistedContext(node);
+          const PersistedContext = initPersistedContext(db);
           Dexie.Promise.resolve(function () {
             // If options.initialUpload is explicitely false, set myRevision to currentRevision.
             if (options.initialUpload === false)

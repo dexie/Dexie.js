@@ -1,4 +1,7 @@
+import initUpdateNode from './update-node';
+
 export default function initSaveToUncommittedChanges(db, node) {
+  const updateNode = initUpdateNode(db);
   return function saveToUncommittedChanges(changes, remoteRevision) {
     return db.transaction('rw!', db._uncommittedChanges, () => {
       return db._uncommittedChanges.bulkAdd(changes.map(change => {
@@ -13,8 +16,7 @@ export default function initSaveToUncommittedChanges(db, node) {
         return changeWithNodeId;
       }));
     }).then(() => {
-      node.appliedRemoteRevision = remoteRevision;
-      return node.save();
+      return updateNode(node, {appliedRemoteRevision: remoteRevision});
     });
   };
 }

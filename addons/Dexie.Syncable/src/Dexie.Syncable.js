@@ -221,19 +221,6 @@ export default function Syncable (db) {
             return origClose.apply(this, arguments);
         };
     });
-
-    Object.defineProperty(
-        db.observable.SyncNode.prototype,
-        'save', {
-            enumerable: false,
-            configurable: true,
-            writable: true,
-            value() {
-                return db.transaction('rw?', db._syncNodes, () => {
-                    return db._syncNodes.put(this);
-            });
-        }
-     });
 }
 
 Syncable.Statuses = Statuses;

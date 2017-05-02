@@ -22,7 +22,7 @@ module('PersistedContext', {
 
 asyncTest('should save any properties we add to the context into the DB', () => {
   const syncNode = new db.observable.SyncNode();
-  const PersistedContext = initPersistedContext(syncNode);
+  const PersistedContext = initPersistedContext(db);
   let addedNodeID;
   db._syncNodes.add(syncNode)
   .then((nodeID) => {
@@ -46,7 +46,7 @@ asyncTest('should save any properties we add to the context into the DB', () => 
 
 test('should extend the instance with the given options object', () => {
   const syncNode = new db.observable.SyncNode();
-  const PersistedContext = initPersistedContext(syncNode);
+  const PersistedContext = initPersistedContext(db);
   const persistedContext = new PersistedContext(1, {foo: 'bar'});
   propEqual(persistedContext, {nodeID: 1, foo: 'bar'});
 });

@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 
-export default function initPersistedContext(node) {
+export default function initPersistedContext(db) {
   //
   // PersistedContext : IPersistedContext
   //
@@ -13,7 +13,9 @@ export default function initPersistedContext(node) {
     save() {
       // Store this instance in the syncContext property of the node it belongs to.
       return Dexie.vip(() => {
-        return node.save();
+        return db.transaction('rw?', db._syncNodes, ()=>{
+          return db._syncNodes.update(this.nodeID, {syncContext: this});
+        });
       });
     }
   }

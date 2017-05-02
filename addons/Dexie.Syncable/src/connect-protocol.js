@@ -5,11 +5,13 @@ import initSaveToUncommittedChanges from './save-to-uncommitted-changes';
 import initFinallyCommitAllChanges from './finally-commit-all-changes';
 import initGetLocalChangesForNode from './get-local-changes-for-node/get-local-changes-for-node';
 import {Statuses} from './statuses';
+import initUpdateNode from './update-node';
 
 const Promise = Dexie.Promise;
 
 export default function initConnectProtocol(db, protocolInstance, dbAliveID, options, rejectConnectPromise) {
   const enqueue = initEnqueue(db);
+  const updateNode = initUpdateNode(db);
   var hasMoreToGive = {hasMoreToGive: true};
 
   function stillAlive() {
@@ -27,7 +29,7 @@ export default function initConnectProtocol(db, protocolInstance, dbAliveID, opt
     function changeStatusTo(newStatus) {
       if (node.status !== newStatus) {
         node.status = newStatus;
-        node.save().then(()=> {
+        updateNode(node, {status: newStatus}).then(()=> {
           db.syncable.on.statusChanged.fire(newStatus, url);
           // Also broadcast message to other nodes about the status
           db.observable.broadcastMessage("syncStatusChanged", {newStatus: newStatus, url: url}, false);
@@ -111,13 +113,9 @@ export default function initConnectProtocol(db, protocolInstance, dbAliveID, opt
       });
 
       function onChangesAccepted() {
-        Object.keys(nodeModificationsOnAck).forEach(function (keyPath) {
-          Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
-        });
-        // We dont know if onSuccess() was called by provider yet. If it's already called, finalPromise.then() will execute immediately,
-        // otherwise it will execute when finalSyncPromise resolves.
-        finalSyncPromise.then(continueSendingChanges);
-        return node.save();
+        return db._syncNodes.update(node.id, nodeModificationsOnAck).then(()=>{
+          return finalSyncPromise;
+        }).then(continueSendingChanges);
       }
     }
 
@@ -128,11 +126,7 @@ export default function initConnectProtocol(db, protocolInstance, dbAliveID, opt
     function getLocalChangesForNode_autoAckIfEmpty(node, cb) {
       return getLocalChangesForNode(node, function autoAck(changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
         if (changes.length === 0 && 'myRevision' in nodeModificationsOnAck && nodeModificationsOnAck.myRevision !== node.myRevision) {
-          Object.keys(nodeModificationsOnAck).forEach(function (keyPath) {
-            Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
-          });
-          node.save().catch('DatabaseClosedError', ()=> {
-          });
+          updateNode(node, nodeModificationsOnAck);
           return getLocalChangesForNode(node, autoAck);
         } else {
           return cb(changes, remoteBaseRevision, partial, nodeModificationsOnAck);
@@ -220,11 +214,7 @@ export default function initConnectProtocol(db, protocolInstance, dbAliveID, opt
           if (!connectedContinuation) return;
           if (changes.length > 0) {
             continuation.react(changes, remoteBaseRevision, partial, function onChangesAccepted() {
-              Object.keys(nodeModificationsOnAck).forEach(function (keyPath) {
-                Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
-              });
-              node.save().catch('DatabaseClosedError', ()=> {
-              });
+              updateNode(node, nodeModificationsOnAck);
               // More changes may be waiting:
               reactToChanges();
             });
@@ -249,18 +239,20 @@ export default function initConnectProtocol(db, protocolInstance, dbAliveID, opt
 
     //  Poll Pattern
     function continueUsingPollPattern() {
-
       function syncAgain() {
+        // Reload node from database before continuing again.
+        db._syncNodes.get(node.id).then(n => {
+          Dexie.extend(node, n);
+          syncAgain2();
+        });
+      }
+      function syncAgain2() {
         getLocalChangesForNode_autoAckIfEmpty(node, function (changes, remoteBaseRevision, partial, nodeModificationsOnAck) {
 
           protocolInstance.sync(node.syncContext, url, options, remoteBaseRevision, node.appliedRemoteRevision, changes, partial, applyRemoteChanges, onChangesAccepted, onSuccess, onError);
 
           function onChangesAccepted() {
-            Object.keys(nodeModificationsOnAck).forEach(function (keyPath) {
-              Dexie.setByKeyPath(node, keyPath, nodeModificationsOnAck[keyPath]);
-            });
-            node.save().catch('DatabaseClosedError', ()=> {
-            });
+            updateNode(node, nodeModificationsOnAck);
           }
 
           function onSuccess(continuation) {

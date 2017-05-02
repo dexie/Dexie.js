@@ -34,22 +34,6 @@ module('finallyCommitAllChanges', {
   }
 });
 
-asyncTest('should call node.save()', () => {
-  let wasCalled = false;
-  db.observable.SyncNode.prototype.save = function() {
-    wasCalled = true;
-    return { catch() {} };
-  };
-  finallyCommitAllChanges([], 1)
-    .then(() => {
-      ok(wasCalled);
-    })
-    .catch(function(err) {
-      ok(false, "Error: " + err);
-    })
-    .finally(start);
-});
-
 asyncTest('should apply _uncommittedChanges and remove them from that table', () => {
   const createChange = {
     key: 1,
@@ -95,18 +79,6 @@ asyncTest('should put the changes into the given table', () => {
     .then((obj) => {
       deepEqual(obj, createChange.obj, 'Change was found in table "foo"');
     })
-    .catch(function(err) {
-      ok(false, "Error: " + err);
-    })
-    .finally(start);
-});
-
-asyncTest('should set the nodeID as source for the currentTransaction', () => {
-  db.observable.SyncNode.prototype.save = function() {
-    strictEqual(Dexie.currentTransaction.source, nodeID);
-    return { catch() {} };
-  };
-  finallyCommitAllChanges([], 1)
     .catch(function(err) {
       ok(false, "Error: " + err);
     })
