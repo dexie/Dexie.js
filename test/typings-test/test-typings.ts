@@ -134,22 +134,41 @@ import './test-extend-dexie';
     db.friends.orderBy('name').eachPrimaryKey(key => key.toFixed());
 
     // Hooks
-    db.friends.hook('creating', (key, friend) => {
+    db.friends.hook('creating', function(key, friend) {
         key.toFixed();
         friend.isGoodFriend;
         friend.address.city;
+        this.onsuccess = function(primKey) {
+            primKey.toFixed();
+        };
+        this.onerror = function(err) {
+            console.log('creating error', err);
+        };
     });
     db.friends.hook('reading', friend => {friend.isGoodFriend = true; return friend; });
-    db.friends.hook('updating', (mods, key, friend) => {
+    db.friends.hook('updating', function(mods, key, friend) {
         mods.valueOf();
         key.toExponential();
         friend.isGoodFriend;
         friend.address.city;
+        this.onsuccess = function(updatedObj) {
+            updatedObj.isGoodFriend;
+            updatedObj.address.city;
+        };
+        this.onerror = function(err) {
+            console.log('updating error', err);
+        };
     });
-    db.friends.hook('deleting', (key, friend) => {
+    db.friends.hook('deleting', function(key, friend) {
         key.toExponential();
         friend.isGoodFriend;
         friend.address.city;
+        this.onsuccess = function() {
+            console.log('deleting success');
+        };
+        this.onerror = function(err) {
+            console.log('deleting error', err);
+        };
     });
 
     // Issue #404
