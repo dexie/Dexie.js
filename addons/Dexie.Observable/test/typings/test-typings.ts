@@ -32,7 +32,7 @@ db.on('message', msg => {
     msg.resolve('foo');
     msg.reject(new Error('Foo'));
 });
-db.observable.sendMessage('myMsgType', {foo: 'bar'}, 13, {wantReply: true}).then(() => {});
+db.observable.sendMessage('myMsgType', {foo: 'bar'}, 13, {wantReply: true});
 db.observable.sendMessage('myMsgType', 'foobar', 13, {wantReply: false});
 
 db.observable.broadcastMessage('myBroadcastMsgType', {foo2: 'bar2'}, false);
