@@ -5,38 +5,31 @@ module.exports = {
   },
 
   customLaunchers: {
-    bs_firefox_latest: {
+    bs_firefox_latest_supported: { 
       base: 'BrowserStack',
       browser: 'firefox',
-      browser_version: 'latest',
+      browser_version: '51',// TODO: Upgrade to test IndexedDB 2.0
       os: 'Windows',
       os_version: 7
     },
-    bs_firefox: {
+    bs_firefox_oldest_supported: {
       base: 'BrowserStack',
       browser: 'firefox',
       browser_version: '47.0',
       os: 'OS X',
       os_version: 'El Capitan'
     },
-    bs_edge_13: {
+    bs_edge_oldest_supported: {
       base: 'BrowserStack',
       browser: "Edge",
       browser_version: '13',
       os: 'Windows',
       os_version: '10'
     },
-    bs_edge: {
-      base: 'BrowserStack',
-      browser: "Edge",
-      browser_version: '14',
-      os: 'Windows',
-      os_version: '10'
-    },
-    bs_edge_latest: {
+    bs_edge_latest_supported: {
       base: 'BrowserStack',
       browser: 'Edge',
-      browser_version: 'latest',
+      browser_version: '15',
       os: 'Windows',
       os_version: '10'
     },
@@ -47,17 +40,17 @@ module.exports = {
       os: 'Windows',
       os_version: 7
     },
-    bs_chrome: {
+    bs_chrome_oldest_supported: {
       base: 'BrowserStack',
       browser: "Chrome",
       browser_version: "49",
       os: 'OS X',
       os_version: 'Mountain Lion'
     },
-    bs_chrome_latest: {      
+    bs_chrome_latest_supported: {      
       base: 'BrowserStack',
       browser: "Chrome",
-      browser_version: "latest",
+      browser_version: "57", // TODO: Upgrade to test IndexedDB 2.0
       os: 'Windows',
       os_version: 10
     }
