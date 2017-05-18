@@ -14,17 +14,16 @@ module.exports = {
     
     // Continous Integration on every push to master
     ci: [
-        'bs_firefox',
+        'bs_firefox_latest_supported',
         'bs_ie11'
     ],
 
-    // Full test matrix. Used before every npm publish.
-    full: [
-        'bs_chrome',
-        'bs_chrome_latest',
-        'bs_firefox',
-        'bs_firefox_latest',
-        'bs_edge_latest', // Know that edge 13 has been sporadically instable. Might be better on Edge 14 or later. Restart of tests often needed.
-        'bs_ie11' // Know that IE11 has been sporadically instable. Restart of tests often needed.
+    // Test matrix used before every npm publish.
+    pre_npm_publish: [
+        'bs_chrome_oldest_supported',
+        'bs_chrome_latest_supported',
+        'bs_firefox_oldest_supported',
+        'bs_firefox_latest_supported',
+        'bs_edge_latest_supported' // Know that edge has been sporadically instable. Might be better on Edge 15 or later. Restart of tests often needed.
     ]
 }

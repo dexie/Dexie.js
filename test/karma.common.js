@@ -41,7 +41,7 @@ const karmaCommon = {
 };
 
 const browserSuiteToUse = process.env.NODE_ENV === 'release' ?
-  "full" :
+  "pre_npm_publish" :
   process.env.TRAVIS ?
     isNaN(process.env.TRAVIS_PULL_REQUEST) && process.env.BROWSER_STACK_USERNAME ?
       "ci" :              // CI pushs to master and browserstack credentials exists

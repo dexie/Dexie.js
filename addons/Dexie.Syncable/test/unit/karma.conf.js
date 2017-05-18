@@ -6,7 +6,7 @@ module.exports = function (config) {
     // Be fine with testing on local travis firefox.
     ci: ["Firefox"],
     // IE indexedDB hangs sporadically. Be fine with testing it once on Dexie main suite.
-    full: defaultBrowserMatrix.full.filter(b => !/bs_ie/i.test(b))
+    pre_npm_publish: defaultBrowserMatrix.pre_npm_publish.filter(b => !/bs_ie/i.test(b))
   };
 
   const cfg = getKarmaConfig(browserMatrixOverrides, {
