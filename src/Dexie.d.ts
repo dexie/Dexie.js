@@ -273,7 +273,7 @@ export declare module Dexie {
     }
 
     interface DbEvents extends DexieEventSet {
-        (eventName: 'ready', subscriber: () => any, bSticky: boolean): void;
+        (eventName: 'ready', subscriber: () => any, bSticky?: boolean): void;
         (eventName: 'populate', subscriber: () => any): void;
         (eventName: 'blocked', subscriber: () => any): void;
         (eventName: 'versionchange', subscriber: (event: IDBVersionChangeEvent) => any): void;
