@@ -414,7 +414,7 @@ export default function Dexie(dbName, options) {
         return new Transaction(mode, storeNames, dbschema, parentTransaction);
     };
 
-    /* Generate a temporary transaction when db operations are done outside a transactino scope.
+    /* Generate a temporary transaction when db operations are done outside a transaction scope.
     */
     function tempTransaction(mode, storeNames, fn) { // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
         if (!openComplete && (!PSD.letThrough)) {
