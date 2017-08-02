@@ -98,5 +98,6 @@ declare module 'dexie' {
     }
 }
 
-export default Dexie.Syncable;
+declare var dexieSyncable: (db: Dexie) => void;
 
+export default dexieSyncable;
