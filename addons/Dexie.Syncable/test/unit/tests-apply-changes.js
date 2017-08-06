@@ -22,17 +22,6 @@ module('applyChanges', {
   }
 });
 
-asyncTest('should resolve with "null" if the offset is equal to the number of changes', () => {
-  // Base case for the recursion
-  applyChanges([], 0)
-    .then((val) => {
-      strictEqual(val, null);
-    })
-    .catch(function(err) {
-      ok(false, "Error: " + err);
-    })
-    .finally(start);
-});
 
 asyncTest('should be able to handle changes belonging to different tables', () => {
   const fooCreateChange = {
@@ -59,6 +48,21 @@ asyncTest('should be able to handle changes belonging to different tables', () =
     .then((objects) => {
       // Works with auto-incremented key
       strictEqual(objects[0].foo, barCreateChange.obj.foo, 'barCreateChange found in table');
+    })
+    .catch(function(err) {
+      ok(false, "Error: " + err);
+    })
+    .finally(start);
+});
+
+asyncTest('should be able to handle large number of changes', () => {
+  let changes = [];
+  for( let i = 0; i < 10000; i++ ) {
+    changes.push({key : i, table: "foo",  obj: { id: i, foo: "bar" }, type: CREATE});
+  }
+  applyChanges(changes)
+    .then(() => {
+      ok(true, "Tests passed!");
     })
     .catch(function(err) {
       ok(false, "Error: " + err);
