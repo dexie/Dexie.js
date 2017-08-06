@@ -22,12 +22,12 @@ export default function initFinallyCommitAllChanges(db, node) {
         // 2. Apply uncommitted changes and delete each uncommitted change
         return db._uncommittedChanges.where('node').equals(node.id).toArray();
       }).then(function (uncommittedChanges) {
-        return applyChanges(uncommittedChanges, 0);
+        return applyChanges(uncommittedChanges);
       }).then(function () {
         return db._uncommittedChanges.where('node').equals(node.id).delete();
       }).then(function () {
         // 3. Apply last chunk of changes
-        return applyChanges(changes, 0);
+        return applyChanges(changes);
       }).then(function () {
         // Get what revision we are at now:
         return db._changes.orderBy('rev').last();

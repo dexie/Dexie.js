@@ -3,15 +3,11 @@ import { CREATE, DELETE, UPDATE } from './change_types';
 import bulkUpdate from './bulk-update';
 
 export default function initApplyChanges(db) {
-  return function applyChanges(changes, offset) {
-    if (offset === changes.length)
-      return Dexie.Promise.resolve(null);
-    changes = changes.slice(offset);
-
+  return function applyChanges(changes) {
     let collectedChanges = {};
-    changes.map((change) => {
+    changes.forEach((change) => {
       if (!collectedChanges.hasOwnProperty(change.table)) {
-        collectedChanges[change.table] = [[], [], [], []];
+        collectedChanges[change.table] = { [CREATE]: [], [DELETE]: [], [UPDATE]: [] };
       }
       collectedChanges[change.table][change.type].push(change);
     });
@@ -19,7 +15,7 @@ export default function initApplyChanges(db) {
     let tables = table_names.map((table) => db.table(table));
 
     return db.transaction("rw", tables, () => {
-      table_names.map((table_name) => {
+      table_names.forEach((table_name) => {
         const table = db.table(table_name);
         const specifyKeys = !table.schema.primKey.keyPath;
         const createChangesToApply = collectedChanges[table_name][CREATE];
