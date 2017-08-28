@@ -1,6 +1,17 @@
 HOW TO CONTRIBUTE
 =================
 
+We appreciate contributions in forms of:
+
+* issues
+* answering questions in [issues](https://github.com/dfahlander/Dexie.js/issues) and on [stackoverflow](https://stackexchange.com/filters/233583/dexie-stackoverflow)
+* fixing bugs via pull-requests
+* developing addons or other [derived work](http://dexie.org/docs/DerivedWork)
+* promoting Dexie.js
+
+Contribute while developing your own app
+========================================
+
 Here is a little cheat-sheet for how to symlink your app's `node_modules/dexie` to a place where you can edit the source, version control your changes and create pull requests back to Dexie. Assuming you've already ran `npm install dexie --save` for the app your are developing.
 
 1. Fork Dexie.js from the web gui on github
