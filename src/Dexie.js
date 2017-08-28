@@ -2785,7 +2785,8 @@ export default function Dexie(dbName, options) {
         for (var i = 0; i < storeNames.length; ++i) {
             var storeName = storeNames[i];
             var store = idbtrans.objectStore(storeName);
-            hasGetAll = 'getAll' in store;
+            hasGetAll = navigator.userAgent.indexOf("Safari") === -1 && // See issue #565
+                'getAll' in store;
             for (var j = 0; j < store.indexNames.length; ++j) {
                 var indexName = store.indexNames[j];
                 var keyPath = store.index(indexName).keyPath;
