@@ -51,22 +51,26 @@ declare module 'dexie' {
             uuid: boolean;
         }
 
-        //
-        // Define Dexie.Observable
-        //
-        module Observable {
+        var Observable: {
+            (db: Dexie) : void;
+
             //
             //
             //
-            var createUUID: () => string;
-            var on: Observable.ObservableEventSet;
-            var localStorageImpl: {
+            createUUID: () => string;
+            on: Observable.ObservableEventSet;
+            localStorageImpl: {
                 setItem(key: string, value: string): void,
                 getItem(key: string): string,
                 removeItem(key: string): void; 
             };
-            var _onStorage: (event: StorageEvent) => void;
-            
+            _onStorage: (event: StorageEvent) => void;
+        }
+
+        //
+        // Define Dexie.Observable
+        //
+        module Observable {
             //
             // Interfaces of Dexie.Observable
             //            
