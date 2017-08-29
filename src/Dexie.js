@@ -2080,12 +2080,22 @@ export default function Dexie(dbName, options) {
                     if (++resolved === 2) resolve(); // Seems like we just support or btwn max 2 expressions, but there are no limit because we do recursion.
                 }
 
+                const ArrayBuffer = _global.ArrayBuffer;
+
                 function union(item, cursor, advance) {
                     if (!filter || filter(cursor, advance, resolveboth, reject)) {
-                        var key = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
+                        var primaryKey = cursor.primaryKey;
+                        var key = (ArrayBuffer && (primaryKey instanceof ArrayBuffer) ?
+                            new Uint8Array(primaryKey) : // Converts ArrayBuffer to comma-separated list of bytes
+                            primaryKey // Converts any Date to String, String to String, Number to String and Array to comma-separated string
+                        ).toString();
+                        
                         if (!hasOwn(set, key)) {
+                            console.log("Adding it");
                             set[key] = true;
                             fn(item, cursor, advance);
+                        } else {
+                            console.log("Had it");
                         }
                     }
                 }
