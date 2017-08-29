@@ -8,7 +8,7 @@ module.exports = {
     bs_firefox_latest_supported: { 
       base: 'BrowserStack',
       browser: 'firefox',
-      browser_version: '50',// TODO: Upgrade to test IndexedDB 2.0
+      browser_version: '55',
       os: 'Windows',
       os_version: 7
     },
@@ -50,7 +50,7 @@ module.exports = {
     bs_chrome_latest_supported: {      
       base: 'BrowserStack',
       browser: "Chrome",
-      browser_version: "57", // TODO: Upgrade to test IndexedDB 2.0
+      browser_version: "60",
       os: 'Windows',
       os_version: 10
     }
