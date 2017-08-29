@@ -113,4 +113,6 @@ declare module 'dexie' {
     }
 }
 
-export default Dexie.Observable;
+declare var dexieObservable: (db: Dexie) => void;
+
+export default dexieObservable;
