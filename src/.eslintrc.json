@@ -30,6 +30,8 @@
     "MutationObserver": false,
     "CustomEvent": false,
     "dispatchEvent": false,
-    "localStorage": false
+    "localStorage": false,
+    "ArrayBuffer": false,
+    "Uint8Array": false
   }
 }
