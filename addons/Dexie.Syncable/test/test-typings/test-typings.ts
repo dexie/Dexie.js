@@ -2,6 +2,7 @@
 import Dexie from 'dexie';
 import 'dexie-observable';
 import '../../src/Dexie.Syncable';
+import dexieSyncable from '../../src/Dexie.Syncable';
 import {IDatabaseChange, DatabaseChangeType} from '../../api';
 
 //
@@ -72,7 +73,7 @@ class Foo {
 class MyDb extends Dexie {
     foo: Dexie.Table<Foo, Date>;
     constructor() {
-        super('mydb');
+        super('mydb', {addons: [dexieSyncable, Dexie.Syncable]});
         this.version(1).stores({foo: 'id'});
         //
         // Connect

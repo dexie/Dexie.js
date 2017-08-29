@@ -81,16 +81,19 @@ declare module 'dexie' {
             }
         }
 
-        module Syncable {
+        var Syncable : {
+            (db: Dexie) : void;
             /**
              * See documentation at:
              * https://github.com/dfahlander/Dexie.js/wiki/Dexie.Syncable.registerSyncProtocol()
              */
-            var registerSyncProtocol: (name: string, prototocolInstance: ISyncProtocol) => void;
+            registerSyncProtocol: (name: string, prototocolInstance: ISyncProtocol) => void;
 
             /** Translates a sync status number into a string "ERROR_WILL_RETRY", "ERROR", etc */
-            var StatusTexts: {[syncStatus:number]: string};
-            
+            StatusTexts: {[syncStatus:number]: string};
+        }
+
+        module Syncable {
             interface SyncableEventSet extends DexieEventSet {
                 (eventName: 'statusChanged', subscriber: (status: number, url: string) => void): void;
             }

@@ -1,6 +1,7 @@
 
 import Dexie from 'dexie';
 import '../../src/Dexie.Observable';
+import dexieObservable from '../../src/Dexie.Observable';
 import { IDatabaseChange, DatabaseChangeType } from '../../api';
 
 interface Foo {
@@ -11,7 +12,7 @@ class MyDb extends Dexie {
     foos: Dexie.Table<Foo, string>;
 
     constructor() {
-        super('testdb');
+        super('testdb', {addons: [dexieObservable, Dexie.Observable]});
         this.version(1).stores({foos: '$$id'});
     }
 }
