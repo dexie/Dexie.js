@@ -104,10 +104,16 @@ rm -rf addons/*/dist/*
 
 # build
 npm run build
-
+   
 # test
-printf "Testing on browserstack\n"
-npm run test
+printf "Testing on browserstack (will retry up to 4 times)\n"
+n=0
+until [ $n -ge 4 ]
+do
+  npm run test && break
+  n=$[$n+1]
+  printf "Browserstack tests failed.\n"
+done
 
 printf "Browserstack tests for Dexie.js passed.\n"
 
@@ -128,9 +134,15 @@ do
     printf "Installing dependencies for ${addonNpmName}"
     npm install
 
-    printf "Building and testing ${addon} on browserstack\n"
+    printf "Building and testing ${addon} on browserstack (will retry up to 4 times)\n"
 
-    npm run test
+    n=0
+    until [ $n -ge 4 ]
+    do
+      npm run test && break
+      n=$[$n+1]
+      printf "${addon} Browserstack tests failed.\n"
+    done
 
     printf "${addon} Browserstack tests passed.\n"
     
