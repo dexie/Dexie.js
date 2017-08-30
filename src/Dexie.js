@@ -2085,17 +2085,14 @@ export default function Dexie(dbName, options) {
                 function union(item, cursor, advance) {
                     if (!filter || filter(cursor, advance, resolveboth, reject)) {
                         var primaryKey = cursor.primaryKey;
-                        var key = (ArrayBuffer && (primaryKey instanceof ArrayBuffer) ?
+                        var key = ''+(ArrayBuffer && (primaryKey instanceof ArrayBuffer) ?
                             new Uint8Array(primaryKey) : // Converts ArrayBuffer to comma-separated list of bytes
                             primaryKey // Converts any Date to String, String to String, Number to String and Array to comma-separated string
-                        ).toString();
+                        );
                         
                         if (!hasOwn(set, key)) {
-                            console.log("Adding it");
                             set[key] = true;
                             fn(item, cursor, advance);
-                        } else {
-                            console.log("Had it");
                         }
                     }
                 }
