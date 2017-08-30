@@ -20,10 +20,12 @@ module.exports = {
 
     // Test matrix used before every npm publish.
     pre_npm_publish: [
-        'bs_chrome_oldest_supported',
-        'bs_chrome_latest_supported',
-        'bs_firefox_oldest_supported',
-        'bs_firefox_latest_supported',
-        'bs_edge_latest_supported' // Know that edge has been sporadically instable. Might be better on Edge 15 or later. Restart of tests often needed.
+        //'bs_chrome_oldest_supported',
+        //'bs_chrome_latest_supported',
+        //'bs_firefox_oldest_supported',
+        //'bs_firefox_latest_supported',
+        //'bs_edge_latest_supported', // Know that edge has been sporadically instable. Might be better on Edge 15 or later. Restart of tests often needed.
+        //'bs_safari',
+        "bs_iphone7"
     ]
 }

@@ -53,6 +53,20 @@ module.exports = {
       browser_version: "60",
       os: 'Windows',
       os_version: 10
+    },
+    bs_safari: {
+      base: 'BrowserStack',
+      browser: "Safari",
+      browser_version: "10.1",
+      os: 'OS X',
+      os_version: 'Sierra'
+    },
+    bs_iphone7: {
+      base: 'BrowserStack',
+      browser: "Safari",
+      browser_version: "10.1",
+      os: 'iOS',
+      os_version: "10.3"
     }
   }
 }
