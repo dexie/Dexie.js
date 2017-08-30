@@ -30,6 +30,14 @@ if (window.location.search.indexOf('longstacks=tests') !== -1) Dexie.debug = tru
 
 var no_optimize = window.no_optimize || window.location.search.indexOf('dontoptimize') !== -1;
 
+const ArrayBuffer = window.ArrayBuffer;
+
+function stringify (idbKey) {
+    var res = '' + (idbKey && idbKey.constructor && idbKey.constructor === ArrayBuffer ?
+        new Uint8Array(idbKey) : idbKey);
+    return res;
+}
+
 export function resetDatabase(db) {
     /// <param name="db" type="Dexie"></param>
     var Promise = Dexie.Promise;
@@ -50,7 +58,7 @@ export function resetDatabase(db) {
                             var items = {};
                             initialState[tableName] = items;
                             return db.table(tableName).each(function(item, cursor) {
-                                items[cursor.primaryKey] = { key: cursor.primaryKey, value: item };
+                                items[stringify(cursor.primaryKey)] = { key: cursor.primaryKey, value: item };
                             });
                         }));
                     });
@@ -73,12 +81,12 @@ export function resetDatabase(db) {
                 // Read current state
                 var items = {};
                 return db.table(tableName).each(function(item, cursor) {
-                    items[cursor.primaryKey] = { key: cursor.primaryKey, value: item };
+                    items[stringify(cursor.primaryKey)] = { key: cursor.primaryKey, value: item };
                 }).then(function() {
                     // Diff from initialState
                     // Go through initialState and diff with current state
                     var initialItems = initialState[tableName];
-                    return Promise.all(Object.keys(initialItems).map(function(key) {
+                    return Promise.all(Object.keys(initialItems).map(key => {
                         var item = items[key];
                         var initialItem = initialItems[key];
                         if (!item || JSON.stringify(item.value) != JSON.stringify(initialItem.value))
@@ -89,13 +97,13 @@ export function resetDatabase(db) {
                 }).then(function() {
                     // Go through current state and diff with initialState
                     var initialItems = initialState[tableName];
-                    return Promise.all(Object.keys(items).map(function (key) {
-                        var item = items[key];
-                        var initialItem = initialItems[key];
-                        if (!initialItem)
-                            return db.table(tableName).delete(item.key);
-                        return Promise.resolve();
-                    }));
+                    var keysToDelete = Object.keys(items)
+                        .filter(key => !initialItems[key])
+                        .map(key => items[key].key);
+
+                    if (keysToDelete.length > 0) {
+                        return db.table(tableName).bulkDelete(keysToDelete);
+                    }
                 });
             }));
         });
