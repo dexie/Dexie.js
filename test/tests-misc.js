@@ -83,8 +83,12 @@ spawnedTest("#248 'modifications' object in 'updating' hook can be bizarre", fun
             return {date: new Date(date._year, date._month, date._day)};
         }
     }
+    function isDate(obj) {
+        // obj instanceof Date does NOT work with Safari when Date are retrieved from IDB.
+        return obj.getTime && obj.getDate && obj.getFullYear;
+    }
     function readingHook (obj) {
-        if (obj.date && obj.date instanceof Date) {
+        if (obj.date && isDate(obj.date)) {
             obj.date = new CustomDate(obj.date);
         }
         return obj;

@@ -2085,11 +2085,8 @@ export default function Dexie(dbName, options) {
                 function union(item, cursor, advance) {
                     if (!filter || filter(cursor, advance, resolveboth, reject)) {
                         var primaryKey = cursor.primaryKey;
-                        var key = ''+(ArrayBuffer && (primaryKey instanceof ArrayBuffer) ?
-                            new Uint8Array(primaryKey) : // Converts ArrayBuffer to comma-separated list of bytes
-                            primaryKey // Converts any Date to String, String to String, Number to String and Array to comma-separated string
-                        );
-                        
+                        var key = '' + primaryKey;
+                        if (key === '[object ArrayBuffer]') key = '' + new Uint8Array(primaryKey);
                         if (!hasOwn(set, key)) {
                             set[key] = true;
                             fn(item, cursor, advance);

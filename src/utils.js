@@ -219,7 +219,8 @@ export function getObjectDiff(a, b, rv, prfx) {
                 bp = b[prop];
             if (typeof ap === 'object' && typeof bp === 'object' &&
                     ap && bp &&
-                    ap.constructor === bp.constructor)
+                    // Now compare constructors are same (not equal because wont work in Safari)
+                    (''+ap.constructor) === (''+bp.constructor))
                 // Same type of object but its properties may have changed
                 getObjectDiff (ap, bp, rv, prfx + prop + ".");
             else if (ap !== bp)
