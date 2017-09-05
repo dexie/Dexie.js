@@ -5,10 +5,8 @@ module.exports = function (config) {
   const browserMatrixOverrides = {
     // Be fine with testing on local travis firefox + browserstack chrome, latest supported.
     ci: ["Firefox", "bs_chrome_latest_supported"],
-    // IE indexedDB hangs sporadically. Avoid it on integration tests to prohibit the
-    // likeliness of having to restart the travis builds over and over. We're testing
-    // it on the dexie main suite. That's enough.
-    pre_npm_publish: defaultBrowserMatrix.pre_npm_publish.filter(b => !/bs_ie/i.test(b)) // TODO: Either remove filter or replace with /bs_edge/ because ie is no longer in prepublish scripts.
+    // This addon is not yet ready for full-blown tests on iphone/Safari. That's one of the reason it is still in beta.
+    pre_npm_publish: defaultBrowserMatrix.pre_npm_publish.filter(b => !/bs_iphone7/i.test(b))
   };
 
   const cfg = getKarmaConfig(browserMatrixOverrides, {
