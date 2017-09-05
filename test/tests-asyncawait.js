@@ -139,6 +139,7 @@ test("Must not leak PSD zone", async function(assert) {
         var trans1, trans2;
         var p1 = db.transaction('r', db.items, async ()=> {
             var trans = trans1 = Dexie.currentTransaction;
+            await db.items.get(1); // Just to prohibit IDB bug in Safari - must use transaction in initial tick!
             await 3;
             ok(Dexie.currentTransaction === trans, "Should still be in same transaction 1.0 - after await 3");
             await 4;
@@ -160,6 +161,7 @@ test("Must not leak PSD zone", async function(assert) {
         });
         var p2 = db.transaction('r', db.items, async ()=> {
             var trans = trans2 = Dexie.currentTransaction;
+            await db.items.get(1); // Just to prohibit IDB bug in Safari - must use transaction in initial tick!
             ok(trans1 !== trans2, "Parallell transactions must be different from each other");
             await 3;
             ok(Dexie.currentTransaction === trans, "Should still be in same transaction 2.0 - after await 3");
@@ -217,7 +219,9 @@ test("Must not leak PSD zone2", async function(assert) {
         });
         // In parallell with the above 2*100 async tasks are being executed and verified,
         // maintain the transaction zone below:        
-        return idbAndPromiseCompatible.then(()=> {
+        return db.items.get(1).then(()=>{ // Just to prohibit IDB bug in Safari - must use transaction in initial tick!
+            return idbAndPromiseCompatible;
+        }).then(()=> {
             ok(Dexie.currentTransaction === trans, "Still same transaction 1");
             // Make sure native async functions maintains the zone:
             let f = new Function('ok', 'equal', 'Dexie', 'trans','NativePromise', 'db',
@@ -237,7 +241,7 @@ test("Must not leak PSD zone2", async function(assert) {
             if (e.name === 'IdbPromiseIncompatibleError') {
                 ok (true, `Promise and IndexedDB is incompatible on this browser. Native async await fails "by design" for indexedDB transactions`);
             } else if (hasNativeAsyncFunctions)
-                ok(false, `Error: ${e.stack || e}`);
+            ok(false, `Error: ${e.stack || e}`);
             else 
                 ok(true, `This browser does not support native async functions`);
         }).then(()=>{
@@ -276,6 +280,7 @@ test("Should be able to await Promise.all()", async (assert) => {
     (new Function('ok', 'equal', 'Dexie', 'db',
     `return db.transaction('r', db.items, async (trans)=>{
         ok(Dexie.currentTransaction === trans, "Correct initial transaction.");
+        await db.items.get(1); // Just to prohibit IDB bug in Safari - must use transaction in initial tick!
         var promises = [];
         for (var i=0; i<50; ++i) {
             promises.push(subAsync1(trans));
