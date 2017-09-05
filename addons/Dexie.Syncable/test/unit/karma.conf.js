@@ -3,8 +3,8 @@ const {karmaCommon, getKarmaConfig, defaultBrowserMatrix} = require('../../../..
 
 module.exports = function (config) {
   const browserMatrixOverrides = {
-    // Be fine with testing on local travis firefox.
-    ci: ["Firefox"],
+    // Be fine with testing on local travis firefox + browserstack chrome, latest supported.
+    ci: ["Firefox", "bs_chrome_latest_supported"],
     // IE indexedDB hangs sporadically. Be fine with testing it once on Dexie main suite.
     pre_npm_publish: defaultBrowserMatrix.pre_npm_publish.filter(b => !/bs_ie/i.test(b))
   };
