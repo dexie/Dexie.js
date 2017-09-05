@@ -8,7 +8,7 @@ module.exports = function (config) {
     // IE indexedDB hangs sporadically. Avoid it on integration tests to prohibit the
     // likeliness of having to restart the travis builds over and over. We're testing
     // it on the dexie main suite. That's enough.
-    pre_npm_publish: defaultBrowserMatrix.pre_npm_publish.filter(b => !/bs_ie/i.test(b))
+    pre_npm_publish: defaultBrowserMatrix.pre_npm_publish.filter(b => !/bs_ie/i.test(b)) // TODO: Either remove filter or replace with /bs_edge/ because ie is no longer in prepublish scripts.
   };
 
   const cfg = getKarmaConfig(browserMatrixOverrides, {
