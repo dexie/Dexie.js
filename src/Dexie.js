@@ -2080,8 +2080,6 @@ export default function Dexie(dbName, options) {
                     if (++resolved === 2) resolve(); // Seems like we just support or btwn max 2 expressions, but there are no limit because we do recursion.
                 }
 
-                const ArrayBuffer = _global.ArrayBuffer;
-
                 function union(item, cursor, advance) {
                     if (!filter || filter(cursor, advance, resolveboth, reject)) {
                         var primaryKey = cursor.primaryKey;

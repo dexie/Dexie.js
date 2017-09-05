@@ -31,7 +31,11 @@ module.exports = {
         'bs_firefox_oldest_supported',
         'bs_firefox_latest_supported',
         'bs_edge_latest_supported', // Know that edge has been sporadically instable. Might be better on Edge 15 or later. Restart of tests often needed.
-        'bs_safari',
+        //Browserstack seems not to support Safari 10.1 on OS X Sierra. It times out over and over.
+        // Skip this. We test Safari 10.1 with "bs_iphone7" instead (working well with BrowserStack)
+        //'bs_safari', 
+
+        // Safari 10.1 on iOS 10.3
         "bs_iphone7"
     ]
 }
