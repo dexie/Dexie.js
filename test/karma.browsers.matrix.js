@@ -14,18 +14,24 @@ module.exports = {
     
     // Continous Integration on every push to master
     ci: [
-        'bs_firefox_latest_supported',
-        'bs_ie11'
+        // - Let firefox represent the standard evergreen browser.
+        // Leaving out Chrome, since local tests have hopefully already run on it.
+        // Chrome will be tested in the pre_npm_publish anyway.
+        'bs_firefox_latest_supported', 
+        // Internet Explorer - an old beast. Enforces legacy compatibility for every PR!
+        'bs_ie11',  
+        // Safari 10.1 - another beast. Enforces native Safari support for every PR!
+        'bs_iphone7'
     ],
 
     // Test matrix used before every npm publish.
     pre_npm_publish: [
-        //'bs_chrome_oldest_supported',
-        //'bs_chrome_latest_supported',
-        //'bs_firefox_oldest_supported',
-        //'bs_firefox_latest_supported',
-        //'bs_edge_latest_supported', // Know that edge has been sporadically instable. Might be better on Edge 15 or later. Restart of tests often needed.
-        //'bs_safari',
+        'bs_chrome_oldest_supported',
+        'bs_chrome_latest_supported',
+        'bs_firefox_oldest_supported',
+        'bs_firefox_latest_supported',
+        'bs_edge_latest_supported', // Know that edge has been sporadically instable. Might be better on Edge 15 or later. Restart of tests often needed.
+        'bs_safari',
         "bs_iphone7"
     ]
 }
