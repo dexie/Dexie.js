@@ -6,7 +6,7 @@
   "module": "index.js",
   "scripts": {
     "test": "npm run test:dexie-relationships",
-    "test:dexie-relationships": "../../node_modules/.bin/just-build dexie-relationships"
+    "test:dexie-relationships": "just-build dexie-relationships"
   },
   "just-build": {
     "dexie-relationships": [
@@ -29,6 +29,7 @@
   },
   "homepage": "https://github.com/dfahlander/Dexie.js#readme",
   "dependencies": {
+    "just-build": "0.9.16",
     "dexie-relationships": "1.2.1"
   }
 }

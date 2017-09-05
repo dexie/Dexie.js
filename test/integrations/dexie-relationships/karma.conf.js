@@ -5,10 +5,8 @@ module.exports = function (config) {
   const browserMatrixOverrides = {
     // Be fine with testing on local travis firefox for both pull requests and pushs.
     ci: ["Firefox"],
-    // IE indexedDB hangs sporadically. Avoid it on integration tests to prohibit the
-    // likeliness of having to restart the travis builds over and over. We're testing
-    // it on the dexie main suite. That's enough.
-    full: defaultBrowserMatrix.full.filter(b => !/bs_ie/i.test(b))
+    // Be fine with chrome for this particular integration test.
+    pre_npm_publish: ['bs_chrome_latest_supported']
   };
 
   const cfg = getKarmaConfig(browserMatrixOverrides, {
