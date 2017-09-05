@@ -1,6 +1,6 @@
 {
   "name": "dexie-observable",
-  "version": "1.0.0-beta.3",
+  "version": "1.0.0-beta.4",
   "description": "Addon to Dexie that makes it possible to observe database changes no matter if they occur on other db instance or other window.",
   "main": "dist/dexie-observable.js",
   "module": "dist/dexie-observable.es.js",
