@@ -60,7 +60,8 @@
       "node -e \"fs.writeFileSync('dist/dexie.d.ts', fs.readFileSync('src/Dexie.d.ts'))\"",
       "node tools/replaceVersionAndDate.js dist/dexie.d.ts",
       "# Minify the default ES5 UMD module",
-      "uglifyjs dist/dexie.js -m -c -o dist/dexie.min.js --source-map dist/dexie.min.js.map  --in-source-map dist/dexie.js.map"
+      "cd dist",
+      "uglifyjs dexie.js -m -c -o dexie.min.js --source-map dexie.min.js.map  --in-source-map dexie.js.map"
     ],
     "dev": [
       "# Build ES5 module and the tests",
