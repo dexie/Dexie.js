@@ -6,12 +6,14 @@ import initFinallyCommitAllChanges from './finally-commit-all-changes';
 import initGetLocalChangesForNode from './get-local-changes-for-node/get-local-changes-for-node';
 import {Statuses} from './statuses';
 import initUpdateNode from './update-node';
+import initPersistedContexxt from './PersistedContext';
 
 const Promise = Dexie.Promise;
 
 export default function initConnectProtocol(db, protocolInstance, dbAliveID, options, rejectConnectPromise) {
   const enqueue = initEnqueue(db);
   const updateNode = initUpdateNode(db);
+  const PersistedContext = initPersistedContexxt(db);
   var hasMoreToGive = {hasMoreToGive: true};
 
   function stillAlive() {
@@ -243,6 +245,8 @@ export default function initConnectProtocol(db, protocolInstance, dbAliveID, opt
         // Reload node from database before continuing again.
         db._syncNodes.get(node.id).then(n => {
           Dexie.extend(node, n);
+          // Need to set the prototype of syncContext correctly, for save()
+          node.syncContext = new PersistedContext(node.id, node.syncContext);
           syncAgain2();
         });
       }
