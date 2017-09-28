@@ -22,6 +22,14 @@ let timeout = async(function* (promise, ms) {
     yield Promise.race([promise, new Promise((resolve,reject)=>setTimeout(()=>reject("timeout"), ms))]);
 });
 
+promisedTest("using persisted storage 2", async ()=> {
+    let db = new Dexie('persdb3', {durable: false});
+    db.version(1).stores({items: '++id'});
+    await db.open();
+    const durable = await db.durable();
+    equal(durable, true, "Database should be persisted");
+});
+
 spawnedTest("multiple db should not block each other", function*(){
     if (!supports("versionchange")) {
         ok(true, "SKIPPED - versionchange UNSUPPORTED");

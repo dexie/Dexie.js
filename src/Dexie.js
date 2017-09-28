@@ -73,14 +73,14 @@ var DEXIE_VERSION = '{version}',
 Debug.setDebug(Debug.debug, dexieStackFrameFilter);
 
 export default function Dexie(dbName, options) {
-    /// <param name="options" type="Object" optional="true">Specify only if you wich to control which addons that should run on this instance</param>
     var deps = Dexie.dependencies;
     var opts = extend({
         // Default Options
         addons: Dexie.addons,           // Pick statically registered addons by default
         autoOpen: true,                 // Don't require db.open() explicitely.
         indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to browser env.
-        IDBKeyRange: deps.IDBKeyRange   // Backend IDBKeyRange api. Default to browser env.
+        IDBKeyRange: deps.IDBKeyRange,  // Backend IDBKeyRange api. Default to browser env.
+        durable: false                  // If true, tries to use a persistent storage.
     }, options);
     var addons = opts.addons,
         autoOpen = opts.autoOpen,
@@ -487,73 +487,101 @@ export default function Dexie(dbName, options) {
         var resolveDbReady = dbReadyResolve,
             // upgradeTransaction to abort on failure.
             upgradeTransaction = null;
-        
-        return Promise.race([openCanceller, new Promise((resolve, reject) => {
-            doFakeAutoComplete(()=>resolve());
-            
-            // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
-            // IE fails when deleting objectStore after reading from it.
-            // A future version of Dexie.js will stopover an intermediate version to workaround this.
-            // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
-            
-            // If no API, throw!
-            if (!indexedDB) throw new exceptions.MissingAPI(
-                "indexedDB API not found. If using IE10+, make sure to run your code on a server URL "+
-                "(not locally). If using old Safari versions, make sure to include indexedDB polyfill.");
-            
-            var req = autoSchema ? indexedDB.open(dbName) : indexedDB.open(dbName, Math.round(db.verno * 10));
-            if (!req) throw new exceptions.MissingAPI("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
-            req.onerror = eventRejectHandler(reject);
-            req.onblocked = wrap(fireOnBlocked);
-            req.onupgradeneeded = wrap (function (e) {
-                upgradeTransaction = req.transaction;
-                if (autoSchema && !db._allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
-                    // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
-                    // If onupgradeneeded is called it means database did not exist. Reject the open() promise and make sure that we
-                    // do not create a new database by accident here.
-                    req.onerror = preventDefault; // Prohibit onabort error from firing before we're done!
-                    upgradeTransaction.abort(); // Abort transaction (would hope that this would make DB disappear but it doesnt.)
-                    // Close database and delete it.
-                    req.result.close();
-                    var delreq = indexedDB.deleteDatabase(dbName); // The upgrade transaction is atomic, and javascript is single threaded - meaning that there is no risk that we delete someone elses database here!
-                    delreq.onsuccess = delreq.onerror = wrap(function () {
-                        reject (new exceptions.NoSuchDatabase(`Database ${dbName} doesnt exist`));
-                    });
-                } else {
-                    upgradeTransaction.onerror = eventRejectHandler(reject);
-                    var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
-                    runUpgraders(oldVer / 10, upgradeTransaction, reject, req);
-                }
-            }, reject);
-            
-            req.onsuccess = wrap (function () {
-                // Core opening procedure complete. Now let's just record some stuff.
-                upgradeTransaction = null;
-                idbdb = req.result;
-                connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.
 
-                if (autoSchema) readGlobalSchema();
-                else if (idbdb.objectStoreNames.length > 0) {
-                    try {
-                        adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
-                    } catch (e) {
-                        // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
+        function tryOpen (durable) {
+            return Promise.resolve(
+                durable && navigator.storage && navigator.storage.persist &&
+                    navigator.storage.persist().then(persisted => {
+                        db._durable = persisted
+                    })
+            ).then(_ => new Promise((resolve, reject) => {
+                doFakeAutoComplete(()=>resolve());
+                
+                // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
+                // IE fails when deleting objectStore after reading from it.
+                // A future version of Dexie.js will stopover an intermediate version to workaround this.
+                // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
+                
+                // If no API, throw!
+                if (!indexedDB) throw new exceptions.MissingAPI(
+                    "indexedDB API not found. If using IE10+, make sure to run your code on a server URL "+
+                    "(not locally). If using old Safari versions, make sure to include indexedDB polyfill.");
+
+                var req = durable && !db._durable ?
+                    // Failed to persist the standard way.
+                    // Try Firefox' way of marking a DB as "persistent"
+                    // https://github.com/dfahlander/Dexie.js/issues/467
+                    autoSchema ?
+                        indexedDB.open(dbName, {storage: 'persistent'}) :
+                        indexedDB.open(dbName, {version: Math.round(db.verno * 10), storage: 'persistent'}) :
+                    // No durability requried, or durability already succeeded the standard way
+                    autoSchema ?
+                        indexedDB.open(dbName) :
+                        indexedDB.open(dbName, Math.round(db.verno * 10));
+
+                if (!req) throw new exceptions.MissingAPI("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
+
+                req.onerror = eventRejectHandler(reject);
+                req.onblocked = wrap(fireOnBlocked);
+                req.onupgradeneeded = wrap (function (e) {
+                    upgradeTransaction = req.transaction;
+                    if (autoSchema && !db._allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
+                        // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
+                        // If onupgradeneeded is called it means database did not exist. Reject the open() promise and make sure that we
+                        // do not create a new database by accident here.
+                        req.onerror = preventDefault; // Prohibit onabort error from firing before we're done!
+                        upgradeTransaction.abort(); // Abort transaction (would hope that this would make DB disappear but it doesnt.)
+                        // Close database and delete it.
+                        req.result.close();
+                        var delreq = indexedDB.deleteDatabase(dbName); // The upgrade transaction is atomic, and javascript is single threaded - meaning that there is no risk that we delete someone elses database here!
+                        delreq.onsuccess = delreq.onerror = wrap(function () {
+                            reject (new exceptions.NoSuchDatabase(`Database ${dbName} doesnt exist`));
+                        });
+                    } else {
+                        upgradeTransaction.onerror = eventRejectHandler(reject);
+                        var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
+                        runUpgraders(oldVer / 10, upgradeTransaction, reject, req);
                     }
-                }
+                }, reject);
                 
-                idbdb.onversionchange = wrap(ev => {
-                    db._vcFired = true; // detect implementations that not support versionchange (IE/Edge/Safari)
-                    db.on("versionchange").fire(ev);
-                });
-                
-                if (!hasNativeGetDatabaseNames && dbName !== '__dbnames') {
-                    dbNamesDB.dbnames.put({name: dbName}).catch(nop);
-                }
+                req.onsuccess = wrap (function () {
+                    // Core opening procedure complete. Now let's just record some stuff.
+                    upgradeTransaction = null;
+                    idbdb = req.result;
+                    connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.
 
-                resolve();
+                    if (autoSchema) readGlobalSchema();
+                    else if (idbdb.objectStoreNames.length > 0) {
+                        try {
+                            adjustToExistingIndexNames(globalSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), READONLY));
+                        } catch (e) {
+                            // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
+                        }
+                    }
+                    
+                    idbdb.onversionchange = wrap(ev => {
+                        db._vcFired = true; // detect implementations that not support versionchange (IE/Edge/Safari)
+                        db.on("versionchange").fire(ev);
+                    });
+                    
+                    if (!hasNativeGetDatabaseNames && dbName !== '__dbnames') {
+                        dbNamesDB.dbnames.put({name: dbName}).catch(nop);
+                    }
 
-            }, reject);
-        })]).then(() => {
+                    resolve();
+
+                }, reject);
+            }).then(() => {
+                if (durable) db._durable = true;
+            }));
+        }
+        
+        return Promise.race([
+            openCanceller,
+            opts.durable ?
+                tryOpen(true).catch(_ => tryOpen(false)) :
+                tryOpen(false)
+        ]).then(() => {
             // Before finally resolving the dbReadyPromise and this promise,
             // call and await all on('ready') subscribers:
             // Dexie.vip() makes subscribers able to use the database while being opened.
@@ -649,11 +677,18 @@ export default function Dexie(dbName, options) {
     this.dynamicallyOpened = function() {
         return autoSchema;
     };
+    this.durable = function () {
+        return Promise.resolve(db._durable || // Persisted through Firefox-specific option to indexedDB.open()
+            (navigator.storage && navigator.storage.persisted && navigator.storage.persisted()) || // standard.
+            false);
+    }
 
     //
     // Properties
     //
     this.name = dbName;
+
+    this._durable = false;
 
     // db.tables - an array of all Table instances.
     props(this, {
