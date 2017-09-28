@@ -110,42 +110,6 @@ update(key: Key, changes: { [keyPath: string]: any }): Promise;
 ```
 This is a mix of methods from [WhereClause](http://dexie.org/docs/WhereClause/WhereClause), [Table](http://dexie.org/docs/Table/Table) and [Collection](http://dexie.org/docs/Collection/Collection). Dive into the [API reference](http://dexie.org/docs/API-Reference) to see the details.
 
-#### Hello World (ES2015 / ES6)
-
-This sample shows how to use Dexie with ES6 compliant environments and npm module resolution. With ES6, the `yield` keyword can be  used instead of calling `.then()` on every database operation. The `yield` keyword and generator functions are already supported today (March 2016) in Chrome, Firefox, Edge and Opera without a transpiler (though this example also uses import statements which still needs transpilation). Dive into this? Read **[SIMPLIFY WITH YIELD](http://dexie.org/docs/Simplify-with-yield)**!
-
-```js
-import Dexie from 'dexie';
-
-//
-// Declare Database
-//
-let db = new Dexie("FriendDatabase");
-db.version(1).stores({ friends: "++id,name,age" });
-
-//
-// Have Fun
-//
-db.transaction('rw', db.friends, function*() {
-
-    // Make sure we have something in DB:
-    if ((yield db.friends.where('name').equals('Josephine').count()) === 0) {
-        let id = yield db.friends.add({name: "Josephine", age: 21});
-        alert (`Addded friend with id ${id}`);
-    }
-
-    // Query:
-    let youngFriends = yield db.friends.where("age").below(25).toArray();
-
-    // Show result:
-    alert ("My young friends: " + JSON.stringify(youngFriends));
-
-}).catch(e => {
-    alert(e.stack || e);
-});
-```
-*NOTE: db.transaction() will treat generator functions (function * ) so that it is possible to use `yield` for consuming promises. [Yield can be used outside transactions as well](http://dexie.org/docs/Simplify-with-yield).*
-
 #### Hello World (ES2016 / ES7)
 ```js
 import Dexie from 'dexie';
@@ -249,11 +213,11 @@ Download
 --------
 For those who don't like package managers, here's the download links:
 
-https://unpkg.com/dexie@^2.0.0-beta/dist/dexie.js
+https://unpkg.com/dexie@latest/dist/dexie.js
 
-https://unpkg.com/dexie@^2.0.0-beta/dist/dexie.js.map
+https://unpkg.com/dexie@latest/dist/dexie.js.map
 
-https://unpkg.com/dexie@^2.0.0-beta/dist/dexie.d.ts
+https://unpkg.com/dexie@latest/dist/dexie.d.ts
 
 
 Contributing
