@@ -645,6 +645,7 @@ export function newScope (fn, props, a1, a2) {
     var globalEnv = globalPSD.env;
     psd.env = patchGlobalPromise ? {
         Promise: Promise, // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
+        PromiseProp: {value: Promise, configurable: true, writable: true},
         all: Promise.all,
         race: Promise.race,
         resolve: Promise.resolve,
@@ -744,7 +745,7 @@ function switchToZone (targetZone, bEnteringZone) {
             // Leaving or entering global zone. It's time to patch / restore global Promise.
 
             // Set this Promise to window.Promise so that transiled async functions will work on Firefox, Safari and IE, as well as with Zonejs and angular.
-            _global.Promise = targetEnv.Promise;
+            Object.defineProperty(_global, 'Promise', targetEnv.PromiseProp);
 
             // Support Promise.all() etc to work indexedDB-safe also when people are including es6-promise as a module (they might
             // not be accessing global.Promise but a local reference to it)
@@ -760,6 +761,7 @@ function snapShot () {
     var GlobalPromise = _global.Promise;
     return patchGlobalPromise ? {
         Promise: GlobalPromise,
+        PromiseProp: Object.getOwnPropertyDescriptor(_global, "Promise"),
         all: GlobalPromise.all,
         race: GlobalPromise.race,
         resolve: GlobalPromise.resolve,
