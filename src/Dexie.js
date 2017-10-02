@@ -2784,12 +2784,12 @@ export default function Dexie(dbName, options) {
         /// <param name="schema" type="Object">Map between name and TableSchema</param>
         /// <param name="idbtrans" type="IDBTransaction"></param>
         var storeNames = idbtrans.db.objectStoreNames;
+
         for (var i = 0; i < storeNames.length; ++i) {
             var storeName = storeNames[i];
             var store = idbtrans.objectStore(storeName);
-            hasGetAll = 'getAll' in store &&
-                !(/Apple/.test(navigator.vendor) &&
-                  [].concat(navigator.userAgent.match(/Safari\/(\d*)/))[1] < 604); // See issue #565 and PR #579
+            hasGetAll = 'getAll' in store;
+            
             for (var j = 0; j < store.indexNames.length; ++j) {
                 var indexName = store.indexNames[j];
                 var keyPath = store.index(indexName).keyPath;
@@ -2800,6 +2800,15 @@ export default function Dexie(dbName, options) {
                 }
             }
         }
+
+        // Bug with getAll() on Safari ver<604 on Workers only, see discussion following PR #579
+        if (/Safari/.test(navigator.userAgent) &&
+            !/Chrome/.test(navigator.userAgent) &&
+            _global.WorkerGlobalScope && _global instanceof _global.WorkerGlobalScope &&
+            [].concat(navigator.userAgent.match(/Safari\/(\d*)/))[1] < 604)
+        {
+            hasGetAll = false;
+        }    
     }
 
     function fireOnBlocked(ev) {
