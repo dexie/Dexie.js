@@ -268,6 +268,11 @@ asyncTest("Issue #76 Dexie inside Web Worker", function () {
                 ok(true, "Could create a transaction");
                 db.table1.add({ name: "My first object" }).then(function(id) {
                     ok(true, "Could add object that got id " + id);
+                    // Verify we workaround Safari issues with getAll() in workers
+                    // ... as discussed in PR #579.
+                    return db.table1.toArray();
+                }).then(function(){
+                    ok(true, "Could all toArray() on a table (verified workaround for Safari 10.1 issue with getAll())");
                 }).catch(function(err) {
                     ok(false, "Got error: " + err);
                 });
