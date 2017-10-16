@@ -32,6 +32,7 @@
     "dispatchEvent": false,
     "localStorage": false,
     "ArrayBuffer": false,
-    "Uint8Array": false
+    "Uint8Array": false,
+    "Zone": false
   }
 }

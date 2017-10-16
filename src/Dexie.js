@@ -40,7 +40,7 @@ import {
 
 } from './utils';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from './errors';
-import Promise, {wrap, PSD, newScope, usePSD, rejection, NativePromise,
+import Promise, {wrap, PSD, newScope, usePSD, rejection, NativePromise, globalPSD,
     incrementExpectedAwaits, decrementExpectedAwaits, AsyncFunction} from './Promise';
 import Events from './Events';
 import {
@@ -2809,6 +2809,43 @@ export default function Dexie(dbName, options) {
             .map(c => c.on("versionchange").fire(ev));
     }
 
+    /**
+     * Optional optimization for Angular 2+. As Angular will perform change detection
+     * after every indexedDB event has been invoked, using ZoneJS this could be processor
+     * intensive for large queries, like 10,000 rows or so. Unless getAll() could be utilized,
+     * Angular may perform 10,000 change detections.
+     * 
+     * This optimization will make some Dexie methods run outside the angular zone so
+     * that change detection is inactivated until the final promise is resolved.
+     */
+    function optimizeForAngular() {
+        if (typeof Zone !== 'undefined' && Zone.assertZonePatched) {
+            // Angular ZoneJS is loaded.
+            // Make sure certain methods run in the root zone so
+            // that frequent indexedDB events doesn't trigger
+            ["toArray", "count", "keys", "uniqueKeys"]
+              .map(method => [Collection, Table]
+                .map(clazz => clazz.prototype)
+                .filter(proto => proto[method])
+                .forEach(proto => proto[method] = override(proto[method], origMeth => function(cb) {
+                    const thiz = this,
+                          NGZoneAwarePromise = globalPSD.env.Promise;
+                    // ZoneAwarePromise = window.Promise, patched by ZoneJS.
+                    // If we are in a Dexie-zone, ZoneAwarePromise.prototype.then will be
+                    // patched by Dexie as well for restoring Dexie zones.
+                    // The result will be that both NG and Dexie zones will be patched.
+                    const result = NGZoneAwarePromise.resolve(
+                        // Run in NG root zone, but keep Dexie zone
+                        Zone.root.run(()=>origMeth.call(thiz)));
+                        // Below probably not needed as ZoneAwarePromise will wrap then().
+                        // When done, call Zone.curent.run() to invoke change detection again.
+                        //.then(result => Zone.current.run(()=>result));
+                    
+                    return cb ? result.then(cb) : result;
+                })));
+        }
+    }
+
     extend(this, {
         Collection: Collection,
         Table: Table,
@@ -2818,6 +2855,8 @@ export default function Dexie(dbName, options) {
     });
 
     init();
+
+    optimizeForAngular();
 
     addons.forEach(function (fn) {
         fn(db);
