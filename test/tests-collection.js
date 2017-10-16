@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, test, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, supports, spawnedTest} from './dexie-unittest-utils';
+import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBCollection");
 db.version(1).stores({ users: "id,first,last,&username,*&email,*pets" });
@@ -306,6 +306,15 @@ asyncTest("modify-causing-error", 2, function () {
     }).catch(function (e) {
         ok(false, "Another error than the expected was thrown: " + e);
     }).finally(start);
+});
+
+promisedTest("modify-with-where(issue-594)", async ()=>{
+    db.users.add({ id: 3, first: "David", last: "Fahlander2", username: "dfahlander2", email: ["david2@awarica.com"], pets: [] });
+    db.users.add({ id: 4, first: "David", last: "Fahlander3", username: "dfahlander3", email: ["david3@awarica.com"], pets: [] });
+    const numDavids = (await db.users.where('first').equals("David").toArray()).length;
+    equal(numDavids, 3, "There should be 3 Davids");
+    const numModifications = await db.users.where('first').equals("David").modify((object) => { object.anotherProperty = 'test'; });
+    equal(numModifications, 3, "There should have been 3 modifications");
 });
 
 
