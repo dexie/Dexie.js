@@ -2,13 +2,14 @@
  * Dexie.js - a minimalistic wrapper for IndexedDB
  * ===============================================
  *
- * By David Fahlander, david.fahlander@gmail.com
+ * Copyright (c) 2014-2017 David Fahlander
  *
  * Version {version}, {date}
  *
  * http://dexie.org
- *
- * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
+ * 
+ * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/LICENSE-2.0
+ * 
  */
 
 import {
