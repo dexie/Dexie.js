@@ -63,11 +63,6 @@ export function override(origFunc, overridedFactory) {
     return overridedFactory(origFunc);
 }
 
-export function doFakeAutoComplete(fn) {
-    var to = setTimeout(fn, 1000);
-    clearTimeout(to);
-}
-
 export function assert (b) {
     if (!b) throw new Error("Assertion Failed");
 }

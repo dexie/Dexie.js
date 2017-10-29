@@ -2,7 +2,7 @@
  * Copyright (c) 2014-2017 David Fahlander
  * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/LICENSE-2.0
  */
-import {doFakeAutoComplete, tryCatch, props, setProp, _global,
+import {tryCatch, props, setProp, _global,
     getPropertyDescriptor, getArrayOf, extend} from './utils';
 import {nop, callBoth, mirror} from './chaining-functions';
 import {debug, prettyStack, getErrorWithStack} from './debug';
@@ -841,12 +841,5 @@ function globalError(err, promise) {
         }
     } catch (e) {}
 }
-
-doFakeAutoComplete(() => {
-    // Simplify the job for VS Intellisense. This piece of code is one of the keys to the new marvellous intellisense support in Dexie.
-    asap = (fn, args) => {
-        setTimeout(()=>{fn.apply(null, args);}, 0);
-    };
-});
 
 export var rejection = Promise.reject;
