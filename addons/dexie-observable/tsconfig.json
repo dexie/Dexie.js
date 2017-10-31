@@ -1,0 +1,18 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "module": "es2015",
+    "target": "es5",
+    "importHelpers": true,
+    "sourceMap": true,
+    "declaration": true,
+    "lib": [
+        "es2017",
+        "dom"
+    ],
+    "outDir": "tmp"
+  },
+  "files": [
+    "src/dexie-observable.ts"
+  ]
+}

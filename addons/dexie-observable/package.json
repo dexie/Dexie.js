@@ -1,0 +1,82 @@
+{
+  "name": "dexie-observable",
+  "version": "2.0.0-alpha.1",
+  "description": "Addon to Dexie that makes it possible to observe database changes no matter if they occur on other db instance or other window.",
+  "main": "dist/dexie-observable.js",
+  "module": "dist/dexie-observable.mjs",
+  "typings": "dist/typings/dexie-observable.d.ts",
+  "jspm": {
+    "format": "cjs",
+    "ignore": [
+      "src/"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dfahlander/Dexie.js.git"
+  },
+  "keywords": [
+    "indexeddb",
+    "browser",
+    "dexie",
+    "addon"
+  ],
+  "author": "David Fahlander",
+  "contributors": [
+    "Nikolas Poniros <https://github.com/nponiros>",
+    "Yury Solovyov <https://github.com/YurySolovyov>",
+    "Martin Diphoorn <https://github.com/martindiphoorn>"
+  ],
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/dfahlander/Dexie.js/issues"
+  },
+  "scripts": {
+    "build": "just-build",
+    "watch": "just-build --watch",
+    "test": "npm run build && npm run test"
+  },
+  "just-build": {
+    "default": [
+      "just-build release test"
+    ],
+    "dev": [
+      "just-build dexie-observable test"
+    ],
+    "dexie-observable": [
+      "# Build UMD module",
+      "tsc [--watch 'Compilation complete.']",
+      "rollup -c rollup.config.js",
+      "#"
+    ],
+    "release": [
+      "just-build dexie-observable",
+      "# Minify the default ES5 UMD module",
+      "uglifyjs dist/dexie-observable.js -m -c -o dist/dexie-observable.min.js --source-map dist/dexie-observable.min.js.map --in-source-map dist/dexie-observable.js.map"
+    ],
+    "test": [
+      "# Build the unit tests (integration tests need no build)",
+      "tsc [--watch 'Compilation complete.']",
+      "rollup -c test/rollup.config.js"
+    ]
+  },
+  "homepage": "http://dexie.org",
+  "peerDependencies": {
+    "dexie": "^2.0.0"
+  },
+  "devDependencies": {
+    "dexie": "^2.0.0",
+    "karma": "^1.4.0",
+    "karma-browserstack-launcher": "^1.1.1",
+    "karma-chrome-launcher": "^2.0.0",
+    "karma-firefox-launcher": "^1.0.0",
+    "karma-mocha-reporter": "^2.2.0",
+    "karma-qunit": "^1.2.1",
+    "qunitjs": "^1.23.1",
+    "rollup": "^0.41.4",
+    "rollup-plugin-cleanup": "^2.0.0",
+    "rollup-plugin-sourcemaps": "^0.4.1",
+    "tslib": "^1.8.0",
+    "typescript": "^2.6.1"
+  }
+}
