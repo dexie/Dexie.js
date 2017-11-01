@@ -228,7 +228,7 @@ export declare module Dexie {
     interface Version {
         stores(schema: { [key: string]: string | null }): Version;
         upgrade(fn: (trans: Transaction) => void): Version;
-        _parseStoresSpec: (stores: { [key: string]: string | null }, outSchema: Dexie.DatabaseSchema): void;
+        _parseStoresSpec: (stores: { [key: string]: string | null }, outSchema: Dexie.DatabaseSchema) => void;
     }
 
     interface Transaction {
@@ -313,10 +313,12 @@ export declare module Dexie {
         (eventName: 'reading', subscriber: (obj:T) => T | any): void;
         (eventName: 'updating', subscriber: (this: UpdatingHookContext<T,Key>, modifications:Object, primKey:Key, obj:T, transaction:Transaction) => any): void;
         (eventName: 'deleting', subscriber: (this: DeletingHookContext<T,Key>, primKey:Key, obj:T, transaction:Transaction) => any): void;
+        (eventName: 'writing', subscriber: (obj:T) => T) : void;
         creating: DexieEvent;
         reading: DexieEvent;
         updating: DexieEvent;
         deleting: DexieEvent;
+        writing: DexieEvent;
     }
 
     interface TransactionEvents extends DexieEventSet {

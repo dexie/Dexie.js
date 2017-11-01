@@ -866,7 +866,8 @@ export default function Dexie(dbName, options) {
             "creating": [hookCreatingChain, nop],
             "reading": [pureFunctionChain, mirror],
             "updating": [hookUpdatingChain, nop],
-            "deleting": [hookDeletingChain, nop]
+            "deleting": [hookDeletingChain, nop],
+            "writing": [pureFunctionChain, mirror]
         });
     }
 
@@ -1113,14 +1114,20 @@ export default function Dexie(dbName, options) {
                     errorList = [],
                     errorHandler,
                     numObjs = objects.length,
-                    table = this;
-                if (this.hook.creating.fire === nop && this.hook.updating.fire === nop) {
+                    table = this,
+                    creatingHook = this.hook.creating.fire,
+                    updatingHook = this.hook.updating.fire,
+                    writingHook = this.hook.writing.fire;
+                if (creatingHook === nop && updatingHook === nop) {
                     //
                     // Standard Bulk (no 'creating' or 'updating' hooks to care about)
                     //
                     errorHandler = BulkErrorHandlerCatchAll(errorList);
                     for (var i = 0, l = objects.length; i < l; ++i) {
-                        req = keys ? idbstore.put(objects[i], keys[i]) : idbstore.put(objects[i]);
+                        const rewrittenObj = writingHook(objects[i]);
+                        req = keys ?
+                            idbstore.put(rewrittenObj, keys[i]) :
+                            idbstore.put(rewrittenObj);
                         req.onerror = errorHandler;
                     }
                     // Only need to catch success or error on the last operation
@@ -1179,7 +1186,8 @@ export default function Dexie(dbName, options) {
         },
         bulkAdd: function(objects, keys) {
             var self = this,
-                creatingHook = this.hook.creating.fire;
+                creatingHook = this.hook.creating.fire,
+                writingHook = this.hook.writing.fire;
             return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
                 if (!idbstore.keyPath && !self.schema.primKey.auto && !keys)
                     throw new exceptions.InvalidArgument("bulkAdd() with non-inbound keys requires keys array in second argument");
@@ -1222,7 +1230,8 @@ export default function Dexie(dbName, options) {
                                     key = keyToUse;
                                 }
                             }
-                            req = key != null ? idbstore.add(obj, key) : idbstore.add(obj);
+                            const rewrittenObj = writingHook(obj);
+                            req = key != null ? idbstore.add(rewrittenObj, key) : idbstore.add(rewrittenObj);
                             req._hookCtx = hookCtx;
                             if (i < l - 1) {
                                 req.onerror = errorHandler;
@@ -1243,7 +1252,8 @@ export default function Dexie(dbName, options) {
                     //
                     errorHandler = BulkErrorHandlerCatchAll(errorList);
                     for (var i = 0, l = objects.length; i < l; ++i) {
-                        req = keys ? idbstore.add(objects[i], keys[i]) : idbstore.add(objects[i]);
+                        const rewrittenObj = writingHook(objects[i]);
+                        req = keys ? idbstore.add(rewrittenObj, keys[i]) : idbstore.add(rewrittenObj);
                         req.onerror = errorHandler;
                     }
                     // Only need to catch success or error on the last operation
@@ -1259,7 +1269,8 @@ export default function Dexie(dbName, options) {
             /// </summary>
             /// <param name="obj" type="Object">A javascript object to insert</param>
             /// <param name="key" optional="true">Primary key</param>
-            var creatingHook = this.hook.creating.fire;
+            var creatingHook = this.hook.creating.fire,
+                writingHook = this.hook.writing.fire;
             return this._idbstore(READWRITE, function (resolve, reject, idbstore, trans) {
                 var hookCtx = {onsuccess: null, onerror: null};
                 if (creatingHook !== nop) {
@@ -1273,7 +1284,8 @@ export default function Dexie(dbName, options) {
                     }
                 }
                 try {
-                    var req = key != null ? idbstore.add(obj, key) : idbstore.add(obj);
+                    const rewrittenObj = writingHook(obj);
+                    var req = key != null ? idbstore.add(rewrittenObj, key) : idbstore.add(rewrittenObj);
                     req._hookCtx = hookCtx;
                     req.onerror = hookedEventRejectHandler(reject);
                     req.onsuccess = hookedEventSuccessHandler(function (result) {
@@ -1297,7 +1309,8 @@ export default function Dexie(dbName, options) {
             /// <param name="obj" type="Object">A javascript object to insert or update</param>
             /// <param name="key" optional="true">Primary key</param>
             var creatingHook = this.hook.creating.fire,
-                updatingHook = this.hook.updating.fire;
+                updatingHook = this.hook.updating.fire,
+                writingHook = this.hook.writing.fire;
             if (creatingHook !== nop || updatingHook !== nop) {
                 //
                 // People listens to when("creating") or when("updating") events!
@@ -1323,7 +1336,8 @@ export default function Dexie(dbName, options) {
             } else {
                 // Use the standard IDB put() method.
                 return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
-                    var req = key !== undefined ? idbstore.put(obj, key) : idbstore.put(obj);
+                    const rewrittenObj = writingHook(obj);
+                    var req = key !== undefined ? idbstore.put(rewrittenObj, key) : idbstore.put(rewrittenObj);
                     req.onerror = eventRejectHandler(reject);
                     req.onsuccess = wrap(function (ev) {
                         var keyPath = idbstore.keyPath;
@@ -2384,7 +2398,8 @@ export default function Dexie(dbName, options) {
                     ctx = this._ctx,
                     hook = ctx.table.hook,
                     updatingHook = hook.updating.fire,
-                    deletingHook = hook.deleting.fire;
+                    deletingHook = hook.deleting.fire,
+                    writingHook = hook.writing.fire;
 
                 return this._write(function (resolve, reject, idbstore, trans) {
                     var modifyer;
@@ -2480,7 +2495,7 @@ export default function Dexie(dbName, options) {
                             var bDelete = !hasOwn(thisContext, "value");
                             ++count;
                             tryCatch(function () {
-                                var req = (bDelete ? cursor.delete() : cursor.update(thisContext.value));
+                                var req = (bDelete ? cursor.delete() : cursor.update(writingHook(thisContext.value)));
                                 req._hookCtx = thisContext;
                                 req.onerror = hookedEventRejectHandler(onerror);
                                 req.onsuccess = hookedEventSuccessHandler(function () {

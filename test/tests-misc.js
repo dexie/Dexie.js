@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
-import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, spawnedTest} from './dexie-unittest-utils';
+import {module, stop, start, asyncTest, equal, ok, deepEqual} from 'QUnit';
+import {resetDatabase, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
 const async = Dexie.async;
 
@@ -8,7 +8,8 @@ var db = new Dexie("TestIssuesDB");
 db.version(1).stores({
     users: "id,first,last,&username,*&email,*pets",
     keyless: ",name",
-    foo: "id"
+    foo: "id",
+    docs: "id,title,*words"
     // If required for your test, add more tables here
 });
 
@@ -26,6 +27,43 @@ module("misc", {
 //
 // Misc Tests
 //
+
+promisedTest("Simple writing hook", async ()=>{
+    db.docs.hook('writing', doc => {
+        return {
+            ...doc,
+            words: `${doc.title || ''} ${doc.content || ''}`.toLowerCase().split(' ')};
+    });
+
+    // Table.put()
+    await db.docs.put({id: "home", title: "The home page", content: "Here is my presentation of myself..."});
+    // Table.bulkPut()
+    await db.docs.bulkPut([{id: "2017-11-01", title: "Another day...", content: "This was another day in my life"}]);
+    // Table.add()
+    await db.docs.add({id: "2017-11-02", title: "Day 2", content: "Nothing, really!"});
+    // Table.bulkAdd()
+    await db.docs.bulkAdd([{id: "2017-11-03", title: "Day 3", content: "Nothing today either..."}]);
+    
+    const allDocs = await db.docs.toArray();
+    const cherryPicked = allDocs.map(doc => [doc.id, doc.words]);
+    deepEqual(cherryPicked[0], 
+        ["2017-11-01", ["another", "day...", "this", "was", "another", "day", "in", "my", "life"]], "Table.put() calls writing hook");
+    deepEqual(cherryPicked[1], 
+        ["2017-11-02", ["day", "2", "nothing,", "really!"]], "Table.bulkPut() calls writing hook");
+    deepEqual(cherryPicked[2],
+        ["2017-11-03", ["day", "3", "nothing", "today", "either..."]], "Table.add() calls writing hook");
+    deepEqual(cherryPicked[3],
+        ["home", ["the", "home", "page", "here", "is", "my", "presentation", "of", "myself..."]], "Table.bulkAdd() calls writing hook");
+    // Table.update()
+    await db.docs.update("home", {title: "My home page!"});
+    const homeDoc = await db.docs.get("home");
+    deepEqual(homeDoc.words, ["my", "home", "page!", "here", "is", "my", "presentation", "of", "myself..."], "Table.update() calls writing hook");
+
+    // Collection.modify()
+    await db.docs.where({title: "Day 2"}).modify({title: "Next day"});
+    const day2Doc = await db.docs.get("2017-11-02");
+    deepEqual(day2Doc.words, ["next", "day", "nothing,", "really!"], "Collection.modify() calls writing hook");
+});
 
 asyncTest("Adding object with falsy keys", function () {
     db.keyless.add({ name: "foo" }, 1).then(function (id) {
