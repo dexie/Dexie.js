@@ -314,11 +314,13 @@ export declare module Dexie {
         (eventName: 'updating', subscriber: (this: UpdatingHookContext<T,Key>, modifications:Object, primKey:Key, obj:T, transaction:Transaction) => any): void;
         (eventName: 'deleting', subscriber: (this: DeletingHookContext<T,Key>, primKey:Key, obj:T, transaction:Transaction) => any): void;
         (eventName: 'writing', subscriber: (obj:T) => T) : void;
+        (eventName: 'clearing', subscriber: (keyrange: IDBKeyRange | Key | null) => void) : void;
         creating: DexieEvent;
         reading: DexieEvent;
         updating: DexieEvent;
         deleting: DexieEvent;
         writing: DexieEvent;
+        clearing: DexieEvent;
     }
 
     interface TransactionEvents extends DexieEventSet {

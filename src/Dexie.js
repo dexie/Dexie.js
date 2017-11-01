@@ -867,7 +867,8 @@ export default function Dexie(dbName, options) {
             "reading": [pureFunctionChain, mirror],
             "updating": [hookUpdatingChain, nop],
             "deleting": [hookDeletingChain, nop],
-            "writing": [pureFunctionChain, mirror]
+            "writing": [pureFunctionChain, mirror],
+            "clearing": [((f1,f2) => f1 === nop ? f2 : range => { f1(range); f2(range); }), nop]
         });
     }
 
@@ -878,7 +879,7 @@ export default function Dexie(dbName, options) {
         });
     }
 
-    function bulkDelete(idbstore, trans, keysOrTuples, hasDeleteHook, deletingHook) {
+    function bulkDelete(idbstore, trans, keysOrTuples, hasDeleteHook, deletingHook, clearingHook) {
         // If hasDeleteHook, keysOrTuples must be an array of tuples: [[key1, value2],[key2,value2],...],
         // else keysOrTuples must be just an array of keys: [key1, key2, ...].
         return new Promise((resolve, reject)=>{
@@ -887,7 +888,9 @@ export default function Dexie(dbName, options) {
             if (len === 0) return resolve();
             if (!hasDeleteHook) {
                 for (var i=0; i < len; ++i) {
-                    var req = idbstore.delete(keysOrTuples[i]);
+                    const key = keysOrTuples[i];
+                    clearingHook(key);
+                    var req = idbstore.delete(key);
                     req.onerror = eventRejectHandler(reject);
                     if (i === lastItem) req.onsuccess = wrap(()=>resolve());
                 }
@@ -898,9 +901,11 @@ export default function Dexie(dbName, options) {
                 tryCatch(()=> {
                     for (var i = 0; i < len; ++i) {
                         hookCtx = {onsuccess: null, onerror: null};
-                        var tuple = keysOrTuples[i];
-                        deletingHook.call(hookCtx, tuple[0], tuple[1], trans);
-                        var req = idbstore.delete(tuple[0]);
+                        var tuple = keysOrTuples[i],
+                            key = tuple[0];
+                        deletingHook.call(hookCtx, key, tuple[1], trans);
+                        clearingHook(key);
+                        var req = idbstore.delete(key);
                         req._hookCtx = hookCtx;
                         req.onerror = errorHandler;
                         if (i === lastItem)
@@ -1087,7 +1092,7 @@ export default function Dexie(dbName, options) {
         bulkDelete: function (keys) {
             if (this.hook.deleting.fire === nop) {
                 return this._idbstore(READWRITE, (resolve, reject, idbstore, trans) => {
-                    resolve (bulkDelete(idbstore, trans, keys, false, nop));
+                    resolve (bulkDelete(idbstore, trans, keys, false, nop, this.hook.clearing.fire));
                 });
             } else {
                 return this
@@ -1356,10 +1361,11 @@ export default function Dexie(dbName, options) {
                 return this.where(":id").equals(key).delete();
             } else {
                 // No one listens. Use standard IDB delete() method.
-                return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
+                return this._idbstore(READWRITE, (resolve, reject, idbstore) => {
+                    this.hook.clearing.fire(key);
                     var req = idbstore.delete(key);
                     req.onerror = eventRejectHandler(reject);
-                    req.onsuccess = wrap(function () {
+                    req.onsuccess = wrap(() => {
                         resolve(req.result);
                     });
                 });
@@ -1372,10 +1378,11 @@ export default function Dexie(dbName, options) {
                 // call the CRUD event. Only Collection.delete() will knows which objects that are actually deleted.
                 return this.toCollection().delete();
             } else {
-                return this._idbstore(READWRITE, function (resolve, reject, idbstore) {
+                return this._idbstore(READWRITE, (resolve, reject, idbstore) => {
+                    this.hook.clearing.fire(null);
                     var req = idbstore.clear();
                     req.onerror = eventRejectHandler(reject);
-                    req.onsuccess = wrap(function () {
+                    req.onsuccess = wrap(() => {
                         resolve(req.result);
                     });
                 });
@@ -2495,7 +2502,9 @@ export default function Dexie(dbName, options) {
                             var bDelete = !hasOwn(thisContext, "value");
                             ++count;
                             tryCatch(function () {
-                                var req = (bDelete ? cursor.delete() : cursor.update(writingHook(thisContext.value)));
+                                var req = (bDelete ?
+                                    (hook.clearing.fire(currentKey), cursor.delete()) :
+                                    cursor.update(writingHook(thisContext.value)));
                                 req._hookCtx = thisContext;
                                 req.onerror = hookedEventRejectHandler(onerror);
                                 req.onsuccess = hookedEventSuccessHandler(function () {
@@ -2536,6 +2545,7 @@ export default function Dexie(dbName, options) {
                 var ctx = this._ctx,
                     range = ctx.range,
                     deletingHook = ctx.table.hook.deleting.fire,
+                    clearingHook = ctx.table.hook.clearing.fire,
                     hasDeleteHook = deletingHook !== nop;
                 if (!hasDeleteHook &&
                     isPlainKeyRange(ctx) &&
@@ -2553,6 +2563,7 @@ export default function Dexie(dbName, options) {
                         countReq.onsuccess = () => {
                             var count = countReq.result;
                             tryCatch(()=> {
+                                clearingHook(range);
                                 var delReq = (range ? idbstore.delete(range) : idbstore.clear());
                                 delReq.onerror = onerror;
                                 delReq.onsuccess = () => resolve(count);
@@ -2594,7 +2605,7 @@ export default function Dexie(dbName, options) {
                         hasDeleteHook ?
                             keysOrTuples.sort((a, b)=>ascending(a[0], b[0])) :
                             keysOrTuples.sort(ascending);
-                        return bulkDelete(idbstore, trans, keysOrTuples, hasDeleteHook, deletingHook);
+                        return bulkDelete(idbstore, trans, keysOrTuples, hasDeleteHook, deletingHook, clearingHook);
 
                     }).then(()=> {
                         var count = keysOrTuples.length;
