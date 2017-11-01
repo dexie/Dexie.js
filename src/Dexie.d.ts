@@ -119,6 +119,15 @@ export declare class Dexie {
     Version: new()=>Dexie.Version;
     Transaction: new()=>Dexie.Transaction;
     Collection: new()=>Dexie.Collection<any,any>;
+
+    // Protected properties that can be used / overrided by addons:
+    _dbSchema: Dexie.DatabaseSchema;
+    _allTables: {[tableName: string]: Dexie.Table<any,any>};
+    _createTransaction: (
+        mode: string,
+        storeNames: string[],
+        dbschema: Dexie.DatabaseSchema,
+        parentTransaction: Dexie.Transaction | null) => Dexie.Transaction;
 }
 
 export declare module Dexie {
@@ -219,6 +228,7 @@ export declare module Dexie {
     interface Version {
         stores(schema: { [key: string]: string | null }): Version;
         upgrade(fn: (trans: Transaction) => void): Version;
+        _parseStoresSpec: (stores: { [key: string]: string | null }, outSchema: Dexie.DatabaseSchema): void;
     }
 
     interface Transaction {
@@ -424,6 +434,8 @@ export declare module Dexie {
         indexes: IndexSpec[];
         mappedClass: Function;
     }
+
+    interface DatabaseSchema {[tableName: string]: TableSchema}
 
     interface IndexSpec {
         name: string;
