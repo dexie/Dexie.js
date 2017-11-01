@@ -4,7 +4,7 @@
   "description": "Addon to Dexie that makes it possible to observe database changes no matter if they occur on other db instance or other window.",
   "main": "dist/dexie-observable.js",
   "module": "dist/dexie-observable.mjs",
-  "typings": "dist/typings/dexie-observable.d.ts",
+  "typings": "dist/typings/index.d.ts",
   "jspm": {
     "format": "cjs",
     "ignore": [
@@ -47,7 +47,7 @@
       "# Build UMD module",
       "tsc [--watch 'Compilation complete.']",
       "rollup -c rollup.config.js",
-      "#"
+      "bash tools/copy-dts.sh"
     ],
     "release": [
       "just-build dexie-observable",

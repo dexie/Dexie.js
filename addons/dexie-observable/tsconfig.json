@@ -13,6 +13,6 @@
     "outDir": "tmp"
   },
   "files": [
-    "src/dexie-observable.ts"
+    "src/index.ts"
   ]
 }

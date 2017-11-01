@@ -9,7 +9,7 @@ const ERRORS_TO_IGNORE = [
 ];
 
 export default {
-  input: "tmp/dexie-observable.js",
+  input: "tmp/index.js",
   output: [{
     file: "dist/dexie-observable.js",
     format: "umd"
@@ -17,7 +17,7 @@ export default {
   sourcemap: true,
   name: "dexieObservable",
   globals: { dexie: 'Dexie', "rxjs/Observable": 'Rx.Observable' },
-  external: ["dexie", "rxjs/Observable", "tslib"],
+  external: ["dexie", "rxjs/Observable"],
   plugins: [
     sourcemaps(),
     nodeResolve({ module: true, jsnext: true, browser: true, ignoreGlobal: false }),
