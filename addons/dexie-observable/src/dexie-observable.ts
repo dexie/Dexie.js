@@ -1,10 +1,12 @@
 import Dexie from 'dexie';
 import * as pubsub from './pubsub';
-import {subscribe} from './pubsub';
+import { subscribe } from './pubsub';
+import './dexie-api-extension';
+import { collectionObserve } from './collection-observe';
+import { dbObserve } from './db-observe';
 
 export default function dexieObservable (db: Dexie) {
-  const o = {hej: 1};
-  const o2 = {...o};
-  const o3 = Object.assign(o, o2);
-  subscribe("", ()=>{});
+  // TODO: Add methods observe() on Collection and db.
+  db.Collection.prototype.observe = collectionObserve;
+  db.observe = dbObserve;
 }
