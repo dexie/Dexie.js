@@ -1,5 +1,6 @@
 import sourcemaps from 'rollup-plugin-sourcemaps';
 import nodeResolve from 'rollup-plugin-node-resolve';
+import commonJs from 'rollup-plugin-commonjs';
 import cleanup from 'rollup-plugin-cleanup';
 
 const ERRORS_TO_IGNORE = [
@@ -8,18 +9,19 @@ const ERRORS_TO_IGNORE = [
 ];
 
 export default {
-  entry: "tmp/dexie-observable.js",
-  targets: [{
-    dest: "dist/dexie-observable.js",
+  input: "tmp/dexie-observable.js",
+  output: [{
+    file: "dist/dexie-observable.js",
     format: "umd"
   }],
-  sourceMap: true,
-  moduleName: "dexieObservable",
-  globals: { dexie: 'Dexie' },
-  external: ["dexie"],
+  sourcemap: true,
+  name: "dexieObservable",
+  globals: { dexie: 'Dexie', "rxjs/Observable": 'Rx.Observable' },
+  external: ["dexie", "rxjs/Observable", "tslib"],
   plugins: [
     sourcemaps(),
     nodeResolve({ module: true, jsnext: true, browser: true, ignoreGlobal: false }),
+    commonJs(),
     cleanup()
   ],
   onwarn({ loc, frame, code, message }) {

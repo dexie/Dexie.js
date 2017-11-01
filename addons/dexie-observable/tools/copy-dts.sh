@@ -1,6 +1,7 @@
 #!/bin/bash -e
 #cp -r
 cd tmp
+rm -rf ../dist/typings
 mkdir ../dist/typings
 for file in `find . -mindepth 1`
 do
