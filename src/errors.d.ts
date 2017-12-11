@@ -46,10 +46,22 @@ export class ModifyError extends DexieError {
   failedKeys: IndexableTypeArrayReadonly;
   successCount: number;
 }
+
+export interface ModifyErrorConstructor {
+  new (
+    msg?:string,
+    failures?: any[],
+    successCount?: number,
+    failedKeys?: IndexableTypeArrayReadonly) : ModifyError
+}
   
 export class BulkError extends DexieError {
   constructor (msg?:string, failures?: any[]);
   failures: Array<any>;
+}
+
+export interface BulkErrorConstructor {
+  new (msg?:string, failures?: any[]) : BulkError
 }
 
 export interface DexieErrorConstructor {
@@ -69,8 +81,8 @@ export class DexieError extends Error {
 
 
 export type ExceptionAliasSet = {[ShortName in keyof DexieErrors]: DexieErrorConstructor} & {
-  Modify: {new (msg?:string, failures?: any[], successCount?: number, failedKeys?: IndexableTypeArrayReadonly) : ModifyError};
-  Bulk: {new (msg?:string, failures?: any[]) : BulkError};
+  Modify: ModifyErrorConstructor;
+  Bulk: BulkErrorConstructor;
 }
 
 export declare const exceptions : ExceptionAliasSet & {Type: ErrorConstructor, Range: ErrorConstructor};
