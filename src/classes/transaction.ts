@@ -1,7 +1,7 @@
-import {Transaction} from '../interfaces/transaction';
+import {Transaction as ITransaction} from '../interfaces/transaction';
 import Promise from "../interfaces/promise-extended";
 
-export class TransactionImpl implements Transaction {
+export class Transaction implements ITransaction {
   create() {
     throw new Error("Method not implemented.");
   }

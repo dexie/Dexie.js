@@ -3,7 +3,7 @@ import { PSD, rejection, newScope } from "../Promise";
 import { DexieOptions } from "../interfaces/dexie-constructor";
 import { exceptions } from "../errors";
 import { nop } from "../chaining-functions";
-import { TransactionImpl } from "../classes/transaction-impl";
+import { Transaction } from "../classes/transaction";
 
 /* Generate a temporary transaction when db operations are done outside a transaction scope.
 */
@@ -11,7 +11,7 @@ export function tempTransaction (
   db: DexieInternal,
   mode: IDBTransactionMode,
   storeNames: string[],
-  fn: (resolve, reject, trans: TransactionImpl) => any)
+  fn: (resolve, reject, trans: Transaction) => any)
   // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
 {
   if (!db._i.openComplete && (!PSD.letThrough)) {
