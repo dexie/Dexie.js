@@ -5,4 +5,6 @@ export interface TableSchema {
   primKey: IndexSpec;
   indexes: IndexSpec[];
   mappedClass: Function;
+  idxByName: {[name: string]: IndexSpec};
+  readHook?: (any) => any
 }

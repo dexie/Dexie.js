@@ -1,6 +1,7 @@
 import { ThenShortcut } from "../types/then-shortcut";
 import { IndexableType, IndexableTypeArray } from "../types/indexable-type";
 import { WhereClause } from "./where-clause";
+import Promise from "./promise-extended";
 
 export interface Collection<T, Key> {
   and(filter: (x: T) => boolean): Collection<T, Key>;

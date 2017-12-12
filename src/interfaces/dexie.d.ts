@@ -5,12 +5,26 @@ import { TransactionMode } from "../types/transaction-mode";
 import { Transaction } from "./transaction";
 import { WhereClause } from "./where-clause";
 import { Collection } from "./collection";
+import { DbSchema } from "./db-schema";
+import { DexieInternal } from "./dexie-internal";
+import { TransactionInternal } from "./transaction-internal";
 
 export interface Dexie {
   readonly name: string;
   readonly tables: Table<any, any>[];
   readonly verno: number;
   
+  readonly _allTables: {[name: string]: Table<any,any>};
+
+  _createTransaction: (
+    this: DexieInternal,
+    mode: IDBTransactionMode,
+    storeNames: ArrayLike<string>,
+    dbschema: DbSchema,
+    parentTransaction?: Transaction | null) => TransactionInternal;
+
+  _dbSchema: DbSchema;
+
   version(versionNumber: Number): Version;
 
   on: DbEvents;

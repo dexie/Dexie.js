@@ -13,9 +13,18 @@ See the Apache Version 2.0 License for specific language governing permissions
 and limitations under the License.
 ***************************************************************************** */
 
+export type IndexableTypePart =
+string | number | Date | ArrayBuffer | ArrayBufferView | DataView | Array<Array<void>>;
+
+export type IndexableTypeArray = Array<IndexableTypePart>;
+export type IndexableTypeArrayReadonly = ReadonlyArray<IndexableTypePart>;
+export type IndexableType = IndexableTypePart | IndexableTypeArrayReadonly;
+
+export type IDBValidKey = IndexableType;
+
 export interface IDBCursor {
   readonly direction: IDBCursorDirection;
-  key: IDBKeyRange | IDBValidKey;
+  key: IDBValidKey;
   readonly primaryKey: any;
   source: IDBObjectStore | IDBIndex;
   advance(count: number): void;
@@ -125,7 +134,7 @@ export interface IDBObjectStore {
   readonly name: string;
   readonly transaction: IDBTransaction;
   autoIncrement: boolean;
-  add(value: any, key?: IDBKeyRange | IDBValidKey): IDBRequest;
+  add(value: any, key?: IDBValidKey): IDBRequest;
   clear(): IDBRequest;
   count(key?: IDBKeyRange | IDBValidKey): IDBRequest;
   createIndex(name: string, keyPath: string | string[], optionalParameters?: IDBIndexParameters): IDBIndex;
@@ -134,7 +143,7 @@ export interface IDBObjectStore {
   get(key: any): IDBRequest;
   index(name: string): IDBIndex;
   openCursor(range?: IDBKeyRange | IDBValidKey, direction?: IDBCursorDirection): IDBRequest;
-  put(value: any, key?: IDBKeyRange | IDBValidKey): IDBRequest;
+  put(value: any, key?: IDBValidKey): IDBRequest;
 }
 
 export declare var IDBObjectStore: {

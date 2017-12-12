@@ -1,4 +1,5 @@
 import { DexieEventSet } from "./dexie-event-set";
+import { DexieEvent } from "./dexie-event";
 
 interface CreatingHookContext<T,Key> {
   onsuccess?: (primKey: Key) => void;

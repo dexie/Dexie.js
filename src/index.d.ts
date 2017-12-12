@@ -1,4 +1,4 @@
-// Type definitions for Dexie v{version}
+/*// Type definitions for Dexie v{version}
 // Project: https://github.com/dfahlander/Dexie.js
 // Definitions by: David Fahlander <http://github.com/dfahlander>
 
@@ -21,3 +21,4 @@ export * from './interfaces/where-clause';
 import { DexieConstructor } from './interfaces/dexie-constructor';
 
 export declare const Dexie: DexieConstructor;
+*/

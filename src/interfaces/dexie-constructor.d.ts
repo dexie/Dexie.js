@@ -5,13 +5,15 @@ import { TableSchema } from "./table-schema";
 import { IndexSpec } from "./index-spec";
 import { ExceptionSet, DexieErrorConstructor, ModifyErrorConstructor, BulkErrorConstructor } from "../errors";
 
+export interface DexieOptions {
+  addons?: Array<(db: Dexie) => void>,
+  autoOpen?: boolean,
+  indexedDB?: IDBFactory,
+  IDBKeyRange?: {new(): IDBKeyRange}
+}
+
 export interface DexieConstructor extends ExceptionSet {
-  new(databaseName: string, options?: {
-    addons?: Array<(db: Dexie) => void>,
-    autoOpen?: boolean,
-    indexedDB?: IDBFactory,
-    IDBKeyRange?: {new(): IDBKeyRange}
-  }) : Dexie;
+  new(databaseName: string, options?: DexieOptions) : Dexie;
 
   addons: Array<(db: Dexie) => void>;
   version: number;
