@@ -1,4 +1,5 @@
-﻿export var keys = Object.keys;
+﻿declare var global;
+export var keys = Object.keys;
 export var isArray = Array.isArray;
 export var _global =
     typeof self !== 'undefined' ? self :
@@ -28,7 +29,7 @@ export function props (proto, extension) {
 
 export const defineProperty = Object.defineProperty;
 
-export function setProp(obj, prop, functionOrGetSet, options) {
+export function setProp(obj, prop, functionOrGetSet, options?) {
     defineProperty(obj, prop, extend(functionOrGetSet && hasOwn(functionOrGetSet, "get") && typeof functionOrGetSet.get === 'function' ?
         {get: functionOrGetSet.get, set: functionOrGetSet.set, configurable: true} :
         {value: functionOrGetSet, configurable: true, writable: true}, options));
@@ -98,7 +99,7 @@ export function trycatcher(fn, reject) {
     };
 }
 
-export function tryCatch(fn, onerror, args) {
+export function tryCatch(fn: (...args: any[])=>void, onerror, args?) : void {
     try {
         fn.apply(null, args);
     } catch (ex) {

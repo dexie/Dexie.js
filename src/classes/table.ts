@@ -1,7 +1,7 @@
 import { IDBObjectStore } from '../interfaces/indexed-db';
 import { IndexableType } from '../types/indexable-type';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from '../errors';
-import { Table as ITable} from '../interfaces/table';
+import { Table as ITable } from '../interfaces/table';
 import { TableSchema } from '../interfaces/table-schema';
 import { TableHooks } from '../interfaces/table-hooks';
 import { PSD, newScope, wrap, rejection } from '../Promise';
@@ -17,6 +17,7 @@ import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, deepClone, tryCatch,
 import { maxKey, maxString } from '../globals/constants';
 import { combine } from '../functions/combine';
 import Promise from "../interfaces/promise-extended";
+import { bulkDelete } from '../functions/bulk-delete';
 
 export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
   _tx?: Transaction;
@@ -499,6 +500,12 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
     });
   }
 
+
+  /** Table.bulkPut()
+   * 
+   * http://dexie.org/docs/Table/Table.bulkPut()
+   * 
+   **/
   bulkPut(objects: T[], keys?: ReadonlyArray<string | number | Date | ArrayBuffer | ArrayBufferView | DataView | void[][]>): Promise<TKey> {
     return this._idbstore('readwrite', (resolve, reject, idbstore) => {
       if (!idbstore.keyPath && !this.schema.primKey.auto && !keys)
@@ -583,8 +590,22 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
     }, "locked"); // If called from transaction scope, lock transaction til all steps are done.
   }
 
-  bulkDelete(keys: ReadonlyArray<string | number | Date | ArrayBuffer | ArrayBufferView | DataView | void[][]>): Promise<void> {
-    throw new Error("Method not implemented.");
+  /** Table.bulkDelete()
+   * 
+   * http://dexie.org/docs/Table/Table.bulkDelete()
+   * 
+   **/
+  bulkDelete(keys: ReadonlyArray<IndexableType>): Promise<void> {
+    if (this.hook.deleting.fire === nop) {
+      return this._idbstore('readwrite', (resolve, reject, idbstore, trans) => {
+        resolve(bulkDelete(idbstore, trans, keys, false, nop));
+      });
+    } else {
+      return this
+        .where(':id')
+        .anyOf(keys)
+        .delete()
+        .then(() => { }); // Resolve with undefined.
+    }
   }
-
 }

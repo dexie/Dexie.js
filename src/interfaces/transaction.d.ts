@@ -1,3 +1,6 @@
+import { Dexie } from "./dexie";
+import { Table } from "./table";
+
 export interface Transaction {
   active: boolean;
   db: Dexie;
