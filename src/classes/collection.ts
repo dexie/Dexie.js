@@ -1,35 +1,15 @@
-import { Collection } from "../interfaces/collection";
-import { WhereClauseImpl } from "./where-clause-impl";
-import { DexieImpl } from "./dexie-impl";
-import { TableImpl } from "./table-impl";
+import { Collection as ICollection } from "../interfaces/collection";
+import { WhereClause } from "./where-clause";
+import { Dexie } from "./dexie";
+import { Table } from "./table";
 import { IndexableType } from "../types/indexable-type";
 import Promise from "../interfaces/promise-extended";
 
-export interface CollectionContext<T,TKey extends IndexableType> {
-  table: TableImpl<T,TKey>;
-  index?: string | null;
-  isPrimKey?: boolean;
-  range: IDBKeyRange;
-  keysOnly: boolean;
-  dir: "next" | "prev";
-  unique: "" | "unique";
-  algorithm?: Function | null;
-  filter?: Function | null;
-  replayFilter: Function | null;
-  justLimit: boolean; // True if a replayFilter is just a filter that performs a "limit" operation (or none at all)
-  isMatch: Function | null;
-  offset: number,
-  limit: number,
-  error: any, // If set, any promise must be rejected with this error
-  or: CollectionImpl<T,TKey>,
-  valueMapper: (any) => any
-}
-
-export class CollectionImpl<T,TKey extends IndexableType> implements Collection<T,TKey> {
+export class Collection<T,TKey extends IndexableType> implements ICollection<T,TKey> {
   _ctx: CollectionContext<T,TKey>;
 
   constructor (
-    whereClause?: WhereClauseImpl<T,TKey> | null,
+    whereClause?: WhereClause<T,TKey> | null,
     keyRangeGenerator?: ()=>IDBKeyRange)
   {
     let keyRange = null, error = null;
@@ -62,10 +42,10 @@ export class CollectionImpl<T,TKey extends IndexableType> implements Collection<
     };
   }
 
-  and(filter: (x: T) => boolean): CollectionImpl<T, TKey> {
+  and(filter: (x: T) => boolean): Collection<T, TKey> {
     throw new Error("Method not implemented.");
   }
-  clone(props?: Object): CollectionImpl<T, TKey> {
+  clone(props?: Object): Collection<T, TKey> {
     throw new Error("Method not implemented.");
   }
   count(): Promise<number>;
@@ -73,7 +53,7 @@ export class CollectionImpl<T,TKey extends IndexableType> implements Collection<
   count(thenShortcut?: any) {
     throw new Error("Method not implemented.");
   }
-  distinct(): CollectionImpl<T, TKey> {
+  distinct(): Collection<T, TKey> {
     throw new Error("Method not implemented.");
   }
   each(callback: (obj: T, cursor: { key: string | number | Date | ArrayBuffer | ArrayBufferView | DataView | void[][] | ReadonlyArray<string | number | Date | ArrayBuffer | ArrayBufferView | DataView | void[][]>; primaryKey: TKey; }) => ): Promise<void> {
@@ -88,7 +68,7 @@ export class CollectionImpl<T,TKey extends IndexableType> implements Collection<
   eachUniqueKey(callback: (key: string | number | Date | ArrayBuffer | ArrayBufferView | DataView | void[][] | ReadonlyArray<string | number | Date | ArrayBuffer | ArrayBufferView | DataView | void[][]>, cursor: { key: string | number | Date | ArrayBuffer | ArrayBufferView | DataView | void[][] | ReadonlyArray<string | number | Date | ArrayBuffer | ArrayBufferView | DataView | void[][]>; primaryKey: TKey; }) => ): Promise<void> {
     throw new Error("Method not implemented.");
   }
-  filter(filter: (x: T) => boolean): CollectionImpl<T, TKey> {
+  filter(filter: (x: T) => boolean): Collection<T, TKey> {
     throw new Error("Method not implemented.");
   }
   first(): Promise<T>;
@@ -111,19 +91,19 @@ export class CollectionImpl<T,TKey extends IndexableType> implements Collection<
   last(thenShortcut?: any) {
     throw new Error("Method not implemented.");
   }
-  limit(n: number): CollectionImpl<T, TKey> {
+  limit(n: number): Collection<T, TKey> {
     throw new Error("Method not implemented.");
   }
-  offset(n: number): CollectionImpl<T, TKey> {
+  offset(n: number): Collection<T, TKey> {
     throw new Error("Method not implemented.");
   }
-  or(indexOrPrimayKey: string): WhereClauseImpl<T, TKey> {
+  or(indexOrPrimayKey: string): WhereClause<T, TKey> {
     throw new Error("Method not implemented.");
   }
-  raw(): CollectionImpl<T, TKey> {
+  raw(): Collection<T, TKey> {
     throw new Error("Method not implemented.");
   }
-  reverse(): CollectionImpl<T, TKey> {
+  reverse(): Collection<T, TKey> {
     throw new Error("Method not implemented.");
   }
   sortBy(keyPath: string): Promise<T[]>;
@@ -141,7 +121,7 @@ export class CollectionImpl<T,TKey extends IndexableType> implements Collection<
   uniqueKeys(thenShortcut?: any) {
     throw new Error("Method not implemented.");
   }
-  until(filter: (value: T) => boolean, includeStopEntry?: boolean): CollectionImpl<T, TKey> {
+  until(filter: (value: T) => boolean, includeStopEntry?: boolean): Collection<T, TKey> {
     throw new Error("Method not implemented.");
   }
   delete(): Promise<number> {
@@ -154,3 +134,24 @@ export class CollectionImpl<T,TKey extends IndexableType> implements Collection<
   }
 
 }
+
+export interface CollectionContext<T,TKey extends IndexableType> {
+  table: Table<T,TKey>;
+  index?: string | null;
+  isPrimKey?: boolean;
+  range: IDBKeyRange;
+  keysOnly: boolean;
+  dir: "next" | "prev";
+  unique: "" | "unique";
+  algorithm?: Function | null;
+  filter?: Function | null;
+  replayFilter: Function | null;
+  justLimit: boolean; // True if a replayFilter is just a filter that performs a "limit" operation (or none at all)
+  isMatch: Function | null;
+  offset: number,
+  limit: number,
+  error: any, // If set, any promise must be rejected with this error
+  or: Collection<T,TKey>,
+  valueMapper: (any) => any
+}
+

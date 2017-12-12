@@ -1,7 +1,7 @@
-* Gör klart implementationan av table-impl.ts.
+* Gör klart implementationan av classes/table.ts.
 * Gör klart de andra klasserna
-* Gör klart dexie-impl.ts
-* Gör index.js som löder ihop dexie-impl med att klistra på det allt annat från src/Dexie.js
+* Gör klart classes/dexie.ts
+* Gör index.js som löder ihop classes/dexie.ts med att klistra på det allt annat från src/Dexie.js
 * Rensa icke-använda imports?
 * Fixa tillbaka Dexie.Promise?
 * Testa!

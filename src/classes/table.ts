@@ -1,31 +1,31 @@
 import { IDBObjectStore } from '../interfaces/indexed-db';
 import { IndexableType } from '../types/indexable-type';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from '../errors';
-import { Table } from '../interfaces/table';
+import { Table as ITable} from '../interfaces/table';
 import { TableSchema } from '../interfaces/table-schema';
 import { TableHooks } from '../interfaces/table-hooks';
 import { PSD, newScope, wrap, rejection } from '../Promise';
 import Events from '../Events';
 import { hookCreatingChain, nop, pureFunctionChain, mirror, hookUpdatingChain, hookDeletingChain } from '../chaining-functions';
-import { TransactionImpl } from './transaction-impl';
-import { DexieImpl } from './dexie-impl';
+import { Transaction } from './transaction';
+import { Dexie } from './dexie';
 import { tempTransaction } from '../functions/temp-transaction';
 import { eventRejectHandler, hookedEventRejectHandler, hookedEventSuccessHandler, BulkErrorHandlerCatchAll, eventSuccessHandler } from '../functions/event-wrappers';
-import { WhereClauseImpl } from './where-clause-impl';
-import { CollectionImpl } from './collection-impl';
+import { WhereClause } from './where-clause';
+import { Collection } from './collection';
 import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, deepClone, tryCatch, arrayToObject } from '../utils';
 import { maxKey, maxString } from '../globals/constants';
 import { combine } from '../functions/combine';
 import Promise from "../interfaces/promise-extended";
 
-export class TableImpl<T, TKey extends IndexableType> implements Table<T, TKey> {
-  _tx?: TransactionImpl;
-  _db: DexieImpl;
+export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
+  _tx?: Transaction;
+  _db: Dexie;
   name: string;
   schema: TableSchema;
   hook: TableHooks<T, TKey>;
 
-  constructor(db: DexieImpl, name: string, tableSchema: TableSchema, optionalTrans?: TransactionImpl) {
+  constructor(db: Dexie, name: string, tableSchema: TableSchema, optionalTrans?: Transaction) {
     this._tx = optionalTrans;
     this._db = db;
     this.name = name;
@@ -53,7 +53,7 @@ export class TableImpl<T, TKey extends IndexableType> implements Table<T, TKey> 
       resolve,
       reject,
       idbstore: IDBObjectStore,
-      trans: TransactionImpl) => any,
+      trans: Transaction) => any,
     writeLocked?: boolean | string) {
     var tableName = this.name;
     function supplyIdbStore(resolve, reject, trans) {
@@ -91,13 +91,13 @@ export class TableImpl<T, TKey extends IndexableType> implements Table<T, TKey> 
    * http://dexie.org/docs/Table/Table.where()
    * 
    **/
-  where(index: string | string[]): WhereClauseImpl<T, TKey>;
-  where(equalityCriterias: { [key: string]: IndexableType }): CollectionImpl<T, TKey>;
+  where(index: string | string[]): WhereClause<T, TKey>;
+  where(equalityCriterias: { [key: string]: IndexableType }): Collection<T, TKey>;
   where(indexOrCrit: any) {
     if (typeof indexOrCrit === 'string')
-      return new WhereClauseImpl(this, indexOrCrit);
+      return new WhereClause(this, indexOrCrit);
     if (isArray(indexOrCrit))
-      return new WhereClauseImpl(this, `[${indexOrCrit.join('+')}]`);
+      return new WhereClause(this, `[${indexOrCrit.join('+')}]`);
     // indexOrCrit is an object map of {[keyPath]:value} 
     const keyPaths = keys(indexOrCrit);
     if (keyPaths.length === 1)
@@ -211,7 +211,7 @@ export class TableImpl<T, TKey extends IndexableType> implements Table<T, TKey> 
    * 
    **/
   toCollection() {
-    return new CollectionImpl<T, TKey>(new WhereClauseImpl<T, TKey>(this));
+    return new Collection<T, TKey>(new WhereClause<T, TKey>(this));
   }
 
   /** Table.orderBy()
@@ -220,8 +220,8 @@ export class TableImpl<T, TKey extends IndexableType> implements Table<T, TKey> 
    * 
    **/
   orderBy(index: string | string[]) {
-    return new CollectionImpl<T, TKey>(
-      new WhereClauseImpl<T, TKey>(this, isArray(index) ?
+    return new Collection<T, TKey>(
+      new WhereClause<T, TKey>(this, isArray(index) ?
         `[${index.join('+')}]` :
         index));
   }
@@ -231,7 +231,7 @@ export class TableImpl<T, TKey extends IndexableType> implements Table<T, TKey> 
    * http://dexie.org/docs/Table/Table.reverse()
    * 
    **/
-  reverse(): CollectionImpl<T, TKey> {
+  reverse(): Collection<T, TKey> {
     return this.toCollection().reverse();
   }
 
