@@ -24,7 +24,8 @@ export class Collection<T, TKey extends IndexableType> implements ICollection<T,
   
   constructor(
     whereClause?: WhereClause<T, TKey> | null,
-    keyRangeGenerator?: () => IDBKeyRange) {
+    keyRangeGenerator?: () => IDBKeyRange)
+  {
     let keyRange = null, error = null;
     if (keyRangeGenerator) try {
       keyRange = keyRangeGenerator();
