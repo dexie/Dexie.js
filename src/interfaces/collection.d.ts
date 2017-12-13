@@ -3,7 +3,7 @@ import { IndexableType, IndexableTypeArray } from "../types/indexable-type";
 import { WhereClause } from "./where-clause";
 import Promise from "./promise-extended";
 
-export interface Collection<T, TKey> {
+export interface Collection<T=any, TKey extends IndexableType=any> {
   and(filter: (x: T) => boolean): Collection<T, TKey>;
   clone(props?: Object): Collection<T, TKey>;
   count(): Promise<number>;

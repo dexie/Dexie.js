@@ -3,7 +3,9 @@ import { Transaction } from "./transaction";
 import { ThenShortcut } from "../types/then-shortcut";
 import { TableSchema } from "./table-schema";
 import { IndexSpec } from "./index-spec";
-import { ExceptionSet, DexieErrorConstructor, ModifyErrorConstructor, BulkErrorConstructor } from "../errors";
+import { DexieExceptionClasses } from "../errors";
+import { PromiseConstructorExtended } from "./promise-extended";
+import { DexieEventSet } from "./dexie-event-set";
 
 export interface DexieOptions {
   addons?: Array<(db: Dexie) => void>,
@@ -12,8 +14,9 @@ export interface DexieOptions {
   IDBKeyRange?: {new(): IDBKeyRange}
 }
 
-export interface DexieConstructor extends ExceptionSet {
+export interface DexieConstructor extends DexieExceptionClasses {
   new(databaseName: string, options?: DexieOptions) : Dexie;
+  prototype: Dexie;
 
   addons: Array<(db: Dexie) => void>;
   version: number;
@@ -42,13 +45,10 @@ export interface DexieConstructor extends ExceptionSet {
   };
   default: Dexie;
 
-  Promise: PromiseConstructor; //?
-  TableSchema: {new():TableSchema}; //?
-  IndexSpec: {new():IndexSpec}; //?
-  Events: any; // Too complex to define correctly right now. ??
+  Promise: PromiseConstructorExtended;
+  //TableSchema: {}; // Deprecate!
+  //IndexSpec: {new():IndexSpec}; //? Deprecate
+  Events: (ctx?)=>DexieEventSet;
 
-  errnames: {[P in keyof ExceptionSet]: P};
-  DexieError: DexieErrorConstructor;
-  ModifyError: ModifyErrorConstructor;
-  BulkError: BulkErrorConstructor;
+  errnames: {[P in keyof DexieExceptionClasses]: P};
 }

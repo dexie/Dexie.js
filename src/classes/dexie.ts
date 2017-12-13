@@ -1,13 +1,14 @@
 import { Dexie as IDexie} from "../interfaces/dexie";
-import { DexieInternal, DbState, DbReadyPromises, WebDependencies } from "../interfaces/dexie-internal";
+import { DexieInternal, DbReadyState, WebDependencies } from "../interfaces/dexie-internal";
 import { DexieOptions } from "../interfaces/dexie-constructor";
 import { Table } from "../interfaces/table";
 import { TableSchema } from "../interfaces/table-schema";
 import { Version } from "../interfaces/version";
 import { DbEvents } from "../interfaces/db-events";
+import { IndexableType } from '../interfaces/indexed-db/index';
 
 export class Dexie implements DexieInternal {
-  _i: DbState & DbReadyPromises & DexieOptions & WebDependencies;
+  _i: DbReadyState & DexieOptions & WebDependencies;
   name: string;
   tables: Table<any, any>[];
   verno: number;
@@ -23,7 +24,7 @@ export class Dexie implements DexieInternal {
   }
   table(tableName: string): Table<any, any>;
   table<T>(tableName: string): Table<T, any>;
-  table<T, Key>(tableName: string): Table<T, Key>;
+  table<T, Key extends IndexableType>(tableName: string): Table<T, Key>;
   table(tableName: any) : Table<any,any> {
     throw new Error("Method not implemented.");
   }
