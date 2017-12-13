@@ -1,5 +1,5 @@
-import { ThenShortcut } from "../types/then-shortcut";
-import { IndexableType, IndexableTypeArray } from "../types/indexable-type";
+import { ThenShortcut } from "./then-shortcut";
+import { IndexableType, IndexableTypeArray } from "./indexable-type";
 import { WhereClause } from "./where-clause";
 import Promise from "./promise-extended";
 
