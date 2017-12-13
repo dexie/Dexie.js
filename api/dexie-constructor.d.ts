@@ -1,9 +1,9 @@
 import { Dexie } from "./dexie";
 import { Transaction } from "./transaction";
-import { ThenShortcut } from "../types/then-shortcut";
+import { ThenShortcut } from "./then-shortcut";
 import { TableSchema } from "./table-schema";
 import { IndexSpec } from "./index-spec";
-import { DexieExceptionClasses } from "../errors";
+import { DexieExceptionClasses } from "./errors";
 import { PromiseConstructorExtended } from "./promise-extended";
 import { DexieEventSet } from "./dexie-event-set";
 
