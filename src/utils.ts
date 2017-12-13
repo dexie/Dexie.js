@@ -203,7 +203,7 @@ export function deepClone(any) {
     return rv;
 }
 
-export function getObjectDiff(a, b, rv, prfx) {
+export function getObjectDiff(a, b, rv?, prfx?) {
     // Compares objects a and b and produces a diff object.
     rv = rv || {};
     prfx = prfx || '';
