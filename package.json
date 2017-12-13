@@ -101,6 +101,7 @@
     "rollup-plugin-node-resolve": "^2.0.0",
     "rollup-plugin-sourcemaps": "^0.4.1",
     "serve-static": "^1.11.1",
+    "tslib": "^1.8.1",
     "typescript": "^2.1.4",
     "uglify-js": "^2.7.5"
   },

@@ -7,7 +7,7 @@ import { WhereClause } from "./where-clause";
 import { Collection } from "./collection";
 import { DbSchema } from "./db-schema";
 import { DexieInternal } from "./dexie-internal";
-import { TransactionInternal } from "./transaction-internal";
+import { IndexableType } from "./indexed-db";
 
 export interface Dexie {
   readonly name: string;
@@ -21,7 +21,7 @@ export interface Dexie {
     mode: IDBTransactionMode,
     storeNames: ArrayLike<string>,
     dbschema: DbSchema,
-    parentTransaction?: Transaction | null) => TransactionInternal;
+    parentTransaction?: Transaction | null) => Transaction;
 
   _dbSchema: DbSchema;
 
@@ -35,7 +35,7 @@ export interface Dexie {
 
   table<T>(tableName: string): Table<T, any>;
 
-  table<T, Key>(tableName: string): Table<T, Key>;
+  table<T, Key extends IndexableType>(tableName: string): Table<T, Key>;
 
   transaction<U>(mode: TransactionMode, table: Table<any, any>, scope: () => PromiseLike<U> | U): Promise<U>;
 

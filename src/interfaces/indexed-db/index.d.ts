@@ -56,15 +56,15 @@ export declare var IDBCursorWithValue: {
 };
 
 export interface IDBDatabaseEventMap {
-  "abort": Event;
-  "error": Event;
+  "abort": IDBEvent;
+  "error": IDBEvent;
 }
 
 export interface IDBDatabase extends EventTarget {
   readonly name: string;
   readonly objectStoreNames: DOMStringList;
-  onabort: (this: IDBDatabase, ev: Event) => any;
-  onerror: (this: IDBDatabase, ev: Event) => any;
+  onabort: (this: IDBDatabase, ev: IDBEvent) => any;
+  onerror: (this: IDBDatabase, ev: IDBEvent) => any;
   version: number;
   onversionchange: (ev: IDBVersionChangeEvent) => any;
   close(): void;
@@ -103,6 +103,8 @@ export interface IDBIndex {
   count(key?: IDBKeyRange | IDBValidKey): IDBRequest;
   get(key: IDBKeyRange | IDBValidKey): IDBRequest;
   getKey(key: IDBKeyRange | IDBValidKey): IDBRequest;
+  getAll?(key?: IDBKeyRange | IDBValidKey, limit?: number): IDBRequest;
+  getAllKeys?(key?: IDBKeyRange | IDBValidKey, limit?: number): IDBRequest;  
   openCursor(range?: IDBKeyRange | IDBValidKey, direction?: IDBCursorDirection): IDBRequest;
   openKeyCursor(range?: IDBKeyRange | IDBValidKey, direction?: IDBCursorDirection): IDBRequest;
 }
@@ -143,7 +145,10 @@ export interface IDBObjectStore {
   get(key: any): IDBRequest;
   index(name: string): IDBIndex;
   openCursor(range?: IDBKeyRange | IDBValidKey, direction?: IDBCursorDirection): IDBRequest;
+  openKeyCursor?(range?: IDBKeyRange | IDBValidKey, direction?: IDBCursorDirection): IDBRequest;
   put(value: any, key?: IDBValidKey): IDBRequest;
+  getAll?(key?: IDBKeyRange | IDBValidKey, limit?: number): IDBRequest;
+  getAllKeys?(key?: IDBKeyRange | IDBValidKey, limit?: number): IDBRequest;  
 }
 
 export declare var IDBObjectStore: {
@@ -171,14 +176,14 @@ export declare var IDBOpenDBRequest: {
 };
 
 export interface IDBRequestEventMap {
-  "error": Event;
-  "success": Event;
+  "error": IDBEvent;
+  "success": IDBEvent;
 }
 
 export interface IDBRequest extends EventTarget {
   readonly error: DOMException;
-  onerror: (this: IDBRequest, ev: Event) => any;
-  onsuccess: (this: IDBRequest, ev: Event) => any;
+  onerror: (this: IDBRequest, ev: IDBEvent) => any;
+  onsuccess: (this: IDBRequest, ev: IDBEvent) => any;
   readonly readyState: IDBRequestReadyState;
   readonly result: any;
   source: IDBObjectStore | IDBIndex | IDBCursor;
@@ -187,6 +192,10 @@ export interface IDBRequest extends EventTarget {
   addEventListener(type: string, listener: EventListenerOrEventListenerObject, useCapture?: boolean): void;
   removeEventListener<K extends keyof IDBRequestEventMap>(type: K, listener: (this: IDBRequest, ev: IDBRequestEventMap[K]) => any, useCapture?: boolean): void;
   removeEventListener(type: string, listener: EventListenerOrEventListenerObject, useCapture?: boolean): void;
+}
+
+export interface IDBEvent extends Event {
+  target: IDBRequest;
 }
 
 export declare var IDBRequest: {

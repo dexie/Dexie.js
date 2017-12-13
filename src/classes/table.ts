@@ -39,7 +39,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
     }) as TableHooks<T, TKey>;
   }
 
-  private _trans(mode: IDBTransactionMode, fn, writeLocked?: boolean | string) {
+  _trans(mode: IDBTransactionMode, fn, writeLocked?: boolean | string) {
     var trans = this._tx || PSD.trans;
     return trans && trans.db === this._db ?
       trans === PSD.trans ?
@@ -48,7 +48,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
       tempTransaction(this._db, mode, [this.name], fn);
   }
 
-  private _idbstore(
+  _idbstore(
     mode: IDBTransactionMode,
     fn: (
       resolve,
@@ -270,7 +270,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
   add(obj: T, key?: TKey) {
     const creatingHook = this.hook.creating.fire;
     return this._idbstore('readwrite', (resolve, reject, idbstore, trans) => {
-      const hookCtx = { onsuccess: null, onerror: null };
+      const hookCtx = { onsuccess: null as any, onerror: null as any };
       if (creatingHook !== nop) {
         const effectiveKey = (key != null) ? key : (idbstore.keyPath ? getByKeyPath(obj, idbstore.keyPath) : undefined);
         const keyToUse = creatingHook.call(hookCtx, effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
@@ -557,14 +557,14 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
               errorList = e.failures; // No need to concat here. These are the first errors added.
             }).then(() => {
               // Now, let's examine which items didnt exist so we can add them:
-              var objsToAdd = [],
+              var objsToAdd: T[] = [],
                 keysToAdd = keys && [];
               // Iterate backwards. Why? Because if same key was used twice, just add the last one.
               for (var i = effectiveKeys.length - 1; i >= 0; --i) {
                 var key = effectiveKeys[i];
                 if (key == null || objectLookup[key as string]) {
                   objsToAdd.push(objects[i]);
-                  keys && keysToAdd.push(key);
+                  keys && keysToAdd!.push(key);
                   if (key != null) objectLookup[key as string] = null; // Mark as "dont add again"
                 }
               }
