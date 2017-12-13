@@ -1,3 +1,3 @@
-import { TableSchema } from "../interfaces/table-schema";
+import { TableSchema } from "./table-schema";
 
 export type DbSchema = {[tableName: string]: TableSchema};
