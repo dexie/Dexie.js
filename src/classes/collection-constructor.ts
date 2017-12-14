@@ -8,13 +8,12 @@ export interface CollectionConstructor {
   prototype: Collection;
 }
 
-export function createCollectionConstructor() {
+export function createCollectionConstructor(db: Dexie) {
   return makeClassConstructor<CollectionConstructor>(
     Collection.prototype,
 
     function Collection(
       this: Collection,
-      db: Dexie,
       whereClause?: WhereClause | null,
       keyRangeGenerator?: () => IDBKeyRange)
     {
