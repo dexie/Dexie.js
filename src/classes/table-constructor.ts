@@ -17,7 +17,7 @@ export function createTableConstructor (db: Dexie) {
     Table.prototype,
 
     function Table (this: Table, name: string, tableSchema: TableSchema, trans?: Transaction) {
-      this._db = db;
+      this.db = db;
       this._tx = trans;
       this.name = name;
       this.schema = tableSchema;
@@ -26,8 +26,8 @@ export function createTableConstructor (db: Dexie) {
         "reading": [pureFunctionChain, mirror],
         "updating": [hookUpdatingChain, nop],
         "deleting": [hookDeletingChain, nop]
-      });
+      }) as TableHooks;
     }
-  
+
   );
 }
