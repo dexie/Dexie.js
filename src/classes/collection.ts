@@ -1,11 +1,11 @@
-import { Collection as ICollection } from "../../api/collection";
+import { Collection as ICollection } from "../../types/collection";
 import { WhereClause } from "./where-clause";
 import { Dexie } from "./dexie";
 import { Table } from "./table";
-import { IDBValidKey } from "../../api/indexeddb";
-import { PromiseExtended } from "../../api/promise-extended";
+import { IDBValidKey } from "../../types/indexeddb";
+import { PromiseExtended } from "../../types/promise-extended";
 import { iter, isPlainKeyRange, getIndexOrStore, addReplayFilter, addFilter, addMatchFilter } from "../functions/collection-helpers";
-import { IDBObjectStore, IDBCursor } from '../../api/indexeddb';
+import { IDBObjectStore, IDBCursor } from '../../types/indexeddb';
 import { rejection } from "../Promise";
 import { combine } from "../functions/combine";
 import { extend, hasOwn, deepClone, getObjectDiff, keys, setByKeyPath, getByKeyPath, shallowClone, tryCatch } from "../utils";
@@ -16,7 +16,7 @@ import { ModifyError } from "../errors";
 import { hangsOnDeleteLargeKeyRange } from "../globals/constants";
 import { ascending } from "../functions/compare-functions";
 import { bulkDelete } from "../functions/bulk-delete";
-import { ThenShortcut } from "../../api/then-shortcut";
+import { ThenShortcut } from "../../types/then-shortcut";
 
 /** class Collection
  * 

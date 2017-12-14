@@ -1,8 +1,8 @@
-import { IDBObjectStore, IDBValidKey } from '../../api/indexeddb';
+import { IDBObjectStore, IDBValidKey } from '../../types/indexeddb';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from '../errors';
-import { Table as ITable } from '../../api/table';
-import { TableSchema } from '../../api/table-schema';
-import { TableHooks } from '../../api/table-hooks';
+import { Table as ITable } from '../../types/table';
+import { TableSchema } from '../../types/table-schema';
+import { TableHooks } from '../../types/table-hooks';
 import { PSD, newScope, wrap, rejection } from '../Promise';
 import Events from '../Events';
 import { hookCreatingChain, nop, pureFunctionChain, mirror, hookUpdatingChain, hookDeletingChain } from '../chaining-functions';
@@ -15,7 +15,7 @@ import { Collection } from './collection';
 import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, deepClone, tryCatch, arrayToObject } from '../utils';
 import { maxKey, maxString } from '../globals/constants';
 import { combine } from '../functions/combine';
-import { PromiseExtended } from "../../api/promise-extended";
+import { PromiseExtended } from "../../types/promise-extended";
 import { bulkDelete } from '../functions/bulk-delete';
 
 /** class Table

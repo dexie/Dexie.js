@@ -1,7 +1,7 @@
-import { WhereClause as IWhereClause } from "../../api/where-clause";
+import { WhereClause as IWhereClause } from "../../types/where-clause";
 import { Collection } from "./collection";
 import { Table } from "./table";
-import { ValidKey } from "../../api/valid-key";
+import { ValidKey } from "../../types/valid-key";
 import { cmp, ascending, descending, min, max } from '../functions/compare-functions';
 import { emptyCollection, fail, addIgnoreCaseAlgorithm } from '../functions/where-clause-helpers';
 import { INVALID_KEY_ARGUMENT, STRING_EXPECTED, maxString, minKey, maxKey } from '../globals/constants';

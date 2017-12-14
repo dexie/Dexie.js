@@ -1,8 +1,8 @@
 import { Dexie } from '../classes/dexie';
-import { TableSchema } from '../../api/table-schema';
+import { TableSchema } from '../../types/table-schema';
 import { Transaction } from '../classes/transaction';
 import { Table } from '../classes/table';
-import { IDBValidKey } from '../../api/indexeddb';
+import { IDBValidKey } from '../../types/indexeddb';
 import { Collection } from './collection';
 
 function createChildClass (Parent: {new()}, context) {
