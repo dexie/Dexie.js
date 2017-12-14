@@ -1,12 +1,12 @@
-import { Dexie as IDexie} from "../../api/dexie";
-import { DexieInternal, DbReadyState, WebDependencies } from "../../api/dexie-internal";
-import { DexieOptions } from "../../api/dexie-constructor";
+import { Dexie as IDexie} from "../../types/dexie";
+import { DexieInternal, DbReadyState, WebDependencies } from "../../types/dexie-internal";
+import { DexieOptions } from "../../types/dexie-constructor";
 import { Table } from "./table";
-import { Table as ITable } from "../../api/table";
-import { TableSchema } from "../../api/table-schema";
-import { Version } from "../../api/version";
-import { DbEvents } from "../../api/db-events";
-import { IDBValidKey } from '../../api/indexeddb';
+import { Table as ITable } from "../../types/table";
+import { TableSchema } from "../../types/table-schema";
+import { Version } from "../../types/version";
+import { DbEvents } from "../../types/db-events";
+import { IDBValidKey } from '../../types/indexeddb';
 import { Transaction } from './transaction';
 import { WhereClause } from './where-clause';
 import { Collection } from './collection';
@@ -15,7 +15,7 @@ import { WhereClauseConstructor } from './where-clause-constructor';
 import { VersionConstructor } from './version-constructor';
 import { TransactionConstructor } from './transaction-constructor';
 import { CollectionConstructor } from './collection-constructor';
-import { PromiseExtended } from '../../api/promise-extended';
+import { PromiseExtended } from '../../types/promise-extended';
 
 export class Dexie implements DexieInternal {
   _i: DbReadyState & DexieOptions & WebDependencies;

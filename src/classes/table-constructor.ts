@@ -1,8 +1,8 @@
 import { Dexie } from './dexie';
-import { TableSchema } from '../../api/table-schema';
+import { TableSchema } from '../../types/table-schema';
 import { Transaction } from './transaction';
 import { hookCreatingChain, pureFunctionChain, nop, mirror, hookUpdatingChain, hookDeletingChain } from '../chaining-functions';
-import { TableHooks } from '../../api/table-hooks';
+import { TableHooks } from '../../types/table-hooks';
 import { Table } from './table';
 import Events from '../Events';
 import { makeClassConstructor } from '../functions/make-class-constructor';

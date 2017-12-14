@@ -1,5 +1,5 @@
 
-import {PromiseExtended, PromiseExtendedConstructor} from '../api/promise-extended';
+import {PromiseExtended, PromiseExtendedConstructor} from '../types/promise-extended';
 
 export const NativePromise : PromiseConstructor;
 export const AsyncFunction : FunctionConstructor;
