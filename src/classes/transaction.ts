@@ -1,7 +1,18 @@
-import {Transaction as ITransaction} from '../interfaces/transaction';
-import Promise from "../interfaces/promise-extended";
+import {Transaction as ITransaction} from '../../api/transaction';
+import Promise from "../../api/promise-extended";
+import { DbSchema } from '../../api/db-schema';
 
 export class Transaction implements ITransaction {
+  idbtrans: IDBTransaction;
+  
+  constructor (
+    mode: IDBTransactionMode,
+    storeNames: string[],
+    dbschema: DbSchema,
+    parent?: Transaction)
+  {
+
+  }
   create() {
     throw new Error("Method not implemented.");
   }

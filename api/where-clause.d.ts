@@ -1,25 +1,25 @@
-import { IndexableType, IndexableTypeArray, IndexableTypeArrayReadonly } from "../types/indexable-type";
+import { IDBValidKey, IndexableTypeArray, IndexableTypeArrayReadonly } from "./indexeddb";
 import { Collection } from "./collection";
 
-export interface WhereClause<T=any, Key extends IndexableType=any> {
-  above(key: IndexableType): Collection<T, Key>;
-  aboveOrEqual(key: IndexableType): Collection<T, Key>;
-  anyOf(keys: IndexableTypeArrayReadonly): Collection<T, Key>;
-  anyOf(...keys: IndexableTypeArray): Collection<T, Key>;
-  anyOfIgnoreCase(keys: string[]): Collection<T, Key>;
-  anyOfIgnoreCase(...keys: string[]): Collection<T, Key>;
-  below(key: IndexableType): Collection<T, Key>;
-  belowOrEqual(key: IndexableType): Collection<T, Key>;
-  between(lower: IndexableType, upper: IndexableType, includeLower?: boolean, includeUpper?: boolean): Collection<T, Key>;
-  equals(key: IndexableType): Collection<T, Key>;
-  equalsIgnoreCase(key: string): Collection<T, Key>;
-  inAnyRange(ranges: Array<IndexableTypeArrayReadonly>): Collection<T, Key>;
-  startsWith(key: string): Collection<T, Key>;
-  startsWithAnyOf(prefixes: string[]): Collection<T, Key>;
-  startsWithAnyOf(...prefixes: string[]): Collection<T, Key>;
-  startsWithIgnoreCase(key: string): Collection<T, Key>;
-  startsWithAnyOfIgnoreCase(prefixes: string[]): Collection<T, Key>;
-  startsWithAnyOfIgnoreCase(...prefixes: string[]): Collection<T, Key>;
-  noneOf(keys: Array<IndexableType>): Collection<T, Key>;
-  notEqual(key: IndexableType): Collection<T, Key>;
+export interface WhereClause<T=any, TKey extends IDBValidKey=IDBValidKey> {
+  above(key: IDBValidKey): Collection<T, TKey>;
+  aboveOrEqual(key: IDBValidKey): Collection<T, TKey>;
+  anyOf(keys: IndexableTypeArrayReadonly): Collection<T, TKey>;
+  anyOf(...keys: IndexableTypeArray): Collection<T, TKey>;
+  anyOfIgnoreCase(keys: string[]): Collection<T, TKey>;
+  anyOfIgnoreCase(...keys: string[]): Collection<T, TKey>;
+  below(key: IDBValidKey): Collection<T, TKey>;
+  belowOrEqual(key: IDBValidKey): Collection<T, TKey>;
+  between(lower: IDBValidKey, upper: IDBValidKey, includeLower?: boolean, includeUpper?: boolean): Collection<T, TKey>;
+  equals(key: IDBValidKey): Collection<T, TKey>;
+  equalsIgnoreCase(key: string): Collection<T, TKey>;
+  inAnyRange(ranges: Array<IndexableTypeArrayReadonly>): Collection<T, TKey>;
+  startsWith(key: string): Collection<T, TKey>;
+  startsWithAnyOf(prefixes: string[]): Collection<T, TKey>;
+  startsWithAnyOf(...prefixes: string[]): Collection<T, TKey>;
+  startsWithIgnoreCase(key: string): Collection<T, TKey>;
+  startsWithAnyOfIgnoreCase(prefixes: string[]): Collection<T, TKey>;
+  startsWithAnyOfIgnoreCase(...prefixes: string[]): Collection<T, TKey>;
+  noneOf(keys: Array<IDBValidKey>): Collection<T, TKey>;
+  notEqual(key: IDBValidKey): Collection<T, TKey>;
 }

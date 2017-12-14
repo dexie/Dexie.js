@@ -1,11 +1,11 @@
-import { Collection as ICollection } from "../interfaces/collection";
+import { Collection as ICollection } from "../../api/collection";
 import { WhereClause } from "./where-clause";
 import { Dexie } from "./dexie";
 import { Table } from "./table";
-import { IndexableType } from "../types/indexable-type";
-import Promise from "../interfaces/promise-extended";
+import { IDBValidKey } from "../../api/indexeddb";
+import { PromiseExtended } from "../../api/promise-extended";
 import { iter, isPlainKeyRange, getIndexOrStore, addReplayFilter, addFilter, addMatchFilter } from "../functions/collection-helpers";
-import { IDBObjectStore, IDBCursor } from '../interfaces/indexed-db';
+import { IDBObjectStore, IDBCursor } from '../../api/indexeddb';
 import { rejection } from "../Promise";
 import { combine } from "../functions/combine";
 import { extend, hasOwn, deepClone, getObjectDiff, keys, setByKeyPath, getByKeyPath, shallowClone, tryCatch } from "../utils";
@@ -16,45 +16,13 @@ import { ModifyError } from "../errors";
 import { hangsOnDeleteLargeKeyRange } from "../globals/constants";
 import { ascending } from "../functions/compare-functions";
 import { bulkDelete } from "../functions/bulk-delete";
-import { ThenShortcut } from "../types/then-shortcut";
+import { ThenShortcut } from "../../api/then-shortcut";
+import { CollectionContext } from './collection-context';
 
-export class Collection<T, TKey extends IndexableType> implements ICollection<T, TKey> {
-  _ctx: CollectionContext<T, TKey>;
+export class Collection implements ICollection {
+  db: Dexie;
+  _ctx: CollectionContext;
   _ondirectionchange?: Function;
-  
-  constructor(
-    whereClause?: WhereClause<T, TKey> | null,
-    keyRangeGenerator?: () => IDBKeyRange)
-  {
-    let keyRange = null, error = null;
-    if (keyRangeGenerator) try {
-      keyRange = keyRangeGenerator();
-    } catch (ex) {
-      error = ex;
-    }
-
-    const whereCtx = whereClause._ctx;
-    const table = whereCtx.table;
-    this._ctx = {
-      table: table,
-      index: whereCtx.index,
-      isPrimKey: (!whereCtx.index || (table.schema.primKey.keyPath && whereCtx.index === table.schema.primKey.name)),
-      range: keyRange,
-      keysOnly: false,
-      dir: "next",
-      unique: "",
-      algorithm: null,
-      filter: null,
-      replayFilter: null,
-      justLimit: true, // True if a replayFilter is just a filter that performs a "limit" operation (or none at all)
-      isMatch: null,
-      offset: 0,
-      limit: Infinity,
-      error: error, // If set, any promise must be rejected with this error
-      or: whereCtx.or,
-      valueMapper: table.hook.reading.fire
-    };
-  }
 
   _read(fn, cb?) {
     var ctx = this._ctx;
@@ -111,7 +79,7 @@ export class Collection<T, TKey extends IndexableType> implements ICollection<T,
    * http://dexie.org/docs/Collection/Collection.each()
    * 
    **/
-  each(fn: (obj: T, cursor: IDBCursor) => any): Promise<void> {
+  each(fn: (obj, cursor: IDBCursor) => any): PromiseExtended<void> {
     var ctx = this._ctx;
 
     return this._read((resolve, reject, idbstore) => {
@@ -124,9 +92,7 @@ export class Collection<T, TKey extends IndexableType> implements ICollection<T,
    * http://dexie.org/docs/Collection/Collection.count()
    * 
    **/
-  count(): Promise<number>;
-  count<R>(thenShortcut: ThenShortcut<number, R>): Promise<R>;
-  count(cb?): Promise<number> {
+  count(cb?) {
     var ctx = this._ctx;
 
     if (isPlainKeyRange(ctx, true)) {
@@ -153,9 +119,9 @@ export class Collection<T, TKey extends IndexableType> implements ICollection<T,
    * http://dexie.org/docs/Collection/Collection.sortBy()
    * 
    **/
-  sortBy(keyPath: string): Promise<T[]>;
-  sortBy<R>(keyPath: string, thenShortcut: ThenShortcut<T[], R>) : Promise<R>;
-  sortBy(keyPath: string, cb?: ThenShortcut<T[], any>) {
+  sortBy(keyPath: string): PromiseExtended<any[]>;
+  sortBy<R>(keyPath: string, thenShortcut: ThenShortcut<any[], R>) : PromiseExtended<R>;
+  sortBy(keyPath: string, cb?: ThenShortcut<any[], any>) {
     /// <param name="keyPath" type="String"></param>
     var parts = keyPath.split('.').reverse(),
       lastPart = parts[0],
@@ -181,9 +147,7 @@ export class Collection<T, TKey extends IndexableType> implements ICollection<T,
    * http://dexie.org/docs/Collection/Collection.toArray()
    * 
    **/
-  toArray(): Promise<Array<T>>;
-  toArray<R>(thenShortcut: ThenShortcut<T[], R>) : Promise<R>;
-  toArray(cb?: ThenShortcut<T[], any>) {
+  toArray(cb?) {
     var ctx = this._ctx;
     return this._read(function (resolve, reject, idbstore) {
       if (hasGetAll && ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
@@ -215,7 +179,7 @@ export class Collection<T, TKey extends IndexableType> implements ICollection<T,
    * http://dexie.org/docs/Collection/Collection.offset()
    * 
    **/
-  offset(offset: number) : Collection<T, TKey>{
+  offset(offset: number) : Collection{
     var ctx = this._ctx;
     if (offset <= 0) return this;
     ctx.offset += offset; // For count()
@@ -246,7 +210,7 @@ export class Collection<T, TKey extends IndexableType> implements ICollection<T,
    * http://dexie.org/docs/Collection/Collection.limit()
    * 
    **/
-  limit(numRows: number) : Collection<T,TKey> {
+  limit(numRows: number) : Collection {
     this._ctx.limit = Math.min(this._ctx.limit, numRows); // For count()
     addReplayFilter(this._ctx, () => {
       var rowsLeft = numRows;
@@ -263,7 +227,7 @@ export class Collection<T, TKey extends IndexableType> implements ICollection<T,
    * http://dexie.org/docs/Collection/Collection.until()
    * 
    **/
-  until(filterFunction: (x: T) => boolean, bIncludeStopEntry?) {
+  until(filterFunction: (x) => boolean, bIncludeStopEntry?) {
     var ctx = this._ctx;
     addFilter(this._ctx, function (cursor, advance, resolve) {
       if (filterFunction(cursor.value)) {
@@ -299,7 +263,7 @@ export class Collection<T, TKey extends IndexableType> implements ICollection<T,
    * http://dexie.org/docs/Collection/Collection.filter()
    * 
    **/
-  filter(filterFunction: (x: T) => boolean): Collection<T,TKey> {
+  filter(filterFunction: (x) => boolean): Collection {
     /// <param name="jsFunctionFilter" type="Function">function(val){return true/false}</param>
     addFilter(this._ctx, function (cursor) {
       return filterFunction(cursor.value);
@@ -315,7 +279,7 @@ export class Collection<T, TKey extends IndexableType> implements ICollection<T,
    * http://dexie.org/docs/Collection/Collection.and()
    * 
    **/
-  and(filter: (x: T) => boolean) {
+  and(filter: (x) => boolean) {
     return this.filter(filter);
   }
 
@@ -325,7 +289,7 @@ export class Collection<T, TKey extends IndexableType> implements ICollection<T,
    * 
    **/
   or(indexName: string) {
-    return new WhereClause(this._ctx.table, indexName, this);
+    return new this.db.WhereClause(this._ctx.table, indexName, this);
   }
 
   /** Collection.reverse()
@@ -699,24 +663,4 @@ export class Collection<T, TKey extends IndexableType> implements ICollection<T,
   }
 }
 
-
-export interface CollectionContext<T=any, TKey extends IndexableType=any> {
-  table: Table<T, TKey>;
-  index?: string | null;
-  isPrimKey?: boolean;
-  range: IDBKeyRange;
-  keysOnly: boolean;
-  dir: "next" | "prev";
-  unique: "" | "unique";
-  algorithm?: Function | null;
-  filter?: Function | null;
-  replayFilter: Function | null;
-  justLimit: boolean; // True if a replayFilter is just a filter that performs a "limit" operation (or none at all)
-  isMatch: Function | null;
-  offset: number,
-  limit: number,
-  error: any, // If set, any promise must be rejected with this error
-  or: Collection<T, TKey>,
-  valueMapper: (any) => any
-}
 

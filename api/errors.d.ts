@@ -1,4 +1,4 @@
-import { IndexableTypeArrayReadonly } from "./indexable-type";
+import { IndexableTypeArrayReadonly } from "./indexeddb";
 
 /** DexieError
  * 

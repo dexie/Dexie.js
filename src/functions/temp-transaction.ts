@@ -1,4 +1,4 @@
-import { DexieInternal, DbState } from "../interfaces/dexie-internal";
+import { DexieInternal, DbReadyState } from "../interfaces/dexie-internal";
 import { PSD, rejection, newScope } from "../Promise";
 import { DexieOptions } from "../interfaces/dexie-constructor";
 import { exceptions } from "../errors";
