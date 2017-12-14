@@ -1,46 +1,65 @@
-import { Dexie as IDexie} from "../interfaces/dexie";
-import { DexieInternal, DbReadyState, WebDependencies } from "../interfaces/dexie-internal";
-import { DexieOptions } from "../interfaces/dexie-constructor";
-import { Table } from "../interfaces/table";
-import { TableSchema } from "../interfaces/table-schema";
-import { Version } from "../interfaces/version";
-import { DbEvents } from "../interfaces/db-events";
-import { IndexableType } from '../interfaces/indexed-db/index';
+import { Dexie as IDexie} from "../../api/dexie";
+import { DexieInternal, DbReadyState, WebDependencies } from "../../api/dexie-internal";
+import { DexieOptions } from "../../api/dexie-constructor";
+import { Table } from "./table";
+import { Table as ITable } from "../../api/table";
+import { TableSchema } from "../../api/table-schema";
+import { Version } from "../../api/version";
+import { DbEvents } from "../../api/db-events";
+import { IDBValidKey } from '../../api/indexeddb';
+import { Transaction } from './transaction';
+import { WhereClause } from './where-clause';
+import { Collection } from './collection';
+import { TableConstructor } from './table-constructor';
+import { WhereClauseConstructor } from './where-clause-constructor';
+import { VersionConstructor } from './version-constructor';
+import { TransactionConstructor } from './transaction-constructor';
+import { CollectionConstructor } from './collection-constructor';
+import { PromiseExtended } from '../../api/promise-extended';
 
 export class Dexie implements DexieInternal {
   _i: DbReadyState & DexieOptions & WebDependencies;
   name: string;
-  tables: Table<any, any>[];
+  tables: Table[];
   verno: number;
-  _allTables: { [name: string]: Table<any, any>; };
+  _allTables: { [name: string]: Table; };
   _createTransaction: (this: DexieInternal, mode: IDBTransactionMode, storeNames: ArrayLike<string>, dbschema: { [tableName: string]: TableSchema; }, parentTransaction?: Transaction) => any;
   _dbSchema: { [tableName: string]: TableSchema; };
+
+  Table: TableConstructor;
+  WhereClause: WhereClauseConstructor;
+  Version: VersionConstructor;
+  Transaction: TransactionConstructor;
+  Collection: CollectionConstructor;
+  
   version(versionNumber: Number): Version {
     throw new Error("Method not implemented.");
   }
   on: DbEvents;
-  open(): Promise<Dexie> {
+  open(): PromiseExtended<Dexie> {
     throw new Error("Method not implemented.");
   }
-  table(tableName: string): Table<any, any>;
-  table<T>(tableName: string): Table<T, any>;
-  table<T, Key extends IndexableType>(tableName: string): Table<T, Key>;
-  table(tableName: any) : Table<any,any> {
+  table<T = any, TKey extends IDBValidKey = IDBValidKey>(tableName: string): ITable<T, TKey>;
+  table(tableName: string): Table {
     throw new Error("Method not implemented.");
   }
-  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, scope: () => U | PromiseLike<U>): Promise<U>;
-  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, table2: Table<any, any>, scope: () => U | PromiseLike<U>): Promise<U>;
-  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, scope: () => U | PromiseLike<U>): Promise<U>;
-  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, table4: Table<any, any>, scope: () => U | PromiseLike<U>): Promise<U>;
-  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, table4: Table<any, any>, table5: Table<any, any>, scope: () => U | PromiseLike<U>): Promise<U>;
-  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", tables: Table<any, any>[], scope: () => U | PromiseLike<U>): Promise<U>;
+  /*transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, scope: () => U | PromiseLike<U>): PromiseExtended<U>;
+  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, table2: Table<any, any>, scope: () => U | PromiseLike<U>): PromiseExtended<U>;
+  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, scope: () => U | PromiseLike<U>): PromiseExtended<U>;
+  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, table4: Table<any, any>, scope: () => U | PromiseLike<U>): PromiseExtended<U>;
+  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, table4: Table<any, any>, table5: Table<any, any>, scope: () => U | PromiseLike<U>): PromiseExtended<U>;
+  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", tables: Table<any, any>[], scope: () => U | PromiseLike<U>): PromiseExtended<U>;
   transaction(mode: any, table: any, table2: any, table3?: any, table4?: any, table5?: any, scope?: any) {
     throw new Error("Method not implemented.");
+  }*/
+  transaction(...args) : PromiseExtended {
+    throw new Error("Method not implemented.");
   }
+
   close(): void {
     throw new Error("Method not implemented.");
   }
-  delete(): Promise<void> {
+  delete(): PromiseExtended<void> {
     throw new Error("Method not implemented.");
   }
   isOpen(): boolean {
@@ -61,9 +80,4 @@ export class Dexie implements DexieInternal {
   vip<U>(scopeFunction: () => U): U {
     throw new Error("Method not implemented.");
   }
-  Table: new () => Table<any, any>;
-  WhereClause: new () => WhereClause<any, any>;
-  Version: new () => Version;
-  Transaction: new () => Transaction;
-  Collection: new () => Collection<any, any>;
 }

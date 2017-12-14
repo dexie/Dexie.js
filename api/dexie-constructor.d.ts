@@ -4,7 +4,7 @@ import { ThenShortcut } from "./then-shortcut";
 import { TableSchema } from "./table-schema";
 import { IndexSpec } from "./index-spec";
 import { DexieExceptionClasses } from "./errors";
-import { PromiseConstructorExtended } from "./promise-extended";
+import { PromiseExtendedConstructor } from "./promise-extended";
 import { DexieEventSet } from "./dexie-event-set";
 
 export interface DexieOptions {
@@ -43,9 +43,9 @@ export interface DexieConstructor extends DexieExceptionClasses {
     indexedDB: IDBFactory,
     IDBKeyRange: IDBKeyRange
   };
-  default: Dexie;
+  default: Dexie; // Work-around for different build tools handling default imports differently.
 
-  Promise: PromiseConstructorExtended;
+  Promise: PromiseExtendedConstructor;
   //TableSchema: {}; // Deprecate!
   //IndexSpec: {new():IndexSpec}; //? Deprecate
   Events: (ctx?)=>DexieEventSet;

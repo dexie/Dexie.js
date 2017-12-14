@@ -1,9 +1,8 @@
-import { IDBObjectStore } from '../interfaces/indexed-db';
-import { IndexableType } from '../types/indexable-type';
+import { IDBObjectStore, IDBValidKey } from '../../api/indexeddb';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from '../errors';
-import { Table as ITable } from '../interfaces/table';
-import { TableSchema } from '../interfaces/table-schema';
-import { TableHooks } from '../interfaces/table-hooks';
+import { Table as ITable } from '../../api/table';
+import { TableSchema } from '../../api/table-schema';
+import { TableHooks } from '../../api/table-hooks';
 import { PSD, newScope, wrap, rejection } from '../Promise';
 import Events from '../Events';
 import { hookCreatingChain, nop, pureFunctionChain, mirror, hookUpdatingChain, hookDeletingChain } from '../chaining-functions';
@@ -16,36 +15,23 @@ import { Collection } from './collection';
 import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, deepClone, tryCatch, arrayToObject } from '../utils';
 import { maxKey, maxString } from '../globals/constants';
 import { combine } from '../functions/combine';
-import Promise from "../interfaces/promise-extended";
+import { PromiseExtended } from "../../api/promise-extended";
 import { bulkDelete } from '../functions/bulk-delete';
 
-export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
+export class Table implements ITable {
+  db: Dexie;
   _tx?: Transaction;
-  _db: Dexie;
   name: string;
   schema: TableSchema;
-  hook: TableHooks<T, TKey>;
-
-  constructor(db: Dexie, name: string, tableSchema: TableSchema, optionalTrans?: Transaction) {
-    this._tx = optionalTrans;
-    this._db = db;
-    this.name = name;
-    this.schema = tableSchema;
-    this.hook = db._allTables[name] ? db._allTables[name].hook : Events(null, {
-      "creating": [hookCreatingChain, nop],
-      "reading": [pureFunctionChain, mirror],
-      "updating": [hookUpdatingChain, nop],
-      "deleting": [hookDeletingChain, nop]
-    }) as TableHooks<T, TKey>;
-  }
+  hook: TableHooks;
 
   _trans(mode: IDBTransactionMode, fn, writeLocked?: boolean | string) {
     var trans = this._tx || PSD.trans;
-    return trans && trans.db === this._db ?
+    return trans && trans.db === this.db ?
       trans === PSD.trans ?
         trans._promise(mode, fn, writeLocked) :
         newScope(() => trans._promise(mode, fn, writeLocked), { trans: trans, transless: PSD.transless || PSD }) :
-      tempTransaction(this._db, mode, [this.name], fn);
+      tempTransaction(this.db, mode, [this.name], fn);
   }
 
   _idbstore(
@@ -70,13 +56,9 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.get()
    * 
    **/
-  get(key: TKey): Promise<T>;
-  get<R>(key: TKey, thenShortcut: (value: T) => R | PromiseLike<R>): Promise<R>;
-  get(equalityCriterias: { [key: string]: string | number | Date | ArrayBuffer | ArrayBufferView | DataView | void[][] | ReadonlyArray<string | number | Date | ArrayBuffer | ArrayBufferView | DataView | void[][]>; }): Promise<T>;
-  get<R>(equalityCriterias: { [key: string]: string | number | Date | ArrayBuffer | ArrayBufferView | DataView | void[][] | ReadonlyArray<string | number | Date | ArrayBuffer | ArrayBufferView | DataView | void[][]>; }, thenShortcut: (value: T) => R | PromiseLike<R>): Promise<R>;
-  get(keyOrCrit: any, cb?: any) {
+  get(keyOrCrit, cb?) {
     if (keyOrCrit && keyOrCrit.constructor === Object)
-      return this.where(keyOrCrit as { [key: string]: IndexableType }).first(cb);
+      return this.where(keyOrCrit as { [key: string]: IDBValidKey }).first(cb);
 
     return this._idbstore('readonly', (resolve, reject, idbstore) => {
       const req = idbstore.get(keyOrCrit);
@@ -92,13 +74,11 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.where()
    * 
    **/
-  where(index: string | string[]): WhereClause<T, TKey>;
-  where(equalityCriterias: { [key: string]: IndexableType }): Collection<T, TKey>;
-  where(indexOrCrit: any) {
+  where(indexOrCrit: string | string[] | { [key: string]: IDBValidKey }) {
     if (typeof indexOrCrit === 'string')
-      return new WhereClause(this, indexOrCrit);
+      return new this.db.WhereClause(this, indexOrCrit);
     if (isArray(indexOrCrit))
-      return new WhereClause(this, `[${indexOrCrit.join('+')}]`);
+      return new this.db.WhereClause(this, `[${indexOrCrit.join('+')}]`);
     // indexOrCrit is an object map of {[keyPath]:value} 
     const keyPaths = keys(indexOrCrit);
     if (keyPaths.length === 1)
@@ -153,7 +133,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.filter()
    * 
    **/
-  filter(filterFunction: (obj: T) => boolean) {
+  filter(filterFunction: (obj: any) => boolean) {
     return this.toCollection().and(filterFunction);
   }
 
@@ -162,8 +142,6 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.count()
    * 
    **/
-  count(): Promise<number>;
-  count<R>(thenShortcut: (value: number) => R | PromiseLike<R>): Promise<R>;
   count(thenShortcut?: any) {
     return this.toCollection().count(thenShortcut);
   }
@@ -191,7 +169,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.each()
    * 
    **/
-  each(callback: (obj: T, cursor: { key: IndexableType, primaryKey: TKey }) => any) {
+  each(callback: (obj: any, cursor: { key: IDBValidKey, primaryKey: IDBValidKey }) => any) {
     return this.toCollection().each(callback);
   }
 
@@ -200,8 +178,6 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.toArray()
    * 
    **/
-  toArray(): Promise<T[]>;
-  toArray<R>(thenShortcut: (value: T[]) => R | PromiseLike<R>): Promise<R>;
   toArray(thenShortcut?: any) {
     return this.toCollection().toArray(thenShortcut);
   }
@@ -212,7 +188,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * 
    **/
   toCollection() {
-    return new Collection<T, TKey>(new WhereClause<T, TKey>(this));
+    return new this.db.Collection(new this.db.WhereClause(this));
   }
 
   /** Table.orderBy()
@@ -221,8 +197,8 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * 
    **/
   orderBy(index: string | string[]) {
-    return new Collection<T, TKey>(
-      new WhereClause<T, TKey>(this, isArray(index) ?
+    return new this.db.Collection(
+      new this.db.WhereClause(this, isArray(index) ?
         `[${index.join('+')}]` :
         index));
   }
@@ -232,7 +208,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.reverse()
    * 
    **/
-  reverse(): Collection<T, TKey> {
+  reverse(): Collection {
     return this.toCollection().reverse();
   }
 
@@ -267,7 +243,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.add()
    * 
    **/
-  add(obj: T, key?: TKey) {
+  add(obj, key?: IDBValidKey) {
     const creatingHook = this.hook.creating.fire;
     return this._idbstore('readwrite', (resolve, reject, idbstore, trans) => {
       const hookCtx = { onsuccess: null as any, onerror: null as any };
@@ -308,7 +284,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.update()
    * 
    **/
-  update(keyOrObject: TKey | T, modifications: { [keyPath: string]: any; }): Promise<number> {
+  update(keyOrObject, modifications: { [keyPath: string]: any; }): PromiseExtended<number> {
     if (typeof modifications !== 'object' || isArray(modifications))
       throw new exceptions.InvalidArgument("Modifications must be an object.");
     if (typeof keyOrObject === 'object' && !isArray(keyOrObject)) {
@@ -331,7 +307,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.put()
    * 
    **/
-  put(obj: T, key?: TKey): Promise<TKey> {
+  put(obj, key?: IDBValidKey) {
     const creatingHook = this.hook.creating.fire,
       updatingHook = this.hook.updating.fire;
     if (creatingHook !== nop || updatingHook !== nop) {
@@ -350,7 +326,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
       // clone obj before this async call. If caller modifies obj the line after put(), the IDB spec requires that it should not affect operation.
       obj = deepClone(obj);
       return this._trans('readwrite', () =>
-        this.where(":id").equals(effectiveKey).modify(function (this: { value: T }) {
+        this.where(":id").equals(effectiveKey).modify(function (this: { value: any }) {
           // Replace extisting value with our object
           // CRUD event firing handled in Collection.modify()
           this.value = obj;
@@ -378,7 +354,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.delete()
    * 
    **/
-  delete(key: TKey) {
+  delete(key: IDBValidKey) {
     if (this.hook.deleting.subscribers.length) {
       // People listens to when("deleting") event. Must implement delete using Collection.delete() that will
       // call the CRUD event. Only Collection.delete() will know whether an object was actually deleted.
@@ -421,7 +397,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.bulkAdd()
    * 
    **/
-  bulkAdd(objects: T[], keys?: ReadonlyArray<IndexableType>): Promise<TKey> {
+  bulkAdd(objects: any[], keys?: ReadonlyArray<IDBValidKey>) {
     const creatingHook = this.hook.creating.fire;
     return this._idbstore('readwrite', function (resolve, reject, idbstore, trans) {
       if (!idbstore.keyPath && !this.schema.primKey.auto && !keys)
@@ -506,7 +482,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.bulkPut()
    * 
    **/
-  bulkPut(objects: T[], keys?: ReadonlyArray<string | number | Date | ArrayBuffer | ArrayBufferView | DataView | void[][]>): Promise<TKey> {
+  bulkPut(objects: any[], keys?: ReadonlyArray<IDBValidKey>) {
     return this._idbstore('readwrite', (resolve, reject, idbstore) => {
       if (!idbstore.keyPath && !this.schema.primKey.auto && !keys)
         throw new exceptions.InvalidArgument("bulkPut() with non-inbound keys requires keys array in second argument");
@@ -550,14 +526,14 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
           // Keys provided. Either as inbound in provided objects, or as a keys argument.
           // Begin with updating those that exists in DB:
           table.where(':id').anyOf(effectiveKeys.filter(key => key != null))
-            .modify(function (this: { value: T, primKey: TKey }) {
-              this.value = objectLookup[this.primKey];
-              objectLookup[this.primKey] = null; // Mark as "don't add this"
+            .modify(function (this: { value: any, primKey: IDBValidKey }) {
+              this.value = objectLookup[this.primKey as string]; // BUGBUG: fix objectLookup for binary keys
+              objectLookup[this.primKey as string] = null; // Mark as "don't add this"
             }).catch(ModifyError, e => {
               errorList = e.failures; // No need to concat here. These are the first errors added.
             }).then(() => {
               // Now, let's examine which items didnt exist so we can add them:
-              var objsToAdd: T[] = [],
+              var objsToAdd: any[] = [],
                 keysToAdd = keys && [];
               // Iterate backwards. Why? Because if same key was used twice, just add the last one.
               for (var i = effectiveKeys.length - 1; i >= 0; --i) {
@@ -595,7 +571,7 @@ export class Table<T, TKey extends IndexableType> implements ITable<T, TKey> {
    * http://dexie.org/docs/Table/Table.bulkDelete()
    * 
    **/
-  bulkDelete(keys: ReadonlyArray<IndexableType>): Promise<void> {
+  bulkDelete(keys: ReadonlyArray<IDBValidKey>): PromiseExtended<void> {
     if (this.hook.deleting.fire === nop) {
       return this._idbstore('readwrite', (resolve, reject, idbstore, trans) => {
         resolve(bulkDelete(idbstore, trans, keys, false, nop));

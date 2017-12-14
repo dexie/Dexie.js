@@ -3,7 +3,7 @@
  * It tests Dexie.d.ts.
  */
 
-import Dexie from '../../src/Dexie'; // Imports the source Dexie.d.ts file
+import Dexie from '../../src/index'; // Imports the source Dexie.d.ts file
 import './test-extend-dexie';
 
 // constructor overloads:

@@ -1,4 +1,4 @@
-import { IDBObjectStore, IndexableType, IDBRequest } from '../interfaces/indexed-db';
+import { IDBObjectStore, IDBValidKey, IDBRequest } from '../interfaces/indexed-db';
 import { Transaction } from '../classes/transaction';
 import { eventRejectHandler, hookedEventRejectHandler, hookedEventSuccessHandler } from './event-wrappers';
 import { wrap } from '../Promise';
@@ -7,7 +7,7 @@ import { tryCatch } from '../utils';
 export function bulkDelete(
   idbstore: IDBObjectStore,
   trans: Transaction,
-  keysOrTuples: ReadonlyArray<IndexableType> | {0: IndexableType, 1: any}[],
+  keysOrTuples: ReadonlyArray<IDBValidKey> | {0: IDBValidKey, 1: any}[],
   hasDeleteHook: boolean, deletingHook)
 {
   // If hasDeleteHook, keysOrTuples must be an array of tuples: [[key1, value2],[key2,value2],...],
@@ -18,7 +18,7 @@ export function bulkDelete(
       if (len === 0) return resolve();
       if (!hasDeleteHook) {
           for (let i=0; i < len; ++i) {
-              const req = idbstore.delete(keysOrTuples[i] as IndexableType);
+              const req = idbstore.delete(keysOrTuples[i] as IDBValidKey);
               req.onerror = eventRejectHandler(reject);
               if (i === lastItem) req.onsuccess = wrap(()=>resolve());
           }

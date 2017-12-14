@@ -1,22 +1,25 @@
 
-import Dexie from '../../src/Dexie'; // Imports the source Dexie.d.ts file
+import Dexie, {IndexableType} from '../../src/index'; // Imports the source Dexie.d.ts file
 
 //
 // Extend Dexie interface
 //
-declare module '../../src/Dexie' {
-    module Dexie {
-        interface Table<T,Key> {
-            extendedTableMethod() : any;
-        }
-        interface DbEvents {
-            (eventName: 'changes', subscriber: ()=>any): void;
-            (eventName: 'customEvent2', subscriber: ()=>any): void;
-            changes: Dexie.DexieEvent;
-            customEvent2: Dexie.DexieEvent;
-        }
-        var extendedStaticMethod: (param1: string) => string;
+declare module '../../src/interfaces/table' {
+    interface Table<T,TKey extends IndexableType> {
+        extendedTableMethod() : any;
     }
+}
+
+declare module '../../src/interfaces/db-events' { 
+
+    interface DbEvents {
+        (eventName: 'changes', subscriber: ()=>any): void;
+        (eventName: 'customEvent2', subscriber: ()=>any): void;
+        changes: Dexie.DexieEvent;
+        customEvent2: Dexie.DexieEvent;
+    }
+    var extendedStaticMethod: (param1: string) => string;
+    
     interface Dexie {
         extendedDBMethod() : any;
     }

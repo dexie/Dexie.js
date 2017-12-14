@@ -1,76 +1,71 @@
 import { WhereClause as IWhereClause} from "../interfaces/where-clause";
 import { Collection } from "./collection";
 import { Table } from "./table";
-import { IndexableType } from "../types/indexable-type";
-import Promise from "../interfaces/promise-extended";
+import { IDBValidKey } from "../../api/indexeddb";
 
-export interface WhereClauseContext<T,TKey extends IndexableType> {
-  table: Table<T,TKey>;
+export interface WhereClauseContext {
+  table: Table;
   index: string;
-  or: Collection<T,TKey>;
+  or: Collection;
 }
 
-export class WhereClause<T,TKey extends IndexableType> implements IWhereClause<T,TKey> {
-  _ctx: WhereClauseContext<T,TKey>;
+export class WhereClause implements IWhereClause {
+  _ctx: WhereClauseContext;
 
-  constructor(table: Table<T,TKey>, index?: string, orCollection?: Collection<T,TKey>) {
+  above(key: IDBValidKey): Collection {
     
   }
-
-  above(key: IndexableType): Collection<T, TKey> {
-    
-  }
-  aboveOrEqual(key: IndexableType): Collection<T, TKey> {
+  aboveOrEqual(key: IDBValidKey): Collection {
     throw new Error("Method not implemented.");
   }
-  anyOf(keys: ReadonlyArray<IndexableType>): Collection<T, TKey>;
-  anyOf(...keys: (IndexableType)[]): Collection<T, TKey>;
+  anyOf(keys: ReadonlyArray<IDBValidKey>): Collection;
+  anyOf(...keys: (IDBValidKey)[]): Collection;
   anyOf(keys?: any, ...rest?: any[]) {
     throw new Error("Method not implemented.");
   }
-  anyOfIgnoreCase(keys: string[]): Collection<T, TKey>;
-  anyOfIgnoreCase(...keys: string[]): Collection<T, TKey>;
+  anyOfIgnoreCase(keys: string[]): Collection;
+  anyOfIgnoreCase(...keys: string[]): Collection;
   anyOfIgnoreCase(keys?: any, ...rest?: any[]) {
     throw new Error("Method not implemented.");
   }
-  below(key: IndexableType): Collection<T, TKey> {
+  below(key: IDBValidKey): Collection {
     throw new Error("Method not implemented.");
   }
-  belowOrEqual(key: IndexableType): Collection<T, TKey> {
+  belowOrEqual(key: IDBValidKey): Collection {
     throw new Error("Method not implemented.");
   }
-  between(lower: IndexableType, upper: IndexableType, includeLower?: boolean, includeUpper?: boolean): Collection<T, TKey> {
+  between(lower: IDBValidKey, upper: IDBValidKey, includeLower?: boolean, includeUpper?: boolean): Collection {
     throw new Error("Method not implemented.");
   }
-  equals(key: IndexableType): Collection<T, TKey> {
+  equals(key: IDBValidKey): Collection {
     throw new Error("Method not implemented.");
   }
-  equalsIgnoreCase(key: string): Collection<T, TKey> {
+  equalsIgnoreCase(key: string): Collection {
     throw new Error("Method not implemented.");
   }
-  inAnyRange(ranges: ReadonlyArray<IndexableType>[]): Collection<T, TKey> {
+  inAnyRange(ranges: ReadonlyArray<IDBValidKey>[]): Collection {
     throw new Error("Method not implemented.");
   }
-  startsWith(key: string): Collection<T, TKey> {
+  startsWith(key: string): Collection {
     throw new Error("Method not implemented.");
   }
-  startsWithAnyOf(prefixes: string[]): Collection<T, TKey>;
-  startsWithAnyOf(...prefixes: string[]): Collection<T, TKey>;
+  startsWithAnyOf(prefixes: string[]): Collection;
+  startsWithAnyOf(...prefixes: string[]): Collection;
   startsWithAnyOf(prefixes?: any, ...rest?: any[]) {
     throw new Error("Method not implemented.");
   }
-  startsWithIgnoreCase(key: string): Collection<T, TKey> {
+  startsWithIgnoreCase(key: string): Collection {
     throw new Error("Method not implemented.");
   }
-  startsWithAnyOfIgnoreCase(prefixes: string[]): Collection<T, TKey>;
-  startsWithAnyOfIgnoreCase(...prefixes: string[]): Collection<T, TKey>;
+  startsWithAnyOfIgnoreCase(prefixes: string[]): Collection;
+  startsWithAnyOfIgnoreCase(...prefixes: string[]): Collection;
   startsWithAnyOfIgnoreCase(prefixes?: any, ...rest?: any[]) {
     throw new Error("Method not implemented.");
   }
-  noneOf(keys: (IndexableType)[]): Collection<T, TKey> {
+  noneOf(keys: (IDBValidKey)[]): Collection {
     throw new Error("Method not implemented.");
   }
-  notEqual(key: IndexableType): Collection<T, TKey> {
+  notEqual(key: IDBValidKey): Collection {
     throw new Error("Method not implemented.");
   }
   

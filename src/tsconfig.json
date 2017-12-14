@@ -6,6 +6,7 @@
     "importHelpers": true,
     "strictNullChecks": false,
     "noImplicitAny": false,
+    "noImplicitReturns": false,
     "moduleResolution": "node",
     "lib": ["es2015", "dom"]
   }

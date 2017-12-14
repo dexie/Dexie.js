@@ -17,11 +17,11 @@ interface DeletingHookContext<T,Key> {
   onerror?: (err: any) => void;
 }
 
-interface TableHooks<T,Key> extends DexieEventSet {
-  (eventName: 'creating', subscriber: (this: CreatingHookContext<T,Key>, primKey:Key, obj:T, transaction:Transaction) => any): void;
+interface TableHooks<T=any,TKey=IDBValidKey> extends DexieEventSet {
+  (eventName: 'creating', subscriber: (this: CreatingHookContext<T,TKey>, primKey:TKey, obj:T, transaction:Transaction) => any): void;
   (eventName: 'reading', subscriber: (obj:T) => T | any): void;
-  (eventName: 'updating', subscriber: (this: UpdatingHookContext<T,Key>, modifications:Object, primKey:Key, obj:T, transaction:Transaction) => any): void;
-  (eventName: 'deleting', subscriber: (this: DeletingHookContext<T,Key>, primKey:Key, obj:T, transaction:Transaction) => any): void;
+  (eventName: 'updating', subscriber: (this: UpdatingHookContext<T,TKey>, modifications:Object, primKey:TKey, obj:T, transaction:Transaction) => any): void;
+  (eventName: 'deleting', subscriber: (this: DeletingHookContext<T,TKey>, primKey:TKey, obj:T, transaction:Transaction) => any): void;
   creating: DexieEvent;
   reading: DexieEvent;
   updating: DexieEvent;
