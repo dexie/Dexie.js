@@ -19,6 +19,10 @@ import { bulkDelete } from "../functions/bulk-delete";
 import { ThenShortcut } from "../../api/then-shortcut";
 import { CollectionContext } from './collection-context';
 
+/** class Collection
+ * 
+ * http://dexie.org/docs/Collection/Collection
+ */
 export class Collection implements ICollection {
   db: Dexie;
   _ctx: CollectionContext;

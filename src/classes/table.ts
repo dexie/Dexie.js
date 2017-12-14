@@ -18,6 +18,10 @@ import { combine } from '../functions/combine';
 import { PromiseExtended } from "../../api/promise-extended";
 import { bulkDelete } from '../functions/bulk-delete';
 
+/** class Table
+ * 
+ * http://dexie.org/docs/Table/Table
+ */
 export class Table implements ITable {
   db: Dexie;
   _tx?: Transaction;
