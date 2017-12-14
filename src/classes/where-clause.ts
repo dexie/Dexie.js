@@ -8,18 +8,16 @@ import { INVALID_KEY_ARGUMENT, STRING_EXPECTED, maxString, minKey, maxKey } from
 import { getArrayOf, NO_CHAR_ARRAY } from '../utils';
 import { exceptions } from '../errors';
 
-export interface WhereClauseContext {
-  table: Table;
-  index: string;
-  or: Collection;
-}
-
 /** class WhereClause
  * 
  * http://dexie.org/docs/WhereClause/WhereClause
  */
 export class WhereClause implements IWhereClause {
-  _ctx: WhereClauseContext;
+  _ctx: {
+    table: Table;
+    index: string;
+    or: Collection;
+  }
 
   get Collection() {
     return this._ctx.table.db.Collection;

@@ -17,7 +17,6 @@ import { hangsOnDeleteLargeKeyRange } from "../globals/constants";
 import { ascending } from "../functions/compare-functions";
 import { bulkDelete } from "../functions/bulk-delete";
 import { ThenShortcut } from "../../api/then-shortcut";
-import { CollectionContext } from './collection-context';
 
 /** class Collection
  * 
@@ -25,7 +24,26 @@ import { CollectionContext } from './collection-context';
  */
 export class Collection implements ICollection {
   db: Dexie;
-  _ctx: CollectionContext;
+  _ctx: {
+    table: Table;
+    index?: string | null;
+    isPrimKey?: boolean;
+    range: IDBKeyRange;
+    keysOnly: boolean;
+    dir: "next" | "prev";
+    unique: "" | "unique";
+    algorithm?: Function | null;
+    filter?: Function | null;
+    replayFilter: Function | null;
+    justLimit: boolean; // True if a replayFilter is just a filter that performs a "limit" operation (or none at all)
+    isMatch: Function | null;
+    offset: number,
+    limit: number,
+    error: any, // If set, any promise must be rejected with this error
+    or: Collection,
+    valueMapper: (any) => any
+  }
+  
   _ondirectionchange?: Function;
 
   _read(fn, cb?) {
