@@ -1,6 +1,6 @@
-import {keys, isArray, asap} from './utils';
-import {nop, mirror, reverseStoppableEventChain} from './chaining-functions';
-import {exceptions} from './errors';
+import {keys, isArray, asap} from '../functions/utils';
+import {nop, mirror, reverseStoppableEventChain} from '../functions/chaining-functions';
+import {exceptions} from '../errors';
 
 export default function Events(ctx) {
     var evs = {};

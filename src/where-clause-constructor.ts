@@ -1,5 +1,5 @@
 import { Dexie } from './dexie';
-import { makeClassConstructor } from '../functions/make-class-constructor';
+import { makeClassConstructor } from './functions/make-class-constructor';
 import { WhereClause } from './where-clause';
 import { Table } from './table';
 import { Collection } from './collection';

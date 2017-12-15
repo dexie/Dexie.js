@@ -1,22 +1,22 @@
-import { Collection as ICollection } from "../../types/collection";
+import { Collection as ICollection } from "./public/types/collection";
 import { WhereClause } from "./where-clause";
 import { Dexie } from "./dexie";
 import { Table } from "./table";
-import { IDBValidKey } from "../../types/indexeddb";
-import { PromiseExtended } from "../../types/promise-extended";
-import { iter, isPlainKeyRange, getIndexOrStore, addReplayFilter, addFilter, addMatchFilter } from "../functions/collection-helpers";
-import { IDBObjectStore, IDBCursor } from '../../types/indexeddb';
-import { rejection } from "../Promise";
-import { combine } from "../functions/combine";
-import { extend, hasOwn, deepClone, getObjectDiff, keys, setByKeyPath, getByKeyPath, shallowClone, tryCatch } from "../utils";
-import { eventRejectHandler, eventSuccessHandler, hookedEventRejectHandler, hookedEventSuccessHandler } from "../functions/event-wrappers";
-import { hasGetAll } from "../globals/lazy-globals";
-import { mirror, nop } from "../chaining-functions";
-import { ModifyError } from "../errors";
-import { hangsOnDeleteLargeKeyRange } from "../globals/constants";
-import { ascending } from "../functions/compare-functions";
-import { bulkDelete } from "../functions/bulk-delete";
-import { ThenShortcut } from "../../types/then-shortcut";
+import { IDBValidKey } from "./public/types/indexeddb";
+import { PromiseExtended } from "./public/types/promise-extended";
+import { iter, isPlainKeyRange, getIndexOrStore, addReplayFilter, addFilter, addMatchFilter } from "./functions/collection-helpers";
+import { IDBObjectStore, IDBCursor } from './public/types/indexeddb';
+import { rejection } from "./helpers/promise";
+import { combine } from "./functions/combine";
+import { extend, hasOwn, deepClone, getObjectDiff, keys, setByKeyPath, getByKeyPath, shallowClone, tryCatch } from "./functions/utils";
+import { eventRejectHandler, eventSuccessHandler, hookedEventRejectHandler, hookedEventSuccessHandler } from "./functions/event-wrappers";
+import { hasGetAll } from "./globals/lazy-globals";
+import { mirror, nop } from "./functions/chaining-functions";
+import { ModifyError } from "./errors";
+import { hangsOnDeleteLargeKeyRange } from "./globals/constants";
+import { ascending } from "./functions/compare-functions";
+import { bulkDelete } from "./functions/bulk-delete";
+import { ThenShortcut } from "./public/types/then-shortcut";
 
 /** class Collection
  * 

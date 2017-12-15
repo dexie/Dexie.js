@@ -1,14 +1,14 @@
-import { DexieInternal, DbReadyState } from "../interfaces/dexie-internal";
-import { PSD, rejection, newScope } from "../Promise";
-import { DexieOptions } from "../interfaces/dexie-constructor";
+import { PSD, rejection, newScope } from "../helpers/promise";
+import { DexieOptions } from "../public/types/dexie-constructor";
 import { exceptions } from "../errors";
-import { nop } from "../chaining-functions";
-import { Transaction } from "../classes/transaction";
+import { nop } from "./chaining-functions";
+import { Transaction } from "../transaction";
+import { Dexie } from '../dexie';
 
 /* Generate a temporary transaction when db operations are done outside a transaction scope.
 */
 export function tempTransaction (
-  db: DexieInternal,
+  db: Dexie,
   mode: IDBTransactionMode,
   storeNames: string[],
   fn: (resolve, reject, trans: Transaction) => any)

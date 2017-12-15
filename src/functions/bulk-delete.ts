@@ -1,8 +1,8 @@
-import { IDBObjectStore, IDBValidKey, IDBRequest } from '../interfaces/indexed-db';
-import { Transaction } from '../classes/transaction';
+import { IDBObjectStore, IDBValidKey, IDBRequest } from '../public/types/indexeddb';
+import { Transaction } from '../transaction';
 import { eventRejectHandler, hookedEventRejectHandler, hookedEventSuccessHandler } from './event-wrappers';
-import { wrap } from '../Promise';
-import { tryCatch } from '../utils';
+import { wrap } from '../helpers/promise';
+import { tryCatch } from '../functions/utils';
 
 export function bulkDelete(
   idbstore: IDBObjectStore,

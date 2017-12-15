@@ -1,5 +1,5 @@
 import { Dexie } from './dexie';
-import { makeClassConstructor } from '../functions/make-class-constructor';
+import { makeClassConstructor } from './functions/make-class-constructor';
 
 export interface VersionConstructor {
   new () : Version;

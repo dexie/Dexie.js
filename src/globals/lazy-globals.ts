@@ -1,4 +1,4 @@
-import { Dexie } from "../interfaces/dexie";
+import { Dexie } from "../dexie";
 
 export let dbNamesDB: Dexie;
 export let hasNativeGetDatabaseNames: boolean | undefined;

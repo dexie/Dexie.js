@@ -1,4 +1,4 @@
-import { Dexie } from "../interfaces/dexie";
+import { Dexie } from "../dexie";
 
 export const maxString = String.fromCharCode(65535);
 // maxKey is an Array<Array> if indexedDB implementations supports array keys (not supported by IE,Edge or Safari at the moment)
