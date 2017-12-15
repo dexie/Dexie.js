@@ -3,10 +3,10 @@
  * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/LICENSE-2.0
  */
 import {tryCatch, props, setProp, _global,
-    getPropertyDescriptor, getArrayOf, extend} from './utils';
-import {nop, callBoth, mirror} from './chaining-functions';
+    getPropertyDescriptor, getArrayOf, extend} from '../functions/utils';
+import {nop, callBoth, mirror} from '../functions/chaining-functions';
 import {debug, prettyStack, getErrorWithStack} from './debug';
-import {exceptions} from './errors';
+import {exceptions} from '../errors';
 
 //
 // Promise and Zone (PSD) for Dexie library

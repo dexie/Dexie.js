@@ -1,10 +1,12 @@
-import { CollectionContext } from "../classes/collection";
 import { combine } from "./combine";
-import { IDBObjectStore, IDBCursor } from "../interfaces/indexed-db";
+import { IDBObjectStore, IDBCursor } from "../public/types/indexeddb";
 import { exceptions } from "../errors";
-import { hasOwn, trycatcher } from "../utils";
-import { wrap } from "../Promise";
+import { hasOwn, trycatcher } from "../functions/utils";
+import { wrap } from "../helpers/promise";
 import { eventRejectHandler } from "./event-wrappers";
+import { Collection } from '../collection';
+
+type CollectionContext = Collection["_ctx"];
 
 export function isPlainKeyRange (ctx: CollectionContext, ignoreLimitFilter?: boolean) {
   return !(ctx.filter || ctx.algorithm || ctx.or) &&

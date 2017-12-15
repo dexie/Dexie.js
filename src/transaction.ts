@@ -1,6 +1,6 @@
-import {Transaction as ITransaction} from '../../types/transaction';
-import Promise from "../../types/promise-extended";
-import { DbSchema } from '../../types/db-schema';
+import {Transaction as ITransaction} from './public/types/transaction';
+import Promise from "./public/types/promise-extended";
+import { DbSchema } from './public/types/db-schema';
 
 export class Transaction implements ITransaction {
   idbtrans: IDBTransaction;

@@ -1,4 +1,4 @@
-import { wrap } from "../Promise";
+import { wrap } from "../helpers/promise";
 
 export function eventRejectHandler(reject) {
   return wrap(function (event) {

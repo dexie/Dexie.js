@@ -1,9 +1,9 @@
-import { WhereClause } from '../classes/where-clause';
-import { Collection } from '../classes/collection';
-import { Dexie } from '../classes/dexie';
+import { WhereClause } from '../where-clause';
+import { Collection } from '../collection';
+import { Dexie } from '../dexie';
 import { STRING_EXPECTED } from '../globals/constants';
 import { simpleCompare, simpleCompareReverse } from './compare-functions';
-import { CollectionConstructor } from '../classes/collection-constructor';
+import { CollectionConstructor } from '../collection-constructor';
 
 export function fail(collectionOrWhereClause: Collection | WhereClause, err, T?) {
   var collection = collectionOrWhereClause instanceof WhereClause ?
