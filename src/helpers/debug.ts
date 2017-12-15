@@ -42,9 +42,10 @@ export function prettyStack(exception, numIgnoredFrames) {
         .join('');
 }
 
-export function deprecated (what, fn) {
+// TODO: Replace this in favor of a decorator instead.
+export function deprecated<T> (what: string, fn: (...args)=>T) {
     return function () {
-        console.warn(`${what} is deprecated. See https://github.com/dfahlander/Dexie.js/wiki/Deprecations. ${prettyStack(getErrorWithStack(), 1)}`);
+        console.warn(`${what} is deprecated. See http://dexie.org/docs/Deprecations. ${prettyStack(getErrorWithStack(), 1)}`);
         return fn.apply(this, arguments);
-    }
+    } as (...args)=>T
 }

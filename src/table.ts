@@ -3,7 +3,7 @@ import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapEr
 import { Table as ITable } from './public/types/table';
 import { TableSchema } from './public/types/table-schema';
 import { TableHooks } from './public/types/table-hooks';
-import { PSD, newScope, wrap, rejection } from './helpers/promise';
+import { DexiePromise as Promise, PSD, newScope, wrap, rejection } from './helpers/promise';
 import Events from './helpers/Events';
 import { hookCreatingChain, nop, pureFunctionChain, mirror, hookUpdatingChain, hookDeletingChain } from './functions/chaining-functions';
 import { Transaction } from './transaction';
@@ -29,8 +29,12 @@ export class Table implements ITable {
   schema: TableSchema;
   hook: TableHooks;
 
-  _trans(mode: IDBTransactionMode, fn, writeLocked?: boolean | string) {
-    var trans = this._tx || PSD.trans;
+  _trans(
+    mode: IDBTransactionMode,
+    fn: (resolve, reject, trans: Transaction) => Promise | void,
+    writeLocked?: boolean | string) : Promise
+  {
+    var trans: Transaction = this._tx || PSD.trans;
     return trans && trans.db === this.db ?
       trans === PSD.trans ?
         trans._promise(mode, fn, writeLocked) :
@@ -44,8 +48,9 @@ export class Table implements ITable {
       resolve,
       reject,
       idbstore: IDBObjectStore,
-      trans: Transaction) => any,
-    writeLocked?: boolean | string) {
+      trans: Transaction) => Promise | void,
+    writeLocked?: boolean | string) : Promise
+  {
     var tableName = this.name;
     function supplyIdbStore(resolve, reject, trans) {
       if (trans.storeNames.indexOf(tableName) === -1)

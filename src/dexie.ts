@@ -22,6 +22,8 @@ export class Dexie implements DexieInternal {
   name: string;
   tables: Table[];
   verno: number;
+  idbdb: IDBDatabase | null;
+
   _allTables: { [name: string]: Table; };
   _createTransaction: (this: DexieInternal, mode: IDBTransactionMode, storeNames: ArrayLike<string>, dbschema: { [tableName: string]: TableSchema; }, parentTransaction?: Transaction) => any;
   _dbSchema: { [tableName: string]: TableSchema; };
@@ -74,8 +76,8 @@ export class Dexie implements DexieInternal {
   dynamicallyOpened(): boolean {
     throw new Error("Method not implemented.");
   }
-  backendDB(): IDBDatabase {
-    throw new Error("Method not implemented.");
+  backendDB() {
+    return this.idbdb;
   }
   vip<U>(scopeFunction: () => U): U {
     throw new Error("Method not implemented.");
