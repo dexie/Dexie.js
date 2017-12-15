@@ -1,7 +1,7 @@
 import { Transaction as ITransaction } from './public/types/transaction';
 import { DexiePromise as Promise, wrap, rejection } from "./helpers/promise";
 import { DbSchema } from './public/types/db-schema';
-import { assert } from './functions/utils';
+import { assert, hasOwn } from './functions/utils';
 import { PSD, usePSD } from './helpers/promise';
 import { Dexie } from './dexie';
 import { IDBTransaction } from './public/types/indexeddb';
@@ -10,6 +10,7 @@ import { safariMultiStoreFix } from './functions/quirks';
 import { preventDefault } from './functions/event-wrappers';
 import { newScope } from './helpers/promise';
 import * as Debug from './helpers/debug';
+import { Table } from './table';
 
 /** Transaction
  * 
@@ -24,6 +25,7 @@ export class Transaction implements ITransaction {
   storeNames: string[];
   on: any;
   parent?: Transaction;
+  _memoizedTables: {[tableName: string]: Table};
 
   _reculock: number;
   _blockedFuncs: { 0: () => any, 1: any }[];
@@ -238,7 +240,15 @@ export class Transaction implements ITransaction {
   table<T>(tableName: string);
   table<T, Key>(tableName: string);
   table(tableName: any) {
+    const memoizedTables = (this._memoizedTables || (this._memoizedTables = {}));
+    if (hasOwn(memoizedTables, tableName))
+      return memoizedTables[tableName];
+
+    // Let Dexie.table() take care of throwing if table name is not part of schema.
     var table = this.db.table(tableName); // Don't check that table is part of transaction. It must fail lazily!
-    return new this.db.Table(name, table.schema, this);
+
+    const transactionBoundTable = new this.db.Table(name, table.schema, this);
+    memoizedTables[tableName] = transactionBoundTable;
+    return transactionBoundTable;
   }
 }

@@ -6,7 +6,6 @@ import { Transaction } from "./transaction";
 import { WhereClause } from "./where-clause";
 import { Collection } from "./collection";
 import { DbSchema } from "./db-schema";
-import { DexieInternal } from "./dexie-internal";
 import { IDBValidKey } from "./indexeddb";
 import { TableSchema } from "./table-schema";
 import { DexieConstructor } from "./dexie-constructor";
