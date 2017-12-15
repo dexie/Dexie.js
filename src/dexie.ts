@@ -1,31 +1,55 @@
+// Import types from the public API
 import { Dexie as IDexie} from "./public/types/dexie";
-import { DexieInternal, DbReadyState, WebDependencies } from "./public/types/dexie-internal";
 import { DexieOptions } from "./public/types/dexie-constructor";
-import { Table } from "./table";
-import { Table as ITable } from "./public/types/table";
-import { TableSchema } from "./public/types/table-schema";
-import { Version } from "./public/types/version";
 import { DbEvents } from "./public/types/db-events";
 import { IDBValidKey } from './public/types/indexeddb';
-import { Transaction } from './transaction';
-import { WhereClause } from './where-clause';
-import { Collection } from './collection';
-import { TableConstructor } from './table-constructor';
-import { WhereClauseConstructor } from './where-clause-constructor';
-import { VersionConstructor } from './version-constructor';
-import { TransactionConstructor } from './transaction-constructor';
-import { CollectionConstructor } from './collection-constructor';
 import { PromiseExtended } from './public/types/promise-extended';
+import { Table as ITable} from './public/types/table';
 
-export class Dexie implements DexieInternal {
-  _i: DbReadyState & DexieOptions & WebDependencies;
+// Internal imports
+import { Table } from "./table";
+import { TableConstructor } from './table-constructor';
+import { TableSchema } from "./public/types/table-schema";
+import { Collection } from './collection';
+import { CollectionConstructor } from './collection-constructor';
+import { WhereClause } from './where-clause';
+import { WhereClauseConstructor } from './where-clause-constructor';
+import { Transaction } from './transaction';
+import { TransactionConstructor } from './transaction-constructor';
+import { Version } from "./version";
+import { VersionConstructor } from './version-constructor';
+
+export interface DbReadyState {
+  dbOpenError: any;
+  isBeingOpened: boolean;
+  onReadyBeingFired: boolean;
+  openComplete: boolean;
+  dbReadyResolve: ()=>void;
+  dbReadyPromise: Promise<any>;
+  cancelOpen: ()=>void;
+  openCanceller: Promise<any>;
+}
+
+export interface WebDependencies {
+  indexedDB?: IDBFactory,
+  IDBKeyRange?: {new(): IDBKeyRange}
+}
+
+export interface VersionsAndSchemas {
+  versions: Version[];
+  dbStoreNames: string[];
+}
+
+
+export class Dexie implements IDexie {
+  _i: DbReadyState & DexieOptions & WebDependencies & VersionsAndSchemas;
   name: string;
   tables: Table[];
   verno: number;
   idbdb: IDBDatabase | null;
 
   _allTables: { [name: string]: Table; };
-  _createTransaction: (this: DexieInternal, mode: IDBTransactionMode, storeNames: ArrayLike<string>, dbschema: { [tableName: string]: TableSchema; }, parentTransaction?: Transaction) => any;
+  _createTransaction: (this: Dexie, mode: IDBTransactionMode, storeNames: ArrayLike<string>, dbschema: { [tableName: string]: TableSchema; }, parentTransaction?: Transaction) => any;
   _dbSchema: { [tableName: string]: TableSchema; };
 
   Table: TableConstructor;
@@ -41,7 +65,7 @@ export class Dexie implements DexieInternal {
   open(): PromiseExtended<Dexie> {
     throw new Error("Method not implemented.");
   }
-  table<T = any, TKey extends IDBValidKey = IDBValidKey>(tableName: string): ITable<T, TKey>;
+  table<T=any, TKey extends IDBValidKey=IDBValidKey>(tableName: string): ITable<T, TKey>;
   table(tableName: string): Table {
     throw new Error("Method not implemented.");
   }
