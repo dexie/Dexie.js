@@ -10,6 +10,12 @@ export interface TransactionConstructor {
   prototype: Transaction;
 }
 
+/** Generates a Transaction constructor bound to given Dexie instance.
+ * 
+ * The purpose of having dynamically created constructors, is to allow
+ * addons to extend classes for a certain Dexie instance without affecting
+ * other db instances.
+ */
 export function createTransactionConstructor (db: Dexie) {
   return makeClassConstructor<TransactionConstructor>(
     Transaction.prototype,
