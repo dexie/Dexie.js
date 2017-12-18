@@ -9,6 +9,12 @@ export interface WhereClauseConstructor {
   prototype: WhereClause;
 }
 
+/** Generates a WhereClause constructor.
+ * 
+ * The purpose of having dynamically created constructors, is to allow
+ * addons to extend classes for a certain Dexie instance without affecting
+ * other db instances.
+ */
 export function createWhereClauseConstructor() {
   return makeClassConstructor<WhereClauseConstructor>(
     WhereClause.prototype,

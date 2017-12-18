@@ -3,11 +3,18 @@ import { makeClassConstructor } from './functions/make-class-constructor';
 import { Collection } from './collection';
 import { WhereClause } from './where-clause';
 
+/** Constructs a Collection instance. */
 export interface CollectionConstructor {
   new(whereClause?: WhereClause | null, keyRangeGenerator?: () => IDBKeyRange): Collection;
   prototype: Collection;
 }
 
+/** Generates a Collection constructor bound to given Dexie instance.
+ * 
+ * The purpose of having dynamically created constructors, is to allow
+ * addons to extend classes for a certain Dexie instance without affecting
+ * other db instances.
+ */
 export function createCollectionConstructor(db: Dexie) {
   return makeClassConstructor<CollectionConstructor>(
     Collection.prototype,

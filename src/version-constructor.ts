@@ -7,6 +7,12 @@ export interface VersionConstructor {
   prototype: Version;
 }
 
+/** Generates a Version constructor bound to given Dexie instance.
+ * 
+ * The purpose of having dynamically created constructors, is to allow
+ * addons to extend classes for a certain Dexie instance without affecting
+ * other db instances.
+ */
 export function createVersionConstructor(db: Dexie) {
   return makeClassConstructor<VersionConstructor>(
     Version.prototype,
