@@ -29,6 +29,8 @@ export interface DexieConstructor extends DexieExceptionClasses {
   getDatabaseNames(): Promise<string[]>;
   getDatabaseNames<R>(thenShortcut: ThenShortcut<string[],R>): Promise<R>;
 
+  vip<U>(scopeFunction: () => U): U;
+  ignoreTransaction<U>(fn: ()=> U) : U;
   override<F> (origFunc:F, overridedFactory: (fn:any)=>any) : F; // ?
   getByKeyPath(obj: Object, keyPath: string): any;
   setByKeyPath(obj: Object, keyPath: string, value: any): void;
