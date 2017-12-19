@@ -61,27 +61,17 @@ export class Dexie implements IDexie {
 
   static addons: Array<(db: Dexie) => void>;
   static version: number;
-  static semVer: string;
-  static currentTransaction: Transaction;
   static maxKey: IDBValidKey;
   static minKey: IDBValidKey;
   static dependencies: DexieDOMDependencies;
   static vip: (any)=> any;
   static ignoreTransaction: any;
   
-  
-  /*
-  static default: DexieConstructor;
-  static Promise: PromiseExtendedConstructor;
-  static Events: (ctx?)=>DexieEventSet;
-  static errnames: {[P in keyof DexieExceptionClasses]: P};
-  */
-
   Table: TableConstructor;
   WhereClause: WhereClauseConstructor;
+  Collection: CollectionConstructor;
   Version: VersionConstructor;
   Transaction: TransactionConstructor;
-  Collection: CollectionConstructor;
 
   constructor(name: string, options?: DexieOptions) {
     const deps = Dexie.dependencies;
