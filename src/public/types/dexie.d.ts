@@ -61,8 +61,6 @@ export interface Dexie extends Database {
   dynamicallyOpened(): boolean;
 
   backendDB(): IDBDatabase;
-
-  vip<U>(scopeFunction: () => U): U;
   
   // Make it possible to touch physical class constructors where they reside - as properties on db instance.
   // For example, checking if (x instanceof db.Table). Can't do (x instanceof Dexie.Table because it's just a virtual interface)
