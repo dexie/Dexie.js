@@ -29,6 +29,7 @@ import Promise from './helpers/promise';
 import { extend, override } from './functions/utils';
 import Events from './helpers/Events';
 import { maxString } from './globals/constants';
+import { getMaxKey } from './functions/quirks';
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -174,12 +175,7 @@ export class Dexie implements IDexie {
         console.warn(`Upgrade '${this.name}' blocked by other connection holding version ${ev.oldVersion / 10}`);
     });
 
-    this._maxKey = [[]];
-    try {
-      options.IDBKeyRange.only([[]]);
-    } catch (e) {
-      this._maxKey = maxString;
-    }
+    this._maxKey = getMaxKey(options.IDBKeyRange);
     
     // Call each addon:
     addons.forEach(addon => addon(this));

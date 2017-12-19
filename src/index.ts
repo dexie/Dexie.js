@@ -14,6 +14,7 @@ import { dexieStackFrameFilter, minKey, connections, DEXIE_VERSION } from './glo
 import Events from './helpers/Events';
 import { exceptions } from './errors';
 import { errnames } from './errors';
+import { getMaxKey } from './functions/quirks';
 
 let databaseLister: DatabaseLister | undefined;
 
@@ -220,5 +221,5 @@ Promise.rejectionMapper = mapError;
 // Initialize databaseLister (won't ever be opened on chromium browsers')
 try {
   databaseLister = DatabaseLister(Dexie.dependencies.indexedDB);
-  Dexie.maxKey = new Dexie('', { addons: [] })._maxKey;
+  Dexie.maxKey = getMaxKey(Dexie.dependencies.IDBKeyRange);
 } catch (e) { }
