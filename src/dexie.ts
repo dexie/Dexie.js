@@ -7,6 +7,7 @@ import { PromiseExtended, PromiseExtendedConstructor } from './public/types/prom
 import { Table as ITable } from './public/types/table';
 import { TableSchema } from "./public/types/table-schema";
 import { IDBKeyRange } from "./public/types/indexeddb";
+import { DbSchema } from './public/types/db-schema';
 
 // Internal imports
 import { Table } from "./table";
@@ -68,7 +69,7 @@ export class Dexie implements IDexie {
 
   constructor(name: string, options?: DexieOptions) {
     const deps = (Dexie as any as DexieConstructor).dependencies;
-    options = {
+    this._options = options = {
       // Default Options
       addons: (Dexie as any as DexieConstructor).addons, // Pick statically registered addons by default
       autoOpen: true,                 // Don't require db.open() explicitely.
@@ -168,6 +169,12 @@ export class Dexie implements IDexie {
     });
 
     this._maxKey = getMaxKey(options.IDBKeyRange);
+
+    this._createTransaction = (
+      mode: IDBTransactionMode,
+      storeNames: string[],
+      dbschema: DbSchema,
+      parentTransaction?: Transaction) => new this.Transaction(mode, storeNames, dbschema, parentTransaction);
     
     // Call each addon:
     addons.forEach(addon => addon(this));
