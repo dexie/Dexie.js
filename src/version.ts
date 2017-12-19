@@ -26,22 +26,22 @@ export class Version implements IVersion {
   stores(stores: { [key: string]: string; }): IVersion {
     const db = this.db;
     this._cfg.storesSource = this._cfg.storesSource ? extend(this._cfg.storesSource, stores) : stores;
-    const versions = db._i.versions;
+    const versions = db._versions;
 
     // Derive stores from earlier versions if they are not explicitely specified as null or a new syntax.
     var storesSpec = {};
-    versions.forEach(function (version) { // 'versions' is always sorted by lowest version first.
+    versions.forEach(version => { // 'versions' is always sorted by lowest version first.
       extend(storesSpec, version._cfg.storesSource);
     });
 
-    var dbschema = (this._cfg.dbschema = {});
+    const dbschema = (this._cfg.dbschema = {});
     this._parseStoresSpec(storesSpec, dbschema);
     // Update the latest schema to this version
     db._dbSchema = dbschema;
     // Update APIs
     removeTablesApi(db, [db._allTables, db, Transaction.prototype]);
     setApiOnPlace(db, [db._allTables, db, Transaction.prototype, this._cfg.tables], keys(dbschema), dbschema);
-    db._i.dbStoreNames = keys(dbschema);
+    db._storeNames = keys(dbschema);
     return this;
   }
 

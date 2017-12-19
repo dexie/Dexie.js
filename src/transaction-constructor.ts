@@ -6,7 +6,11 @@ import Events from './helpers/Events';
 import Promise, { rejection } from './helpers/promise';
 
 export interface TransactionConstructor {
-  new () : Transaction;
+  new (
+    mode: IDBTransactionMode,
+    storeNames: string[],
+    dbschema: DbSchema,
+    parent?: Transaction) : Transaction;
   prototype: Transaction;
 }
 
