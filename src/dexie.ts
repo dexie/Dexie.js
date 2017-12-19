@@ -1,6 +1,6 @@
 // Import types from the public API
 import { Dexie as IDexie } from "./public/types/dexie";
-import { DexieOptions, DexieConstructor, DexieConstructor } from "./public/types/dexie-constructor";
+import { DexieOptions, DexieConstructor } from "./public/types/dexie-constructor";
 import { DbEvents } from "./public/types/db-events";
 import { IDBValidKey, IDBKeyRangeConstructor, IDBFactory } from './public/types/indexeddb';
 import { PromiseExtended, PromiseExtendedConstructor } from './public/types/promise-extended';
@@ -59,14 +59,6 @@ export class Dexie implements IDexie {
   tables: Table[];
   verno: number;
   idbdb: IDBDatabase | null;
-
-  static addons: Array<(db: Dexie) => void>;
-  static version: number;
-  static maxKey: IDBValidKey;
-  static minKey: IDBValidKey;
-  static dependencies: DexieDOMDependencies;
-  static vip: (any)=> any;
-  static ignoreTransaction: any;
   
   Table: TableConstructor;
   WhereClause: WhereClauseConstructor;
@@ -75,10 +67,10 @@ export class Dexie implements IDexie {
   Transaction: TransactionConstructor;
 
   constructor(name: string, options?: DexieOptions) {
-    const deps = Dexie.dependencies;
+    const deps = (Dexie as any as DexieConstructor).dependencies;
     options = {
       // Default Options
-      addons: Dexie.addons,           // Pick statically registered addons by default
+      addons: (Dexie as any as DexieConstructor).addons, // Pick statically registered addons by default
       autoOpen: true,                 // Don't require db.open() explicitely.
       // Default DOM dependency implementations from static prop.
       indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to browser env.
@@ -116,7 +108,7 @@ export class Dexie implements IDexie {
     this.on = Events(this, "populate", "blocked", "versionchange", { ready: [promisableChain, nop] }) as DbEvents;
     this.on.ready.subscribe = override(this.on.ready.subscribe, subscribe => {
       return (subscriber, bSticky) => {
-        Dexie.vip(() => {
+        (Dexie as any as DexieConstructor).vip(() => {
           const state = this._state;
           if (state.openComplete) {
             // Database already open. Call subscriber asap.
