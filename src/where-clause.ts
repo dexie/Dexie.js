@@ -2,22 +2,30 @@ import { WhereClause as IWhereClause } from "./public/types/where-clause";
 import { Collection } from "./collection";
 import { Table } from "./table";
 import { ValidKey } from "./public/types/valid-key";
-import { cmp, ascending, descending, min, max } from './functions/compare-functions';
 import { emptyCollection, fail, addIgnoreCaseAlgorithm } from './functions/where-clause-helpers';
-import { INVALID_KEY_ARGUMENT, STRING_EXPECTED, maxString, minKey, maxKey } from './globals/constants';
+import { INVALID_KEY_ARGUMENT, STRING_EXPECTED, maxString, minKey } from './globals/constants';
+import { maxKey } from './globals/lazy-globals';
 import { getArrayOf, NO_CHAR_ARRAY } from './functions/utils';
 import { exceptions } from './errors';
+import { Dexie } from './dexie';
+import { IndexableTypeArray, IDBValidKey } from './public/types/indexeddb';
 
 /** class WhereClause
  * 
  * http://dexie.org/docs/WhereClause/WhereClause
  */
 export class WhereClause implements IWhereClause {
+  db: Dexie;
   _ctx: {
     table: Table;
     index: string;
     or: Collection;
   }
+  _cmp: (a: IDBValidKey, b: IDBValidKey) => number;
+  _ascending: (a: IDBValidKey, b: IDBValidKey) => number;
+  _descending: (a: IDBValidKey, b: IDBValidKey) => number;
+  _min: (a: IDBValidKey, b: IDBValidKey) => IDBValidKey;
+  _max: (a: IDBValidKey, b: IDBValidKey) => IDBValidKey;
 
   get Collection() {
     return this._ctx.table.db.Collection;
@@ -32,8 +40,8 @@ export class WhereClause implements IWhereClause {
     includeLower = includeLower !== false;   // Default to true
     includeUpper = includeUpper === true;    // Default to false
     try {
-      if ((cmp(lower, upper) > 0) ||
-        (cmp(lower, upper) === 0 && (includeLower || includeUpper) && !(includeLower && includeUpper)))
+      if ((this._cmp(lower, upper) > 0) ||
+        (this._cmp(lower, upper) === 0 && (includeLower || includeUpper) && !(includeLower && includeUpper)))
         return emptyCollection(this); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
       return new this.Collection(this, function () { return IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper); });
     } catch (e) {
@@ -150,13 +158,15 @@ export class WhereClause implements IWhereClause {
   anyOf(values: string[]): Collection;
   anyOf() {
     const set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
-    let compare = ascending;
+    let compare = this._cmp;
     try { set.sort(compare); } catch (e) { return fail(this, INVALID_KEY_ARGUMENT); }
     if (set.length === 0) return emptyCollection(this);
     const c = new this.Collection(this, () => IDBKeyRange.bound(set[0], set[set.length - 1]));
 
     c._ondirectionchange = direction => {
-      compare = (direction === "next" ? ascending : descending);
+      compare = (direction === "next" ?
+        this._ascending :
+        this._descending);
       set.sort(compare);
     };
 
@@ -203,7 +213,7 @@ export class WhereClause implements IWhereClause {
   noneOf() {
     const set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
     if (set.length === 0) return new this.Collection(this); // Return entire collection.
-    try { set.sort(ascending); } catch (e) { return fail(this, INVALID_KEY_ARGUMENT); }
+    try { set.sort(this._ascending); } catch (e) { return fail(this, INVALID_KEY_ARGUMENT); }
     // Transform ["a","b","c"] to a set of ranges for between/above/below: [[minKey,"a"], ["a","b"], ["b","c"], ["c",maxKey]]
     const ranges = set.reduce(
       (res, val) => res ?
@@ -223,6 +233,9 @@ export class WhereClause implements IWhereClause {
     ranges: ReadonlyArray<{ 0: ValidKey, 1: ValidKey }>,
     options?: { includeLowers?: boolean, includeUppers?: boolean })
   {
+    const ascending = this._ascending,
+          descending = this._descending;
+
     if (ranges.length === 0) return emptyCollection(this);
     if (!ranges.every(range =>
       range[0] !== undefined &&
@@ -240,9 +253,9 @@ export class WhereClause implements IWhereClause {
       let i = 0, l = ranges.length;
       for (; i < l; ++i) {
         const range = ranges[i];
-        if (cmp(newRange[0], range[1]) < 0 && cmp(newRange[1], range[0]) > 0) {
-          range[0] = min(range[0], newRange[0]);
-          range[1] = max(range[1], newRange[1]);
+        if (this._cmp(newRange[0], range[1]) < 0 && this._cmp(newRange[1], range[0]) > 0) {
+          range[0] = this._min(range[0], newRange[0]);
+          range[1] = this._max(range[1], newRange[1]);
           break;
         }
       }
@@ -307,7 +320,7 @@ export class WhereClause implements IWhereClause {
       if (keyWithinCurrentRange(key)) {
         // The current cursor value should be included and we should continue a single step in case next item has the same key or possibly our next key in set.
         return true;
-      } else if (cmp(key, set[rangePos][1]) === 0 || cmp(key, set[rangePos][0]) === 0) {
+      } else if (this._cmp(key, set[rangePos][1]) === 0 || this._cmp(key, set[rangePos][0]) === 0) {
         // includeUpper or includeLower is false so keyWithinCurrentRange() returns false even though we are at range border.
         // Continue to next key but don't include this one.
         return false;

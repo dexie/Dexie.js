@@ -12,6 +12,7 @@ export interface DexiePromiseConstructor extends PromiseExtendedConstructor {
   PSD,
   newPSD<R> (zoneProps, fn: (...args)=>R, ...args) : R;
   usePSD<R> (psd, fn: (...args)=>R, ...args): R;
+  rejectionMapper: (e?: any) => Error;
 }
 
 export const NativePromise : PromiseConstructor;

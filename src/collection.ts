@@ -2,7 +2,7 @@ import { Collection as ICollection } from "./public/types/collection";
 import { WhereClause } from "./where-clause";
 import { Dexie } from "./dexie";
 import { Table } from "./table";
-import { IDBValidKey } from "./public/types/indexeddb";
+import { IDBKeyRange, IDBValidKey } from "./public/types/indexeddb";
 import { PromiseExtended } from "./public/types/promise-extended";
 import { iter, isPlainKeyRange, getIndexOrStore, addReplayFilter, addFilter, addMatchFilter } from "./functions/collection-helpers";
 import { IDBObjectStore, IDBCursor } from './public/types/indexeddb';
@@ -14,7 +14,6 @@ import { hasGetAll } from "./globals/lazy-globals";
 import { mirror, nop } from "./functions/chaining-functions";
 import { ModifyError } from "./errors";
 import { hangsOnDeleteLargeKeyRange } from "./globals/constants";
-import { ascending } from "./functions/compare-functions";
 import { bulkDelete } from "./functions/bulk-delete";
 import { ThenShortcut } from "./public/types/then-shortcut";
 

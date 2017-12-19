@@ -15,17 +15,22 @@ export interface WhereClauseConstructor {
  * addons to extend classes for a certain Dexie instance without affecting
  * other db instances.
  */
-export function createWhereClauseConstructor() {
+export function createWhereClauseConstructor(db: Dexie) {
   return makeClassConstructor<WhereClauseConstructor>(
     WhereClause.prototype,
 
     function WhereClause(this: WhereClause, table: Table, index?: string, orCollection?: Collection) {
+      this.db = db;
       this._ctx = {
         table: table,
         index: index === ":id" ? null : index,
         or: orCollection
       };
+      const indexedDB = db._deps.indexedDB;
+      this._cmp = this._ascending = indexedDB.cmp.bind(indexedDB);
+      this._descending = (a, b) => indexedDB.cmp(b, a);
+      this._max = (a, b) => indexedDB.cmp(a,b) > 0 ? a : b;
+      this._min = (a, b) => indexedDB.cmp(a,b) < 0 ? a : b;
     }
-
   );
 }
