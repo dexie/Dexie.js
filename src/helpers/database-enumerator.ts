@@ -6,13 +6,13 @@ import { Table } from '../public/types/table';
 import { nop } from '../functions/chaining-functions';
 import { PromiseExtended } from '../public/types/promise-extended';
 
-export interface DatabaseLister {
+export interface DatabaseEnumerator {
   getDatabaseNames (): PromiseExtended<string[]>;
   add (name: string): undefined | PromiseExtended;
   remove (name: string): undefined | PromiseExtended;
 }
 
-export function DatabaseLister (indexedDB) : DatabaseLister {
+export function DatabaseEnumerator (indexedDB) : DatabaseEnumerator {
   const getDatabaseNamesNative = indexedDB && (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
   let dbNamesTable: Table<{name: string}, string>;
 
