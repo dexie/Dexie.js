@@ -16,7 +16,7 @@ export interface DexieVersionChangeEvent {
 export interface DbEvents extends DexieEventSet {
   (eventName: 'ready', subscriber: () => any, bSticky?: boolean): void;
   (eventName: 'populate', subscriber: () => any): void;
-  (eventName: 'blocked', subscriber: () => any): void;
+  (eventName: 'blocked', subscriber: (event: IDBVersionChangeEvent) => any): void;
   (eventName: 'versionchange', subscriber: (event: IDBVersionChangeEvent) => any): void;
   ready: DexieOnReadyEvent;
   populate: DexieEvent;

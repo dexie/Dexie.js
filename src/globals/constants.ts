@@ -1,10 +1,8 @@
 import { Dexie } from "../dexie";
 
+export const DEXIE_VERSION = '{version}'; // Replaced by build-script.
 export const maxString = String.fromCharCode(65535);
-// maxKey is an Array<Array> if indexedDB implementations supports array keys (not supported by IE,Edge or Safari at the moment)
-// Otherwise maxKey is maxString. This is handy when needing an open upper border without limit.
-export const maxKey = (function(){try {IDBKeyRange.only([[]]);return [[]];}catch(e){return maxString;}})();
-export const minKey = -Infinity;
+export const minKey = -Infinity; // minKey can be constant. maxKey must be a prop of Dexie (_maxKey)
 export const INVALID_KEY_ARGUMENT =
   "Invalid key provided. Keys must be of type string, number, Date or Array<string | number | Date>.";
 export const STRING_EXPECTED = "String expected.";

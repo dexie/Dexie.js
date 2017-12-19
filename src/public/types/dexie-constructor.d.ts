@@ -6,12 +6,14 @@ import { IndexSpec } from "./index-spec";
 import { DexieExceptionClasses } from "./errors";
 import { PromiseExtendedConstructor } from "./promise-extended";
 import { DexieEventSet } from "./dexie-event-set";
+import { IDBFactory, IDBKeyRangeConstructor } from "./indexeddb";
+import { DexieDOMDependencies } from "./dexie-dom-dependencies";
 
 export interface DexieOptions {
   addons?: Array<(db: Dexie) => void>,
   autoOpen?: boolean,
   indexedDB?: IDBFactory,
-  IDBKeyRange?: {new(): IDBKeyRange}
+  IDBKeyRange?: IDBKeyRangeConstructor
 }
 
 export interface DexieConstructor extends DexieExceptionClasses {
@@ -22,8 +24,7 @@ export interface DexieConstructor extends DexieExceptionClasses {
   version: number;
   semVer: string;
   currentTransaction: Transaction;
-  waitFor<T> (promise: PromiseLike<T> | T) : Promise<T>;
-  waitFor<T> (promise: PromiseLike<T> | T, timeoutMilliseconds: number) : Promise<T>;
+  waitFor<T> (promise: PromiseLike<T> | T, timeoutMilliseconds?: number) : Promise<T>;
 
   getDatabaseNames(): Promise<string[]>;
   getDatabaseNames<R>(thenShortcut: ThenShortcut<string[],R>): Promise<R>;
@@ -39,10 +40,7 @@ export interface DexieConstructor extends DexieExceptionClasses {
   minKey: number;
   exists(dbName: string) : Promise<boolean>;
   delete(dbName: string): Promise<void>;
-  dependencies: {
-    indexedDB: IDBFactory,
-    IDBKeyRange: IDBKeyRange
-  };
+  dependencies: DexieDOMDependencies;
   default: Dexie; // Work-around for different build tools handling default imports differently.
 
   Promise: PromiseExtendedConstructor;

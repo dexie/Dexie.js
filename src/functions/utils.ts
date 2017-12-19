@@ -56,7 +56,7 @@ export function getPropertyDescriptor(obj, prop) {
 }
 
 var _slice = [].slice;
-export function slice(args, start, end) {
+export function slice(args, start, end?) {
     return _slice.call(args, start, end);
 }
 

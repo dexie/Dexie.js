@@ -19,4 +19,4 @@ export declare const exceptions : ExceptionAliasSet & {
 };
 export declare const errnames : {[P in keyof ExceptionSet]: P};
 export declare const fullNameExceptions : ExceptionSet;
-export declare function mapError (domError, message) : DexieError;
+export declare function mapError (domError, message?) : DexieError;
