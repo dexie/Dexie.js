@@ -31,6 +31,8 @@ import { extend, override } from './functions/utils';
 import Events from './helpers/Events';
 import { maxString } from './globals/constants';
 import { getMaxKey } from './functions/quirks';
+import { exceptions } from './errors';
+import { lowerVersionFirst } from './functions/schema-helpers';
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -180,9 +182,22 @@ export class Dexie implements IDexie {
     addons.forEach(addon => addon(this));
   }
 
-  version(versionNumber: Number): Version {
-    throw new Error("Method not implemented.");
+  version(versionNumber: number): Version {
+    if (this.idbdb || this._state.isBeingOpened)
+      throw new exceptions.Schema("Cannot add version when database is open");
+    this.verno = Math.max(this.verno, versionNumber);
+    const versions = this._versions;
+    var versionInstance = versions.filter(
+      v => v._cfg.version === versionNumber)[0];
+    if (versionInstance) return versionInstance;
+    versionInstance = new this.Version(versionNumber);
+    versions.push(versionInstance);
+    versions.sort(lowerVersionFirst);
+    // Disable autoschema mode, as at least one version is specified.
+    this._state.autoSchema = false;
+    return versionInstance;
   }
+  
   on: DbEvents;
   open(): PromiseExtended<Dexie> {
     throw new Error("Method not implemented.");

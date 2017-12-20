@@ -28,7 +28,7 @@ export interface Dexie extends Database {
   
   _dbSchema: DbSchema;
 
-  version(versionNumber: Number): Version;
+  version(versionNumber: number): Version;
 
   on: DbEvents;
 

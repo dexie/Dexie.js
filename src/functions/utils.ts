@@ -1,7 +1,7 @@
 ﻿declare var global;
-export var keys = Object.keys;
-export var isArray = Array.isArray;
-export var _global =
+export const keys = Object.keys;
+export const isArray = Array.isArray;
+export const _global =
     typeof self !== 'undefined' ? self :
     typeof window !== 'undefined' ? window :
     global;
@@ -50,13 +50,13 @@ export function derive(Child) {
 export const getOwnPropertyDescriptor = Object.getOwnPropertyDescriptor;
 
 export function getPropertyDescriptor(obj, prop) {
-    var pd = getOwnPropertyDescriptor(obj, prop),
-        proto;
+    const pd = getOwnPropertyDescriptor(obj, prop);
+    let proto;
     return pd || (proto = getProto(obj)) && getPropertyDescriptor (proto, prop);
 }
 
-var _slice = [].slice;
-export function slice(args, start, end?) {
+const _slice = [].slice;
+export function slice(args, start?, end?) {
     return _slice.call(args, start, end);
 }
 
@@ -176,7 +176,7 @@ export function flatten (a) {
 }
 
 //https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm
-var intrinsicTypes =
+const intrinsicTypes =
     "Boolean,String,Date,RegExp,Blob,File,FileList,ArrayBuffer,DataView,Uint8ClampedArray,ImageData,Map,Set"
     .split(',').concat(
         flatten([8,16,32,64].map(num=>["Int","Uint","Float"].map(t=>t+num+"Array")))
