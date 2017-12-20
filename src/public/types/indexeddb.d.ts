@@ -68,6 +68,18 @@ export interface IDBDatabase extends EventTarget {
   removeEventListener(type: string, listener: EventListenerOrEventListenerObject, useCapture?: boolean): void;
 }
 
+export interface IDBIndexParameters {
+  multiEntry?: boolean;
+  unique?: boolean;
+}
+
+export interface IDBObjectStoreParameters {
+  autoIncrement?: boolean;
+  keyPath?: IDBKeyPath | null;
+}
+
+export type IDBKeyPath = string | string[];
+
 export interface IDBFactory {
   cmp(first: any, second: any): number;
   deleteDatabase(name: string): IDBOpenDBRequest;

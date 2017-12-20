@@ -8,7 +8,7 @@ export interface DexiePromise<T=any> extends PromiseExtended<T> {
 
 export interface DexiePromiseConstructor extends PromiseExtendedConstructor {
   new <T>(executor: (resolve: (value?: T | PromiseLike<T>) => void, reject: (reason?: any) => void) => void): DexiePromise<T>;
-  follow<R> (fn: (...args)=>R, zoneProps): R;
+  follow<R> (fn: (...args)=>R, zoneProps?): R;
   PSD,
   newPSD<R> (zoneProps, fn: (...args)=>R, ...args) : R;
   usePSD<R> (psd, fn: (...args)=>R, ...args): R;

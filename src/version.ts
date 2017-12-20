@@ -3,7 +3,9 @@ import { DbSchema } from './public/types/db-schema';
 import { extend, keys } from './functions/utils';
 import { Dexie } from './dexie';
 import { Transaction } from './transaction';
-import { removeTablesApi, setApiOnPlace } from './functions/schema-helpers';
+import { removeTablesApi, setApiOnPlace, parseIndexSyntax } from './functions/schema-helpers';
+import { exceptions } from './errors';
+import { createTableSchema } from './helpers/table-schema';
 
 /** class Version
  * 
@@ -16,20 +18,33 @@ export class Version implements IVersion {
     storesSource: { [tableName: string]: string | null },
     dbschema: DbSchema,
     tables: {},
-    contentUpgrade: null
+    contentUpgrade: Function | null
   }
 
-  _parseStoresSpec(arg0: any, arg1: any): any {
-    throw new Error("Method not implemented.");
+  _parseStoresSpec(stores: { [tableName: string]: string | null }, outSchema: DbSchema): any {
+    keys(stores).forEach(tableName => {
+      if (stores[tableName] !== null) {
+          var indexes = parseIndexSyntax(stores[tableName]);
+          var primKey = indexes.shift();
+          if (primKey.multi) throw new exceptions.Schema("Primary key cannot be multi-valued");
+          indexes.forEach(idx => {
+              if (idx.auto) throw new exceptions.Schema("Only primary key can be marked as autoIncrement (++)");
+              if (!idx.keyPath) throw new exceptions.Schema("Index must have a name and cannot be an empty string");
+          });
+          outSchema[tableName] = createTableSchema(tableName, primKey, indexes);
+      }
+    });
   }
 
   stores(stores: { [key: string]: string; }): IVersion {
     const db = this.db;
-    this._cfg.storesSource = this._cfg.storesSource ? extend(this._cfg.storesSource, stores) : stores;
+    this._cfg.storesSource = this._cfg.storesSource ?
+      extend(this._cfg.storesSource, stores) :
+      stores;
     const versions = db._versions;
 
     // Derive stores from earlier versions if they are not explicitely specified as null or a new syntax.
-    var storesSpec = {};
+    const storesSpec: { [key: string]: string; } = {};
     versions.forEach(version => { // 'versions' is always sorted by lowest version first.
       extend(storesSpec, version._cfg.storesSource);
     });
@@ -45,7 +60,8 @@ export class Version implements IVersion {
     return this;
   }
 
-  upgrade(fn: (trans: Transaction) => void): IVersion {
-    throw new Error("Method not implemented.");
+  upgrade(upgradeFunction: (trans: Transaction) => PromiseLike<any> | void): Version {
+    this._cfg.contentUpgrade = upgradeFunction;
+    return this;
   }
 }
