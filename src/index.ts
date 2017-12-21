@@ -5,9 +5,13 @@ import { defineDexieStaticProperties } from './dexie-static-props';
 import { DexieConstructor } from './public/types/dexie-constructor';
 import * as Debug from './helpers/debug';
 import { dexieStackFrameFilter } from './globals/constants';
+import { initDatabaseEnumerator } from './helpers/database-enumerator';
 
 // Generate all static properties of Dexie dynamically:
 defineDexieStaticProperties(Dexie as any as DexieConstructor);
+
+// Init Database Enumerator (for Dexie.getDatabaseNames())
+initDatabaseEnumerator((Dexie as any as DexieConstructor).dependencies.indexedDB);
 
 // Set rejectionMapper of DexiePromise so that it generally tries to map
 // DOMErrors and DOMExceptions to a DexieError instance with same name but with

@@ -2,8 +2,8 @@
 import { Dexie as IDexie } from "./public/types/dexie";
 import { DexieOptions, DexieConstructor } from "./public/types/dexie-constructor";
 import { DbEvents } from "./public/types/db-events";
-import { IDBValidKey, IDBKeyRangeConstructor, IDBFactory } from './public/types/indexeddb';
-import { PromiseExtended, PromiseExtendedConstructor } from './public/types/promise-extended';
+import { IDBValidKey, IDBKeyRangeConstructor, IDBFactory, IDBEvent } from './public/types/indexeddb';
+//import { PromiseExtended, PromiseExtendedConstructor } from './public/types/promise-extended';
 import { Table as ITable } from './public/types/table';
 import { TableSchema } from "./public/types/table-schema";
 import { IDBKeyRange } from "./public/types/indexeddb";
@@ -26,13 +26,21 @@ import { DexieEventSet } from './public/types/dexie-event-set';
 import { DexieExceptionClasses } from './public/types/errors';
 import { DexieDOMDependencies } from './public/types/dexie-dom-dependencies';
 import { nop, promisableChain } from './functions/chaining-functions';
-import Promise from './helpers/promise';
-import { extend, override } from './functions/utils';
+import Promise, { PSD } from './helpers/promise';
+import { extend, override, keys, hasOwn } from './functions/utils';
 import Events from './helpers/Events';
-import { maxString } from './globals/constants';
+import { maxString, connections, READONLY, READWRITE } from './globals/constants';
 import { getMaxKey } from './functions/quirks';
 import { exceptions } from './errors';
 import { lowerVersionFirst } from './functions/schema-helpers';
+import { dexieOpen } from './functions/dexie-open';
+import { wrap } from './helpers/promise';
+import { databaseEnumerator } from './helpers/database-enumerator';
+import { eventRejectHandler } from './functions/event-wrappers';
+import { extractTransactionArgs, enterTransactionScope } from './functions/transaction-helpers';
+import { TransactionMode } from './public/types/transaction-mode';
+import { rejection } from './helpers/promise';
+import { usePSD } from './helpers/promise';
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -41,9 +49,10 @@ export interface DbReadyState {
   openComplete: boolean;
   dbReadyResolve: () => void;
   dbReadyPromise: Promise<any>;
-  cancelOpen: () => void;
-  openCanceller: Promise<any>;
+  cancelOpen: (reason?: Error) => void;
+  openCanceller: Promise<any> & { _stackHolder?: Error };
   autoSchema: boolean;
+  vcFired?: boolean;
 }
 
 export class Dexie implements IDexie {
@@ -53,16 +62,17 @@ export class Dexie implements IDexie {
   _storeNames: string[];
   _deps: DexieDOMDependencies;
   _allTables: { [name: string]: Table; };
-  _createTransaction: (this: Dexie, mode: IDBTransactionMode, storeNames: ArrayLike<string>, dbschema: { [tableName: string]: TableSchema; }, parentTransaction?: Transaction) => any;
+  _createTransaction: (this: Dexie, mode: IDBTransactionMode, storeNames: ArrayLike<string>, dbschema: { [tableName: string]: TableSchema; }, parentTransaction?: Transaction) => Transaction;
   _dbSchema: { [tableName: string]: TableSchema; };
   _hasGetAll?: boolean;
   _maxKey: IDBValidKey;
+  _fireOnBlocked: (ev: IDBEvent) => void;
 
   name: string;
-  tables: Table[];
-  verno: number;
+  verno: number = 0;
   idbdb: IDBDatabase | null;
-  
+  on: DbEvents;
+
   Table: TableConstructor;
   WhereClause: WhereClauseConstructor;
   Collection: CollectionConstructor;
@@ -177,7 +187,15 @@ export class Dexie implements IDexie {
       storeNames: string[],
       dbschema: DbSchema,
       parentTransaction?: Transaction) => new this.Transaction(mode, storeNames, dbschema, parentTransaction);
-    
+
+    this._fireOnBlocked = ev => {
+      this.on("blocked").fire(ev);
+      // Workaround (not fully*) for missing "versionchange" event in IE,Edge and Safari:
+      connections
+        .filter(c => c.name === this.name && c !== this && !c._state.vcFired)
+        .map(c => c.on("versionchange").fire(ev));
+    }
+
     // Call each addon:
     addons.forEach(addon => addon(this));
   }
@@ -197,51 +215,177 @@ export class Dexie implements IDexie {
     this._state.autoSchema = false;
     return versionInstance;
   }
-  
-  on: DbEvents;
-  open(): PromiseExtended<Dexie> {
-    throw new Error("Method not implemented.");
+
+  _whenReady<T>(fn: () => Promise<T>): Promise<T> {
+    return this._state.openComplete || PSD.letThrough ? fn() : new Promise<T>((resolve, reject) => {
+      if (!this._state.isBeingOpened) {
+        if (!this._options.autoOpen) {
+          reject(new exceptions.DatabaseClosed());
+          return;
+        }
+        this.open().catch(nop); // Open in background. If if fails, it will be catched by the final promise anyway.
+      }
+      this._state.dbReadyPromise.then(resolve, reject);
+    }).then(fn);
   }
-  table(tableName: string): Table;
-  table<T, TKey extends IDBValidKey=IDBValidKey>(tableName: string): ITable<T, TKey>;
-  table(tableName: string): Table {
-    throw new Error("Method not implemented.");
-  }
-  /*transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, scope: () => U | PromiseLike<U>): PromiseExtended<U>;
-  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, table2: Table<any, any>, scope: () => U | PromiseLike<U>): PromiseExtended<U>;
-  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, scope: () => U | PromiseLike<U>): PromiseExtended<U>;
-  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, table4: Table<any, any>, scope: () => U | PromiseLike<U>): PromiseExtended<U>;
-  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, table4: Table<any, any>, table5: Table<any, any>, scope: () => U | PromiseLike<U>): PromiseExtended<U>;
-  transaction<U>(mode: "r" | "r!" | "r?" | "rw" | "rw!" | "rw?", tables: Table<any, any>[], scope: () => U | PromiseLike<U>): PromiseExtended<U>;
-  transaction(mode: any, table: any, table2: any, table3?: any, table4?: any, table5?: any, scope?: any) {
-    throw new Error("Method not implemented.");
-  }*/
-  transaction(...args): PromiseExtended {
-    throw new Error("Method not implemented.");
+
+  open() {
+    return dexieOpen(this);
   }
 
   close(): void {
-    throw new Error("Method not implemented.");
+    const idx = connections.indexOf(this),
+      state = this._state;
+    if (idx >= 0) connections.splice(idx, 1);
+    if (this.idbdb) {
+      try { this.idbdb.close(); } catch (e) { }
+      this.idbdb = null;
+    }
+    this._options.autoOpen = false;
+    state.dbOpenError = new exceptions.DatabaseClosed();
+    if (state.isBeingOpened)
+      state.cancelOpen(state.dbOpenError);
+
+    // Reset dbReadyPromise promise:
+    state.dbReadyPromise = new Promise(resolve => {
+      state.dbReadyResolve = resolve;
+    });
+    state.openCanceller = new Promise((_, reject) => {
+      state.cancelOpen = reject;
+    });
   }
-  delete(): PromiseExtended<void> {
-    throw new Error("Method not implemented.");
+
+  delete(): Promise<void> {
+    const hasArguments = arguments.length > 0;
+    const state = this._state;
+    return new Promise((resolve, reject) => {
+      const doDelete = () => {
+        this.close();
+        var req = indexedDB.deleteDatabase(this.name);
+        req.onsuccess = wrap(() => {
+          databaseEnumerator.remove(this.name);
+          resolve();
+        });
+        req.onerror = eventRejectHandler(reject);
+        req.onblocked = this._fireOnBlocked;
+      }
+
+      if (hasArguments) throw new exceptions.InvalidArgument("Arguments not allowed in db.delete()");
+      if (state.isBeingOpened) {
+        state.dbReadyPromise.then(doDelete);
+      } else {
+        doDelete();
+      }
+    });
   }
-  isOpen(): boolean {
-    throw new Error("Method not implemented.");
-  }
-  hasBeenClosed(): boolean {
-    throw new Error("Method not implemented.");
-  }
-  hasFailed(): boolean {
-    throw new Error("Method not implemented.");
-  }
-  dynamicallyOpened(): boolean {
-    throw new Error("Method not implemented.");
-  }
+
   backendDB() {
     return this.idbdb;
   }
-  vip<U>(scopeFunction: () => U): U {
-    throw new Error("Method not implemented.");
+
+  isOpen() {
+    return this.idbdb !== null;
+  }
+
+  hasBeenClosed() {
+    const dbOpenError = this._state.dbOpenError;
+    return dbOpenError && (dbOpenError.name === 'DatabaseClosed');
+  }
+
+  hasFailed() {
+    return this._state.dbOpenError !== null;
+  }
+
+  dynamicallyOpened() {
+    return this._state.autoSchema;
+  }
+
+  get tables () {
+    return keys(this._allTables).map(name => this._allTables[name]);
+  }
+
+  transaction(): Promise {
+    const args = extractTransactionArgs.apply(this, arguments);
+    return this._transaction.apply(this, args);
+  }
+
+  _transaction(mode: TransactionMode, tables: Array<ITable | string>, scopeFunc: Function) {
+    let parentTransaction = PSD.trans as Transaction | undefined;
+    // Check if parent transactions is bound to this db instance, and if caller wants to reuse it
+    if (!parentTransaction || parentTransaction.db !== this || mode.indexOf('!') !== -1) parentTransaction = null;
+    const onlyIfCompatible = mode.indexOf('?') !== -1;
+    mode = mode.replace('!', '').replace('?', '') as TransactionMode; // Ok. Will change arguments[0] as well but we wont touch arguments henceforth.
+    let idbMode: IDBTransactionMode,
+        storeNames;
+
+    try {
+        //
+        // Get storeNames from arguments. Either through given table instances, or through given table names.
+        //
+        storeNames = tables.map(table => {
+            var storeName = table instanceof this.Table ? table.name : table;
+            if (typeof storeName !== 'string') throw new TypeError("Invalid table argument to Dexie.transaction(). Only Table or String are allowed");
+            return storeName;
+        });
+
+        //
+        // Resolve mode. Allow shortcuts "r" and "rw".
+        //
+        if (mode == "r" || mode === READONLY)
+          idbMode = READONLY;
+        else if (mode == "rw" || mode == READWRITE)
+          idbMode = READWRITE;
+        else
+            throw new exceptions.InvalidArgument("Invalid transaction mode: " + mode);
+
+        if (parentTransaction) {
+            // Basic checks
+            if (parentTransaction.mode === READONLY && idbMode === READWRITE) {
+                if (onlyIfCompatible) {
+                    // Spawn new transaction instead.
+                    parentTransaction = null; 
+                }
+                else throw new exceptions.SubTransaction("Cannot enter a sub-transaction with READWRITE mode when parent transaction is READONLY");
+            }
+            if (parentTransaction) {
+                storeNames.forEach(storeName => {
+                    if (parentTransaction && parentTransaction.storeNames.indexOf(storeName) === -1) {
+                        if (onlyIfCompatible) {
+                            // Spawn new transaction instead.
+                            parentTransaction = null; 
+                        }
+                        else throw new exceptions.SubTransaction("Table " + storeName +
+                            " not included in parent transaction.");
+                    }
+                });
+            }
+            if (onlyIfCompatible && parentTransaction && !parentTransaction.active) {
+                // '?' mode should not keep using an inactive transaction.
+                parentTransaction = null;
+            }
+        }
+    } catch (e) {
+        return parentTransaction ?
+            parentTransaction._promise(null, (_, reject) => {reject(e);}) :
+            rejection (e);
+    }
+    // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
+    const enterTransaction = enterTransactionScope.bind(this, idbMode, storeNames, parentTransaction, scopeFunc);
+    return (parentTransaction ?
+        parentTransaction._promise(idbMode, enterTransaction, "lock") :
+        PSD.trans ?
+            // no parent transaction despite PSD.trans exists. Make sure also
+            // that the zone we create is not a sub-zone of current, because
+            // Promise.follow() should not wait for it if so.
+            usePSD(PSD.transless, ()=>this._whenReady(enterTransaction)) :
+            this._whenReady (enterTransaction));
+  }
+
+  table(tableName: string): Table;
+  table<T, TKey extends IDBValidKey=IDBValidKey>(tableName: string): ITable<T, TKey>;
+  table(tableName: string): Table {
+    if (!hasOwn(this._allTables, tableName)) {
+      throw new exceptions.InvalidTable(`Table ${tableName} does not exist`); }
+    return this._allTables[tableName];
   }
 }

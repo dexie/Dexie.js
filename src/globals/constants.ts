@@ -12,3 +12,6 @@ export const isIEOrEdge =
 export const hasIEDeleteObjectStoreBug = isIEOrEdge;
 export const hangsOnDeleteLargeKeyRange = isIEOrEdge;
 export const dexieStackFrameFilter = frame => !/(dexie\.js|dexie\.min\.js)/.test(frame);
+export const DBNAMES_DB = '__dbnames';
+export const READONLY = 'readonly';
+export const READWRITE = 'readwrite';

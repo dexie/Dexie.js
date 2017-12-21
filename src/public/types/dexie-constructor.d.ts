@@ -13,7 +13,8 @@ export interface DexieOptions {
   addons?: Array<(db: Dexie) => void>,
   autoOpen?: boolean,
   indexedDB?: IDBFactory,
-  IDBKeyRange?: IDBKeyRangeConstructor
+  IDBKeyRange?: IDBKeyRangeConstructor,
+  allowEmptyDB?: boolean;
 }
 
 export interface DexieConstructor extends DexieExceptionClasses {
