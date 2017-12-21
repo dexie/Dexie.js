@@ -13,7 +13,7 @@ import { eventRejectHandler, hookedEventRejectHandler, hookedEventSuccessHandler
 import { WhereClause } from './where-clause';
 import { Collection } from './collection';
 import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, deepClone, tryCatch, arrayToObject } from './functions/utils';
-import { maxKey, maxString } from './globals/constants';
+import { maxString } from './globals/constants';
 import { combine } from './functions/combine';
 import { PromiseExtended } from "./public/types/promise-extended";
 import { bulkDelete } from './functions/bulk-delete';
@@ -104,7 +104,7 @@ export class Table implements ITable {
       keyPaths.every(keyPath => ix.keyPath.indexOf(keyPath) >= 0) &&
       (ix.keyPath as string[]).every(keyPath => keyPaths.indexOf(keyPath) >= 0))[0];
 
-    if (compoundIndex && maxKey !== maxString)
+    if (compoundIndex && this.db._maxKey !== maxString)
       // Cool! We found such compound index
       // and this browser supports compound indexes (maxKey !== maxString)!
       return this

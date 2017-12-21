@@ -46,10 +46,10 @@ export function lowerVersionFirst(a: Version, b: Version) {
 
 export function runUpgraders (db: Dexie, oldVersion: number, idbtrans: IDBTransaction, reject) {
   const globalSchema = db._dbSchema;
-  var trans = db._createTransaction('readwrite', db._storeNames, globalSchema);)
+  const trans = db._createTransaction('readwrite', db._storeNames, globalSchema);
   trans.create(idbtrans);
   trans._completion.catch(reject);
-  var rejectTransaction = trans._reject.bind(trans);
+  const rejectTransaction = trans._reject.bind(trans);
   newScope(() => {
       PSD.trans = trans;
       if (oldVersion === 0) {

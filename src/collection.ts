@@ -10,7 +10,6 @@ import { rejection } from "./helpers/promise";
 import { combine } from "./functions/combine";
 import { extend, hasOwn, deepClone, getObjectDiff, keys, setByKeyPath, getByKeyPath, shallowClone, tryCatch } from "./functions/utils";
 import { eventRejectHandler, eventSuccessHandler, hookedEventRejectHandler, hookedEventSuccessHandler } from "./functions/event-wrappers";
-import { hasGetAll } from "./globals/lazy-globals";
 import { mirror, nop } from "./functions/chaining-functions";
 import { ModifyError } from "./errors";
 import { hangsOnDeleteLargeKeyRange } from "./globals/constants";
@@ -169,14 +168,14 @@ export class Collection implements ICollection {
    * 
    **/
   toArray(cb?) {
-    var ctx = this._ctx;
-    return this._read(function (resolve, reject, idbstore) {
-      if (hasGetAll && ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
+    return this._read((resolve, reject, idbstore) => {
+      var ctx = this._ctx;
+      if (this.db._hasGetAll && ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
         // Special optimation if we could use IDBObjectStore.getAll() or
         // IDBKeyRange.getAll():
-        var readingHook = ctx.table.hook.reading.fire;
-        var idxOrStore = getIndexOrStore(ctx, idbstore);
-        var req = ctx.limit < Infinity ?
+        const readingHook = ctx.table.hook.reading.fire;
+        const idxOrStore = getIndexOrStore(ctx, idbstore);
+        const req = ctx.limit < Infinity ?
           idxOrStore.getAll(ctx.range, ctx.limit) :
           idxOrStore.getAll(ctx.range);
         req.onerror = eventRejectHandler(reject);
@@ -187,7 +186,7 @@ export class Collection implements ICollection {
           });
       } else {
         // Getting array through a cursor.
-        var a = [];
+        const a = [];
         iter(ctx, function (item) { a.push(item); }, function arrayComplete() {
           resolve(a);
         }, reject, idbstore);
@@ -388,7 +387,7 @@ export class Collection implements ICollection {
    **/
   primaryKeys(cb?) {
     var ctx = this._ctx;
-    if (hasGetAll && ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
+    if (this.db._hasGetAll && ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
       // Special optimation if we could use IDBObjectStore.getAllKeys() or
       // IDBKeyRange.getAllKeys():
       return this._read((resolve, reject, idbstore) => {
@@ -667,9 +666,10 @@ export class Collection implements ICollection {
         keysOrTuples.push(cursor.primaryKey);
       }).then(() => {
         // Chromium deletes faster when doing it in sort order.
+        const indexedDB = this.db._deps.indexedDB;
         hasDeleteHook ?
-          keysOrTuples.sort((a, b) => ascending(a[0], b[0])) :
-          keysOrTuples.sort(ascending);
+          keysOrTuples.sort((a, b) => indexedDB.cmp(a[0], b[0])) :
+          keysOrTuples.sort((a, b) => indexedDB.cmp(a, b));
         return bulkDelete(idbstore, trans, keysOrTuples, hasDeleteHook, deletingHook);
 
       }).then(() => {

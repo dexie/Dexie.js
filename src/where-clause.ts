@@ -4,7 +4,6 @@ import { Table } from "./table";
 import { ValidKey } from "./public/types/valid-key";
 import { emptyCollection, fail, addIgnoreCaseAlgorithm } from './functions/where-clause-helpers';
 import { INVALID_KEY_ARGUMENT, STRING_EXPECTED, maxString, minKey } from './globals/constants';
-import { maxKey } from './globals/lazy-globals';
 import { getArrayOf, NO_CHAR_ARRAY } from './functions/utils';
 import { exceptions } from './errors';
 import { Dexie } from './dexie';
@@ -200,7 +199,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   notEqual(value: ValidKey) {
-    return this.inAnyRange([[minKey, value], [value, maxKey]], { includeLowers: false, includeUppers: false });
+    return this.inAnyRange([[minKey, value], [value, this.db._maxKey]], { includeLowers: false, includeUppers: false });
   }
 
   /** WhereClause.noneOf()
@@ -220,7 +219,7 @@ export class WhereClause implements IWhereClause {
         res.concat([[res[res.length - 1][1], val]]) :
         [[minKey, val]],
       null);
-    ranges.push([set[set.length - 1], maxKey]);
+    ranges.push([set[set.length - 1], this.db._maxKey]);
     return this.inAnyRange(ranges, { includeLowers: false, includeUppers: false });
   }
 
