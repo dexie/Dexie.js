@@ -91,10 +91,10 @@ export class Transaction implements ITransaction {
    * Internal method.
    * 
    */
-  create(idbtrans: IDBTransaction) {
+  create(idbtrans?: IDBTransaction) {
     if (!this.mode) return this;
     const idbdb = this.db.idbdb;
-    const dbOpenError = this.db._i.dbOpenError;
+    const dbOpenError = this.db._state.dbOpenError;
     assert(!this.idbtrans);
     if (!idbtrans && !idbdb) {
       switch (dbOpenError && dbOpenError.name) {
@@ -110,7 +110,7 @@ export class Transaction implements ITransaction {
       }
     }
     if (!this.active) throw new exceptions.TransactionInactive();
-    assert(this._completion._state === null);
+    assert(this._completion._state === null); // Completion Promise must still be pending.
 
     idbtrans = this.idbtrans = idbtrans || idbdb.transaction(safariMultiStoreFix(this.storeNames), this.mode) as IDBTransaction;
     idbtrans.onerror = wrap(ev => {

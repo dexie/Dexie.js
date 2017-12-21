@@ -14,13 +14,13 @@ export function tempTransaction (
   fn: (resolve, reject, trans: Transaction) => any)
   // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
 {
-  if (!db._i.openComplete && (!PSD.letThrough)) {
-    if (!db._i.isBeingOpened) {
-      if (!db._i.autoOpen)
+  if (!db._state.openComplete && (!PSD.letThrough)) {
+    if (!db._state.isBeingOpened) {
+      if (!db._options.autoOpen)
         return rejection(new exceptions.DatabaseClosed());
       db.open().catch(nop); // Open in background. If if fails, it will be catched by the final promise anyway.
     }
-    return db._i.dbReadyPromise.then(() => tempTransaction(db, mode, storeNames, fn));
+    return db._state.dbReadyPromise.then(() => tempTransaction(db, mode, storeNames, fn));
   } else {
     var trans = db._createTransaction(mode, storeNames, db._dbSchema);
     try { trans.create(); } catch (ex) { return rejection(ex); }
