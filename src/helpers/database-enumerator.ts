@@ -5,6 +5,10 @@ import { Dexie } from '../dexie';
 import { Table } from '../public/types/table';
 import { nop } from '../functions/chaining-functions';
 import { PromiseExtended } from '../public/types/promise-extended';
+import { DBNAMES_DB } from '../globals/constants';
+import { IDBFactory } from '../public/types/indexeddb';
+
+export let databaseEnumerator: DatabaseEnumerator;
 
 export interface DatabaseEnumerator {
   getDatabaseNames (): PromiseExtended<string[]>;
@@ -12,12 +16,12 @@ export interface DatabaseEnumerator {
   remove (name: string): undefined | PromiseExtended;
 }
 
-export function DatabaseEnumerator (indexedDB) : DatabaseEnumerator {
+export function DatabaseEnumerator (indexedDB: IDBFactory & {getDatabaseNames?, webkitGetDatabaseNames?}) : DatabaseEnumerator {
   const getDatabaseNamesNative = indexedDB && (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
   let dbNamesTable: Table<{name: string}, string>;
 
   if (!getDatabaseNamesNative) {
-    const db = new Dexie ('__dbnames', {addons: []});
+    const db = new Dexie (DBNAMES_DB, {addons: []});
     db.version(1).stores({dbnames: 'name'});
     dbNamesTable = db.table<{name: string}, string>('dbnames');
   }
@@ -32,11 +36,18 @@ export function DatabaseEnumerator (indexedDB) : DatabaseEnumerator {
     },
 
     add (name: string) : PromiseExtended<any> | undefined {
-      return !getDatabaseNamesNative && dbNamesTable.add({name}).catch(nop);
+      return !getDatabaseNamesNative && name !== DBNAMES_DB && dbNamesTable.put({name}).catch(nop);
     },
 
     remove (name: string) : PromiseExtended<any> | undefined {
-      return getDatabaseNamesNative && dbNamesTable.delete(name).catch(nop);
+      return getDatabaseNamesNative && name !== DBNAMES_DB && dbNamesTable.delete(name).catch(nop);
     }
   };
 }
+
+export function initDatabaseEnumerator(indexedDB: IDBFactory) {
+  try {
+    databaseEnumerator = DatabaseEnumerator(indexedDB);
+  } catch (e) {}
+}
+

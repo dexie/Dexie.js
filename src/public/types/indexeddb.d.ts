@@ -139,12 +139,12 @@ export interface IDBObjectStore {
 }
 
 export interface IDBOpenDBRequestEventMap extends IDBRequestEventMap {
-  "blocked": Event;
+  "blocked": IDBEvent;
   "upgradeneeded": IDBVersionChangeEvent;
 }
 
 export interface IDBOpenDBRequest extends IDBRequest {
-  onblocked: (this: IDBOpenDBRequest, ev: Event) => any;
+  onblocked: (this: IDBOpenDBRequest, ev: IDBEvent) => any;
   onupgradeneeded: (this: IDBOpenDBRequest, ev: IDBVersionChangeEvent) => any;
   addEventListener<K extends keyof IDBOpenDBRequestEventMap>(type: K, listener: (this: IDBOpenDBRequest, ev: IDBOpenDBRequestEventMap[K]) => any, useCapture?: boolean): void;
   addEventListener(type: string, listener: EventListenerOrEventListenerObject, useCapture?: boolean): void;
@@ -176,18 +176,18 @@ export interface IDBEvent extends Event {
 }
 
 export interface IDBTransactionEventMap {
-  "abort": Event;
-  "complete": Event;
-  "error": Event;
+  "abort": IDBEvent;
+  "complete": IDBEvent;
+  "error": IDBEvent;
 }
 
 export interface IDBTransaction extends EventTarget {
   readonly db: IDBDatabase;
   readonly error: DOMException;
   readonly mode: IDBTransactionMode;
-  onabort: (this: IDBTransaction, ev: Event) => any;
-  oncomplete: (this: IDBTransaction, ev: Event) => any;
-  onerror: (this: IDBTransaction, ev: Event) => any;
+  onabort: (this: IDBTransaction, ev: IDBEvent) => any;
+  oncomplete: (this: IDBTransaction, ev: IDBEvent) => any;
+  onerror: (this: IDBTransaction, ev: IDBEvent) => any;
   abort(): void;
   objectStore(name: string): IDBObjectStore;
   readonly READ_ONLY: string;
@@ -199,7 +199,7 @@ export interface IDBTransaction extends EventTarget {
   removeEventListener(type: string, listener: EventListenerOrEventListenerObject, useCapture?: boolean): void;
 }
 
-export interface IDBVersionChangeEvent extends Event {
+export interface IDBVersionChangeEvent extends IDBEvent {
   readonly newVersion: number | null;
   readonly oldVersion: number;
 }

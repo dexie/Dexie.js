@@ -46,7 +46,7 @@ export function lowerVersionFirst(a: Version, b: Version) {
 
 export function runUpgraders (db: Dexie, oldVersion: number, idbtrans: IDBTransaction, reject) {
   const globalSchema = db._dbSchema;
-  var trans = db._createTransaction('readwrite', db._storeNames, globalSchema);
+  var trans = db._createTransaction('readwrite', db._storeNames, globalSchema);)
   trans.create(idbtrans);
   trans._completion.catch(reject);
   var rejectTransaction = trans._reject.bind(trans);
@@ -260,12 +260,8 @@ export function readGlobalSchema(db: Dexie, idbdb: IDBDatabase) {
   setApiOnPlace(db, [db._allTables], keys(globalSchema), globalSchema);
 }
 
-function adjustToExistingIndexNames(db: Dexie, schema, idbtrans) {
-  /// <summary>
-  /// Issue #30 Problem with existing db - adjust to existing index names when migrating from non-dexie db
-  /// </summary>
-  /// <param name="schema" type="Object">Map between name and TableSchema</param>
-  /// <param name="idbtrans" type="IDBTransaction"></param>
+export function adjustToExistingIndexNames(db: Dexie, schema: DbSchema, idbtrans: IDBTransaction) {
+  // Issue #30 Problem with existing db - adjust to existing index names when migrating from non-dexie db
   const storeNames = idbtrans.db.objectStoreNames;
 
   for (let i = 0; i < storeNames.length; ++i) {
