@@ -1,7 +1,7 @@
 import { WhereClause as IWhereClause } from "./public/types/where-clause";
 import { Collection } from "./collection";
 import { Table } from "./table";
-import { ValidKey } from "./public/types/valid-key";
+import { IndexableType } from "./public/types/indexable-type";
 import { emptyCollection, fail, addIgnoreCaseAlgorithm } from './functions/where-clause-helpers';
 import { INVALID_KEY_ARGUMENT, STRING_EXPECTED, maxString, minKey } from './globals/constants';
 import { getArrayOf, NO_CHAR_ARRAY } from './functions/utils';
@@ -35,7 +35,7 @@ export class WhereClause implements IWhereClause {
    * http://dexie.org/docs/WhereClause/WhereClause.between()
    * 
    **/
-  between(lower: ValidKey, upper: ValidKey, includeLower?: boolean, includeUpper?: boolean) {
+  between(lower: IndexableType, upper: IndexableType, includeLower?: boolean, includeUpper?: boolean) {
     includeLower = includeLower !== false;   // Default to true
     includeUpper = includeUpper === true;    // Default to false
     try {
@@ -53,7 +53,7 @@ export class WhereClause implements IWhereClause {
    * http://dexie.org/docs/WhereClause/WhereClause.equals()
    * 
    **/
-  equals(value: ValidKey) {
+  equals(value: IndexableType) {
     return new this.Collection(this, () => IDBKeyRange.only(value));
   }
 
@@ -62,7 +62,7 @@ export class WhereClause implements IWhereClause {
    * http://dexie.org/docs/WhereClause/WhereClause.above()
    * 
    **/
-  above(value: ValidKey) {
+  above(value: IndexableType) {
     return new this.Collection(this, () => IDBKeyRange.lowerBound(value, true));
   }
 
@@ -71,7 +71,7 @@ export class WhereClause implements IWhereClause {
    * http://dexie.org/docs/WhereClause/WhereClause.aboveOrEqual()
    * 
    **/
-  aboveOrEqual(value: ValidKey) {
+  aboveOrEqual(value: IndexableType) {
     return new this.Collection(this, () => IDBKeyRange.lowerBound(value));
   }
 
@@ -80,7 +80,7 @@ export class WhereClause implements IWhereClause {
    * http://dexie.org/docs/WhereClause/WhereClause.below()
    * 
    **/
-  below(value: ValidKey) {
+  below(value: IndexableType) {
     return new this.Collection(this, () => IDBKeyRange.upperBound(value, true));
   }
 
@@ -89,7 +89,7 @@ export class WhereClause implements IWhereClause {
    * http://dexie.org/docs/WhereClause/WhereClause.belowOrEqual()
    * 
    **/
-  belowOrEqual(value: ValidKey) {
+  belowOrEqual(value: IndexableType) {
     return new this.Collection(this, () => IDBKeyRange.upperBound(value));
   }
 
@@ -198,7 +198,7 @@ export class WhereClause implements IWhereClause {
    * http://dexie.org/docs/WhereClause/WhereClause.notEqual()
    * 
    **/
-  notEqual(value: ValidKey) {
+  notEqual(value: IndexableType) {
     return this.inAnyRange([[minKey, value], [value, this.db._maxKey]], { includeLowers: false, includeUppers: false });
   }
 
@@ -229,7 +229,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   inAnyRange(
-    ranges: ReadonlyArray<{ 0: ValidKey, 1: ValidKey }>,
+    ranges: ReadonlyArray<{ 0: IndexableType, 1: IndexableType }>,
     options?: { includeLowers?: boolean, includeUppers?: boolean })
   {
     const ascending = this._ascending,

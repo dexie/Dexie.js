@@ -1,3 +1,3 @@
 import { IDBValidKey } from './indexeddb';
 
-export type ValidKey = IDBValidKey;
+export type IndexableType = IDBValidKey;
