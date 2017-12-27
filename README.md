@@ -142,7 +142,7 @@ db.transaction('rw', db.friends, async() => {
 
 #### Hello World (Typescript)
 
-*This sample requires using Dexie v2, `npm install dexie@^2.0.0-beta`*
+*This sample requires using Dexie v2*
 
 ```js
 import Dexie from 'dexie';
@@ -205,7 +205,7 @@ Website
 Install over npm
 ----------------
 ```
-npm install dexie@^2.0.0-beta
+npm install dexie
 ```
 
 
