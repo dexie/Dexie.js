@@ -1,16 +1,28 @@
 
-import Dexie, {IndexableType} from '../../src/index'; // Imports the source Dexie.d.ts file
+import Dexie, {IndexableType} from '../../src/public/index'; // Imports the source Dexie.d.ts file
 
 //
 // Extend Dexie interface
 //
-declare module '../../src/interfaces/table' {
+
+// 3.0-style
+declare module '../../src/public/types/table' {
     interface Table<T,TKey extends IndexableType> {
         extendedTableMethod() : any;
     }
 }
 
-declare module '../../src/interfaces/db-events' { 
+// 2.0-style
+declare module '../../src/public/index' {
+    module Dexie {
+        interface Table<T,TKey extends IndexableType> {
+            extendedTableMethod() : any;
+        }     
+    }
+}
+
+// 3.0-style
+declare module '../../src/public/types/db-events' { 
 
     interface DbEvents {
         (eventName: 'changes', subscriber: ()=>any): void;
@@ -18,8 +30,28 @@ declare module '../../src/interfaces/db-events' {
         changes: Dexie.DexieEvent;
         customEvent2: Dexie.DexieEvent;
     }
-    var extendedStaticMethod: (param1: string) => string;
-    
+    //var extendedStaticMethod: (param1: string) => string;
+}
+declare module '../../src/public/types/dexie-constructor' {
+    interface DexieConstructor {
+        extendedStaticMethod: (param1: string) => string;
+    }
+}
+
+// 2.0-style
+declare module '../../src/public/index' { 
+    module Dexie { 
+        interface DbEvents {
+            (eventName: 'changes', subscriber: ()=>any): void;
+            (eventName: 'customEvent2', subscriber: ()=>any): void;
+            changes: Dexie.DexieEvent;
+            customEvent2: Dexie.DexieEvent;
+        }
+        var extendedStaticMethod: (param1: string) => string;
+    }
+}
+
+declare module '../../src/public/types/dexie' {
     interface Dexie {
         extendedDBMethod() : any;
     }
