@@ -44,4 +44,3 @@ export interface PromiseExtended<T=any> extends Promise<T> {
   timeout (ms: number, msg?: string): PromiseExtended<T>;
 }
 
-export default PromiseExtended;

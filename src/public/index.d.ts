@@ -2,6 +2,7 @@
 // Project: https://github.com/dfahlander/Dexie.js
 // Definitions by: David Fahlander <http://github.com/dfahlander>
 
+
 export * from './types/collection';
 export * from './types/database';
 export * from './types/db-events';
@@ -29,19 +30,23 @@ import { DexieConstructor} from './types/dexie-constructor';
 import { PromiseExtended } from './types/promise-extended';
 import { Version as IVersion} from './types/version';
 import { Transaction as ITransaction} from './types/transaction';
+import { DexieEvent as IDexieEvent } from './types/dexie-event';
+import { DbEvents as IDbEvents } from './types/db-events';
 import { Table as ITable} from './types/table';
 import { IndexableType } from './types/indexable-type';
 import { WhereClause as IWhereClause} from './types/where-clause';
 import { Collection as ICollection} from './types/collection';
 
 // For backard compatibility:
-export declare namespace Dexie {
+declare module Dexie {
   type Promise<T> = PromiseExtended<T> // Because many samples have been Dexie.Promise.
   interface Version extends IVersion {} // Because addons may want to extend Dexie.Version for old dexies as well.
   interface Transaction  extends ITransaction {} // Because app code may declare it.
   interface Table<T,TKey extends IndexableType> extends ITable<T,TKey> {} // Because all samples have been Dexie.Table<...>
   interface WhereClause<T,TKey extends IndexableType> extends IWhereClause<T, TKey> {}
   interface Collection<T,TKey extends IndexableType> extends ICollection<T, TKey> {} // Because app-code may declare it.
+  interface DexieEvent extends IDexieEvent {}
+  interface DbEvents extends IDbEvents {}
 }
 
 declare var Dexie: DexieConstructor;
