@@ -21,7 +21,7 @@
         // Make sure we have something in DB:
         if ((yield db.friends.where('name').equals('Josephine').count()) === 0) {
             let id = yield db.friends.add({name: "Josephine", age: 21});
-            alert (`Addded friend with id ${id}`);
+            alert (`Added friend with id ${id}`);
         }
 
         // Query:
