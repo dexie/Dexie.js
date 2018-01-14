@@ -3152,8 +3152,17 @@ props(Dexie, {
     //
     dependencies: {
         // Required:
-        indexedDB: _global.indexedDB || _global.mozIndexedDB || _global.webkitIndexedDB || _global.msIndexedDB,
-        IDBKeyRange: _global.IDBKeyRange || _global.webkitIDBKeyRange
+        get indexedDB() {
+            try {
+                return _global.indexedDB || _global.mozIndexedDB || _global.webkitIndexedDB || _global.msIndexedDB;    
+            } catch(e) {}
+            
+        },
+        get IDBKeyRange() {
+            try {
+                return _global.IDBKeyRange || _global.webkitIDBKeyRange;                
+            } catch(e) {}
+        }
     },
     
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
@@ -3184,10 +3193,13 @@ dbNamesDB.version(1).stores({dbnames: 'name'});
 (()=>{
     // Migrate from Dexie 1.x database names stored in localStorage:
     var DBNAMES = 'Dexie.DatabaseNames';
-    if (typeof localStorage !== undefined && _global.document !== undefined) try {
-        // Have localStorage and is not executing in a worker. Lets migrate from Dexie 1.x.
-        JSON.parse(localStorage.getItem(DBNAMES) || "[]")
-            .forEach(name => dbNamesDB.dbnames.put({name: name}).catch(nop));
-        localStorage.removeItem(DBNAMES);
-    } catch (_e) {}
+    try {
+        // typeof localStorage will throw error when cookie is disabled in FF
+        if (typeof localStorage !== undefined && _global.document !== undefined) try {
+            // Have localStorage and is not executing in a worker. Lets migrate from Dexie 1.x.
+            JSON.parse(localStorage.getItem(DBNAMES) || "[]")
+                .forEach(name => dbNamesDB.dbnames.put({name: name}).catch(nop));
+            localStorage.removeItem(DBNAMES);
+        } catch (_e) {}
+    } catch (e) {}
 })();
