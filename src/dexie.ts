@@ -10,10 +10,8 @@ import { IDBKeyRange } from "./public/types/indexeddb";
 import { DbSchema } from './public/types/db-schema';
 
 // Internal imports
-import { Table } from "./table";
-import { TableConstructor, createTableConstructor } from './table-constructor';
-import { Collection } from './collection';
-import { CollectionConstructor, createCollectionConstructor } from './collection-constructor';
+import { Table, TableConstructor, createTableConstructor } from "./table";
+import { Collection, CollectionConstructor, createCollectionConstructor } from './collection';
 import { WhereClause } from './where-clause';
 import { WhereClauseConstructor, createWhereClauseConstructor } from './where-clause-constructor';
 import { Transaction } from './transaction';
