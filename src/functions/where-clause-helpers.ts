@@ -3,7 +3,7 @@ import { Collection } from '../collection';
 import { Dexie } from '../dexie';
 import { STRING_EXPECTED } from '../globals/constants';
 import { simpleCompare, simpleCompareReverse } from './compare-functions';
-import { CollectionConstructor } from '../collection-constructor';
+import { CollectionConstructor } from '../collection';
 
 export function fail(collectionOrWhereClause: Collection | WhereClause, err, T?) {
   var collection = collectionOrWhereClause instanceof WhereClause ?
