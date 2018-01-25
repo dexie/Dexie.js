@@ -48,10 +48,12 @@
     ],
     "dexie": [
       "# Build es5 output",
-      "tsc --allowJs -t es5 -m es2015 --outDir tools/tmp/es5/src/ --sourceMap src/Dexie.js [--watch 'Compilation complete.']",
-      "rollup -c tools/build-configs/rollup.config.js",
-      "node tools/replaceVersionAndDate.js dist/dexie.js",
-      "eslint src"
+      "cd src",
+      "tsc [--watch 'Compilation complete.']",
+      "#rollup -c tools/build-configs/rollup.config.js",
+      "#node tools/replaceVersionAndDate.js dist/dexie.js",
+      "dts-bundle-generator -o ../dist/dexie.d.ts public/index.d.ts",
+      "node -e \"fs.appendFileSync('../dist/dexie.d.ts', '\\\\nexport default Dexie;\\\\n')\""
     ],
     "release": [
       "# Build ES5 umd module as well as the es6 module.",
@@ -86,6 +88,7 @@
   "devDependencies": {
     "babel-cli": "^6.18.0",
     "babel-plugin-transform-regenerator": "^6.21.0",
+    "dts-bundle-generator": "^0.6.1",
     "eslint": "^3.7.1",
     "just-build": "^0.9.16",
     "karma": "^1.4.0",

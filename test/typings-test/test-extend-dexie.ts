@@ -1,57 +1,23 @@
 
-import Dexie, {IndexableType} from '../../src/public/index'; // Imports the source Dexie.d.ts file
+import {Dexie, Table, DexieConstructor, IndexableType} from '../../dist/dexie';
 
 //
 // Extend Dexie interface
 //
-
-// 3.0-style
-declare module '../../src/public/types/table' {
-    interface Table<T,TKey extends IndexableType> {
+declare module '../../dist/dexie' {
+    interface Table<T, TKey> {
         extendedTableMethod() : any;
     }
-}
-
-// 2.0-style
-declare module '../../src/public/index' {
-    module Dexie {
-        interface Table<T,TKey extends IndexableType> {
-            extendedTableMethod() : any;
-        }     
-    }
-}
-
-// 3.0-style
-declare module '../../src/public/types/db-events' { 
-
     interface DbEvents {
         (eventName: 'changes', subscriber: ()=>any): void;
         (eventName: 'customEvent2', subscriber: ()=>any): void;
-        changes: Dexie.DexieEvent;
-        customEvent2: Dexie.DexieEvent;
+        changes: DexieEvent;
+        customEvent2: DexieEvent;
     }
-    //var extendedStaticMethod: (param1: string) => string;
-}
-declare module '../../src/public/types/dexie-constructor' {
     interface DexieConstructor {
-        extendedStaticMethod: (param1: string) => string;
+        extendedStaticMethod (param1: string) : string;    
     }
-}
-
-// 2.0-style
-declare module '../../src/public/index' { 
-    module Dexie { 
-        interface DbEvents {
-            (eventName: 'changes', subscriber: ()=>any): void;
-            (eventName: 'customEvent2', subscriber: ()=>any): void;
-            changes: Dexie.DexieEvent;
-            customEvent2: Dexie.DexieEvent;
-        }
-        var extendedStaticMethod: (param1: string) => string;
-    }
-}
-
-declare module '../../src/public/types/dexie' {
+    
     interface Dexie {
         extendedDBMethod() : any;
     }
@@ -68,3 +34,7 @@ Dexie.addons.push(db => {
 
 Dexie.extendedStaticMethod = param1 => param1;
 
+
+//var x: Dexie.Table<{name: string, age: number}, number>;
+var x: Dexie.Promise;
+var y: Dexie.Table<{hello: any}, number>;
