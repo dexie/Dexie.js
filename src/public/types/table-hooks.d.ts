@@ -1,6 +1,7 @@
 import { DexieEventSet } from "./dexie-event-set";
 import { DexieEvent } from "./dexie-event";
 import { Transaction } from "./transaction";
+import { IndexableType } from "./indexable-type";
 
 interface CreatingHookContext<T,Key> {
   onsuccess?: (primKey: Key) => void;
@@ -17,7 +18,7 @@ interface DeletingHookContext<T,Key> {
   onerror?: (err: any) => void;
 }
 
-interface TableHooks<T=any,TKey=IDBValidKey> extends DexieEventSet {
+interface TableHooks<T=any,TKey=IndexableType> extends DexieEventSet {
   (eventName: 'creating', subscriber: (this: CreatingHookContext<T,TKey>, primKey:TKey, obj:T, transaction:Transaction) => any): void;
   (eventName: 'reading', subscriber: (obj:T) => T | any): void;
   (eventName: 'updating', subscriber: (this: UpdatingHookContext<T,TKey>, modifications:Object, primKey:TKey, obj:T, transaction:Transaction) => any): void;

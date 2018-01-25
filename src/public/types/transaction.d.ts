@@ -1,6 +1,5 @@
 import { Table } from "./table";
 import { Database } from "./database";
-import { IDBValidKey } from "./indexeddb";
 import { TransactionEvents } from "./transaction-events";
 
 export interface Transaction {
@@ -14,5 +13,5 @@ export interface Transaction {
   abort(): void;
   table(tableName: string): Table<any, any>;
   table<T>(tableName: string): Table<T, any>;
-  table<T, Key extends IDBValidKey>(tableName: string): Table<T, Key>;
+  table<T, Key>(tableName: string): Table<T, Key>;
 }

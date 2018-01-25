@@ -49,7 +49,7 @@ export interface DexieConstructor extends DexieExceptionClasses {
   Promise: PromiseExtendedConstructor;
   //TableSchema: {}; // Deprecate!
   //IndexSpec: {new():IndexSpec}; //? Deprecate
-  Events: (ctx?)=>DexieEventSet;
+  Events: (ctx?: any)=>DexieEventSet;
 
   errnames: {[P in keyof DexieExceptionClasses]: P};
 }

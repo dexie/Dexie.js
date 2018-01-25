@@ -6,11 +6,11 @@ import { Transaction } from "./transaction";
 import { WhereClause } from "./where-clause";
 import { Collection } from "./collection";
 import { DbSchema } from "./db-schema";
-import { IDBValidKey } from "./indexeddb";
 import { TableSchema } from "./table-schema";
 import { DexieConstructor } from "./dexie-constructor";
 import { PromiseExtended } from "./promise-extended";
 import { Database } from "./database";
+import { IndexableType } from "./indexable-type";
 
 export interface Dexie extends Database {
   readonly name: string;
@@ -34,7 +34,7 @@ export interface Dexie extends Database {
 
   open(): PromiseExtended<Dexie>;
 
-  table<T=any, TKey extends IDBValidKey=IDBValidKey>(tableName: string): Table<T, TKey>;
+  table<T=any, TKey=IndexableType>(tableName: string): Table<T, TKey>;
 
   transaction<U>(mode: TransactionMode, table: Table<any, any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 
