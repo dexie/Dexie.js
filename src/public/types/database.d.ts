@@ -1,5 +1,4 @@
 import { Table } from "./table";
-import { IDBValidKey } from "./indexeddb";
 import { TransactionMode } from "./transaction-mode";
 import { PromiseExtended } from "./promise-extended";
 import { WhereClause } from "./where-clause";
@@ -9,7 +8,7 @@ export interface Database {
   readonly name: string;
   readonly tables: Table[];
   
-  table<T=any, TKey extends IDBValidKey=IDBValidKey>(tableName: string): Table<T, TKey>;
+  table<T=any, TKey=any>(tableName: string): Table<T, TKey>;
 
   transaction<U>(mode: TransactionMode, table: Table<any, any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 

@@ -1,20 +1,21 @@
 import { ThenShortcut } from "./then-shortcut";
-import { IDBValidKey, IndexableTypeArray } from "./indexeddb";
+import { IndexableTypeArray } from "./indexeddb";
 import { WhereClause } from "./where-clause";
 import { PromiseExtended } from "./promise-extended";
 import { Database } from "./database";
+import { IndexableType } from "./indexable-type";
 
-export interface Collection<T=any, TKey extends IDBValidKey=IDBValidKey> {
+export interface Collection<T=any, TKey=IndexableType> {
   //db: Database;
   and(filter: (x: T) => boolean): Collection<T, TKey>;
   clone(props?: Object): Collection<T, TKey>;
   count(): PromiseExtended<number>;
   count<R>(thenShortcut: ThenShortcut<number, R>): PromiseExtended<R>;
   distinct(): Collection<T, TKey>;
-  each(callback: (obj: T, cursor: {key: IDBValidKey, primaryKey: TKey}) => any): PromiseExtended<void>;
-  eachKey(callback: (key: IDBValidKey, cursor: {key: IDBValidKey, primaryKey: TKey}) => any): PromiseExtended<void>;
-  eachPrimaryKey(callback: (key: TKey, cursor: {key: IDBValidKey, primaryKey: TKey}) => any): PromiseExtended<void>;
-  eachUniqueKey(callback: (key: IDBValidKey, cursor: {key: IDBValidKey, primaryKey: TKey}) => any): PromiseExtended<void>;
+  each(callback: (obj: T, cursor: {key: IndexableType, primaryKey: TKey}) => any): PromiseExtended<void>;
+  eachKey(callback: (key: IndexableType, cursor: {key: IndexableType, primaryKey: TKey}) => any): PromiseExtended<void>;
+  eachPrimaryKey(callback: (key: TKey, cursor: {key: IndexableType, primaryKey: TKey}) => any): PromiseExtended<void>;
+  eachUniqueKey(callback: (key: IndexableType, cursor: {key: IndexableType, primaryKey: TKey}) => any): PromiseExtended<void>;
   filter(filter: (x: T) => boolean): Collection<T, TKey>;
   first(): PromiseExtended<T | undefined>;
   first<R>(thenShortcut: ThenShortcut<T | undefined, R>): PromiseExtended<R>;
