@@ -36,5 +36,16 @@ Dexie.extendedStaticMethod = param1 => param1;
 
 
 //var x: Dexie.Table<{name: string, age: number}, number>;
-var x: Dexie.Promise;
+var db: Dexie = null as any as Dexie;
+
+var x: Dexie.Promise = null as any as Dexie.Promise;
+var x2 = Dexie.Promise.all([1]);
+x = x2;
+
+
 var y: Dexie.Table<{hello: any}, number>;
+var y2: Table<{hello: any}, number>;
+var y3 = db.table<{hello: any}, number>("hello");
+y2 = y3;
+y = y2;
+
