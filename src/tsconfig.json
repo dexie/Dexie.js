@@ -13,7 +13,10 @@
     "outDir": "../tools/tmp/src/",
     "sourceMap": true
   },
-  "files": [
-    "index.ts"
+  "dirs": [
+    "."
+  ],
+  "exclude": [
+    "_old"
   ]
 }

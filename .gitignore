@@ -6,6 +6,7 @@ dist/*.js
 dist/*.map
 dist/*.ts
 dist/*.gz
+dist/*.mjs
 
 # Other ignores
 tmp/
