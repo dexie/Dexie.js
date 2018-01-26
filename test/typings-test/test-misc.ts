@@ -1,4 +1,4 @@
-import Dexie from '../../src/index'; // Imports the source Dexie.d.ts file
+import Dexie from '../../dist/dexie';
 
 class MyDb extends Dexie {
   friends: Dexie.Table<{name, id}, number>;

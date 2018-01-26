@@ -88,8 +88,8 @@ export class Dexie implements IDexie {
       IDBKeyRange: deps.IDBKeyRange,  // Backend IDBKeyRange api. Default to browser env.
       ...options
     };
-    this._deps.indexedDB = options.indexedDB;
-    this._deps.IDBKeyRange = options.IDBKeyRange;
+    this._deps.indexedDB = options.indexedDB as IDBFactory;
+    this._deps.IDBKeyRange = options.IDBKeyRange as IDBKeyRangeConstructor;
     const {
       addons,
       autoOpen,
@@ -178,7 +178,7 @@ export class Dexie implements IDexie {
         console.warn(`Upgrade '${this.name}' blocked by other connection holding version ${ev.oldVersion / 10}`);
     });
 
-    this._maxKey = getMaxKey(options.IDBKeyRange);
+    this._maxKey = getMaxKey(options.IDBKeyRange as IDBKeyRangeConstructor);
 
     this._createTransaction = (
       mode: IDBTransactionMode,

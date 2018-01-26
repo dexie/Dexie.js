@@ -3,8 +3,8 @@
   "version": "2.0.1",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
-  "module": "dist/dexie.es.js",
-  "jsnext:main": "dist/dexie.es.js",
+  "module": "dist/dexie.mjs",
+  "jsnext:main": "dist/dexie.mjs",
   "typings": "dist/dexie.d.ts",
   "jspm": {
     "format": "cjs",
@@ -47,10 +47,13 @@
       "just-build release test"
     ],
     "dexie": [
-      "# Build es5 output",
+      "# Build dist/dexie.js, dist/dexie.mjs and dist/dexie.d.ts",
       "cd src",
       "tsc [--watch 'Compilation complete.']",
-      "#rollup -c tools/build-configs/rollup.config.js",
+      "# Copy source JS files to build output (as tsc ignores them)",
+      "node -e \"fs.writeFileSync('../tools/tmp/src/helpers/promise.js', fs.readFileSync('helpers/promise.js'))\"",
+      "node -e \"fs.writeFileSync('../tools/tmp/src/errors.js', fs.readFileSync('errors.js'))\"",
+      "rollup -c ../tools/build-configs/rollup.config.js",
       "#node tools/replaceVersionAndDate.js dist/dexie.js",
       "dts-bundle-generator -o ../dist/dexie.d.ts public/index.d.ts",
       "node -e \"fs.appendFileSync('../dist/dexie.d.ts', '\\\\nexport default Dexie;\\\\n')\""
@@ -58,8 +61,6 @@
     "release": [
       "# Build ES5 umd module as well as the es6 module.",
       "just-build dexie",
-      "# Copy Dexie.d.ts to dist and replace version in it",
-      "node -e \"fs.writeFileSync('dist/dexie.d.ts', fs.readFileSync('src/Dexie.d.ts'))\"",
       "node tools/replaceVersionAndDate.js dist/dexie.d.ts",
       "# Minify the default ES5 UMD module",
       "cd dist",
@@ -99,12 +100,13 @@
     "karma-qunit": "^1.2.1",
     "qunit": "^0.7.7",
     "qunitjs": "^1.23.1",
-    "rollup": "^0.41.4",
+    "rollup": "^0.41.6",
+    "rollup-plugin-cleanup": "^2.0.0",
     "rollup-plugin-commonjs": "^7.0.0",
-    "rollup-plugin-node-resolve": "^2.0.0",
+    "rollup-plugin-node-resolve": "^2.1.1",
     "rollup-plugin-sourcemaps": "^0.4.1",
     "serve-static": "^1.11.1",
-    "tslib": "^1.8.1",
+    "tslib": "^1.9.0",
     "typescript": "^2.6.2",
     "uglify-js": "^2.7.5"
   },

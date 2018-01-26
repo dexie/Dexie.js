@@ -6,14 +6,13 @@ import { IndexSpec } from "./index-spec";
 import { DexieExceptionClasses } from "./errors";
 import { PromiseExtendedConstructor } from "./promise-extended";
 import { DexieEventSet } from "./dexie-event-set";
-import { IDBFactory, IDBKeyRangeConstructor } from "./indexeddb";
 import { DexieDOMDependencies } from "./dexie-dom-dependencies";
 
 export interface DexieOptions {
   addons?: Array<(db: Dexie) => void>,
   autoOpen?: boolean,
-  indexedDB?: IDBFactory,
-  IDBKeyRange?: IDBKeyRangeConstructor,
+  indexedDB?: {open: Function},
+  IDBKeyRange?: {bound: Function, lowerBound: Function, upperBound: Function},
   allowEmptyDB?: boolean;
 }
 
