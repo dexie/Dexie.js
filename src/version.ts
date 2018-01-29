@@ -54,8 +54,8 @@ export class Version implements IVersion {
     // Update the latest schema to this version
     db._dbSchema = dbschema;
     // Update APIs
-    removeTablesApi(db, [db._allTables, db, Transaction.prototype]);
-    setApiOnPlace(db, [db._allTables, db, Transaction.prototype, this._cfg.tables], keys(dbschema), dbschema);
+    removeTablesApi(db, [db._allTables, db, db.Transaction.prototype]);
+    setApiOnPlace(db, [db._allTables, db, db.Transaction.prototype, this._cfg.tables], keys(dbschema), dbschema);
     db._storeNames = keys(dbschema);
     return this;
   }

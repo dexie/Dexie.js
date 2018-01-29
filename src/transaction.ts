@@ -1,5 +1,5 @@
 import { Transaction as ITransaction } from './public/types/transaction';
-import { DexiePromise as Promise, wrap, rejection } from "./helpers/promise";
+import { DexiePromise, wrap, rejection } from "./helpers/promise";
 import { DbSchema } from './public/types/db-schema';
 import { assert, hasOwn } from './functions/utils';
 import { PSD, usePSD } from './helpers/promise';
@@ -31,10 +31,10 @@ export class Transaction implements ITransaction {
   _blockedFuncs: { 0: () => any, 1: any }[];
   _resolve: () => void;
   _reject: (Error) => void;
-  _waitingFor: Promise; // for waitFor()
+  _waitingFor: DexiePromise; // for waitFor()
   _waitingQueue: Function[]; // for waitFor()
   _spinCount: number; // Just for debugging waitFor()
-  _completion: Promise;
+  _completion: DexiePromise;
 
   //
   // Transaction internal methods (not required by API users, but needed internally and eventually by dexie extensions)
@@ -136,8 +136,8 @@ export class Transaction implements ITransaction {
    */
   _promise(
     mode: IDBTransactionMode,
-    fn: (resolve, reject, trans: Transaction) => Promise | void,
-    bWriteLock?: string | boolean): Promise
+    fn: (resolve, reject, trans: Transaction) => DexiePromise | void,
+    bWriteLock?: string | boolean): DexiePromise
   {
     if (mode === 'readwrite' && this.mode !== 'readwrite')
       return rejection(new exceptions.ReadOnly("Transaction is readonly"));
@@ -146,7 +146,7 @@ export class Transaction implements ITransaction {
       return rejection(new exceptions.TransactionInactive());
 
     if (this._locked()) {
-      return new Promise((resolve, reject) => {
+      return new DexiePromise((resolve, reject) => {
         this._blockedFuncs.push([() => {
           this._promise(mode, fn, bWriteLock).then(resolve, reject);
         }, PSD]);
@@ -154,7 +154,7 @@ export class Transaction implements ITransaction {
 
     } else if (bWriteLock) {
       return newScope(() => {
-        var p = new Promise((resolve, reject) => {
+        var p = new DexiePromise((resolve, reject) => {
           this._lock();
           const rv = fn(resolve, reject, this);
           if (rv && rv.then) rv.then(resolve, reject);
@@ -165,7 +165,7 @@ export class Transaction implements ITransaction {
       });
 
     } else {
-      var p = new Promise((resolve, reject) => {
+      var p = new DexiePromise((resolve, reject) => {
         var rv = fn(resolve, reject, this);
         if (rv && rv.then) rv.then(resolve, reject);
       });
@@ -193,7 +193,7 @@ export class Transaction implements ITransaction {
     var root = this._root();
     // For stability reasons, convert parameter to promise no matter what type is passed to waitFor().
     // (We must be able to call .then() on it.)
-    const promise = Promise.resolve(promiseLike);
+    const promise = DexiePromise.resolve(promiseLike);
     if (root._waitingFor) {
       // Already called waitFor(). Wait for both to complete.
       root._waitingFor = root._waitingFor.then(() => promise);
@@ -210,7 +210,7 @@ export class Transaction implements ITransaction {
       }());
     }
     var currentWaitPromise = root._waitingFor;
-    return new Promise((resolve, reject) => {
+    return new DexiePromise((resolve, reject) => {
       promise.then(
         res => root._waitingQueue.push(wrap(resolve.bind(null, res))),
         err => root._waitingQueue.push(wrap(reject.bind(null, err)))
@@ -236,10 +236,7 @@ export class Transaction implements ITransaction {
    * 
    * http://dexie.org/docs/Transaction/Transaction.table()
    */
-  table(tableName: string);
-  table<T>(tableName: string);
-  table<T, Key>(tableName: string);
-  table(tableName: any) {
+  table(tableName: string) {
     const memoizedTables = (this._memoizedTables || (this._memoizedTables = {}));
     if (hasOwn(memoizedTables, tableName))
       return memoizedTables[tableName];
@@ -247,7 +244,7 @@ export class Transaction implements ITransaction {
     // Let Dexie.table() take care of throwing if table name is not part of schema.
     var table = this.db.table(tableName); // Don't check that table is part of transaction. It must fail lazily!
 
-    const transactionBoundTable = new this.db.Table(name, table.schema, this);
+    const transactionBoundTable = new this.db.Table(table.name, table.schema, this);
     memoizedTables[tableName] = transactionBoundTable;
     return transactionBoundTable;
   }
