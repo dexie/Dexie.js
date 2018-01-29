@@ -1,14 +1,15 @@
 import sourcemaps from 'rollup-plugin-sourcemaps';
 import commonjs from 'rollup-plugin-commonjs';
 import nodeResolve from 'rollup-plugin-node-resolve';
+import path from 'path';
 
 const ERRORS_TO_IGNORE = [
   "THIS_IS_UNDEFINED"
 ];
 
 export default {
-  entry: 'tools/tmp/es5/test/test/tests-all.js',
-  dest: 'tools/tmp/es5/test/bundle.js',
+  entry: path.resolve(__dirname, '../tmp/test/tests-all.js'),
+  dest: path.resolve(__dirname, '../../test/bundle.js'),
   format: 'umd',
   sourceMap: true,
   moduleName: 'dexieTests',
