@@ -36,6 +36,7 @@
   "scripts": {
     "build": "just-build",
     "watch": "just-build --watch",
+    "clean": "rm -rf tools/tmp && rm dist/*.js && rm dist/*.map && rm dist/*.ts && rm dist/*.mjs",
     "test": "npm run build && npm run test:typings && npm run test:unit",
     "test:unit": "karma start test/karma.conf.js --single-run",
     "test:typings": "tsc -p test/typings-test/",
@@ -83,10 +84,7 @@
   },
   "homepage": "http://dexie.org",
   "devDependencies": {
-    "babel-cli": "^6.18.0",
-    "babel-plugin-transform-regenerator": "^6.21.0",
     "dts-bundle-generator": "^0.6.1",
-    "eslint": "^3.7.1",
     "just-build": "^0.9.16",
     "karma": "^1.4.0",
     "karma-browserstack-launcher": "^1.1.1",
