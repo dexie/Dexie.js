@@ -107,15 +107,17 @@ export class Dexie implements IDexie {
       onReadyBeingFired: null,
       openComplete: false,
       dbReadyResolve: nop,
-      dbReadyPromise: new Promise(resolve => {
-        state.dbReadyResolve = resolve;
-      }),
+      dbReadyPromise: null as Promise,
       cancelOpen: nop,
-      openCanceller: new Promise((_, reject) => {
-        state.cancelOpen = reject;
-      }),
+      openCanceller: null as Promise,
       autoSchema: true
     };
+    state.dbReadyPromise = new Promise(resolve => {
+      state.dbReadyResolve = resolve;
+    });
+    state.openCanceller = new Promise((_, reject) => {
+      state.cancelOpen = reject;
+    });
     this._state = state;
     this.name = name;
     this.on = Events(this, "populate", "blocked", "versionchange", { ready: [promisableChain, nop] }) as DbEvents;
@@ -370,7 +372,7 @@ export class Dexie implements IDexie {
             rejection (e);
     }
     // If this is a sub-transaction, lock the parent and then launch the sub-transaction.
-    const enterTransaction = enterTransactionScope.bind(this, idbMode, storeNames, parentTransaction, scopeFunc);
+    const enterTransaction = enterTransactionScope.bind(null, this, idbMode, storeNames, parentTransaction, scopeFunc);
     return (parentTransaction ?
         parentTransaction._promise(idbMode, enterTransaction, "lock") :
         PSD.trans ?

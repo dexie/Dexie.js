@@ -247,6 +247,12 @@ export class Table implements ITable {
     return constructor;
   }
 
+  /** @deprecated */
+  defineClass() {
+    function Class (){};
+    return this.mapToClass(Class);
+  }
+
   /** Table.add()
    * 
    * http://dexie.org/docs/Table/Table.add()
