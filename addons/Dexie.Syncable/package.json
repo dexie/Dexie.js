@@ -86,7 +86,7 @@
     "qunitjs": "^1.23.1",
     "rollup": "^0.41.4",
     "rollup-plugin-sourcemaps": "^0.4.1",
-    "typescript": "^2.1.5",
+    "typescript": "^2.6.2",
     "uglifyjs": "^2.4.10"
   }
 }
