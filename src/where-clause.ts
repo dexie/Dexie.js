@@ -232,8 +232,11 @@ export class WhereClause implements IWhereClause {
     ranges: ReadonlyArray<{ 0: IndexableType, 1: IndexableType }>,
     options?: { includeLowers?: boolean, includeUppers?: boolean })
   {
-    const ascending = this._ascending,
-          descending = this._descending;
+    const cmp = this._cmp,
+          ascending = this._ascending,
+          descending = this._descending,
+          min = this._min,
+          max = this._max;
 
     if (ranges.length === 0) return emptyCollection(this);
     if (!ranges.every(range =>
@@ -252,9 +255,9 @@ export class WhereClause implements IWhereClause {
       let i = 0, l = ranges.length;
       for (; i < l; ++i) {
         const range = ranges[i];
-        if (this._cmp(newRange[0], range[1]) < 0 && this._cmp(newRange[1], range[0]) > 0) {
-          range[0] = this._min(range[0], newRange[0]);
-          range[1] = this._max(range[1], newRange[1]);
+        if (cmp(newRange[0], range[1]) < 0 && cmp(newRange[1], range[0]) > 0) {
+          range[0] = min(range[0], newRange[0]);
+          range[1] = max(range[1], newRange[1]);
           break;
         }
       }

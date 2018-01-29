@@ -414,7 +414,7 @@ export class Table implements ITable {
    **/
   bulkAdd(objects: any[], keys?: ReadonlyArray<IDBValidKey>) {
     const creatingHook = this.hook.creating.fire;
-    return this._idbstore('readwrite', function (resolve, reject, idbstore, trans) {
+    return this._idbstore('readwrite', (resolve, reject, idbstore, trans) => {
       if (!idbstore.keyPath && !this.schema.primKey.auto && !keys)
         throw new exceptions.InvalidArgument("bulkAdd() with non-inbound keys requires keys array in second argument");
       if (idbstore.keyPath && keys)
@@ -422,7 +422,7 @@ export class Table implements ITable {
       if (keys && keys.length !== objects.length)
         throw new exceptions.InvalidArgument("Arguments objects and keys must have the same length");
       if (objects.length === 0) return resolve(); // Caller provided empty list.
-      function done(result) {
+      const done = result => {
         if (errorList.length === 0) resolve(result);
         else reject(new BulkError(`${this.name}.bulkAdd(): ${errorList.length} of ${numObjs} operations failed`, errorList));
       }
