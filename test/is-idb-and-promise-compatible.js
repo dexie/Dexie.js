@@ -1,5 +1,5 @@
 import Dexie from 'dexie';
-import {NativePromise} from '../src/Promise';
+import {NativePromise} from '../src/helpers/promise';
 
 var _resolve = NativePromise.resolve.bind(NativePromise);
 var _then = NativePromise.prototype.then;
