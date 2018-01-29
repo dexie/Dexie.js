@@ -88,8 +88,10 @@ export class Dexie implements IDexie {
       IDBKeyRange: deps.IDBKeyRange,  // Backend IDBKeyRange api. Default to browser env.
       ...options
     };
-    this._deps.indexedDB = options.indexedDB as IDBFactory;
-    this._deps.IDBKeyRange = options.IDBKeyRange as IDBKeyRangeConstructor;
+    this._deps = {
+      indexedDB: options.indexedDB as IDBFactory,
+      IDBKeyRange: options.IDBKeyRange as IDBKeyRangeConstructor
+    };
     const {
       addons,
       autoOpen,
