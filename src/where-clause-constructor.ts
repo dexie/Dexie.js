@@ -3,6 +3,7 @@ import { makeClassConstructor } from './functions/make-class-constructor';
 import { WhereClause } from './where-clause';
 import { Table } from './table';
 import { Collection } from './collection';
+import { exceptions } from './errors';
 
 export interface WhereClauseConstructor {
   new(table: Table, index?: string, orCollection?: Collection): WhereClause;
@@ -27,6 +28,7 @@ export function createWhereClauseConstructor(db: Dexie) {
         or: orCollection
       };
       const indexedDB = db._deps.indexedDB;
+      if (!indexedDB) throw new exceptions.MissingAPI("indexedDB API missing");
       this._cmp = this._ascending = indexedDB.cmp.bind(indexedDB);
       this._descending = (a, b) => indexedDB.cmp(b, a);
       this._max = (a, b) => indexedDB.cmp(a,b) > 0 ? a : b;

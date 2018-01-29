@@ -40,7 +40,7 @@ export function DatabaseEnumerator (indexedDB: IDBFactory & {getDatabaseNames?, 
     },
 
     remove (name: string) : PromiseExtended<any> | undefined {
-      return getDatabaseNamesNative && name !== DBNAMES_DB && dbNamesTable.delete(name).catch(nop);
+      return !getDatabaseNamesNative && name !== DBNAMES_DB && dbNamesTable.delete(name).catch(nop);
     }
   };
 }
