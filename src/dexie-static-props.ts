@@ -69,6 +69,14 @@ export function defineDexieStaticProperties (DexieConstructor: DexieConstructor)
         Promise.resolve([]);
     },
 
+    /** @deprecated */
+    defineClass() {
+      function Class (content) {
+        extend(this, content);
+      }
+      return Class;
+    },
+
     ignoreTransaction(scopeFunc) {
       // In case caller is within a transaction but needs to create a separate transaction.
       // Example of usage:

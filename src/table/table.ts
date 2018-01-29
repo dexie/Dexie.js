@@ -12,7 +12,7 @@ import { tempTransaction } from '../functions/temp-transaction';
 import { eventRejectHandler, hookedEventRejectHandler, hookedEventSuccessHandler, BulkErrorHandlerCatchAll, eventSuccessHandler } from '../functions/event-wrappers';
 import { WhereClause } from '../where-clause';
 import { Collection } from '../collection';
-import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, deepClone, tryCatch, arrayToObject } from '../functions/utils';
+import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, deepClone, tryCatch, arrayToObject, extend } from '../functions/utils';
 import { maxString } from '../globals/constants';
 import { combine } from '../functions/combine';
 import { PromiseExtended } from "../public/types/promise-extended";
@@ -249,7 +249,9 @@ export class Table implements ITable {
 
   /** @deprecated */
   defineClass() {
-    function Class (){};
+    function Class (content){
+      extend(this, content);
+    };
     return this.mapToClass(Class);
   }
 
