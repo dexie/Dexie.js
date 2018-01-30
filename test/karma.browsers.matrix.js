@@ -19,7 +19,9 @@ module.exports = {
         // Chrome will be tested in the pre_npm_publish anyway.
         'bs_firefox_latest_supported', 
         // Internet Explorer - an old beast. Enforces legacy compatibility for every PR!
-        'bs_ie11',  
+        //'bs_ie11',  
+        // Edge latest
+        'bs_edge_latest_supported',  
         // Safari 10.1 - another beast. Enforces native Safari support for every PR!
         'bs_iphone7'
     ],
