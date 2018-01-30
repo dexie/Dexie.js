@@ -8,12 +8,14 @@ const ERRORS_TO_IGNORE = [
 ];
 
 export default {
-  entry: path.resolve(__dirname, '../tmp/test/tests-all.js'),
-  dest: path.resolve(__dirname, '../../test/bundle.js'),
-  format: 'umd',
-  sourceMap: true,
-  moduleName: 'dexieTests',
-  globals: {dexie: "Dexie", QUnit: "QUnit"},
+  input: path.resolve(__dirname, '../tmp/test/tests-all.js'),
+  output: {
+    file: path.resolve(__dirname, '../../test/bundle.js'),
+    format: 'umd',
+    sourcemap: true,
+    name: 'dexieTests',
+    globals: {dexie: "Dexie", QUnit: "QUnit"},
+  },
   external: ['dexie', 'QUnit'],
   plugins: [
     sourcemaps(),
