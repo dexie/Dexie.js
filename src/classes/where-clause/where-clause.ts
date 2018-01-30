@@ -1,13 +1,13 @@
-import { WhereClause as IWhereClause } from "./public/types/where-clause";
-import { Collection } from "./collection";
-import { Table } from "./table";
-import { IndexableType } from "./public/types/indexable-type";
-import { emptyCollection, fail, addIgnoreCaseAlgorithm } from './functions/where-clause-helpers';
-import { INVALID_KEY_ARGUMENT, STRING_EXPECTED, maxString, minKey } from './globals/constants';
-import { getArrayOf, NO_CHAR_ARRAY } from './functions/utils';
-import { exceptions } from './errors';
-import { Dexie } from './dexie';
-import { IndexableTypeArray, IDBValidKey } from './public/types/indexeddb';
+import { WhereClause as IWhereClause } from "../../public/types/where-clause";
+import { Collection } from "../collection";
+import { Table } from "../table";
+import { IndexableType } from "../../public/types/indexable-type";
+import { emptyCollection, fail, addIgnoreCaseAlgorithm } from './where-clause-helpers';
+import { INVALID_KEY_ARGUMENT, STRING_EXPECTED, maxString, minKey } from '../../globals/constants';
+import { getArrayOf, NO_CHAR_ARRAY } from '../../functions/utils';
+import { exceptions } from '../../errors';
+import { Dexie } from '../dexie';
+import { IndexableTypeArray, IDBValidKey } from '../../public/types/indexeddb';
 
 /** class WhereClause
  * 

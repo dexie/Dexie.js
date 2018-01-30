@@ -52,9 +52,12 @@
       "cd src",
       "tsc [--watch 'Compilation complete.']",
       "rollup -c ../tools/build-configs/rollup.config.js",
-      "#node tools/replaceVersionAndDate.js dist/dexie.js",
-      "dts-bundle-generator -o ../dist/dexie.d.ts public/index.d.ts",
-      "node -e \"fs.appendFileSync('../dist/dexie.d.ts', '\\\\nexport default Dexie;\\\\n')\""
+      "node ../tools/replaceVersionAndDate.js ../dist/dexie.js",
+      "node ../tools/replaceVersionAndDate.js ../dist/dexie.mjs",
+      "dts-bundle-generator --umd-module-name Dexie -o ../dist/dexie.d.ts public/index.d.ts",
+      "node -e \"fs.appendFileSync('../dist/dexie.d.ts', '\\\\nexport default Dexie;\\\\n')\"",
+      "node ../tools/prepend.js ../dist/dexie.d.ts ../tools/build-configs/banner.txt",
+      "node ../tools/replaceVersionAndDate.js ../dist/dexie.d.ts"
     ],
     "release": [
       "# Build ES5 umd module as well as the es6 module.",

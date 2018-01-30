@@ -1,9 +1,9 @@
-import { Dexie } from './dexie';
-import { makeClassConstructor } from './functions/make-class-constructor';
+import { Dexie } from '../dexie';
+import { makeClassConstructor } from '../../functions/make-class-constructor';
 import { WhereClause } from './where-clause';
-import { Table } from './table';
-import { Collection } from './collection';
-import { exceptions } from './errors';
+import { Table } from '../table';
+import { Collection } from '../collection';
+import { exceptions } from '../../errors';
 
 export interface WhereClauseConstructor {
   new(table: Table, index?: string, orCollection?: Collection): WhereClause;

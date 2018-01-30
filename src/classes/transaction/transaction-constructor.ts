@@ -1,9 +1,9 @@
-import { Dexie } from './dexie';
-import { makeClassConstructor } from './functions/make-class-constructor';
+import { Dexie } from '../dexie';
+import { makeClassConstructor } from '../../functions/make-class-constructor';
 import { Transaction } from './transaction';
-import { DbSchema } from './public/types/db-schema';
-import Events from './helpers/Events';
-import Promise, { rejection } from './helpers/promise';
+import { DbSchema } from '../../public/types/db-schema';
+import Events from '../../helpers/Events';
+import Promise, { rejection } from '../../helpers/promise';
 
 export interface TransactionConstructor {
   new (

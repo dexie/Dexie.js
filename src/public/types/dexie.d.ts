@@ -36,17 +36,17 @@ export interface Dexie extends Database {
 
   table<T=any, TKey=IndexableType>(tableName: string): Table<T, TKey>;
 
-  transaction<U>(mode: TransactionMode, table: Table<any, any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, table: Table<any, any>, table2: Table<any, any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, table2: Table, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, table2: Table, table3: Table, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, table4: Table<any,any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, table2: Table, table3: Table, table4: Table<any,any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, table4: Table<any,any>, table5: Table<any,any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, table2: Table, table3: Table, table4: Table<any,any>, table5: Table<any,any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, tables: Table<any, any>[], scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, tables: Table[], scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 
   close(): void;
 

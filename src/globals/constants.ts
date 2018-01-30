@@ -1,4 +1,4 @@
-import { Dexie } from "../dexie";
+import { Dexie } from "../classes/dexie";
 
 export const DEXIE_VERSION = '{version}'; // Replaced by build-script.
 export const maxString = String.fromCharCode(65535);

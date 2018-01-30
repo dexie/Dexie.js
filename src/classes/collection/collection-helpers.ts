@@ -1,10 +1,10 @@
-import { combine } from "./combine";
-import { IDBObjectStore, IDBCursor } from "../public/types/indexeddb";
-import { exceptions } from "../errors";
-import { hasOwn, trycatcher } from "../functions/utils";
-import { wrap } from "../helpers/promise";
-import { eventRejectHandler } from "./event-wrappers";
-import { Collection } from '../collection';
+import { combine } from "../../functions/combine";
+import { IDBObjectStore, IDBCursor } from "../../public/types/indexeddb";
+import { exceptions } from "../../errors";
+import { hasOwn, trycatcher } from "../../functions/utils";
+import { wrap } from "../../helpers/promise";
+import { eventRejectHandler } from "../../functions/event-wrappers";
+import { Collection } from './';
 
 type CollectionContext = Collection["_ctx"];
 

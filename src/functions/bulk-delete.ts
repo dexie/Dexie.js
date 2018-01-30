@@ -1,5 +1,5 @@
 import { IDBObjectStore, IDBValidKey, IDBRequest } from '../public/types/indexeddb';
-import { Transaction } from '../transaction';
+import { Transaction } from '../classes/transaction';
 import { eventRejectHandler, hookedEventRejectHandler, hookedEventSuccessHandler } from './event-wrappers';
 import { wrap } from '../helpers/promise';
 import { tryCatch } from '../functions/utils';

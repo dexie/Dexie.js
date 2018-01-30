@@ -2,8 +2,8 @@ import { PSD, rejection, newScope } from "../helpers/promise";
 import { DexieOptions } from "../public/types/dexie-constructor";
 import { exceptions } from "../errors";
 import { nop } from "./chaining-functions";
-import { Transaction } from "../transaction";
-import { Dexie } from '../dexie';
+import { Transaction } from "../classes/transaction";
+import { Dexie } from '../classes/dexie';
 
 /* Generate a temporary transaction when db operations are done outside a transaction scope.
 */

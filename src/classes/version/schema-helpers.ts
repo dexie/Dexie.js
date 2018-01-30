@@ -1,18 +1,17 @@
 import { Dexie } from '../dexie';
-import { DbSchema } from '../public/types/db-schema';
-import { setProp, keys, slice, _global, isArray } from './utils';
+import { DbSchema } from '../../public/types/db-schema';
+import { setProp, keys, slice, _global, isArray } from '../../functions/utils';
 import { Transaction } from '../transaction';
-import { Version } from '../version';
-import { IDBTransaction, IDBObjectStore, IDBDatabase } from '../public/types/indexeddb';
-import { newScope } from '../helpers/promise';
-import Promise, { PSD } from '../helpers/promise';
-import { exceptions } from '../errors';
-import { TableSchema } from '../public/types/table-schema';
-import { IndexSpec } from '../public/types/index-spec';
-import { hasIEDeleteObjectStoreBug } from '../globals/constants';
-import { safariMultiStoreFix } from './quirks';
-import { createIndexSpec, nameFromKeyPath } from '../helpers/index-spec';
-import { createTableSchema } from '../helpers/table-schema';
+import { Version } from './version';
+import { IDBTransaction, IDBObjectStore, IDBDatabase } from '../../public/types/indexeddb';
+import Promise, { PSD, newScope } from '../../helpers/promise';
+import { exceptions } from '../../errors';
+import { TableSchema } from '../../public/types/table-schema';
+import { IndexSpec } from '../../public/types/index-spec';
+import { hasIEDeleteObjectStoreBug } from '../../globals/constants';
+import { safariMultiStoreFix } from '../../functions/quirks';
+import { createIndexSpec, nameFromKeyPath } from '../../helpers/index-spec';
+import { createTableSchema } from '../../helpers/table-schema';
 
 export function setApiOnPlace(db: Dexie, objs: Object[], tableNames: string[], dbschema: DbSchema) {
   tableNames.forEach(tableName => {

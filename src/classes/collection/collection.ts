@@ -1,20 +1,20 @@
-import { Collection as ICollection } from "../public/types/collection";
-import { WhereClause } from "../where-clause";
+import { Collection as ICollection } from "../../public/types/collection";
+import { WhereClause } from "../where-clause/where-clause";
 import { Dexie } from "../dexie";
 import { Table } from "../table";
-import { IDBKeyRange, IDBValidKey } from "../public/types/indexeddb";
-import { PromiseExtended } from "../public/types/promise-extended";
-import { iter, isPlainKeyRange, getIndexOrStore, addReplayFilter, addFilter, addMatchFilter } from "../functions/collection-helpers";
-import { IDBObjectStore, IDBCursor } from '../public/types/indexeddb';
-import { rejection } from "../helpers/promise";
-import { combine } from "../functions/combine";
-import { extend, hasOwn, deepClone, getObjectDiff, keys, setByKeyPath, getByKeyPath, shallowClone, tryCatch } from "../functions/utils";
-import { eventRejectHandler, eventSuccessHandler, hookedEventRejectHandler, hookedEventSuccessHandler } from "../functions/event-wrappers";
-import { mirror, nop } from "../functions/chaining-functions";
-import { ModifyError } from "../errors";
-import { hangsOnDeleteLargeKeyRange } from "../globals/constants";
-import { bulkDelete } from "../functions/bulk-delete";
-import { ThenShortcut } from "../public/types/then-shortcut";
+import { IDBKeyRange, IDBValidKey } from "../../public/types/indexeddb";
+import { PromiseExtended } from "../../public/types/promise-extended";
+import { iter, isPlainKeyRange, getIndexOrStore, addReplayFilter, addFilter, addMatchFilter } from "./collection-helpers";
+import { IDBObjectStore, IDBCursor } from '../../public/types/indexeddb';
+import { rejection } from "../../helpers/promise";
+import { combine } from "../../functions/combine";
+import { extend, hasOwn, deepClone, getObjectDiff, keys, setByKeyPath, getByKeyPath, shallowClone, tryCatch } from "../../functions/utils";
+import { eventRejectHandler, eventSuccessHandler, hookedEventRejectHandler, hookedEventSuccessHandler } from "../../functions/event-wrappers";
+import { mirror, nop } from "../../functions/chaining-functions";
+import { ModifyError } from "../../errors";
+import { hangsOnDeleteLargeKeyRange } from "../../globals/constants";
+import { bulkDelete } from "../../functions/bulk-delete";
+import { ThenShortcut } from "../../public/types/then-shortcut";
 
 /** class Collection
  * 
@@ -248,7 +248,6 @@ export class Collection implements ICollection {
    * 
    **/
   until(filterFunction: (x) => boolean, bIncludeStopEntry?) {
-    var ctx = this._ctx;
     addFilter(this._ctx, function (cursor, advance, resolve) {
       if (filterFunction(cursor.value)) {
         advance(resolve);

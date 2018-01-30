@@ -1,16 +1,16 @@
-import { Transaction as ITransaction } from './public/types/transaction';
-import { DexiePromise, wrap, rejection } from "./helpers/promise";
-import { DbSchema } from './public/types/db-schema';
-import { assert, hasOwn } from './functions/utils';
-import { PSD, usePSD } from './helpers/promise';
-import { Dexie } from './dexie';
-import { IDBTransaction } from './public/types/indexeddb';
-import { exceptions } from './errors';
-import { safariMultiStoreFix } from './functions/quirks';
-import { preventDefault } from './functions/event-wrappers';
-import { newScope } from './helpers/promise';
-import * as Debug from './helpers/debug';
-import { Table } from './table';
+import { Transaction as ITransaction } from '../../public/types/transaction';
+import { DexiePromise, wrap, rejection } from "../../helpers/promise";
+import { DbSchema } from '../../public/types/db-schema';
+import { assert, hasOwn } from '../../functions/utils';
+import { PSD, usePSD } from '../../helpers/promise';
+import { Dexie } from '../dexie';
+import { IDBTransaction } from '../../public/types/indexeddb';
+import { exceptions } from '../../errors';
+import { safariMultiStoreFix } from '../../functions/quirks';
+import { preventDefault } from '../../functions/event-wrappers';
+import { newScope } from '../../helpers/promise';
+import * as Debug from '../../helpers/debug';
+import { Table } from '../table';
 
 /** Transaction
  * 

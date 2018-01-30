@@ -7,7 +7,7 @@ import {
   BulkErrorConstructor,
   ExceptionAliasSet,
   ExceptionSet
-} from "./public/types/errors";
+} from "../public/types/errors";
 
 export declare const DexieError: DexieErrorConstructor;
 export declare const ModifyError: ModifyErrorConstructor;

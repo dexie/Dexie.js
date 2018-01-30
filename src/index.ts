@@ -1,7 +1,7 @@
 import DexiePromise from './helpers/promise';
 import { mapError } from './errors';
-import { Dexie } from './dexie';
-import { defineDexieStaticProperties } from './dexie-static-props';
+import { Dexie } from './classes/dexie';
+import { defineDexieStaticProperties } from './classes/dexie/dexie-static-props';
 import { DexieConstructor } from './public/types/dexie-constructor';
 import * as Debug from './helpers/debug';
 import { dexieStackFrameFilter } from './globals/constants';
