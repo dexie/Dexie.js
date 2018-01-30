@@ -65,7 +65,7 @@
       "node tools/replaceVersionAndDate.js dist/dexie.d.ts",
       "# Minify the default ES5 UMD module",
       "cd dist",
-      "uglifyjs dexie.js -m -c -o dexie.min.js --source-map dexie.min.js.map  --in-source-map dexie.js.map"
+      "uglifyjs dexie.js -m -c negate_iife=0 -o dexie.min.js --source-map"
     ],
     "dev": [
       "# Build ES5 module and the tests",
@@ -105,7 +105,7 @@
     "serve-static": "^1.11.1",
     "tslib": "^1.9.0",
     "typescript": "^2.6.2",
-    "uglify-js": "^2.7.5"
+    "uglify-js": "^3.3.9"
   },
   "dependencies": {}
 }
