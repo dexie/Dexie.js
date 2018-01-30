@@ -46,7 +46,7 @@ export function dexieOpen (db: Dexie) {
         indexedDB.open(dbName, Math.round(db.verno * 10));
       if (!req) throw new exceptions.MissingAPI("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
       req.onerror = eventRejectHandler(reject);
-      req.onblocked = ev => wrap(db._fireOnBlocked);
+      req.onblocked = wrap(db._fireOnBlocked);
       req.onupgradeneeded = wrap (e => {
           upgradeTransaction = req.transaction;
           if (state.autoSchema && !db._options.allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
