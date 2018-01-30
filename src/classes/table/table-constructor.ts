@@ -1,11 +1,11 @@
 import { Dexie } from '../dexie';
-import { TableSchema } from '../public/types/table-schema';
-import { Transaction } from '../transaction';
-import { hookCreatingChain, pureFunctionChain, nop, mirror, hookUpdatingChain, hookDeletingChain } from '../functions/chaining-functions';
-import { TableHooks } from '../public/types/table-hooks';
+import { TableSchema } from '../../public/types/table-schema';
+import { Transaction } from '../transaction/transaction';
+import { hookCreatingChain, pureFunctionChain, nop, mirror, hookUpdatingChain, hookDeletingChain } from '../../functions/chaining-functions';
+import { TableHooks } from '../../public/types/table-hooks';
 import { Table } from './table';
-import Events from '../helpers/Events';
-import { makeClassConstructor } from '../functions/make-class-constructor';
+import Events from '../../helpers/Events';
+import { makeClassConstructor } from '../../functions/make-class-constructor';
 
 export interface TableConstructor {
   new (name: string, tableSchema: TableSchema, optionalTrans?: Transaction) : Table;

@@ -1,5 +1,5 @@
-import { derive, setProp } from './functions/utils';
-import { getErrorWithStack, prettyStack } from './helpers/debug';
+import { derive, setProp } from '../functions/utils';
+import { getErrorWithStack, prettyStack } from '../helpers/debug';
 
 var dexieErrorNames = [
     'Modify',

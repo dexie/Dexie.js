@@ -1,11 +1,11 @@
-import { Version as IVersion } from './public/types/version';
-import { DbSchema } from './public/types/db-schema';
-import { extend, keys } from './functions/utils';
-import { Dexie } from './dexie';
-import { Transaction } from './transaction';
-import { removeTablesApi, setApiOnPlace, parseIndexSyntax } from './functions/schema-helpers';
-import { exceptions } from './errors';
-import { createTableSchema } from './helpers/table-schema';
+import { Version as IVersion } from '../../public/types/version';
+import { DbSchema } from '../../public/types/db-schema';
+import { extend, keys } from '../../functions/utils';
+import { Dexie } from '../dexie';
+import { Transaction } from '../transaction';
+import { removeTablesApi, setApiOnPlace, parseIndexSyntax } from './schema-helpers';
+import { exceptions } from '../../errors';
+import { createTableSchema } from '../../helpers/table-schema';
 
 /** class Version
  * 

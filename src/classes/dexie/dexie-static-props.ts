@@ -1,20 +1,20 @@
 import { Dexie } from './dexie';
-import { props, derive, extend, override, getByKeyPath, setByKeyPath, delByKeyPath, shallowClone, deepClone, getObjectDiff, asap, _global } from './functions/utils';
-import { fullNameExceptions } from './errors';
-import { DexieConstructor } from './public/types/dexie-constructor';
-import { DatabaseEnumerator, databaseEnumerator } from './helpers/database-enumerator';
-import { PSD } from './helpers/promise';
-import { usePSD } from './helpers/promise';
-import { newScope } from './helpers/promise';
-import { rejection } from './helpers/promise';
-import { awaitIterator } from './helpers/yield-support';
-import Promise from './helpers/promise';
-import * as Debug from './helpers/debug';
-import { dexieStackFrameFilter, minKey, connections, DEXIE_VERSION } from './globals/constants';
-import Events from './helpers/Events';
-import { exceptions } from './errors';
-import { errnames } from './errors';
-import { getMaxKey } from './functions/quirks';
+import { props, derive, extend, override, getByKeyPath, setByKeyPath, delByKeyPath, shallowClone, deepClone, getObjectDiff, asap, _global } from '../../functions/utils';
+import { fullNameExceptions } from '../../errors';
+import { DexieConstructor } from '../../public/types/dexie-constructor';
+import { DatabaseEnumerator, databaseEnumerator } from '../../helpers/database-enumerator';
+import { PSD } from '../../helpers/promise';
+import { usePSD } from '../../helpers/promise';
+import { newScope } from '../../helpers/promise';
+import { rejection } from '../../helpers/promise';
+import { awaitIterator } from '../../helpers/yield-support';
+import Promise from '../../helpers/promise';
+import * as Debug from '../../helpers/debug';
+import { dexieStackFrameFilter, minKey, connections, DEXIE_VERSION } from '../../globals/constants';
+import Events from '../../helpers/Events';
+import { exceptions } from '../../errors';
+import { errnames } from '../../errors';
+import { getMaxKey } from '../../functions/quirks';
 
 export function vip (fn) {
   // To be used by subscribers to the on('ready') event.

@@ -1,16 +1,16 @@
-import { Dexie } from '../dexie';
-import * as Debug from '../helpers/debug';
-import { rejection } from '../helpers/promise';
-import { exceptions } from '../errors';
-import { eventRejectHandler, preventDefault } from './event-wrappers';
-import Promise, { wrap } from '../helpers/promise';
-import { IDBEvent, IDBTransaction } from '../public/types/indexeddb';
-import { connections } from '../globals/constants';
-import { runUpgraders, readGlobalSchema, adjustToExistingIndexNames } from './schema-helpers';
-import { safariMultiStoreFix } from './quirks';
-import { databaseEnumerator } from '../helpers/database-enumerator';
-import { vip } from '../dexie-static-props';
-import { promisableChain, nop } from './chaining-functions';
+import { Dexie } from './dexie';
+import * as Debug from '../../helpers/debug';
+import { rejection } from '../../helpers/promise';
+import { exceptions } from '../../errors';
+import { eventRejectHandler, preventDefault } from '../../functions/event-wrappers';
+import Promise, { wrap } from '../../helpers/promise';
+import { IDBEvent, IDBTransaction } from '../../public/types/indexeddb';
+import { connections } from '../../globals/constants';
+import { runUpgraders, readGlobalSchema, adjustToExistingIndexNames } from '../version/schema-helpers';
+import { safariMultiStoreFix } from '../../functions/quirks';
+import { databaseEnumerator } from '../../helpers/database-enumerator';
+import { vip } from './dexie-static-props';
+import { promisableChain, nop } from '../../functions/chaining-functions';
 
 export function dexieOpen (db: Dexie) {
   const state = db._state;

@@ -1,11 +1,17 @@
-import { TransactionMode } from '../public/types/transaction-mode';
-import { exceptions } from '../errors';
-import { flatten } from './utils';
-import { PSD, NativePromise, decrementExpectedAwaits, rejection } from '../helpers/promise';
-import { Dexie } from '../dexie';
+import { TransactionMode } from '../../public/types/transaction-mode';
+import { exceptions } from '../../errors';
+import { flatten } from '../../functions/utils';
+import { Dexie } from './dexie';
 import { Transaction } from '../transaction';
-import Promise, { AsyncFunction, incrementExpectedAwaits } from '../helpers/promise';
-import { awaitIterator } from '../helpers/yield-support';
+import { awaitIterator } from '../../helpers/yield-support';
+import Promise, {
+  PSD,
+  NativePromise,
+  decrementExpectedAwaits,
+  rejection,
+  AsyncFunction,
+  incrementExpectedAwaits
+} from '../../helpers/promise';
 
 export function extractTransactionArgs(mode: TransactionMode, _tableArgs_, scopeFunc) {
   // Let table arguments be all arguments between mode and last argument.

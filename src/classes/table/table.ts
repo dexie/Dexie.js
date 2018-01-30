@@ -1,28 +1,29 @@
-import { IDBObjectStore, IDBValidKey } from '../public/types/indexeddb';
-import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from '../errors';
-import { Table as ITable } from '../public/types/table';
-import { TableSchema } from '../public/types/table-schema';
-import { TableHooks } from '../public/types/table-hooks';
-import { DexiePromise as Promise, PSD, newScope, wrap, rejection } from '../helpers/promise';
-import Events from '../helpers/Events';
-import { hookCreatingChain, nop, pureFunctionChain, mirror, hookUpdatingChain, hookDeletingChain } from '../functions/chaining-functions';
+import { IDBObjectStore, IDBValidKey } from '../../public/types/indexeddb';
+import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from '../../errors';
+import { Table as ITable } from '../../public/types/table';
+import { TableSchema } from '../../public/types/table-schema';
+import { TableHooks } from '../../public/types/table-hooks';
+import { DexiePromise as Promise, PSD, newScope, wrap, rejection } from '../../helpers/promise';
+import Events from '../../helpers/Events';
+import { hookCreatingChain, nop, pureFunctionChain, mirror, hookUpdatingChain, hookDeletingChain } from '../../functions/chaining-functions';
 import { Transaction } from '../transaction';
 import { Dexie } from '../dexie';
-import { tempTransaction } from '../functions/temp-transaction';
-import { eventRejectHandler, hookedEventRejectHandler, hookedEventSuccessHandler, BulkErrorHandlerCatchAll, eventSuccessHandler } from '../functions/event-wrappers';
-import { WhereClause } from '../where-clause';
+import { tempTransaction } from '../../functions/temp-transaction';
+import { eventRejectHandler, hookedEventRejectHandler, hookedEventSuccessHandler, BulkErrorHandlerCatchAll, eventSuccessHandler } from '../../functions/event-wrappers';
+import { WhereClause } from '../where-clause/where-clause';
 import { Collection } from '../collection';
-import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, deepClone, tryCatch, arrayToObject, extend } from '../functions/utils';
-import { maxString } from '../globals/constants';
-import { combine } from '../functions/combine';
-import { PromiseExtended } from "../public/types/promise-extended";
-import { bulkDelete } from '../functions/bulk-delete';
+import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, deepClone, tryCatch, arrayToObject, extend } from '../../functions/utils';
+import { maxString } from '../../globals/constants';
+import { combine } from '../../functions/combine';
+import { PromiseExtended } from "../../public/types/promise-extended";
+import { bulkDelete } from '../../functions/bulk-delete';
+import { IndexableType } from '../../public/types/indexable-type';
 
 /** class Table
  * 
  * http://dexie.org/docs/Table/Table
  */
-export class Table implements ITable {
+export class Table implements ITable<any, IndexableType> {
   db: Dexie;
   _tx?: Transaction;
   name: string;

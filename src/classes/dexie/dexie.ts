@@ -1,44 +1,44 @@
 // Import types from the public API
-import { Dexie as IDexie } from "./public/types/dexie";
-import { DexieOptions, DexieConstructor } from "./public/types/dexie-constructor";
-import { DbEvents } from "./public/types/db-events";
-import { IDBValidKey, IDBKeyRangeConstructor, IDBFactory, IDBEvent } from './public/types/indexeddb';
-//import { PromiseExtended, PromiseExtendedConstructor } from './public/types/promise-extended';
-import { Table as ITable } from './public/types/table';
-import { TableSchema } from "./public/types/table-schema";
-import { IDBKeyRange } from "./public/types/indexeddb";
-import { DbSchema } from './public/types/db-schema';
+import { Dexie as IDexie } from "../../public/types/dexie";
+import { DexieOptions, DexieConstructor } from "../../public/types/dexie-constructor";
+import { DbEvents } from "../../public/types/db-events";
+import { IDBValidKey, IDBKeyRangeConstructor, IDBFactory, IDBEvent } from '../../public/types/indexeddb';
+//import { PromiseExtended, PromiseExtendedConstructor } from '../../public/types/promise-extended';
+import { Table as ITable } from '../../public/types/table';
+import { TableSchema } from "../../public/types/table-schema";
+import { IDBKeyRange } from "../../public/types/indexeddb";
+import { DbSchema } from '../../public/types/db-schema';
 
 // Internal imports
-import { Table, TableConstructor, createTableConstructor } from "./table";
-import { Collection, CollectionConstructor, createCollectionConstructor } from './collection';
-import { WhereClause } from './where-clause';
-import { WhereClauseConstructor, createWhereClauseConstructor } from './where-clause-constructor';
-import { Transaction } from './transaction';
-import { TransactionConstructor, createTransactionConstructor } from './transaction-constructor';
-import { Version } from "./version";
-import { VersionConstructor, createVersionConstructor } from './version-constructor';
+import { Table, TableConstructor, createTableConstructor } from "../table";
+import { Collection, CollectionConstructor, createCollectionConstructor } from '../collection';
+import { WhereClause } from '../where-clause/where-clause';
+import { WhereClauseConstructor, createWhereClauseConstructor } from '../where-clause/where-clause-constructor';
+import { Transaction } from '../transaction';
+import { TransactionConstructor, createTransactionConstructor } from '../transaction/transaction-constructor';
+import { Version } from "../version/version";
+import { VersionConstructor, createVersionConstructor } from '../version/version-constructor';
 
 // Other imports...
-import { DexieEventSet } from './public/types/dexie-event-set';
-import { DexieExceptionClasses } from './public/types/errors';
-import { DexieDOMDependencies } from './public/types/dexie-dom-dependencies';
-import { nop, promisableChain } from './functions/chaining-functions';
-import Promise, { PSD } from './helpers/promise';
-import { extend, override, keys, hasOwn } from './functions/utils';
-import Events from './helpers/Events';
-import { maxString, connections, READONLY, READWRITE } from './globals/constants';
-import { getMaxKey } from './functions/quirks';
-import { exceptions } from './errors';
-import { lowerVersionFirst } from './functions/schema-helpers';
-import { dexieOpen } from './functions/dexie-open';
-import { wrap } from './helpers/promise';
-import { databaseEnumerator } from './helpers/database-enumerator';
-import { eventRejectHandler } from './functions/event-wrappers';
-import { extractTransactionArgs, enterTransactionScope } from './functions/transaction-helpers';
-import { TransactionMode } from './public/types/transaction-mode';
-import { rejection } from './helpers/promise';
-import { usePSD } from './helpers/promise';
+import { DexieEventSet } from '../../public/types/dexie-event-set';
+import { DexieExceptionClasses } from '../../public/types/errors';
+import { DexieDOMDependencies } from '../../public/types/dexie-dom-dependencies';
+import { nop, promisableChain } from '../../functions/chaining-functions';
+import Promise, { PSD } from '../../helpers/promise';
+import { extend, override, keys, hasOwn } from '../../functions/utils';
+import Events from '../../helpers/Events';
+import { maxString, connections, READONLY, READWRITE } from '../../globals/constants';
+import { getMaxKey } from '../../functions/quirks';
+import { exceptions } from '../../errors';
+import { lowerVersionFirst } from '../version/schema-helpers';
+import { dexieOpen } from './dexie-open';
+import { wrap } from '../../helpers/promise';
+import { databaseEnumerator } from '../../helpers/database-enumerator';
+import { eventRejectHandler } from '../../functions/event-wrappers';
+import { extractTransactionArgs, enterTransactionScope } from './transaction-helpers';
+import { TransactionMode } from '../../public/types/transaction-mode';
+import { rejection } from '../../helpers/promise';
+import { usePSD } from '../../helpers/promise';
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -94,7 +94,6 @@ export class Dexie implements IDexie {
     };
     const {
       addons,
-      autoOpen,
     } = options;
     this._dbSchema = {};
     this._versions = [];

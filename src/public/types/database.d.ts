@@ -10,21 +10,15 @@ export interface Database {
   
   table<T=any, TKey=any>(tableName: string): Table<T, TKey>;
 
-  transaction<U>(mode: TransactionMode, table: Table<any, any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, table: Table<any, any>, table2: Table<any, any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, table2: Table, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, table2: Table, table3: Table, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, table4: Table<any,any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, table2: Table, table3: Table, table4: Table, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, table: Table<any, any>, table2: Table<any, any>, table3: Table<any, any>, table4: Table<any,any>, table5: Table<any,any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, table2: Table, table3: Table, table4: Table, table5: Table, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, tables: Table<any, any>[], scope: () => PromiseLike<U> | U): PromiseExtended<U>;
-
-  // Make it possible to touch physical class constructors where they reside - as properties on db instance.
-  // For example, checking if (x instanceof db.Table). Can't do (x instanceof Dexie.Table because it's just a virtual interface)
-  Table : {prototype: Table};
-  WhereClause: {prototype: WhereClause};
-  Collection: {prototype: Collection};
+  transaction<U>(mode: TransactionMode, tables: Table[], scope: () => PromiseLike<U> | U): PromiseExtended<U>;
 }
