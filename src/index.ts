@@ -1,14 +1,14 @@
 import DexiePromise from './helpers/promise';
 import { mapError } from './errors';
 import { Dexie } from './classes/dexie';
-import { defineDexieStaticProperties } from './classes/dexie/dexie-static-props';
 import { DexieConstructor } from './public/types/dexie-constructor';
 import * as Debug from './helpers/debug';
 import { dexieStackFrameFilter } from './globals/constants';
 import { initDatabaseEnumerator } from './helpers/database-enumerator';
 
-// Generate all static properties of Dexie dynamically:
-defineDexieStaticProperties(Dexie as any as DexieConstructor);
+// Generate all static properties such as Dexie.maxKey etc
+// (implement interface DexieConstructor):
+import './classes/dexie/dexie-static-props';
 
 // Init Database Enumerator (for Dexie.getDatabaseNames())
 initDatabaseEnumerator((Dexie as any as DexieConstructor).dependencies.indexedDB);

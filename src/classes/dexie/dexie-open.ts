@@ -9,7 +9,7 @@ import { connections } from '../../globals/constants';
 import { runUpgraders, readGlobalSchema, adjustToExistingIndexNames } from '../version/schema-helpers';
 import { safariMultiStoreFix } from '../../functions/quirks';
 import { databaseEnumerator } from '../../helpers/database-enumerator';
-import { vip } from './dexie-static-props';
+import { vip } from './vip';
 import { promisableChain, nop } from '../../functions/chaining-functions';
 
 export function dexieOpen (db: Dexie) {
