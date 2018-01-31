@@ -1,7 +1,7 @@
-import DexiePromise from './helpers/promise';
-import { mapError } from './errors';
 import { Dexie } from './classes/dexie';
 import { DexieConstructor } from './public/types/dexie-constructor';
+import { DexiePromise } from './helpers/promise';
+import { mapError } from './errors';
 import * as Debug from './helpers/debug';
 import { dexieStackFrameFilter } from './globals/constants';
 import { initDatabaseEnumerator } from './helpers/database-enumerator';
