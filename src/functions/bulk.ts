@@ -49,7 +49,7 @@ export interface BulkResponse {
   req.onsuccess 
 }*/
 
-function bulk (store: IDBObjectStore, breq: BulkRequest) : Promise<BulkResponse> {
+export function bulk (store: IDBObjectStore, breq: BulkRequest) : Promise<BulkResponse> {
   return new Promise(resolve => {
     const length = breq.op === 'delete' ? breq.keys.length : breq.objs.length;
     let req: IDBRequest & { _reqno?};
