@@ -15,7 +15,7 @@
  *                             Javascript / Typescript import.
  * 
  */
-export enum DatabaseChangeType {
+export const enum DatabaseChangeType {
     Create = 1,
     Update = 2,
     Delete = 3
