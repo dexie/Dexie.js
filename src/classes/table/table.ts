@@ -119,12 +119,12 @@ export class Table implements ITable<any, IndexableType> {
     // Ok, now let's fallback to finding at least one matching index
     // and filter the rest.
     const { idxByName } = this.schema;
-    const simpleIndex = keyPaths.reduce((r, keyPath) => [
-      r[0] || idxByName[keyPath],
+    const simpleIndex = keyPaths.reduce<[{keyPath: string, name: string}, (x)=>boolean]>((r, keyPath) => [
+      r[0] || idxByName[keyPath] as {keyPath: string, name: string},
       r[0] || !idxByName[keyPath] ?
         combine(
           r[1],
-          x => '' + getByKeyPath(x, keyPath) === // BUGBUG: Binary Keys may fail
+          x => '' + getByKeyPath(x, keyPath) === // BUGBUG: ArrayBuffer Keys may produce false positives
             '' + indexOrCrit[keyPath])
         : r[1]
     ], [null, null]);
@@ -137,7 +137,7 @@ export class Table implements ITable<any, IndexableType> {
         this.filter(simpleIndex[1]) : // Has compound but browser bad. Allow filter.
         this.where(keyPaths).equals(''); // No index at all. Fail lazily.
   }
-
+  
   /** Table.filter()
    * 
    * http://dexie.org/docs/Table/Table.filter()
