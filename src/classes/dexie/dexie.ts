@@ -202,6 +202,7 @@ export class Dexie implements IDexie {
   }
 
   version(versionNumber: number): Version {
+    versionNumber = Math.round(versionNumber * 10) / 10;
     if (this.idbdb || this._state.isBeingOpened)
       throw new exceptions.Schema("Cannot add version when database is open");
     this.verno = Math.max(this.verno, versionNumber);
