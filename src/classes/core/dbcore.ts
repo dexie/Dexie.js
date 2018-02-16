@@ -1,25 +1,15 @@
-import { CursorObserver, ObjectStore, RangeQuery, KeyRange } from './idbcore';
+import { CursorObserver, RangeQuery, KeyRange, DBCore } from './L1-dbcore/dbcore';
 
 /* Motsvarar expresion engine på högsta nivå.
 Kan ha liknande metoder som idbcore, men troligen inte identiskt.*/
 
 export type Expression =
-  MultiRangeExpression |
   ArithmeticExpression |
   LogicalExpression;
 
 export const enum ExpressionType {
-  MultiRange =1,
-  Arithmetic = 2,
-  Logical = 3
-}
-
-export interface MultiRangeExpression {
-  type: ExpressionType.MultiRange;
-  op: 'inRanges';
-  keyPath: string;
-  ranges: KeyRange[];
-  ignoreCase?: boolean; // Överkurs för nu. Behövs ett ignoreCase lager samt att ANDOR-matrix skiljer dessa som om de vore annan keyPath.
+  Arithmetic = 1,
+  Logical = 2
 }
 
 export interface ArithmeticExpression {
@@ -35,9 +25,38 @@ export interface LogicalExpression {
   operands: Expression[];
 }
 
-export interface Query {
+export interface MultiRangeQuery {
   table: string;
-  expr: Expression; // Only Key
+  index?: string;
+  ranges: KeyRange[];
+  reverse?: boolean;
+  limit?: number;
+  want: {
+    pageToken?: boolean;
+    count?: boolean;
+    keys?: boolean;
+    primaryKeys?: boolean;
+    values?: boolean;
+  }
+}
+
+export interface InsersectionQuery {
+  table: string;
+  ranges: KeyRange[];
+  reverse?: boolean;
+  limit?: number;
+  want: {
+    pageToken?: boolean;
+    count?: boolean;
+    keys?: boolean;
+    primaryKeys?: boolean;
+    values?: boolean;
+  }
+}
+
+export interface ExpressionQuery {
+  table: string;
+  expr: Expression;
   orderBy?: { // Not allowed in IDBCore
     keyPaths: string[];
     reverse?: boolean;
@@ -47,16 +66,29 @@ export interface Query {
     pageToken?: boolean;
     count?: boolean;
     keys?: boolean;
+    primaryKeys?: boolean;
     values?: boolean;
   }
 }
 
-export interface DBCore {
-  //transaction(), put(), add(), delete() samma som IDCore's!
-  //även get() samma!
-  // MEN: Det som skiljer är:
-  getAll(req: Query | RangeQuery): Promise<any[]>;
-  openCursor(req: Query | RangeQuery, observer: CursorObserver): void;
-  count(req: Query): Promise<number>;
-  createComparer(table: string, property: string): (a: any, b: any) => number;
+export interface QueryResponse {
+  pageToken?: any;
+  count?: number;
+  keys?: any[];
+  primaryKeys?: any[];
+  values?: any[];
 }
+
+export type Query = ExpressionQuery | RangeQuery;
+
+export interface MultiRangeCore extends DBCore {
+  queryRanges(req: MultiRangeExpression): Promise<QueryResponse>;
+}
+
+//export interface 
+
+export interface ExpressionCore extends DBCore {
+  // MEN: Det som skiljer är:
+  expression(req: ExpressionQuery): Promise<QueryResponse>;
+}
+

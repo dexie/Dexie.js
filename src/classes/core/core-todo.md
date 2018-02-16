@@ -76,13 +76,16 @@ IDBCoreMiddleware {
   level: number; /*
  !  1=IDBCore (varför inte ha uniform query metod ända ned hit?! Blir mindre kod då!)
     2=Polyfills för IE, Safari och IndexedDB <2.0.
- *  3=Virtual partially- or non-compound indexes (accepterar första delen av compound index. CursorProxy)
+ *  3=Virtual partially- or non-compound indexes (accepterar första delen av compound index.
+      Både getAll() och openCursor() (CursorProxy)). Specifikt är CursorProxy intressant
+      för ignoreCase-biten.
 
- *! 3.3=Översätt multiRange requests
+ *! 3.3=Översätt multiRange requests samt pageToken support.
       getAll(): Gör flera getAll(). Om keys: parallellt med samma limit som inkommer,
       annars sekvensiellt om limit, annars parallellt.
+      
 
- *! 3.5=ignoreCase () Lägger på no-case algoritm på getAll() och openCursor().
+ *! 3.5=ignoreCase () Lägger på no-case algoritm på getAll() och openCursor(), samt pageToken support.
       Allt sker nedåt på openCursor-sättet, men uppåt tillåter vi getAll().
       Även om vi får in multi-range requests här så görs en enkel openCursor() helt enligt
       addIgnoreCaseAlgorithm(). Vi gör alltås inga multiRange requests nedår. Bara enkla RangeQueries
@@ -92,7 +95,7 @@ IDBCoreMiddleware {
       queries. Hade kunna lägga i omvänd ordning, men då måste det lagret skicka vidare noCase varianten
       till oss.
 
- *  3.7=pageToken support (low level) på multiRange requests.
+ NEJ: Bygg in i ovanstående lager!*  3.7=pageToken support (low level) på multiRange requests.
       Behöver exekveras före ignoreCase() för att hantera case-insensitive ranges.
       A: Ta hand om inkommande pageToken:
         1. RangeConjunction: Skala bort ranger eller delar av ranger som inte ska med.
@@ -108,9 +111,8 @@ IDBCoreMiddleware {
         getAllKeys(): [getByKeyPath(await get(lastPrimaryKey), keyPath), lastPrimaryKey]
         openCursor: [key, primaryKey]
 
-    3.8=virtuellt reverse-stöd för getAll()
+ NEJ!   3.8=virtuellt reverse-stöd för getAll() NEJ: Det ligger direkt i IDBCore. Likaså unique "polyfilling".
       Om ett reverse-query kommer in till getAll(), översätt det genom att använda openCursor inåt.
-    3.9=virtuellt unique-stöd för 
 
     4=AND-Engine exekverar AND-uttryck.
         Exekverar endast AND uttryck

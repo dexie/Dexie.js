@@ -33,6 +33,7 @@ export interface IDBCursor {
   source: IDBObjectStore | IDBIndex;
   advance(count: number): void;
   continue(key?: IDBKeyRange | IDBValidKey): void;
+  continuePrimaryKey(key: IDBKeyRange | IDBValidKey, primaryKey: IDBValidKey): void;
   delete(): IDBRequest;
   update(value: any): IDBRequest;
   readonly NEXT: string;

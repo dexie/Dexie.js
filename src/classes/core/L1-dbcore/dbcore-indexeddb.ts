@@ -1,5 +1,5 @@
-import { IDBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, RangeQuery, CursorObserver, Schema } from './idbcore';
-import { IDBObjectStore, IDBRequest, IDBCursor, IDBTransaction } from '../../public/types/indexeddb';
+import { DBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, RangeQuery, Schema, OpenCursorResponse } from './dbcore';
+import { IDBObjectStore, IDBRequest, IDBCursor, IDBTransaction } from '../../../public/types/indexeddb';
 
 // Move these to separate module(s)
 export function eventRejectHandler(reject) {
@@ -25,6 +25,15 @@ export function trycatch(reject, fn) {
     reject(err);
   }
 };
+export function arrayify<T>(arrayLike: {length: number, [index: number]: T}): T[] {
+  return [].slice.call(arrayLike);
+}
+export function pick<T,Prop extends keyof T>(obj: T, props: Prop[]): Pick<T, Prop> {
+  const result = {} as Pick<T, Prop>;
+  props.forEach(prop => result[prop] = obj[prop]);
+  return result;
+}
+
 
 // Into own module:
 function mutate (op: 'add' | 'put' | 'delete', store: IDBObjectStore, args1: any[], args2?: any) : Promise<WriteResponse> {
@@ -76,11 +85,9 @@ function mutate (op: 'add' | 'put' | 'delete', store: IDBObjectStore, args1: any
   });
 }
 
-function openCursor ({trans, table, index, wantKeys, limit, range, reverse, unique}: RangeQuery,
-  observer: CursorObserver)
+function openCursor ({trans, table, index, wantKeys, limit, range, reverse, unique}: RangeQuery): Promise<OpenCursorResponse>
 {
-  trycatch(observer.onError.bind(observer), ()=>{
-    const {onInitCursor, onNext, onError, onDone} = observer;
+  return new Promise((resolve, reject) => {
     const store = (trans as IDBTransaction).objectStore(table);
     // source
     const source = index == null ? store : store.index(index);
@@ -96,66 +103,52 @@ function openCursor ({trans, table, index, wantKeys, limit, range, reverse, uniq
     const req = wantKeys ?
       source.openKeyCursor(range, direction) :
       source.openCursor(range, direction);
-
-    function onCursorSuccess () {
-      if (!req.result) return onDone();
-      onNext(req.result);
-    }
       
     // iteration
-    req.onerror = eventRejectHandler(observer.onError.bind(observer));
+    req.onerror = eventRejectHandler(reject);
     req.onsuccess = trycatcher(ev => {
       const cursor: IDBCursor = req.result;
       if (!cursor) {
-        onDone();
+        resolve({cursor: null, iterate: ()=>Promise.resolve()});
         return;
       }
-      req.onsuccess = trycatcher(event => {
-        onNext(req.result);
-      }, onError);
-
-      // Now change req.onsuccess to a callback that doesn't call initCursor but just observer.next()
-      req.onsuccess = trycatcher(onCursorSuccess, onError);
-
-      if (onInitCursor) observer.onInitCursor(cursor);
-
-      observer.onNext(cursor);
-        
-    }, onError);          
+      req.onsuccess = ()=>resolve({
+        cursor: req.result,
+        iterate (callback) {
+          return new Promise((resolve, reject) => {
+            // Now change req.onsuccess to a callback that doesn't call initCursor but just observer.next()
+            const guardedCallback = trycatcher(callback, reject);
+            req.onsuccess = guardedCallback;
+            // Call it once for the first entry, so it can call cursor.continue()
+            guardedCallback();
+          });
+        }
+      });
+    }, reject);          
   });
 }
 
 function simulateGetAll(query: RangeQuery): Promise<any[]> {
-  return new Promise((resolve, reject) => {
-    const result = new Array();
-    openCursor(query, {
-      onError: reject,
-      onDone: ()=>resolve(result),
-      onNext: query.wantKeys ?
-        cursor => {
-          result.push(cursor.primaryKey);
-          cursor.continue();
-        } :
-        cursor => {
-          result.push(cursor.value);
-          cursor.continue();
-        }
+  const result = [];
+  return openCursor(query).then(({iterate, cursor}) => {
+    return iterate(query.wantKeys ? ()=>{
+      result.push(cursor.primaryKey);
+      cursor.continue();
+    } : ()=>{
+      result.push(cursor.value);
+      cursor.continue();
     });
-  });
+  }).then(()=>result);
 }
 
 function simulateCount(query: RangeQuery): Promise<number> {
-  return new Promise((resolve, reject) => {
-    let result = 0;
-    openCursor({...query, wantKeys: true}, {
-      onError: reject,
-      onDone: ()=>resolve(result),
-      onNext(cursor) {
-        ++result;
-        cursor.continue();
-      }
+  let result = 0;
+  return openCursor({...query, wantKeys: true}).then(({iterate, cursor}) => {
+    return iterate(()=>{
+      ++result;
+      cursor.continue();
     });
-  });
+  }).then(()=>result);
 }
 
 function getAll (query: RangeQuery) {
@@ -174,8 +167,20 @@ function getAll (query: RangeQuery) {
   });
 }
 
+function extractSchema(db: IDBDatabase) : Schema {
+  const tables = arrayify(db.objectStoreNames);
+  const trans = db.transaction(tables, 'readonly');
+  return {
+    name: db.name,
+    tables: tables.map(table => trans.objectStore(table)).map(store => ({
+      ...pick(store, ["name", "keyPath", "autoIncrement"]),
+      indexes: arrayify(store.indexNames).map(indexName => store.index(indexName))
+        .map(index => pick(index, ["name", "keyPath", "unique", "multiEntry"]))
+      }))
+  };
+}
 
-export function getIDBCoreImpl (db: IDBDatabase, indexedDB: IDBFactory, schema: Schema) : IDBCore {
+export function createDBCore (db: IDBDatabase, indexedDB: IDBFactory, schema: Schema) : DBCore {
   return {
     transaction: db.transaction.bind(db),
 
@@ -240,9 +245,10 @@ export function getIDBCoreImpl (db: IDBDatabase, indexedDB: IDBFactory, schema: 
       });
     },
 
-    comparer: () => indexedDB.cmp.bind(indexedDB),
+    //comparer: () => indexedDB.cmp.bind(indexedDB),
+    cmp: indexedDB.cmp.bind(indexedDB),
 
-    schema
+    schema: extractSchema(db)
 
   };
 }

@@ -18,39 +18,6 @@ export interface TransactionRequest {
   mode: 'readonly' | 'readwrite';
 }
 
-/*export interface GetAllQuery {
-  index: string | null;
-  range: KeyRange;
-  limit: number;
-  wantKeys?: boolean;
-}
-
-export interface OpenCursorQuery {
-  index: string | null;
-  range: KeyRange;
-  reverse?: boolean;
-  unique?: boolean;
-  wantKeysOnly?: boolean;
-  observer: CursorObserver;
-}*/
-
-export interface CursorObserver {
-  onInitCursor?(cursor: Cursor);
-  onNext(cursor: Cursor);
-  onError(e: Error);
-  onDone();
-}
-
-export interface Cursor {
-  readonly direction: string;
-  readonly key: Key;
-  readonly primaryKey: Key;
-  readonly value?: any;
-  continue(key?: any): void;
-  continuePrimaryKey(key: Key, primaryKey: Key): void;
-  advance(count: number): void;
-}
-
 export interface InsertRequest {
   op: 'insert';
   trans: Transaction;
@@ -106,36 +73,40 @@ export interface RangeQuery {
   reverse?: boolean; // incompatible with getAll(). Ignored for count().
 }
 
-export type Schema = {
-  [tableName: string]: {
-    name: string;
-    primKey: {
-      keyPath: string | Array<string>;
-      auto?: boolean;
-      compound?: boolean;
-    };
-    indexes: Array<{
-      name: string;
-      keyPath: string | Array<string>;
-      unique?: boolean;
-      multi?: boolean;
-      compound?: boolean;
-    }>;
-    idxByName: {
-      [name: string]: {
-        name?: string;
-        keyPath?: string | Array<string>
-        unique?: boolean;
-        multi?: boolean;
-        auto?: boolean;
-        compound?: boolean;
-      }
-    };
-    readHook?: (x: any) => any
-  }
-};
+export interface Cursor {
+  readonly key: Key;
+  readonly primaryKey: Key;
+  readonly value?: any;
+  continue(key?: any): void;
+  continuePrimaryKey(key: Key, primaryKey: Key): void;
+  advance(count: number): void;
+}
 
-export interface IDBCore {
+export interface OpenCursorResponse {
+  cursor: Cursor;
+  iterate(onNext: ()=>void): Promise<void>
+}
+
+export interface Schema {
+  name: string;
+  tables: TableSchema[];
+}
+
+export interface TableSchema {
+  name: string;
+  keyPath?: string | string[];
+  autoIncrement?: boolean;
+  indexes: IndexSchema[];
+}
+
+export interface IndexSchema {
+  name: string;
+  keyPath: string | string[];
+  unique?: boolean;
+  multiEntry?: boolean;
+}
+
+export interface DBCore {
   // Transaction and Object Store
   transaction(req: TransactionRequest): Transaction;
 
@@ -147,11 +118,12 @@ export interface IDBCore {
   // Query methods
   get(req: GetRequest): Promise<any[]>;
   getAll(query: RangeQuery): Promise<any[]>;
-  openCursor(query: RangeQuery, observer: CursorObserver): void;
+  openCursor(query: RangeQuery): Promise<OpenCursorResponse>;
   count(query: RangeQuery): Promise<number>;
 
   // Utility methods
-  comparer(table: string, index: string | null): (a: any, b: any) => number;
+  cmp(a: any, b: any) : number;
+  //comparer(table: string, index: string | null): (a: any, b: any) => number;
   readonly schema: Schema;
 }
 
