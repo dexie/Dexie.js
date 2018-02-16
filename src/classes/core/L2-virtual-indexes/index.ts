@@ -127,7 +127,7 @@ export function createVirtualIndexCore (next: DBCore) : DBCore {
       }
 
       return next.openCursor(translateQuery(query)).then(({cursor, iterate})=>({
-        cursor: cursor && ProxyCursor(cursor),
+        cursor: cursor && (keyTail ? ProxyCursor(cursor) : cursor),
         iterate
       }));
     }
