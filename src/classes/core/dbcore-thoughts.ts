@@ -1,4 +1,4 @@
-import { CursorObserver, RangeQuery, KeyRange, DBCore } from './L1-dbcore/dbcore';
+import { KeyRangeQuery, KeyRange, DBCore } from './L1-dbcore/dbcore';
 
 /* Motsvarar expresion engine på högsta nivå.
 Kan ha liknande metoder som idbcore, men troligen inte identiskt.*/
@@ -79,7 +79,7 @@ export interface QueryResponse {
   values?: any[];
 }
 
-export type Query = ExpressionQuery | RangeQuery;
+export type Query = ExpressionQuery | KeyRangeQuery;
 
 export interface MultiRangeCore extends DBCore {
   queryRanges(req: MultiRangeExpression): Promise<QueryResponse>;
