@@ -1,6 +1,18 @@
-import { DBCore, RangeQuery, KeyRange, Cursor, OpenCursorResponse } from '../L1-dbcore/dbcore';
+import { DBCore, KeyRangeQuery, KeyRange, Cursor, OpenCursorResponse } from '../L1-dbcore/dbcore';
 import { isArray } from '../../../functions/utils';
 import { exceptions } from '../../../errors';
+
+export interface VirtualIndexCore extends DBCore {
+  readonly tableIndexLookup: {
+    [tableName: string]: {
+      [keyPath: string]: {
+        keyLength: number;
+        keyTail?: number; // If this is a virtual index representing all but some keys in a compound index.
+        index?: string; // Name of the index in low-level schema. If no index, this resolves to the primary key.
+      }[]
+    }
+  }
+}
 
 const MIN_KEY = -Infinity;
 const MAX_KEY = [[]];
@@ -15,7 +27,7 @@ export function pad (a: any[], value: any, count: number) {
   return result;
 }
 
-export function createVirtualIndexCore (next: DBCore) : DBCore {
+export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
   const tableIndexLookup = {} as {
     [tableName: string]: {
       [keyPath: string]: {
@@ -27,7 +39,7 @@ export function createVirtualIndexCore (next: DBCore) : DBCore {
   };
 
   // NEEDS REVIEW AND UNIT TEST!!!
-  const addKeyPathsAndAliases = (tableName: string, keyPath: string | string[], keyTail: number=0, lowLevelIndexName?: string) => {
+  const addVirtualIndexes = (tableName: string, keyPath: string | string[], keyTail: number=0, lowLevelIndexName?: string) => {
     const keyPaths = isArray(keyPath) ? keyPath : [keyPath];
     const indexLookup = (tableIndexLookup[tableName] = tableIndexLookup[tableName] || {});
 
@@ -41,7 +53,7 @@ export function createVirtualIndexCore (next: DBCore) : DBCore {
     if (keyLength > 1) {
       const indexList = (indexLookup[keyPathAlias] = indexLookup[keyPathAlias] || []);
       indexList.push({index: lowLevelIndexName, keyTail, keyLength});
-      addKeyPathsAndAliases(tableName, keyPaths.slice(0, keyLength - 1), keyTail + 1, lowLevelIndexName);
+      addVirtualIndexes(tableName, keyPaths.slice(0, keyLength - 1), keyTail + 1, lowLevelIndexName);
     } else {
       // Map the simple keyPath to the index.
       indexList.push({index: lowLevelIndexName, keyTail: 0, keyLength: 1});
@@ -52,17 +64,17 @@ export function createVirtualIndexCore (next: DBCore) : DBCore {
   const {schema} = next;
   for (let table of schema.tables) {
     // Add special keyPath ":id" that corresponds to the primary key:    
-    addKeyPathsAndAliases(table.name, ":id", 0);
+    addVirtualIndexes(table.name, ":id", 0);
     if (table.keyPath) {
       // inbound keys
-      addKeyPathsAndAliases(table.name, table.keyPath);
+      addVirtualIndexes(table.name, table.keyPath);
     }
     for (let index of table.indexes) {
-      addKeyPathsAndAliases(table.name, index.keyPath, 0, index.name);
+      addVirtualIndexes(table.name, index.keyPath, 0, index.name);
     }
   }
 
-  function findPossibleIndexes({table, index}: RangeQuery) {
+  function findPossibleIndexes({table, index}: KeyRangeQuery) {
     const indexLookup = tableIndexLookup[table];
     if (!indexLookup) throw new exceptions.InvalidTable(`Invalid table: ${table}`);
     if (index == null) index = ":id";
@@ -80,7 +92,7 @@ export function createVirtualIndexCore (next: DBCore) : DBCore {
     };
   }
 
-  function translateQuery (query: RangeQuery) {
+  function translateQuery (query: KeyRangeQuery) {
     const {index, keyTail} = findPossibleIndexes(query)[0];
     if (!keyTail) {
       // No virtual compound index with keyTail.
@@ -96,8 +108,20 @@ export function createVirtualIndexCore (next: DBCore) : DBCore {
     };
   }
   
-  return {
+  /** Virtual Index DBCore
+   * 
+   * Translates incoming index names to physical index names.
+   * 
+   * * Canonicalize index naming no matter their real names in DBCode.schema.
+   * * Virtualize first parts of compound indexes as if they were normal named indexes.
+   * * Let special index ":id" resolve to the primary key.
+   * * Allows virtual indexes on sub-queries where first part of a compound index is a fixed key (x.equals(A) AND y.between(range))
+   * 
+   */
+  const thiz = {
     ...next,
+    
+    tableIndexLookup,
 
     count(query): Promise<number> {
       return next.count(translateQuery(query));
@@ -132,4 +156,6 @@ export function createVirtualIndexCore (next: DBCore) : DBCore {
       }));
     }
   };
+
+  return thiz;
 }

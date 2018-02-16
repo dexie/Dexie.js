@@ -62,15 +62,15 @@ export interface GetRequest {
   keys: Key[];
 }
 
-export interface RangeQuery {
+export interface KeyRangeQuery {
   trans: Transaction;
   table: string;
   index: string;
-  range: KeyRange;
   limit?: number;
-  wantKeys?: boolean; // ignored for count()
-  unique?: boolean; // incompatible with getAll() and count()
-  reverse?: boolean; // incompatible with getAll(). Ignored for count().
+  wantKeys?: boolean;
+  unique?: boolean;
+  reverse?: boolean;
+  range: KeyRange;
 }
 
 export interface Cursor {
@@ -117,9 +117,9 @@ export interface DBCore {
 
   // Query methods
   get(req: GetRequest): Promise<any[]>;
-  getAll(query: RangeQuery): Promise<any[]>;
-  openCursor(query: RangeQuery): Promise<OpenCursorResponse>;
-  count(query: RangeQuery): Promise<number>;
+  getAll(query: KeyRangeQuery): Promise<any[]>;
+  openCursor(query: KeyRangeQuery): Promise<OpenCursorResponse>;
+  count(query: KeyRangeQuery): Promise<number>;
 
   // Utility methods
   cmp(a: any, b: any) : number;

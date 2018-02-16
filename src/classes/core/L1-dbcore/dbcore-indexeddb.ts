@@ -1,4 +1,4 @@
-import { DBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, RangeQuery, Schema, OpenCursorResponse } from './dbcore';
+import { DBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, KeyRangeQuery, Schema, OpenCursorResponse } from './dbcore';
 import { IDBObjectStore, IDBRequest, IDBCursor, IDBTransaction } from '../../../public/types/indexeddb';
 
 // Move these to separate module(s)
@@ -85,7 +85,7 @@ function mutate (op: 'add' | 'put' | 'delete', store: IDBObjectStore, args1: any
   });
 }
 
-function openCursor ({trans, table, index, wantKeys, limit, range, reverse, unique}: RangeQuery): Promise<OpenCursorResponse>
+function openCursor ({trans, table, index, wantKeys, limit, range, reverse, unique}: KeyRangeQuery): Promise<OpenCursorResponse>
 {
   return new Promise((resolve, reject) => {
     const store = (trans as IDBTransaction).objectStore(table);
@@ -128,7 +128,7 @@ function openCursor ({trans, table, index, wantKeys, limit, range, reverse, uniq
   });
 }
 
-function simulateGetAll(query: RangeQuery): Promise<any[]> {
+function simulateGetAll(query: KeyRangeQuery): Promise<any[]> {
   const result = [];
   return openCursor(query).then(({iterate, cursor}) => {
     return iterate(query.wantKeys ? ()=>{
@@ -141,7 +141,7 @@ function simulateGetAll(query: RangeQuery): Promise<any[]> {
   }).then(()=>result);
 }
 
-function simulateCount(query: RangeQuery): Promise<number> {
+function simulateCount(query: KeyRangeQuery): Promise<number> {
   let result = 0;
   return openCursor({...query, wantKeys: true}).then(({iterate, cursor}) => {
     return iterate(()=>{
@@ -151,7 +151,7 @@ function simulateCount(query: RangeQuery): Promise<number> {
   }).then(()=>result);
 }
 
-function getAll (query: RangeQuery) {
+function getAll (query: KeyRangeQuery) {
   return new Promise<any[]>((resolve, reject) => {
     if (query.reverse || query.unique) {
       return simulateGetAll(query);
