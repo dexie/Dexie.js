@@ -2,8 +2,9 @@ import Promise, {wrap} from '../helpers/promise';
 import { IDBObjectStore, IDBRequest, IDBEvent, IDBKeyRange } from '../public/types/indexeddb';
 import { preventDefault, eventSuccessHandler } from './event-wrappers';
 import { IndexableType } from '../public/types/indexable-type';
+import { WriteRequest, MutationResponse, DeleteRequest, MutationFailure } from '../public/types/mutation-core';
 
-export type BulkRequest = BulkAddRequest | BulkPutRequest | BulkDeleteRequest;
+/*export type BulkRequest = BulkAddRequest | BulkPutRequest | BulkDeleteRequest;
 
 export interface BulkAddRequest {
   op: 'add';
@@ -30,7 +31,7 @@ export interface BulkFailure {
 export interface BulkResponse {
   failures: BulkFailure[];
   lastResult: IndexableType | undefined;
-}
+}*/
 
 /*function deleteRange (
   store: IDBObjectStore,
@@ -49,12 +50,12 @@ export interface BulkResponse {
   req.onsuccess 
 }*/
 
-export function bulk (store: IDBObjectStore, breq: BulkRequest) : Promise<BulkResponse> {
+export function bulk (breq: WriteRequest<any, IndexableType> | DeleteRequest<IndexableType>) : Promise<MutationResponse> {
   return new Promise(resolve => {
     const length = breq.op === 'delete' ? breq.keys.length : breq.objs.length;
     let req: IDBRequest & { _reqno?};
     let i: number;
-    const failures: BulkFailure[] = [];
+    const failures: MutationFailure[] = [];
     const errorHandler = (event: IDBEvent) => {
       preventDefault(event);
       failures.push({
@@ -62,7 +63,7 @@ export function bulk (store: IDBObjectStore, breq: BulkRequest) : Promise<BulkRe
         error: event.target.error
       });
     };
-    const {keys} = breq;
+    const {keys, store} = breq;
     if (breq.op === 'delete') {
       for (i=0; i<length; ++i) {
         req = store.delete(keys[i]);
@@ -73,10 +74,13 @@ export function bulk (store: IDBObjectStore, breq: BulkRequest) : Promise<BulkRe
       // inbound keys
       const {objs} = breq;
       const supplyKeys = store.keyPath == null;
+      const isAdd = breq.op === 'add';
       for (i=0; i<length; ++i) {
         req = supplyKeys ?
-          store[breq.op](objs[i], keys[i]) :
-          store[breq.op](objs[i]);
+          isAdd ?
+            store.add(objs[i], keys[i]) : store.put(objs[i], keys[i]) :
+            isAdd ?
+              store.add(objs[i]) : store.put(objs[i]);
         req._reqno = i;
         req.onerror = errorHandler;
       }

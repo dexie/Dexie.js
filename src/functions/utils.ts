@@ -64,8 +64,8 @@ export function override(origFunc, overridedFactory) {
     return overridedFactory(origFunc);
 }
 
-export function assert (b) {
-    if (!b) throw new Error("Assertion Failed");
+export function assert (b, msg?) {
+    if (!b) throw new Error(`Assertion Failed${msg ? `: ${msg}`: ''}`);
 }
 
 export function asap(fn) {
@@ -182,7 +182,7 @@ const intrinsicTypes =
         flatten([8,16,32,64].map(num=>["Int","Uint","Float"].map(t=>t+num+"Array")))
     ).filter(t=>_global[t]).map(t=>_global[t])
 
-export function deepClone(any) {
+export function deepClone<T>(any: T): T {
     if (!any || typeof any !== 'object') return any;
     var rv;
     if (isArray(any)) {

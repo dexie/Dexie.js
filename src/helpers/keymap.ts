@@ -1,26 +1,35 @@
 import { IndexableType } from '../public/types/indexable-type';
 import { stringifyKey } from '../functions/stringify-key';
-import { hasOwn } from '../functions/utils';
+import { hasOwn, _hasOwn, keys } from '../functions/utils';
 
 export interface KeyMap<T=any> {
-  set (key: IndexableType, value: T): this;
+  set (key: IndexableType, value: T): void;
+  delete (key: IndexableType): void;
   has (key: IndexableType): boolean;
   get (key: IndexableType): T;
+  values (): T[];
   getMap(): {[stringifiedKey: string]: T};
 }
 
-export function KeyMap (): KeyMap {
+export function KeyMap<T> (): KeyMap<T> {
   const map: {[stringifiedKey: string]: any} = {};
+  const mapHasOwn = _hasOwn.bind(map);
   return {
     set (key: IndexableType, value) {
       map[stringifyKey(key)] = value;
-      return this;
+    },
+    delete (key: IndexableType) {
+      delete map[stringifyKey(key)];
     },
     has (key: IndexableType) {
-      return hasOwn(map, stringifyKey(key));
+      return mapHasOwn(stringifyKey(key));
     },
     get (key: IndexableType) {
-      return map[stringifyKey(key)];
+      const stringifiedKey = stringifyKey(key);
+      return mapHasOwn(stringifiedKey) && map[stringifiedKey];
+    },
+    values () {
+      return keys(map).map(key => map[key]);
     },
     getMap() {
       return map;

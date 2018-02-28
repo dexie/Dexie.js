@@ -1,12 +1,29 @@
+import { stringifyKey } from '../../../functions/stringify-key';
+
 // For public interface
 
 export type Key = any;
 
 export interface KeyRange {
-  readonly lower: Key;
+  readonly lower: Key | undefined;
   readonly lowerOpen: boolean;
-  readonly upper: Key;
+  readonly upper: Key | undefined;
   readonly upperOpen: boolean;
+}
+
+export const KeyRange = {
+  only (key: Key): KeyRange {
+    return {lower: key, upper: key, lowerOpen: false, upperOpen: false};
+  },
+  whatever (): KeyRange {
+    return {lower: undefined, upper: undefined, lowerOpen: false, upperOpen: false};
+  },
+  isSingleValued({lower, upper}: KeyRange) {
+    return lower !== undefined && upper !== undefined && stringifyKey(lower) === stringifyKey(upper);
+  }
+  /*never(): KeyRange {// ??? IndexedDB will through for this. Need to check for it.
+    return {lower: Infinity, upper: Infinity, lowerOpen: true, upperOpen: true};
+  }*/
 }
 
 export interface Transaction {
@@ -67,7 +84,7 @@ export interface KeyRangeQuery {
   table: string;
   index: string;
   limit?: number;
-  wantKeys?: boolean;
+  want?: "primaryKeys" | "keys" | "values" | "keyPairs";
   unique?: boolean;
   reverse?: boolean;
   range: KeyRange;
@@ -80,6 +97,8 @@ export interface Cursor {
   continue(key?: any): void;
   continuePrimaryKey(key: Key, primaryKey: Key): void;
   advance(count: number): void;
+  close(): void;
+  fail(error: Error): void;
 }
 
 export interface OpenCursorResponse {
@@ -94,14 +113,20 @@ export interface Schema {
 
 export interface TableSchema {
   name: string;
-  keyPath?: string | string[];
-  autoIncrement?: boolean;
+  primaryKey: IndexSchema;
   indexes: IndexSchema[];
 }
 
 export interface IndexSchema {
-  name: string;
-  keyPath: string | string[];
+  isPrimaryKey?: boolean;
+  /** True if and only if keyPath is an array */
+  compound?: boolean;
+  /** Name of the index, or null for primary key */
+  name: string | null;
+  /** KeyPath, or undefined for outbound primary keys. */
+  keyPath?: string | string[];
+  /** Auto-generated primary key (does not apply to secondary indexes) */
+  autoIncrement?: boolean;
   unique?: boolean;
   multiEntry?: boolean;
 }

@@ -1,5 +1,5 @@
 import { DBCore, KeyRangeQuery, OpenCursorResponse, Cursor, Key } from '../L1-dbcore/dbcore';
-import { VirtualIndexCore } from '../L2-virtual-indexes/index';
+import { VirtualIndexCore, pad } from '../L2-virtual-indexes/index';
 
 export interface KeyEqualityQuery {
   index: string;
@@ -16,10 +16,19 @@ export function concatIndexes(firstIsCompound: boolean, first: string, second: s
     `[${first}+${second}]`;
 }
 
+export function copyArray(source: any[], target: any[]) {
+  for (let i=source.length; i;) target[--i] = source[i];
+}
+
 export function concatKeys(firstIsCompound: boolean, first: Key, second: Key) {
-  const key = firstIsCompound ? first : [first];
-  key.push(second);
-  return key;
+  if (firstIsCompound) {
+    const result = new Array(first.length + 1);
+    copyArray(first, result);
+    result[first.length] = second;
+    return result;
+  } else {
+    return [first, second];
+  }
 }
 
 export function concatEqualityQueries(first: KeyEqualityQuery, second: KeyEqualityQuery): KeyEqualityQuery {
@@ -69,10 +78,17 @@ export function SubQueryCore (next: VirtualIndexCore, baseQuery?: KeyEqualityQue
     openCursor(subQuery) : Promise<OpenCursorResponse> {
 
       function ProxyCursor(cursor: Cursor) : Cursor {
+        function _continue (key?: Key) {
+          key != null ?
+            cursor.continue(concatKeys(baseIndexIsArray, baseQuery.key, key)) :
+            cursor.continue()
+        }
         return {
           ...cursor,
-          continue: cursor.continue.bind(cursor),
-          continuePrimaryKey: cursor.continuePrimaryKey.bind(cursor),
+          continue: _continue,
+          continuePrimaryKey: (key: Key, primaryKey: Key) => {
+            cursor.continuePrimaryKey(concatKeys(baseIndexIsArray, baseQuery.key, key), primaryKey);
+          },
           advance: cursor.advance.bind(cursor),
           get key() {
             const key = cursor.key as any[];
@@ -83,7 +99,13 @@ export function SubQueryCore (next: VirtualIndexCore, baseQuery?: KeyEqualityQue
 
       return next.openCursor(translateSubQuery(subQuery)).then(({cursor, iterate})=>({
         cursor: cursor && ProxyCursor(cursor),
-        iterate
+        iterate /*NEJ BEHÖVS EJ: uplevelCallback => iterate (()=>{
+          if (next.cmp(baseQuery.key, cursor.key.slice(0, cursor.key.length - 1)) === 0) {
+            uplevelCallback();
+          } else {
+            cursor.done();
+          }
+        })*/
       }));
     },
     

@@ -1,5 +1,7 @@
-import { DBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, KeyRangeQuery, Schema, OpenCursorResponse } from './dbcore';
+import { DBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, KeyRangeQuery, Schema, OpenCursorResponse, IndexSchema } from './dbcore';
 import { IDBObjectStore, IDBRequest, IDBCursor, IDBTransaction } from '../../../public/types/indexeddb';
+import { getCountAndGetAllEmulation } from './utils/index';
+import { isArray } from '../../../functions/utils';
 
 // Move these to separate module(s)
 export function eventRejectHandler(reject) {
@@ -85,7 +87,7 @@ function mutate (op: 'add' | 'put' | 'delete', store: IDBObjectStore, args1: any
   });
 }
 
-function openCursor ({trans, table, index, wantKeys, limit, range, reverse, unique}: KeyRangeQuery): Promise<OpenCursorResponse>
+function openCursor ({trans, table, index, want, limit, range, reverse, unique}: KeyRangeQuery): Promise<OpenCursorResponse>
 {
   return new Promise((resolve, reject) => {
     const store = (trans as IDBTransaction).objectStore(table);
@@ -100,66 +102,62 @@ function openCursor ({trans, table, index, wantKeys, limit, range, reverse, uniq
         "nextunique" :
         "next";
     // request
-    const req = wantKeys ?
+    const req = want !== 'values' ?
       source.openKeyCursor(range, direction) :
       source.openCursor(range, direction);
       
     // iteration
     req.onerror = eventRejectHandler(reject);
     req.onsuccess = trycatcher(ev => {
-      const cursor: IDBCursor = req.result;
+      const cursor = req.result as Cursor;
       if (!cursor) {
         resolve({cursor: null, iterate: ()=>Promise.resolve()});
         return;
       }
-      req.onsuccess = ()=>resolve({
-        cursor: req.result,
-        iterate (callback) {
-          return new Promise((resolve, reject) => {
-            // Now change req.onsuccess to a callback that doesn't call initCursor but just observer.next()
-            const guardedCallback = trycatcher(callback, reject);
-            req.onsuccess = guardedCallback;
-            // Call it once for the first entry, so it can call cursor.continue()
-            guardedCallback();
-          });
+      const iterationPromise = new Promise<void>((resolveIteration, rejectIteration) =>{
+        cursor.close = resolveIteration;
+        cursor.fail = req.onerror = rejectIteration;
+      });
+      resolve({
+        cursor,
+        iterate: callback => {
+          // Now change req.onsuccess to a callback that doesn't call initCursor but just observer.next()
+          const guardedCallback = trycatcher(callback, cursor.fail);
+          req.onsuccess = ev => {
+            if (req.result) {
+              if (limit && !--limit) {
+                cursor.continue = ()=>{};
+                cursor.close();
+              }
+              guardedCallback();
+            } else {
+              cursor.close();
+            }
+          };
+          if (limit && !--limit) {
+            cursor.continue = ()=>{};
+            cursor.close();
+          }
+          // Call it once for the first entry, so it can call cursor.continue()
+          guardedCallback();
+          return iterationPromise;
         }
       });
     }, reject);          
   });
 }
 
-function simulateGetAll(query: KeyRangeQuery): Promise<any[]> {
-  const result = [];
-  return openCursor(query).then(({iterate, cursor}) => {
-    return iterate(query.wantKeys ? ()=>{
-      result.push(cursor.primaryKey);
-      cursor.continue();
-    } : ()=>{
-      result.push(cursor.value);
-      cursor.continue();
-    });
-  }).then(()=>result);
-}
-
-function simulateCount(query: KeyRangeQuery): Promise<number> {
-  let result = 0;
-  return openCursor({...query, wantKeys: true}).then(({iterate, cursor}) => {
-    return iterate(()=>{
-      ++result;
-      cursor.continue();
-    });
-  }).then(()=>result);
-}
+const polyfills = getCountAndGetAllEmulation(openCursor);
 
 function getAll (query: KeyRangeQuery) {
   return new Promise<any[]>((resolve, reject) => {
-    if (query.reverse || query.unique) {
-      return simulateGetAll(query);
+    const {trans, table, index, want, limit, range} = query;
+    if (query.reverse || query.unique || want === 'keys') {
+      return polyfills.getAll(query);
     }
-    const {trans, table, index, wantKeys, limit, range} = query;
     const store = (trans as IDBTransaction).objectStore(table);
     const source = index == null ? store : store.index(index);
-    const req = wantKeys ?
+    const req = want === "primaryKeys" ?
       source.getAllKeys(range, limit) :
       source.getAll(range, limit);
     req.onsuccess = event => resolve(event.target.result);
@@ -173,9 +171,18 @@ function extractSchema(db: IDBDatabase) : Schema {
   return {
     name: db.name,
     tables: tables.map(table => trans.objectStore(table)).map(store => ({
-      ...pick(store, ["name", "keyPath", "autoIncrement"]),
+      name: store.name,
+      primaryKey: {
+        isPrimaryKey: true,
+        name: null,
+        compound: isArray(store.keyPath),
+        ...pick(store, ["keyPath", "autoIncrement"])
+      } as IndexSchema,
       indexes: arrayify(store.indexNames).map(indexName => store.index(indexName))
-        .map(index => pick(index, ["name", "keyPath", "unique", "multiEntry"]))
+        .map(index => ({
+          ...pick(index, ["name", "keyPath", "unique", "multiEntry"]),
+          compound: isArray(index.keyPath)
+        } as IndexSchema))
       }))
   };
 }
@@ -238,7 +245,7 @@ export function createDBCore (db: IDBDatabase, indexedDB: IDBFactory, schema: Sc
       return new Promise<number>((resolve, reject) => {
         const store = (query.trans as IDBTransaction).objectStore(query.table);
         const source = query.index == null ? store : store.index(query.index);
-        if (query.unique) return simulateCount(query);
+        if (query.unique) return polyfills.count(query);
         const req = source.count(query.range);
         req.onsuccess = ev => resolve(ev.target.result);
         req.onerror = eventRejectHandler(reject);
