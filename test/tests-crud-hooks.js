@@ -155,7 +155,7 @@ function reading2 (obj) {
 function updating1 (modifications, primKey, obj, transaction) {
     // You may use transaction to do additional database operations.
     // You may not do any modifications on any of the given arguments.
-    // You may set this.onsuccess = callback when update operation completes.
+    // You may set this.onsuccess = function (updatedObj){} when update operation completes.
     // You may set this.onerror = callback if update operation fails.
     // If you want to make additional modifications, return another modifications object
     // containing the additional or overridden modifications to make. Any returned
@@ -170,7 +170,7 @@ function updating1 (modifications, primKey, obj, transaction) {
     opLog.push(op);
 
     if (watchSuccess) {
-        this.onsuccess = () => successLog.push(undefined);
+        this.onsuccess = (updatedObj) => successLog.push(updatedObj);
     }
     if (watchError) {
         this.onerror = e => errorLog.push(e);
@@ -182,7 +182,7 @@ function updating1 (modifications, primKey, obj, transaction) {
 function updating2 (modifications, primKey, obj, transaction) {
     // You may use transaction to do additional database operations.
     // You may not do any modifications on any of the given arguments.
-    // You may set this.onsuccess = callback when update operation completes.
+    // You may set this.onsuccess = function (updatedObj){} when update operation completes.
     // You may set this.onerror = callback if update operation fails.
     // If you want to make additional modifications, return another modifications object
     // containing the additional or overridden modifications to make. Any returned
@@ -196,7 +196,7 @@ function updating2 (modifications, primKey, obj, transaction) {
     opLog2.push(op);
 
     if (watchSuccess) {
-        this.onsuccess = () => successLog2.push(undefined);
+        this.onsuccess = (updatedObj) => successLog2.push(updatedObj);
     }
     if (watchError) {
         this.onerror = e => errorLog2.push(e);
@@ -263,7 +263,8 @@ module("crud-hooks", {
 const expect = async (function* (expected, modifyer) {
     yield reset();
     yield modifyer();
-    equal(JSON.stringify(opLog, null, 2), JSON.stringify(expected, null, 2), "Expected oplog: " + JSON.stringify(expected));
+    equal(JSON.stringify(opLog, null, 2), JSON.stringify(
+        expected.map((x) => ({...x, updatedObj: undefined})), null, 2), "Expected oplog: " + JSON.stringify(expected));
     ok(transLog.every(x => x.trans && x.current === x.trans), "transaction argument is valid and same as Dexie.currentTransaction");
     yield reset();
     watchSuccess = true;
@@ -276,6 +277,12 @@ const expect = async (function* (expected, modifyer) {
         if (x.op === "create" && x.key !== undefined) {
             equal(successLog[i], x.key, "Success events got the correct key");
             equal(successLog2[i], x.key, "Success events got the correct key (2)");
+        }
+        if (x.op === "update") {
+            equal(JSON.stringify(successLog[i]), JSON.stringify(x.updatedObj),
+                "Success events got the updated object");
+            equal(JSON.stringify(successLog2[i]), JSON.stringify(x.updatedObj),
+                "Success events got the updated object (2)");
         }
     });
 
@@ -575,6 +582,7 @@ spawnedTest("updating using Table.put()", function*(){
         key: 1,
         obj: {id:1, address: {city: 'A'}},
         mods: {"address.city": "B"},
+        updatedObj: {id:1, address: {city: 'B'}},
     }], ()=>db.transaction('rw', db.tables, function* (){
         db.table1.put({id:1, address: {city: 'A'}}); // create
         db.table1.put({id:1, address: {city: 'B'}}); // update
@@ -597,6 +605,7 @@ spawnedTest("updating using Table.bulkPut()", function*(){
         key: 1,
         obj: {id:1, address: {city: 'A'}},
         mods: {"address.city": "B"},
+        updatedObj: {id:1, address: {city: 'B'}},
     }], ()=>db.transaction('rw', db.tables, function* (){
         db.table1.put({id:1, address: {city: 'A'}}); // create
         db.table1.put({id:1, address: {city: 'B'}}); // update
@@ -619,6 +628,7 @@ spawnedTest("updating using Table.update()", function*(){
         key: 1,
         obj: {id:1, address: {city: 'A'}},
         mods: {"address.city": "B"},
+        updatedObj: {id:1, address: {city: 'B'}},
     }], ()=>db.transaction('rw', db.tables, function* (){
         yield db.table1.add({id:1, address: {city: 'A'}}); // create
         yield db.table1.update(1, {"address.city": "B"}); // update
@@ -641,6 +651,7 @@ spawnedTest("updating using Collection.modify()", function*(){
         key: 1,
         obj: {id:1, address: {city: 'A'}},
         mods: {"address.city": "B"},
+        updatedObj: {id:1, address: {city: 'B'}},
     }], ()=>db.transaction('rw', db.tables, function* (){
         yield db.table1.add({id:1, address: {city: 'A'}}); // create
         yield db.table1.where('id').equals(1).modify({"address.city": "B"}); // update

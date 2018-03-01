@@ -41,8 +41,8 @@ export function hookedEventSuccessHandler(resolve) {
   // because it is always marked with _lib = true when created using Transaction._promise().
   return wrap(function(event) {
       var req = event.target,
-          result = req.result,
           ctx = req._hookCtx,// Contains the hook error handler. Put here instead of closure to boost performance.
+          result = ctx.value || req.result, // Pass the object value on updates. The result from IDB is the primary key.
           hookSuccessHandler = ctx && ctx.onsuccess;
       hookSuccessHandler && hookSuccessHandler(result);
       resolve && resolve(result);
