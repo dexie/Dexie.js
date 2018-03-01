@@ -1,14 +1,14 @@
-import { Expression, NotExpression, AtomicFormula, Formula, OrExpression, AndExpression } from "./expression";
+import { Expression, NotExpression, AtomicFormula, OrExpression, AndExpression } from "./expression";
 import { eliminateNot } from './eliminate-not';
 import { assert } from '../../../functions/utils';
 import { exceptions } from '../../../errors';
 
-export interface DisjunctiveNormalForm extends Formula {
+export interface DisjunctiveNormalForm {
   type: 'DIS';
   operands: Conjunction[];
 }
 
-export interface Conjunction extends Formula {
+export interface Conjunction {
   type: 'CON';
   operands: AtomicFormula[];
 }

@@ -6,27 +6,23 @@ export type Expression =
   AndExpression |
   NotExpression;
 
-export interface Formula {
-  type: string;
-}
-
-export interface AtomicFormula extends Formula {
-  keyPath: string | string[];
+export interface AtomicFormula {
   type: 'atom';
+  keyPath: string | string[];
   ranges: KeyRange[]; // Precondition: ranges must be sorted!
 }
 
-export interface OrExpression extends Formula {
+export interface OrExpression {
   type: 'or';
   operands: Expression[];
 }
 
-export interface AndExpression extends Formula {
+export interface AndExpression {
   type: 'and';
   operands: Expression[];
 }
 
-export interface NotExpression extends Formula {
+export interface NotExpression {
   type: 'not';
   operand: Expression;
 }

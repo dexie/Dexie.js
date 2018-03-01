@@ -39,13 +39,13 @@ export interface QueryResponse {
 }
 
 export interface ExpressionCore extends PagingCore {
-  evaluateExpression (query: ExpressionQuery): Promise<QueryResponse>;
+  execQuery (query: ExpressionQuery): Promise<QueryResponse>;
 }
 
 export function ExpressionCore (engine: PagingCore) {
   return {
     ...engine,
-    evaluateExpression (query) {
+    execQuery (query) {
       // Convert a complex expression into a DNF matrix:
       const dnf = disjunctiveNormalForm(query.expr);
       // Canonicalize it (make it "Full DNF"):

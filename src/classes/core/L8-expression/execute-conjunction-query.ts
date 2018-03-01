@@ -13,7 +13,7 @@ export interface PagedMultiRangeCriteria {
   prevResponseKeys?: {primaryKeys: Key[]}[];
 }
 
-export function intersect(core: PagingCore, trans: Transaction, table: string, operands: PagedMultiRangeCriteria[]): Promise<KeySet> {
+export function executeConjunctionQuery(core: PagingCore, trans: Transaction, table: string, operands: PagedMultiRangeCriteria[]): Promise<KeySet> {
   assert (!operands.some((o,i) => o.isOrderBy && i !== operands.length - 1),
     "isOrderBy only valid for last operand");
     
@@ -51,7 +51,7 @@ export function intersect(core: PagingCore, trans: Transaction, table: string, o
     const doneResults = responses.filter(r => !r.hasMore);
     if (doneResults.length === 0) {
       // Still not any operand has finished to end. Keep on scanning:
-      return intersect(core, trans, table, responses.map(r => ({
+      return executeConjunctionQuery(core, trans, table, responses.map(r => ({
         index: r.index,
         ranges: r.ranges,
         isOrderBy: false,

@@ -4,7 +4,10 @@ import { deepClone } from '../../../functions/utils';
 import { getCountAndGetAllEmulation } from '../L1-dbcore/utils/index';
 
 
-/** This will be a pure middleware on the L2-virtual-indexes API
+/** This will be a pure middleware to intercept the L4-multirange API
+ * It will provide virtual indexes suffixed with ":nc" and if such indexes
+ * are queried, will do the ignoreCase algorithm to accomplish a multirange query.
+ * 
  * It will be moved from here into maybe a separate addon.
  * But have to define it here to ensure the architecture allows this.
  * 
