@@ -264,7 +264,7 @@ const expect = async (function* (expected, modifyer) {
     yield reset();
     yield modifyer();
     equal(JSON.stringify(opLog, null, 2), JSON.stringify(
-        expected.map((x) => Object.assign({}, x, {updatedObj: undefined})), null, 2), "Expected oplog: " + JSON.stringify(expected));
+        expected.map((x) => ({...x, updatedObj: undefined})), null, 2), "Expected oplog: " + JSON.stringify(expected));
     ok(transLog.every(x => x.trans && x.current === x.trans), "transaction argument is valid and same as Dexie.currentTransaction");
     yield reset();
     watchSuccess = true;
