@@ -141,14 +141,20 @@ export function setByKeyPath(obj, keyPath, value) {
             var currentKeyPath = keyPath.substr(0, period);
             var remainingKeyPath = keyPath.substr(period + 1);
             if (remainingKeyPath === "")
-                if (value === undefined) delete obj[currentKeyPath]; else obj[currentKeyPath] = value;
+                if (value === undefined) {
+                    if (isArray(obj) && !isNaN(parseInt(currentKeyPath))) obj.splice(currentKeyPath, 1);
+                    else delete obj[currentKeyPath];
+                } else obj[currentKeyPath] = value;
             else {
                 var innerObj = obj[currentKeyPath];
                 if (!innerObj) innerObj = (obj[currentKeyPath] = {});
                 setByKeyPath(innerObj, remainingKeyPath, value);
             }
         } else {
-            if (value === undefined) delete obj[keyPath]; else obj[keyPath] = value;
+            if (value === undefined) {
+                if (isArray(obj) && !isNaN(parseInt(keyPath))) obj.splice(keyPath, 1);
+                else delete obj[keyPath];
+            } else obj[keyPath] = value;
         }
     }
 }

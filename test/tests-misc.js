@@ -196,3 +196,14 @@ spawnedTest ("#360 DB unresponsive after multiple Table.update() or Collection.m
     });
     equal(result.value, NUM_UPDATES, `Should have updated id 1 a ${NUM_UPDATES} times`);
 });
+
+spawnedTest ("delByKeyPath not working correctly for arrays", function* () {
+    const obj = {deepObject: {someArray: ["a", "b"]}};
+    const obj2 = {deepObject: {someArray: ["a", "b", "c"]}};
+    const jsonResult = JSON.stringify(obj);
+    console.log("jsonResult = ", jsonResult);
+    Dexie.delByKeyPath(obj2, "deepObject.someArray.2");
+    const jsonResult2 = JSON.stringify(obj2);
+    console.log("jsonResult2 = ", jsonResult2);
+    equal(jsonResult, jsonResult2, `Should be equal ${jsonResult} ${jsonResult2}`);
+});
