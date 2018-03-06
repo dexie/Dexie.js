@@ -1,19 +1,34 @@
-import { DBCore, KeyRangeQuery, KeyRange, Cursor, OpenCursorResponse, Key, IndexSchema } from '../L1-dbcore/dbcore';
+import { DBCore, KeyRangeQuery, KeyRange, Cursor, Key, IndexSchema } from '../L1-dbcore/dbcore';
 import { isArray } from '../../../functions/utils';
 import { exceptions } from '../../../errors';
+import { getKeyExtractor } from './get-key-extractor';
 
 export type VirtualIndexLookup = {[keyPath: string]: VirtualIndex[]};
 export interface VirtualIndex {
+  /** Identical to keyPaths.length. Can be 0..N. Note: This is the length of the *virtual index*, not
+   * the real index.
+   */
   keyLength: number;
 
-  /** If this is a virtual index representing all but some keys in a compound index. */
+  /** If this is a virtual index representing all but some keys in a compound index,
+   * the keyTail is a number of skipped keys from the real index.
+   */
   keyTail?: number; 
 
-  /** Same as index.keyPath but will always be an array of strings */
+  /** 0..N keyPaths that really represents the property that this index refers to.
+   * For outbound primary keys, this is null.
+   * For normal indexes, this is same as index.keyPath.
+   * For virtually normal indexes (but compound internally), this will still be the single keyPath.
+  */
   keyPaths: string[];
 
   /** Index or primary key */
-  index?: IndexSchema;
+  index: IndexSchema;
+
+  /** Extract (using keyPath) a key from given value (object)
+   * 
+  */
+  extractKey: (value: any) => Key;
 }
 
 export interface VirtualIndexCore extends DBCore {
@@ -43,25 +58,28 @@ export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
 
   // NEEDS REVIEW AND UNIT TEST!!!
   const addVirtualIndexes = (tableName: string, keyPath: string | string[], keyTail: number, lowLevelIndex: IndexSchema) => {
-    const keyPaths = isArray(keyPath) ? keyPath : [keyPath];
+    const keyPaths = keyPath == null ? [] : isArray(keyPath) ? keyPath : [keyPath];
     const indexLookup = (tableIndexLookup[tableName] = tableIndexLookup[tableName] || {});
 
     // Translate array based keyPath to an index name
     const keyPathAlias = keyPaths.length > 1 ?
       `[${keyPaths.join('+')}]` :
-      keyPaths[0];
-    const indexList = (indexLookup[keyPathAlias] = indexLookup[keyPathAlias] || []);
+      keyPaths.length === 1 ?
+        keyPaths[0] :
+        ":id";
 
+    const indexList = (indexLookup[keyPathAlias] = indexLookup[keyPathAlias] || []);
+    const extractKey = getKeyExtractor(keyPaths);
     const keyLength = keyPaths.length;
     if (keyLength > 1) {
       const indexList = (indexLookup[keyPathAlias] = indexLookup[keyPathAlias] || []);
-      indexList.push({index: lowLevelIndex, keyTail, keyLength, keyPaths});
+      indexList.push({index: lowLevelIndex, keyTail, keyLength, keyPaths, extractKey});
       addVirtualIndexes(tableName, keyPaths.slice(0, keyLength - 1), keyTail + 1, lowLevelIndex);
     } else {
       // Map the simple keyPath to the index.
-      indexList.push({index: lowLevelIndex, keyTail: 0, keyLength: 1, keyPaths});
+      indexList.push({index: lowLevelIndex, keyTail: 0, keyLength: 1, keyPaths, extractKey});
     }
-    indexList.sort((a,b) => a.keyTail - b.keyTail)
+    indexList.sort((a,b) => a.keyTail - b.keyTail); // Shortest keyTail is the best one (represents real index)
   };
 
   const {schema} = next;
@@ -134,7 +152,7 @@ export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
       return next.getAll(translateQuery(query));
     },
 
-    openCursor(query: KeyRangeQuery) : Promise<OpenCursorResponse> {
+    openCursor(query: KeyRangeQuery) : Promise<Cursor> {
       const {keyTail, keyLength} = findBestIndex(query);
       if (!keyTail) return next.openCursor(translateQuery(query));
 
@@ -162,10 +180,8 @@ export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
         };
       }
 
-      return next.openCursor(translateQuery(query)).then(({cursor, iterate})=>({
-        cursor: cursor && (keyTail ? ProxyCursor(cursor) : cursor),
-        iterate
-      }));
+      return next.openCursor(translateQuery(query))
+        .then(cursor=>cursor && (keyTail ? ProxyCursor(cursor) : cursor));
     }
   };
 
