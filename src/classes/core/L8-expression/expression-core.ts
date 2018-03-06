@@ -25,7 +25,6 @@ export interface ExpressionQuery {
   orderBy?: {
     keyPath: string;
     reverse?: string;
-    unique?: boolean;
     limit?: number;
   }
 }

@@ -3,8 +3,7 @@ import { assert } from '../../../functions/utils';
 export interface BloomFilter<Key=any> {
   readonly bitmap: Uint32Array;
   addKeys(keys: Key[]): void;
-  and(other: BloomFilter): BloomFilter;
-  or(other: BloomFilter): BloomFilter;
+  applyAND(other: BloomFilter): BloomFilter<Key>;
   has(key): boolean;
   filter(keys: Key[]): Key[];
 }
@@ -26,26 +25,13 @@ export function BloomFilter (
       }
     },
 
-    and (other) {
-      const resultFilter = BloomFilter(hash, numBuckets);
-      const result = resultFilter.bitmap;
+    applyAND (other: BloomFilter) {
       const otherBitmap = other.bitmap;
       assert(otherBitmap.length === bitmap.length);
       for (let i=0, l=bitmap.length; i<l; ++i) {
-        result[i] = bitmap[i] & otherBitmap[i];
+        bitmap[i] = bitmap[i] & otherBitmap[i];
       }
-      return resultFilter;
-    },
-
-    or (other) {
-      const resultFilter = BloomFilter(hash, numBuckets);
-      const result = resultFilter.bitmap;
-      const otherBitmap = other.bitmap;
-      assert(otherBitmap.length === bitmap.length);
-      for (let i=0, l=bitmap.length; i<l; ++i) {
-        result[i] = bitmap[i] | otherBitmap[i];
-      }
-      return resultFilter;
+      return this;
     },
 
     has(key) {
