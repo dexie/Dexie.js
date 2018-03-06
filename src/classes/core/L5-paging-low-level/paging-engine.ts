@@ -1,6 +1,10 @@
 import { MultiRangeResponse, MultiRangeQuery, MultiRangeCore } from '../L4-multirange/multirange-engine';
 import { Key } from '../L1-dbcore/dbcore';
 
+/** This layer is already implemented lower down. MultiRangeEngine should already support ranges.
+ * This file should be removed.
+ */
+
 export interface PagedMultiRangeQuery extends MultiRangeQuery {
   lastPrimaryKey?: Key; // If present together with lastKey, use continuePrimaryKey() until key end. Then getAllKeys on next.
   lastKey?: Key; // if undefined but lastPrimaryKey set, look it up based on lastPrimaryKey.
