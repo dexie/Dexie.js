@@ -1,13 +1,13 @@
-import { KeyRangeQuery, OpenCursorResponse } from "../dbcore";
+import { KeyRangeQuery, Cursor } from "../dbcore";
 
 
-export function getCountAndGetAllEmulation(openCursor: (query: KeyRangeQuery) => Promise<OpenCursorResponse>) {
+export function getCountAndGetAllEmulation(openCursor: (query: KeyRangeQuery) => Promise<Cursor>) {
   return {
     getAll: (query: KeyRangeQuery) => {
       const result = [];
       const want = query.want;
-      return openCursor(query).then(({ iterate, cursor }) => {
-        return iterate(want === 'primaryKeys' ? () => {
+      return openCursor(query).then(cursor => {
+        return cursor.start(want === 'primaryKeys' ? () => {
           result.push(cursor.primaryKey);
           cursor.continue();
         } : want === 'keys' ? () => {
@@ -22,8 +22,8 @@ export function getCountAndGetAllEmulation(openCursor: (query: KeyRangeQuery) =>
 
     count: (query: KeyRangeQuery) => {
       let result = 0;
-      return openCursor({ ...query, want: 'primaryKeys' }).then(({ iterate, cursor }) => {
-        return iterate(() => {
+      return openCursor({ ...query, want: 'primaryKeys' }).then(cursor => {
+        return cursor.start(() => {
           ++result;
           cursor.continue();
         });

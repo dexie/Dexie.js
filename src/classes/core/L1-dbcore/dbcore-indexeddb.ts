@@ -1,5 +1,5 @@
-import { DBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, KeyRangeQuery, Schema, OpenCursorResponse, IndexSchema } from './dbcore';
-import { IDBObjectStore, IDBRequest, IDBCursor, IDBTransaction } from '../../../public/types/indexeddb';
+import { DBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, KeyRangeQuery, Schema, IndexSchema, KeyRange } from './dbcore';
+import { IDBObjectStore, IDBRequest, IDBCursor, IDBTransaction, IDBKeyRange } from '../../../public/types/indexeddb';
 import { getCountAndGetAllEmulation } from './utils/index';
 import { isArray } from '../../../functions/utils';
 
@@ -87,7 +87,7 @@ function mutate (op: 'add' | 'put' | 'delete', store: IDBObjectStore, args1: any
   });
 }
 
-function openCursor ({trans, table, index, want, limit, range, reverse, unique}: KeyRangeQuery): Promise<OpenCursorResponse>
+function openCursor ({trans, table, index, want, limit, range, reverse, unique}: KeyRangeQuery): Promise<Cursor>
 {
   return new Promise((resolve, reject) => {
     const store = (trans as IDBTransaction).objectStore(table);
@@ -103,47 +103,65 @@ function openCursor ({trans, table, index, want, limit, range, reverse, unique}:
         "next";
     // request
     const req = want !== 'values' ?
-      source.openKeyCursor(range, direction) :
-      source.openCursor(range, direction);
+      source.openKeyCursor(convertRange(range), direction) :
+      source.openCursor(convertRange(range), direction);
       
     // iteration
     req.onerror = eventRejectHandler(reject);
     req.onsuccess = trycatcher(ev => {
       const cursor = req.result as Cursor;
       if (!cursor) {
-        resolve({cursor: null, iterate: ()=>Promise.resolve()});
+        resolve(null);
         return;
       }
-      const iterationPromise = new Promise<void>((resolveIteration, rejectIteration) =>{
-        cursor.close = resolveIteration;
-        cursor.fail = req.onerror = rejectIteration;
-      });
-      resolve({
-        cursor,
-        iterate: callback => {
-          // Now change req.onsuccess to a callback that doesn't call initCursor but just observer.next()
-          const guardedCallback = trycatcher(callback, cursor.fail);
-          req.onsuccess = ev => {
-            if (req.result) {
-              if (limit && !--limit) {
-                cursor.continue = ()=>{};
-                cursor.close();
-              }
-              guardedCallback();
-            } else {
-              cursor.close();
-            }
-          };
-          if (limit && !--limit) {
-            cursor.continue = ()=>{};
-            cursor.close();
+      let veryFirst = true;
+      const _cursorContinue = cursor.continue;
+      const _cursorContinuePrimaryKey = cursor.continuePrimaryKey;
+      const _cursorAdvance = cursor.advance;
+      const doThrowCursorIsStopped = ()=>{throw new Error("Cursor is stopped");}
+      cursor.start = (callback, key?, primaryKey?) => {
+        const iterationPromise = new Promise<void>((resolveIteration, rejectIteration) =>{
+          cursor.stop = value => {
+            cursor.continue = cursor.continuePrimaryKey = cursor.advance = doThrowCursorIsStopped;
+            cursor.fail = req.onerror = rejectIteration;
+            resolveIteration(value);
           }
-          // Call it once for the first entry, so it can call cursor.continue()
-          guardedCallback();
-          return iterationPromise;
+        });
+        // Now change req.onsuccess to a callback that doesn't call initCursor but just observer.next()
+        const guardedCallback = trycatcher(callback, cursor.fail);
+        req.onsuccess = () => {
+          if (cursor.continue === doThrowCursorIsStopped) {
+            cursor.continue = _cursorContinue;
+            cursor.continuePrimaryKey = _cursorContinuePrimaryKey;
+            cursor.advance = _cursorAdvance;
+          }
+          if (req.result) {
+            guardedCallback();
+          } else {
+            cursor.stop();
+          }
+        };
+        // Call it once for the first entry, so it can call cursor.continue()
+        if (veryFirst) {
+          veryFirst = false;
+          if (key == null || indexedDB.cmp(key, cursor.key) === 0) {
+            if (primaryKey == null || indexedDB.cmp(primaryKey, cursor.primaryKey) === 0) {
+              // Either user did not specify key/primaryKey as optional args to cursor.start(),
+              // so we should provide the first entry it landed on already. OR, user provided key /primaryKey
+              // but the cursor happens to be exactly on that key/primaryKey! Then we must callback!
+              guardedCallback();
+            }
+          }
         }
-      });
-    }, reject);          
+        if (primaryKey != null) {
+          cursor.continuePrimaryKey(key, primaryKey);
+        } else {
+          cursor.continue(key || null);
+        }
+        return iterationPromise;
+      };
+      resolve(cursor);
+    }, reject);     
   });
 }
 
@@ -158,8 +176,8 @@ function getAll (query: KeyRangeQuery) {
     const store = (trans as IDBTransaction).objectStore(table);
     const source = index == null ? store : store.index(index);
     const req = want === "primaryKeys" ?
-      source.getAllKeys(range, limit) :
-      source.getAll(range, limit);
+      source.getAllKeys(convertRange(range), limit) :
+      source.getAll(convertRange(range), limit);
     req.onsuccess = event => resolve(event.target.result);
     req.onerror = event => eventRejectHandler(reject);
   });
@@ -184,6 +202,30 @@ function extractSchema(db: IDBDatabase) : Schema {
           compound: isArray(index.keyPath)
         } as IndexSchema))
       }))
+  };
+}
+
+
+function convertRange ({lower, upper, lowerOpen, upperOpen}: KeyRange) : IDBKeyRange | null {
+  const idbRange = lower === undefined ?
+    upper === undefined ?
+      null :
+      IDBKeyRange.lowerBound(lower, lowerOpen) :
+    upper === undefined ?
+      IDBKeyRange.upperBound(upper, upperOpen) :
+      IDBKeyRange.bound(lower, upper, lowerOpen, upperOpen);
+  return idbRange as IDBKeyRange;
+}
+
+function rangeIncludes (range: KeyRange) {
+  const idbRange = convertRange(range);
+  if (idbRange === null) return ()=>true;
+  return key => {
+    try {
+      return idbRange.includes(key);
+    } catch (err) {
+      return false;
+    }
   };
 }
 
@@ -246,7 +288,7 @@ export function createDBCore (db: IDBDatabase, indexedDB: IDBFactory, schema: Sc
         const store = (query.trans as IDBTransaction).objectStore(query.table);
         const source = query.index == null ? store : store.index(query.index);
         if (query.unique) return polyfills.count(query);
-        const req = source.count(query.range);
+        const req = source.count(convertRange(query.range));
         req.onsuccess = ev => resolve(ev.target.result);
         req.onerror = eventRejectHandler(reject);
       });
@@ -254,6 +296,8 @@ export function createDBCore (db: IDBDatabase, indexedDB: IDBFactory, schema: Sc
 
     //comparer: () => indexedDB.cmp.bind(indexedDB),
     cmp: indexedDB.cmp.bind(indexedDB),
+
+    rangeIncludes,
 
     schema: extractSchema(db)
 

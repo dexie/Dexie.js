@@ -1,4 +1,4 @@
-import { Cursor, Key, OpenCursorResponse } from '../dbcore';
+import { Cursor, Key } from '../dbcore';
 /* Inkomplett! Får se om denna behövs!
 */
 export interface ProxyCursorMethods {
@@ -23,31 +23,28 @@ export interface ProxyCursorOptions {
   onNext?: (upNext: ()=>void) => ()=>void;
 }
 
-export function openProxyCursor(res: OpenCursorResponse, methods: ProxyCursorMethods, getters: ProxyCursorGetters, options?: ProxyCursorOptions) {
+export function openProxyCursor(cursor: Cursor, methods: ProxyCursorMethods, getters: ProxyCursorGetters, options?: ProxyCursorOptions) {
   const props: PropertyDescriptorMap = {};
-  let {cursor, iterate} = res;
   Object.keys(methods).forEach(method => props[method] = {value: methods[method]});
   Object.keys(getters).forEach(getter => props[getter] = {get: getters[getter]});
   let upNext: ()=>void;
   let tmpOnNext: ()=>void;
   if (options.adv) {
-    iterate = (onNext: ()=>void) => {
+    props.start = {value: (onNext: ()=>void, key?, primaryKey?) => {
+      // TODO: How should we take care of key or primaryKey?
       upNext = tmpOnNext = onNext;
-      return res.iterate(() => {
+      return cursor.start(() => {
         tmpOnNext();
       });
-    };
+    }};
     props.advance = {value: function(count: number) {
-      if (count > 1) upNext = () => {
-        if (--count === 1) upNext = _onNextImpl;
+      if (count > 1) tmpOnNext = () => {
+        if (--count === 1) tmpOnNext = upNext;
         this.continue();
-    }
-    this.continue();
-  
+        return;
+      }
+      this.continue();
     }}
   }
-  return {
-    cursor: Object.create(res.cursor, props),
-    iterate
-  }
+  return Object.create(cursor, props);
 }

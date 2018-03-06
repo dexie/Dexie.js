@@ -1,5 +1,7 @@
-import { DBCore, KeyRangeQuery, OpenCursorResponse, Cursor, Key } from '../L1-dbcore/dbcore';
+import { DBCore, KeyRangeQuery, Cursor, Key } from '../L1-dbcore/dbcore';
 import { VirtualIndexCore, pad } from '../L2-virtual-indexes/index';
+
+/** This layer is probably not needed! */
 
 export interface KeyEqualityQuery {
   index: string;
@@ -75,7 +77,7 @@ export function SubQueryCore (next: VirtualIndexCore, baseQuery?: KeyEqualityQue
     getAll(subQuery: KeyRangeQuery) : Promise<any[]> {
       return next.getAll(translateSubQuery(subQuery));
     },
-    openCursor(subQuery) : Promise<OpenCursorResponse> {
+    openCursor(subQuery) : Promise<Cursor> {
 
       function ProxyCursor(cursor: Cursor) : Cursor {
         function _continue (key?: Key) {
@@ -97,16 +99,7 @@ export function SubQueryCore (next: VirtualIndexCore, baseQuery?: KeyEqualityQue
         };
       }
 
-      return next.openCursor(translateSubQuery(subQuery)).then(({cursor, iterate})=>({
-        cursor: cursor && ProxyCursor(cursor),
-        iterate /*NEJ BEHÖVS EJ: uplevelCallback => iterate (()=>{
-          if (next.cmp(baseQuery.key, cursor.key.slice(0, cursor.key.length - 1)) === 0) {
-            uplevelCallback();
-          } else {
-            cursor.done();
-          }
-        })*/
-      }));
+      return next.openCursor(translateSubQuery(subQuery)).then(cursor => cursor && ProxyCursor(cursor));
     },
     
     subQuery (additionalBaseQuery: KeyEqualityQuery): SubQueryCore {

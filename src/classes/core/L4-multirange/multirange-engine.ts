@@ -25,13 +25,19 @@ export interface MultiRangeCore extends SubQueryCore {
   queryRanges(req: MultiRangeQuery): Promise<MultiRangeResponse>
 }
 
+const KEY_COUNT_LIMIT = 10000;
+
 export function MultiRangeCore (next: SubQueryCore) : MultiRangeCore {
   return {
     ...next,
     queryRanges(req) : Promise<MultiRangeResponse> {
-      const {limit, reverse, want} = req;
-      if (want.values && want.
+      const {limit, reverse, want, ranges} = req;
+      /*if (want == 'bloom') {
+        return Promise.all(ranges.map(range => bloom(next, ({...req, range, limit: KEY_COUNT_LIMIT} as KeyRangeQuery))))
+          .then(() => ({}));
+      }*/
       throw new Error();
     }
   };
+
 }

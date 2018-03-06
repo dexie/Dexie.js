@@ -1,4 +1,5 @@
 import { stringifyKey } from '../../../functions/stringify-key';
+import { BloomFilter } from '../L8-expression/bloomfilter';
 
 // For public interface
 
@@ -9,22 +10,24 @@ export interface KeyRange {
   readonly lowerOpen: boolean;
   readonly upper: Key | undefined;
   readonly upperOpen: boolean;
+  //includes (key: Key) : boolean;
 }
 
+/*export interface KeyRangeFactory {
+  bound(lower: Key, upper: Key, lowerOpen?: boolean, upperOpen?: boolean): KeyRange;
+  lowerBound(lower: Key, open?: boolean): KeyRange;
+  upperBound(upper: Key, open?: boolean): KeyRange;
+  only(key: Key): KeyRange;
+}*/
+
+/* TODO: Don't use stringifyKey. Use cmp. Need to remove this const and where it is called, do
+   it another way! */
 export const KeyRange = {
-  only (key: Key): KeyRange {
-    return {lower: key, upper: key, lowerOpen: false, upperOpen: false};
-  },
-  whatever (): KeyRange {
-    return {lower: undefined, upper: undefined, lowerOpen: false, upperOpen: false};
-  },
   isSingleValued({lower, upper}: KeyRange) {
     return lower !== undefined && upper !== undefined && stringifyKey(lower) === stringifyKey(upper);
   }
-  /*never(): KeyRange {// ??? IndexedDB will through for this. Need to check for it.
-    return {lower: Infinity, upper: Infinity, lowerOpen: true, upperOpen: true};
-  }*/
 }
+
 
 export interface Transaction {
   abort(): void;
@@ -90,20 +93,16 @@ export interface KeyRangeQuery {
   range: KeyRange;
 }
 
-export interface Cursor {
+export interface Cursor<TResult=any> {
   readonly key: Key;
   readonly primaryKey: Key;
   readonly value?: any;
   continue(key?: any): void;
   continuePrimaryKey(key: Key, primaryKey: Key): void;
   advance(count: number): void;
-  close(): void;
+  start(onNext: ()=>void, key?: Key, primaryKey?: Key): Promise<TResult>
+  stop(value?: TResult | Promise<TResult>): void;
   fail(error: Error): void;
-}
-
-export interface OpenCursorResponse {
-  cursor: Cursor;
-  iterate(onNext: ()=>void): Promise<void>
 }
 
 export interface Schema {
@@ -143,11 +142,12 @@ export interface DBCore {
   // Query methods
   get(req: GetRequest): Promise<any[]>;
   getAll(query: KeyRangeQuery): Promise<any[]>;
-  openCursor(query: KeyRangeQuery): Promise<OpenCursorResponse>;
+  openCursor(query: KeyRangeQuery): Promise<Cursor | null>;
   count(query: KeyRangeQuery): Promise<number>;
 
   // Utility methods
   cmp(a: any, b: any) : number;
+  rangeIncludes(range: KeyRange): (key: Key) => boolean;
   //comparer(table: string, index: string | null): (a: any, b: any) => number;
   readonly schema: Schema;
 }

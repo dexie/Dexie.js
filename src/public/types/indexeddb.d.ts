@@ -107,6 +107,7 @@ export interface IDBKeyRange {
   readonly lowerOpen: boolean;
   readonly upper: any;
   readonly upperOpen: boolean;
+  includes(key: any): boolean;
 }
 
 export interface IDBKeyRangeConstructor {
