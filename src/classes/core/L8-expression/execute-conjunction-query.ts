@@ -2,7 +2,7 @@ import { PagingCore, PagedQueryResponse } from '../L5-paging-low-level/paging-en
 import { Transaction, Key, KeyRange } from '../L1-dbcore/dbcore';
 import { AtomicFormula } from '../L8-expression/expression';
 import { BloomFilter } from './bloomfilter';
-import { KeyRangePagingCore, KeyRangePageToken } from '../L2.1-keyrange-paging/keyrange-paging-engine';
+import { KeyRangePagingCore, KeyRangePageToken } from '../L3-keyrange-paging/keyrange-paging-engine';
 
 const LIMIT_FOR_PARALLELL_KEY_LISTING = 10000;
 const LIMIT_FOR_SEQUENCIAL_KEY_LISTING = 50000;

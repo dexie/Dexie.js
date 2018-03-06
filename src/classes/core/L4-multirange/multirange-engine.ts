@@ -1,6 +1,6 @@
 import { DBCore, KeyRange, Key, Transaction, KeyRangeQuery } from '../L1-dbcore/dbcore';
-import { SubQueryCore } from '../L3-sub-query/sub-query-core';
-import { KeyRangePagingCore, PagableKeyRangeQuery, QueryRangeResponse } from '../L2.1-keyrange-paging/keyrange-paging-engine';
+import { SubQueryCore } from '../L2.9-sub-query/sub-query-core';
+import { KeyRangePagingCore, PagableKeyRangeQuery, QueryRangeResponse } from '../L3-keyrange-paging/keyrange-paging-engine';
 
 export interface MultiRangeQuery extends Pick<PagableKeyRangeQuery, 
   "trans" | "table" | "index" | "limit" | "want" | "unique" | "reverse" | "wantPageToken" | "pageToken"> // all but "range"
