@@ -98,7 +98,7 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
       (pageToken && (pageToken.type === 'cursor' || pageToken.type === 'offset')) || // There's already a cursor to continue from
       reverse || // reverse calls
       unique ||
-      idx.keyLength === 0 || // outbound primary key. Cant find the index after getAll() or getAllKeys()
+      (idx.keyLength === 0 && values) || // outbound primary key. Cant find last key after getAll()
       (limit < 10 && !values && !idx.index.isPrimaryKey) // When using getAllKeys(), low limit may not be so good since pageToken will need to query last value unless we're iterating primary key
     );
 
@@ -258,8 +258,8 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
           result,
           pageToken: new KeyRangePageToken({
             type: 'lastKey',
-            lastKey: lastEntry,
-            lastPrimaryKey: idx.extractKey(value)
+            lastKey: idx.extractKey(value),
+            lastPrimaryKey: lastEntry
           })
         } as PagedQueryResponse));
       }
