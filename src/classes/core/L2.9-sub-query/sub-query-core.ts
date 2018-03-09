@@ -74,8 +74,8 @@ export function SubQueryCore (next: VirtualIndexCore, baseQuery?: KeyEqualityQue
     count(subQuery: KeyRangeQuery): Promise<number> {
       return next.count(translateSubQuery(subQuery));
     },
-    getAll(subQuery: KeyRangeQuery) : Promise<any[]> {
-      return next.getAll(translateSubQuery(subQuery));
+    query(subQuery: KeyRangeQuery) : Promise<any[]> {
+      return next.query(translateSubQuery(subQuery));
     },
     openCursor(subQuery) : Promise<Cursor> {
 

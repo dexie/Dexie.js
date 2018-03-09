@@ -1,17 +1,16 @@
-import { KeyRangeQuery, Cursor } from "../dbcore";
+import { QueryRequest, OpenCursorRequest, Cursor, CountRequest } from "../dbcore";
 
+/** Detta lager ska troligen inte med i dbcore. Kanske som hjälp utility till ignore-case delen
+ * och/eller andra.
+*/
 
-export function getCountAndGetAllEmulation(openCursor: (query: KeyRangeQuery) => Promise<Cursor>) {
+export function getCountAndGetAllEmulation(openCursor: (query: OpenCursorRequest) => Promise<Cursor>) {
   return {
-    getAll: (query: KeyRangeQuery) => {
+    getAll: (query: QueryRequest) => {
       const result = [];
-      const want = query.want;
       return openCursor(query).then(cursor => {
-        return cursor.start(want === 'primaryKeys' ? () => {
+        return cursor.start(!query.values? () => {
           result.push(cursor.primaryKey);
-          cursor.continue();
-        } : want === 'keys' ? () => {
-          result.push(cursor.key);
           cursor.continue();
         } : () => {
           result.push(cursor.value);
@@ -20,9 +19,9 @@ export function getCountAndGetAllEmulation(openCursor: (query: KeyRangeQuery) =>
       }).then(() => result);
     },
 
-    count: (query: KeyRangeQuery) => {
+    count: (query: CountRequest) => {
       let result = 0;
-      return openCursor({ ...query, want: 'primaryKeys' }).then(cursor => {
+      return openCursor(query).then(cursor => {
         return cursor.start(() => {
           ++result;
           cursor.continue();

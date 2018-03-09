@@ -88,24 +88,29 @@ export interface QueryBase {
   index?: string | null;
 }
 
-export interface GetAllQuery extends QueryBase {
+export interface QueryRequest extends QueryBase {
   range?: KeyRange;
   values?: boolean;
   limit?: number;
 }
 
-export interface OpenCursorQuery extends QueryBase {
+export interface QueryResponse {
+  result: any[];
+}
+
+export interface OpenCursorRequest extends QueryBase {
   range?: KeyRange;
   values?: boolean;
   unique?: boolean;
   reverse?: boolean;
 }
 
-export interface CountQuery extends QueryBase {
+export interface CountRequest extends QueryBase {
   range?: KeyRange;
 }
 
 export interface Cursor<TResult=any> {
+  readonly trans: Transaction;
   readonly key: Key;
   readonly primaryKey: Key;
   readonly value?: any;
@@ -156,9 +161,9 @@ export interface DBCore {
 
   // Query methods
   get(req: GetRequest): Promise<any[]>;
-  getAll(query: GetAllQuery): Promise<any[]>;
-  openCursor(query: OpenCursorQuery): Promise<Cursor | null>;
-  count(query: CountQuery): Promise<number>;
+  query(req: QueryRequest): Promise<QueryResponse>;
+  openCursor(req: OpenCursorRequest): Promise<Cursor | null>;
+  count(req: CountRequest): Promise<number>;
 
   // Utility methods
   cmp(a: any, b: any) : number;

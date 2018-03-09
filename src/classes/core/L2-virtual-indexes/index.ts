@@ -1,4 +1,4 @@
-import { DBCore, GetAllQuery, OpenCursorQuery, CountQuery, KeyRange, Cursor, Key, IndexSchema } from '../L1-dbcore/dbcore';
+import { DBCore, QueryRequest, OpenCursorRequest, CountRequest, KeyRange, Cursor, Key, IndexSchema, QueryResponse } from '../L1-dbcore/dbcore';
 import { isArray } from '../../../functions/utils';
 import { exceptions } from '../../../errors';
 import { getKeyExtractor } from './get-key-extractor';
@@ -113,7 +113,7 @@ export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
     };
   }
 
-  function translateQuery (query: GetAllQuery | OpenCursorQuery | CountQuery) {
+  function translateRequest (query: QueryRequest | OpenCursorRequest | CountRequest) {
     const {index, keyTail} = findBestIndex(query);
     if (!keyTail) {
       // No virtual compound index with keyTail.
@@ -144,23 +144,23 @@ export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
 
     tableIndexLookup,
 
-    count(query: CountQuery): Promise<number> {
-      return next.count(translateQuery(query));
+    count(req: CountRequest): Promise<number> {
+      return next.count(translateRequest(req));
     },    
 
-    getAll(query: GetAllQuery) : Promise<any[]> {
-      return next.getAll(translateQuery(query));
+    getAll(req: QueryRequest) : Promise<QueryResponse> {
+      return next.query(translateRequest(req));
     },
 
-    openCursor(query: OpenCursorQuery) : Promise<Cursor> {
-      const {keyTail, keyLength} = findBestIndex(query);
-      if (!keyTail) return next.openCursor(translateQuery(query));
+    openCursor(req: OpenCursorRequest) : Promise<Cursor> {
+      const {keyTail, keyLength} = findBestIndex(req);
+      if (!keyTail) return next.openCursor(translateRequest(req));
 
       function ProxyCursor(cursor: Cursor) : Cursor {
         function _continue (key?: Key) {
           key != null ?
             cursor.continue(pad(key, -Infinity, keyTail)) :
-            query.unique ?
+            req.unique ?
               cursor.continue(pad(key, MAX_KEY, keyTail)) :
               cursor.continue()
         }
@@ -180,7 +180,7 @@ export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
         };
       }
 
-      return next.openCursor(translateQuery(query))
+      return next.openCursor(translateRequest(req))
         .then(cursor=>cursor && (keyTail ? ProxyCursor(cursor) : cursor));
     }
   };

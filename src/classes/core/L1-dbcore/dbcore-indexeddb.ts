@@ -1,4 +1,4 @@
-import { DBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, OpenCursorQuery, GetAllQuery, CountQuery, Schema, IndexSchema, KeyRange } from './dbcore';
+import { DBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, OpenCursorRequest, QueryRequest, CountRequest, Schema, IndexSchema, KeyRange, QueryResponse } from './dbcore';
 import { IDBObjectStore, IDBRequest, IDBCursor, IDBTransaction, IDBKeyRange } from '../../../public/types/indexeddb';
 //import { getCountAndGetAllEmulation } from './utils/index';
 import { isArray } from '../../../functions/utils';
@@ -89,7 +89,7 @@ function mutate (op: 'add' | 'put' | 'delete', store: IDBObjectStore, args1: any
   });
 }
 
-function openCursor ({trans, table, index, values, range, reverse, unique}: OpenCursorQuery): Promise<Cursor>
+function openCursor ({trans, table, index, values, range, reverse, unique}: OpenCursorRequest): Promise<Cursor>
 {
   return new Promise((resolve, reject) => {
     const store = (trans as IDBTransaction).objectStore(table);
@@ -122,6 +122,7 @@ function openCursor ({trans, table, index, values, range, reverse, unique}: Open
       const _cursorContinuePrimaryKey = cursor.continuePrimaryKey.bind(cursor);
       const _cursorAdvance = cursor.advance.bind(cursor);
       const doThrowCursorIsStopped = ()=>{throw new Error("Cursor not started");}
+      (cursor as any).trans = trans;
       cursor.stop = cursor.continue = cursor.continuePrimaryKey = cursor.advance = doThrowCursorIsStopped;
       cursor.start = (callback, key?, primaryKey?) => {
         const iterationPromise = new Promise<void>((resolveIteration, rejectIteration) =>{
@@ -189,15 +190,15 @@ function openCursor ({trans, table, index, values, range, reverse, unique}: Open
 
 //const polyfills = getCountAndGetAllEmulation(openCursor);
 
-function getAll (query: GetAllQuery) {
-  return new Promise<any[]>((resolve, reject) => {
-    const {trans, table, index, values, limit, range} = query;
+function getAll (request: QueryRequest) {
+  return new Promise<QueryResponse>((resolve, reject) => {
+    const {trans, table, index, values, limit, range} = request;
     const store = (trans as IDBTransaction).objectStore(table);
     const source = index == null ? store : store.index(index);
     const req = values ?
       source.getAll(makeIDBKeyRange(range), limit) :
       source.getAllKeys(makeIDBKeyRange(range), limit);
-    req.onsuccess = event => resolve(event.target.result);
+    req.onsuccess = event => resolve({result: event.target.result});
     req.onerror = event => eventRejectHandler(reject);
   });
 }
@@ -301,7 +302,7 @@ export function createDBCore (db: IDBDatabase, indexedDB: IDBFactory, schema: Sc
       });
     },
 
-    getAll,
+    query: getAll,
     
     openCursor,
 

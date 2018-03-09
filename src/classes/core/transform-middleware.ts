@@ -1,4 +1,4 @@
-import { DBCore, ObjectStore, WriteResponse, GetAllQuery, OpenCursorQuery } from './L1-dbcore/dbcore';
+import { DBCore, ObjectStore, WriteResponse, QueryRequest, OpenCursorRequest } from './L1-dbcore/dbcore';
 
 
 export interface Transformer {
@@ -40,10 +40,10 @@ export function createTransformationMiddleware (= {
       get(store: ObjectStore, keys: any[]): Promise<any[]> {
         throw new Error("Method not implemented.");
       },
-      getAll(store: ObjectStore, req: GetAllQuery): Promise<any[]> {
+      query(store: ObjectStore, req: QueryRequest): Promise<any[]> {
         throw new Error("Method not implemented.");
       },
-      openCursor(store: ObjectStore, req: OpenCursorQuery): void {
+      openCursor(store: ObjectStore, req: OpenCursorRequest): void {
         throw new Error("Method not implemented.");
       },
       cmp(a: any, b: any): number {
