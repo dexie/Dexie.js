@@ -1,6 +1,6 @@
-import { DBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, KeyRangeQuery, Schema, IndexSchema, KeyRange } from './dbcore';
+import { DBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, OpenCursorQuery, GetAllQuery, CountQuery, Schema, IndexSchema, KeyRange } from './dbcore';
 import { IDBObjectStore, IDBRequest, IDBCursor, IDBTransaction, IDBKeyRange } from '../../../public/types/indexeddb';
-import { getCountAndGetAllEmulation } from './utils/index';
+//import { getCountAndGetAllEmulation } from './utils/index';
 import { isArray } from '../../../functions/utils';
 
 const cmp = indexedDB.cmp.bind(indexedDB);
@@ -89,7 +89,7 @@ function mutate (op: 'add' | 'put' | 'delete', store: IDBObjectStore, args1: any
   });
 }
 
-function openCursor ({trans, table, index, want, limit, range, reverse, unique}: KeyRangeQuery): Promise<Cursor>
+function openCursor ({trans, table, index, values, range, reverse, unique}: OpenCursorQuery): Promise<Cursor>
 {
   return new Promise((resolve, reject) => {
     const store = (trans as IDBTransaction).objectStore(table);
@@ -104,9 +104,9 @@ function openCursor ({trans, table, index, want, limit, range, reverse, unique}:
         "nextunique" :
         "next";
     // request
-    const req = want !== 'values' ?
-      source.openKeyCursor(convertRange(range), direction) :
-      source.openCursor(convertRange(range), direction);
+    const req = values ?
+    source.openCursor(makeIDBKeyRange(range), direction) :
+    source.openKeyCursor(makeIDBKeyRange(range), direction);
       
     // iteration
     req.onerror = eventRejectHandler(reject);
@@ -116,12 +116,13 @@ function openCursor ({trans, table, index, want, limit, range, reverse, unique}:
         resolve(null);
         return;
       }
+      (cursor as any).done = false;
       let veryFirst = true;
       const _cursorContinue = cursor.continue.bind(cursor);
       const _cursorContinuePrimaryKey = cursor.continuePrimaryKey.bind(cursor);
       const _cursorAdvance = cursor.advance.bind(cursor);
       const doThrowCursorIsStopped = ()=>{throw new Error("Cursor not started");}
-      cursor.stop = doThrowCursorIsStopped;
+      cursor.stop = cursor.continue = cursor.continuePrimaryKey = cursor.advance = doThrowCursorIsStopped;
       cursor.start = (callback, key?, primaryKey?) => {
         const iterationPromise = new Promise<void>((resolveIteration, rejectIteration) =>{
           req.onerror = eventRejectHandler(rejectIteration);
@@ -132,18 +133,25 @@ function openCursor ({trans, table, index, want, limit, range, reverse, unique}:
           }
         });
         // Now change req.onsuccess to a callback that doesn't call initCursor but just observer.next()
-        const guardedCallback = trycatcher(callback, cursor.fail);
-        req.onsuccess = () => {
-          if (cursor.continue === doThrowCursorIsStopped) {
-            cursor.continue = _cursorContinue;
-            cursor.continuePrimaryKey = _cursorContinuePrimaryKey;
-            cursor.advance = _cursorAdvance;
-          }
+        const guardedCallback = () => {
           if (req.result) {
-            guardedCallback();
+            try {
+              callback();
+            } catch (err) {
+              cursor.fail(err);
+            }
           } else {
+            (cursor as any).done = true;
+            cursor.start = ()=>{throw new Error("Cursor behind last entry");}
             cursor.stop();
           }
+        }
+        req.onsuccess = () => {
+          cursor.continue = _cursorContinue;
+          cursor.continuePrimaryKey = _cursorContinuePrimaryKey;
+          cursor.advance = _cursorAdvance;
+          req.onsuccess = guardedCallback;
+          guardedCallback();
         };
         // Call it once for the first entry, so it can call cursor.continue()
         const isAtGivenKeys = (
@@ -179,19 +187,16 @@ function openCursor ({trans, table, index, want, limit, range, reverse, unique}:
   });
 }
 
-const polyfills = getCountAndGetAllEmulation(openCursor);
+//const polyfills = getCountAndGetAllEmulation(openCursor);
 
-function getAll (query: KeyRangeQuery) {
+function getAll (query: GetAllQuery) {
   return new Promise<any[]>((resolve, reject) => {
-    const {trans, table, index, want, limit, range} = query;
-    if (query.reverse || query.unique || want === 'keys') {
-      return polyfills.getAll(query);
-    }
+    const {trans, table, index, values, limit, range} = query;
     const store = (trans as IDBTransaction).objectStore(table);
     const source = index == null ? store : store.index(index);
-    const req = want === "primaryKeys" ?
-      source.getAllKeys(convertRange(range), limit) :
-      source.getAll(convertRange(range), limit);
+    const req = values ?
+      source.getAll(makeIDBKeyRange(range), limit) :
+      source.getAllKeys(makeIDBKeyRange(range), limit);
     req.onsuccess = event => resolve(event.target.result);
     req.onerror = event => eventRejectHandler(reject);
   });
@@ -207,6 +212,7 @@ function extractSchema(db: IDBDatabase) : Schema {
       primaryKey: {
         isPrimaryKey: true,
         name: null,
+        unique: true,
         compound: isArray(store.keyPath),
         ...pick(store, ["keyPath", "autoIncrement"])
       } as IndexSchema,
@@ -220,19 +226,21 @@ function extractSchema(db: IDBDatabase) : Schema {
 }
 
 
-function convertRange ({lower, upper, lowerOpen, upperOpen}: KeyRange) : IDBKeyRange | null {
+function makeIDBKeyRange (range?: KeyRange) : IDBKeyRange | null {
+  if (!range) return null;
+  const {lower, upper, lowerOpen, upperOpen} = range;
   const idbRange = lower === undefined ?
     upper === undefined ?
       null :
-      IDBKeyRange.lowerBound(lower, lowerOpen) :
+      IDBKeyRange.lowerBound(lower, !!lowerOpen) :
     upper === undefined ?
-      IDBKeyRange.upperBound(upper, upperOpen) :
-      IDBKeyRange.bound(lower, upper, lowerOpen, upperOpen);
+      IDBKeyRange.upperBound(upper, !!upperOpen) :
+      IDBKeyRange.bound(lower, upper, !!lowerOpen, !!upperOpen);
   return idbRange as IDBKeyRange;
 }
 
 function rangeIncludes (range: KeyRange) {
-  const idbRange = convertRange(range);
+  const idbRange = makeIDBKeyRange(range);
   if (idbRange === null) return ()=>true;
   return key => {
     try {
@@ -301,8 +309,7 @@ export function createDBCore (db: IDBDatabase, indexedDB: IDBFactory, schema: Sc
       return new Promise<number>((resolve, reject) => {
         const store = (query.trans as IDBTransaction).objectStore(query.table);
         const source = query.index == null ? store : store.index(query.index);
-        if (query.unique) return polyfills.count(query);
-        const req = source.count(convertRange(query.range));
+        const req = source.count(makeIDBKeyRange(query.range));
         req.onsuccess = ev => resolve(ev.target.result);
         req.onerror = eventRejectHandler(reject);
       });

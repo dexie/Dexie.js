@@ -1,5 +1,4 @@
 import { KeyRange, Transaction } from '../L1-dbcore/dbcore';
-import { PagingCore } from '../L5-paging-low-level/paging-engine';
 import { utilizeCompoundIndexes } from './utilize-compound-indexes';
 import { Expression } from './expression';
 import { disjunctiveNormalForm } from './disjunctive-normal-form';

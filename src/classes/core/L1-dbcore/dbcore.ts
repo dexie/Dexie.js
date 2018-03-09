@@ -7,9 +7,9 @@ export type Key = any;
 
 export interface KeyRange {
   readonly lower: Key | undefined;
-  readonly lowerOpen: boolean;
+  readonly lowerOpen?: boolean;
   readonly upper: Key | undefined;
-  readonly upperOpen: boolean;
+  readonly upperOpen?: boolean;
   //includes (key: Key) : boolean;
 }
 
@@ -82,21 +82,34 @@ export interface GetRequest {
   keys: Key[];
 }
 
-export interface KeyRangeQuery {
+export interface QueryBase {
   trans: Transaction;
   table: string;
-  index: string;
+  index?: string | null;
+}
+
+export interface GetAllQuery extends QueryBase {
+  range?: KeyRange;
+  values?: boolean;
   limit?: number;
-  want?: "primaryKeys" | "keys" | "values" | "keyPairs";
+}
+
+export interface OpenCursorQuery extends QueryBase {
+  range?: KeyRange;
+  values?: boolean;
   unique?: boolean;
   reverse?: boolean;
-  range: KeyRange;
+}
+
+export interface CountQuery extends QueryBase {
+  range?: KeyRange;
 }
 
 export interface Cursor<TResult=any> {
   readonly key: Key;
   readonly primaryKey: Key;
   readonly value?: any;
+  readonly done?: boolean;
   continue(key?: any): void;
   continuePrimaryKey(key: Key, primaryKey: Key): void;
   advance(count: number): void;
@@ -126,7 +139,9 @@ export interface IndexSchema {
   keyPath?: string | string[];
   /** Auto-generated primary key (does not apply to secondary indexes) */
   autoIncrement?: boolean;
+  /** Whether index is unique. Also true if index is primary key. */
   unique?: boolean;
+  /** Whether index is multiEntry. */
   multiEntry?: boolean;
 }
 
@@ -141,9 +156,9 @@ export interface DBCore {
 
   // Query methods
   get(req: GetRequest): Promise<any[]>;
-  getAll(query: KeyRangeQuery): Promise<any[]>;
-  openCursor(query: KeyRangeQuery): Promise<Cursor | null>;
-  count(query: KeyRangeQuery): Promise<number>;
+  getAll(query: GetAllQuery): Promise<any[]>;
+  openCursor(query: OpenCursorQuery): Promise<Cursor | null>;
+  count(query: CountQuery): Promise<number>;
 
   // Utility methods
   cmp(a: any, b: any) : number;
@@ -151,45 +166,3 @@ export interface DBCore {
   //comparer(table: string, index: string | null): (a: any, b: any) => number;
   readonly schema: Schema;
 }
-
-/* TODO! Tänk om!
-
-  1. Låt återigen add och put bli write()
-  2. Splitta upp delete mellan delete och deleteRanges.
-  3. Sammanfoga get, getAll och openCursor till en och samma subscribe-liknande metod.
-  4. Låt cmp vara beroende av ett ObjectStore och ett optionellt (nullable) index namn så
-     att man kan skapa ett middleware som gör skillnad 
-  Summa summarum, encapsulering:
-    Middleware för value- och key transformering bör troligen ligga på ganska hög nivå,
-    alltså högre än expression-motorn, så förenklas expression-motorns ansvar.
-
-    För att encapsulera värden,
-      proxa write() 
-
-    För att reviva värden, 
-      proxa query och skicka in en proxy Observer som ändrar eventuella värden, detta
-      ...utan att förstå sig på queryt!
-
-    För att encapsulera keys
-      write:
-        values - getByKeyPath(), setByKeyPath()
-        keys - as they are
-      query:
-        expression:
-          keyrange: lower, upper
-          anyOf: alla keys
-          equals...: the key
-          AND: rekursivt
-          OR: rekursivt 
-        ej: orderBy: den talar bara om vilket index den ska ordna efter.
-        ej: pageToken för den är black-box för utsidan.
-
-    För att reviva keys:
-      query:
-        observer:
-          keys
-          primaryKeys
-          values
-
-
-*/

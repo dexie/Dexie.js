@@ -1,4 +1,3 @@
-import { PagingCore, PagedQueryResponse } from '../L5-paging-low-level/paging-engine';
 import { Transaction, Key, KeyRange } from '../L1-dbcore/dbcore';
 import { AtomicFormula } from '../L8-expression/expression';
 import { BloomFilter } from './bloomfilter';

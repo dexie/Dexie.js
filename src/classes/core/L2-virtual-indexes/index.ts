@@ -1,4 +1,4 @@
-import { DBCore, KeyRangeQuery, KeyRange, Cursor, Key, IndexSchema } from '../L1-dbcore/dbcore';
+import { DBCore, GetAllQuery, OpenCursorQuery, CountQuery, KeyRange, Cursor, Key, IndexSchema } from '../L1-dbcore/dbcore';
 import { isArray } from '../../../functions/utils';
 import { exceptions } from '../../../errors';
 import { getKeyExtractor } from './get-key-extractor';
@@ -95,7 +95,7 @@ export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
     }
   }
 
-  function findBestIndex({table, index}: KeyRangeQuery) {
+  function findBestIndex({table, index}: {table: string, index?: string}): VirtualIndex {
     const indexLookup = tableIndexLookup[table];
     if (!indexLookup) throw new exceptions.InvalidTable(`Invalid table: ${table}`);
     if (index == null) index = ":id";
@@ -104,7 +104,7 @@ export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
     return result[0];
   }
 
-  function translateRange (range: KeyRange, keyTail: number) {
+  function translateRange (range: KeyRange, keyTail: number): KeyRange {
     return {
       lower: pad(range.lower, range.lowerOpen ? MAX_KEY : MIN_KEY, keyTail),
       lowerOpen: true, // doesn't matter true or false
@@ -113,7 +113,7 @@ export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
     };
   }
 
-  function translateQuery (query: KeyRangeQuery) {
+  function translateQuery (query: GetAllQuery | OpenCursorQuery | CountQuery) {
     const {index, keyTail} = findBestIndex(query);
     if (!keyTail) {
       // No virtual compound index with keyTail.
@@ -144,15 +144,15 @@ export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
 
     tableIndexLookup,
 
-    count(query): Promise<number> {
+    count(query: CountQuery): Promise<number> {
       return next.count(translateQuery(query));
     },    
 
-    getAll(query) : Promise<any[]> {
+    getAll(query: GetAllQuery) : Promise<any[]> {
       return next.getAll(translateQuery(query));
     },
 
-    openCursor(query: KeyRangeQuery) : Promise<Cursor> {
+    openCursor(query: OpenCursorQuery) : Promise<Cursor> {
       const {keyTail, keyLength} = findBestIndex(query);
       if (!keyTail) return next.openCursor(translateQuery(query));
 

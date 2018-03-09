@@ -8,3 +8,4 @@ import { IndexableType } from "../public/types/indexable-type";
  * @param key {IndexableType} Key to string
  */
 export function stringifyKey (key: IndexableType): string;
+export function unstringifyKey (str: string): IndexableType;
