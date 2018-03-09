@@ -1,17 +1,17 @@
 import { VirtualIndexCore } from '../L2-virtual-indexes';
-import { QueryBase, Transaction, KeyRange, Cursor, Key, QueryRequest, OpenCursorRequest } from '../L1-dbcore/dbcore';
+import { QueryBase, Transaction, KeyRange, Cursor, Key, QueryRequest, OpenCursorRequest, DBCore } from '../L1-dbcore/dbcore';
 import { OffsetCursor } from '../L1-dbcore/utils/offset-cursor';
 import { exceptions } from '../../../errors';
 import { assert, isArray } from '../../../functions/utils';
 import { stringifyKey, unstringifyKey } from '../../../functions/stringify-key';
 import { KeyRangePageToken } from './pagetoken';
 
-export interface KeyRangePagingCore extends VirtualIndexCore {
-  query(query: PagedQueryRequest): Promise<PagedQueryResponse>;
+export interface KeyRangePagingCore<TQuery=KeyRange> extends VirtualIndexCore<TQuery> {
+  query(req: PagedQueryRequest<TQuery>): Promise<PagedQueryResponse>;
 }
 
-export interface PagedQueryRequest extends QueryRequest, OpenCursorRequest {
-  range?: KeyRange;
+export interface PagedQueryRequest<TQuery=KeyRange> extends QueryRequest<TQuery>, OpenCursorRequest<TQuery> {
+  query?: TQuery;
   values?: boolean;
   limit?: number;
   unique?: boolean;
@@ -26,26 +26,26 @@ export interface PagedQueryResponse {
   partial?: boolean; // True if the requested limit was not reached. If so, pageToken will be present, no matter wantPageToken or not.
 }
 
-export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore {
+export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore<KeyRange> {
   return {
     ...next,
     query,
     openCursor
   };
 
-  function openCursor (query: PagedQueryRequest): Promise<Cursor> {
-    const {pageToken, range, values, reverse} = query;
+  function openCursor (req: PagedQueryRequest): Promise<Cursor> {
+    const {pageToken, query, values, reverse} = req;
 
     // Translate query from PagableKeyRangeQuery to OpenCursorQuery.
     // The only missing property is "values" that should be true IFF want === 'value':
     if (!pageToken) {
       // We don't have a pageToken. Call openCursor():
-      return next.openCursor(query);
+      return next.openCursor(req);
     }
 
     let {type, lastKey, lastPrimaryKey, cursor} = pageToken;
 
-    if (type === 'cursor' && cursor.trans !== query.trans) {
+    if (type === 'cursor' && cursor.trans !== req.trans) {
       // On a different transaction. Convert pageToken type to lastKey to continue off withou
       // using previous cursor
       type = 'lastKey';
@@ -58,7 +58,7 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
         // cursor
         Promise.resolve(cursor) :
         // offset
-        next.openCursor(query).then(cursor => OffsetCursor(cursor, pageToken.offset));
+        next.openCursor(req).then(cursor => OffsetCursor(cursor, pageToken.offset));
     }
 
     // We have a pageToken of type "lastKey".
@@ -67,11 +67,11 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
     // after given lastKey/lastPrimaryKey:
 
     // Adjust range:
-    query = {...query, range: reverse ?
-      {...range, upper: lastKey, upperOpen: false} :
-      {...range, lower: lastKey, lowerOpen: false}};
+    req = {...req, query: reverse ?
+      {...query, upper: lastKey, upperOpen: false} :
+      {...query, lower: lastKey, lowerOpen: false}};
 
-    const cursorPromise = next.openCursor(query);
+    const cursorPromise = next.openCursor(req);
     
     return lastPrimaryKey == null ?
       cursorPromise :
@@ -85,7 +85,7 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
   }
     
   function query(req: PagedQueryRequest): Promise<PagedQueryResponse> {
-    let { table, index, pageToken, range, reverse, wantPageToken, limit, unique, values } = req;
+    let { table, index, pageToken, query, reverse, wantPageToken, limit, unique, values } = req;
     const idx = next.tableIndexLookup[table][index][0];
 
     let useCursor = (
@@ -179,8 +179,8 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
         // We can do getAll() but we have a pageToken to consider:
         req = {
           ...req,
-          range: {
-            ...range,
+          query: {
+            ...query,
             lower: lastKey,
             lowerOpen: true // Don't include last key
           }

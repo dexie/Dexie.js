@@ -88,8 +88,8 @@ export interface QueryBase {
   index?: string | null;
 }
 
-export interface QueryRequest extends QueryBase {
-  range?: KeyRange;
+export interface QueryRequest<TQuery=KeyRange> extends QueryBase {
+  query?: TQuery;
   values?: boolean;
   limit?: number;
 }
@@ -98,15 +98,15 @@ export interface QueryResponse {
   result: any[];
 }
 
-export interface OpenCursorRequest extends QueryBase {
-  range?: KeyRange;
+export interface OpenCursorRequest<TQuery=KeyRange> extends QueryBase {
+  query?: TQuery;
   values?: boolean;
   unique?: boolean;
   reverse?: boolean;
 }
 
-export interface CountRequest extends QueryBase {
-  range?: KeyRange;
+export interface CountRequest<TQuery=KeyRange> extends QueryBase {
+  query?: TQuery;
 }
 
 export interface Cursor<TResult=any> {
@@ -150,7 +150,7 @@ export interface IndexSchema {
   multiEntry?: boolean;
 }
 
-export interface DBCore {
+export interface DBCore<TQuery=KeyRange> {
   // Transaction and Object Store
   transaction(req: TransactionRequest): Transaction;
 
@@ -161,9 +161,9 @@ export interface DBCore {
 
   // Query methods
   get(req: GetRequest): Promise<any[]>;
-  query(req: QueryRequest): Promise<QueryResponse>;
-  openCursor(req: OpenCursorRequest): Promise<Cursor | null>;
-  count(req: CountRequest): Promise<number>;
+  query(req: QueryRequest<TQuery>): Promise<QueryResponse>;
+  openCursor(req: OpenCursorRequest<TQuery>): Promise<Cursor | null>;
+  count(req: CountRequest<TQuery>): Promise<number>;
 
   // Utility methods
   cmp(a: any, b: any) : number;

@@ -31,7 +31,7 @@ export interface VirtualIndex {
   extractKey: (value: any) => Key;
 }
 
-export interface VirtualIndexCore extends DBCore {
+export interface VirtualIndexCore<TQuery=KeyRange> extends DBCore<TQuery> {
   readonly tableIndexLookup: {
     [tableName: string]: VirtualIndexLookup;
   }
@@ -113,19 +113,19 @@ export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
     };
   }
 
-  function translateRequest (query: QueryRequest | OpenCursorRequest | CountRequest) {
-    const {index, keyTail} = findBestIndex(query);
+  function translateRequest (req: QueryRequest | OpenCursorRequest | CountRequest) {
+    const {index, keyTail} = findBestIndex(req);
     if (!keyTail) {
       // No virtual compound index with keyTail.
       // Just replace the index name with the name that the DBCore recognizes
-      return {...query, index: index.name};
+      return {...req, index: index.name};
     }
 
     // Translate range as well
     return {
-      ...query,
+      ...req,
       index: index.name,
-      range: translateRange(query.range, keyTail)
+      range: translateRange(req.query, keyTail)
     };
   }
   

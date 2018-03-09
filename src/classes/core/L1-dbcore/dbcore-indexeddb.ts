@@ -89,7 +89,7 @@ function mutate (op: 'add' | 'put' | 'delete', store: IDBObjectStore, args1: any
   });
 }
 
-function openCursor ({trans, table, index, values, range, reverse, unique}: OpenCursorRequest): Promise<Cursor>
+function openCursor ({trans, table, index, values, query, reverse, unique}: OpenCursorRequest): Promise<Cursor>
 {
   return new Promise((resolve, reject) => {
     const store = (trans as IDBTransaction).objectStore(table);
@@ -105,8 +105,8 @@ function openCursor ({trans, table, index, values, range, reverse, unique}: Open
         "next";
     // request
     const req = values ?
-    source.openCursor(makeIDBKeyRange(range), direction) :
-    source.openKeyCursor(makeIDBKeyRange(range), direction);
+    source.openCursor(makeIDBKeyRange(query), direction) :
+    source.openKeyCursor(makeIDBKeyRange(query), direction);
       
     // iteration
     req.onerror = eventRejectHandler(reject);
@@ -192,12 +192,12 @@ function openCursor ({trans, table, index, values, range, reverse, unique}: Open
 
 function getAll (request: QueryRequest) {
   return new Promise<QueryResponse>((resolve, reject) => {
-    const {trans, table, index, values, limit, range} = request;
+    const {trans, table, index, values, limit, query} = request;
     const store = (trans as IDBTransaction).objectStore(table);
     const source = index == null ? store : store.index(index);
     const req = values ?
-      source.getAll(makeIDBKeyRange(range), limit) :
-      source.getAllKeys(makeIDBKeyRange(range), limit);
+      source.getAll(makeIDBKeyRange(query), limit) :
+      source.getAllKeys(makeIDBKeyRange(query), limit);
     req.onsuccess = event => resolve({result: event.target.result});
     req.onerror = event => eventRejectHandler(reject);
   });
@@ -310,7 +310,7 @@ export function createDBCore (db: IDBDatabase, indexedDB: IDBFactory, schema: Sc
       return new Promise<number>((resolve, reject) => {
         const store = (query.trans as IDBTransaction).objectStore(query.table);
         const source = query.index == null ? store : store.index(query.index);
-        const req = source.count(makeIDBKeyRange(query.range));
+        const req = source.count(makeIDBKeyRange(query.query));
         req.onsuccess = ev => resolve(ev.target.result);
         req.onerror = eventRejectHandler(reject);
       });
