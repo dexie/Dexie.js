@@ -3,7 +3,7 @@ import { unstringifyKey, stringifyKey } from '../../../functions/stringify-key';
 import { Key, Cursor } from '../L1-dbcore/dbcore';
 
 export class KeyRangePageToken {
-  type: 'lastKey' | 'cursor' | 'offset';
+  type: 'lastKey' | 'cursor' | 'offset' | null;
   lastKey?: Key; // Will be there if type='lastKey'. If no lastPrimaryKey, getAll() will be used.
   lastPrimaryKey?: Key; // May be there if type='lastKey'. If so, a cursor will be opened and used until next key.
   cursor?: Cursor; // Will be there if type='cursor'

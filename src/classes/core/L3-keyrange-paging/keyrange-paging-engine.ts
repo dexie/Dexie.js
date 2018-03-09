@@ -38,7 +38,7 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
 
     // Translate query from PagableKeyRangeQuery to OpenCursorQuery.
     // The only missing property is "values" that should be true IFF want === 'value':
-    if (!pageToken) {
+    if (!pageToken || pageToken.type === null) {
       // We don't have a pageToken. Call openCursor():
       return next.openCursor(req);
     }
@@ -87,9 +87,13 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
   function query(req: PagedQueryRequest): Promise<PagedQueryResponse> {
     let { table, index, pageToken, query, reverse, wantPageToken, limit, unique, values } = req;
     const idx = next.tableIndexLookup[table][index][0];
+    if (pageToken && pageToken.type === null) {
+      // Derived PageTokens may need to null in their call to super. That's why we support null type here.
+      pageToken = null;
+    }
 
     let useCursor = (
-      (pageToken && pageToken.type !== 'lastKey' ) || // There's already a cursor to continue from
+      (pageToken && (pageToken.type === 'cursor' || pageToken.type === 'offset')) || // There's already a cursor to continue from
       reverse || // reverse calls
       unique ||
       idx.keyLength === 0 || // outbound primary key. Cant find the index after getAll() or getAllKeys()
@@ -100,10 +104,10 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
       // We could call openCursor() here and return a new pageToken, but
       // it would be unnescessary code for no real case. If for example, token has offset,
       // openCursor() would create an OffsetCursor that would not have a valid key/primaryKey
-      // and would therefore not be correctly stringified.
+      // and would therefore not be correctly stringified. So leave result empty and send the same
+      // pageToken back, if any
       result: [],
-      partial: true,
-      pageToken
+      pageToken: wantPageToken && pageToken
     });
 
     if (useCursor) {
