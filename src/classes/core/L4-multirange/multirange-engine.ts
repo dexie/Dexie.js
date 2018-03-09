@@ -1,4 +1,4 @@
-import { DBCore, KeyRange, Key, Transaction, QueryBase, Cursor, RangeType } from '../L1-dbcore/dbcore';
+import { DBCore, KeyRange, Key, Transaction, QueryBase, Cursor, RangeType, CountRequest } from '../L1-dbcore/dbcore';
 import { SubQueryCore } from '../L2.9-sub-query/sub-query-core';
 import { KeyRangePagingCore, PagedQueryRequest, PagedQueryResponse } from '../L3-keyrange-paging/keyrange-paging-engine';
 import { KeyRangePageToken } from '../L3-keyrange-paging/pagetoken';
@@ -7,6 +7,7 @@ import { ProxyCursor } from '../L1-dbcore/utils/proxy-cursor';
 export interface MultiRangeCore<TExpression=KeyRange[]> extends KeyRangePagingCore<TExpression> {
   query(req: MultiRangeQueryRequest<TExpression>): Promise<MultiRangeResponse>
   openCursor(req: MultiRangeQueryRequest<TExpression>): Promise<Cursor | null>
+  count(req: CountRequest<TExpression>): Promise<number>;
 }
 
 export interface MultiRangeQueryRequest<TExpression=KeyRange[]> extends PagedQueryRequest<TExpression> {
@@ -51,6 +52,14 @@ function responseConverter({ pageToken, query, limit, reverse }: MultiRangeQuery
 export function MultiRangeCore(next: KeyRangePagingCore<KeyRange>): MultiRangeCore<KeyRange[]> {
   return {
     ...next,
+
+    /** Query keys or values withing given ranges at given table and index, with given
+     * limit and with respect to given pageToken.
+     * 
+     * Will use the most optimized way to query - unless certain request properties such as
+     * reverse, unique, iteration over values on outbound primary key, or if limit is
+     * very low (considering it more optimal to use openCursor() is so).
+     */
     query(req): Promise<MultiRangeResponse> {
       const { query, pageToken, reverse } = req;
       if (query.length === 0) return Promise.resolve({ result: [] });
@@ -60,6 +69,13 @@ export function MultiRangeCore(next: KeyRangePagingCore<KeyRange>): MultiRangeCo
         .then(responseConverter(req, rangePos));
     },
 
+    /** Open a cursor on given set of ranges.
+     * If given request contains a pageToken, it will be respected so that
+     * iteration will start from that point, but no pageToken will be given
+     * back.
+     * 
+     * Given limit is not respected, as caller may end the iteration at any time.
+     */
     openCursor(req): Promise<Cursor> {
       const { query, pageToken, reverse } = req;
       const includes = query.map(range => next.rangeIncludes(range));
@@ -111,6 +127,11 @@ export function MultiRangeCore(next: KeyRangePagingCore<KeyRange>): MultiRangeCo
         }
       }));
     },
+
+    /** Counts the sum of records within all given ranges on given table and index.
+     * 
+     * @param req Request containing a set of ranges to count on given index.
+     */
     count(req): Promise<number> {
       return Promise.all(req.query.map(range => next.count({ ...req, query: range })))
         .then(counts => counts.reduce((p, c) => p + c));
