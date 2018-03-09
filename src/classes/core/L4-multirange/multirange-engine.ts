@@ -8,7 +8,7 @@ export interface MultiRangeCore<TExpression=KeyRange[]> extends KeyRangePagingCo
 }
 
 export interface MultiRangeQueryRequest<TExpression=KeyRange[]> extends PagedQueryRequest<TExpression> {
-  query?: TExpression;
+  query: TExpression;
   pageToken?: MultiRangePageToken;
 }
 

@@ -227,8 +227,8 @@ function extractSchema(db: IDBDatabase) : Schema {
 }
 
 
-function makeIDBKeyRange (range?: KeyRange) : IDBKeyRange | null {
-  if (!range) return null;
+function makeIDBKeyRange (range: KeyRange) : IDBKeyRange | null {
+  if (!range) return null; // TODO: Make KeyRange have a "type" to inspect instead.
   const {lower, upper, lowerOpen, upperOpen} = range;
   const idbRange = lower === undefined ?
     upper === undefined ?

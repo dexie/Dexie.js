@@ -89,7 +89,7 @@ export interface QueryBase {
 }
 
 export interface QueryRequest<TQuery=KeyRange> extends QueryBase {
-  query?: TQuery;
+  query: TQuery;
   values?: boolean;
   limit?: number;
 }
@@ -99,14 +99,14 @@ export interface QueryResponse {
 }
 
 export interface OpenCursorRequest<TQuery=KeyRange> extends QueryBase {
-  query?: TQuery;
+  query: TQuery;
   values?: boolean;
   unique?: boolean;
   reverse?: boolean;
 }
 
 export interface CountRequest<TQuery=KeyRange> extends QueryBase {
-  query?: TQuery;
+  query: TQuery;
 }
 
 export interface Cursor<TResult=any> {

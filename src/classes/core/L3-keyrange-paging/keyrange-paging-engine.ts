@@ -11,7 +11,7 @@ export interface KeyRangePagingCore<TQuery=KeyRange> extends VirtualIndexCore<TQ
 }
 
 export interface PagedQueryRequest<TQuery=KeyRange> extends QueryRequest<TQuery>, OpenCursorRequest<TQuery> {
-  query?: TQuery;
+  query: TQuery;
   values?: boolean;
   limit?: number;
   unique?: boolean;
