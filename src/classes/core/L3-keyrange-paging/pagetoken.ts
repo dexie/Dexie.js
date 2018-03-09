@@ -14,10 +14,13 @@ export class KeyRangePageToken {
       [this.lastKey, this.lastPrimaryKey || undefined] :
       [this.cursor.key, this.cursor.primaryKey];
 
-    return JSON.stringify(this.type !== 'cursor' ? this : {
+    return JSON.stringify(this.type === 'offset' ? {
+      type: 'offset',
+      offset: this.offset
+    } : {
       type: 'lastKey',
-      lastKey: stringifyKey(this.cursor.key),
-      lastPrimaryKey: stringifyKey(this.cursor.primaryKey)
+      lastKey: key && stringifyKey(key),
+      lastPrimaryKey: primaryKey && stringifyKey(primaryKey)
     });
   }
 

@@ -10,7 +10,16 @@ export interface KeyRangePagingCore extends VirtualIndexCore {
   queryRange(query: PagableKeyRangeQuery): Promise<QueryRangeResponse>;
 }
 
-export interface PagableKeyRangeQuery extends OpenCursorQuery, GetAllQuery {
+export interface PagableQueryBase extends QueryBase {
+  values?: boolean;
+  limit?: number;
+  unique?: boolean;
+  reverse?: boolean;
+  wantPageToken?: boolean;
+  pageToken?: KeyRangePageToken;  
+}
+
+export interface PagableKeyRangeQuery extends PagableQueryBase, OpenCursorQuery, GetAllQuery {
   range?: KeyRange;
   values?: boolean;
   limit?: number;

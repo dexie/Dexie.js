@@ -1,32 +1,11 @@
 import { DBCore, KeyRange, Key, Transaction, QueryBase } from '../L1-dbcore/dbcore';
 import { SubQueryCore } from '../L2.9-sub-query/sub-query-core';
-import { KeyRangePagingCore, PagableKeyRangeQuery, QueryRangeResponse, KeyRangePageToken } from '../L3-keyrange-paging/keyrange-paging-engine';
+import { KeyRangePagingCore, PagableKeyRangeQuery, QueryRangeResponse, PagableQueryBase } from '../L3-keyrange-paging/keyrange-paging-engine';
+import { KeyRangePageToken } from '../L3-keyrange-paging/pagetoken';
 
 
-export interface MultiRangeQuery extends {
-  trans: Transaction;
-  table: string;
-  index: string;
-  limit?: number;
-  want?: "primaryKeys" | "keys" | "values" | "keyPairs";
-  unique?: boolean;
-  reverse?: boolean;
+export interface MultiRangeQuery extends PagableQueryBase {
   ranges: KeyRange[];
-  wantPageToken?: boolean;
-  pageToken?: KeyRangePageToken;
-}
-
-export interface MultiRangeBloomQuery {
-  trans: Transaction;
-  table: string;
-  index: string;
-  limit?: number;
-  want?: "primaryKeys" | "keys" | "values" | "keyPairs";
-  unique?: boolean;
-  reverse?: boolean;
-  ranges: KeyRange[];
-  wantPageToken?: boolean;
-  pageToken?: KeyRangePageToken;  
 }
 
 export interface MultiRangeResponse extends QueryRangeResponse {
