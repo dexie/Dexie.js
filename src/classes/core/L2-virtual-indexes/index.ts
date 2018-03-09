@@ -1,4 +1,4 @@
-import { DBCore, QueryRequest, OpenCursorRequest, CountRequest, KeyRange, Cursor, Key, IndexSchema, QueryResponse } from '../L1-dbcore/dbcore';
+import { DBCore, QueryRequest, OpenCursorRequest, CountRequest, KeyRange, Cursor, Key, IndexSchema, QueryResponse, RangeType } from '../L1-dbcore/dbcore';
 import { isArray } from '../../../functions/utils';
 import { exceptions } from '../../../errors';
 import { getKeyExtractor } from './get-key-extractor';
@@ -106,6 +106,9 @@ export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
 
   function translateRange (range: KeyRange, keyTail: number): KeyRange {
     return {
+      type: range.type === RangeType.Equal ?
+        RangeType.Range :
+        range.type,
       lower: pad(range.lower, range.lowerOpen ? MAX_KEY : MIN_KEY, keyTail),
       lowerOpen: true, // doesn't matter true or false
       upper: pad(range.upper, range.upperOpen ? MIN_KEY : MAX_KEY, keyTail),

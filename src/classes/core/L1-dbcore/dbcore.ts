@@ -5,7 +5,15 @@ import { BloomFilter } from '../L8-expression/bloomfilter';
 
 export type Key = any;
 
+export const enum RangeType {
+  Equal = 1,
+  Range = 2,
+  Any = 3,
+  Never = 4
+}
+
 export interface KeyRange {
+  readonly type: RangeType;
   readonly lower: Key | undefined;
   readonly lowerOpen?: boolean;
   readonly upper: Key | undefined;

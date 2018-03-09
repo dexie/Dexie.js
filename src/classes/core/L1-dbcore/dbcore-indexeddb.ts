@@ -1,4 +1,4 @@
-import { DBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, OpenCursorRequest, QueryRequest, CountRequest, Schema, IndexSchema, KeyRange, QueryResponse } from './dbcore';
+import { DBCore, WriteFailure, WriteResponse, Cursor, InsertRequest, UpsertRequest, OpenCursorRequest, QueryRequest, CountRequest, Schema, IndexSchema, KeyRange, QueryResponse, RangeType } from './dbcore';
 import { IDBObjectStore, IDBRequest, IDBCursor, IDBTransaction, IDBKeyRange } from '../../../public/types/indexeddb';
 //import { getCountAndGetAllEmulation } from './utils/index';
 import { isArray } from '../../../functions/utils';
@@ -228,21 +228,20 @@ function extractSchema(db: IDBDatabase) : Schema {
 
 
 function makeIDBKeyRange (range: KeyRange) : IDBKeyRange | null {
-  if (!range) return null; // TODO: Make KeyRange have a "type" to inspect instead.
   const {lower, upper, lowerOpen, upperOpen} = range;
   const idbRange = lower === undefined ?
     upper === undefined ?
-      null :
-      IDBKeyRange.lowerBound(lower, !!lowerOpen) :
+      IDBKeyRange.lowerBound(-Infinity, false) : // Any range
+      IDBKeyRange.upperBound(upper, !!upperOpen) : // below
     upper === undefined ?
-      IDBKeyRange.upperBound(upper, !!upperOpen) :
+      IDBKeyRange.lowerBound(lower, !!lowerOpen) : // above
       IDBKeyRange.bound(lower, upper, !!lowerOpen, !!upperOpen);
   return idbRange as IDBKeyRange;
 }
 
 function rangeIncludes (range: KeyRange) {
+  if (range.type === RangeType.Never) return ()=>false;
   const idbRange = makeIDBKeyRange(range);
-  if (idbRange === null) return ()=>true;
   return key => {
     try {
       return idbRange.includes(key);

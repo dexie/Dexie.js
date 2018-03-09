@@ -5,9 +5,11 @@ import { exceptions } from '../../../errors';
 import { assert, isArray } from '../../../functions/utils';
 import { stringifyKey, unstringifyKey } from '../../../functions/stringify-key';
 import { KeyRangePageToken } from './pagetoken';
+import { openCursor } from '../../collection/collection-helpers';
 
 export interface KeyRangePagingCore<TQuery=KeyRange> extends VirtualIndexCore<TQuery> {
   query(req: PagedQueryRequest<TQuery>): Promise<PagedQueryResponse>;
+  openCursor(req: PagedQueryRequest<TQuery>): Promise<Cursor | null>;
 }
 
 export interface PagedQueryRequest<TQuery=KeyRange> extends QueryRequest<TQuery>, OpenCursorRequest<TQuery> {
