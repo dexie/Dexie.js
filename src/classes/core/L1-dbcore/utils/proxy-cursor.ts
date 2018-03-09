@@ -1,50 +1,63 @@
 import { Cursor, Key } from '../dbcore';
-/* Inkomplett! Får se om denna behövs!
-*/
-export interface ProxyCursorMethods {
+
+export interface ProxyCursorHooks {
   // Methods
-  continue?: (key?: Key) => void;
-  continuePrimaryKey?: (key: Key, primaryKey: Key) => void;
-  advance?: (count: number) => void;
-  close?: ()=>void;
-  fail?: (error:Error)=>void;
-}
-  // Smart Methods
-  //continueNext?: ()=>void;
-export interface ProxyCursorGetters {
-  // Getters
-  key?: ()=>Key;
-  primaryKey?: ()=>Key;
-  value?: ()=>any;
+  proxyOnNext?: (onNext: ()=>void) => ()=>void;
+  getKey?: () => Key;
+  getPrimaryKey?: () => Key;
+  getValue?: ( )=> any;
+  provideKey?: (key: Key) => Key;
+  providePrimaryKey?: (key: Key) => Key;
 }
 
-export interface ProxyCursorOptions {
-  adv?: boolean;
-  onNext?: (upNext: ()=>void) => ()=>void;
-}
-
-export function openProxyCursor(cursor: Cursor, methods: ProxyCursorMethods, getters: ProxyCursorGetters, options?: ProxyCursorOptions) {
-  const props: PropertyDescriptorMap = {};
-  Object.keys(methods).forEach(method => props[method] = {value: methods[method]});
-  Object.keys(getters).forEach(getter => props[getter] = {get: getters[getter]});
-  let upNext: ()=>void;
-  let tmpOnNext: ()=>void;
-  if (options.adv) {
-    props.start = {value: (onNext: ()=>void, key?, primaryKey?) => {
-      // TODO: How should we take care of key or primaryKey?
-      upNext = tmpOnNext = onNext;
-      return cursor.start(() => {
-        tmpOnNext();
-      });
-    }};
-    props.advance = {value: function(count: number) {
-      if (count > 1) tmpOnNext = () => {
-        if (--count === 1) tmpOnNext = upNext;
-        this.continue();
+export function ProxyCursor (
+  cursor: Cursor, {
+    proxyOnNext,
+    getKey,
+    getPrimaryKey,
+    getValue,
+    provideKey,
+    providePrimaryKey
+  }: ProxyCursorHooks
+) : Cursor
+{
+  let skipOrUpNext;
+  let upNext = skipOrUpNext = ()=>{};
+  
+  const props: PropertyDescriptorMap = {
+    start: {
+      value: (onNextUpper: ()=>void, key?: Key, primaryKey?: Key) => {
+        if (key && provideKey) key = provideKey(key);
+        if (primaryKey && providePrimaryKey) primaryKey = providePrimaryKey(primaryKey);
+        skipOrUpNext = upNext = onNextUpper;
+        return cursor.start(proxyOnNext ? proxyOnNext(()=>skipOrUpNext()) : onNextUpper, key, primaryKey);
+      }
+    }
+  };
+  if (getKey) props.key = {get: getKey};
+  if (getPrimaryKey) props.primaryKey = {get: getPrimaryKey};
+  if (getValue) props.value = {get: getValue};
+  if (proxyOnNext) props.advance = {
+    value: (count: number) => {
+      if (count > 1) skipOrUpNext = () => {
+        if (--count === 1) skipOrUpNext = upNext;
+        cursor.continue();
         return;
       }
-      this.continue();
-    }}
+      cursor.continue();
+    }
+  };
+  if (provideKey) {
+    props.continue = {
+      value: (key?: Key) => key == null ?
+        cursor.continue() :
+        cursor.continue(provideKey(key))
+    }
+    props.continuePrimaryKey = {
+      value: (key: Key, primaryKey: Key) => {
+        cursor.continuePrimaryKey(provideKey(key), providePrimaryKey ? providePrimaryKey(primaryKey) : primaryKey);
+      }
+    }
   }
   return Object.create(cursor, props);
 }
