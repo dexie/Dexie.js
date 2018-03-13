@@ -1,6 +1,6 @@
 import { KeyRange } from '../L1-dbcore/dbcore';
 
-export type Expression =
+export type ExpressionQuery =
   AtomicFormula |
   OrExpression |
   AndExpression |
@@ -14,16 +14,16 @@ export interface AtomicFormula {
 
 export interface OrExpression {
   type: 'or';
-  operands: Expression[];
+  operands: ExpressionQuery[];
 }
 
 export interface AndExpression {
   type: 'and';
-  operands: Expression[];
+  operands: ExpressionQuery[];
 }
 
 export interface NotExpression {
   type: 'not';
-  operand: Expression;
+  operand: ExpressionQuery;
 }
 

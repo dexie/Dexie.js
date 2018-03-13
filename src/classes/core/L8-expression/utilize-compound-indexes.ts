@@ -1,6 +1,6 @@
-import { AtomicFormula, Expression } from './expression';
+import { AtomicFormula, ExpressionQuery } from './expression';
 import { VirtualIndexLookup, VirtualIndex } from '../L2-virtual-indexes';
-import { KeyRange, DBCore } from '../L1-dbcore/dbcore';
+import { KeyRange, DBCore, RangeType } from '../L1-dbcore/dbcore';
 import { isArray, assert } from '../../../functions/utils';
 import { KeyMap } from '../../../helpers/keymap';
 import { Conjunction } from './disjunctive-normal-form';
@@ -91,6 +91,7 @@ export function utilizeCompoundIndexes(
       type: 'atom' as 'atom',
       keyPath: keyPaths,
       ranges: steeringRanges.map(range => ({
+        type: RangeType.Range, // TODO: Fix! Don't know if type will always be Range!
         lower: [...groundKey, range.lower],
         lowerOpen: range.lowerOpen,
         upper: [...groundKey, range.upper],

@@ -1,4 +1,4 @@
-import { Expression, AtomicFormula, OrExpression, NotExpression, AndExpression } from "./expression";
+import { ExpressionQuery, AtomicFormula, OrExpression, NotExpression, AndExpression } from "./expression";
 import { invertRanges } from './invert-ranges';
 
 interface NotTable {
@@ -12,8 +12,8 @@ interface NotTable {
     0: (a: AndExpression) => AndExpression,
     1: (a: AndExpression) => OrExpression},
   not: {
-    0: (a: NotExpression) => Expression,
-    1: (a: NotExpression) => Expression}
+    0: (a: NotExpression) => ExpressionQuery,
+    1: (a: NotExpression) => ExpressionQuery}
 };
         
 const NotTable: NotTable = {
@@ -34,8 +34,8 @@ const NotTable: NotTable = {
   ]
 }
 
-export function eliminateNot(opr: Expression, negate?: boolean) : Expression {
-  const func = NotTable[opr.type][negate ? 1 : 0] as (x: Expression) => Expression;
+export function eliminateNot(opr: ExpressionQuery, negate?: boolean) : ExpressionQuery {
+  const func = NotTable[opr.type][negate ? 1 : 0] as (x: ExpressionQuery) => ExpressionQuery;
   if (!func) throw new Error('Invalid expression type: ' + opr.type);
   return func(opr);
 }

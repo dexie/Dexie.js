@@ -1,4 +1,4 @@
-import { Expression, NotExpression, AtomicFormula, OrExpression, AndExpression } from "./expression";
+import { ExpressionQuery, NotExpression, AtomicFormula, OrExpression, AndExpression } from "./expression";
 import { eliminateNot } from './eliminate-not';
 import { assert } from '../../../functions/utils';
 import { exceptions } from '../../../errors';
@@ -17,7 +17,7 @@ export interface Conjunction {
  * 
  * @param expression Expression to normalize
  */
-export function disjunctiveNormalForm(expression: Expression): DisjunctiveNormalForm {
+export function disjunctiveNormalForm(expression: ExpressionQuery): DisjunctiveNormalForm {
   // Convert the expression to an equivalent expression without NOT operators involved:
   const expressionWithoutNot = eliminateNot(expression);
   // All NOT expressions are now eliminated recursively by replacing them with their
@@ -57,7 +57,7 @@ declare module './expression' {
  * its switch incremented, and so on... until all OrExpression's switches
  * points to their final path.
  */
-function addSwitches(expr: Expression): Expression {
+function addSwitches(expr: ExpressionQuery): ExpressionQuery {
   if (expr.type === 'or') {
     return {type: 'or', switch: 0, operands: expr.operands.map(addSwitches)};
   } else if (expr.type === 'and') {
@@ -69,12 +69,12 @@ function addSwitches(expr: Expression): Expression {
  * 
  * @param expr Expression, where each OrOperation has a switch on it. 
  */
-function getNextConjunction(expr: Expression) : [Conjunction, boolean] {
+function getNextConjunction(expr: ExpressionQuery) : [Conjunction, boolean] {
   let switchedOne = false;
   const rv = followPath([], expr);
   return [{type: 'CON', operands: rv}, switchedOne];
   
-  function followPath (path: AtomicFormula[], opr: Expression) : AtomicFormula[] {
+  function followPath (path: AtomicFormula[], opr: ExpressionQuery) : AtomicFormula[] {
     if (opr.type === 'and') {
       return [].concat(opr.operands.map(opr => followPath(getPath(opr), opr)));
     } else if (opr.type === 'or') {
@@ -90,7 +90,7 @@ function getNextConjunction(expr: Expression) : [Conjunction, boolean] {
     }
   }
 
-  function getPath(opr: Expression): AtomicFormula[] {
+  function getPath(opr: ExpressionQuery): AtomicFormula[] {
     if (opr.type === 'and') {
       return [].concat(opr.operands.map(opr => getPath(opr)));
     } else if (opr.type === 'or') {

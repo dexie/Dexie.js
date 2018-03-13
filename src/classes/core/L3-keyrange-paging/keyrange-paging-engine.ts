@@ -27,7 +27,7 @@ export interface PagedQueryResponse {
   result: any[];
   partial?: boolean; // True if the requested limit was not reached. If so, pageToken will be present, no matter wantPageToken or not.
 }
-
+  
 export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore<KeyRange> {
   return {
     ...next,
