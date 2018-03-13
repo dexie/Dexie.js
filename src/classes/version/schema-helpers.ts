@@ -280,7 +280,7 @@ export function adjustToExistingIndexNames(db: Dexie, schema: DbSchema, idbtrans
   }
 
   // Bug with getAll() on Safari ver<604 on Workers only, see discussion following PR #579
-  if (/Safari/.test(navigator.userAgent) &&
+  if (typeof navigator !== 'undefined' && /Safari/.test(navigator.userAgent) &&
       !/(Chrome\/|Edge\/)/.test(navigator.userAgent) &&
       _global.WorkerGlobalScope && _global instanceof _global.WorkerGlobalScope &&
       [].concat(navigator.userAgent.match(/Safari\/(\d*)/))[1] < 604)
