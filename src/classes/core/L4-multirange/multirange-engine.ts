@@ -1,5 +1,4 @@
 import { DBCore, KeyRange, Key, Transaction, QueryBase, Cursor, RangeType, CountRequest } from '../L1-dbcore/dbcore';
-import { SubQueryCore } from '../L2.9-sub-query/sub-query-core';
 import { KeyRangePagingCore, PagedQueryRequest, PagedQueryResponse } from '../L3-keyrange-paging/keyrange-paging-engine';
 import { KeyRangePageToken } from '../L3-keyrange-paging/pagetoken';
 import { ProxyCursor } from '../L1-dbcore/utils/proxy-cursor';
