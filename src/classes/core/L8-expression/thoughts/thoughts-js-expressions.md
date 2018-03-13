@@ -12,10 +12,13 @@ db.people.where('name').startsWith('R')
     where('interests').anyOf('sports', 'music').or('age').below(7)
   )
 
+// The following is a favourite along with mango queries:
 const query = db.people.where({
+  customerID: 89,
   name: startsWith('R'),
-  age: between(7, 16),
   interests: anyOf("sports", "gaming", "music")
+}).or({
+  age: between(7, 16),
 }).orderBy('interests')
   .pageSize(10);
 
@@ -30,13 +33,13 @@ for (await let page of query) {
 }
 
 //await db.people.sql `age >= ${minAge} && age < ${retireAge}`.toArray();
-await db.sql `select * from people where age >= ${minAge} && age < ${retireAge}`.toArray();
+await db.sql `select * from people where age >= ${minAge} and age < ${retireAge}`.toArray();
 // När vi stödjer join (ganska enkelt) och groupBy (gissningsvis ganska enkelt) så behövs
 // bara en enkel SQL tokenizer + AST för att översätta det. 
 // indexed-sql
 
 db.people.where({
-  or: [
+  $or: [
     {
       name: {
         startsWith: 'R'
@@ -49,6 +52,8 @@ db.people.where({
       }
     }
 })
+
+await db.people.findOne({...mangoQuery}) // vore bra.
 
 db.people.where('age').
 
