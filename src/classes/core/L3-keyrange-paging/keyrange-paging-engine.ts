@@ -15,6 +15,7 @@ export interface KeyRangePagingCore<TQuery=KeyRange> extends VirtualIndexCore<TQ
 export interface PagedQueryRequest<TQuery=KeyRange> extends QueryRequest<TQuery>, OpenCursorRequest<TQuery> {
   query: TQuery;
   values?: boolean;
+  keyPairs?: boolean;
   limit?: number;
   unique?: boolean;
   reverse?: boolean;
@@ -58,7 +59,7 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
     if (type !== 'lastKey') {
       return type === 'cursor' ?
         // cursor
-        Promise.resolve(cursor) :
+        cursor.next().then(()=>cursor) :
         // offset
         next.openCursor(req).then(cursor => OffsetCursor(cursor, pageToken.offset));
     }
@@ -80,14 +81,18 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
       cursorPromise.then(cursor => cursor && Object.create(cursor, {
         start: {
           value: (onNext) =>
-            cursor.start(()=>cursor.stop(), lastKey, lastPrimaryKey)
-              .then(()=>cursor.start(onNext))
+            cursor.start(()=> {
+              const keyCmp = next.cmp([cursor.key, cursor.primaryKey], [lastKey, lastPrimaryKey]);
+              if (keyCmp < 0) cursor.continuePrimaryKey(lastKey, lastPrimaryKey);
+              else if (keyCmp === 0) cursor.continue();
+              else cursor.stop();
+            }).then(()=>cursor.start(onNext))
         }
       }));
   }
     
   function query(req: PagedQueryRequest): Promise<PagedQueryResponse> {
-    let { table, index, pageToken, query, reverse, wantPageToken, limit, unique, values } = req;
+    let { table, index, pageToken, query, reverse, wantPageToken, limit, unique, values, keyPairs } = req;
     const idx = next.tableIndexLookup[table][index][0];
     if (pageToken && pageToken.type === null) {
       // Derived PageTokens may need to null in their call to super. That's why we support null type here.
@@ -97,7 +102,8 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
     let useCursor = (
       (pageToken && (pageToken.type === 'cursor' || pageToken.type === 'offset')) || // There's already a cursor to continue from
       reverse || // reverse calls
-      unique ||
+      (keyPairs && !idx.index.isPrimaryKey) || // want keypairs. Only possible with getAll() if key and primaryKey is same.
+      (unique && !idx.unique) || // unique query not possible for getAll() unless index is unique in itself
       (idx.keyLength === 0 && values) || // outbound primary key. Cant find last key after getAll()
       (limit < 10 && !values && !idx.index.isPrimaryKey) // When using getAllKeys(), low limit may not be so good since pageToken will need to query last value unless we're iterating primary key
     );
@@ -122,7 +128,11 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
         {result} : 
         // At least one entry in result. Iterate cursor:
         cursor.start(() => {
-          result.push(values ? cursor.value : cursor.primaryKey);
+          result.push(values ?
+            cursor.value :
+            keyPairs ?
+              [cursor.primaryKey, cursor.key] :
+              cursor.primaryKey);
           if (result.length === limit) {
             return cursor.stop(true);// stop(true): Will resolve promise with `true`
           }
@@ -152,7 +162,11 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
               if (next.cmp(cursor.key, lastKey) > 0) {
                 return cursor.stop({passed: true}); // Makes promise resolve with 'passed'.
               }
-              result.push(values ? cursor.value : cursor.primaryKey);
+              result.push(values ?
+                cursor.value :
+                keyPairs ?
+                  [cursor.primaryKey, cursor.key] :
+                  cursor.primaryKey);
               if (result.length < limit) {
                 return cursor.continue();
               }
@@ -235,7 +249,7 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
           pageToken: new KeyRangePageToken({
             type: 'lastKey',
             lastKey: idx.extractKey(lastEntry),
-            lastPrimaryKey: idx.index.unique ?
+            lastPrimaryKey: idx.unique ?
               null : // No need to record lastPrimaryKey if index is unique (including primary key). Safe to do getAll() on rest.
               primaryKeyIdx.extractKey(lastEntry)
           })
@@ -244,7 +258,7 @@ export function KeyRangePagingEngine(next: VirtualIndexCore): KeyRangePagingCore
         // We're iterating the primary key, so we will never need to record lastPrimaryKey,
         // as it will be equal to lastKey and safe for getAllKeys() again.
         return {
-          result,
+          result: keyPairs ? result.map(id => [id, id]) : result,
           pageToken: new KeyRangePageToken({
             type: 'lastKey',
             lastKey: lastEntry

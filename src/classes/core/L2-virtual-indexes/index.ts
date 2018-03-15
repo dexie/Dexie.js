@@ -25,6 +25,9 @@ export interface VirtualIndex {
   /** Index or primary key */
   index: IndexSchema;
 
+  /** A virtual index on a unique compound index won't be unique for the virtual index */
+  unique: boolean;
+
   /** Extract (using keyPath) a key from given value (object)
    * 
   */
@@ -73,11 +76,11 @@ export function VirtualIndexCore (next: DBCore) : VirtualIndexCore {
     const keyLength = keyPaths.length;
     if (keyLength > 1) {
       const indexList = (indexLookup[keyPathAlias] = indexLookup[keyPathAlias] || []);
-      indexList.push({index: lowLevelIndex, keyTail, keyLength, keyPaths, extractKey});
+      indexList.push({index: lowLevelIndex, keyTail, keyLength, keyPaths, extractKey, unique: false});
       addVirtualIndexes(tableName, keyPaths.slice(0, keyLength - 1), keyTail + 1, lowLevelIndex);
     } else {
       // Map the simple keyPath to the index.
-      indexList.push({index: lowLevelIndex, keyTail: 0, keyLength: 1, keyPaths, extractKey});
+      indexList.push({index: lowLevelIndex, keyTail: 0, keyLength: 1, keyPaths, extractKey, unique: lowLevelIndex.unique});
     }
     indexList.sort((a,b) => a.keyTail - b.keyTail); // Shortest keyTail is the best one (represents real index)
   };

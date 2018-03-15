@@ -117,14 +117,17 @@ function openCursor ({trans, table, index, values, query, reverse, unique}: Open
         return;
       }
       (cursor as any).done = false;
-      let veryFirst = true;
       const _cursorContinue = cursor.continue.bind(cursor);
       const _cursorContinuePrimaryKey = cursor.continuePrimaryKey.bind(cursor);
       const _cursorAdvance = cursor.advance.bind(cursor);
       const doThrowCursorIsStopped = ()=>{throw new Error("Cursor not started");}
       (cursor as any).trans = trans;
       cursor.stop = cursor.continue = cursor.continuePrimaryKey = cursor.advance = doThrowCursorIsStopped;
-      cursor.start = (callback, key?, primaryKey?) => {
+      cursor.next = () => {
+        let gotOne = 1;
+        return cursor.start(() => gotOne-- ? cursor.continue() : cursor.stop()).then(() => cursor);
+      }
+      cursor.start = (callback) => {
         const iterationPromise = new Promise<void>((resolveIteration, rejectIteration) =>{
           req.onerror = eventRejectHandler(rejectIteration);
           cursor.stop = value => {
@@ -154,33 +157,7 @@ function openCursor ({trans, table, index, values, query, reverse, unique}: Open
           req.onsuccess = guardedCallback;
           guardedCallback();
         };
-        // Call it once for the first entry, so it can call cursor.continue()
-        const isAtGivenKeys = (
-          key == null ||
-          (cmp(key, cursor.key) === 0 && 
-            (primaryKey == null || cmp(primaryKey, cursor.primaryKey) === 0))
-        );
-        if (veryFirst) {
-          veryFirst = false;
-          if (isAtGivenKeys) {
-            // Either user did not specify key/primaryKey as optional args to cursor.start(),
-            // so we should provide the first entry it landed on already. OR, user provided key /primaryKey
-            // but the cursor happens to be exactly on that key/primaryKey! Then we must callback!
-            guardedCallback();
-            return iterationPromise;
-          }
-        }
-        // This is the second time cursor.start() is called OR, it's the first, but we're not yet at given keys.
-        // We did not call guardedCallback() so 
-        // we must do the call to cursor.continue() ourselves we should ever see anything happen.
-        // Depending on whether a key/primaryKey is given, call the proper continue method:
-        if (primaryKey != null) {
-          // Both key and primaryKey was given.
-          cursor.continuePrimaryKey(key, primaryKey);
-        } else {
-          // key may be given. Or not.
-          cursor.continue(key || null);
-        }
+        guardedCallback();
         return iterationPromise;
       };
       resolve(cursor);

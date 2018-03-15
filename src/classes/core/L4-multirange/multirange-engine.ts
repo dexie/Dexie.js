@@ -77,8 +77,9 @@ export function MultiRangeCore(next: KeyRangePagingCore<KeyRange>): MultiRangeCo
      */
     openCursor(req): Promise<Cursor> {
       const { query, pageToken, reverse } = req;
-      const includes = query.map(range => next.rangeIncludes(range));
       if (query.length === 0) return Promise.resolve(null); // Empty cursor.
+      if (query.length === 1) return next.openCursor({...req, query: query[0]});
+      const includes = query.map(range => next.rangeIncludes(range));
       let rangePos = pageToken ? pageToken.rangePos : reverse ? query.length - 1 : 0;
       const currentRange = query[rangePos];
       const lastRange = reverse ? query[0] : query[query.length - 1];
@@ -98,31 +99,31 @@ export function MultiRangeCore(next: KeyRangePagingCore<KeyRange>): MultiRangeCo
             lowerOpen: lastRange.lowerOpen
           }
       } as PagedQueryRequest;
-      return next.openCursor(translatedRequest).then(cursor => ProxyCursor(cursor, {
-        proxyOnNext: (onNext: () => void) => {
+      return next.openCursor(translatedRequest).then(cursor => ProxyCursor(cursor, true, {
+        start: (onNext: () => void) => {
           const cmp = reverse ? (a, b) => next.cmp(b, a) : next.cmp;
           let rangeIncludes = includes[rangePos],
-            range = query[rangePos];
+              range = query[rangePos];
 
-          return () => {
+          return cursor.start(() => {
             if (rangeIncludes(cursor.key)) {
               return onNext();
             }
-            let cursorIsBeyondRange, nextStartKey, nextEndKey, nextEndKeyOpen;
+            let rangeIsBeforeCursor, nextStartKey, nextEndKey, nextEndKeyOpen;
             do {
               if (range === lastRange) return cursor.stop();
               range = query[reverse ? --rangePos : ++rangePos];
               [nextStartKey, nextEndKey, nextEndKeyOpen] = reverse ?
                 [range.upper, range.lower, range.lowerOpen] :
                 [range.lower, range.upper, range.upperOpen];
-              cursorIsBeyondRange = nextEndKeyOpen ?
-                cmp(cursor.key, nextEndKey) >= 0 :
-                cmp(cursor.key, nextEndKey) > 0;
-            } while (cursorIsBeyondRange);
+              rangeIsBeforeCursor = nextEndKeyOpen ?
+                cmp(nextEndKey, cursor.key) <= 0 :
+                cmp(nextEndKey, cursor.key) < 0;
+            } while (rangeIsBeforeCursor);
             rangeIncludes = includes[rangePos];
             if (rangeIncludes(cursor.key)) return onNext();
             cursor.continue(nextStartKey);
-          };
+          });
         }
       }));
     },

@@ -126,8 +126,9 @@ export interface Cursor<TResult=any> {
   continue(key?: any): void;
   continuePrimaryKey(key: Key, primaryKey: Key): void;
   advance(count: number): void;
-  start(onNext: ()=>void, key?: Key, primaryKey?: Key): Promise<TResult>
+  start(onNext: ()=>void): Promise<TResult>
   stop(value?: TResult | Promise<TResult>): void;
+  next(): Promise<Cursor>;
   fail(error: Error): void;
 }
 
