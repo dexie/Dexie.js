@@ -48,8 +48,5 @@ export { IndexableType } from './types/indexable-type';
 export { Dexie };
 
 /** Exporting 'Dexie' as the default export.
- * NOTE: This line is ignored by dts-bundle-generator, so it has to be
- * manyally inserted in build script (package.json:"just-build"/"dexie")
- * Still, keeping it here for clarity.
  **/
 export default Dexie;

@@ -55,7 +55,6 @@
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.mjs",
       "dts-bundle-generator --umd-module-name Dexie -o ../dist/dexie.d.ts public/index.d.ts",
-      "node ../tools/append.js ../dist/dexie.d.ts ../tools/build-configs/export-default-dexie.txt",
       "node ../tools/prepend.js ../dist/dexie.d.ts ../tools/build-configs/banner.txt",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.d.ts"
     ],
@@ -87,7 +86,7 @@
   },
   "homepage": "http://dexie.org",
   "devDependencies": {
-    "dts-bundle-generator": "^0.6.1",
+    "dts-bundle-generator": "^1.0.0",
     "just-build": "^0.9.16",
     "karma": "^1.7.1",
     "karma-browserstack-launcher": "^1.1.1",
