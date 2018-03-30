@@ -157,9 +157,9 @@ interface IFriend {
 // Declare Database
 //
 class FriendDatabase extends Dexie {
-    friends: Dexie.Table<IFriend,number>;
+    public friends!: Dexie.Table<IFriend,number>;
 
-    constructor() {
+    public constructor() {
         super("FriendDatabase");
         this.version(1).stores({
             friends: "++id,name,age"
@@ -167,7 +167,7 @@ class FriendDatabase extends Dexie {
     }
 }
 
-var db = new FriendDatabase();
+const db = new FriendDatabase();
 
 db.transaction('rw', db.friends, async() => {
 
