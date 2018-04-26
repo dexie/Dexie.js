@@ -3184,10 +3184,12 @@ dbNamesDB.version(1).stores({dbnames: 'name'});
 (()=>{
     // Migrate from Dexie 1.x database names stored in localStorage:
     var DBNAMES = 'Dexie.DatabaseNames';
-    if (typeof localStorage !== undefined && _global.document !== undefined) try {
-        // Have localStorage and is not executing in a worker. Lets migrate from Dexie 1.x.
-        JSON.parse(localStorage.getItem(DBNAMES) || "[]")
-            .forEach(name => dbNamesDB.dbnames.put({name: name}).catch(nop));
-        localStorage.removeItem(DBNAMES);
+    try { // https://github.com/dfahlander/Dexie.js/issues/617
+        if (typeof localStorage !== undefined && _global.document !== undefined) {
+            // Have localStorage and is not executing in a worker. Lets migrate from Dexie 1.x.
+            JSON.parse(localStorage.getItem(DBNAMES) || "[]")
+                .forEach(name => dbNamesDB.dbnames.put({name: name}).catch(nop));
+            localStorage.removeItem(DBNAMES);
+        }
     } catch (_e) {}
 })();
