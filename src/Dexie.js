@@ -208,8 +208,6 @@ export default function Dexie(dbName, options) {
             return this;
         },
         upgrade: function (upgradeFunction) {
-            /// <param name="upgradeFunction" optional="true">Function that performs upgrading actions.</param>
-            var self = this;
             this._cfg.contentUpgrade = upgradeFunction;
             return this;
         },
@@ -2083,9 +2081,6 @@ export default function Dexie(dbName, options) {
                 iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, !ctx.keysOnly && ctx.valueMapper);
             })();
         }
-        function getInstanceTemplate(ctx) {
-            return ctx.table.schema.instanceTemplate;
-        }
         
         return {
 
@@ -2248,7 +2243,6 @@ export default function Dexie(dbName, options) {
             },
 
             until: function (filterFunction, bIncludeStopEntry) {
-                var ctx = this._ctx;
                 addFilter(this._ctx, function (cursor, advance, resolve) {
                     if (filterFunction(cursor.value)) {
                         advance(resolve);
@@ -2998,14 +2992,7 @@ props(Dexie, {
         }).then(cb) : dbNamesDB.dbnames.toCollection().primaryKeys(cb);
     },
     
-    defineClass: function (structure) {
-        /// <summary>
-        ///     Create a javascript constructor based on given template for which properties to expect in the class.
-        ///     Any property that is a constructor function will act as a type. So {name: String} will be equal to {name: new String()}.
-        /// </summary>
-        /// <param name="structure">Helps IDE code completion by knowing the members that objects contain and not just the indexes. Also
-        /// know what type each member has. Example: {name: String, emailAddresses: [String], properties: {shoeSize: Number}}</param>
-
+    defineClass: function () {
         // Default constructor able to copy given properties into this object.
         function Class(properties) {
             /// <param name="properties" type="Object" optional="true">Properties to initialize object with.
