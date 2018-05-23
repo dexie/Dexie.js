@@ -792,3 +792,30 @@ promisedTest("orderBy(['idx1','idx2'])", async () => {
     equal (files.map(f=>f.filename+f.extension).join(','), "README.TXT,hello.bat,hello.exe,hello-there.exe,world.js",
         'Files should be ordered according to the orderBy query');
 });
+
+// https://github.com/dfahlander/Dexie.js/issues/700
+promisedTest("Issue #700 - Possible compound primary key bug", async ()=>{
+    if (!supports("compound")) {
+        ok(true, "SKIPPED - COMPOUND UNSUPPORTED");
+        return;
+    }
+    await db.chart.bulkAdd([
+        {patno: "x1", row: "y", col: "z"},
+        {patno: "x2", row: "y", col: "z"},
+    ]);
+    const x1 = await db.chart.where({
+        patno: "x1",
+        row: "y",
+        col: "z"
+    }).toArray();
+    ok(x1.length === 1, "Could query and find correct number of results.");
+    equal(x1[0].patno, "x1", "Found the right item (x1)");
+    
+    const x2 = await db.chart.where({
+        patno: "x2",
+        row: "y",
+        col: "z"
+    }).toArray();
+    ok(x2.length === 1, "Could query and find correct number of results.");
+    equal(x2[0].patno, "x2", "Found the right item (x2)");
+});
