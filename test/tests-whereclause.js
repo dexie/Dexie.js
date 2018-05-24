@@ -11,7 +11,8 @@ db.version(1).stores({
     people: "[name+number],name,number",
     friends: "++id,name,age",
     chart: '[patno+row+col], patno',
-    chaps: "++id,[name+number]"
+    chaps: "++id,[name+number]",
+    multiMulti: "id,*tags,*categories"
 });
 
 var Folder = db.folders.defineClass({
@@ -791,4 +792,22 @@ promisedTest("orderBy(['idx1','idx2'])", async () => {
     equal (files.length, 5, "Should be 5 files in total that has both filename and extension");
     equal (files.map(f=>f.filename+f.extension).join(','), "README.TXT,hello.bat,hello.exe,hello-there.exe,world.js",
         'Files should be ordered according to the orderBy query');
+});
+
+promisedTest("Issue #696 - Query on multiple multi-entry indexes doesn't seem to work", async () => {
+    if (!supports("multientry")) {
+        ok(true, "No support for multiEntry in browser. Skippping.");
+        return;
+    }
+    await db.multiMulti.bulkAdd([
+        {id: 1, name: "Foo", age: 42, categories: ['cat_a','cat_b'], tags: ['tag_a','tag_b']},
+        {id: 2, name: "Bar", age: 32, categories: ['cat_b','cat_c'], tags: ['tag_b','tag_c']}
+    ]);
+
+    const cat_a = await db.multiMulti.where({categories: 'cat_a'}).distinct().toArray();
+    equal(cat_a.length, 1, "Should get one item");
+    const cat_a_tag_a = await db.multiMulti.where({'categories':'cat_a','tags':'tag_a'})
+        .distinct()
+        .toArray();
+    equal(cat_a_tag_a.length, 1, "Should get one item here as well");
 });
