@@ -799,23 +799,30 @@ promisedTest("Issue #700 - Possible compound primary key bug", async ()=>{
         ok(true, "SKIPPED - COMPOUND UNSUPPORTED");
         return;
     }
-    await db.chart.bulkAdd([
-        {patno: "x1", row: "y", col: "z"},
-        {patno: "x2", row: "y", col: "z"},
+    await db.people.bulkAdd([
+        {name: "foo", number: 123},
+        {name: "bar", number: 124},
     ]);
-    const x1 = await db.chart.where({
-        patno: "x1",
-        row: "y",
-        col: "z"
-    }).toArray();
-    ok(x1.length === 1, "Could query and find correct number of results.");
-    equal(x1[0].patno, "x1", "Found the right item (x1)");
-    
-    const x2 = await db.chart.where({
-        patno: "x2",
-        row: "y",
-        col: "z"
-    }).toArray();
-    ok(x2.length === 1, "Could query and find correct number of results.");
-    equal(x2[0].patno, "x2", "Found the right item (x2)");
+    // Now open the database dynamically to trigger the issue:)
+    const dynDb = new Dexie("TestDBWhereClause", {autoOpen: false}); // Don't specify schema.
+    await dynDb.open();
+    ok(true, "Opened the database dynamically");
+    try {
+
+        const foos = await dynDb.table('chart').where({
+            name: "foo",
+            number: 123
+        }).toArray();
+        ok(foos.length === 1, "Could query and find correct number of results.");
+        equal(foos[0].number, 123, "Found the right item (foo 123)");
+        
+        const bars = await dynDb.table('chart').where({
+            name: "bar",
+            number: 124
+        }).toArray();
+        ok(bars.length === 1, "Could query and find correct number of results.");
+        equal(bars[0].number, 124, "Found the right item (bar 124)");
+    } finally {
+        dynDb.close();
+    }
 });
