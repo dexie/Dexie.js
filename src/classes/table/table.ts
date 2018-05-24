@@ -119,23 +119,40 @@ export class Table implements ITable<any, IndexableType> {
     // Ok, now let's fallback to finding at least one matching index
     // and filter the rest.
     const { idxByName } = this.schema;
-    const simpleIndex = keyPaths.reduce((r, keyPath) => [
-      r[0] || idxByName[keyPath],
-      r[0] || !idxByName[keyPath] ?
-        combine(
-          r[1],
-          x => '' + getByKeyPath(x, keyPath) === // BUGBUG: Binary Keys may fail
-            '' + indexOrCrit[keyPath])
-        : r[1]
-    ], [null, null]);
+    const idb = this.db._deps.indexedDB;
 
-    const idx = simpleIndex[0];
+    function equals (a, b) {
+      debugger;
+      try {
+        return idb.cmp(a,b) === 0; // Works with all indexable types including binary keys.
+      } catch (e) {
+        return false;
+      }
+    }
+
+    const [idx, filterFunction] = keyPaths.reduce(([prevIndex, prevFilterFn], keyPath) => {
+      const index = idxByName[keyPath];
+      const value = indexOrCrit[keyPath];
+      return [
+        prevIndex || index, // idx::=Pick index of first matching keypath
+        prevIndex || !index ? // filter::=null if not needed, otherwise combine function filter
+          combine(
+            prevFilterFn,
+            index && index.multi ?
+              x => {
+                const prop = getByKeyPath(x, keyPath);
+                return isArray(prop) && prop.some(item => equals(value, item));
+              } : x => equals(value, getByKeyPath(x, keyPath)))
+          : prevFilterFn
+      ];
+    }, [null, null]);
+
     return idx ?
       this.where(idx.name).equals(indexOrCrit[idx.keyPath])
-        .filter(simpleIndex[1]) :
+        .filter(filterFunction) :
       compoundIndex ?
-        this.filter(simpleIndex[1]) : // Has compound but browser bad. Allow filter.
-        this.where(keyPaths).equals(''); // No index at all. Fail lazily.
+        this.filter(filterFunction) : // Has compound but browser bad. Allow filter.
+        this.where(keyPaths).equals(''); // No index at all. Fail lazily with "[a+b+c] is not indexed"
   }
 
   /** Table.filter()
