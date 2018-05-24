@@ -86,7 +86,7 @@
   },
   "homepage": "http://dexie.org",
   "devDependencies": {
-    "dts-bundle-generator": "^1.0.0",
+    "dts-bundle-generator": "1.2.0",
     "just-build": "^0.9.16",
     "karma": "^1.7.1",
     "karma-browserstack-launcher": "^1.1.1",
