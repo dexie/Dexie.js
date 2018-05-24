@@ -809,14 +809,14 @@ promisedTest("Issue #700 - Possible compound primary key bug", async ()=>{
     ok(true, "Opened the database dynamically");
     try {
 
-        const foos = await dynDb.table('chart').where({
+        const foos = await dynDb.table('people').where({
             name: "foo",
             number: 123
         }).toArray();
         ok(foos.length === 1, "Could query and find correct number of results.");
         equal(foos[0].number, 123, "Found the right item (foo 123)");
         
-        const bars = await dynDb.table('chart').where({
+        const bars = await dynDb.table('people').where({
             name: "bar",
             number: 124
         }).toArray();
