@@ -88,7 +88,7 @@
   "devDependencies": {
     "dts-bundle-generator": "1.2.0",
     "just-build": "^0.9.16",
-    "karma": "^1.7.1",
+    "karma": "^2.0.2",
     "karma-browserstack-launcher": "^1.1.1",
     "karma-chrome-launcher": "^2.0.0",
     "karma-firefox-launcher": "^1.1.0",
@@ -96,15 +96,15 @@
     "karma-qunit": "^1.2.1",
     "qunit": "^0.7.7",
     "qunitjs": "^1.23.1",
-    "rollup": "^0.55.1",
-    "rollup-plugin-cleanup": "^2.0.0",
-    "rollup-plugin-commonjs": "^8.3.0",
-    "rollup-plugin-node-resolve": "^3.0.2",
+    "rollup": "^0.55.5",
+    "rollup-plugin-cleanup": "^2.0.1",
+    "rollup-plugin-commonjs": "^8.4.1",
+    "rollup-plugin-node-resolve": "^3.3.0",
     "rollup-plugin-sourcemaps": "^0.4.1",
-    "serve-static": "^1.11.1",
-    "tslib": "^1.9.0",
-    "typescript": "^2.6.2",
-    "uglify-js": "^3.3.9"
+    "serve-static": "^1.13.2",
+    "tslib": "^1.9.1",
+    "typescript": "^2.8.3",
+    "uglify-js": "^3.3.27"
   },
   "dependencies": {}
 }

@@ -550,7 +550,7 @@ export class Table implements ITable<any, IndexableType> {
         req.onerror = BulkErrorHandlerCatchAll(errorList, done);
         req.onsuccess = eventSuccessHandler(done);
       } else {
-        var effectiveKeys = keys || idbstore.keyPath && objects.map(o => getByKeyPath(o, idbstore.keyPath));
+        var effectiveKeys: ReadonlyArray<any> = keys || idbstore.keyPath && objects.map(o => getByKeyPath(o, idbstore.keyPath));
         // Generate map of {[key]: object}
         // BUGBUG: May fail for binary keys! FIXTHIS!
         var objectLookup = effectiveKeys && arrayToObject(effectiveKeys, (key, i) => key != null && [key, objects[i]]);
