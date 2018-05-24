@@ -301,8 +301,7 @@ export function parseIndexSyntax(indexes: string): IndexSpec[] {
           /\&/.test(index),
           /\*/.test(index),
           /\+\+/.test(index),
-          isArray(keyPath),
-          /\./.test(index)
+          isArray(keyPath)
       ));
   });
   return rv;
