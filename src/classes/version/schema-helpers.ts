@@ -244,14 +244,12 @@ export function readGlobalSchema(db: Dexie, idbdb: IDBDatabase) {
   dbStoreNames.forEach(storeName => {
       const store = trans.objectStore(storeName);
       let keyPath = store.keyPath;
-      let dotted = keyPath && typeof keyPath === 'string' && keyPath.indexOf('.') !== -1;
-      const primKey = createIndexSpec(nameFromKeyPath(keyPath), keyPath || "", false, false, !!store.autoIncrement, keyPath && typeof keyPath !== 'string', dotted);
+      const primKey = createIndexSpec(nameFromKeyPath(keyPath), keyPath || "", false, false, !!store.autoIncrement, keyPath && typeof keyPath !== 'string');
       const indexes: IndexSpec[] = [];
       for (let j = 0; j < store.indexNames.length; ++j) {
           const idbindex = store.index(store.indexNames[j]);
           keyPath = idbindex.keyPath;
-          dotted = keyPath && typeof keyPath === 'string' && keyPath.indexOf('.') !== -1;
-          var index = createIndexSpec(idbindex.name, keyPath, !!idbindex.unique, !!idbindex.multiEntry, false, keyPath && typeof keyPath !== 'string', dotted);
+          var index = createIndexSpec(idbindex.name, keyPath, !!idbindex.unique, !!idbindex.multiEntry, false, keyPath && typeof keyPath !== 'string');
           indexes.push(index);
       }
       globalSchema[storeName] = createTableSchema(storeName, primKey, indexes);

@@ -8,7 +8,6 @@ export function createIndexSpec(
   multi?: boolean,
   auto?: boolean,
   compound?: boolean,
-  dotted?: boolean
 ): IndexSpec {
   return {
     name,
