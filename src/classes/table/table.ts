@@ -18,6 +18,7 @@ import { combine } from '../../functions/combine';
 import { PromiseExtended } from "../../public/types/promise-extended";
 import { bulkDelete } from '../../functions/bulk-delete';
 import { IndexableType } from '../../public/types/indexable-type';
+import { debug } from '../../helpers/debug';
 
 /** class Table
  * 
@@ -112,7 +113,7 @@ export class Table implements ITable<any, IndexableType> {
         .where(compoundIndex.name)
         .equals((compoundIndex.keyPath as string[]).map(kp => indexOrCrit[kp]));
 
-    if (!compoundIndex) console.warn(
+    if (!compoundIndex && debug) console.warn(
       `The query ${JSON.stringify(indexOrCrit)} on ${this.name} would benefit of a ` +
       `compound index [${keyPaths.join('+')}]`);
 
