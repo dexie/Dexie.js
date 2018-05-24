@@ -3137,11 +3137,20 @@ props(Dexie, {
     // In node.js, however, these properties must be set "manually" before instansiating a new Dexie().
     // For node.js, you need to require indexeddb-js or similar and then set these deps.
     //
-    dependencies: {
-        // Required:
-        indexedDB: _global.indexedDB || _global.mozIndexedDB || _global.webkitIndexedDB || _global.msIndexedDB,
-        IDBKeyRange: _global.IDBKeyRange || _global.webkitIDBKeyRange
-    },
+    dependencies: (()=>{
+        try {
+            return {
+                // Required:
+                indexedDB: _global.indexedDB || _global.mozIndexedDB || _global.webkitIndexedDB || _global.msIndexedDB,
+                IDBKeyRange: _global.IDBKeyRange || _global.webkitIDBKeyRange
+            };
+        } catch (e) {
+            return {
+                indexedDB: null,
+                IDBKeyRange: null
+            };
+        }
+    })(),
     
     // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
     semVer: DEXIE_VERSION,
