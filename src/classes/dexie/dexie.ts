@@ -263,7 +263,7 @@ export class Dexie implements IDexie {
     return new Promise((resolve, reject) => {
       const doDelete = () => {
         this.close();
-        var req = indexedDB.deleteDatabase(this.name);
+        var req = this._deps.indexedDB.deleteDatabase(this.name);
         req.onsuccess = wrap(() => {
           databaseEnumerator.remove(this.name);
           resolve();
