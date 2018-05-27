@@ -15,7 +15,7 @@ export function fail(collectionOrWhereClause: Collection | WhereClause, err, T?)
 }
 
 export function emptyCollection(whereClause: WhereClause) {
-  return new whereClause.Collection (whereClause, () => { return whereClause.db._deps.IDBKeyRange.only(""); }).limit(0);
+  return new whereClause.Collection (whereClause, () => { return whereClause._IDBKeyRange.only(""); }).limit(0);
 }
 
 export function upperFactory(dir: 'next' | 'prev') {
@@ -72,7 +72,7 @@ export function addIgnoreCaseAlgorithm(whereClause: WhereClause, match, needles,
   initDirection("next");
 
   var c = new whereClause.Collection (whereClause, function() {
-      return whereClause.db._deps.IDBKeyRange.bound(upperNeedles[0], lowerNeedles[needlesLen-1] + suffix);
+      return whereClause._IDBKeyRange.bound(upperNeedles[0], lowerNeedles[needlesLen-1] + suffix);
   });
 
   c._ondirectionchange = function (direction) {

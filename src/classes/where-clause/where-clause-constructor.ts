@@ -33,6 +33,7 @@ export function createWhereClauseConstructor(db: Dexie) {
       this._descending = (a, b) => indexedDB.cmp(b, a);
       this._max = (a, b) => indexedDB.cmp(a,b) > 0 ? a : b;
       this._min = (a, b) => indexedDB.cmp(a,b) < 0 ? a : b;
+      this._IDBKeyRange = db._deps.IDBKeyRange;
     }
   );
 }

@@ -7,7 +7,7 @@ import { INVALID_KEY_ARGUMENT, STRING_EXPECTED, maxString, minKey } from '../../
 import { getArrayOf, NO_CHAR_ARRAY } from '../../functions/utils';
 import { exceptions } from '../../errors';
 import { Dexie } from '../dexie';
-import { IndexableTypeArray, IDBValidKey } from '../../public/types/indexeddb';
+import { IndexableTypeArray, IDBValidKey, IDBKeyRangeConstructor } from '../../public/types/indexeddb';
 
 /** class WhereClause
  * 
@@ -15,6 +15,7 @@ import { IndexableTypeArray, IDBValidKey } from '../../public/types/indexeddb';
  */
 export class WhereClause implements IWhereClause {
   db: Dexie;
+  _IDBKeyRange: IDBKeyRangeConstructor;
   _ctx: {
     table: Table;
     index: string;
@@ -42,7 +43,7 @@ export class WhereClause implements IWhereClause {
       if ((this._cmp(lower, upper) > 0) ||
         (this._cmp(lower, upper) === 0 && (includeLower || includeUpper) && !(includeLower && includeUpper)))
         return emptyCollection(this); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
-      return new this.Collection(this, function () { return IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper); });
+      return new this.Collection(this, () => this._IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper));
     } catch (e) {
       return fail(this, INVALID_KEY_ARGUMENT);
     }
@@ -54,7 +55,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   equals(value: IndexableType) {
-    return new this.Collection(this, () => IDBKeyRange.only(value));
+    return new this.Collection(this, () => this._IDBKeyRange.only(value));
   }
 
   /** WhereClause.above()
@@ -63,7 +64,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   above(value: IndexableType) {
-    return new this.Collection(this, () => IDBKeyRange.lowerBound(value, true));
+    return new this.Collection(this, () => this._IDBKeyRange.lowerBound(value, true));
   }
 
   /** WhereClause.aboveOrEqual()
@@ -72,7 +73,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   aboveOrEqual(value: IndexableType) {
-    return new this.Collection(this, () => IDBKeyRange.lowerBound(value));
+    return new this.Collection(this, () => this._IDBKeyRange.lowerBound(value));
   }
 
   /** WhereClause.below()
@@ -81,7 +82,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   below(value: IndexableType) {
-    return new this.Collection(this, () => IDBKeyRange.upperBound(value, true));
+    return new this.Collection(this, () => this._IDBKeyRange.upperBound(value, true));
   }
 
   /** WhereClause.belowOrEqual()
@@ -90,7 +91,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   belowOrEqual(value: IndexableType) {
-    return new this.Collection(this, () => IDBKeyRange.upperBound(value));
+    return new this.Collection(this, () => this._IDBKeyRange.upperBound(value));
   }
 
   /** WhereClause.startsWith()
@@ -160,7 +161,7 @@ export class WhereClause implements IWhereClause {
     let compare = this._cmp;
     try { set.sort(compare); } catch (e) { return fail(this, INVALID_KEY_ARGUMENT); }
     if (set.length === 0) return emptyCollection(this);
-    const c = new this.Collection(this, () => IDBKeyRange.bound(set[0], set[set.length - 1]));
+    const c = new this.Collection(this, () => this._IDBKeyRange.bound(set[0], set[set.length - 1]));
 
     c._ondirectionchange = direction => {
       compare = (direction === "next" ?
@@ -295,7 +296,7 @@ export class WhereClause implements IWhereClause {
 
     const c = new this.Collection(
       this,
-      () => IDBKeyRange.bound(set[0][0], set[set.length - 1][1], !includeLowers, !includeUppers));
+      () => this._IDBKeyRange.bound(set[0][0], set[set.length - 1][1], !includeLowers, !includeUppers));
 
     c._ondirectionchange = direction => {
       if (direction === "next") {
