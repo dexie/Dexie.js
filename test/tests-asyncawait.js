@@ -5,10 +5,10 @@ import {isIdbAndPromiseCompatible} from './is-idb-and-promise-compatible';
 
 const idbAndPromiseCompatible = isIdbAndPromiseCompatible();
 
-const hasNativeAsyncFunctions = false;
+let hasNativeAsyncFunctions = false;
 try {
     hasNativeAsyncFunctions = !!new Function(`return (async ()=>{})();`)().then;
-} catch (e) {}
+} catch (e) { console.log(e) }
 
 var db = new Dexie("TestDBTranx");
 db.version(1).stores({
