@@ -86,8 +86,10 @@
   },
   "homepage": "http://dexie.org",
   "devDependencies": {
+    "child-process-es6-promise": "^1.2.0",
     "dts-bundle-generator": "^1.2.2",
     "filereader": "^0.10.3",
+    "glob": "^7.1.2",
     "indexeddbshim": "^3.7.0",
     "just-build": "^0.9.16",
     "karma": "^2.0.2",
