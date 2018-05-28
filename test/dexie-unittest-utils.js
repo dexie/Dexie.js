@@ -25,10 +25,19 @@ config.urlConfig.push(/*{
     " dexie.js are also included)"
  });
 
+// Node defaults
+const runningInBrowser = (typeof window !== 'undefined')
+Dexie.debug = false
+var no_optimize = false
+
+// Browser overrides
+if (runningInBrowser) {
+
 Dexie.debug = window.location.search.indexOf('longstacks') !== -1 ? 'dexie' : false;
 if (window.location.search.indexOf('longstacks=tests') !== -1) Dexie.debug = true; // Don't include stuff from dexie.js.
 
-var no_optimize = window.no_optimize || window.location.search.indexOf('dontoptimize') !== -1;
+no_optimize = window.no_optimize || window.location.search.indexOf('dontoptimize') !== -1;
+} else { window = global }
 
 const ArrayBuffer = window.ArrayBuffer;
 
@@ -124,10 +133,13 @@ export function deleteDatabase(db) {
     });
 }
 
-var isIE = !(window.ActiveXObject) && "ActiveXObject" in window;
-var isEdge = /Edge\/\d+/.test(navigator.userAgent);
-var hasPolyfillIE = [].slice.call(document.getElementsByTagName("script")).some(
-    s => s.src.indexOf("idb-iegap") !== -1);
+var isIE = false, isEdge = false, hasPolyfillIE = false; // Defaults for Node.js
+if (runningInBrowser) {
+    isIE = !(window.ActiveXObject) && "ActiveXObject" in window;
+    isEdge = /Edge\/\d+/.test(navigator.userAgent);
+    hasPolyfillIE = [].slice.call(document.getElementsByTagName("script")).some(
+        s => s.src.indexOf("idb-iegap") !== -1);
+}
 
 export function supports (features) {
     return features.split('+').reduce((result,feature)=>{
