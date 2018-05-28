@@ -67,7 +67,7 @@ function info (message) { console.log (message) }
         // (One of the test files is getting stuck at the moment so this allows the
         // rest to run.)
         const timeout = setTimeout(() => {
-          info(`*** Killing test script: ${testFile} ***`)
+          info(`\n*** Killing test script: ${testFile} ***\n`)
           child.kill()
         }, 10000);
         await childPromise
