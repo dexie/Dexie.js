@@ -22,7 +22,7 @@ const testFilesString = tranformations.reduce((document, transformation) => {
 // Get the list of files as an array, filtering out any empty entries.
 // const testFiles = testFilesString.split('\n').filter((i) => { return i !== '' })
 
-// Debug: start with just tests-table.js
+// Debug: start by testing one file at a time
 let testFiles = ['./tests-table.js']
 
 info(`Loading ${testFiles.length} tests.`)
@@ -85,8 +85,16 @@ Dexie.dependencies.indexedDB = indexedDB
 Dexie.dependencies.IDBKeyRange = IDBKeyRange
 
 const qUnitModule = require('qunitjs').module                                                           // eslint-disable-line no-unused-vars
-const {stop, start, asyncTest, equal, ok} = require('qunitjs')                                          // eslint-disable-line no-unused-vars
+const {stop, start, asyncTest, test, equal, ok} = require('qunitjs')                                          // eslint-disable-line no-unused-vars
 const {promisedTest, spawnedTest, supports, resetDatabase} = require('./dexie-unittest-utils-node.js')  // eslint-disable-line no-unused-vars
+
+// Monkey patch the test of IndexedDB and promises (node has promises and we
+// just included the IndexedDBShim)
+async function isIdbAndPromiseCompatible () { return Promise.resolve(true) }
+
+// Since Node.js doesn’t have native Blob or FileReader support, use polyfills.
+const Blob = require('w3c-blob')
+const FileReader = require('filereader')
 
 info('Running tests…')
 

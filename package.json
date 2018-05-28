@@ -87,6 +87,8 @@
   "homepage": "http://dexie.org",
   "devDependencies": {
     "dts-bundle-generator": "^1.2.2",
+    "filereader": "^0.10.3",
+    "indexeddbshim": "^3.7.0",
     "just-build": "^0.9.16",
     "karma": "^2.0.2",
     "karma-browserstack-launcher": "^1.1.1",
@@ -95,6 +97,7 @@
     "karma-mocha-reporter": "^2.2.5",
     "karma-qunit": "^1.2.1",
     "qunit": "^0.7.7",
+    "qunit-tap": "^1.5.1",
     "qunitjs": "^1.23.1",
     "rollup": "^0.55.5",
     "rollup-plugin-cleanup": "^2.0.1",
@@ -104,7 +107,8 @@
     "serve-static": "^1.13.2",
     "tslib": "^1.9.1",
     "typescript": "^2.8.3",
-    "uglify-js": "^3.3.27"
+    "uglify-js": "^3.3.27",
+    "w3c-blob": "0.0.1"
   },
   "dependencies": {}
 }
