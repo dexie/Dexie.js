@@ -179,3 +179,7 @@ samples/typescript/utils.js.map
 
 /.ntvs_analysis.dat
 /*.njsproj
+
+# Test databases under Node with IndexedDBShim (SQLite3)
+D_*
+__*
