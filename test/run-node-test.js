@@ -7,14 +7,18 @@ const testFile = process.argv[2]
 
 function info (message) { console.log (message) }
 
-info(`Loading tests: ${testFile}`)
+info('# ########################################')
+info(`# ${testFile}`)
+info('# ########################################')
 
 let tests = fs.readFileSync(path.join(__dirname, testFile), 'utf-8')
-tests = tests.replace(/^\uFEFF/, '')                        // Strip BOM
-tests = tests.replace(/^import .*?$/gm, '')                 // Strip import statements
-tests = tests.replace(/module[/s]*?\(/gm, 'qUnitModule(')   // Transform module( => qUnitModule(
+tests = tests.replace(/^\uFEFF/, '')                        // Strip BOM.
+tests = tests.replace(/^import .*?$/gm, '')                 // Strip import statements.
+tests = tests.replace(/module[/s]*?\(/gm, 'qUnitModule(')   // Transform module( => qUnitModule(.
 
-info('Patching IndexedDB and the tests for the Node environment.')
+//
+// Patch IndexedDB and the tests for the Node environment.
+//
 
 var QUnit = require('qunitjs')
 var qunitTap = require('qunit-tap');
@@ -37,15 +41,14 @@ const qUnitModule = require('qunitjs').module                                   
 const {stop, start, asyncTest, test, equal, ok} = require('qunitjs')                                          // eslint-disable-line no-unused-vars
 const {promisedTest, spawnedTest, supports, resetDatabase} = require('./dexie-unittest-utils-node.js')  // eslint-disable-line no-unused-vars
 
-// Monkey patch the test of IndexedDB and promises (node has promises and we
-// just included the IndexedDBShim)
+// Monkey patch the test of IndexedDB and promises (node has promises and we just included the IndexedDBShim).
 async function isIdbAndPromiseCompatible () { return Promise.resolve(true) }
 
 // Since Node.js doesn’t have native Blob or FileReader support, use polyfills.
 const Blob = require('w3c-blob')
 const FileReader = require('filereader')
 
-info('Running tests…')
+// Run the tests.
 
 eval(tests) // eslint-disable-line no-eval
 

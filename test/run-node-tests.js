@@ -7,7 +7,7 @@ const childProcess = require('child-process-es6-promise')
 function info (message) { console.log (message) }
 
 (async function () {
-  info('Preparing Dexie tests for Node.js.')
+  info('# Preparing Dexie tests for Node.js.')
 
   //
   // Extract the list of tests from the tests-all.js file.
@@ -26,7 +26,7 @@ function info (message) { console.log (message) }
   // Get the list of files as an array, filtering out any empty entries.
   const testFiles = testFilesString.split('\n').filter((i) => { return i !== '' })
 
-  info('Preparing unit test utilities for use in Node.')
+  info('# Preparing unit test utilities for use in Node.')
 
   let dexieUnittestUtilsJS = fs.readFileSync('./dexie-unittest-utils.js', 'utf-8').replace(/^\uFEFF/, '').replace(/^import .*?$/gm, '')
 
@@ -67,7 +67,8 @@ function info (message) { console.log (message) }
         // (One of the test files is getting stuck at the moment so this allows the
         // rest to run.)
         const timeout = setTimeout(() => {
-          info(`\n*** Killing test script: ${testFile} ***\n`)
+          // See http://testanything.org/tap-specification.html#bail-out
+          info(`Bail out! Script timeout.`)
           child.kill()
         }, 10000);
         await childPromise
@@ -80,7 +81,9 @@ function info (message) { console.log (message) }
 
   await runTests()
 
-  info('All tests run.')
+  info('# ##############')
+  info('# All tests run.')
+  info('# ##############')
 
   // Clean up
   fs.unlinkSync('./dexie-unittest-utils-node.js')
