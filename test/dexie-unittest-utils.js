@@ -26,9 +26,9 @@ config.urlConfig.push(/*{
  });
 
 // Node defaults
-const runningInBrowser = (typeof window !== 'undefined')
-Dexie.debug = false
-var no_optimize = false
+const runningInBrowser = (typeof window !== 'undefined');
+Dexie.debug = false;
+var no_optimize = false;
 
 // Browser overrides
 if (runningInBrowser) {
