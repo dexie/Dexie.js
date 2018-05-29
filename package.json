@@ -41,7 +41,8 @@
     "test:unit": "karma start test/karma.conf.js --single-run",
     "test:typings": "tsc -p test/typings-test/",
     "test:debug": "karma start test/karma.conf.js --log-level debug",
-    "test:node": "cd test && node ./run-node-tests.js"
+    "test:node": "cd test && node ./run-node-tests.js",
+    "test:node:pretty": "cd test && node ./run-node-tests.js | ../node_modules/faucet/bin/cmd.js"
   },
   "just-build": {
     "default": [
@@ -89,6 +90,7 @@
   "devDependencies": {
     "child-process-es6-promise": "^1.2.0",
     "dts-bundle-generator": "^1.2.2",
+    "faucet": "0.0.1",
     "filereader": "^0.10.3",
     "glob": "^7.1.2",
     "indexeddbshim": "^3.7.0",
