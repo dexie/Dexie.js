@@ -50,7 +50,7 @@ function allTests() {
     // (Or, if you have faucet installed globally: … | faucet)
 
     let specificTests = process.argv.splice(2);
-    const testFiles = (specificTests.length === 0) ? allTests() : specificTests.map(t => `./${t}.js`.replace('.js.js', ''));
+    const testFiles = (specificTests.length === 0) ? allTests() : specificTests.map(t => `./${t}.js`.replace('.js.js', '.js'));
     
     info(`# Will run tests:`);
     testFiles.forEach(f => info(`#  - ${f}`));
