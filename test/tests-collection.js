@@ -371,9 +371,9 @@ asyncTest("delete(3, combine with OR)", 3, function () {
 });
 
 
-asyncTest("keys", function () {
+asyncTest("keys", 3, function () {
     db.users.orderBy("first").keys(function(a) {
-        ok(a.length, 2);
+        equal(a.length, 2, "There should be two results");
         equal(a[0], "David", "First is David");
         equal(a[1], "Karl", "Second is Karl");
     }).catch(function (e) {
@@ -381,17 +381,17 @@ asyncTest("keys", function () {
     }).finally(start);
 });
 
-asyncTest("uniqueKeys", function () {
+asyncTest("uniqueKeys", 7, function () {
     db.transaction("rw", db.users, function () {
         db.users.add({ id: 3, first: "David", last: "Helenius", username: "dahel" });
         db.users.orderBy("first").keys(function (a) {
-            ok(a.length, 3, "when not using uniqueKeys, length is 3");
+            equal(a.length, 3, "When not using uniqueKeys, length is 3");
             equal(a[0], "David", "First is David");
             equal(a[1], "David", "Second is David");
             equal(a[2], "Karl", "Third is Karl");
         });
         db.users.orderBy("first").uniqueKeys(function (a) {
-            ok(a.length, 2, "when using uniqueKeys, length is 2");
+            equal(a.length, 2, "When using uniqueKeys, length is 2");
             equal(a[0], "David", "First is David");
             equal(a[1], "Karl", "Second is Karl");
         });
@@ -400,9 +400,9 @@ asyncTest("uniqueKeys", function () {
     }).finally(start);
 });
 
-asyncTest("primaryKeys", function () {
+asyncTest("primaryKeys", 3, function () {
     db.users.orderBy("last").primaryKeys(function(a) {
-        ok(a.length, 2);
+        equal(a.length, 2, "There should be two results");
         equal(a[0], 2, "Second is Karl");
         equal(a[1], 1, "First is David");
     }).catch(function (e) {
@@ -410,9 +410,9 @@ asyncTest("primaryKeys", function () {
     }).finally(start);
 });
 
-asyncTest("primaryKeys2", function () {
+asyncTest("primaryKeys2", 3, function () {
     db.users.orderBy("first").primaryKeys(function(a) {
-        ok(a.length, 2);
+        equal(a.length, 2, "There should be two results");
         equal(a[0], 1, "First is David");
         equal(a[1], 2, "Second is Karl");
     }).catch(function (e) {
