@@ -42,7 +42,7 @@ Dexie.dependencies.indexedDB = indexedDB;
 Dexie.dependencies.IDBKeyRange = IDBKeyRange;
 
 const qUnitModule = require("qunitjs").module; // eslint-disable-line no-unused-vars
-const { stop, start, asyncTest, test, equal, ok } = require("qunitjs"); // eslint-disable-line no-unused-vars
+const { stop, start, asyncTest, test, equal, notEqual, ok } = require("qunitjs"); // eslint-disable-line no-unused-vars
 const {
     promisedTest,
     spawnedTest,
