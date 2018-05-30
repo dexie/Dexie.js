@@ -4,16 +4,13 @@ const util = require("util");
 const glob = util.promisify(require("glob"));
 const childProcess = require("child-process-es6-promise");
 
+// Shorthand for console.log.
 function info(message) {
     console.log(message);
 }
 
-(async function() {
-    info("# Preparing Dexie tests for Node.js.");
-
-    //
-    // Extract the list of tests from the tests-all.js file.
-    //
+// Extract the list of tests from the tests-all.js file.
+function allTests() {
     const tranformations = [
         { find: /^\uFEFF/, replace: "" }, // Remove BOM symbol
         { find: /import "\.\/(.*?)";/g, replace: "$1" }, // Remove the import "…" shell
@@ -29,6 +26,34 @@ function info(message) {
     const testFiles = testFilesString.split("\n").filter(i => {
         return i !== "";
     });
+
+    return testFiles;
+}
+
+(async function() {
+    info("# Preparing Dexie tests for Node.js.");
+
+    // Check if need to run all tests or whether we’ve been asked to run
+    // specific test(s). To run specific tests:
+    //
+    // npm run test:node -- tests-1(.js) tests-2(.js)
+    //
+    // This will run only tests in test/tests-1.js and test/tests-.js. The
+    // file extension is optional and will be added if missing.
+    //
+    // Note: npm run test:node:pretty does not accept arguments. If you want
+    // to pretty print the results of specific tests, manually pipe the result
+    // to faucet:
+    //
+    // e.g., npm run test:node -- tests-table | node_modules/faucet/bin/cmd.js
+    // 
+    // (Or, if you have faucet installed globally: … | faucet)
+
+    let specificTests = process.argv.splice(2);
+    const testFiles = (specificTests.length === 0) ? allTests() : specificTests.map(t => `./${t}.js`.replace('.js.js', ''));
+    
+    info(`# Will run tests:`);
+    testFiles.forEach(f => info(`#  - ${f}`));
 
     info("# Preparing unit test utilities for use in Node.");
 
