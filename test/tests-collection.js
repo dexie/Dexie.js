@@ -510,8 +510,7 @@ asyncTest("or-issue#15-test", function () {
         }).finally(function () {
             if (--numRuns == 0) {
                 // All test runs finished. Delete DB and exit unit test.
-                db.delete();
-                start();
+                db.delete().then(start)
             }
         });
     }
