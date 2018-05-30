@@ -42,7 +42,7 @@
     "test:typings": "tsc -p test/typings-test/",
     "test:debug": "karma start test/karma.conf.js --log-level debug",
     "test:node": "cd test && node ./run-node-tests.js",
-    "test:node:pretty": "cd test && node ./run-node-tests.js | ../node_modules/faucet/bin/cmd.js"
+    "test:node:pretty": "npm run test:node | node_modules/faucet/bin/cmd.js"
   },
   "just-build": {
     "default": [
