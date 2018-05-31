@@ -481,10 +481,16 @@ asyncTest("or-issue#15-test", function () {
             db.phones.add({ id: 3 + i, name: "Name" + randomString(16), additionalFeatures: [randomString(10)], android: 1, availability: 0, battery: 1, camera: 1 });
         }
 
+        var seed = 1;
+        function pseudoRandom() {
+            var x = Math.sin(seed++) * 10000;
+            return x - Math.floor(x);
+        }
+
         function randomString(count) {
             var ms = [];
             for (var i = 0; i < count; ++i) {
-                ms.push(String.fromCharCode(32 + Math.floor(Math.random() * 95)));
+                ms.push(String.fromCharCode(32 + Math.floor(pseudoRandom() * 95)));
             }
             return ms.join('');
         }
