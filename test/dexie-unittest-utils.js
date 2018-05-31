@@ -147,6 +147,8 @@ export function supports (features) {
                 } catch (e) {
                     return false;
                 }
+            case "domevents":
+                return typeof window === 'object' && window.addEventListener;
 
             default:
                 throw new Error ("Unknown feature: " + feature);

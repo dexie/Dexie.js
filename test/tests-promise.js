@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {spawnedTest} from './dexie-unittest-utils';
+import {spawnedTest, supports} from './dexie-unittest-utils';
 
 module("promise");
 
@@ -131,6 +131,11 @@ asyncTest ("Promise.follow chained", ()=>{
 });
 
 asyncTest("onunhandledrejection should propagate once", 1, function(){
+    if (!supports("domevents")) {
+        ok(true, "Skipping - DOM events not supported");
+        start();
+    }
+
     var Promise = Dexie.Promise;
     function logErr (ev) {
         ok(true, ev.reason);
@@ -161,6 +166,10 @@ asyncTest("onunhandledrejection should propagate once", 1, function(){
 });
 
 asyncTest("onunhandledrejection should not propagate if catched after finally", 1, function(){
+    if (!supports("domevents")) {
+        ok(true, "Skipping - DOM events not supported");
+        start();
+    }
     var Promise = Dexie.Promise;
     function logErr (ev) {
         ok(false, "Should already be catched:" + ev.reason);
@@ -303,6 +312,10 @@ asyncTest("Issue #97 A transaction may be lost after calling Dexie.Promise.resol
 });*/
 
 asyncTest("unhandledrejection", ()=> {
+    if (!supports("domevents")) {
+        ok(true, "Skipping - DOM events not supported");
+        start();
+    }
     var errors = [];
     function onError(ev) {
         errors.push(ev.reason);
@@ -323,6 +336,10 @@ asyncTest("unhandledrejection", ()=> {
 });
 
 asyncTest("unhandledrejection2", ()=> {
+    if (!supports("domevents")) {
+        ok(true, "Skipping - DOM events not supported");
+        start();
+    }
     var errors = [];
     function onError(ev) {
         errors.push(ev.reason);
@@ -348,6 +365,10 @@ asyncTest("unhandledrejection2", ()=> {
 });
 
 asyncTest("unhandledrejection3", ()=> {
+    if (!supports("domevents")) {
+        ok(true, "Skipping - DOM events not supported");
+        start();
+    }
     var errors = [];
     function onError(ev) {
         errors.push(ev.reason);

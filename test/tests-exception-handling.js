@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, spawnedTest} from './dexie-unittest-utils';
+import {resetDatabase, spawnedTest, supports} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBException");
 db.version(1).stores({ users: "id,first,last,&username,&*email,*pets" });
@@ -22,6 +22,10 @@ module("exception-handling", {
 
 asyncTest("Uncaught promise should signal 'unhandledrejection'", function(){
     // We must not use finally or catch here because then we don't test what we should.
+    if (!supports("domevents")) {
+        ok(true, "Skipping - DOM events not supported");
+        start();
+    }
     var onErrorSignals = 0;
     function onerror(ev) {
         ++onErrorSignals;
@@ -392,6 +396,10 @@ asyncTest("Issue #67 - Regression test - Transaction still fails if error in key
 });
 
 asyncTest("Issue #69 Global exception handler for promises", function () {
+    if (!supports("domevents")) {
+        ok(true, "Skipping - DOM events not supported");
+        start();
+    }
     var errorList = [];
     function globalRejectionHandler(ev) {
         console.log("Got error: " + ev.reason);
