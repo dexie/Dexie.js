@@ -134,6 +134,7 @@ asyncTest("onunhandledrejection should propagate once", 1, function(){
     if (!supports("domevents")) {
         ok(true, "Skipping - DOM events not supported");
         start();
+        return;
     }
 
     var Promise = Dexie.Promise;
@@ -169,6 +170,7 @@ asyncTest("onunhandledrejection should not propagate if catched after finally", 
     if (!supports("domevents")) {
         ok(true, "Skipping - DOM events not supported");
         start();
+        return;
     }
     var Promise = Dexie.Promise;
     function logErr (ev) {
@@ -315,6 +317,7 @@ asyncTest("unhandledrejection", ()=> {
     if (!supports("domevents")) {
         ok(true, "Skipping - DOM events not supported");
         start();
+        return;
     }
     var errors = [];
     function onError(ev) {
@@ -339,6 +342,7 @@ asyncTest("unhandledrejection2", ()=> {
     if (!supports("domevents")) {
         ok(true, "Skipping - DOM events not supported");
         start();
+        return;
     }
     var errors = [];
     function onError(ev) {
@@ -368,6 +372,7 @@ asyncTest("unhandledrejection3", ()=> {
     if (!supports("domevents")) {
         ok(true, "Skipping - DOM events not supported");
         start();
+        return;
     }
     var errors = [];
     function onError(ev) {
