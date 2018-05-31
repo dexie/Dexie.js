@@ -484,7 +484,7 @@ asyncTest("or-issue#15-test", function () {
         function randomString(count) {
             var ms = [];
             for (var i = 0; i < count; ++i) {
-                ms.push(String.fromCharCode(32 + Math.floor(Math.random() * 96)));
+                ms.push(String.fromCharCode(32 + Math.floor(Math.random() * 95)));
             }
             return ms.join('');
         }
