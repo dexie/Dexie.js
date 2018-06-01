@@ -54,9 +54,9 @@ export class Table implements ITable<any, IndexableType> {
     writeLocked?: boolean | string) : Promise
   {
     var tableName = this.name;
-    function supplyIdbStore(resolve, reject, trans) {
-      if (trans.storeNames.indexOf(tableName) === -1)
-        throw new exceptions.NotFound("Table" + tableName + " not part of transaction");
+    function supplyIdbStore(resolve, reject, trans: Transaction) {
+      if (!trans.schema[tableName])
+        throw new exceptions.NotFound("Table " + tableName + " not part of transaction");
       return fn(resolve, reject, trans.idbtrans.objectStore(tableName), trans);
     }
     return this._trans(mode, supplyIdbStore, writeLocked);
