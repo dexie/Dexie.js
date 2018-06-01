@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, test, equal, ok, deepEqual} from 'QUnit';
-import {resetDatabase, supports} from './dexie-unittest-utils';
+import {resetDatabase, supports, promisedTest} from './dexie-unittest-utils';
 
 module("upgrading");
 
@@ -510,4 +510,39 @@ test("Issue #30 - Problem with existing db", (assert) => {
         if (db) db.close();
         Dexie.delete("raw-db").then(done);
     });
+});
+
+promisedTest("Issue #713 - how to change table name", async ()=> {
+    await Dexie.delete("issue713");
+    const db = new Dexie('issue713');
+    try {
+        db.version(1).stores({
+            friends: '++id, name, age'
+        });
+        await db.friends.bulkAdd([
+            {name: "Foo", age: 25},
+            {name: "Bar", age: 75}
+        ]);
+        db.close();
+        const db2 = new Dexie('issue713');
+        db2.version(1).stores({
+            friends: '++id, name, age'
+        });
+        db2.version(2).stores({
+            friends2: 'id, name, age'
+        }).upgrade(tx=>{
+            return tx.friends.toArray().then(objs => {
+                return tx.friends2.bulkAdd(objs);
+            });
+        });
+        db2.version(3).stores({
+            friends: null
+        });
+        const result = await db2.friends2.toArray();
+        equal(result.length, 2, "Should get 2 friends");
+        equal(result[0].name, "Foo", "First friend is 'Foo'");
+        equal(result[1].name, "Bar", "First friend is 'Bar'");
+    } finally {
+        await db.delete();   
+    }
 });

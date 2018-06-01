@@ -25,6 +25,7 @@ export class Transaction implements ITransaction {
   storeNames: string[];
   on: any;
   parent?: Transaction;
+  schema: DbSchema;
   _memoizedTables: {[tableName: string]: Table};
 
   _reculock: number;
@@ -240,11 +241,12 @@ export class Transaction implements ITransaction {
     const memoizedTables = (this._memoizedTables || (this._memoizedTables = {}));
     if (hasOwn(memoizedTables, tableName))
       return memoizedTables[tableName];
+    const tableSchema = this.schema[tableName];
+    if (!tableSchema) {
+      throw new exceptions.NotFound("Table " + tableName + " not part of transaction");        
+    }
 
-    // Let Dexie.table() take care of throwing if table name is not part of schema.
-    var table = this.db.table(tableName); // Don't check that table is part of transaction. It must fail lazily!
-
-    const transactionBoundTable = new this.db.Table(table.name, table.schema, this);
+    const transactionBoundTable = new this.db.Table(tableName, tableSchema, this);
     memoizedTables[tableName] = transactionBoundTable;
     return transactionBoundTable;
   }

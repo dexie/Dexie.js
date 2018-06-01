@@ -5,13 +5,13 @@ import { DbSchema } from '../../public/types/db-schema';
 import Events from '../../helpers/Events';
 import Promise, { rejection } from '../../helpers/promise';
 
-export interface TransactionConstructor {
+export interface TransactionConstructor<T extends Transaction=Transaction> {
   new (
     mode: IDBTransactionMode,
     storeNames: string[],
     dbschema: DbSchema,
-    parent?: Transaction) : Transaction;
-  prototype: Transaction;
+    parent?: Transaction) : T;
+  prototype: T;
 }
 
 /** Generates a Transaction constructor bound to given Dexie instance.
@@ -20,8 +20,8 @@ export interface TransactionConstructor {
  * addons to extend classes for a certain Dexie instance without affecting
  * other db instances.
  */
-export function createTransactionConstructor (db: Dexie) {
-  return makeClassConstructor<TransactionConstructor>(
+export function createTransactionConstructor(db: Dexie) {
+  return makeClassConstructor<TransactionConstructor<Transaction>>(
     Transaction.prototype,
     function Transaction (
       this: Transaction,
@@ -33,6 +33,7 @@ export function createTransactionConstructor (db: Dexie) {
       this.db = db;
       this.mode = mode;
       this.storeNames = storeNames;
+      this.schema = dbschema;
       this.idbtrans = null;
       this.on = Events(this, "complete", "error", "abort");
       this.parent = parent || null;
