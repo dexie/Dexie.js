@@ -546,3 +546,69 @@ promisedTest("Issue #713 - how to change table name", async ()=> {
         await db.delete();   
     }
 });
+
+promisedTest("Changing primary key", async ()=> {
+    const isIE = typeof window === 'object' &&
+        !(window.ActiveXObject) && "ActiveXObject" in window;
+    if (isIE) {
+        ok(true, "Skipping this test for IE - it has a bug that prevents it from renaming a table");
+    }
+
+    await Dexie.delete("changePrimKey");
+
+    // First, create the initial version of the DB, populate some data, and then close it.
+    let db = new Dexie("changePrimKey");
+    db.version(1).stores({
+        foos: '++id'
+    });
+    await db.foos.bulkAdd([{name: "Hola"}, {name: "Hello"}]);
+    db.close();
+
+    // To change primary key, let's start by copying the table
+    // and then deleting and recreating the original table
+    // to copy it back again
+    db = new Dexie("changePrimKey");
+    db.version(1).stores({
+        foos: '++id'
+    });
+
+    // Add version 2 that copies the data to foos2
+    db.version(2).stores({
+        foos2: 'objId'
+    }).upgrade(async tx => {
+        const foos = await tx.foos.toArray();
+        await tx.foos2.bulkAdd(foos.map(foo => ({
+            objId: "obj:"+foo.id,
+            hello: foo.name
+        })));
+    });
+
+    // Add version 3 that deletes old "foos"
+    db.version(3).stores({
+        foos: null
+    });
+
+    // Add version 4 that recreates "foos" with wanted primary key
+    // and do the copying again
+    db.version(4).stores({
+        foos: 'objId, hello'
+    }).upgrade(async tx => {
+        const foos = await tx.foos2.toArray();
+        await tx.foos.bulkAdd(foos);
+    });
+
+    // Finally delete the temp table
+    db.version(5).stores({
+        foos2: null
+    });
+
+    // Now, verify we have what we expect
+    const foos = await db.foos.toArray();
+    equal(foos.length, 2, "Should have 2 rows");
+    equal(foos[0].objId, "obj:1", "A primary key with an object ID 1 is there");
+    equal(foos[1].objId, "obj:2", "A primary key with an object ID 2 is there");
+    // Verify we can use the new index as well
+    const foo2 = await db.foos.get({hello: "Hello"});
+    ok(foo2 != null, "Should get a match");
+    equal(foo2.objId, "obj:2", "The expected ID was returned");
+});
