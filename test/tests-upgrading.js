@@ -552,6 +552,7 @@ promisedTest("Changing primary key", async ()=> {
         !(window.ActiveXObject) && "ActiveXObject" in window;
     if (isIE) {
         ok(true, "Skipping this test for IE - it has a bug that prevents it from renaming a table");
+        return;
     }
 
     await Dexie.delete("changePrimKey");
