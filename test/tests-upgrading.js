@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, test, equal, ok, deepEqual} from 'QUnit';
-import {resetDatabase, supports, promisedTest} from './dexie-unittest-utils';
+import {resetDatabase, supports, promisedTest, isIE, isEdge} from './dexie-unittest-utils';
 
 module("upgrading");
 
@@ -548,10 +548,8 @@ promisedTest("Issue #713 - how to change table name", async ()=> {
 });
 
 promisedTest("Changing primary key", async ()=> {
-    const isIE = typeof window === 'object' &&
-        !(window.ActiveXObject) && "ActiveXObject" in window;
-    if (isIE) {
-        ok(true, "Skipping this test for IE - it has a bug that prevents it from renaming a table");
+    if (isIE || isEdge) {
+        ok(true, "Skipping this test for IE and Edge - it has a bug that prevents it from renaming a table");
         return;
     }
 

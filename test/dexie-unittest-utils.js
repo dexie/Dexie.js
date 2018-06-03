@@ -124,8 +124,8 @@ export function deleteDatabase(db) {
     });
 }
 
-var isIE = !(window.ActiveXObject) && "ActiveXObject" in window;
-var isEdge = /Edge\/\d+/.test(navigator.userAgent);
+export const isIE = !(window.ActiveXObject) && "ActiveXObject" in window;
+export const isEdge = /Edge\/\d+/.test(navigator.userAgent);
 var hasPolyfillIE = [].slice.call(document.getElementsByTagName("script")).some(
     s => s.src.indexOf("idb-iegap") !== -1);
 
