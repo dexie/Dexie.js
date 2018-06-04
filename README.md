@@ -142,8 +142,6 @@ db.transaction('rw', db.friends, async() => {
 
 #### Hello World (Typescript)
 
-*This sample requires using Dexie v2*
-
 ```js
 import Dexie from 'dexie';
 
