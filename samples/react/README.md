@@ -2,8 +2,6 @@
 
 This project was bootstrapped with [Create React App](https://github.com/facebookincubator/create-react-app).
 
-*NOTE: This sample uses a beta version of Dexie*
-
 ## Install dependencies
 
 Before you can run the app in your browser, you will have to install its dependencies with:
