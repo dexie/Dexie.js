@@ -155,7 +155,7 @@ interface Friend {
 // Declare Database
 //
 class FriendDatabase extends Dexie {
-    public friends!: Dexie.Table<Friend, number>; // id is number
+    public friends!: Dexie.Table<Friend, number>; // id is number in this case
 
     public constructor() {
         super("FriendDatabase");
