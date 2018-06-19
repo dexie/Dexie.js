@@ -85,11 +85,12 @@ promisedTest (`Issue #618 - Safari 11 add blob becomes null`, async ()=>{
     var debug = {hello: "world"};
     var blob = new Blob([JSON.stringify(debug, null, 2)], {type : 'application/json'});
     const obj = {
+        id: 18,
         name: 'foo',
         blob
     }
-    let id = await db.songs.add(obj);
-    const retrieved = await db.songs.get(id);
+    let id = await db.items.add(obj);
+    const retrieved = await db.items.get(id);
     equal(retrieved.name, obj.name, `Blob name is '${obj.name}'`);
     ok(!!retrieved.blob, `Retrieved blob is truthy`);
     if (retrieved.blob) {
