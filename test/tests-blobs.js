@@ -5,7 +5,7 @@ import {resetDatabase, promisedTest} from './dexie-unittest-utils';
 var db = new Dexie("TestDBBinary");
 db.version(1).stores({
     items: "id",
-    songs: "++id, name"
+    songs: "id, name"
 });
 
 module("blobs", {
@@ -89,8 +89,8 @@ promisedTest (`Issue #618 - Safari 11 add blob becomes null`, async ()=>{
         name: 'foo',
         blob
     }
-    let id = await db.items.add(obj);
-    const retrieved = await db.items.get(id);
+    let id = await db.songs.add(obj);
+    const retrieved = await db.songs.get(id);
     equal(retrieved.name, obj.name, `Blob name is '${obj.name}'`);
     ok(!!retrieved.blob, `Retrieved blob is truthy`);
     if (retrieved.blob) {
