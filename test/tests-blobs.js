@@ -4,7 +4,8 @@ import {resetDatabase, promisedTest} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBBinary");
 db.version(1).stores({
-    items: "id"
+    items: "id",
+    songs: "++id, name"
 });
 
 module("blobs", {
@@ -18,13 +19,27 @@ module("blobs", {
     }
 });
 
-function readBlob (blob) {
+function readBlob (blob, resultFormat) {
     return new Promise ((resolve, reject) => {
         let reader = new FileReader();
         reader.onloadend = ev => resolve (ev.target.result);
         reader.onerror = ev => reject(ev.target.error);
         reader.onabort = ev => reject(new Error("Blob Aborted"));
-        reader.readAsArrayBuffer(blob);
+        switch ((resultFormat||"arraybuffer").toLowerCase()) {
+            case 'text':
+                reader.readAsText(blob);
+                break;
+            case 'dataurl':
+                reader.readAsDataURL(blob);
+                break;
+            case 'binarystring':
+                reader.readAsBinaryString(blob);
+                break;
+            default:
+            case 'arraybuffer':
+                reader.readAsArrayBuffer(blob);
+                break;
+        }        
     });
 }
 
@@ -66,3 +81,19 @@ promisedTest (`Test blob with creating hook applied`, async ()=>{
     }
 });
 
+promisedTest (`Issue #618 - Safari 11 add blob becomes null`, async ()=>{
+    var debug = {hello: "world"};
+    var blob = new Blob([JSON.stringify(debug, null, 2)], {type : 'application/json'});
+    const obj = {
+        name: 'foo',
+        blob
+    }
+    let id = await db.songs.add(obj);
+    const retrieved = await db.songs.get(id);
+    equal(retrieved.name, obj.name, `Blob name is '${obj.name}'`);
+    ok(!!retrieved.blob, `Retrieved blob is truthy`);
+    if (retrieved.blob) {
+        const dataBack = JSON.parse(await readBlob(retrieved.blob, "text"));
+        equal(dataBack.hello, debug.hello, `Blob could be retrieved and decoded back`);
+    }
+});
