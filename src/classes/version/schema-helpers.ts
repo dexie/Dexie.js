@@ -1,6 +1,6 @@
 import { Dexie } from '../dexie';
 import { DbSchema } from '../../public/types/db-schema';
-import { setProp, keys, slice, _global, isArray } from '../../functions/utils';
+import { setProp, keys, slice, _global, isArray, shallowClone } from '../../functions/utils';
 import { Transaction } from '../transaction';
 import { Version } from './version';
 import { IDBTransaction, IDBObjectStore, IDBDatabase } from '../../public/types/indexeddb';
@@ -117,13 +117,19 @@ export function updateTablesAndIndexes(
       if (contentUpgrade) {
         anyContentUpgraderHasRun = true;
 
+        // Add to-be-deleted tables to contentUpgrade transaction
+        let upgradeSchema = shallowClone(newSchema);
+        diff.del.forEach(table => {
+          upgradeSchema[table] = oldSchema[table];
+        });
+
         // Safe to affect Transaction.prototype globally in this moment,
         // because when this code runs, there may not be any other code
         // that can access any transaction instance, else than this particular
         // upgrader function.
         removeTablesApi(db, [db.Transaction.prototype]);
-        setApiOnPlace(db, [db.Transaction.prototype], keys(newSchema), newSchema);
-        trans.schema = newSchema;
+        setApiOnPlace(db, [db.Transaction.prototype], keys(upgradeSchema), upgradeSchema);
+        trans.schema = upgradeSchema;
 
         return Promise.follow(() => {
           contentUpgrade(trans);
