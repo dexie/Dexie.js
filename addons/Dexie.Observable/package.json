@@ -26,7 +26,8 @@
   "contributors": [
     "Nikolas Poniros <https://github.com/nponiros>",
     "Yury Solovyov <https://github.com/YurySolovyov>",
-    "Martin Diphoorn <https://github.com/martindiphoorn>"
+    "Martin Diphoorn <https://github.com/martindiphoorn>",
+    "Corbin Crutchley <https://github.com/crutchcorn>"
   ],
   "license": "Apache-2.0",
   "bugs": {
@@ -63,7 +64,7 @@
       "node -e \"fs.writeFileSync('dist/dexie-observable.d.ts', fs.readFileSync('src/Dexie.Observable.d.ts'))\"",
       "node tools/replaceVersionAndDate.js dist/dexie-observable.d.ts",
       "# Minify the default ES5 UMD module",
-      "uglifyjs dist/dexie-observable.js -m -c -o dist/dexie-observable.min.js --source-map dist/dexie-observable.min.js.map  --in-source-map dist/dexie-observable.js.map"
+      "uglifyjs dist/dexie-observable.js -m -c -o dist/dexie-observable.min.js --source-map \"filename=dist/dexie-observable.min.js.map\" --in-source-map dist/dexie-observable.js.map"
     ],
     "test": [
       "# Build the unit tests (integration tests need no build)",
@@ -74,22 +75,22 @@
   },
   "homepage": "http://dexie.org",
   "peerDependencies": {
-    "dexie": "^2.0.0-beta.7"
+    "dexie": "^2.0.4"
   },
   "devDependencies": {
-    "dexie": "^2.0.0-beta.7",
+    "dexie": "^2.0.4",
     "eslint": "^3.14.0",
-    "just-build": "^0.9.13",
-    "karma": "^1.4.0",
+    "just-build": "^0.9.16",
+    "karma": "^2.0.2",
     "karma-browserstack-launcher": "^1.1.1",
     "karma-chrome-launcher": "^2.0.0",
-    "karma-firefox-launcher": "^1.0.0",
-    "karma-mocha-reporter": "^2.2.0",
+    "karma-firefox-launcher": "^1.1.0",
+    "karma-mocha-reporter": "^2.2.5",
     "karma-qunit": "^1.2.1",
     "qunitjs": "^1.23.1",
-    "rollup": "^0.41.4",
+    "rollup": "^0.55.5",
     "rollup-plugin-sourcemaps": "^0.4.1",
-    "typescript": "^2.6.2",
+    "typescript": "^2.8.3",
     "uglifyjs": "^2.4.10"
   }
 }
