@@ -1,4 +1,3 @@
-import { IDBKeyRangeConstructor } from '../public/types/indexeddb';
 import { maxString } from '../globals/constants';
 
 export function safariMultiStoreFix(storeNames: string[]) {
@@ -10,9 +9,9 @@ export function getNativeGetDatabaseNamesFn(indexedDB) {
   return fn && fn.bind(indexedDB);
 }
 
-export function getMaxKey (IDBKeyRange: IDBKeyRangeConstructor) {
+export function getMaxKey (IdbKeyRange: typeof IDBKeyRange) {
   try {
-    IDBKeyRange.only([[]]);
+    IdbKeyRange.only([[]]);
     return [[]];
   } catch (e) {
     return maxString;

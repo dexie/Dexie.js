@@ -1,4 +1,3 @@
-import { IDBObjectStore, IDBValidKey } from '../../public/types/indexeddb';
 import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from '../../errors';
 import { Table as ITable } from '../../public/types/table';
 import { TableSchema } from '../../public/types/table-schema';
@@ -19,6 +18,7 @@ import { PromiseExtended } from "../../public/types/promise-extended";
 import { bulkDelete } from '../../functions/bulk-delete';
 import { IndexableType } from '../../public/types/indexable-type';
 import { debug } from '../../helpers/debug';
+import { DBCoreTransactionMode, DBCore, DBCoreTransaction } from '../../public/types/dbcore';
 
 /** class Table
  * 
@@ -33,33 +33,21 @@ export class Table implements ITable<any, IndexableType> {
 
   _trans(
     mode: IDBTransactionMode,
-    fn: (resolve, reject, trans: Transaction) => Promise | void,
+    fn: (trans: Transaction) => PromiseLike<any> | void,
     writeLocked?: boolean | string) : Promise
   {
-    var trans: Transaction = this._tx || PSD.trans;
-    return trans && trans.db === this.db ?
-      trans === PSD.trans ?
-        trans._promise(mode, fn, writeLocked) :
-        newScope(() => trans._promise(mode, fn, writeLocked), { trans: trans, transless: PSD.transless || PSD }) :
-      tempTransaction(this.db, mode, [this.name], fn);
-  }
-
-  _idbstore(
-    mode: IDBTransactionMode,
-    fn: (
-      resolve,
-      reject,
-      idbstore: IDBObjectStore,
-      trans: Transaction) => Promise | void,
-    writeLocked?: boolean | string) : Promise
-  {
-    var tableName = this.name;
-    function supplyIdbStore(resolve, reject, trans: Transaction) {
+    const trans: Transaction = this._tx || PSD.trans;
+    const tableName = this.name;
+    function checkTableInTransaction(resolve, reject, trans: Transaction) {
       if (!trans.schema[tableName])
         throw new exceptions.NotFound("Table " + tableName + " not part of transaction");
-      return fn(resolve, reject, trans.idbtrans.objectStore(tableName), trans);
+      return fn(trans);
     }
-    return this._trans(mode, supplyIdbStore, writeLocked);
+    return trans && trans.db === this.db ?
+      trans === PSD.trans ?
+        trans._promise(mode, checkTableInTransaction, writeLocked) :
+        newScope(() => trans._promise(mode, checkTableInTransaction, writeLocked), { trans: trans, transless: PSD.transless || PSD }) :
+      tempTransaction(this.db, mode, [this.name], checkTableInTransaction);
   }
 
   /** Table.get()
@@ -69,14 +57,14 @@ export class Table implements ITable<any, IndexableType> {
    **/
   get(keyOrCrit, cb?) {
     if (keyOrCrit && keyOrCrit.constructor === Object)
-      return this.where(keyOrCrit as { [key: string]: IDBValidKey }).first(cb);
+      return this.where(keyOrCrit as { [key: string]: IndexableType }).first(cb);
 
-    return this._idbstore('readonly', (resolve, reject, idbstore) => {
-      const req = idbstore.get(keyOrCrit);
-      req.onerror = eventRejectHandler(reject);
-      req.onsuccess = wrap(() => {
-        resolve(this.hook.reading.fire(req.result));
-      }, reject);
+    return this._trans('readonly', (trans) => {
+      return this.db.core.getOne({table: this.name, trans, key: keyOrCrit})
+        .then((res => {
+          this.hook.reading.fire(res);
+          return res;
+        }));
     }).then(cb);
   }
 
@@ -85,7 +73,7 @@ export class Table implements ITable<any, IndexableType> {
    * http://dexie.org/docs/Table/Table.where()
    * 
    **/
-  where(indexOrCrit: string | string[] | { [key: string]: IDBValidKey }) {
+  where(indexOrCrit: string | string[] | { [key: string]: IndexableType }) {
     if (typeof indexOrCrit === 'string')
       return new this.db.WhereClause(this, indexOrCrit);
     if (isArray(indexOrCrit))
@@ -197,7 +185,7 @@ export class Table implements ITable<any, IndexableType> {
    * http://dexie.org/docs/Table/Table.each()
    * 
    **/
-  each(callback: (obj: any, cursor: { key: IDBValidKey, primaryKey: IDBValidKey }) => any) {
+  each(callback: (obj: any, cursor: { key: IndexableType, primaryKey: IndexableType }) => any) {
     return this.toCollection().each(callback);
   }
 
@@ -279,23 +267,31 @@ export class Table implements ITable<any, IndexableType> {
    * http://dexie.org/docs/Table/Table.add()
    * 
    **/
-  add(obj, key?: IDBValidKey) {
+  add(obj, key?: IndexableType) {
     const creatingHook = this.hook.creating.fire;
-    return this._idbstore('readwrite', (resolve, reject, idbstore, trans) => {
+    return this._trans('readwrite', trans => {
+      const keyPath = this.schema.primKey.keyPath;
       const hookCtx = { onsuccess: null as any, onerror: null as any };
       if (creatingHook !== nop) {
-        const effectiveKey = (key != null) ? key : (idbstore.keyPath ? getByKeyPath(obj, idbstore.keyPath) : undefined);
+        const effectiveKey = (key != null) ? key : (keyPath ? getByKeyPath(obj, keyPath) : undefined);
         const keyToUse = creatingHook.call(hookCtx, effectiveKey, obj, trans); // Allow subscribers to when("creating") to generate the key.
         if (effectiveKey == null && keyToUse != null) { // Using "==" and "!=" to check for either null or undefined!
-          if (idbstore.keyPath)
-            setByKeyPath(obj, idbstore.keyPath, keyToUse);
+          if (keyPath)
+            setByKeyPath(obj, keyPath, keyToUse);
           else
             key = keyToUse;
         }
       }
+      return this.db.core.writeMany({
+        table: this.name,
+        trans, 
+        op: 'insert',
+        keys: key != null && [key],
+        values: [obj]
+      }).then
       try {
         const req = (key != null ?
-          idbstore.add(obj, key) :
+          idbstore.add(obj, key as IDBValidKey) :
           idbstore.add(obj)
         ) as IDBRequest & { _hookCtx?};
 
@@ -343,7 +339,7 @@ export class Table implements ITable<any, IndexableType> {
    * http://dexie.org/docs/Table/Table.put()
    * 
    **/
-  put(obj, key?: IDBValidKey) {
+  put(obj, key?: IndexableType) {
     const creatingHook = this.hook.creating.fire,
       updatingHook = this.hook.updating.fire;
     if (creatingHook !== nop || updatingHook !== nop) {
@@ -390,7 +386,7 @@ export class Table implements ITable<any, IndexableType> {
    * http://dexie.org/docs/Table/Table.delete()
    * 
    **/
-  delete(key: IDBValidKey) {
+  delete(key: IndexableType) {
     if (this.hook.deleting.subscribers.length) {
       // People listens to when("deleting") event. Must implement delete using Collection.delete() that will
       // call the CRUD event. Only Collection.delete() will know whether an object was actually deleted.
@@ -433,7 +429,7 @@ export class Table implements ITable<any, IndexableType> {
    * http://dexie.org/docs/Table/Table.bulkAdd()
    * 
    **/
-  bulkAdd(objects: any[], keys?: ReadonlyArray<IDBValidKey>) {
+  bulkAdd(objects: any[], keys?: ReadonlyArray<IndexableType>) {
     const creatingHook = this.hook.creating.fire;
     return this._idbstore('readwrite', (resolve, reject, idbstore, trans) => {
       if (!idbstore.keyPath && !this.schema.primKey.auto && !keys)
@@ -518,7 +514,7 @@ export class Table implements ITable<any, IndexableType> {
    * http://dexie.org/docs/Table/Table.bulkPut()
    * 
    **/
-  bulkPut(objects: any[], keys?: ReadonlyArray<IDBValidKey>) {
+  bulkPut(objects: any[], keys?: ReadonlyArray<IndexableType>) {
     return this._idbstore('readwrite', (resolve, reject, idbstore) => {
       if (!idbstore.keyPath && !this.schema.primKey.auto && !keys)
         throw new exceptions.InvalidArgument("bulkPut() with non-inbound keys requires keys array in second argument");
@@ -562,7 +558,7 @@ export class Table implements ITable<any, IndexableType> {
           // Keys provided. Either as inbound in provided objects, or as a keys argument.
           // Begin with updating those that exists in DB:
           table.where(':id').anyOf(effectiveKeys.filter(key => key != null))
-            .modify(function (this: { value: any, primKey: IDBValidKey }) {
+            .modify(function (this: { value: any, primKey: IndexableType }) {
               this.value = objectLookup[this.primKey as string]; // BUGBUG: fix objectLookup for binary keys
               objectLookup[this.primKey as string] = null; // Mark as "don't add this"
             }).catch(ModifyError, e => {
@@ -607,7 +603,7 @@ export class Table implements ITable<any, IndexableType> {
    * http://dexie.org/docs/Table/Table.bulkDelete()
    * 
    **/
-  bulkDelete(keys: ReadonlyArray<IDBValidKey>): PromiseExtended<void> {
+  bulkDelete(keys: ReadonlyArray<IndexableType>): PromiseExtended<void> {
     if (this.hook.deleting.fire === nop) {
       return this._idbstore('readwrite', (resolve, reject, idbstore, trans) => {
         resolve(bulkDelete(idbstore, trans, keys, false, nop));

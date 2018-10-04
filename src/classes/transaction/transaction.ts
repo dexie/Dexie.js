@@ -4,7 +4,6 @@ import { DbSchema } from '../../public/types/db-schema';
 import { assert, hasOwn } from '../../functions/utils';
 import { PSD, usePSD } from '../../helpers/promise';
 import { Dexie } from '../dexie';
-import { IDBTransaction } from '../../public/types/indexeddb';
 import { exceptions } from '../../errors';
 import { safariMultiStoreFix } from '../../functions/quirks';
 import { preventDefault } from '../../functions/event-wrappers';
@@ -137,7 +136,7 @@ export class Transaction implements ITransaction {
    */
   _promise(
     mode: IDBTransactionMode,
-    fn: (resolve, reject, trans: Transaction) => DexiePromise | void,
+    fn: (resolve, reject, trans: Transaction) => PromiseLike<any> | void,
     bWriteLock?: string | boolean): DexiePromise
   {
     if (mode === 'readwrite' && this.mode !== 'readwrite')

@@ -7,7 +7,7 @@ import { INVALID_KEY_ARGUMENT, STRING_EXPECTED, maxString, minKey } from '../../
 import { getArrayOf, NO_CHAR_ARRAY } from '../../functions/utils';
 import { exceptions } from '../../errors';
 import { Dexie } from '../dexie';
-import { IndexableTypeArray, IDBValidKey, IDBKeyRangeConstructor } from '../../public/types/indexeddb';
+import { IndexableTypeArray, IndexableType, IDBKeyRangeConstructor } from '../../public/types/indexeddb';
 
 /** class WhereClause
  * 
@@ -21,11 +21,11 @@ export class WhereClause implements IWhereClause {
     index: string;
     or: Collection;
   }
-  _cmp: (a: IDBValidKey, b: IDBValidKey) => number;
-  _ascending: (a: IDBValidKey, b: IDBValidKey) => number;
-  _descending: (a: IDBValidKey, b: IDBValidKey) => number;
-  _min: (a: IDBValidKey, b: IDBValidKey) => IDBValidKey;
-  _max: (a: IDBValidKey, b: IDBValidKey) => IDBValidKey;
+  _cmp: (a: IndexableType, b: IndexableType) => number;
+  _ascending: (a: IndexableType, b: IndexableType) => number;
+  _descending: (a: IndexableType, b: IndexableType) => number;
+  _min: (a: IndexableType, b: IndexableType) => IndexableType;
+  _max: (a: IndexableType, b: IndexableType) => IndexableType;
 
   get Collection() {
     return this._ctx.table.db.Collection;

@@ -11,6 +11,7 @@ import { DexieConstructor } from "./dexie-constructor";
 import { PromiseExtended } from "./promise-extended";
 import { Database } from "./database";
 import { IndexableType } from "./indexable-type";
+import { DBCore } from "./dbcore";
 
 export interface Dexie extends Database {
   readonly name: string;
@@ -61,6 +62,9 @@ export interface Dexie extends Database {
   dynamicallyOpened(): boolean;
 
   backendDB(): IDBDatabase;
+
+  use(middleware: {middleware: (next: DBCore) => Partial<DBCore>, level?: number, name?: string}): this;
+  unuse(middleware: (next: DBCore) => Partial<DBCore>): this;
   
   // Make it possible to touch physical class constructors where they reside - as properties on db instance.
   // For example, checking if (x instanceof db.Table). Can't do (x instanceof Dexie.Table because it's just a virtual interface)

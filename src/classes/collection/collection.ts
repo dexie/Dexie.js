@@ -2,7 +2,7 @@ import { Collection as ICollection } from "../../public/types/collection";
 import { WhereClause } from "../where-clause/where-clause";
 import { Dexie } from "../dexie";
 import { Table } from "../table";
-import { IDBKeyRange, IDBValidKey } from "../../public/types/indexeddb";
+import { IDBKeyRange, IndexableType } from "../../public/types/indexeddb";
 import { PromiseExtended } from "../../public/types/promise-extended";
 import { iter, isPlainKeyRange, getIndexOrStore, addReplayFilter, addFilter, addMatchFilter } from "./collection-helpers";
 import { IDBObjectStore, IDBCursor } from '../../public/types/indexeddb';

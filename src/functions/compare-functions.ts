@@ -1,4 +1,4 @@
-import { IDBFactory, IDBValidKey } from '../public/types/indexeddb';
+import { IDBFactory, IndexableType } from '../public/types/indexeddb';
 
 export function simpleCompare(a, b) {
   return a < b ? -1 : a === b ? 0 : 1;

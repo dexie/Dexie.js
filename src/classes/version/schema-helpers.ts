@@ -3,7 +3,6 @@ import { DbSchema } from '../../public/types/db-schema';
 import { setProp, keys, slice, _global, isArray, shallowClone } from '../../functions/utils';
 import { Transaction } from '../transaction';
 import { Version } from './version';
-import { IDBTransaction, IDBObjectStore, IDBDatabase } from '../../public/types/indexeddb';
 import Promise, { PSD, newScope } from '../../helpers/promise';
 import { exceptions } from '../../errors';
 import { TableSchema } from '../../public/types/table-schema';
@@ -262,14 +261,13 @@ export function addIndex(store: IDBObjectStore, idx: IndexSpec) {
   store.createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multi });
 }
 
-export function readGlobalSchema(db: Dexie, idbdb: IDBDatabase) {
+export function readGlobalSchema(db: Dexie, idbdb: IDBDatabase, tmpTrans: IDBTransaction) {
   db.verno = idbdb.version / 10;
   const globalSchema = db._dbSchema = {};
   const dbStoreNames = db._storeNames = slice(idbdb.objectStoreNames, 0);
   if (dbStoreNames.length === 0) return; // Database contains no stores.
-  const trans = idbdb.transaction(safariMultiStoreFix(dbStoreNames), 'readonly');
   dbStoreNames.forEach(storeName => {
-    const store = trans.objectStore(storeName);
+    const store = tmpTrans.objectStore(storeName);
     let keyPath = store.keyPath;
     const primKey = createIndexSpec(nameFromKeyPath(keyPath), keyPath || "", false, false, !!store.autoIncrement, keyPath && typeof keyPath !== 'string');
     const indexes: IndexSpec[] = [];

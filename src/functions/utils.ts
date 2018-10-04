@@ -177,7 +177,7 @@ export function shallowClone(obj) {
 }
 
 const concat = [].concat;
-export function flatten (a) {
+export function flatten<T> (a: (T | T[])[]) : T[] {
     return concat.apply([], a);
 }
 

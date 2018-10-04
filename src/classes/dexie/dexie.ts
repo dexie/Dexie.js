@@ -2,7 +2,6 @@
 import { Dexie as IDexie } from "../../public/types/dexie";
 import { DexieOptions, DexieConstructor } from "../../public/types/dexie-constructor";
 import { DbEvents } from "../../public/types/db-events";
-import { IDBValidKey, IDBKeyRangeConstructor, IDBFactory, IDBEvent } from '../../public/types/indexeddb';
 //import { PromiseExtended, PromiseExtendedConstructor } from '../../public/types/promise-extended';
 import { Table as ITable } from '../../public/types/table';
 import { TableSchema } from "../../public/types/table-schema";
@@ -39,6 +38,7 @@ import { extractTransactionArgs, enterTransactionScope } from './transaction-hel
 import { TransactionMode } from '../../public/types/transaction-mode';
 import { rejection } from '../../helpers/promise';
 import { usePSD } from '../../helpers/promise';
+import { DBCore } from '../../public/types/dbcore';
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -64,7 +64,9 @@ export class Dexie implements IDexie {
   _dbSchema: { [tableName: string]: TableSchema; };
   _hasGetAll?: boolean;
   _maxKey: IDBValidKey;
-  _fireOnBlocked: (ev: IDBEvent) => void;
+  _fireOnBlocked: (ev: Event) => void;
+  _middlewares: {middleware: (down: DBCore) => Partial<DBCore>, level: number, name: string | undefined}[];
+  core: DBCore;
 
   name: string;
   verno: number = 0;
@@ -90,7 +92,7 @@ export class Dexie implements IDexie {
     };
     this._deps = {
       indexedDB: options.indexedDB as IDBFactory,
-      IDBKeyRange: options.IDBKeyRange as IDBKeyRangeConstructor
+      IDBKeyRange: options.IDBKeyRange as typeof IDBKeyRange
     };
     const {
       addons,
@@ -181,7 +183,7 @@ export class Dexie implements IDexie {
         console.warn(`Upgrade '${this.name}' blocked by other connection holding version ${ev.oldVersion / 10}`);
     });
 
-    this._maxKey = getMaxKey(options.IDBKeyRange as IDBKeyRangeConstructor);
+    this._maxKey = getMaxKey(options.IDBKeyRange as typeof IDBKeyRange);
 
     this._createTransaction = (
       mode: IDBTransactionMode,
@@ -229,6 +231,17 @@ export class Dexie implements IDexie {
       }
       this._state.dbReadyPromise.then(resolve, reject);
     }).then(fn);
+  }
+
+  use({middleware, level, name}: {middleware: (down: DBCore) => Partial<DBCore>, level?: number, name?: string}) {
+    this._middlewares.push({middleware, level: level == null ? 5 : level, name});
+    this._middlewares.sort((a, b) => a.level - b.level);
+    return this;
+  }
+
+  unuse(middleware: (down: DBCore) => DBCore) {
+    this._middlewares = this._middlewares.filter(mw => mw.middleware !== middleware);
+    return this;
   }
 
   open() {
