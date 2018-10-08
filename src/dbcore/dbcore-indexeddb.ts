@@ -112,8 +112,8 @@ export function createDBCore (
           throw new Error ("Invalid operation type: " + type);
 
         const {length} = keys || values || {length: 1}; // keys.length if keys. values.length if values. 1 if range.
-        if (type !== 'deleteRange' && (!keys || (type !== 'delete' && keys.length !== values.length))) {
-          throw new Error("Keys must be resolved before calling mutate()");
+        if (keys && values && keys.length !== values.length) {
+          throw new Error("Given keys array must have same length as given values array.");
         }
         if (length === 0)
           // No items to write. Don't even bother!
