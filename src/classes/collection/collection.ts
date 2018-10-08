@@ -111,25 +111,25 @@ export class Collection implements ICollection {
    * 
    **/
   count(cb?) {
-    var ctx = this._ctx;
-    const coreTable = ctx.table.core;
-
-    if (isPlainKeyRange(ctx, true)) {
-      // This is a plain key range. We can use the count() method if the index.
-      return this._read(trans => coreTable.count({
-        trans,
-        query: {
-          index: coreTable.schema.getIndexByKeyPath(ctx.index),
-          range: ctx.range ? {...ctx.range, type: RangeType.Range} : AnyRange
-        }
-      })).then(cb);
-    } else {
-      // Algorithms, filters or expressions are applied. Need to count manually.
-      var count = 0;
-      return this._read(trans =>
-        iter(ctx, () => { ++count; return false; }, trans, coreTable)
-      ).then(()=>count).then(cb);
-    }
+    return this._read(trans => {
+      const ctx = this._ctx;
+      const coreTable = ctx.table.core;
+      if (isPlainKeyRange(ctx, true)) {
+        // This is a plain key range. We can use the count() method if the index.
+        return coreTable.count({
+          trans,
+          query: {
+            index: coreTable.schema.getIndexByKeyPath(ctx.index),
+            range: ctx.range ? {...ctx.range, type: RangeType.Range} : AnyRange
+          }
+        });
+      } else {
+        // Algorithms, filters or expressions are applied. Need to count manually.
+        var count = 0;
+        return iter(ctx, () => { ++count; return false; }, trans, coreTable)
+        .then(()=>count);
+      }
+    }).then(cb);
   }
 
   /** Collection.sortBy()

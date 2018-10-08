@@ -80,7 +80,9 @@ export function dexieOpen (db: Dexie) {
           const tmpTrans = idbdb.transaction(safariMultiStoreFix(slice(idbdb.objectStoreNames)), 'readonly');
           const stacks = createMiddlewareStacks(db._middlewares, idbdb, db._deps, tmpTrans);
           db.core = stacks.dbcore!;
-          db.tables.forEach(table => table.core = db.core.table(table.name));
+          db.tables.forEach(table => {
+              table.core = db.core.table(table.name);
+          });
           connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.
 
           if (state.autoSchema) readGlobalSchema(db, idbdb, tmpTrans);

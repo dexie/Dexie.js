@@ -17,7 +17,7 @@ export function HooksMiddleware(db: Dexie): Middleware<DBCore> {
       ...downCore,
       table(tableName: string) {
         const {deleting, creating, updating} = db.table(tableName).hook;
-        const downTable = downCore.table(name);
+        const downTable = downCore.table(tableName);
         const {primaryKey} = downTable.schema;
     
         const tableMiddleware: DBCoreTable = {
