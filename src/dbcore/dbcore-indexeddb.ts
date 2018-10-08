@@ -217,6 +217,7 @@ export function createDBCore (
         // iteration
         req.onerror = eventRejectHandler(reject);
         req.onsuccess = wrap(ev => {
+
           const cursor = req.result as DBCoreCursor;
           if (!cursor) {
             resolve(null);
@@ -226,9 +227,11 @@ export function createDBCore (
           const _cursorContinue = cursor.continue.bind(cursor);
           const _cursorContinuePrimaryKey = cursor.continuePrimaryKey.bind(cursor);
           const _cursorAdvance = cursor.advance.bind(cursor);
-          const doThrowCursorIsStopped = ()=>{throw new Error("Cursor not started");}
+          const doThrowCursorIsNotStarted = ()=>{throw new Error("Cursor not started");}
+          const doThrowCursorIsStopped = ()=>{throw new Error("Cursor not stopped");}
           (cursor as any).trans = trans;
-          cursor.stop = cursor.continue = cursor.continuePrimaryKey = cursor.advance = doThrowCursorIsStopped;
+          cursor.stop = cursor.continue = cursor.continuePrimaryKey = cursor.advance = doThrowCursorIsNotStarted;
+          cursor.fail = reject;
           cursor.next = function (this: DBCoreCursor) {
             // next() must work with "this" pointer in order to function correctly for ProxyCursors (derived objects)
             // without having to re-define next() on each child.
@@ -238,11 +241,11 @@ export function createDBCore (
           cursor.start = (callback) => {
             const iterationPromise = new Promise<void>((resolveIteration, rejectIteration) =>{
               req.onerror = eventRejectHandler(rejectIteration);
+              cursor.fail = rejectIteration;
               cursor.stop = value => {
                 cursor.stop = cursor.continue = cursor.continuePrimaryKey = cursor.advance = doThrowCursorIsStopped;
-                cursor.fail = req.onerror = rejectIteration;
                 resolveIteration(value);
-              }
+              };
             });
             // Now change req.onsuccess to a callback that doesn't call initCursor but just observer.next()
             const guardedCallback = () => {
@@ -258,13 +261,17 @@ export function createDBCore (
                 cursor.stop();
               }
             }
-            req.onsuccess = wrap(() => {
-              cursor.continue = _cursorContinue;
-              cursor.continuePrimaryKey = _cursorContinuePrimaryKey;
-              cursor.advance = _cursorAdvance;
+            req.onsuccess = wrap(ev => {
+              console.log("Next cursor stop", cursor, ev.target);
+              //cursor.continue = _cursorContinue;
+              //cursor.continuePrimaryKey = _cursorContinuePrimaryKey;
+              //cursor.advance = _cursorAdvance;
               req.onsuccess = guardedCallback;
               guardedCallback();
             });
+            cursor.continue = _cursorContinue;
+            cursor.continuePrimaryKey = _cursorContinuePrimaryKey;
+            cursor.advance = _cursorAdvance;
             guardedCallback();
             return iterationPromise;
           };
@@ -278,14 +285,15 @@ export function createDBCore (
         return new Promise<DBCoreQueryResponse>((resolve, reject) => {
           resolve = wrap(resolve);
           const {trans, values, limit, query} = request;
+          const nonInfinitLimit = limit === Infinity ? undefined : limit;
           const {index, range} = query;
           const store = (trans as IDBTransaction).objectStore(tableName);
           const source = index.isPrimaryKey ? store : store.index(index.name);
           const idbKeyRange = makeIDBKeyRange(range);
           if (hasGetAll) {
             const req = values ?
-                (source as any).getAll(idbKeyRange, limit) :
-                (source as any).getAllKeys(makeIDBKeyRange(range), limit);
+                (source as any).getAll(idbKeyRange, nonInfinitLimit) :
+                (source as any).getAllKeys(makeIDBKeyRange(range), nonInfinitLimit);
             req.onsuccess = event => resolve({result: event.target.result});
             req.onerror = eventRejectHandler(reject);
           } else {

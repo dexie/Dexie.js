@@ -90,10 +90,14 @@ function iterate(cursorPromise: Promise<DBCoreCursor>, filter, fn, valueMapper):
   // Wrap fn with PSD and microtick stuff from Promise.
   var wrappedFn = wrap(mappedFn);
   
-  return cursorPromise.then(cursor => cursor && cursor.start(()=>{
-    var c = ()=>cursor.continue();
-    if (!filter || filter(cursor, advancer => c = advancer, val=>{cursor.stop(val);c=nop}, e => {cursor.fail(e);c = nop;}))
-      wrappedFn(cursor.value, cursor, advancer => c = advancer);
-    c();
-  }));
+  return cursorPromise.then(cursor => {
+    if (cursor) {
+      return cursor.start(()=>{
+        var c = ()=>cursor.continue();
+        if (!filter || filter(cursor, advancer => c = advancer, val=>{cursor.stop(val);c=nop}, e => {cursor.fail(e);c = nop;}))
+          wrappedFn(cursor.value, cursor, advancer => c = advancer);
+        c();
+      });
+    }
+  });
 }
