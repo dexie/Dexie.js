@@ -6,6 +6,7 @@ import { eventRejectHandler } from "../../functions/event-wrappers";
 import { Collection } from './';
 import { DBCoreCursor, DBCoreTable, DBCoreTransaction, DBCoreTableSchema, RangeType } from '../../public/types/dbcore';
 import { Table } from '../table';
+import { nop } from '../../functions/chaining-functions';
 
 type CollectionContext = Collection["_ctx"];
 
@@ -91,7 +92,7 @@ function iterate(cursorPromise: Promise<DBCoreCursor>, filter, fn, valueMapper):
   
   return cursorPromise.then(cursor => cursor && cursor.start(()=>{
     var c = ()=>cursor.continue();
-    if (!filter || filter(cursor, advancer => c = advancer, val=>cursor.stop(val), e => cursor.fail(e)))
+    if (!filter || filter(cursor, advancer => c = advancer, val=>{cursor.stop(val);c=nop}, e => {cursor.fail(e);c = nop;}))
       wrappedFn(cursor.value, cursor, advancer => c = advancer);
     c();
   }));
