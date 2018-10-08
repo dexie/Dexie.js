@@ -12,10 +12,10 @@ import { eventRejectHandler, eventSuccessHandler, hookedEventRejectHandler, hook
 import { mirror, nop } from "../../functions/chaining-functions";
 import { ModifyError } from "../../errors";
 import { hangsOnDeleteLargeKeyRange } from "../../globals/constants";
-import { bulkDelete } from "../../functions/bulk-delete";
 import { ThenShortcut } from "../../public/types/then-shortcut";
 import { Transaction } from '../transaction';
 import { DBCoreCursor, DBCoreTransaction, RangeType, MutateResponse } from '../../public/types/dbcore';
+import { AnyRange } from '../../dbcore/keyrange';
 
 /** class Collection
  * 
@@ -120,7 +120,7 @@ export class Collection implements ICollection {
         trans,
         query: {
           index: coreTable.schema.getIndexByKeyPath(ctx.index),
-          range: {...ctx.range, type: RangeType.Range}
+          range: ctx.range ? {...ctx.range, type: RangeType.Range} : AnyRange
         }
       })).then(cb);
     } else {
@@ -178,7 +178,7 @@ export class Collection implements ICollection {
           values: true,
           query: {
             index,
-            range: {...ctx.range, type: RangeType.Range}
+            range: ctx.range ? {...ctx.range, type: RangeType.Range} : AnyRange
           }
         }).then(({result}) => result);
       } else {
@@ -392,7 +392,7 @@ export class Collection implements ICollection {
           limit: ctx.limit,
           query: {
             index,
-            range: {...ctx.range, type: RangeType.Range}
+            range: ctx.range ? {...ctx.range, type: RangeType.Range} : AnyRange
           }});
       }).then(({result})=>result).then(cb);
     }
@@ -568,81 +568,35 @@ export class Collection implements ICollection {
    * http://dexie.org/docs/Collection/Collection.delete()
    * 
    **/
-  delete() {
+  delete() : PromiseExtended<number> {
     var ctx = this._ctx,
-      range = ctx.range,
-      deletingHook = ctx.table.hook.deleting.fire,
-      hasDeleteHook = deletingHook !== nop;
-    if (!hasDeleteHook &&
-      isPlainKeyRange(ctx) &&
+      range = ctx.range;
+      //deletingHook = ctx.table.hook.deleting.fire,
+      //hasDeleteHook = deletingHook !== nop;
+    if (isPlainKeyRange(ctx) &&
       ((ctx.isPrimKey && !hangsOnDeleteLargeKeyRange) || !range)) // if no range, we'll use clear().
     {
       // May use IDBObjectStore.delete(IDBKeyRange) in this case (Issue #208)
       // For chromium, this is the way most optimized version.
       // For IE/Edge, this could hang the indexedDB engine and make operating system instable
       // (https://gist.github.com/dfahlander/5a39328f029de18222cf2125d56c38f7)
-      return this._write((resolve, reject, idbstore) => {
+      return this._write(trans => {
         // Our API contract is to return a count of deleted items, so we have to count() before delete().
-        var onerror = eventRejectHandler(reject),
-          countReq = (range ? idbstore.count(range) : idbstore.count());
-        countReq.onerror = onerror;
-        countReq.onsuccess = () => {
-          var count = countReq.result;
-          tryCatch(() => {
-            var delReq = (range ? idbstore.delete(range) : idbstore.clear());
-            delReq.onerror = onerror;
-            delReq.onsuccess = () => resolve(count);
-          }, err => reject(err));
-        };
+        const {primaryKey} = ctx.table.core.schema;
+        const coreRange = range ? {...range, type: RangeType.Range} : AnyRange;
+        return ctx.table.core.count({trans, query: {index: primaryKey, range: coreRange}}).then(count => {
+          return ctx.table.core.mutate({trans, type: 'deleteRange', range: coreRange})
+          .then(({failures, lastResult, results, numFailures}) => {
+            if (numFailures) throw new ModifyError("Could not delete some values",
+              Object.keys(failures).map(pos => failures[pos]),
+              count - numFailures);
+            return count - numFailures;
+          });
+        });
       });
     }
 
-    // Default version to use when collection is not a vanilla IDBKeyRange on the primary key.
-    // Divide into chunks to not starve RAM.
-    // If has delete hook, we will have to collect not just keys but also objects, so it will use
-    // more memory and need lower chunk size.
-    const CHUNKSIZE = hasDeleteHook ? 2000 : 10000;
-
-    return this._write((resolve, reject, idbstore, trans) => {
-      var totalCount = 0;
-      // Clone collection and change its table and set a limit of CHUNKSIZE on the cloned Collection instance.
-      var collection = this
-        .clone({
-          keysOnly: !ctx.isMatch && !hasDeleteHook
-        }) // load just keys (unless filter() or and() or deleteHook has subscribers)
-        .distinct() // In case multiEntry is used, never delete same key twice because resulting count
-        // would become larger than actual delete count.
-        .limit(CHUNKSIZE)
-        .raw(); // Don't filter through reading-hooks (like mapped classes etc)
-
-      var keysOrTuples = [];
-
-      // We're gonna do things on as many chunks that are needed.
-      // Use recursion of nextChunk function:
-      const nextChunk = () => collection.each(hasDeleteHook ? (val, cursor) => {
-        // Somebody subscribes to hook('deleting'). Collect all primary keys and their values,
-        // so that the hook can be called with its values in bulkDelete().
-        keysOrTuples.push([cursor.primaryKey, cursor.value]);
-      } : (val, cursor) => {
-        // No one subscribes to hook('deleting'). Collect only primary keys:
-        keysOrTuples.push(cursor.primaryKey);
-      }).then(() => {
-        // Chromium deletes faster when doing it in sort order.
-        const indexedDB = this.db._deps.indexedDB;
-        hasDeleteHook ?
-          keysOrTuples.sort((a, b) => indexedDB.cmp(a[0], b[0])) :
-          keysOrTuples.sort((a, b) => indexedDB.cmp(a, b));
-        return bulkDelete(idbstore, trans, keysOrTuples, hasDeleteHook, deletingHook);
-
-      }).then(() => {
-        var count = keysOrTuples.length;
-        totalCount += count;
-        keysOrTuples = [];
-        return count < CHUNKSIZE ? totalCount : nextChunk();
-      });
-
-      resolve(nextChunk());
-    });
+    return this.modify((value, ctx) => ctx.value = null);
   }
 }
 

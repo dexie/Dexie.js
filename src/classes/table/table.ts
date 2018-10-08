@@ -15,7 +15,6 @@ import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, deepClone, tryCatch,
 import { maxString } from '../../globals/constants';
 import { combine } from '../../functions/combine';
 import { PromiseExtended } from "../../public/types/promise-extended";
-import { bulkDelete } from '../../functions/bulk-delete';
 import { IndexableType } from '../../public/types/indexable-type';
 import { debug } from '../../helpers/debug';
 import { DBCoreTransactionMode, DBCore, DBCoreTransaction, DBCoreTable, RangeType } from '../../public/types/dbcore';
@@ -325,7 +324,8 @@ export class Table implements ITable<any, IndexableType> {
    **/
   clear() {
     return this._trans('readwrite',
-      trans => this.core.mutate({trans, type: 'deleteRange', range: AnyRange})).;
+      trans => this.core.mutate({trans, type: 'deleteRange', range: AnyRange}))
+        .then(res => res.numFailures ? Promise.reject(res.failures[0]) : undefined);
   }
 
   /** Table.bulkAdd()

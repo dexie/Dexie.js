@@ -41,6 +41,7 @@ import { DBCore } from '../../public/types/dbcore';
 import { Middleware, DexieStacks } from '../../public/types/middleware';
 import { virtualIndexMiddleware } from '../../dbcore/virtual-index-middleware';
 import { HooksMiddleware } from '../../hooks/hooks-middleware';
+import { IndexableType } from '../../public';
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -65,7 +66,7 @@ export class Dexie implements IDexie {
   _createTransaction: (this: Dexie, mode: IDBTransactionMode, storeNames: ArrayLike<string>, dbschema: { [tableName: string]: TableSchema; }, parentTransaction?: Transaction) => Transaction;
   _dbSchema: { [tableName: string]: TableSchema; };
   _hasGetAll?: boolean;
-  _maxKey: IDBValidKey;
+  _maxKey: IndexableType;
   _fireOnBlocked: (ev: Event) => void;
   _middlewares: {[StackName in keyof DexieStacks]?: Middleware<DexieStacks[StackName]>[]} = {};
   core: DBCore;
@@ -414,7 +415,7 @@ export class Dexie implements IDexie {
   }
 
   table(tableName: string): Table;
-  table<T, TKey extends IDBValidKey=IDBValidKey>(tableName: string): ITable<T, TKey>;
+  table<T, TKey extends IndexableType=IndexableType>(tableName: string): ITable<T, TKey>;
   table(tableName: string): Table {
     if (!hasOwn(this._allTables, tableName)) {
       throw new exceptions.InvalidTable(`Table ${tableName} does not exist`); }
