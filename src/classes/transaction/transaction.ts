@@ -246,6 +246,7 @@ export class Transaction implements ITransaction {
     }
 
     const transactionBoundTable = new this.db.Table(tableName, tableSchema, this);
+    transactionBoundTable.core = this.db.core.table(tableName);
     memoizedTables[tableName] = transactionBoundTable;
     return transactionBoundTable;
   }

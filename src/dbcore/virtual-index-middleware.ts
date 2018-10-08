@@ -4,6 +4,7 @@ import { isArray, flatten } from '../functions/utils';
 import { getKeyExtractor } from './get-key-extractor';
 import { exceptions } from '../errors';
 import { getKeyPathAlias } from './dbcore-indexeddb';
+import { Middleware } from '../public/types/middleware';
 
 interface VirtualIndex extends DBCoreIndex {
   /** True if this index is virtual, i.e. represents a compound index internally,
@@ -33,7 +34,7 @@ export function pad (a: any | any[], value: any, count: number) {
 }
 
 
-export function virtualIndexMiddleware (down: DBCore) : DBCore {
+export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
   return {
     ...down,
     table(tableName: string) {
@@ -158,3 +159,11 @@ export function virtualIndexMiddleware (down: DBCore) : DBCore {
     }
   }
 }
+
+export const virtualIndexMiddleware : Middleware<DBCore> = {
+  stack: "dbcore",
+  name: "VirtualIndexMiddleware",
+  level: 1,
+  create: createVirtualIndexMiddleware
+};
+

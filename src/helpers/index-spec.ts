@@ -1,9 +1,8 @@
 import { IndexSpec } from '../public/types/index-spec';
-import { IDBKeyPath } from '../public/types/indexeddb';
 
 export function createIndexSpec(
   name: string,
-  keyPath?: IDBKeyPath,
+  keyPath?: string | string[],
   unique?: boolean,
   multi?: boolean,
   auto?: boolean,
@@ -20,7 +19,7 @@ export function createIndexSpec(
   }
 }
 
-export function nameFromKeyPath (keyPath: IDBKeyPath): string {
+export function nameFromKeyPath (keyPath: string | string[]): string {
   return typeof keyPath === 'string' ?
     keyPath :
     keyPath && ('[' + [].join.call(keyPath, '+') + ']');

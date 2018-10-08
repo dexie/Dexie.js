@@ -4,14 +4,13 @@ import { rejection } from '../../helpers/promise';
 import { exceptions } from '../../errors';
 import { eventRejectHandler, preventDefault } from '../../functions/event-wrappers';
 import Promise, { wrap } from '../../helpers/promise';
-//import { IDBEvent, IDBTransaction } from '../../public/types/indexeddb';
 import { connections } from '../../globals/constants';
 import { runUpgraders, readGlobalSchema, adjustToExistingIndexNames } from '../version/schema-helpers';
 import { safariMultiStoreFix } from '../../functions/quirks';
 import { databaseEnumerator } from '../../helpers/database-enumerator';
 import { vip } from './vip';
 import { promisableChain, nop } from '../../functions/chaining-functions';
-import { createMiddlewareStack } from './create-middleware-stack';
+import { createMiddlewareStacks } from './create-middleware-stacks';
 import { slice } from '../../functions/utils';
 import { createDBCore } from '../../dbcore/dbcore-indexeddb';
 
@@ -54,6 +53,7 @@ export function dexieOpen (db: Dexie) {
           upgradeTransaction = req.transaction;
           // For upgraders, do not invoke any middleware.
           db.core = createDBCore(req.result, indexedDB, IDBKeyRange, upgradeTransaction);
+          db.tables.forEach(table => table.core = db.core.table(table.name));
           if (state.autoSchema && !db._options.allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
               // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
               // If onupgradeneeded is called it means database did not exist. Reject the open() promise and make sure that we
@@ -78,7 +78,9 @@ export function dexieOpen (db: Dexie) {
           upgradeTransaction = null;
           const idbdb = db.idbdb = req.result;
           const tmpTrans = idbdb.transaction(safariMultiStoreFix(slice(idbdb.objectStoreNames)), 'readonly');
-          db.core = createMiddlewareStack(db._middlewares, idbdb, indexedDB, tmpTrans);
+          const stacks = createMiddlewareStacks(db._middlewares, idbdb, db._deps, tmpTrans);
+          db.core = stacks.dbcore!;
+          db.tables.forEach(table => table.core = db.core.table(table.name));
           connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.
 
           if (state.autoSchema) readGlobalSchema(db, idbdb, tmpTrans);

@@ -34,39 +34,16 @@ export type MutateRequest = AddRequest | PutRequest | DeleteRequest | DeleteRang
 export interface MutateResponse {
   numFailures: number,
   failures: {[operationNumber: number]: Error};
-  results?: Key[]; // Present on AddRequest and PutRequest
+  lastResult: Key;
+  results?: Key[]; // Present on AddRequest and PutRequest if request.wantResults is truthy.
 }
-
-//export type MutatingOperation = AddOperation | PutOperation | DeleteOperation;
-//export type MutatingOperationResult = AddOperationResult | PutOperationResult | DeleteOperationResult | DeleteRangeOperationResult;
-
-/*export interface AddOperation {
-  op: 'add';
-  key?: Key;
-  value: any;
-}
-
-export interface PutOperation {
-  op: 'put';
-  key?: Key;
-  value: any;
-}
-
-export interface DeleteOperation {
-  op: 'delete';
-  key: Key;
-}
-
-export interface DeleteRangeOperation {
-  op: 'deleteRange';
-  range: KeyRange;
-}*/
 
 export interface AddRequest {
   type: 'add';
   trans: DBCoreTransaction;
   values: any[];
   keys?: Key[];
+  wantResults?: boolean;
 }
 
 export interface PutRequest {
@@ -74,6 +51,7 @@ export interface PutRequest {
   trans: DBCoreTransaction;
   values: any[];
   keys?: Key[];
+  wantResults?: boolean;
 }
 
 export interface DeleteRequest {
@@ -176,6 +154,7 @@ export interface DBCoreIndex {
 }
 
 export interface DBCore<TQuery=DBCoreQuery> {
+  stack: "dbcore";
   // Transaction and Object Store
   transaction(req: DBCoreTransactionRequest): DBCoreTransaction;
 

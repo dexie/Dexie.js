@@ -7,6 +7,7 @@ import { eventRejectHandler, preventDefault } from '../functions/event-wrappers'
 import { wrap, DexiePromise } from '../helpers/promise';
 import { getMaxKey } from '../functions/quirks';
 import { getKeyExtractor } from './get-key-extractor';
+import { getEffectiveKeys } from './get-effective-keys';
 
 export function arrayify<T>(arrayLike: {length: number, [index: number]: T}): T[] {
   return [].slice.call(arrayLike);
@@ -84,6 +85,8 @@ export function createDBCore (
   }
 
   function makeIDBKeyRange (range: KeyRange) : IDBKeyRange | null {
+    if (range.type === RangeType.Any) return null;
+    if (range.type === RangeType.Never) throw new Error("Cannot convert never type to IDBKeyRange");
     const {lower, upper, lowerOpen, upperOpen} = range;
     const idbRange = lower === undefined ?
       upper === undefined ?
@@ -98,7 +101,7 @@ export function createDBCore (
   function createDbCoreTable(tableSchema: DBCoreTableSchema): DBCoreTable {
     const tableName = tableSchema.name;
 
-    function mutate ({trans, type, keys, values, range}) {
+    function mutate ({trans, type, keys, values, range, wantResults}) {
       return new Promise<MutateResponse>((resolve, reject) => {
         resolve = wrap(resolve);
         const store = (trans as IDBTransaction).objectStore(tableName);
@@ -112,7 +115,14 @@ export function createDBCore (
         if (type !== 'deleteRange' && (!keys || (type !== 'delete' && keys.length !== values.length))) {
           throw new Error("Keys must be resolved before calling mutate()");
         }
-        const results = [...keys];
+        if (length === 0)
+          // No items to write. Don't even bother!
+          return resolve({numFailures: 0, failures: {}, results: [], lastResult: undefined});
+
+        const results = wantResults && [...(keys ?
+          keys : // keys already resolved in an earlier middleware. Don't re-resolve them.
+          getEffectiveKeys(tableSchema.primaryKey, {type, keys, values}))];
+          
         let req: IDBRequest & { _reqno?};
         const failures: {[operationNumber: number]: Error} = [];
         let numFailures = 0;
@@ -120,7 +130,7 @@ export function createDBCore (
           event => {
             ++numFailures;
             preventDefault(event);
-            results[(event.target as any)._reqno] = undefined;
+            if (results) results[(event.target as any)._reqno] = undefined;
             failures[(event.target as any)._reqno] = event.target.error;
           };
         const setResult = ({target}) => {
@@ -130,7 +140,7 @@ export function createDBCore (
         if (type === 'deleteRange') {
           // Here the argument is the range
           if (range.type === RangeType.Never)
-            return resolve({numFailures, failures, results}); // Deleting the Never range shoulnt do anything.
+            return resolve({numFailures, failures, results, lastResult: undefined}); // Deleting the Never range shoulnt do anything.
           if (range.type === RangeType.Any)
             req = store.clear(); // Deleting the Any range is equivalent to store.clear()
           else
@@ -147,7 +157,7 @@ export function createDBCore (
             for (let i=0; i<length; ++i) {
               req = (args2 ? store[type](args1[i], args2[i]) : store[type](args1[i])) as IDBRequest;
               req._reqno = i;
-              if (keys[i] === undefined) {
+              if (results && results[i] === undefined) {
                 // Key is not set explicitely and is autoIncremented.
                 // Have to listen for onsuccess and set the resulting key.
                 req.onsuccess = setResult;
@@ -163,11 +173,13 @@ export function createDBCore (
           }
         }
         const done = event => {
-          results[length-1] = event.target.result;
+          const lastResult = event.target.result;
+          if (results) results[length-1] = lastResult;
           resolve({
             numFailures,
             failures,
-            results
+            results,
+            lastResult
           });
         };
   
@@ -365,6 +377,8 @@ export function createDBCore (
   const tableMap: {[name: string]: DBCoreTable} = {};
   tables.forEach(table => tableMap[table.name] = table);
   return {
+    stack: "dbcore",
+    
     transaction: db.transaction.bind(db),
 
     table(name: string) {

@@ -1,4 +1,4 @@
-import { IndexableTypeArray, IndexableTypeArrayReadonly } from "./indexeddb";
+import { IndexableTypeArray, IndexableTypeArrayReadonly } from "./indexable-type";
 import { Collection } from "./collection";
 import { IndexableType } from "./indexable-type";
 

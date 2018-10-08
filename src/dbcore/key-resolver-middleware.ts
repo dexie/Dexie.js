@@ -9,7 +9,7 @@ import { DBCore } from '../public/types/dbcore';
  * This middleware should run on a high prio before other middlewares.
  * Also hooks middleware can take advantage of this info.
  */
-export function createKeyResolverMiddleware<TQuery>(down: DBCore) : DBCore {
+export function createKeyResolverMiddleware(down: DBCore) : DBCore {
   return {
     ...down,
     table (tableName) {

@@ -1,5 +1,5 @@
 import { ThenShortcut } from "./then-shortcut";
-import { IndexableTypeArray } from "./indexeddb";
+import { IndexableTypeArray } from "./indexable-type";
 import { WhereClause } from "./where-clause";
 import { PromiseExtended } from "./promise-extended";
 import { Database } from "./database";
@@ -39,6 +39,6 @@ export interface Collection<T=any, TKey=IndexableType> {
   until(filter: (value: T) => boolean, includeStopEntry?: boolean): Collection<T, TKey>;
   // Mutating methods
   delete(): PromiseExtended<number>;
-  modify(changeCallback: (obj: T, ctx:{value: T}) => void): PromiseExtended<number>;
+  modify(changeCallback: (obj: T, ctx:{value: T}) => void | boolean): PromiseExtended<number>;
   modify(changes: { [keyPath: string]: any } ): PromiseExtended<number>;
 }

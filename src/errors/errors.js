@@ -71,8 +71,8 @@ derive(DexieError).from(Error).extend({
 });
 
 function getMultiErrorMessage (msg, failures) {
-    return msg + ". Errors: " + failures
-        .map(f=>f.toString())
+    return msg + ". Errors: " + Object.keys(failures)
+        .map(key=>failures[key].toString())
         .filter((v,i,s)=>s.indexOf(v) === i) // Only unique error strings
         .join('\n');
 }

@@ -11,6 +11,7 @@ import { hasIEDeleteObjectStoreBug } from '../../globals/constants';
 import { safariMultiStoreFix } from '../../functions/quirks';
 import { createIndexSpec, nameFromKeyPath } from '../../helpers/index-spec';
 import { createTableSchema } from '../../helpers/table-schema';
+import { createDBCore } from '../../dbcore/dbcore-indexeddb';
 
 export function setApiOnPlace(db: Dexie, objs: Object[], tableNames: string[], dbschema: DbSchema) {
   tableNames.forEach(tableName => {
@@ -55,6 +56,10 @@ export function runUpgraders(db: Dexie, oldVersion: number, idbUpgradeTrans: IDB
       keys(globalSchema).forEach(tableName => {
         createTable(idbUpgradeTrans, tableName, globalSchema[tableName].primKey, globalSchema[tableName].indexes);
       });
+      // Update db-core with new tables and indexes:
+      db.core = createDBCore(db.idbdb, db._deps.indexedDB, db._deps.IDBKeyRange, idbUpgradeTrans);
+      // For those using db.friends instead of trans.friends:
+      db.tables.forEach(table => table.core = db.core.table(table.name));
       Promise.follow(() => db.on.populate.fire(trans)).catch(rejectTransaction);
     } else
       updateTablesAndIndexes(db, oldVersion, trans, idbUpgradeTrans).catch(rejectTransaction);
@@ -67,7 +72,8 @@ export function updateTablesAndIndexes(
   db: Dexie,
   oldVersion: number,
   trans: Transaction,
-  idbUpgradeTrans: IDBTransaction) {
+  idbUpgradeTrans: IDBTransaction)
+{
   // Upgrade version to version, step-by-step from oldest to newest version.
   // Each transaction object will contain the table set that was current in that version (but also not-yet-deleted tables from its previous version)
   const queue: UpgradeQueueItem[] = [];
@@ -114,6 +120,11 @@ export function updateTablesAndIndexes(
       const contentUpgrade = version._cfg.contentUpgrade;
 
       if (contentUpgrade) {
+        // Update db.core with new tables and indexes:
+        db.core = createDBCore(db.idbdb, db._deps.indexedDB, db._deps.IDBKeyRange, idbUpgradeTrans);
+        // For those using db.friends instead of trans.friends.
+        db.tables.forEach(table => table.core = db.core.table(table.name)); 
+
         anyContentUpgraderHasRun = true;
 
         // Add to-be-deleted tables to contentUpgrade transaction

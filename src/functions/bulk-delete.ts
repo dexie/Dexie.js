@@ -1,4 +1,4 @@
-import { IndexableType } from '../public/types/indexeddb';
+import { IndexableType } from '../public/types/indexable-type';
 import { Transaction } from '../classes/transaction';
 import { eventRejectHandler, hookedEventRejectHandler, hookedEventSuccessHandler } from './event-wrappers';
 import { wrap } from '../helpers/promise';

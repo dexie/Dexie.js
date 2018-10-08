@@ -1,24 +1,26 @@
 import { DBCore, DBCoreTable, MutateResponse, DeleteRangeRequest, AddRequest, PutRequest, DeleteRequest, DBCoreTransaction, KeyRange } from '../public/types/dbcore';
-import { Dexie } from '../classes/dexie';
+import { Dexie } from '../public/types/dexie';
 import { nop } from '../functions/chaining-functions';
 import { tryCatch, getObjectDiff, setByKeyPath } from '../functions/utils';
 import { PSD } from '../helpers/promise';
 import { LockableTableMiddleware } from '../dbcore/lockable-table-middleware';
 import { exceptions } from '../errors';
-import { DBCoreUp1, DBCoreUp1Table } from '../public/types/dbcore-up-1';
 import { getEffectiveKeys, getExistingValues } from '../dbcore/get-effective-keys';
+import { Middleware } from '../public/types/middleware';
 
-export function HooksMiddleware(db: Dexie) {
+export function HooksMiddleware(db: Dexie): Middleware<DBCore> {
   return {
+    stack: "dbcore",
     name: "HooksMiddleware",
-    middleware: (downCore: DBCoreUp1) => ({
+    level: 2,
+    create: (downCore: DBCore) => ({
       ...downCore,
       table(tableName: string) {
         const {deleting, creating, updating} = db.table(tableName).hook;
         const downTable = downCore.table(name);
         const {primaryKey} = downTable.schema;
     
-        const tableMiddleware: DBCoreUp1Table = {
+        const tableMiddleware: DBCoreTable = {
           ...downTable,
           mutate(req):Promise<MutateResponse> {
             switch (req.type) {
@@ -62,9 +64,7 @@ export function HooksMiddleware(db: Dexie) {
                   key = generatedPrimaryKey;
                   req.keys[i] = key;
                   if (!primaryKey.outbound) {
-                    setByKeyPath(req.values[i], primaryKey.compound ?
-                      primaryKey.keyPathArray :
-                      primaryKey.keyPathArray[0], key);
+                    setByKeyPath(req.values[i], primaryKey.keyPath, key);
                   }
                 }
               } else {
@@ -80,7 +80,7 @@ export function HooksMiddleware(db: Dexie) {
               }
               return ctx;
             });
-            return downTable.mutate(req).then(({failures, results, numFailures}) => {
+            return downTable.mutate(req).then(({failures, results, numFailures, lastResult}) => {
               for (let i=0; i<keys.length; ++i) {
                 const result = results[i];
                 const ctx = contexts[i];
@@ -94,7 +94,7 @@ export function HooksMiddleware(db: Dexie) {
                   );
                 }
               }
-              return {failures, results, numFailures};
+              return {failures, results, numFailures, lastResult};
             });
           });
         }
@@ -105,14 +105,14 @@ export function HooksMiddleware(db: Dexie) {
 
         function deleteNextChunk(trans: DBCoreTransaction, range: KeyRange, limit: number) {
           // Query what keys in the DB within the given range
-          return downTable.query({trans, values: false, query: {keyPath: ":id", range}, limit})
+          return downTable.query({trans, values: false, query: {index: primaryKey, range}, limit})
           .then(({result}) => {
             // Given a set of keys, bulk delete those using the same procedure as in addPutOrDelete().
             // This will make sure that deleting hook is called.
             return addPutOrDelete({type: 'delete', keys: result, trans}).then(res => {
               if (res.numFailures > 0) return Promise.reject(res.failures[0]);
               if (result.length < limit) {
-                return {failures: [], numFailures: 0} as MutateResponse;
+                return {failures: [], numFailures: 0, lastResult: undefined} as MutateResponse;
               } else {
                 return deleteNextChunk(trans, {...range, lower: result[result.length - 1], lowerOpen: true}, limit);
               }
@@ -122,6 +122,6 @@ export function HooksMiddleware(db: Dexie) {
 
         return lockableMiddleware;
       },
-    }) as DBCoreUp1
+    }) as DBCore
   };
 }

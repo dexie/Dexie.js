@@ -2,7 +2,6 @@ import { Dexie } from '../../classes/dexie';
 import { makeClassConstructor } from '../../functions/make-class-constructor';
 import { Collection } from './collection';
 import { WhereClause } from '../where-clause/where-clause';
-import { IDBKeyRange } from '../../public/types/indexeddb';
 
 /** Constructs a Collection instance. */
 export interface CollectionConstructor {

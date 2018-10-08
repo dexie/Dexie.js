@@ -1,4 +1,4 @@
-import { IndexableTypeArrayReadonly } from "./indexeddb";
+import { IndexableTypeArrayReadonly } from "./indexable-type";
 
 /** DexieError
  * 
@@ -137,7 +137,7 @@ export interface ModifyError extends DexieError {
  * http://dexie.org/docs/DexieErrors/Dexie.BulkError
  */
 export interface BulkError extends DexieError {
-  failures: Array<any>;
+  failures: {[operationNumber: number]: Error};
 }
 
 export interface DexieErrorConstructor {
@@ -156,7 +156,7 @@ export interface ModifyErrorConstructor {
 }
 
 export interface BulkErrorConstructor {
-  new (msg?:string, failures?: any[]) : BulkError;
+  new (msg?:string, failures?: {[operationNumber: number]: Error}) : BulkError;
   prototype: BulkError;
 }
 

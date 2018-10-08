@@ -1,6 +1,8 @@
 import { AddRequest, PutRequest, DeleteRequest, Key, DBCoreIndex, DBCoreTable } from '../public/types/dbcore';
 
-export function getEffectiveKeys (primaryKey: DBCoreIndex, req: AddRequest | PutRequest | DeleteRequest) {
+export function getEffectiveKeys (
+  primaryKey: DBCoreIndex,
+  req: (Pick<AddRequest | PutRequest, "type" | "values"> & {keys?: Key[]}) | Pick<DeleteRequest, "keys" | "type">) {
   const {outbound} = primaryKey;
   return outbound || req.type === 'delete' ?
     req.keys! :

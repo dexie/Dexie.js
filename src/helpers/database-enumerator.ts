@@ -6,7 +6,6 @@ import { Table } from '../public/types/table';
 import { nop } from '../functions/chaining-functions';
 import { PromiseExtended } from '../public/types/promise-extended';
 import { DBNAMES_DB } from '../globals/constants';
-import { IDBFactory } from '../public/types/indexeddb';
 
 export let databaseEnumerator: DatabaseEnumerator;
 

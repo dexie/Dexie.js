@@ -2,19 +2,20 @@ import { Collection as ICollection } from "../../public/types/collection";
 import { WhereClause } from "../where-clause/where-clause";
 import { Dexie } from "../dexie";
 import { Table } from "../table";
-import { IDBKeyRange, IndexableType } from "../../public/types/indexeddb";
+import { IndexableType, IndexableTypeArrayReadonly } from "../../public/types/indexable-type";
 import { PromiseExtended } from "../../public/types/promise-extended";
 import { iter, isPlainKeyRange, getIndexOrStore, addReplayFilter, addFilter, addMatchFilter } from "./collection-helpers";
-import { IDBObjectStore, IDBCursor } from '../../public/types/indexeddb';
 import { rejection } from "../../helpers/promise";
 import { combine } from "../../functions/combine";
-import { extend, hasOwn, deepClone, getObjectDiff, keys, setByKeyPath, getByKeyPath, shallowClone, tryCatch } from "../../functions/utils";
+import { extend, hasOwn, deepClone, getObjectDiff, keys, setByKeyPath, getByKeyPath, shallowClone, tryCatch, flatten } from "../../functions/utils";
 import { eventRejectHandler, eventSuccessHandler, hookedEventRejectHandler, hookedEventSuccessHandler } from "../../functions/event-wrappers";
 import { mirror, nop } from "../../functions/chaining-functions";
 import { ModifyError } from "../../errors";
 import { hangsOnDeleteLargeKeyRange } from "../../globals/constants";
 import { bulkDelete } from "../../functions/bulk-delete";
 import { ThenShortcut } from "../../public/types/then-shortcut";
+import { Transaction } from '../transaction';
+import { DBCoreCursor, DBCoreTransaction, RangeType, MutateResponse } from '../../public/types/dbcore';
 
 /** class Collection
  * 
@@ -44,18 +45,18 @@ export class Collection implements ICollection {
   
   _ondirectionchange?: Function;
 
-  _read(fn, cb?) {
+  _read<T>(fn: (idbtrans: IDBTransaction, dxTrans: Transaction) => PromiseLike<T>, cb?): PromiseExtended<T> {
     var ctx = this._ctx;
     return ctx.error ?
       ctx.table._trans(null, rejection.bind(null, ctx.error)) :
-      ctx.table._idbstore('readonly', fn).then(cb);
+      ctx.table._trans('readonly', fn).then(cb);
   }
 
-  _write(fn) {
+  _write<T>(fn: (idbtrans: IDBTransaction, dxTrans: Transaction) => PromiseLike<T>): PromiseExtended<T> {
     var ctx = this._ctx;
     return ctx.error ?
       ctx.table._trans(null, rejection.bind(null, ctx.error)) :
-      ctx.table._idbstore('readwrite', fn, "locked"); // When doing write operations on collections, always lock the operation so that upcoming operations gets queued.
+      ctx.table._trans('readwrite', fn, "locked"); // When doing write operations on collections, always lock the operation so that upcoming operations gets queued.
   }
 
   _addAlgorithm(fn) {
@@ -64,11 +65,10 @@ export class Collection implements ICollection {
   }
 
   _iterate(
-    fn: (item, cursor: IDBCursor, advance: Function) => void,
-    resolve,
-    reject,
-    idbstore: IDBObjectStore) {
-    return iter(this._ctx, fn, resolve, reject, idbstore);
+    fn: (item, cursor: DBCoreCursor, advance: Function) => void,
+    coreTrans: DBCoreTransaction) : Promise<any>
+  {
+    return iter(this._ctx, fn, coreTrans, this._ctx.table.core);
   }
 
   /** Collection.clone()
@@ -99,12 +99,10 @@ export class Collection implements ICollection {
    * http://dexie.org/docs/Collection/Collection.each()
    * 
    **/
-  each(fn: (obj, cursor: IDBCursor) => any): PromiseExtended<void> {
+  each(fn: (obj, cursor: DBCoreCursor) => any): PromiseExtended<void> {
     var ctx = this._ctx;
 
-    return this._read((resolve, reject, idbstore) => {
-      iter(ctx, fn, resolve, reject, idbstore);
-    });
+    return this._read(trans => iter(ctx, fn, trans, ctx.table.core));
   }
 
   /** Collection.count()
@@ -114,23 +112,23 @@ export class Collection implements ICollection {
    **/
   count(cb?) {
     var ctx = this._ctx;
+    const coreTable = ctx.table.core;
 
     if (isPlainKeyRange(ctx, true)) {
       // This is a plain key range. We can use the count() method if the index.
-      return this._read(function (resolve, reject, idbstore) {
-        var idx = getIndexOrStore(ctx, idbstore);
-        var req = (ctx.range ? idx.count(ctx.range) : idx.count());
-        req.onerror = eventRejectHandler(reject);
-        req.onsuccess = function (e) {
-          resolve(Math.min(e.target.result, ctx.limit));
-        };
-      }, cb);
+      return this._read(trans => coreTable.count({
+        trans,
+        query: {
+          index: coreTable.schema.getIndexByKeyPath(ctx.index),
+          range: {...ctx.range, type: RangeType.Range}
+        }
+      })).then(cb);
     } else {
       // Algorithms, filters or expressions are applied. Need to count manually.
       var count = 0;
-      return this._read(function (resolve, reject, idbstore) {
-        iter(ctx, function () { ++count; return false; }, function () { resolve(count); }, reject, idbstore);
-      }, cb);
+      return this._read(trans =>
+        iter(ctx, () => { ++count; return false; }, trans, coreTable)
+      ).then(()=>count).then(cb);
     }
   }
 
@@ -142,8 +140,7 @@ export class Collection implements ICollection {
   sortBy(keyPath: string): PromiseExtended<any[]>;
   sortBy<R>(keyPath: string, thenShortcut: ThenShortcut<any[], R>) : PromiseExtended<R>;
   sortBy(keyPath: string, cb?: ThenShortcut<any[], any>) {
-    /// <param name="keyPath" type="String"></param>
-    var parts = keyPath.split('.').reverse(),
+    const parts = keyPath.split('.').reverse(),
       lastPart = parts[0],
       lastIndex = parts.length - 1;
     function getval(obj, i) {
@@ -167,29 +164,27 @@ export class Collection implements ICollection {
    * http://dexie.org/docs/Collection/Collection.toArray()
    * 
    **/
-  toArray(cb?) {
-    return this._read((resolve, reject, idbstore) => {
+  toArray(cb?): PromiseExtended<any[]> {
+    return this._read(trans => {
       var ctx = this._ctx;
-      if (this.db._hasGetAll && ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
+      if (ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
         // Special optimation if we could use IDBObjectStore.getAll() or
         // IDBKeyRange.getAll():
         const readingHook = ctx.table.hook.reading.fire;
-        const idxOrStore = getIndexOrStore(ctx, idbstore);
-        const req = ctx.limit < Infinity ?
-          idxOrStore.getAll(ctx.range, ctx.limit) :
-          idxOrStore.getAll(ctx.range);
-        req.onerror = eventRejectHandler(reject);
-        req.onsuccess = readingHook === mirror ?
-          eventSuccessHandler(resolve) :
-          eventSuccessHandler(res => {
-            try { resolve(res.map(readingHook)); } catch (e) { reject(e); }
-          });
+        const index = getIndexOrStore(ctx, ctx.table.core.schema);
+        return ctx.table.core.query({
+          trans,
+          limit: ctx.limit,
+          values: true,
+          query: {
+            index,
+            range: {...ctx.range, type: RangeType.Range}
+          }
+        }).then(({result}) => result);
       } else {
         // Getting array through a cursor.
         const a = [];
-        iter(ctx, function (item) { a.push(item); }, function arrayComplete() {
-          resolve(a);
-        }, reject, idbstore);
+        return iter(ctx, item => a.push(item), trans, ctx.table.core).then(()=>a);
       }
     }, cb);
   }
@@ -384,19 +379,22 @@ export class Collection implements ICollection {
    * http://dexie.org/docs/Collection/Collection.primaryKeys()
    * 
    **/
-  primaryKeys(cb?) {
+  primaryKeys(cb?) : PromiseExtended<IndexableType[]> {
     var ctx = this._ctx;
-    if (this.db._hasGetAll && ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
+    if (ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
       // Special optimation if we could use IDBObjectStore.getAllKeys() or
       // IDBKeyRange.getAllKeys():
-      return this._read((resolve, reject, idbstore) => {
-        var idxOrStore = getIndexOrStore(ctx, idbstore);
-        var req = ctx.limit < Infinity ?
-          idxOrStore.getAllKeys(ctx.range, ctx.limit) :
-          idxOrStore.getAllKeys(ctx.range);
-        req.onerror = eventRejectHandler(reject);
-        req.onsuccess = eventSuccessHandler(resolve);
-      }).then(cb);
+      return this._read(trans => {
+        var index = getIndexOrStore(ctx, ctx.table.core.schema);
+        return ctx.table.core.query({
+          trans,
+          values: false,
+          limit: ctx.limit,
+          query: {
+            index,
+            range: {...ctx.range, type: RangeType.Range}
+          }});
+      }).then(({result})=>result).then(cb);
     }
     ctx.keysOnly = !ctx.isMatch;
     var a = [];
@@ -445,7 +443,7 @@ export class Collection implements ICollection {
       idx = ctx.index && ctx.table.schema.idxByName[ctx.index];
     if (!idx || !idx.multi) return this; // distinct() only makes differencies on multiEntry indexes.
     var set = {};
-    addFilter(this._ctx, function (cursor) {
+    addFilter(this._ctx, function (cursor: DBCoreCursor) {
       var strKey = cursor.primaryKey.toString(); // Converts any Date to String, String to String, Number to String and Array to comma-separated string
       var found = hasOwn(set, strKey);
       set[strKey] = true;
@@ -463,44 +461,15 @@ export class Collection implements ICollection {
    * http://dexie.org/docs/Collection/Collection.modify()
    * 
    **/
-  modify(changes) {
-    var ctx = this._ctx,
-      hook = ctx.table.hook,
-      updatingHook = hook.updating.fire,
-      deletingHook = hook.deleting.fire;
-
-    return this._write((resolve, reject, idbstore, trans) => {
-      var modifyer;
+  modify(changes: { [keyPath: string]: any }) : PromiseExtended<number>
+  modify(changes: (obj: any, ctx:{value: any, primKey: IndexableType}) => void | boolean): PromiseExtended<number> {
+    var ctx = this._ctx;
+    return this._write(trans => {
+      var modifyer: (obj: any, ctx:{value: any, primKey: IndexableType}) => void | boolean
       if (typeof changes === 'function') {
         // Changes is a function that may update, add or delete propterties or even require a deletion the object itself (delete this.item)
-        if (updatingHook === nop && deletingHook === nop) {
-          // Noone cares about what is being changed. Just let the modifier function be the given argument as is.
-          modifyer = changes;
-        } else {
-          // People want to know exactly what is being modified or deleted.
-          // Let modifyer be a proxy function that finds out what changes the caller is actually doing
-          // and call the hooks accordingly!
-          modifyer = function (item) {
-            var origItem = deepClone(item); // Clone the item first so we can compare laters.
-            if (changes.call(this, item, this) === false) return false; // Call the real modifyer function (If it returns false explicitely, it means it dont want to modify anyting on this object)
-            if (!hasOwn(this, "value")) {
-              // The real modifyer function requests a deletion of the object. Inform the deletingHook that a deletion is taking place.
-              deletingHook.call(this, this.primKey, item, trans);
-            } else {
-              // No deletion. Check what was changed
-              var objectDiff = getObjectDiff(origItem, this.value);
-              var additionalChanges = updatingHook.call(this, objectDiff, this.primKey, origItem, trans);
-              if (additionalChanges) {
-                // Hook want to apply additional modifications. Make sure to fullfill the will of the hook.
-                item = this.value;
-                keys(additionalChanges).forEach(function (keyPath) {
-                  setByKeyPath(item, keyPath, additionalChanges[keyPath]);  // Adding {keyPath: undefined} means that the keyPath should be deleted. Handled by setByKeyPath
-                });
-              }
-            }
-          };
-        }
-      } else if (updatingHook === nop) {
+        modifyer = changes;
+      } else {
         // changes is a set of {keyPath: value} and no one is listening to the updating hook.
         var keyPaths = keys(changes);
         var numKeys = keyPaths.length;
@@ -515,88 +484,82 @@ export class Collection implements ICollection {
           }
           return anythingModified;
         };
-      } else {
-        // changes is a set of {keyPath: value} and people are listening to the updating hook so we need to call it and
-        // allow it to add additional modifications to make.
-        var origChanges = changes;
-        changes = shallowClone(origChanges); // Let's work with a clone of the changes keyPath/value set so that we can restore it in case a hook extends it.
-        modifyer = function (item) {
-          var anythingModified = false;
-          var additionalChanges = updatingHook.call(this, changes, this.primKey, deepClone(item), trans);
-          if (additionalChanges) extend(changes, additionalChanges);
-          keys(changes).forEach(function (keyPath) {
-            var val = changes[keyPath];
-            if (getByKeyPath(item, keyPath) !== val) {
-              setByKeyPath(item, keyPath, val);
-              anythingModified = true;
+      }
+
+      const coreTable = ctx.table.core;
+      const {outbound, extractKey} = coreTable.schema.primaryKey;
+      const limit = 'testmode' in Dexie ? 1 : 2000;
+      const {cmp} = this.db.core;
+      const totalFailures = [];
+      let successCount = 0;
+      const failedKeys: IndexableType[] = [];
+      const applyMutateResult = (expectedCount: number, res: MutateResponse) => {
+        const {failures, numFailures} = res;
+        successCount += expectedCount - numFailures;
+        for (let pos in failures) {
+          totalFailures.push(failures[pos]);
+        }
+      }
+      return this.clone().primaryKeys().then(keys => {
+
+        const nextChunk = (offset: number) => {
+          const count = Math.min(limit, keys.length - offset);
+          return coreTable.getMany({trans, keys: keys.slice(offset, offset + count)}).then(values => {
+            const addValues = [];
+            const putValues = [];
+            const putKeys = outbound ? [] : null;
+            let deleteKeys = [];
+            for (let i=0; i<count; ++i) {
+              const origValue = values[i];
+              const ctx = {
+                value: deepClone(origValue),
+                primKey: keys[offset+i]
+              };
+              if (modifyer.call(ctx, ctx.value, ctx) !== false) {
+                if (ctx.value == null) {
+                  // Deleted
+                  deleteKeys.push(keys[offset+i]);
+                } else if (!outbound && cmp(extractKey(origValue), extractKey(ctx.value) !== 0)) {
+                  // Changed primary key of inbound
+                  deleteKeys.push(keys[offset+i]);
+                  addValues.push(ctx.value)
+                } else {
+                  // Changed value
+                  putValues.push(ctx.value);
+                  if (outbound) putKeys.push(keys[offset+i]);
+                }
+              }
             }
-          });
-          if (additionalChanges) changes = shallowClone(origChanges); // Restore original changes for next iteration
-          return anythingModified;
-        };
-      }
-
-      var count = 0;
-      var successCount = 0;
-      var iterationComplete = false;
-      var failures = [];
-      var failKeys = [];
-      var currentKey = null;
-
-      function modifyItem(item, cursor) {
-        currentKey = cursor.primaryKey;
-        var thisContext = {
-          primKey: cursor.primaryKey,
-          value: item,
-          onsuccess: null,
-          onerror: null
-        };
-
-        function onerror(e) {
-          failures.push(e);
-          failKeys.push(thisContext.primKey);
-          checkFinished();
-          return true; // Catch these errors and let a final rejection decide whether or not to abort entire transaction
-        }
-
-        if (modifyer.call(thisContext, item, thisContext) !== false) { // If a callback explicitely returns false, do not perform the update!
-          var bDelete = !hasOwn(thisContext, "value");
-          ++count;
-          tryCatch(function () {
-            var req = (bDelete ? cursor.delete() : cursor.update(thisContext.value));
-            req._hookCtx = thisContext;
-            req.onerror = hookedEventRejectHandler(onerror);
-            req.onsuccess = hookedEventSuccessHandler(function () {
-              ++successCount;
-              checkFinished();
+            
+            return Promise.resolve(addValues.length > 0 &&
+              coreTable.mutate({trans, type: 'add', values: addValues})
+                .then(res => {
+                  for (let pos in res.failures) {
+                    // Remove from deleteKeys the key of the object that failed to change its primary key
+                    deleteKeys = deleteKeys.filter(key => cmp(keys[offset + pos], key) !== 0);
+                  }
+                  applyMutateResult(addValues.length, res);
+                })
+            ).then(res=>putValues.length > 0 &&
+                coreTable.mutate({trans, type: 'put', keys: putKeys, values: putValues})
+                  .then(applyMutateResult.bind(putValues.length))
+            ).then(()=>deleteKeys.length > 0 &&
+                coreTable.mutate({trans, type: 'delete', keys: deleteKeys})
+                  .then(applyMutateResult.bind(deleteKeys.length))
+            ).then(()=>{
+              return keys.length > offset + count && nextChunk(offset + limit);
             });
-          }, onerror);
-        } else if (thisContext.onsuccess) {
-          // Hook will expect either onerror or onsuccess to always be called!
-          thisContext.onsuccess(thisContext.value);
+          });
         }
-      }
 
-      function doReject(e?) {
-        if (e) {
-          failures.push(e);
-          failKeys.push(currentKey);
-        }
-        return reject(new ModifyError("Error modifying one or more objects", failures, successCount, failKeys));
-      }
+        return nextChunk(0).then(()=>{
+          if (totalFailures.length > 0)
+            throw new ModifyError("Error modifying one or more objects", totalFailures, successCount, failedKeys as IndexableTypeArrayReadonly);
 
-      function checkFinished() {
-        if (iterationComplete && successCount + failures.length === count) {
-          if (failures.length > 0)
-            doReject();
-          else
-            resolve(successCount);
-        }
-      }
-      this.clone().raw()._iterate(modifyItem, function () {
-        iterationComplete = true;
-        checkFinished();
-      }, doReject, idbstore);
+          return keys.length;
+        });
+      });
+
     });
   }
 

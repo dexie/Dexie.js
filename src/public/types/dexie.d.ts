@@ -12,13 +12,14 @@ import { PromiseExtended } from "./promise-extended";
 import { Database } from "./database";
 import { IndexableType } from "./indexable-type";
 import { DBCore } from "./dbcore";
+import { Middleware, DexieStacks } from "./middleware";
 
 export interface Dexie extends Database {
   readonly name: string;
   readonly tables: Table[];
   readonly verno: number;
   
-  readonly _allTables: {[name: string]: Table<any,any>};
+  readonly _allTables: {[name: string]: Table<any,IndexableType>};
 
   _createTransaction: (
     this: Dexie,
@@ -63,8 +64,10 @@ export interface Dexie extends Database {
 
   backendDB(): IDBDatabase;
 
-  use(middleware: {middleware: (next: DBCore) => Partial<DBCore>, level?: number, name?: string}): this;
-  unuse(middleware: (next: DBCore) => Partial<DBCore>): this;
+  use(middleware: Middleware<DBCore>): this;
+  // Add more supported stacks here... : use(middleware: Middleware<HookStack>): this;
+  unuse({stack, create}: Middleware<{stack: keyof DexieStacks}>): this;
+  unuse({stack, name}: {stack: keyof DexieStacks, name: string}): this;
   
   // Make it possible to touch physical class constructors where they reside - as properties on db instance.
   // For example, checking if (x instanceof db.Table). Can't do (x instanceof Dexie.Table because it's just a virtual interface)

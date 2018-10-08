@@ -5,7 +5,6 @@ import { DbEvents } from "../../public/types/db-events";
 //import { PromiseExtended, PromiseExtendedConstructor } from '../../public/types/promise-extended';
 import { Table as ITable } from '../../public/types/table';
 import { TableSchema } from "../../public/types/table-schema";
-import { IDBKeyRange } from "../../public/types/indexeddb";
 import { DbSchema } from '../../public/types/db-schema';
 
 // Internal imports
@@ -39,6 +38,9 @@ import { TransactionMode } from '../../public/types/transaction-mode';
 import { rejection } from '../../helpers/promise';
 import { usePSD } from '../../helpers/promise';
 import { DBCore } from '../../public/types/dbcore';
+import { Middleware, DexieStacks } from '../../public/types/middleware';
+import { virtualIndexMiddleware } from '../../dbcore/virtual-index-middleware';
+import { HooksMiddleware } from '../../hooks/hooks-middleware';
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -65,7 +67,7 @@ export class Dexie implements IDexie {
   _hasGetAll?: boolean;
   _maxKey: IDBValidKey;
   _fireOnBlocked: (ev: Event) => void;
-  _middlewares: {middleware: (down: DBCore) => Partial<DBCore>, level: number, name: string | undefined}[];
+  _middlewares: {[StackName in keyof DexieStacks]?: Middleware<DexieStacks[StackName]>[]} = {};
   core: DBCore;
 
   name: string;
@@ -199,6 +201,10 @@ export class Dexie implements IDexie {
         .map(c => c.on("versionchange").fire(ev));
     }
 
+    // Default middlewares:
+    this.use(virtualIndexMiddleware);
+    this.use(HooksMiddleware(this));
+
     // Call each addon:
     addons.forEach(addon => addon(this));
   }
@@ -233,14 +239,25 @@ export class Dexie implements IDexie {
     }).then(fn);
   }
 
-  use({middleware, level, name}: {middleware: (down: DBCore) => Partial<DBCore>, level?: number, name?: string}) {
-    this._middlewares.push({middleware, level: level == null ? 5 : level, name});
-    this._middlewares.sort((a, b) => a.level - b.level);
+  use({stack, create, level, name}: Middleware<DBCore>): this {
+    if (name) this.unuse({stack, name}); // Be able to replace existing middleware.
+    const middlewares = this._middlewares[stack] || (this._middlewares[stack] = []);
+    middlewares.push({stack, create, level: level == null ? 10 : level, name});
+    middlewares.sort((a, b) => a.level - b.level);
+    // Todo update db.core and db.tables...core ? Or should be expect this to have effect
+    // only after next open()?
     return this;
   }
 
-  unuse(middleware: (down: DBCore) => DBCore) {
-    this._middlewares = this._middlewares.filter(mw => mw.middleware !== middleware);
+  unuse({stack, create}: Middleware<{stack: keyof DexieStacks}>): this;
+  unuse({stack, name}: {stack: keyof DexieStacks, name: string}): this;
+  unuse({stack, name, create}: {stack: keyof DexieStacks, name?: string, create?: Function}) {
+    if (stack && this._middlewares[stack]) {
+      this._middlewares[stack] = this._middlewares[stack].filter(mw =>
+        create ? mw.create !== create : // Given middleware has a create method. Match that exactly.
+        name ? mw.name !== name : // Given middleware spec 
+        false);
+    }
     return this;
   }
 
