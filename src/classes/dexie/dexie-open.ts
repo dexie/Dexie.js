@@ -82,6 +82,9 @@ export function dexieOpen (db: Dexie) {
           db.core = stacks.dbcore!;
           db.tables.forEach(table => {
               table.core = db.core.table(table.name);
+              if (db[table.name] instanceof db.Table) {
+                  db[table.name].core = table.core;
+              }
           });
           connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.
 

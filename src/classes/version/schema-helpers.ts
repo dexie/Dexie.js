@@ -57,9 +57,14 @@ export function runUpgraders(db: Dexie, oldVersion: number, idbUpgradeTrans: IDB
         createTable(idbUpgradeTrans, tableName, globalSchema[tableName].primKey, globalSchema[tableName].indexes);
       });
       // Update db-core with new tables and indexes:
-      db.core = createDBCore(db.idbdb, db._deps.indexedDB, db._deps.IDBKeyRange, idbUpgradeTrans);
+      db.core = createDBCore(idbUpgradeTrans.db, db._deps.indexedDB, db._deps.IDBKeyRange, idbUpgradeTrans);
       // For those using db.friends instead of trans.friends:
-      db.tables.forEach(table => table.core = db.core.table(table.name));
+      db.tables.forEach(table => {
+        table.core = db.core.table(table.name);
+        if (db[table.name] instanceof db.Table) {
+          db[table.name].core = table.core;
+        }
+      });
       Promise.follow(() => db.on.populate.fire(trans)).catch(rejectTransaction);
     } else
       updateTablesAndIndexes(db, oldVersion, trans, idbUpgradeTrans).catch(rejectTransaction);
@@ -123,7 +128,12 @@ export function updateTablesAndIndexes(
         // Update db.core with new tables and indexes:
         db.core = createDBCore(db.idbdb, db._deps.indexedDB, db._deps.IDBKeyRange, idbUpgradeTrans);
         // For those using db.friends instead of trans.friends.
-        db.tables.forEach(table => table.core = db.core.table(table.name)); 
+        db.tables.forEach(table => {
+          table.core = db.core.table(table.name);
+          if (db[table.name] instanceof db.Table) {
+            db[table.name].core = table.core;
+          }  
+        }); 
 
         anyContentUpgraderHasRun = true;
 
