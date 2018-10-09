@@ -2,10 +2,12 @@ import { Dexie } from '../../classes/dexie';
 import { makeClassConstructor } from '../../functions/make-class-constructor';
 import { Collection } from './collection';
 import { WhereClause } from '../where-clause/where-clause';
+import { AnyRange } from '../../dbcore/keyrange';
+import { KeyRange } from '../../public/types/dbcore';
 
 /** Constructs a Collection instance. */
 export interface CollectionConstructor {
-  new(whereClause?: WhereClause | null, keyRangeGenerator?: () => IDBKeyRange): Collection;
+  new(whereClause?: WhereClause | null, keyRangeGenerator?: () => KeyRange): Collection;
   prototype: Collection;
 }
 
@@ -22,10 +24,10 @@ export function createCollectionConstructor(db: Dexie) {
     function Collection(
       this: Collection,
       whereClause?: WhereClause | null,
-      keyRangeGenerator?: () => IDBKeyRange)
+      keyRangeGenerator?: () => KeyRange)
     {
       this.db = db;
-      let keyRange = null, error = null;
+      let keyRange = AnyRange, error = null;
       if (keyRangeGenerator) try {
         keyRange = keyRangeGenerator();
       } catch (ex) {

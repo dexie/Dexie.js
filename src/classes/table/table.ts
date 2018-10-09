@@ -268,7 +268,13 @@ export class Table implements ITable<any, IndexableType> {
   add(obj, key?: IndexableType): Promise<IndexableType> {
     return this._trans('readwrite', trans => {
       return this.core.mutate({trans, type: 'add', keys: key && [key], values: [obj]});
-    }).then(res => res.numFailures ? Promise.reject(res.failures[0]) : res.lastResult);
+    }).then(res => res.numFailures ? Promise.reject(res.failures[0]) : res.lastResult)
+    .then(lastResult => {
+      if (!this.core.schema.primaryKey.outbound) {
+        setByKeyPath(obj, this.core.schema.primaryKey.keyPath, lastResult);
+      }
+      return lastResult;
+    });
   }
 
   /** Table.update()
@@ -303,7 +309,13 @@ export class Table implements ITable<any, IndexableType> {
     return this._trans(
       'readwrite',
       trans => this.core.mutate({trans, type: 'put', values: [obj], keys: key && [key]}))
-    .then(res => res.numFailures ? Promise.reject(res.failures[0]) : res.lastResult);
+    .then(res => res.numFailures ? Promise.reject(res.failures[0]) : res.lastResult)
+    .then(lastResult => {
+      if (!this.core.schema.primaryKey.outbound) {
+        setByKeyPath(obj, this.core.schema.primaryKey.keyPath, lastResult);
+      }
+      return lastResult;
+    });
   }
 
   /** Table.delete()

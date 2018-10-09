@@ -14,7 +14,7 @@ import { ModifyError } from "../../errors";
 import { hangsOnDeleteLargeKeyRange } from "../../globals/constants";
 import { ThenShortcut } from "../../public/types/then-shortcut";
 import { Transaction } from '../transaction';
-import { DBCoreCursor, DBCoreTransaction, RangeType, MutateResponse } from '../../public/types/dbcore';
+import { DBCoreCursor, DBCoreTransaction, RangeType, MutateResponse, KeyRange } from '../../public/types/dbcore';
 import { AnyRange } from '../../dbcore/keyrange';
 
 /** class Collection
@@ -27,7 +27,7 @@ export class Collection implements ICollection {
     table: Table;
     index?: string | null;
     isPrimKey?: boolean;
-    range: IDBKeyRange;
+    range: KeyRange;
     keysOnly: boolean;
     dir: "next" | "prev";
     unique: "" | "unique";
@@ -120,9 +120,9 @@ export class Collection implements ICollection {
           trans,
           query: {
             index: coreTable.schema.getIndexByKeyPath(ctx.index),
-            range: ctx.range ? {...ctx.range, type: RangeType.Range} : AnyRange
+            range: ctx.range
           }
-        });
+        }).then(count => Math.min(count, ctx.limit));
       } else {
         // Algorithms, filters or expressions are applied. Need to count manually.
         var count = 0;
@@ -178,7 +178,7 @@ export class Collection implements ICollection {
           values: true,
           query: {
             index,
-            range: ctx.range ? {...ctx.range, type: RangeType.Range} : AnyRange
+            range: ctx.range
           }
         }).then(({result}) => result);
       } else {
@@ -392,7 +392,7 @@ export class Collection implements ICollection {
           limit: ctx.limit,
           query: {
             index,
-            range: ctx.range ? {...ctx.range, type: RangeType.Range} : AnyRange
+            range: ctx.range
           }});
       }).then(({result})=>result).then(cb);
     }
@@ -519,7 +519,7 @@ export class Collection implements ICollection {
                 if (ctx.value == null) {
                   // Deleted
                   deleteKeys.push(keys[offset+i]);
-                } else if (!outbound && cmp(extractKey(origValue), extractKey(ctx.value) !== 0)) {
+                } else if (!outbound && cmp(extractKey(origValue), extractKey(ctx.value)) !== 0) {
                   // Changed primary key of inbound
                   deleteKeys.push(keys[offset+i]);
                   addValues.push(ctx.value)
@@ -542,10 +542,10 @@ export class Collection implements ICollection {
                 })
             ).then(res=>putValues.length > 0 &&
                 coreTable.mutate({trans, type: 'put', keys: putKeys, values: putValues})
-                  .then(applyMutateResult.bind(putValues.length))
+                  .then(res=>applyMutateResult(putValues.length, res))
             ).then(()=>deleteKeys.length > 0 &&
                 coreTable.mutate({trans, type: 'delete', keys: deleteKeys})
-                  .then(applyMutateResult.bind(deleteKeys.length))
+                  .then(res=>applyMutateResult(deleteKeys.length, res))
             ).then(()=>{
               return keys.length > offset + count && nextChunk(offset + limit);
             });
@@ -574,7 +574,7 @@ export class Collection implements ICollection {
       //deletingHook = ctx.table.hook.deleting.fire,
       //hasDeleteHook = deletingHook !== nop;
     if (isPlainKeyRange(ctx) &&
-      ((ctx.isPrimKey && !hangsOnDeleteLargeKeyRange) || !range)) // if no range, we'll use clear().
+      ((ctx.isPrimKey && !hangsOnDeleteLargeKeyRange) || range.type === RangeType.Any)) // if no range, we'll use clear().
     {
       // May use IDBObjectStore.delete(IDBKeyRange) in this case (Issue #208)
       // For chromium, this is the way most optimized version.
@@ -583,7 +583,7 @@ export class Collection implements ICollection {
       return this._write(trans => {
         // Our API contract is to return a count of deleted items, so we have to count() before delete().
         const {primaryKey} = ctx.table.core.schema;
-        const coreRange = range ? {...range, type: RangeType.Range} : AnyRange;
+        const coreRange = range;
         return ctx.table.core.count({trans, query: {index: primaryKey, range: coreRange}}).then(count => {
           return ctx.table.core.mutate({trans, type: 'deleteRange', range: coreRange})
           .then(({failures, lastResult, results, numFailures}) => {

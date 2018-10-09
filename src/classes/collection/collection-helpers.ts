@@ -45,7 +45,7 @@ export function openCursor(ctx: CollectionContext, coreTable: DBCoreTable, trans
     unique: !!ctx.unique,
     query: {
       index, 
-      range: {...ctx.range, type: RangeType.Range} // Temporary... Will change ctx.range to be an DBCoreRange instead!
+      range: ctx.range
     }
   });
 }

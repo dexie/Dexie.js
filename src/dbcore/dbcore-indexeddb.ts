@@ -18,6 +18,8 @@ export function pick<T,Prop extends keyof T>(obj: T, props: Prop[]): Pick<T, Pro
   return result;
 }
 
+let _id_counter = 0;
+
 export function getKeyPathAlias(keyPath: null | string | string[]) {
   return keyPath == null ?
     ":id" :
@@ -88,6 +90,7 @@ export function createDBCore (
     if (range.type === RangeType.Any) return null;
     if (range.type === RangeType.Never) throw new Error("Cannot convert never type to IDBKeyRange");
     const {lower, upper, lowerOpen, upperOpen} = range;
+    console.log("range", range);
     const idbRange = lower === undefined ?
       upper === undefined ?
         null : //IDBKeyRange.lowerBound(-Infinity, false) : // Any range (TODO: Should we return null instead?)
@@ -191,7 +194,7 @@ export function createDBCore (
         req.onsuccess = done;
       });
     }
-  
+    
     function openCursor ({trans, values, query, reverse, unique}: DBCoreOpenCursorRequest): Promise<DBCoreCursor>
     {
       return new Promise((resolve, reject) => {
@@ -223,6 +226,7 @@ export function createDBCore (
             resolve(null);
             return;
           }
+          (cursor as any).___id = ++_id_counter;
           (cursor as any).done = false;
           const _cursorContinue = cursor.continue.bind(cursor);
           const _cursorContinuePrimaryKey = cursor.continuePrimaryKey.bind(cursor);
@@ -239,10 +243,12 @@ export function createDBCore (
             return this.start(() => gotOne-- ? this.continue() : this.stop()).then(() => this);
           };
           cursor.start = (callback) => {
+            console.log("Starting cursor", (cursor as any).___id);
             const iterationPromise = new Promise<void>((resolveIteration, rejectIteration) =>{
               req.onerror = eventRejectHandler(rejectIteration);
               cursor.fail = rejectIteration;
               cursor.stop = value => {
+                console.log("Cursor stop", cursor);
                 cursor.stop = cursor.continue = cursor.continuePrimaryKey = cursor.advance = doThrowCursorIsStopped;
                 resolveIteration(value);
               };
@@ -250,6 +256,7 @@ export function createDBCore (
             // Now change req.onsuccess to a callback that doesn't call initCursor but just observer.next()
             const guardedCallback = () => {
               if (req.result) {
+                console.log("Next result", cursor);
                 try {
                   callback();
                 } catch (err) {
@@ -262,7 +269,6 @@ export function createDBCore (
               }
             }
             req.onsuccess = wrap(ev => {
-              console.log("Next cursor stop", cursor, ev.target);
               //cursor.continue = _cursorContinue;
               //cursor.continuePrimaryKey = _cursorContinuePrimaryKey;
               //cursor.advance = _cursorAdvance;
@@ -290,6 +296,7 @@ export function createDBCore (
           const store = (trans as IDBTransaction).objectStore(tableName);
           const source = index.isPrimaryKey ? store : store.index(index.name);
           const idbKeyRange = makeIDBKeyRange(range);
+          if (limit === 0) return resolve({result: []});
           if (hasGetAll) {
             const req = values ?
                 (source as any).getAll(idbKeyRange, nonInfinitLimit) :
