@@ -65,6 +65,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   above(value: IndexableType) {
+    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
     return new this.Collection(this, () => createRange(value, undefined, true));
   }
 
@@ -74,6 +75,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   aboveOrEqual(value: IndexableType) {
+    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
     return new this.Collection(this, () => createRange(value, undefined, false));
   }
 
@@ -83,6 +85,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   below(value: IndexableType) {
+    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
     return new this.Collection(this, () => createRange(undefined, value, false, true));
   }
 
@@ -92,6 +95,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   belowOrEqual(value: IndexableType) {
+    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
     return new this.Collection(this, () => createRange(undefined, value));
   }
 

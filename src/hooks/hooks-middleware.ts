@@ -26,11 +26,12 @@ export function HooksMiddleware(db: Dexie): Middleware<DBCore> {
             switch (req.type) {
               case 'add':
                 if (creating.fire === nop) break;
+                return lock(req.trans, addPutOrDelete(req));
               case 'put':
                 if (creating.fire === nop && updating.fire === nop) break;
+                return lock(req.trans, addPutOrDelete(req));
               case 'delete':
                 if (deleting.fire === nop) break;
-                // The following line should intentionally fall through from all three of 'add' and 'put' and 'delete':
                 return lock(req.trans, addPutOrDelete(req));
               case 'deleteRange':
                 if (deleting.fire === nop) break;
@@ -45,8 +46,11 @@ export function HooksMiddleware(db: Dexie): Middleware<DBCore> {
         function addPutOrDelete(req: AddRequest | PutRequest | DeleteRequest): Promise<MutateResponse> {
           const dxTrans = PSD.trans;
           const keys = req.keys || getEffectiveKeys(primaryKey, req);
+          if (!keys) throw new Error("Keys missing");
           // Clone Request and set keys arg
-          req = {...req, keys};
+          req = req.type === 'add' || req.type === 'put' ?
+            {...req, keys, wantResults: true} : // Tell lower layer to deliver results. Hooks onsuccess needs it.
+            {...req};
           if (req.type !== 'delete') req.values = [...req.values];
           if (req.keys) req.keys = [...req.keys];
 
@@ -56,10 +60,10 @@ export function HooksMiddleware(db: Dexie): Middleware<DBCore> {
               const ctx = { onerror: null, onsuccess: null, primKey: key, value: existingValue };
               if (req.type === 'delete') {
                 // delete operation
-                deleting.fire(ctx, key, existingValue, dxTrans);
+                deleting.fire.call(ctx, key, existingValue, dxTrans);
               } else if (req.type === 'add' || existingValue === undefined) {
                 // The add() or put() resulted in a create
-                const generatedPrimaryKey = creating.fire(ctx, key, req.values[i], dxTrans);
+                const generatedPrimaryKey = creating.fire.call(ctx, key, req.values[i], dxTrans);
                 if (key == null && generatedPrimaryKey != null) {
                   key = generatedPrimaryKey;
                   req.keys[i] = key;
@@ -70,7 +74,7 @@ export function HooksMiddleware(db: Dexie): Middleware<DBCore> {
               } else {
                 // The put() operation resulted in an update
                 const objectDiff = getObjectDiff(existingValue, req.values[i]);
-                const additionalChanges = updating.fire(ctx, objectDiff, this.primKey, existingValue, dxTrans);
+                const additionalChanges = updating.fire.call(ctx, objectDiff, key, existingValue, dxTrans);
                 if (additionalChanges) {
                   const requestedValue = req.values[i];
                   Object.keys(additionalChanges).forEach(keyPath => {
@@ -82,19 +86,22 @@ export function HooksMiddleware(db: Dexie): Middleware<DBCore> {
             });
             return downTable.mutate(req).then(({failures, results, numFailures, lastResult}) => {
               for (let i=0; i<keys.length; ++i) {
-                const result = results[i];
+                const primKey = results ? results[i] : keys[i];
                 const ctx = contexts[i];
-                if (result === undefined) {
+                if (primKey == null) {
                   ctx.onerror && ctx.onerror(failures[i]);
                 } else {
                   ctx.onsuccess && ctx.onsuccess(
                     req.type === 'put' && existingValues[i] ? // the put resulted in an update
                       req.values[i] : // update hooks expects existing value
-                      result // create hooks expects primary key
+                      primKey // create hooks expects primary key
                   );
                 }
               }
               return {failures, results, numFailures, lastResult};
+            }).catch(error => {
+              contexts.forEach(ctx => ctx.onerror && ctx.onerror(error));
+              return Promise.reject(error);
             });
           });
         }

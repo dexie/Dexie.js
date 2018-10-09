@@ -180,7 +180,7 @@ export class Collection implements ICollection {
             index,
             range: ctx.range
           }
-        }).then(({result}) => result);
+        }).then(({result}) => readingHook === mirror ? result : result.map(readingHook));
       } else {
         // Getting array through a cursor.
         const a = [];

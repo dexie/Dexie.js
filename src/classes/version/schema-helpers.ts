@@ -126,7 +126,7 @@ export function updateTablesAndIndexes(
 
       if (contentUpgrade) {
         // Update db.core with new tables and indexes:
-        db.core = createDBCore(db.idbdb, db._deps.indexedDB, db._deps.IDBKeyRange, idbUpgradeTrans);
+        db.core = createDBCore(idbUpgradeTrans.db, db._deps.indexedDB, db._deps.IDBKeyRange, idbUpgradeTrans);
         // For those using db.friends instead of trans.friends.
         db.tables.forEach(table => {
           table.core = db.core.table(table.name);
