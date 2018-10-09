@@ -508,7 +508,7 @@ export class Collection implements ICollection {
             const addValues = [];
             const putValues = [];
             const putKeys = outbound ? [] : null;
-            let deleteKeys = [];
+            const deleteKeys = [];
             for (let i=0; i<count; ++i) {
               const origValue = values[i];
               const ctx = {
@@ -536,7 +536,7 @@ export class Collection implements ICollection {
                 .then(res => {
                   for (let pos in res.failures) {
                     // Remove from deleteKeys the key of the object that failed to change its primary key
-                    deleteKeys = deleteKeys.filter(key => cmp(keys[offset + pos], key) !== 0);
+                    deleteKeys.splice(parseInt(pos), 1);
                   }
                   applyMutateResult(addValues.length, res);
                 })
