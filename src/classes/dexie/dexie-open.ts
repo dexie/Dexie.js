@@ -77,25 +77,27 @@ export function dexieOpen (db: Dexie) {
           // Core opening procedure complete. Now let's just record some stuff.
           upgradeTransaction = null;
           const idbdb = db.idbdb = req.result;
-          const tmpTrans = idbdb.transaction(safariMultiStoreFix(slice(idbdb.objectStoreNames)), 'readonly');
-          const stacks = createMiddlewareStacks(db._middlewares, idbdb, db._deps, tmpTrans);
-          db.core = stacks.dbcore!;
-          db.tables.forEach(table => {
-              table.core = db.core.table(table.name);
-              if (db[table.name] instanceof db.Table) {
-                  db[table.name].core = table.core;
-              }
-          });
-          connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.
 
-          if (state.autoSchema) readGlobalSchema(db, idbdb, tmpTrans);
-          else if (idbdb.objectStoreNames.length > 0) {
-              try {
-                  adjustToExistingIndexNames(db, db._dbSchema, tmpTrans);
-              } catch (e) {
-                  // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
-              }
+          const objectStoreNames = slice(idbdb.objectStoreNames);
+          if (objectStoreNames.length > 0) {
+            const tmpTrans = idbdb.transaction(safariMultiStoreFix(objectStoreNames), 'readonly');
+            const stacks = createMiddlewareStacks(db._middlewares, idbdb, db._deps, tmpTrans);
+            db.core = stacks.dbcore!;
+            db.tables.forEach(table => {
+                table.core = db.core.table(table.name);
+                if (db[table.name] instanceof db.Table) {
+                    db[table.name].core = table.core;
+                }
+            });
+            if (state.autoSchema) readGlobalSchema(db, idbdb, tmpTrans);
+            else try {
+                adjustToExistingIndexNames(db, db._dbSchema, tmpTrans);
+            } catch (e) {
+                // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
+            }
           }
+          
+          connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.
           
           idbdb.onversionchange = wrap(ev => {
               state.vcFired = true; // detect implementations that not support versionchange (IE/Edge/Safari)
