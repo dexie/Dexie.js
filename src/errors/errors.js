@@ -86,6 +86,7 @@ export function ModifyError (msg, failures, successCount, failedKeys) {
     this.failures = failures;
     this.failedKeys = failedKeys;
     this.successCount = successCount;
+    this.message = getMultiErrorMessage(msg, failures);
 }
 derive(ModifyError).from(DexieError);
 
