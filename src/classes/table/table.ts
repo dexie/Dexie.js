@@ -271,7 +271,7 @@ export class Table implements ITable<any, IndexableType> {
     }).then(res => res.numFailures ? Promise.reject(res.failures[0]) : res.lastResult)
     .then(lastResult => {
       if (!this.core.schema.primaryKey.outbound) {
-        setByKeyPath(obj, this.core.schema.primaryKey.keyPath, lastResult);
+        try{setByKeyPath(obj, this.core.schema.primaryKey.keyPath, lastResult);}catch(_){};
       }
       return lastResult;
     });
@@ -312,7 +312,7 @@ export class Table implements ITable<any, IndexableType> {
     .then(res => res.numFailures ? Promise.reject(res.failures[0]) : res.lastResult)
     .then(lastResult => {
       if (!this.core.schema.primaryKey.outbound) {
-        setByKeyPath(obj, this.core.schema.primaryKey.keyPath, lastResult);
+        try{setByKeyPath(obj, this.core.schema.primaryKey.keyPath, lastResult);}catch(_){};
       }
       return lastResult;
     });

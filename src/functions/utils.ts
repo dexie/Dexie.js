@@ -188,7 +188,7 @@ const intrinsicTypes =
         flatten([8,16,32,64].map(num=>["Int","Uint","Float"].map(t=>t+num+"Array")))
     ).filter(t=>_global[t]).map(t=>_global[t])
 
-export function deepClone(any) {
+export function deepClone<T>(any: T): T {
     if (!any || typeof any !== 'object') return any;
     var rv;
     if (isArray(any)) {

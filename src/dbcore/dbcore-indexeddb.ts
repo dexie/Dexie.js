@@ -90,7 +90,6 @@ export function createDBCore (
     if (range.type === RangeType.Any) return null;
     if (range.type === RangeType.Never) throw new Error("Cannot convert never type to IDBKeyRange");
     const {lower, upper, lowerOpen, upperOpen} = range;
-    console.log("range", range);
     const idbRange = lower === undefined ?
       upper === undefined ?
         null : //IDBKeyRange.lowerBound(-Infinity, false) : // Any range (TODO: Should we return null instead?)
@@ -243,12 +242,12 @@ export function createDBCore (
             return this.start(() => gotOne-- ? this.continue() : this.stop()).then(() => this);
           };
           cursor.start = (callback) => {
-            console.log("Starting cursor", (cursor as any).___id);
+            //console.log("Starting cursor", (cursor as any).___id);
             const iterationPromise = new Promise<void>((resolveIteration, rejectIteration) =>{
               req.onerror = eventRejectHandler(rejectIteration);
               cursor.fail = rejectIteration;
               cursor.stop = value => {
-                console.log("Cursor stop", cursor);
+                //console.log("Cursor stop", cursor);
                 cursor.stop = cursor.continue = cursor.continuePrimaryKey = cursor.advance = doThrowCursorIsStopped;
                 resolveIteration(value);
               };
@@ -256,7 +255,7 @@ export function createDBCore (
             // Now change req.onsuccess to a callback that doesn't call initCursor but just observer.next()
             const guardedCallback = () => {
               if (req.result) {
-                console.log("Next result", cursor);
+                //console.log("Next result", cursor);
                 try {
                   callback();
                 } catch (err) {
