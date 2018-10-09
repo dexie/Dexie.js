@@ -359,7 +359,8 @@ export class Table implements ITable<any, IndexableType> {
         .then(({numFailures, lastResult, failures}) => {
           if (numFailures === 0) return lastResult;
           throw new BulkError(
-            `${this.name}.bulkAdd(): ${numFailures} of ${objects.length} operations failed`, failures);
+            `${this.name}.bulkAdd(): ${numFailures} of ${objects.length} operations failed`,
+              Object.keys(failures).map(pos => failures[pos]));
         });
     });
   }
@@ -384,7 +385,8 @@ export class Table implements ITable<any, IndexableType> {
         .then(({numFailures, lastResult, failures}) => {
           if (numFailures === 0) return lastResult;
           throw new BulkError(
-            `${this.name}.bulkPut(): ${numFailures} of ${objects.length} operations failed`, failures);
+            `${this.name}.bulkPut(): ${numFailures} of ${objects.length} operations failed`,
+              Object.keys(failures).map(pos => failures[pos]));
         });
     });
   }
