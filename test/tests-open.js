@@ -253,6 +253,7 @@ asyncTest("Issue #76 Dexie inside Web Worker", function () {
     //
     var CodeToExecuteInWebWorker = `function CodeToExecuteInWebWorker(ok, done) {
         ok(true, "Could enter the web worker");
+        if (!self.Promise) self.Promise = Dexie.Promise;
 
         Dexie.delete("codeFromWorker").then(function() {
             var db = new Dexie("codeFromWorker");

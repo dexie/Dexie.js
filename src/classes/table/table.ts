@@ -2,7 +2,7 @@ import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapEr
 import { Table as ITable } from '../../public/types/table';
 import { TableSchema } from '../../public/types/table-schema';
 import { TableHooks } from '../../public/types/table-hooks';
-import { DexiePromise as Promise, PSD, newScope, wrap, rejection } from '../../helpers/promise';
+import { DexiePromise as Promise, PSD, newScope, wrap, rejection, beginMicroTickScope, endMicroTickScope } from '../../helpers/promise';
 import Events from '../../helpers/Events';
 import { hookCreatingChain, nop, pureFunctionChain, mirror, hookUpdatingChain, hookDeletingChain } from '../../functions/chaining-functions';
 import { Transaction } from '../transaction';
@@ -35,7 +35,7 @@ export class Table implements ITable<any, IndexableType> {
   _trans(
     mode: IDBTransactionMode,
     fn: (idbtrans: IDBTransaction, dxTrans: Transaction) => PromiseLike<any> | void,
-    writeLocked?: boolean | string) : Promise
+    writeLocked?: boolean | string) : PromiseExtended<any>
   {
     const trans: Transaction = this._tx || PSD.trans;
     const tableName = this.name;
@@ -44,11 +44,29 @@ export class Table implements ITable<any, IndexableType> {
         throw new exceptions.NotFound("Table " + tableName + " not part of transaction");
       return fn(trans.idbtrans, trans);
     }
-    return trans && trans.db === this.db ?
-      trans === PSD.trans ?
-        trans._promise(mode, checkTableInTransaction, writeLocked) :
-        newScope(() => trans._promise(mode, checkTableInTransaction, writeLocked), { trans: trans, transless: PSD.transless || PSD }) :
-      tempTransaction(this.db, mode, [this.name], checkTableInTransaction);
+    // Surround all in a microtick scope.
+    // Reason: Browsers (modern Safari + older others)
+    // still as of 2018-10-10 has problems keeping a transaction
+    // alive between micro ticks. Safari because if transaction
+    // is created but not used in same microtick, it will go
+    // away. That specific issue could be solved in DBCore
+    // by opening the transaction just before using it instead.
+    // But older Firefoxes and IE11 (with Promise polyfills)
+    // will still have probs.
+    // The beginMicrotickScope()/endMicrotickScope() works
+    // in cooperation with Dexie.Promise to orchestrate
+    // the micro-ticks in endMicrotickScope() rather than
+    // in native engine.
+    const wasRootExec = beginMicroTickScope();
+    try {
+      return trans && trans.db === this.db ?
+        trans === PSD.trans ?
+          trans._promise(mode, checkTableInTransaction, writeLocked) :
+          newScope(() => trans._promise(mode, checkTableInTransaction, writeLocked), { trans: trans, transless: PSD.transless || PSD }) :
+        tempTransaction(this.db, mode, [this.name], checkTableInTransaction);
+    } finally {
+      if (wasRootExec) endMicroTickScope();
+    }
   }
 
   /** Table.get()
@@ -109,7 +127,6 @@ export class Table implements ITable<any, IndexableType> {
     const idb = this.db._deps.indexedDB;
 
     function equals (a, b) {
-      debugger;
       try {
         return idb.cmp(a,b) === 0; // Works with all indexable types including binary keys.
       } catch (e) {
@@ -265,7 +282,7 @@ export class Table implements ITable<any, IndexableType> {
    * http://dexie.org/docs/Table/Table.add()
    * 
    **/
-  add(obj, key?: IndexableType): Promise<IndexableType> {
+  add(obj, key?: IndexableType): PromiseExtended<IndexableType> {
     return this._trans('readwrite', trans => {
       return this.core.mutate({trans, type: 'add', keys: key != null ? [key] : null, values: [obj]});
     }).then(res => res.numFailures ? Promise.reject(res.failures[0]) : res.lastResult)
@@ -305,7 +322,7 @@ export class Table implements ITable<any, IndexableType> {
    * http://dexie.org/docs/Table/Table.put()
    * 
    **/
-  put(obj, key?: IndexableType): Promise<IndexableType> {
+  put(obj, key?: IndexableType): PromiseExtended<IndexableType> {
     return this._trans(
       'readwrite',
       trans => this.core.mutate({trans, type: 'put', values: [obj], keys: key != null ? [key] : null}))
@@ -323,7 +340,7 @@ export class Table implements ITable<any, IndexableType> {
    * http://dexie.org/docs/Table/Table.delete()
    * 
    **/
-  delete(key: IndexableType): Promise<void> {
+  delete(key: IndexableType): PromiseExtended<void> {
     return this._trans('readwrite',
       trans => this.core.mutate({trans, type: 'delete', keys: [key]}))
     .then(res => res.numFailures ? Promise.reject(res.failures[0]) : undefined);
@@ -347,9 +364,7 @@ export class Table implements ITable<any, IndexableType> {
    **/
   bulkAdd(objects: any[], keys?: ReadonlyArray<IndexableType>) {
     return this._trans('readwrite', trans => {
-      const {outbound, autoIncrement} = this.core.schema.primaryKey;
-      if (outbound && !autoIncrement && !keys)
-        throw new exceptions.InvalidArgument("bulkAdd() with non-inbound keys requires keys array in second argument");
+      const {outbound} = this.core.schema.primaryKey;
       if (!outbound && keys)
         throw new exceptions.InvalidArgument("bulkAdd(): keys argument invalid on tables with inbound keys");
       if (keys && keys.length !== objects.length)
@@ -373,9 +388,7 @@ export class Table implements ITable<any, IndexableType> {
    **/
   bulkPut(objects: any[], keys?: ReadonlyArray<IndexableType>) {
     return this._trans('readwrite', trans => {
-      const {outbound, autoIncrement} = this.core.schema.primaryKey;
-      if (outbound && !autoIncrement && !keys)
-        throw new exceptions.InvalidArgument("bulkPut() with non-inbound keys requires keys array in second argument");
+      const {outbound} = this.core.schema.primaryKey;
       if (!outbound && keys)
         throw new exceptions.InvalidArgument("bulkPut(): keys argument invalid on tables with inbound keys");
       if (keys && keys.length !== objects.length)

@@ -31,7 +31,8 @@ export function usePSD<T> (psd, fn: (...args)=>T, a1?, a2?, a3?) : T;
 export function rejection (failure: any) : DexiePromise<never>;
 export function incrementExpectedAwaits(): number;
 export function decrementExpectedAwaits(sourceTaskId?: number): void;
-
+export function beginMicroTickScope(): boolean;
+export function endMicroTickScope(): void;
 export declare var DexiePromise : DexiePromiseConstructor;
 
 export default DexiePromise;

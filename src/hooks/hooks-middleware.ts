@@ -57,7 +57,7 @@ export function HooksMiddleware(db: Dexie): Middleware<DBCore> {
           return getExistingValues(downTable, req, keys).then (existingValues => {
             const contexts = keys.map((key, i) => {
               const existingValue = existingValues[i];
-              const ctx = { onerror: null, onsuccess: null, primKey: key, value: existingValue };
+              const ctx = { onerror: null, onsuccess: null };
               if (req.type === 'delete') {
                 // delete operation
                 deleting.fire.call(ctx, key, existingValue, dxTrans);

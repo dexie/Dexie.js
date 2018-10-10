@@ -4,7 +4,7 @@ import { DBCore, DBCoreCursor, DBCoreOpenCursorRequest, DBCoreQueryRequest, DBCo
   from '../public/types/dbcore';
 import { isArray, trycatcher } from '../functions/utils';
 import { eventRejectHandler, preventDefault } from '../functions/event-wrappers';
-import { wrap, DexiePromise } from '../helpers/promise';
+import { wrap } from '../helpers/promise';
 import { getMaxKey } from '../functions/quirks';
 import { getKeyExtractor } from './get-key-extractor';
 import { getEffectiveKeys } from './get-effective-keys';
@@ -82,7 +82,10 @@ export function createDBCore (
           return result;
         })
       },
-      hasGetAll: tables.length > 0 && ('getAll' in trans.objectStore(tables[0]))
+      hasGetAll: tables.length > 0 && ('getAll' in trans.objectStore(tables[0])) &&
+        !(typeof navigator !== 'undefined' && /Safari/.test(navigator.userAgent) &&
+        !/(Chrome\/|Edge\/)/.test(navigator.userAgent) &&
+        [].concat(navigator.userAgent.match(/Safari\/(\d*)/))[1] < 604) // Bug with getAll() on Safari ver<604. See discussion following PR #579
     };
   }
 
@@ -108,7 +111,6 @@ export function createDBCore (
         resolve = wrap(resolve);
         const store = (trans as IDBTransaction).objectStore(tableName);
         const outbound = store.keyPath == null;
-        const {autoIncrement} = store;
         const isAddOrPut = type === "put" || type === "add";
         if (!isAddOrPut && type !== 'delete' && type !== 'deleteRange')
           throw new Error ("Invalid operation type: " + type);
@@ -155,9 +157,11 @@ export function createDBCore (
               [values, null] :
             [keys, null];
 
-          if (isAddOrPut && autoIncrement) {
+          if (isAddOrPut) {
             for (let i=0; i<length; ++i) {
-              req = (args2 ? store[type](args1[i], args2[i]) : store[type](args1[i])) as IDBRequest;
+              req = (args2 && args2[i] !== undefined ?
+                store[type](args1[i], args2[i]) :
+                store[type](args1[i])) as IDBRequest;
               req._reqno = i;
               if (results && results[i] === undefined) {
                 // Key is not set explicitely and is autoIncremented.
@@ -168,7 +172,7 @@ export function createDBCore (
             }
           } else {
             for (let i=0; i<length; ++i) {
-              req = (args2 ? store[type](args1[i], args2[i]) : store[type](args1[i])) as IDBRequest;
+              req = store[type](args1[i]) as IDBRequest;
               req._reqno = i;
               req.onerror = errorHandler;
             }
@@ -197,6 +201,7 @@ export function createDBCore (
     function openCursor ({trans, values, query, reverse, unique}: DBCoreOpenCursorRequest): Promise<DBCoreCursor>
     {
       return new Promise((resolve, reject) => {
+        resolve = wrap(resolve);
         const {index, range} = query;
         const store = (trans as IDBTransaction).objectStore(tableName);
         // source
@@ -228,13 +233,14 @@ export function createDBCore (
           (cursor as any).___id = ++_id_counter;
           (cursor as any).done = false;
           const _cursorContinue = cursor.continue.bind(cursor);
-          const _cursorContinuePrimaryKey = cursor.continuePrimaryKey.bind(cursor);
+          let _cursorContinuePrimaryKey = cursor.continuePrimaryKey;
+          if (_cursorContinuePrimaryKey) _cursorContinuePrimaryKey = _cursorContinuePrimaryKey.bind(cursor);
           const _cursorAdvance = cursor.advance.bind(cursor);
           const doThrowCursorIsNotStarted = ()=>{throw new Error("Cursor not started");}
           const doThrowCursorIsStopped = ()=>{throw new Error("Cursor not stopped");}
           (cursor as any).trans = trans;
           cursor.stop = cursor.continue = cursor.continuePrimaryKey = cursor.advance = doThrowCursorIsNotStarted;
-          cursor.fail = reject;
+          cursor.fail = wrap(reject);
           cursor.next = function (this: DBCoreCursor) {
             // next() must work with "this" pointer in order to function correctly for ProxyCursors (derived objects)
             // without having to re-define next() on each child.
@@ -244,6 +250,7 @@ export function createDBCore (
           cursor.start = (callback) => {
             //console.log("Starting cursor", (cursor as any).___id);
             const iterationPromise = new Promise<void>((resolveIteration, rejectIteration) =>{
+              resolveIteration = wrap(resolveIteration);
               req.onerror = eventRejectHandler(rejectIteration);
               cursor.fail = rejectIteration;
               cursor.stop = value => {
@@ -299,14 +306,14 @@ export function createDBCore (
           if (hasGetAll) {
             const req = values ?
                 (source as any).getAll(idbKeyRange, nonInfinitLimit) :
-                (source as any).getAllKeys(makeIDBKeyRange(range), nonInfinitLimit);
+                (source as any).getAllKeys(idbKeyRange, nonInfinitLimit);
             req.onsuccess = event => resolve({result: event.target.result});
             req.onerror = eventRejectHandler(reject);
           } else {
             let count = 0;
             const req = values || !('openKeyCursor' in source) ?
               source.openCursor(idbKeyRange) :
-              source.openKeyCursor(idbKeyRange);
+              source.openKeyCursor(idbKeyRange)
             const result = [];
             req.onsuccess = event => {
               const cursor = req.result as IDBCursorWithValue;
@@ -378,7 +385,8 @@ export function createDBCore (
         return new Promise<number>((resolve, reject) => {
           const store = (trans as IDBTransaction).objectStore(tableName);
           const source = index.isPrimaryKey ? store : store.index(index.name);
-          const req = source.count(makeIDBKeyRange(range));
+          const idbKeyRange = makeIDBKeyRange(range);
+          const req = idbKeyRange ? source.count(idbKeyRange) : source.count();
           req.onsuccess = wrap(ev => resolve(ev.target.result));
           req.onerror = eventRejectHandler(reject);
         });
