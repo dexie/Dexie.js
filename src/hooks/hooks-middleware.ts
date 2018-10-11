@@ -3,10 +3,11 @@ import { Dexie } from '../public/types/dexie';
 import { nop } from '../functions/chaining-functions';
 import { tryCatch, getObjectDiff, setByKeyPath } from '../functions/utils';
 import { PSD } from '../helpers/promise';
-import { LockableTableMiddleware } from '../dbcore/lockable-table-middleware';
+//import { LockableTableMiddleware } from '../dbcore/lockable-table-middleware';
 import { exceptions } from '../errors';
 import { getEffectiveKeys, getExistingValues } from '../dbcore/get-effective-keys';
 import { Middleware } from '../public/types/middleware';
+import { Transaction } from '../classes/transaction';
 
 export function HooksMiddleware(db: Dexie): Middleware<DBCore> {
   return {
@@ -23,25 +24,26 @@ export function HooksMiddleware(db: Dexie): Middleware<DBCore> {
         const tableMiddleware: DBCoreTable = {
           ...downTable,
           mutate(req):Promise<MutateResponse> {
+            const dxTrans = PSD.trans as Transaction;
             switch (req.type) {
               case 'add':
                 if (creating.fire === nop) break;
-                return lock(req.trans, addPutOrDelete(req));
+                return dxTrans._promise('readwrite', ()=>addPutOrDelete(req), true);
               case 'put':
                 if (creating.fire === nop && updating.fire === nop) break;
-                return lock(req.trans, addPutOrDelete(req));
+                return dxTrans._promise('readwrite', ()=>addPutOrDelete(req), true);
               case 'delete':
                 if (deleting.fire === nop) break;
-                return lock(req.trans, addPutOrDelete(req));
+                return dxTrans._promise('readwrite', ()=>addPutOrDelete(req), true);
               case 'deleteRange':
                 if (deleting.fire === nop) break;
-                return lock(req.trans, deleteRange(req));
+                return dxTrans._promise('readwrite', ()=>deleteRange(req), true);
             }
             // Any of the breaks above happened (no hooks) - do the default:
             return downTable.mutate(req);
           }
         };
-        const {lock, lockableMiddleware} = LockableTableMiddleware(tableMiddleware);
+        //const {lock, lockableMiddleware} = LockableTableMiddleware(tableMiddleware);
 
         function addPutOrDelete(req: AddRequest | PutRequest | DeleteRequest): Promise<MutateResponse> {
           const dxTrans = PSD.trans;
@@ -127,7 +129,7 @@ export function HooksMiddleware(db: Dexie): Middleware<DBCore> {
           })
         }
 
-        return lockableMiddleware;
+        return tableMiddleware;
       },
     }) as DBCore
   };
