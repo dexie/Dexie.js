@@ -404,6 +404,8 @@ export function createDBCore (
     transaction: db.transaction.bind(db),
 
     table(name: string) {
+      const result = tableMap[name];
+      if (!result) throw new Error(`Table '${name}' not found`);
       return tableMap[name];
     },
 
