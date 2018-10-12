@@ -40,7 +40,7 @@ import { usePSD } from '../../helpers/promise';
 import { DBCore } from '../../public/types/dbcore';
 import { Middleware, DexieStacks } from '../../public/types/middleware';
 import { virtualIndexMiddleware } from '../../dbcore/virtual-index-middleware';
-import { HooksMiddleware } from '../../hooks/hooks-middleware';
+import { hooksMiddleware } from '../../hooks/hooks-middleware';
 import { IndexableType } from '../../public';
 
 export interface DbReadyState {
@@ -204,7 +204,7 @@ export class Dexie implements IDexie {
 
     // Default middlewares:
     this.use(virtualIndexMiddleware);
-    this.use(HooksMiddleware(this));
+    this.use(hooksMiddleware);
 
     // Call each addon:
     addons.forEach(addon => addon(this));

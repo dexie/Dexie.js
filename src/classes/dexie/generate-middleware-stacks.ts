@@ -3,6 +3,7 @@ import { createDBCore } from '../../dbcore/dbcore-indexeddb';
 import { DBCore } from '../../public/types/dbcore';
 import { DexieDOMDependencies } from '../../public/types/dexie-dom-dependencies';
 import { DexieStacks, Middleware } from '../../public/types/middleware';
+import { exceptions } from '../../errors';
 
 function createMiddlewareStack<TStack extends {stack: string}>(
   stackImpl: {stack: string},
@@ -10,7 +11,7 @@ function createMiddlewareStack<TStack extends {stack: string}>(
   return middlewares.reduce((down, {create}) => ({...down, ...create(down)}), stackImpl) as TStack;
 } 
 
-export function createMiddlewareStacks(
+function createMiddlewareStacks(
   middlewares: {[StackName in keyof DexieStacks]?: Middleware<DexieStacks[StackName]>[]},
   idbdb: IDBDatabase,
   {IDBKeyRange, indexedDB}: DexieDOMDependencies,
@@ -26,4 +27,19 @@ export function createMiddlewareStacks(
   return {
     dbcore
   };
+}
+
+export function generateMiddlewareStacks(db: Dexie, tmpTrans: IDBTransaction) {
+  const idbdb = tmpTrans.db;
+  const stacks = createMiddlewareStacks(db._middlewares, idbdb, db._deps, tmpTrans);
+  db.core = stacks.dbcore!;
+  db.tables.forEach(table => {
+    const tableName = table.name;
+    if (db.core.schema.tables.some(tbl => tbl.name === tableName)) {
+      table.core = db.core.table(tableName);
+      if (db[tableName] instanceof db.Table) {
+          db[tableName].core = table.core;
+      }
+    }
+  });
 }

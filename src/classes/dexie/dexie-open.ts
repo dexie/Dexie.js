@@ -10,9 +10,8 @@ import { safariMultiStoreFix } from '../../functions/quirks';
 import { databaseEnumerator } from '../../helpers/database-enumerator';
 import { vip } from './vip';
 import { promisableChain, nop } from '../../functions/chaining-functions';
-import { createMiddlewareStacks } from './create-middleware-stacks';
+import { generateMiddlewareStacks } from './generate-middleware-stacks';
 import { slice } from '../../functions/utils';
-import { createDBCore } from '../../dbcore/dbcore-indexeddb';
 
 export function dexieOpen (db: Dexie) {
   const state = db._state;
@@ -51,9 +50,6 @@ export function dexieOpen (db: Dexie) {
       req.onblocked = wrap(db._fireOnBlocked);
       req.onupgradeneeded = wrap (e => {
           upgradeTransaction = req.transaction;
-          // For upgraders, do not invoke any middleware.
-          db.core = createDBCore(req.result, indexedDB, IDBKeyRange, upgradeTransaction);
-          db.tables.forEach(table => table.core = db.core.table(table.name));
           if (state.autoSchema && !db._options.allowEmptyDB) { // Unless an addon has specified db._allowEmptyDB, lets make the call fail.
               // Caller did not specify a version or schema. Doing that is only acceptable for opening alread existing databases.
               // If onupgradeneeded is called it means database did not exist. Reject the open() promise and make sure that we
@@ -79,22 +75,18 @@ export function dexieOpen (db: Dexie) {
           const idbdb = db.idbdb = req.result;
 
           const objectStoreNames = slice(idbdb.objectStoreNames);
-          if (objectStoreNames.length > 0) {
+          if (objectStoreNames.length > 0) try {
             const tmpTrans = idbdb.transaction(safariMultiStoreFix(objectStoreNames), 'readonly');
-            const stacks = createMiddlewareStacks(db._middlewares, idbdb, db._deps, tmpTrans);
-            db.core = stacks.dbcore!;
-            db.tables.forEach(table => {
-                table.core = db.core.table(table.name);
-                if (db[table.name] instanceof db.Table) {
-                    db[table.name].core = table.core;
-                }
-            });
             if (state.autoSchema) readGlobalSchema(db, idbdb, tmpTrans);
-            else try {
-                adjustToExistingIndexNames(db, db._dbSchema, tmpTrans);
-            } catch (e) {
-                // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
-            }
+            else adjustToExistingIndexNames(db, db._dbSchema, tmpTrans);
+            generateMiddlewareStacks(db, tmpTrans);
+          } catch (e) {
+            // Safari 8 may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
+            // BUGBUG: It will bail out anyway as of Dexie 3.
+            // Should we support Safari 8 anymore? Believe all
+            // Dexie users use the shim for that platform anyway?!
+            // If removing Safari 8 support, go ahead and remove the safariMultiStoreFix() function
+            // as well as absurd upgrade version quirk for Safari.
           }
           
           connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.

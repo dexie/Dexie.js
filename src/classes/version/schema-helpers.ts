@@ -11,7 +11,7 @@ import { hasIEDeleteObjectStoreBug } from '../../globals/constants';
 import { safariMultiStoreFix } from '../../functions/quirks';
 import { createIndexSpec, nameFromKeyPath } from '../../helpers/index-spec';
 import { createTableSchema } from '../../helpers/table-schema';
-import { createDBCore } from '../../dbcore/dbcore-indexeddb';
+import { generateMiddlewareStacks } from '../dexie/generate-middleware-stacks';
 
 export function setApiOnPlace(db: Dexie, objs: Object[], tableNames: string[], dbschema: DbSchema) {
   tableNames.forEach(tableName => {
@@ -56,15 +56,7 @@ export function runUpgraders(db: Dexie, oldVersion: number, idbUpgradeTrans: IDB
       keys(globalSchema).forEach(tableName => {
         createTable(idbUpgradeTrans, tableName, globalSchema[tableName].primKey, globalSchema[tableName].indexes);
       });
-      // Update db-core with new tables and indexes:
-      db.core = createDBCore(idbUpgradeTrans.db, db._deps.indexedDB, db._deps.IDBKeyRange, idbUpgradeTrans);
-      // For those using db.friends instead of trans.friends:
-      db.tables.forEach(table => {
-        table.core = db.core.table(table.name);
-        if (db[table.name] instanceof db.Table) {
-          db[table.name].core = table.core;
-        }
-      });
+      generateMiddlewareStacks(db, idbUpgradeTrans);
       Promise.follow(() => db.on.populate.fire(trans)).catch(rejectTransaction);
     } else
       updateTablesAndIndexes(db, oldVersion, trans, idbUpgradeTrans).catch(rejectTransaction);
@@ -126,14 +118,7 @@ export function updateTablesAndIndexes(
 
       if (contentUpgrade) {
         // Update db.core with new tables and indexes:
-        db.core = createDBCore(idbUpgradeTrans.db, db._deps.indexedDB, db._deps.IDBKeyRange, idbUpgradeTrans);
-        // For those using db.friends instead of trans.friends.
-        db.tables.forEach(table => {
-          table.core = db.core.table(table.name);
-          if (db[table.name] instanceof db.Table) {
-            db[table.name].core = table.core;
-          }  
-        }); 
+        generateMiddlewareStacks(db, idbUpgradeTrans);
 
         anyContentUpgraderHasRun = true;
 
