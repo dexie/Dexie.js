@@ -123,7 +123,6 @@ export class Table implements ITable<any, IndexableType> {
     const idb = this.db._deps.indexedDB;
 
     function equals (a, b) {
-      debugger;
       try {
         return idb.cmp(a,b) === 0; // Works with all indexable types including binary keys.
       } catch (e) {
