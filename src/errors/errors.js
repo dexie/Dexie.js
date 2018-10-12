@@ -126,7 +126,7 @@ export var exceptions = errorList.reduce((obj,name)=>{
             this.message = defaultTexts[name] || fullName;
             this.inner = null;
         } else if (typeof msgOrInner === 'string') {
-            this.message = msgOrInner;
+            this.message = `${msgOrInner}${!inner ? '' : '\n ' + inner}`;
             this.inner = inner || null;
         } else if (typeof msgOrInner === 'object') {
             this.message = `${msgOrInner.name} ${msgOrInner.message}`;
