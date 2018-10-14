@@ -395,6 +395,19 @@ asyncTest("Issue #67 - Regression test - Transaction still fails if error in key
     }).finally(start);
 });
 
+asyncTest("Issue #67 - Regression test 2 - other error in key", function () {
+    db.transaction('rw', db.users, function () {
+        db.users.where('first').above("").delete().then(function (num) {
+            ok(true, num + " users deleted");
+            db.users.where('first').above(false).delete();
+        });
+    }).then(function() {
+        ok(false, "Transaction should not commit when we an unhandled error has happened");
+    }).catch(function(err) {
+        ok(true, "Good, transaction failed as expected");
+    }).finally(start);
+});
+
 asyncTest("Issue #69 Global exception handler for promises", function () {
     if (!supports("domevents")) {
         ok(true, "Skipping - DOM events not supported");

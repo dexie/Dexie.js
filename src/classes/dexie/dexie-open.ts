@@ -4,13 +4,14 @@ import { rejection } from '../../helpers/promise';
 import { exceptions } from '../../errors';
 import { eventRejectHandler, preventDefault } from '../../functions/event-wrappers';
 import Promise, { wrap } from '../../helpers/promise';
-import { IDBEvent, IDBTransaction } from '../../public/types/indexeddb';
 import { connections } from '../../globals/constants';
 import { runUpgraders, readGlobalSchema, adjustToExistingIndexNames } from '../version/schema-helpers';
 import { safariMultiStoreFix } from '../../functions/quirks';
 import { databaseEnumerator } from '../../helpers/database-enumerator';
 import { vip } from './vip';
 import { promisableChain, nop } from '../../functions/chaining-functions';
+import { generateMiddlewareStacks } from './generate-middleware-stacks';
+import { slice } from '../../functions/utils';
 
 export function dexieOpen (db: Dexie) {
   const state = db._state;
@@ -27,7 +28,7 @@ export function dexieOpen (db: Dexie) {
   // Function pointers to call when the core opening process completes.
   let resolveDbReady = state.dbReadyResolve,
       // upgradeTransaction to abort on failure.
-      upgradeTransaction: IDBTransaction = null;
+      upgradeTransaction: (IDBTransaction | null) = null;
   
   return Promise.race([state.openCanceller, new Promise((resolve, reject) => {
       // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
@@ -72,16 +73,23 @@ export function dexieOpen (db: Dexie) {
           // Core opening procedure complete. Now let's just record some stuff.
           upgradeTransaction = null;
           const idbdb = db.idbdb = req.result;
-          connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.
 
-          if (state.autoSchema) readGlobalSchema(db, idbdb);
-          else if (idbdb.objectStoreNames.length > 0) {
-              try {
-                  adjustToExistingIndexNames(db, db._dbSchema, idbdb.transaction(safariMultiStoreFix(idbdb.objectStoreNames), 'readonly'));
-              } catch (e) {
-                  // Safari may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
-              }
+          const objectStoreNames = slice(idbdb.objectStoreNames);
+          if (objectStoreNames.length > 0) try {
+            const tmpTrans = idbdb.transaction(safariMultiStoreFix(objectStoreNames), 'readonly');
+            if (state.autoSchema) readGlobalSchema(db, idbdb, tmpTrans);
+            else adjustToExistingIndexNames(db, db._dbSchema, tmpTrans);
+            generateMiddlewareStacks(db, tmpTrans);
+          } catch (e) {
+            // Safari 8 may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
+            // BUGBUG: It will bail out anyway as of Dexie 3.
+            // Should we support Safari 8 anymore? Believe all
+            // Dexie users use the shim for that platform anyway?!
+            // If removing Safari 8 support, go ahead and remove the safariMultiStoreFix() function
+            // as well as absurd upgrade version quirk for Safari.
           }
+          
+          connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.
           
           idbdb.onversionchange = wrap(ev => {
               state.vcFired = true; // detect implementations that not support versionchange (IE/Edge/Safari)

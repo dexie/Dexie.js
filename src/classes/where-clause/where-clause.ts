@@ -1,13 +1,14 @@
 import { WhereClause as IWhereClause } from "../../public/types/where-clause";
 import { Collection } from "../collection";
 import { Table } from "../table";
-import { IndexableType } from "../../public/types/indexable-type";
-import { emptyCollection, fail, addIgnoreCaseAlgorithm } from './where-clause-helpers';
+import { IndexableTypeArray, IndexableType } from "../../public/types/indexable-type";
+import { emptyCollection, fail, addIgnoreCaseAlgorithm, createRange, rangeEqual } from './where-clause-helpers';
 import { INVALID_KEY_ARGUMENT, STRING_EXPECTED, maxString, minKey } from '../../globals/constants';
 import { getArrayOf, NO_CHAR_ARRAY } from '../../functions/utils';
 import { exceptions } from '../../errors';
 import { Dexie } from '../dexie';
-import { IndexableTypeArray, IDBValidKey, IDBKeyRangeConstructor } from '../../public/types/indexeddb';
+import { Collection as ICollection} from "../../public/types/collection";
+import { RangeType } from '../../public/types/dbcore';
 
 /** class WhereClause
  * 
@@ -15,17 +16,17 @@ import { IndexableTypeArray, IDBValidKey, IDBKeyRangeConstructor } from '../../p
  */
 export class WhereClause implements IWhereClause {
   db: Dexie;
-  _IDBKeyRange: IDBKeyRangeConstructor;
+  _IDBKeyRange: typeof IDBKeyRange;
   _ctx: {
     table: Table;
     index: string;
     or: Collection;
   }
-  _cmp: (a: IDBValidKey, b: IDBValidKey) => number;
-  _ascending: (a: IDBValidKey, b: IDBValidKey) => number;
-  _descending: (a: IDBValidKey, b: IDBValidKey) => number;
-  _min: (a: IDBValidKey, b: IDBValidKey) => IDBValidKey;
-  _max: (a: IDBValidKey, b: IDBValidKey) => IDBValidKey;
+  _cmp: (a: IndexableType, b: IndexableType) => number;
+  _ascending: (a: IndexableType, b: IndexableType) => number;
+  _descending: (a: IndexableType, b: IndexableType) => number;
+  _min: (a: IndexableType, b: IndexableType) => IndexableType;
+  _max: (a: IndexableType, b: IndexableType) => IndexableType;
 
   get Collection() {
     return this._ctx.table.db.Collection;
@@ -43,7 +44,7 @@ export class WhereClause implements IWhereClause {
       if ((this._cmp(lower, upper) > 0) ||
         (this._cmp(lower, upper) === 0 && (includeLower || includeUpper) && !(includeLower && includeUpper)))
         return emptyCollection(this); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
-      return new this.Collection(this, () => this._IDBKeyRange.bound(lower, upper, !includeLower, !includeUpper));
+      return new this.Collection(this, ()=>createRange(lower, upper, !includeLower, !includeUpper));
     } catch (e) {
       return fail(this, INVALID_KEY_ARGUMENT);
     }
@@ -55,7 +56,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   equals(value: IndexableType) {
-    return new this.Collection(this, () => this._IDBKeyRange.only(value));
+    return new this.Collection(this, () => rangeEqual(value)) as ICollection;
   }
 
   /** WhereClause.above()
@@ -64,7 +65,8 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   above(value: IndexableType) {
-    return new this.Collection(this, () => this._IDBKeyRange.lowerBound(value, true));
+    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
+    return new this.Collection(this, () => createRange(value, undefined, true));
   }
 
   /** WhereClause.aboveOrEqual()
@@ -73,7 +75,8 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   aboveOrEqual(value: IndexableType) {
-    return new this.Collection(this, () => this._IDBKeyRange.lowerBound(value));
+    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
+    return new this.Collection(this, () => createRange(value, undefined, false));
   }
 
   /** WhereClause.below()
@@ -82,7 +85,8 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   below(value: IndexableType) {
-    return new this.Collection(this, () => this._IDBKeyRange.upperBound(value, true));
+    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
+    return new this.Collection(this, () => createRange(undefined, value, false, true));
   }
 
   /** WhereClause.belowOrEqual()
@@ -91,7 +95,8 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   belowOrEqual(value: IndexableType) {
-    return new this.Collection(this, () => this._IDBKeyRange.upperBound(value));
+    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
+    return new this.Collection(this, () => createRange(undefined, value));
   }
 
   /** WhereClause.startsWith()
@@ -161,7 +166,7 @@ export class WhereClause implements IWhereClause {
     let compare = this._cmp;
     try { set.sort(compare); } catch (e) { return fail(this, INVALID_KEY_ARGUMENT); }
     if (set.length === 0) return emptyCollection(this);
-    const c = new this.Collection(this, () => this._IDBKeyRange.bound(set[0], set[set.length - 1]));
+    const c = new this.Collection(this, () => createRange(set[0], set[set.length - 1]));
 
     c._ondirectionchange = direction => {
       compare = (direction === "next" ?
@@ -296,7 +301,7 @@ export class WhereClause implements IWhereClause {
 
     const c = new this.Collection(
       this,
-      () => this._IDBKeyRange.bound(set[0][0], set[set.length - 1][1], !includeLowers, !includeUppers));
+      () => createRange(set[0][0], set[set.length - 1][1], !includeLowers, !includeUppers));
 
     c._ondirectionchange = direction => {
       if (direction === "next") {

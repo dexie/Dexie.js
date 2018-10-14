@@ -308,6 +308,15 @@ asyncTest("modify-causing-error", 2, function () {
     }).finally(start);
 });
 
+promisedTest("modify-primary-key", async ()=>{
+    await db.users.add({id: 87, first: "Olle"});
+    const res = await db.users.where({id: 87}).modify(user => user.id = 88);
+    ok(res, "Successfully modified the primary key of a user");
+    const user88 = await db.users.get(88);
+    ok(!!user88, "Should be able to retrieve user 88 using db.users.get(88)");
+    equal(user88.first, "Olle", "Retrieved user should be David");
+});
+
 // Issue #594 (A Safari issue)
 //
 // The test below fails in Safari 10 and 11. Collection.modify currently uses IDBCursor.update().
@@ -616,4 +625,3 @@ asyncTest("Promise chain from within each() operation", 2, function () {
         ok(false, err.stack || err);
     }).finally(start);
 });
-

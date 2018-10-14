@@ -112,6 +112,10 @@ asyncTest('should not create an UPDATE change if the mods are already in the old
   db.foo.add({id: ID, foo: 'bar'})
       .then(() => {
         return db.foo.update(ID, {foo: 'bar'});
+      }).then(()=>{
+        return db._changes.toArray((changes) => {
+          strictEqual(changes.length, 0, 'We have no change');
+        });
       })
       .catch(function(err) {
         ok(false, "Error: " + err);

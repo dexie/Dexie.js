@@ -177,7 +177,7 @@ export function shallowClone(obj) {
 }
 
 const concat = [].concat;
-export function flatten (a) {
+export function flatten<T> (a: (T | T[])[]) : T[] {
     return concat.apply([], a);
 }
 
@@ -188,7 +188,7 @@ const intrinsicTypes =
         flatten([8,16,32,64].map(num=>["Int","Uint","Float"].map(t=>t+num+"Array")))
     ).filter(t=>_global[t]).map(t=>_global[t])
 
-export function deepClone(any) {
+export function deepClone<T>(any: T): T {
     if (!any || typeof any !== 'object') return any;
     var rv;
     if (isArray(any)) {

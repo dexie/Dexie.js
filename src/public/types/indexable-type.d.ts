@@ -1,3 +1,7 @@
-import { IDBValidKey } from './indexeddb';
+export type IndexableTypePart =
+string | number | Date | ArrayBuffer | ArrayBufferView | DataView | Array<Array<void>>;
 
-export type IndexableType = IDBValidKey;
+export type IndexableTypeArray = Array<IndexableTypePart>;
+export type IndexableTypeArrayReadonly = ReadonlyArray<IndexableTypePart>;
+export type IndexableType = IndexableTypePart | IndexableTypeArrayReadonly;
+

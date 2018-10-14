@@ -1,5 +1,5 @@
 import { TableSchema } from "./table-schema";
-import { IndexableTypeArrayReadonly } from "./indexeddb";
+import { IndexableTypeArrayReadonly } from "./indexable-type";
 import { TableHooks } from "./table-hooks";
 import { Collection } from "./collection";
 import { ThenShortcut } from "./then-shortcut";

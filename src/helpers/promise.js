@@ -528,7 +528,7 @@ function physicalTick() {
     beginMicroTickScope() && endMicroTickScope();
 }
 
-function beginMicroTickScope() {
+export function beginMicroTickScope() {
     var wasRootExec = isOutsideMicroTick;
     isOutsideMicroTick = false;
     needsNewPhysicalTick = false;
@@ -543,7 +543,7 @@ function beginMicroTickScope() {
    would destroy the framework and make it instable. So we don't export
    our asap method.
 */
-function endMicroTickScope() {
+export function endMicroTickScope() {
     var callbacks, i, l;
     do {
         while (microtickQueue.length > 0) {

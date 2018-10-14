@@ -71,8 +71,8 @@ derive(DexieError).from(Error).extend({
 });
 
 function getMultiErrorMessage (msg, failures) {
-    return msg + ". Errors: " + failures
-        .map(f=>f.toString())
+    return msg + ". Errors: " + Object.keys(failures)
+        .map(key=>failures[key].toString())
         .filter((v,i,s)=>s.indexOf(v) === i) // Only unique error strings
         .join('\n');
 }
@@ -86,6 +86,7 @@ export function ModifyError (msg, failures, successCount, failedKeys) {
     this.failures = failures;
     this.failedKeys = failedKeys;
     this.successCount = successCount;
+    this.message = getMultiErrorMessage(msg, failures);
 }
 derive(ModifyError).from(DexieError);
 
@@ -125,7 +126,7 @@ export var exceptions = errorList.reduce((obj,name)=>{
             this.message = defaultTexts[name] || fullName;
             this.inner = null;
         } else if (typeof msgOrInner === 'string') {
-            this.message = msgOrInner;
+            this.message = `${msgOrInner}${!inner ? '' : '\n ' + inner}`;
             this.inner = inner || null;
         } else if (typeof msgOrInner === 'object') {
             this.message = `${msgOrInner.name} ${msgOrInner.message}`;

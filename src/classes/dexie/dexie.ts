@@ -2,11 +2,9 @@
 import { Dexie as IDexie } from "../../public/types/dexie";
 import { DexieOptions, DexieConstructor } from "../../public/types/dexie-constructor";
 import { DbEvents } from "../../public/types/db-events";
-import { IDBValidKey, IDBKeyRangeConstructor, IDBFactory, IDBEvent } from '../../public/types/indexeddb';
 //import { PromiseExtended, PromiseExtendedConstructor } from '../../public/types/promise-extended';
 import { Table as ITable } from '../../public/types/table';
 import { TableSchema } from "../../public/types/table-schema";
-import { IDBKeyRange } from "../../public/types/indexeddb";
 import { DbSchema } from '../../public/types/db-schema';
 
 // Internal imports
@@ -39,6 +37,11 @@ import { extractTransactionArgs, enterTransactionScope } from './transaction-hel
 import { TransactionMode } from '../../public/types/transaction-mode';
 import { rejection } from '../../helpers/promise';
 import { usePSD } from '../../helpers/promise';
+import { DBCore } from '../../public/types/dbcore';
+import { Middleware, DexieStacks } from '../../public/types/middleware';
+import { virtualIndexMiddleware } from '../../dbcore/virtual-index-middleware';
+import { hooksMiddleware } from '../../hooks/hooks-middleware';
+import { IndexableType } from '../../public';
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -63,8 +66,10 @@ export class Dexie implements IDexie {
   _createTransaction: (this: Dexie, mode: IDBTransactionMode, storeNames: ArrayLike<string>, dbschema: { [tableName: string]: TableSchema; }, parentTransaction?: Transaction) => Transaction;
   _dbSchema: { [tableName: string]: TableSchema; };
   _hasGetAll?: boolean;
-  _maxKey: IDBValidKey;
-  _fireOnBlocked: (ev: IDBEvent) => void;
+  _maxKey: IndexableType;
+  _fireOnBlocked: (ev: Event) => void;
+  _middlewares: {[StackName in keyof DexieStacks]?: Middleware<DexieStacks[StackName]>[]} = {};
+  core: DBCore;
 
   name: string;
   verno: number = 0;
@@ -90,7 +95,7 @@ export class Dexie implements IDexie {
     };
     this._deps = {
       indexedDB: options.indexedDB as IDBFactory,
-      IDBKeyRange: options.IDBKeyRange as IDBKeyRangeConstructor
+      IDBKeyRange: options.IDBKeyRange as typeof IDBKeyRange
     };
     const {
       addons,
@@ -181,7 +186,7 @@ export class Dexie implements IDexie {
         console.warn(`Upgrade '${this.name}' blocked by other connection holding version ${ev.oldVersion / 10}`);
     });
 
-    this._maxKey = getMaxKey(options.IDBKeyRange as IDBKeyRangeConstructor);
+    this._maxKey = getMaxKey(options.IDBKeyRange as typeof IDBKeyRange);
 
     this._createTransaction = (
       mode: IDBTransactionMode,
@@ -196,6 +201,10 @@ export class Dexie implements IDexie {
         .filter(c => c.name === this.name && c !== this && !c._state.vcFired)
         .map(c => c.on("versionchange").fire(ev));
     }
+
+    // Default middlewares:
+    this.use(virtualIndexMiddleware);
+    this.use(hooksMiddleware);
 
     // Call each addon:
     addons.forEach(addon => addon(this));
@@ -229,6 +238,28 @@ export class Dexie implements IDexie {
       }
       this._state.dbReadyPromise.then(resolve, reject);
     }).then(fn);
+  }
+
+  use({stack, create, level, name}: Middleware<DBCore>): this {
+    if (name) this.unuse({stack, name}); // Be able to replace existing middleware.
+    const middlewares = this._middlewares[stack] || (this._middlewares[stack] = []);
+    middlewares.push({stack, create, level: level == null ? 10 : level, name});
+    middlewares.sort((a, b) => a.level - b.level);
+    // Todo update db.core and db.tables...core ? Or should be expect this to have effect
+    // only after next open()?
+    return this;
+  }
+
+  unuse({stack, create}: Middleware<{stack: keyof DexieStacks}>): this;
+  unuse({stack, name}: {stack: keyof DexieStacks, name: string}): this;
+  unuse({stack, name, create}: {stack: keyof DexieStacks, name?: string, create?: Function}) {
+    if (stack && this._middlewares[stack]) {
+      this._middlewares[stack] = this._middlewares[stack].filter(mw =>
+        create ? mw.create !== create : // Given middleware has a create method. Match that exactly.
+        name ? mw.name !== name : // Given middleware spec 
+        false);
+    }
+    return this;
   }
 
   open() {
@@ -384,7 +415,7 @@ export class Dexie implements IDexie {
   }
 
   table(tableName: string): Table;
-  table<T, TKey extends IDBValidKey=IDBValidKey>(tableName: string): ITable<T, TKey>;
+  table<T, TKey extends IndexableType=IndexableType>(tableName: string): ITable<T, TKey>;
   table(tableName: string): Table {
     if (!hasOwn(this._allTables, tableName)) {
       throw new exceptions.InvalidTable(`Table ${tableName} does not exist`); }

@@ -3,7 +3,6 @@ import { DbSchema } from '../../public/types/db-schema';
 import { setProp, keys, slice, _global, isArray, shallowClone } from '../../functions/utils';
 import { Transaction } from '../transaction';
 import { Version } from './version';
-import { IDBTransaction, IDBObjectStore, IDBDatabase } from '../../public/types/indexeddb';
 import Promise, { PSD, newScope } from '../../helpers/promise';
 import { exceptions } from '../../errors';
 import { TableSchema } from '../../public/types/table-schema';
@@ -12,6 +11,7 @@ import { hasIEDeleteObjectStoreBug } from '../../globals/constants';
 import { safariMultiStoreFix } from '../../functions/quirks';
 import { createIndexSpec, nameFromKeyPath } from '../../helpers/index-spec';
 import { createTableSchema } from '../../helpers/table-schema';
+import { generateMiddlewareStacks } from '../dexie/generate-middleware-stacks';
 
 export function setApiOnPlace(db: Dexie, objs: Object[], tableNames: string[], dbschema: DbSchema) {
   tableNames.forEach(tableName => {
@@ -56,6 +56,7 @@ export function runUpgraders(db: Dexie, oldVersion: number, idbUpgradeTrans: IDB
       keys(globalSchema).forEach(tableName => {
         createTable(idbUpgradeTrans, tableName, globalSchema[tableName].primKey, globalSchema[tableName].indexes);
       });
+      generateMiddlewareStacks(db, idbUpgradeTrans);
       Promise.follow(() => db.on.populate.fire(trans)).catch(rejectTransaction);
     } else
       updateTablesAndIndexes(db, oldVersion, trans, idbUpgradeTrans).catch(rejectTransaction);
@@ -68,7 +69,8 @@ export function updateTablesAndIndexes(
   db: Dexie,
   oldVersion: number,
   trans: Transaction,
-  idbUpgradeTrans: IDBTransaction) {
+  idbUpgradeTrans: IDBTransaction)
+{
   // Upgrade version to version, step-by-step from oldest to newest version.
   // Each transaction object will contain the table set that was current in that version (but also not-yet-deleted tables from its previous version)
   const queue: UpgradeQueueItem[] = [];
@@ -115,6 +117,9 @@ export function updateTablesAndIndexes(
       const contentUpgrade = version._cfg.contentUpgrade;
 
       if (contentUpgrade) {
+        // Update db.core with new tables and indexes:
+        generateMiddlewareStacks(db, idbUpgradeTrans);
+
         anyContentUpgraderHasRun = true;
 
         // Add to-be-deleted tables to contentUpgrade transaction
@@ -262,14 +267,13 @@ export function addIndex(store: IDBObjectStore, idx: IndexSpec) {
   store.createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multi });
 }
 
-export function readGlobalSchema(db: Dexie, idbdb: IDBDatabase) {
+export function readGlobalSchema(db: Dexie, idbdb: IDBDatabase, tmpTrans: IDBTransaction) {
   db.verno = idbdb.version / 10;
   const globalSchema = db._dbSchema = {};
   const dbStoreNames = db._storeNames = slice(idbdb.objectStoreNames, 0);
   if (dbStoreNames.length === 0) return; // Database contains no stores.
-  const trans = idbdb.transaction(safariMultiStoreFix(dbStoreNames), 'readonly');
   dbStoreNames.forEach(storeName => {
-    const store = trans.objectStore(storeName);
+    const store = tmpTrans.objectStore(storeName);
     let keyPath = store.keyPath;
     const primKey = createIndexSpec(nameFromKeyPath(keyPath), keyPath || "", false, false, !!store.autoIncrement, keyPath && typeof keyPath !== 'string');
     const indexes: IndexSpec[] = [];

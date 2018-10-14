@@ -1,10 +1,12 @@
 import { combine } from "../../functions/combine";
-import { IDBObjectStore, IDBCursor } from "../../public/types/indexeddb";
 import { exceptions } from "../../errors";
 import { hasOwn, trycatcher } from "../../functions/utils";
 import { wrap } from "../../helpers/promise";
 import { eventRejectHandler } from "../../functions/event-wrappers";
 import { Collection } from './';
+import { DBCoreCursor, DBCoreTable, DBCoreTransaction, DBCoreTableSchema, RangeType } from '../../public/types/dbcore';
+import { Table } from '../table';
+import { nop } from '../../functions/chaining-functions';
 
 type CollectionContext = Collection["_ctx"];
 
@@ -27,40 +29,45 @@ export function addMatchFilter(ctx: CollectionContext, fn) {
   ctx.isMatch = combine(ctx.isMatch, fn);
 }
 
-export function getIndexOrStore(ctx: CollectionContext, store: IDBObjectStore) {
-  if (ctx.isPrimKey) return store;
-  var indexSpec = ctx.table.schema.idxByName[ctx.index];
-  if (!indexSpec) throw new exceptions.Schema("KeyPath " + ctx.index + " on object store " + store.name + " is not indexed");
-  return store.index(indexSpec.name);
+export function getIndexOrStore(ctx: CollectionContext, coreSchema: DBCoreTableSchema) {
+  // TODO: Rewrite this. No need to know ctx.isPrimKey. ctx.index should hold the keypath.
+  // Still, throw if not found!
+  if (ctx.isPrimKey) return coreSchema.primaryKey;
+  const index = coreSchema.getIndexByKeyPath(ctx.index);
+  if (!index) throw new exceptions.Schema("KeyPath " + ctx.index + " on object store " + coreSchema.name + " is not indexed");
+  return index;
 }
 
-export function openCursor(ctx: CollectionContext, store: IDBObjectStore) {
-  var idxOrStore = getIndexOrStore(ctx, store);
-  return ctx.keysOnly && 'openKeyCursor' in idxOrStore ?
-      idxOrStore.openKeyCursor(ctx.range || null, ctx.dir + ctx.unique as IDBCursorDirection) :
-      idxOrStore.openCursor(ctx.range || null, ctx.dir + ctx.unique as IDBCursorDirection);
+export function openCursor(ctx: CollectionContext, coreTable: DBCoreTable, trans: DBCoreTransaction) {
+  const index = getIndexOrStore(ctx, coreTable.schema);
+  return coreTable.openCursor({
+    trans,
+    values: !ctx.keysOnly,
+    reverse: ctx.dir === 'prev',
+    unique: !!ctx.unique,
+    query: {
+      index, 
+      range: ctx.range
+    }
+  });
 }
 
 export function iter (
   ctx: CollectionContext, 
-  fn: (item, cursor: IDBCursor, advance: Function)=>void, 
-  resolve,
-  reject,
-  idbstore: IDBObjectStore)
+  fn: (item, cursor: DBCoreCursor, advance: Function)=>void,
+  coreTrans: DBCoreTransaction,
+  coreTable: DBCoreTable): Promise<any>
 {
-  var filter = ctx.replayFilter ? combine(ctx.filter, ctx.replayFilter()) : ctx.filter;
+  const filter = ctx.replayFilter ? combine(ctx.filter, ctx.replayFilter()) : ctx.filter;
   if (!ctx.or) {
-      iterate(openCursor(ctx, idbstore), combine(ctx.algorithm, filter), fn, resolve, reject, !ctx.keysOnly && ctx.valueMapper);
-  } else (()=>{
-      var set = {};
-      var resolved = 0;
+      return iterate(
+        openCursor(ctx, coreTable, coreTrans),
+        combine(ctx.algorithm, filter), fn, !ctx.keysOnly && ctx.valueMapper);
+  } else {
+      const set = {};
 
-      function resolveboth() {
-          if (++resolved === 2) resolve(); // Seems like we just support or btwn max 2 expressions, but there are no limit because we do recursion.
-      }
-
-      function union(item, cursor, advance) {
-          if (!filter || filter(cursor, advance, resolveboth, reject)) {
+      const union = (item: any, cursor: DBCoreCursor, advance) => {
+          if (!filter || filter(cursor, advance, result=>cursor.stop(result), err => cursor.fail(err))) {
               var primaryKey = cursor.primaryKey;
               var key = '' + primaryKey;
               if (key === '[object ArrayBuffer]') key = '' + new Uint8Array(primaryKey);
@@ -71,41 +78,28 @@ export function iter (
           }
       }
 
-      ctx.or._iterate(union, resolveboth, reject, idbstore);
-      iterate(openCursor(ctx, idbstore), ctx.algorithm, union, resolveboth, reject, !ctx.keysOnly && ctx.valueMapper);
-  })();
+      return Promise.all([
+        ctx.or._iterate(union, coreTrans),
+        iterate(openCursor(ctx, coreTable, coreTrans), ctx.algorithm, union, !ctx.keysOnly && ctx.valueMapper)
+      ]);
+  }
 }
 
-function iterate(req, filter, fn, resolve, reject, valueMapper) {
+function iterate(cursorPromise: Promise<DBCoreCursor>, filter, fn, valueMapper): Promise<any> {
   
   // Apply valueMapper (hook('reading') or mappped class)
   var mappedFn = valueMapper ? (x,c,a) => fn(valueMapper(x),c,a) : fn;
   // Wrap fn with PSD and microtick stuff from Promise.
-  var wrappedFn = wrap(mappedFn, reject);
+  var wrappedFn = wrap(mappedFn);
   
-  if (!req.onerror) req.onerror = eventRejectHandler(reject);
-  if (filter) {
-      req.onsuccess = trycatcher(function filter_record() {
-          var cursor = req.result;
-          if (cursor) {
-              var c = function () { cursor.continue(); };
-              if (filter(cursor, function (advancer) { c = advancer; }, resolve, reject))
-                  wrappedFn(cursor.value, cursor, function (advancer) { c = advancer; });
-              c();
-          } else {
-              resolve();
-          }
-      }, reject);
-  } else {
-      req.onsuccess = trycatcher(function filter_record() {
-          var cursor = req.result;
-          if (cursor) {
-              var c = function () { cursor.continue(); };
-              wrappedFn(cursor.value, cursor, function (advancer) { c = advancer; });
-              c();
-          } else {
-              resolve();
-          }
-      }, reject);
-  }
+  return cursorPromise.then(cursor => {
+    if (cursor) {
+      return cursor.start(()=>{
+        var c = ()=>cursor.continue();
+        if (!filter || filter(cursor, advancer => c = advancer, val=>{cursor.stop(val);c=nop}, e => {cursor.fail(e);c = nop;}))
+          wrappedFn(cursor.value, cursor, advancer => c = advancer);
+        c();
+      });
+    }
+  });
 }

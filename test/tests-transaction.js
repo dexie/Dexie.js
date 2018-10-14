@@ -713,7 +713,8 @@ asyncTest("Issue #137 db.table() does not respect current transaction", function
     }).finally(start);
 });
 
-asyncTest("Dexie.currentTransaction in CRUD hooks", 53, function () {
+asyncTest("Dexie.currentTransaction in CRUD hooks", 83 /* If fails on num assertions, it's ok to change to expected if all looks fine */,
+function () {
 
     function CurrentTransChecker(scope, trans) {
         return function() {
@@ -771,8 +772,18 @@ asyncTest("Dexie.currentTransaction in CRUD hooks", 53, function () {
         await db.users.where("username").equals("monkey1").modify(user => {
             user.username = "monkey2";// trigger updating.onerror
         }).catch(function(ex) {
-            ok(true, "Should fail modifying primary key");
+            ok(true, "Should fail modifying primary key to an already existing primary key");
         });
+        ok(true, "Will now be modifying primary key of monkey1...");
+        await db.users.where("username").equals("monkey1").modify(user => {
+            user.username = "monkey88";// trigger updating.onerror
+        }).then(res => {
+            ok(true, "Should succeed modifying primary key to non-existing primary key, resulting in deletion and creation: " + res);
+        }).catch(function(ex) {
+            ok(false, "Should succeed modifying primary key to non-existing primary key, resulting in deletion and creation: " + ex);
+        });
+        ok(true, "Will now modify monkey88 back to monkey1 again...");
+        await db.users.where({username: "monkey88"}).modify({username: "monkey1"});
         await db.users.toArray();
         await db.users.delete("monkey2");
         await db.users.delete("monkey1");

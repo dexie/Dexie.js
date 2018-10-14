@@ -4,6 +4,8 @@ import { Dexie } from '../dexie';
 import { STRING_EXPECTED } from '../../globals/constants';
 import { simpleCompare, simpleCompareReverse } from '../../functions/compare-functions';
 import { CollectionConstructor } from '../collection';
+import { IndexableType } from '../../public';
+import { KeyRange, RangeType } from '../../public/types/dbcore';
 
 export function fail(collectionOrWhereClause: Collection | WhereClause, err, T?) {
   var collection = collectionOrWhereClause instanceof WhereClause ?
@@ -15,7 +17,7 @@ export function fail(collectionOrWhereClause: Collection | WhereClause, err, T?)
 }
 
 export function emptyCollection(whereClause: WhereClause) {
-  return new whereClause.Collection (whereClause, () => { return whereClause._IDBKeyRange.only(""); }).limit(0);
+  return new whereClause.Collection (whereClause, () => rangeEqual("")).limit(0);
 }
 
 export function upperFactory(dir: 'next' | 'prev') {
@@ -71,9 +73,10 @@ export function addIgnoreCaseAlgorithm(whereClause: WhereClause, match, needles,
   }
   initDirection("next");
 
-  var c = new whereClause.Collection (whereClause, function() {
-      return whereClause._IDBKeyRange.bound(upperNeedles[0], lowerNeedles[needlesLen-1] + suffix);
-  });
+  var c = new whereClause.Collection (
+      whereClause,
+      ()=>createRange(upperNeedles[0], lowerNeedles[needlesLen-1] + suffix)
+  );
 
   c._ondirectionchange = function (direction) {
       // This event onlys occur before filter is called the first time.
@@ -110,4 +113,22 @@ export function addIgnoreCaseAlgorithm(whereClause: WhereClause, match, needles,
       }
   });
   return c;
+}
+
+export function createRange (lower: IndexableType, upper: IndexableType, lowerOpen?: boolean, upperOpen?: boolean): KeyRange {
+    return {
+        type: RangeType.Range,
+        lower,
+        upper,
+        lowerOpen,
+        upperOpen
+    };
+}
+
+export function rangeEqual (value: IndexableType) : KeyRange {
+    return {
+        type: RangeType.Equal,
+        lower: value,
+        upper: value
+    };
 }

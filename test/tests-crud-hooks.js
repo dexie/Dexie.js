@@ -404,11 +404,15 @@ spawnedTest("creating using Table.put()", function*(){
     },{
         op: "create",
         value: {idx: 14}
-    }], () => db.transaction('rw', db.tables, ()=>{
-        db.table1.put({id:1, idx:11});
-        db.table2.put({idx:12}, 2);
-        db.table3.put({idx:13});
-        db.table4.put({idx:14});
+    }], () => db.transaction('rw', db.tables, function* () {
+        //console.log("Putting {id:1, idx: 11} into table1");
+        yield db.table1.put({id:1, idx:11});
+        //console.log("Putting {idx: 12} for key 2 into table2");
+        yield db.table2.put({idx:12}, 2);
+        //console.log("Putting {idx: 13} into table3");
+        yield db.table3.put({idx:13});
+        //console.log("Putting {idx: 14} into table4");
+        yield db.table4.put({idx:14});
     }));
 
     yield verifyErrorFlows(()=>db.transaction('rw', db.tables, function* () {
