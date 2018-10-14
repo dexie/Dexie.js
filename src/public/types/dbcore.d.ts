@@ -129,7 +129,7 @@ export interface DBCoreTableSchema {
   readonly name: string;
   readonly primaryKey: DBCoreIndex;
   readonly indexes: DBCoreIndex[];
-  readonly getIndexByKeyPath: (keyPath: null | string | string[]) => DBCoreIndex;
+  readonly getIndexByKeyPath: (keyPath: null | string | string[]) => DBCoreIndex | undefined;
 }
 
 export interface DBCoreIndex {

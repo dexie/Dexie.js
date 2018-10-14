@@ -30,6 +30,8 @@ export function addMatchFilter(ctx: CollectionContext, fn) {
 }
 
 export function getIndexOrStore(ctx: CollectionContext, coreSchema: DBCoreTableSchema) {
+  // TODO: Rewrite this. No need to know ctx.isPrimKey. ctx.index should hold the keypath.
+  // Still, throw if not found!
   if (ctx.isPrimKey) return coreSchema.primaryKey;
   const index = coreSchema.getIndexByKeyPath(ctx.index);
   if (!index) throw new exceptions.Schema("KeyPath " + ctx.index + " on object store " + coreSchema.name + " is not indexed");

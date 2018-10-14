@@ -119,7 +119,7 @@ export class Collection implements ICollection {
         return coreTable.count({
           trans,
           query: {
-            index: coreTable.schema.getIndexByKeyPath(ctx.index),
+            index: getIndexOrStore(ctx, coreTable.schema),
             range: ctx.range
           }
         }).then(count => Math.min(count, ctx.limit));
