@@ -193,3 +193,11 @@ import './test-extend-dexie';
     });
 }
 
+// Issue 756
+// Also that Dexie.currentTransaction is given as first argument.
+{
+    let db = new Dexie('dbname');
+    db.transaction('rw', 'foo', 'baa', trans=>{
+        trans.abort();
+    });
+}

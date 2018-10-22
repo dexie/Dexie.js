@@ -38,17 +38,23 @@ export interface Dexie extends Database {
 
   table<T=any, TKey=IndexableType>(tableName: string): Table<T, TKey>;
 
-  transaction<U>(mode: TransactionMode, table: Table, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, scope: (trans: Transaction) => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: string, scope: (trans: Transaction) => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, table: Table, table2: Table, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, table2: Table, scope: (trans: Transaction) => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: string, table2: string, scope: (trans: Transaction) => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, table: Table, table2: Table, table3: Table, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, table2: Table, table3: Table, scope: (trans: Transaction) => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: string, table2: string, table3: string, scope: (trans: Transaction) => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, table: Table, table2: Table, table3: Table, table4: Table<any,any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, table2: Table, table3: Table, table4: Table, scope: (trans: Transaction) => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: string, table2: string, table3: string, table4: string, scope: (trans: Transaction) => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, table: Table, table2: Table, table3: Table, table4: Table<any,any>, table5: Table<any,any>, scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: Table, table2: Table, table3: Table, table4: Table, table5: Table, scope: (trans: Transaction) => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, table: string, table2: string, table3: string, table4: string, table5: string, scope: (trans: Transaction) => PromiseLike<U> | U): PromiseExtended<U>;
 
-  transaction<U>(mode: TransactionMode, tables: Table[], scope: () => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, tables: Table[], scope: (trans: Transaction) => PromiseLike<U> | U): PromiseExtended<U>;
+  transaction<U>(mode: TransactionMode, tables: string[], scope: (trans: Transaction) => PromiseLike<U> | U): PromiseExtended<U>;
 
   close(): void;
 
