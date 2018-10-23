@@ -25,16 +25,16 @@ export async function importDB(exportedData: Blob | DexieExportJsonStructure): P
   const dbExport = await getDbExport(exportedData);
   const db = new Dexie(dbExport.name);
   db.version(dbExport.version).stores(extractDbSchema(dbExport));
-  await importInto(dbExport, db);
+  await importInto(db, dbExport);
   return db;
 }
 
-export async function importInto(exportedData: DexieExportJsonStructure | Blob, db: Dexie, options?: ImportOptions): Promise<void> {
+export async function importInto(db: Dexie, exportedData: DexieExportJsonStructure | Blob, options?: ImportOptions): Promise<void> {
   const dbExport = await getDbExport(exportedData);
   options = options || {}; // All booleans defaults to false.
-  if (!options.acceptNameDiff && db.name !== dbExport.name)
+  if (!options!.acceptNameDiff && db.name !== dbExport.name)
     throw new Error(`Name differs. Current database name is ${db.name} but export is ${dbExport.name}`);
-  if (!options.acceptVersionDiff && db.verno !== dbExport.version) {
+  if (!options!.acceptVersionDiff && db.verno !== dbExport.version) {
     // Possible feature: Call upgraders in some isolated way if this happens... ?
     throw new Error(`Database version differs. Current database is in version ${db.verno} but export is ${dbExport.version}`);
   }
@@ -57,18 +57,18 @@ export async function importInto(exportedData: DexieExportJsonStructure | Blob, 
     for (const tableExport of dbExport.data) {
       const table = db.table(tableExport.name);
       if (!table) {
-        if (!options.acceptMissingTables)
+        if (!options!.acceptMissingTables)
           throw new Error(`Exported table ${tableExport.name} is missing in installed database`);
         else
           continue;
       }
-      if (!options.acceptChangedPrimaryKey &&
+      if (!options!.acceptChangedPrimaryKey &&
         tableExport.schema.split(',')[0] != table.schema.primKey.src) {
         throw new Error(`Primary key differs for table ${tableExport.name}. `);
       }
       const rows = tableExport.values.map(row => TSON.revive(row));
       const keys = tableExport.keys && tableExport.keys.map(key => TSON.revive(key));
-      if (options.overwriteValues)
+      if (options!.overwriteValues)
         await table.bulkPut(rows, keys);
       else
         await table.bulkAdd(rows, keys);
