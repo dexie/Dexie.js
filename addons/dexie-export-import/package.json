@@ -1,0 +1,19 @@
+{
+  "name": "dexie-export-import",
+  "version": "1.0.0-alpha.1",
+  "description": "Dexie addon that adds export and import capabilities",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "author": "david.fahlander@gmail.com",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "typescript": "^3.1.3"
+  },
+  "dependencies": {
+    "dexie": "^3.0.0-alpha.5",
+    "typeson": "^5.8.2",
+    "typeson-registry": "^1.0.0-alpha.21"
+  }
+}
