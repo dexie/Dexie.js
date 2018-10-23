@@ -72,10 +72,14 @@ export async function importInto(db: Dexie, exportedData: DexieExportJsonStructu
       }
       const rows = tableExport.values.map(row => TSON.revive(row));
       const keys = tableExport.keys && tableExport.keys.map(key => TSON.revive(key));
+      if (options!.clearTablesBeforeImport) {
+        await table.clear();
+      }
       if (options!.overwriteValues)
         await table.bulkPut(rows, keys);
       else
         await table.bulkAdd(rows, keys);
+        
       if (progressCallback) {
         progress.completedRows += rows.length;
         progress.completedTables += 1;
