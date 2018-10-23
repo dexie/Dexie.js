@@ -4,6 +4,10 @@ import { DexieExportJsonStructure } from './json-structure';
 import { TSON } from './tson';
 import { FORMAT_HEADER, VERSION, FORMAT_FOOTER } from './data-format';
 
+export interface StaticImportOptions {
+  progressCallback?: (progress: ImportProgress) => boolean;
+}
+
 export interface ImportOptions {
   acceptMissingTables?: boolean;
   acceptVersionDiff?: boolean;
@@ -21,11 +25,11 @@ export interface ImportProgress {
   completedRows: number;
 }
 
-export async function importDB(exportedData: Blob | DexieExportJsonStructure): Promise<Dexie> {
+export async function importDB(exportedData: Blob | DexieExportJsonStructure, options?: StaticImportOptions): Promise<Dexie> {
   const dbExport = await getDbExport(exportedData);
   const db = new Dexie(dbExport.name);
   db.version(dbExport.version).stores(extractDbSchema(dbExport));
-  await importInto(db, dbExport);
+  await importInto(db, dbExport, options);
   return db;
 }
 
