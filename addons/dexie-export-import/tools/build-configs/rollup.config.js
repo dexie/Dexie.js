@@ -1,6 +1,9 @@
 import sourcemaps from 'rollup-plugin-sourcemaps';
 import {readFileSync} from 'fs';
 import path from 'path';
+import commonjs from 'rollup-plugin-commonjs';
+import nodeResolve from 'rollup-plugin-node-resolve';
+
 
 const version = require(path.resolve(__dirname, '../../package.json')).version;
 
@@ -26,5 +29,9 @@ export default {
     sourcemap: true
   }],
   external: ['dexie'],
-  plugins: [ sourcemaps() ]
+  plugins: [
+    sourcemaps(),
+    nodeResolve({browser: true}),
+    commonjs()
+  ]
 };
