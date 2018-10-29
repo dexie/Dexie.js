@@ -2,6 +2,7 @@
   "compilerOptions": {
     "target": "es5",
     "module": "es2015",
+    "allowJs": true,
     "importHelpers": true,
     "strictNullChecks": true,
     "noImplicitAny": false,
