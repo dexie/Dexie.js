@@ -6,7 +6,7 @@ import { JsonStream } from './json-stream';
 
 export interface StaticImportOptions {
   noTransaction?: boolean;
-  numKilobytesPerChunk?: number; // Default: 1024 ( 1MB )
+  numKilobytesPerChunk?: number; // Default: DEFAULT_KILOBYTES_PER_CHUNK ( 1MB )
   filter?: (table: string, value: any, key?: any) => boolean;
   progressCallback?: (progress: ImportProgress) => boolean;
 }
@@ -19,10 +19,12 @@ export interface ImportOptions extends StaticImportOptions {
   overwriteValues?: boolean;
   clearTablesBeforeImport?: boolean;
   noTransaction?: boolean;
-  numKilobytesPerChunk?: number; // Default: 1024 ( 1MB )
+  numKilobytesPerChunk?: number; // Default: DEFAULT_KILOBYTES_PER_CHUNK ( 1MB )
   filter?: (table: string, value: any, key?: any) => boolean;
   progressCallback?: (progress: ImportProgress) => boolean;
 }
+
+const DEFAULT_KILOBYTES_PER_CHUNK = 1024;
 
 export interface ImportProgress {
   totalTables: number;
@@ -34,7 +36,7 @@ export interface ImportProgress {
 
 export async function importDB(exportedData: Blob | JsonStream<DexieExportJsonStructure>, options?: StaticImportOptions): Promise<Dexie> {
   options = options || {}; // All booleans defaults to false.
-  const CHUNK_SIZE = (options!.numKilobytesPerChunk || 512) * 1024;
+  const CHUNK_SIZE = (options!.numKilobytesPerChunk || DEFAULT_KILOBYTES_PER_CHUNK) * 1024;
   const stream = await loadUntilWeGotEnoughData(exportedData, CHUNK_SIZE);
   const dbExport = stream.result.data!;
   const db = new Dexie(dbExport.databaseName);
@@ -45,7 +47,7 @@ export async function importDB(exportedData: Blob | JsonStream<DexieExportJsonSt
 
 export async function importInto(db: Dexie, exportedData: Blob | JsonStream<DexieExportJsonStructure>, options?: ImportOptions): Promise<void> {
   options = options || {}; // All booleans defaults to false.
-  const CHUNK_SIZE = (options!.numKilobytesPerChunk || 512) * 1024;
+  const CHUNK_SIZE = (options!.numKilobytesPerChunk || DEFAULT_KILOBYTES_PER_CHUNK) * 1024;
   const jsonStream = await loadUntilWeGotEnoughData(exportedData, CHUNK_SIZE);
   let dbExportFile = jsonStream.result;
 
