@@ -2,7 +2,7 @@
   "compilerOptions": {
     "target": "es5",
     "module": "es2015",
-    "allowJs": true,
+    "declaration": true,
     "importHelpers": true,
     "strictNullChecks": true,
     "noImplicitAny": false,
@@ -10,10 +10,12 @@
     "moduleResolution": "node",
     "lib": ["es2015", "dom"],
     "forceConsistentCasingInFileNames": true,
-    "outDir": "../tools/tmp/src/",
-    "sourceMap": true
+    "outDir": "tools/tmp/",
+    "declarationDir": "dist/",
+    "sourceMap": true,
+    "rootDir": "src"
   },
   "files": [
-    "index.ts"
+    "src/dexie-export-import.ts"
   ]
 }

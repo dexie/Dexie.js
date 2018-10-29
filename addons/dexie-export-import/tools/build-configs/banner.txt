@@ -1,0 +1,17 @@
+/* ========================================================================== 
+ *                           dexie-export-import.js
+ * ==========================================================================
+ *
+ * Dexie addon for exporting and importing databases to / from Blobs.
+ *
+ * By David Fahlander, david.fahlander@gmail.com,
+ *
+ * ==========================================================================
+ *
+ * Version {version}, {date}
+ *
+ * http://dexie.org
+ *
+ * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
+ * 
+ */
