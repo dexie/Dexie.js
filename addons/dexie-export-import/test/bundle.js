@@ -82,6 +82,15 @@
             });
         }); });
     }
+    function readBlob(blob) {
+        return new Promise(function (resolve, reject) {
+            var reader = new FileReader();
+            reader.onabort = function (ev) { return reject(new Error("file read aborted")); };
+            reader.onerror = function (ev) { return reject(ev.target.error); };
+            reader.onload = function (ev) { return resolve(ev.target.result); };
+            reader.readAsText(blob);
+        });
+    }
 
     var _this = undefined;
     qunit.module("basic-tests");
@@ -146,7 +155,7 @@
                     return [3 /*break*/, 7];
                 case 6:
                     error_1 = _a.sent();
-                    qunit.equal(error_1.name, "ConstraintError", "Should fail with ConstraintError");
+                    qunit.equal(error_1.name, "BulkError", "Should fail with BulkError");
                     return [3 /*break*/, 7];
                 case 7: return [4 /*yield*/, db.import(blob, { overwriteValues: true })];
                 case 8:
@@ -162,7 +171,64 @@
             }
         });
     }); });
-    //promisedTest("")
+    promisedTest("export-format", function () { return __awaiter(_this, void 0, void 0, function () {
+        var db, blob, json, parsed;
+        return __generator(this, function (_a) {
+            switch (_a.label) {
+                case 0: return [4 /*yield*/, Dexie.delete(DATABASE_NAME)];
+                case 1:
+                    _a.sent();
+                    db = new Dexie(DATABASE_NAME);
+                    db.version(1).stores({
+                        outbound: '',
+                        inbound: 'id'
+                    });
+                    return [4 /*yield*/, db.table('outbound').bulkAdd([{
+                                date: new Date(1),
+                                blob: new Blob(["something"]),
+                                binary: new Uint8Array([1, 2, 3]),
+                                text: "foo",
+                                check: false,
+                            }, {
+                                foo: "bar"
+                            }, {
+                                bar: "foo"
+                            }], [
+                            new Date(1),
+                            2,
+                            "3"
+                        ])];
+                case 2:
+                    _a.sent();
+                    return [4 /*yield*/, db.table("inbound").bulkAdd([{
+                                id: 1,
+                                date: new Date(1),
+                                blob: new Blob(["something"]),
+                                binary: new Uint8Array([1, 2, 3]),
+                                text: "foo",
+                                check: false
+                            }, {
+                                id: 2,
+                                foo: "bar"
+                            }, {
+                                id: 3,
+                                bar: "foo"
+                            }])];
+                case 3:
+                    _a.sent();
+                    return [4 /*yield*/, db.export({ prettyJson: true })];
+                case 4:
+                    blob = _a.sent();
+                    return [4 /*yield*/, readBlob(blob)];
+                case 5:
+                    json = _a.sent();
+                    console.log("json", json);
+                    parsed = JSON.parse(json);
+                    console.log("parsed", parsed);
+                    return [2 /*return*/];
+            }
+        });
+    }); });
 
 })));
 //# sourceMappingURL=bundle.js.map

@@ -1,0 +1,99 @@
+{
+  "formatName": "dexie",
+  "formatVersion": 1,
+  "data": {
+    "databaseName": "dexie-export-import-basic-tests",
+    "databaseVersion": 1,
+    "tables": [
+      {
+        "name": "outbound",
+        "schema": "null",
+        "rowCount": 3
+      },
+      {
+        "name": "inbound",
+        "schema": "id",
+        "rowCount": 3
+      }
+    ],
+    "data": [
+      {
+        "tableName": "outbound",
+        "inbound": false,
+        "rows": [
+          [
+            2,
+            {
+              "foo": "bar"
+            }
+          ],
+          {
+            "$": [
+              1,
+              {
+                "date": 1,
+                "blob": {
+                  "type": "",
+                  "stringContents": "潳敭桴湩"
+                },
+                "binary": {
+                  "encoded": "AQID",
+                  "byteOffset": 0,
+                  "length": 3
+                },
+                "text": "foo",
+                "check": false
+              }
+            ],
+            "$types": {
+              "$": {
+                "0": "date",
+                "1.date": "date",
+                "1.blob": "blob",
+                "1.binary": "uint8array"
+              }
+            }
+          },
+          [
+            "3",
+            {
+              "bar": "foo"
+            }
+          ]
+        },
+        {
+          "tableName": "inbound",
+          "inbound": true,
+          "rows": [
+            {
+              "id": 1,
+              "date": 1,
+              "blob": {
+                "type": "",
+                "stringContents": "潳敭桴湩"
+              },
+              "binary": {
+                "encoded": "AQID",
+                "byteOffset": 0,
+                "length": 3
+              },
+              "text": "foo",
+              "check": false,
+              "$types": {
+                "date": "date",
+                "blob": "blob",
+                "binary": "uint8array"
+              }
+            },
+            {
+              "id": 2,
+              "foo": "bar"
+            },
+            {
+              "id": 3,
+              "bar": "foo"
+            ]
+          }
+        ]
+      }
+    }
