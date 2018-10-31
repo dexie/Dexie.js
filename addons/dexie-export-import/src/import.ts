@@ -130,7 +130,7 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
       }
 
       // Avoid unnescessary loops in "for (const tableExport of dbExport.data)" 
-      while (dbExport.data.length > 0 && (dbExport.data[0].rows as any).complete) {
+      while (dbExport.data.length > 0 && dbExport.data[0].rows && (dbExport.data[0].rows as any).complete) {
         // We've already imported all rows from the first table. Delete its occurrence
         dbExport.data.splice(0, 1); 
       }

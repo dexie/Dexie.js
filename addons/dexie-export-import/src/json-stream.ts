@@ -44,7 +44,7 @@ export function JsonStream<T>(blob: Blob):  JsonStream<T> {
 
 
 export function JsonParser () {
-  const parser = clarinet.parser();
+  const parser = (clarinet as any).parser();
   let level = 0;
   let result: any;
   const stack: any[][] = [];
@@ -54,10 +54,12 @@ export function JsonParser () {
   let array = false;
 
   parser.onopenobject = newKey => {
-    if (obj) stack.push([key,obj,array]);
-    obj = {};
-    if (!result) result = obj;
+    const newObj = {};
+    if (!result) result = newObj;
+    if (obj) stack.push([key,obj,array])
+    obj = newObj;
     key = newKey;
+    array = false;
     ++level;
   }
   parser.onkey = newKey => key = newKey;
@@ -67,16 +69,23 @@ export function JsonParser () {
     if (--level === 0) {
       done = true;
     } else {
+      const completedObj = obj;
       [key, obj, array] = stack.pop()!;
+      if (array) {
+        obj.push(completedObj);
+      } else {
+        obj[key!] = completedObj;
+      }
     }
   }
   parser.onopenarray = () => {
+    const newObj = [];
+    (newObj as any).complete = false;
+    if (!result) result = newObj;
     if (obj) stack.push([key, obj, array]);
-    key = null;
-    obj = [];
-    obj.complete = false;
+    obj = newObj;
     array = true;
-    if (!result) result = obj;
+    key = null;
     ++level;
   }
   parser.onclosearray = () => {
@@ -85,7 +94,13 @@ export function JsonParser () {
     if (--level === 0) {
       done = true;
     } else {
+      const completedObj = obj;
       [key, obj, array] = stack.pop()!;
+      if (array) {
+        obj.push(completedObj);
+      } else {
+        obj[key!] = completedObj;
+      }
     }
   }
 
