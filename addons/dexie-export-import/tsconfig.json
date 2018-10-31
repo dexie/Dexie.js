@@ -13,9 +13,11 @@
     "outDir": "tools/tmp/",
     "declarationDir": "dist/",
     "sourceMap": true,
-    "rootDir": "src"
+    "rootDir": "."
   },
   "files": [
-    "src/dexie-export-import.ts"
+    "src/dexie-export-import.ts",
+    "test/index.ts",
+    "test/qunit.d.ts"
   ]
 }

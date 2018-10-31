@@ -7,6 +7,7 @@ import { TSON } from './tson';
 export interface ExportOptions {
   numRowsPerChunk?: number;
   noTransaction?: boolean;
+  prettyJson?: boolean;
   filter?: (table: string, value: any, key?: any) => boolean;
   progressCallback?: (progress: ExportProgress) => boolean;
 }
@@ -27,6 +28,7 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
     schema: getSchemaString(table),
     rowCount: 0
   }));
+  const {prettyJson} = options!;
   const emptyExport: DexieExportJsonStructure = {
     formatName: "dexie",
     formatVersion: 1,
@@ -34,9 +36,10 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
       databaseName: db.name,
       databaseVersion: db.verno,
       tables: tables,
-      data: []}};
+      data: []
+    }
+  };
   
-  const lastJsonSlice = "]}}";// End of array + end of object + end of object.
   const {progressCallback} = options!;
   const progress: ExportProgress = {
     done: false,
@@ -55,7 +58,6 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
   if (progressCallback) {
     if (progressCallback(progress)) throw new Error("Operation aborted");
   }
-  slices.push(lastJsonSlice);
   return new Blob(slices,{type: "text/json"});
 
   async function exportAll() {
@@ -65,8 +67,9 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
     progress.totalRows = tablesRowCounts.reduce((p,c)=>p+c);
 
     // Write first JSON slice
-    const emptyExportJson = JSON.stringify(emptyExport);
-    const firstJsonSlice = emptyExportJson.substring(0, emptyExportJson.length - lastJsonSlice.length);
+    const emptyExportJson = JSON.stringify(emptyExport, undefined, prettyJson ? 2 : undefined);
+    const posEndDataArray = emptyExportJson.lastIndexOf(']');
+    const firstJsonSlice = emptyExportJson.substring(0, posEndDataArray);
     slices.push(firstJsonSlice);
 
     const filter = options!.filter;
@@ -85,9 +88,22 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
         inbound: false,
         rows: []
       };
-      const lastTableJsonSlice = "]}";
-      const emptyTableExportJson = JSON.stringify(emptyTableExport);
-      slices.push(emptyExportJson.substring(0, emptyTableExportJson.length - lastTableJsonSlice.length));
+      let emptyTableExportJson = JSON.stringify(emptyTableExport, undefined, prettyJson ? 2 : undefined);
+      if (prettyJson) {
+        // Increase indentation according to this:
+        // {
+        //   ...
+        //   data: [
+        //     ...
+        //     data: [
+        // 123456<---- here
+        //     ] 
+        //   ]
+        // }
+        emptyTableExportJson = emptyTableExportJson.split('\n').join('\n      ');
+      }
+      const posEndRowsArray = emptyTableExportJson.lastIndexOf(']');
+      slices.push(emptyTableExportJson.substring(0, posEndRowsArray));
       let lastKey: any = null;
       let hasMore = true;
       while (hasMore) {
@@ -105,7 +121,8 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
             values.filter(value => filter(tableName, value)) :
             values;
           const tsonValues = values.map(value => TSON.encapsulate(value));
-          const json = JSON.stringify(tsonValues);
+          let json = JSON.stringify(tsonValues, undefined, prettyJson ? 2 : undefined);
+          if (prettyJson) json = json.split('\n').join('\n          ');
 
           // By generating a blob here, we give web platform the opportunity to store the contents
           // on disk and release RAM.
@@ -116,18 +133,34 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
           let keyvals = keys.map((key, i) => [key, values[i]]);
           if (filter) keyvals = keyvals.filter(([key, value]) => filter(tableName, value, key));
           const tsonTuples = keyvals.map(tuple => TSON.encapsulate(tuple));
-          const json = JSON.stringify(tsonTuples);
+          let json = JSON.stringify(tsonTuples, undefined, prettyJson ? 2 : undefined);
+          if (prettyJson) json = json.split('\n').join('\n          ');
 
           // By generating a blob here, we give web platform the opportunity to store the contents
           // on disk and release RAM.
           slices.push(new Blob([json.substring(1, json.length - 2)]));
+          if (hasMore) {
+            slices.push(",");
+            if (prettyJson) {
+              slices.push("\n          ");
+            }
+          }
           lastKey = keys[keys.length - 1];
         }
         progress.completedRows += values.length;
       }
-      slices.push(lastTableJsonSlice);
+      if (prettyJson) slices.push("\n        ");
+      slices.push(emptyTableExportJson.substr(posEndRowsArray));
       progress.completedTables += 1;
+      if (progress.completedTables < progress.totalTables) {
+        slices.push(",");
+        if (prettyJson) {
+          slices.push("\n      ");
+        }
+      }
     }
+    if (prettyJson) slices.push("\n      ");
+    slices.push(emptyExportJson.substr(posEndDataArray));
     progress.done = true;
     if (progressCallback) {
       if (progressCallback(progress)) throw new Error("Operation aborted");

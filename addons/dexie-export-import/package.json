@@ -9,8 +9,9 @@
   },
   "just-build": {
     "default": [
-      "tsc",
-      "rollup -c tools/build-configs/rollup.config.js"
+      "tsc [--watch 'Compilation complete.']",
+      "rollup -c tools/build-configs/rollup.config.js",
+      "rollup -c tools/build-configs/rollup.tests.config.js"
     ]
   },
   "author": "david.fahlander@gmail.com",
