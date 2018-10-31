@@ -1,1 +1,1 @@
-import "./simple-import";
+import "./basic-tests";

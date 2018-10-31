@@ -10,14 +10,12 @@
     "moduleResolution": "node",
     "lib": ["es2015", "dom"],
     "forceConsistentCasingInFileNames": true,
-    "outDir": "tools/tmp/",
-    "declarationDir": "dist/",
+    "outDir": "../tools/tmp/src/",
+    "declarationDir": "../dist/",
     "sourceMap": true,
     "rootDir": "."
   },
   "files": [
-    "src/dexie-export-import.ts",
-    "test/index.ts",
-    "test/qunit.d.ts"
+    "dexie-export-import.ts"
   ]
 }

@@ -84,8 +84,8 @@
     }
 
     var _this = undefined;
-    qunit.module("simple-import");
-    var DATABASE_NAME = "dexie-simple-import";
+    qunit.module("basic-tests");
+    var DATABASE_NAME = "dexie-export-import-basic-tests";
     var IMPORT_DATA = {
         formatName: "dexie",
         formatVersion: 1,
@@ -119,7 +119,7 @@
     // Set correct row count:
     IMPORT_DATA.data.tables[0].rowCount = IMPORT_DATA.data.data[0].rows.length;
     promisedTest("simple-import", function () { return __awaiter(_this, void 0, void 0, function () {
-        var blob, db, friends;
+        var blob, db, friends, error_1, friends2;
         return __generator(this, function (_a) {
             switch (_a.label) {
                 case 0:
@@ -128,7 +128,7 @@
                 case 1:
                     _a.sent();
                     return [4 /*yield*/, Dexie.import(blob, {
-                            chunkSizeBytes: 16,
+                            chunkSizeBytes: 11,
                         })];
                 case 2:
                     db = _a.sent();
@@ -136,10 +136,33 @@
                 case 3:
                     friends = _a.sent();
                     qunit.deepEqual(IMPORT_DATA.data.data[0].rows, friends, "Imported data should equal");
+                    _a.label = 4;
+                case 4:
+                    _a.trys.push([4, 6, , 7]);
+                    return [4 /*yield*/, db.import(blob)];
+                case 5:
+                    _a.sent();
+                    qunit.ok(false, "Should not work to reimport without overwriteValues option set");
+                    return [3 /*break*/, 7];
+                case 6:
+                    error_1 = _a.sent();
+                    qunit.equal(error_1.name, "ConstraintError", "Should fail with ConstraintError");
+                    return [3 /*break*/, 7];
+                case 7: return [4 /*yield*/, db.import(blob, { overwriteValues: true })];
+                case 8:
+                    _a.sent();
+                    return [4 /*yield*/, db.table("friends").toArray()];
+                case 9:
+                    friends2 = _a.sent();
+                    qunit.deepEqual(IMPORT_DATA.data.data[0].rows, friends2, "Imported data should equal");
+                    return [4 /*yield*/, Dexie.delete(DATABASE_NAME)];
+                case 10:
+                    _a.sent();
                     return [2 /*return*/];
             }
         });
     }); });
+    //promisedTest("")
 
 })));
 //# sourceMappingURL=bundle.js.map

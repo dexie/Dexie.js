@@ -1,13 +1,13 @@
 import Dexie from 'dexie';
 import "dexie-export-import";
-import {module, asyncTest, start, stop, strictEqual, deepEqual, ok} from 'qunit';
+import {module, asyncTest, start, stop, strictEqual, deepEqual, ok, equal} from 'qunit';
 import {promisedTest} from './tools';
 //const {module, asyncTest, start, stop, strictEqual, deepEqual, ok} = QUnit;
 import {DexieExportJsonStructure} from '../src/json-structure';
 
-module("simple-import");
+module("basic-tests");
 
-const DATABASE_NAME = "dexie-simple-import";
+const DATABASE_NAME = "dexie-export-import-basic-tests";
 const IMPORT_DATA: DexieExportJsonStructure = {
   formatName: "dexie",
   formatVersion: 1,
@@ -46,9 +46,24 @@ promisedTest("simple-import", async ()=>{
 
   await Dexie.delete(DATABASE_NAME);
   const db = await Dexie.import(blob, {
-    chunkSizeBytes: 16,
+    chunkSizeBytes: 11,
   });
 
   const friends = await db.table("friends").toArray();
   deepEqual(IMPORT_DATA.data.data[0].rows, friends, "Imported data should equal");
+  
+  try {
+    await db.import(blob);
+    ok(false, "Should not work to reimport without overwriteValues option set");
+  } catch (error) {
+    equal(error.name, "ConstraintError", "Should fail with ConstraintError");    
+  }
+
+  await db.import(blob, { overwriteValues: true });
+  const friends2 = await db.table("friends").toArray();
+  deepEqual(IMPORT_DATA.data.data[0].rows, friends2, "Imported data should equal");
+
+  await Dexie.delete(DATABASE_NAME);
 });
+
+//promisedTest("")

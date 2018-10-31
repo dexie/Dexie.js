@@ -8,5 +8,6 @@ declare module 'qunit' {
   function stop();
   function strictEqual(a: any, b: any, description: string);
   function deepEqual(a: any, b: any, description: string);
+  function equal(a: any, b: any, description: string);
   function ok(x: any, description: string);
 }
