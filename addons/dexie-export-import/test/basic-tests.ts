@@ -75,7 +75,7 @@ promisedTest("export-format", async() => {
   });
   await db.table('outbound').bulkAdd([{
     date: new Date(1),
-    blob: new Blob(["somethin"]),
+    blob: new Blob(["something"]),
     binary: new Uint8Array([1,2,3]),
     text: "foo",
     bool: false,
@@ -91,7 +91,7 @@ promisedTest("export-format", async() => {
   await db.table("inbound").bulkAdd([{
     id: 1,
     date: new Date(1),
-    blob: new Blob(["somethin"]),
+    blob: new Blob(["something"]),
     binary: new Uint8Array([1,2,3]),
     text: "foo",
     bool: false
@@ -105,7 +105,7 @@ promisedTest("export-format", async() => {
 
   const blob = await db.export({prettyJson: true});
   const json = await readBlob(blob);
-  console.log("json", json)
+  console.log("json", json);
   const parsed = JSON.parse(json);
   
   await db.delete();
@@ -120,7 +120,7 @@ promisedTest("export-format", async() => {
   equal( inboundValues[0].id, 1, "First id should be 1");
   equal( inboundValues[0].date.getTime(), 1, "First Date should be 1");
   const firstBlobStr = await readBlob(inboundValues[0].blob);
-  equal(firstBlobStr, "somethin", "First Blob should be 'somethin'");
+  equal(firstBlobStr, "something", "First Blob should be 'something'");
   equal( inboundValues[0].binary[0], 1, "First binary[0] should be 1");
   equal( inboundValues[0].binary[1], 2, "First binary[0] should be 2");
   equal( inboundValues[0].binary[2], 3, "First binary[0] should be 3");

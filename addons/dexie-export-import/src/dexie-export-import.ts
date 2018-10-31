@@ -25,10 +25,10 @@ declare module 'dexie' {
 
 Dexie.prototype.export = function (this: Dexie, options?: ExportOptions) {
   return exportDB(this, options);
-}
+};
 Dexie.prototype.import = function (this: Dexie, blob: Blob, options?: ImportOptions) {
   return importInto(this, blob, options);
-}
+};
 Dexie.import = (blob: Blob, options?: StaticImportOptions) => importDB(blob, options);
 
 export default ()=>{
