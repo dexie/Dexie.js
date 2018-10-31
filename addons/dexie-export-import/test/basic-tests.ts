@@ -75,10 +75,10 @@ promisedTest("export-format", async() => {
   });
   await db.table('outbound').bulkAdd([{
     date: new Date(1),
-    blob: new Blob(["something"]),
+    blob: new Blob(["somethin"]),
     binary: new Uint8Array([1,2,3]),
     text: "foo",
-    check: false,
+    bool: false,
   },{
     foo: "bar"
   },{
@@ -91,10 +91,10 @@ promisedTest("export-format", async() => {
   await db.table("inbound").bulkAdd([{
     id: 1,
     date: new Date(1),
-    blob: new Blob(["something"]),
+    blob: new Blob(["somethin"]),
     binary: new Uint8Array([1,2,3]),
     text: "foo",
-    check: false
+    bool: false
   },{
     id: 2,
     foo: "bar"
@@ -107,5 +107,24 @@ promisedTest("export-format", async() => {
   const json = await readBlob(blob);
   console.log("json", json)
   const parsed = JSON.parse(json);
-  console.log("parsed", parsed);
+  
+  await db.delete();
+  const importedDB = await Dexie.import(blob);
+  const outboundKeys = await importedDB.table('outbound').toCollection().primaryKeys();
+  const inboundValues = await importedDB.table('inbound').toArray();
+  equal (outboundKeys[0], 2, "First key should be 2");
+  ok('getTime' in (outboundKeys[1] as Date), "Second outbound key should be a Date instance");
+  equal((outboundKeys[1] as Date).getTime(), 1, "The time '1' should be the value of the Date key");
+  equal (outboundKeys[2], "3", "Third key should be '3'");
+
+  equal( inboundValues[0].id, 1, "First id should be 1");
+  equal( inboundValues[0].date.getTime(), 1, "First Date should be 1");
+  const firstBlobStr = await readBlob(inboundValues[0].blob);
+  equal(firstBlobStr, "somethin", "First Blob should be 'somethin'");
+  equal( inboundValues[0].binary[0], 1, "First binary[0] should be 1");
+  equal( inboundValues[0].binary[1], 2, "First binary[0] should be 2");
+  equal( inboundValues[0].binary[2], 3, "First binary[0] should be 3");
+  equal( inboundValues[0].text, "foo", "First text should be 'foo'");
+
+  await Dexie.delete(DATABASE_NAME);
 });
