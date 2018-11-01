@@ -6,7 +6,7 @@
   "module": "dist/dexie-export-import.mjs",
   "typings": "dist/dexie-export-import.d.ts",
   "scripts": {
-    "test": "karma start test/karma.conf.js --single-run",
+    "test": "npm run build && npx karma start test/karma.conf.js --single-run",
     "build": "just-build",
     "watch": "just-build --watch",
     "clean": "rm -rf tools/tmp dist/*.js dist/*.mjs dist/*.map dist/*.d.ts test/bundle.*"
