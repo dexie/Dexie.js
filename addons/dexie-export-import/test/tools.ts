@@ -21,3 +21,14 @@ export function readBlob(blob: Blob): Promise<string> {
     reader.readAsText(blob);
   });
 }
+
+export function readBlobBinary(blob: Blob): Promise<ArrayBuffer> {
+  return new Promise<ArrayBuffer>((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onabort = ev => reject(new Error("file read aborted"));
+    reader.onerror = ev => reject((ev.target as any).error);
+    reader.onload = ev => resolve((ev.target as any).result);
+    reader.readAsArrayBuffer(blob);
+  });
+}
+

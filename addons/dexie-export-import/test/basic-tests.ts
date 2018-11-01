@@ -1,7 +1,7 @@
 import Dexie from 'dexie';
 import "dexie-export-import";
 import {module, asyncTest, start, stop, strictEqual, deepEqual, ok, equal} from 'qunit';
-import {promisedTest, readBlob} from './tools';
+import {promisedTest, readBlob, readBlobBinary} from './tools';
 //const {module, asyncTest, start, stop, strictEqual, deepEqual, ok} = QUnit;
 import {DexieExportJsonStructure} from '../src/json-structure';
 
@@ -88,10 +88,14 @@ promisedTest("export-format", async() => {
     2,
     "3"
   ]);
+  const fullByteArray = new Uint8Array(256);
+  for (let i=0;i<256;++i) {
+    fullByteArray[i] = i;
+  }
   await db.table("inbound").bulkAdd([{
     id: 1,
     date: new Date(1),
-    blob: new Blob(["something"]),
+    fullBlob: new Blob([fullByteArray]),
     binary: new Uint8Array([1,2,3]),
     text: "foo",
     bool: false
@@ -119,8 +123,11 @@ promisedTest("export-format", async() => {
 
   equal( inboundValues[0].id, 1, "First id should be 1");
   equal( inboundValues[0].date.getTime(), 1, "First Date should be 1");
-  const firstBlobStr = await readBlob(inboundValues[0].blob);
-  equal(firstBlobStr, "something", "First Blob should be 'something'");
+  const ab = await readBlobBinary(inboundValues[0].fullBlob);
+  const ba = new Uint8Array(ab);
+  console.log("byte array", ba);
+  deepEqual([].slice.call(ba), [].slice.call(fullByteArray), "The whole byte spectrum supported after redecoding blob");
+  //equal(firstBlobStr, "something", "First Blob should be 'something'");
   equal( inboundValues[0].binary[0], 1, "First binary[0] should be 1");
   equal( inboundValues[0].binary[1], 2, "First binary[0] should be 2");
   equal( inboundValues[0].binary[2], 3, "First binary[0] should be 3");

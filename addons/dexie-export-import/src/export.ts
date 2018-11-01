@@ -120,7 +120,9 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
           const filteredValues = filter ?
             values.filter(value => filter(tableName, value)) :
             values;
-          const tsonValues = filteredValues.map(value => TSON.encapsulate(value));
+          const tsonValues = await Dexie.waitFor(
+            Promise.all(
+              filteredValues.map(value => TSON.encapsulateAsync(value))));
           let json = JSON.stringify(tsonValues, undefined, prettyJson ? 2 : undefined);
           if (prettyJson) json = json.split('\n').join('\n      ');
 
@@ -132,7 +134,8 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
           const keys = await chunkedCollection.primaryKeys();
           let keyvals = keys.map((key, i) => [key, values[i]]);
           if (filter) keyvals = keyvals.filter(([key, value]) => filter(tableName, value, key));
-          const tsonTuples = keyvals.map(tuple => TSON.encapsulate(tuple));
+          const tsonTuples = await Dexie.waitFor(Promise.all(
+            keyvals.map(tuple => TSON.encapsulateAsync(tuple))));
           let json = JSON.stringify(tsonTuples, undefined, prettyJson ? 2 : undefined);
           if (prettyJson) json = json.split('\n').join('\n      ');
 

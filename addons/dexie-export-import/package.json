@@ -24,6 +24,7 @@
   "author": "david.fahlander@gmail.com",
   "license": "Apache-2.0",
   "devDependencies": {
+    "base64-arraybuffer-es6": "*",
     "clarinet": "^0.12.1",
     "just-build": "^0.9.16",
     "rollup": "^0.66.6",
