@@ -2,69 +2,72 @@ import Typeson from 'typeson';
 import StructuredCloning from 'typeson-registry/dist/presets/structured-cloning';
 import { encode as encodeB64, decode as decodeB64 } from 'base64-arraybuffer-es6';
 import Dexie from 'dexie';
+import { readBlobSync, readBlobAsync } from './helpers';
 
 export const TSON = new Typeson().register(StructuredCloning);
 
-function readBlobBinary(blob: Blob): Promise<ArrayBuffer> {
-  return new Promise<ArrayBuffer>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onabort = ev => reject(new Error("file read aborted"));
-    reader.onerror = ev => reject((ev.target as any).error);
-    reader.onload = ev => resolve((ev.target as any).result);
-    reader.readAsArrayBuffer(blob);
-  });
-}
+const readBlobsSynchronously = 'FileReaderSync' in self; // true in workers only.
 
-const blobType = {
-  test(x) { return Typeson.toStringTag(x) === 'Blob'; },
-  replace(b) {
-    // TODO: Use FileReaderSync
-    throw "Blobs can only be encapsulated asynchronically";
-  },
-  revive ({type, data}) {
-    return new Blob([decodeB64(data)], {type});
-  }
-};
+let blobsToAwait: any[] = [];
+let blobsToAwaitPos = 0;
 
-TSON.register({blob: blobType});
-
-TSON.encapsulateAsync = async obj => {
-  let cursor = 0;
-  const blobs: Blob[] = [];
-  const tson = new Typeson().register([
-    TSON.types,
-    {
-      blob: {
-        ...blobType,
-        replace(b) {
+// Need to patch encapsulateAsync as it does not work as of typeson 5.8.2
+// Also, current version of typespn-registry-1.0.0-alpha.21 does not
+// encapsulate/revive Blobs correctly (fails one of the unit tests in
+// this library (test 'export-format'))
+TSON.register({
+  blobTwoStep: {
+    test(x) { return Typeson.toStringTag(x) === 'Blob'; },
+    replace(b) {
+        if (b.isClosed) { // On MDN, but not in https://w3c.github.io/FileAPI/#dfn-Blob
+          throw new Error('The Blob is closed');
+        }
+        if (readBlobsSynchronously) {
+          const data = readBlobSync(b, 'binary');
+          const base64 = encodeB64(data);
+          return {
+            type: b.type,
+            data: base64
+          }
+        } else {
+          blobsToAwait.push(b); // This will also make TSON.mustFinalize() return true.
           const result = {
             type: b.type,
-            start: cursor,
-            end: cursor + b.size
-          };
-          blobs.push(b);
-          cursor += b.size;
+            data: {start: blobsToAwaitPos, end: blobsToAwaitPos + b.size}
+          }
+          blobsToAwaitPos += b.size;
           return result;
+        }
+    },
+    finalize(b, ba: ArrayBuffer) {
+      b.data = encodeB64(ba);
+    },
+    revive ({type, data}) {
+      return new Blob([decodeB64(data)], {type});
+    }
+  }
+});
+
+TSON.mustFinalize = ()=>blobsToAwait.length > 0;
+
+TSON.finalize = async (items: any[]) => {
+  const allChunks = await readBlobAsync(new Blob(blobsToAwait), 'binary');
+  for (const item of items) {
+    // Manually go through all "blob" types in the result
+    // and lookup the data slice they point at.
+    if (item.$types) {
+      let types = item.$types;
+      const arrayType = types.$;
+      if (arrayType) types = types.$;
+      for (let keyPath in types) {
+        const typeSpec = TSON.types[types[keyPath]];
+        if (typeSpec.finalize) {
+          const b = Dexie.getByKeyPath(item, arrayType ? "$." + keyPath : keyPath);
+          typeSpec.finalize(b, allChunks.slice(b.start, b.end));
         }
       }
     }
-  ]);
-  const result = tson.encapsulate(obj);
-  if (blobs.length === 0) return result;
-  const ab = await readBlobBinary(new Blob(blobs));
-
-  if (result.$types) {
-    let types = result.$types;
-    const arrayType = types.$;
-    if (arrayType) types = types.$;
-    for (let keyPath in types) {
-      if (types[keyPath] === 'blob') {
-        const b = Dexie.getByKeyPath(result, arrayType ? "$." + keyPath : keyPath);
-        b.data = encodeB64(ab.slice(b.start,b.end));
-        delete b.start;
-        delete b.end;
-      }
-    }
   }
-  return result;
+  // Free up memory
+  blobsToAwait = [];
 }

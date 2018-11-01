@@ -50,6 +50,7 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
   const CHUNK_SIZE = options!.chunkSizeBytes || (DEFAULT_KILOBYTES_PER_CHUNK * 1024);
   const jsonStream = await loadUntilWeGotEnoughData(exportedData, CHUNK_SIZE);
   let dbExportFile = jsonStream.result;
+  const readBlobsSynchronously = 'FileReaderSync' in self; // true in workers only.
 
   const dbExport = dbExportFile.data!;
 
@@ -136,7 +137,14 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
       }
       if (!jsonStream.done() && !jsonStream.eof()) {
         // Pull some more (keeping transaction alive)
-        await Dexie.waitFor(jsonStream.pull(CHUNK_SIZE));
+        if (readBlobsSynchronously) {
+          // If we can pull from blob synchronically, we don't have to
+          // keep transaction alive using Dexie.waitFor().
+          // This will only be possible in workers.
+          jsonStream.pullSync(CHUNK_SIZE);
+        } else {
+          await Dexie.waitFor(jsonStream.pullAsync(CHUNK_SIZE));
+        }
       }
     } while (!jsonStream.done() && !jsonStream.eof());
   }
@@ -153,7 +161,7 @@ async function loadUntilWeGotEnoughData(exportedData: Blob | JsonStream<DexieExp
     exportedData);
 
   while (!stream.eof() && (!stream.result.data || !stream.result.data.data)) {
-    await stream.pull(CHUNK_SIZE);
+    await stream.pullAsync(CHUNK_SIZE);
   }
   const dbExportFile = stream.result;
   if (!dbExportFile || dbExportFile.formatName != "dexie")

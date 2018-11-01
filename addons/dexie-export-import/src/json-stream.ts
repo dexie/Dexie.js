@@ -1,17 +1,9 @@
 import clarinet from 'clarinet';
-
-function readBlob(blob: Blob): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onabort = ev => reject(new Error("file read aborted"));
-    reader.onerror = ev => reject((ev.target as any).error);
-    reader.onload = ev => resolve((ev.target as any).result);
-    reader.readAsText(blob);
-  });
-}
+import { readBlobAsync, readBlobSync } from './helpers';
 
 export interface JsonStream<T> {
-  pull(numBytes: number): Promise<Partial<T>>;
+  pullAsync(numBytes: number): Promise<Partial<T>>;
+  pullSync(numBytes: number): Partial<T>;
   done(): boolean;
   eof(): boolean;
   result: Partial<T>;
@@ -22,10 +14,18 @@ export function JsonStream<T>(blob: Blob):  JsonStream<T> {
   const parser = JsonParser();
 
   const rv = {
-    async pull(numBytes: number): Promise<Partial<T>> {
+    async pullAsync(numBytes: number): Promise<Partial<T>> {
       const slize = blob.slice(pos, pos + numBytes);
       pos += numBytes;
-      const jsonPart = await readBlob(slize);
+      const jsonPart = await readBlobAsync(slize, 'text');
+      const result = parser.write(jsonPart);
+      rv.result = result || {};
+      return result;
+    },
+    pullSync(numBytes: number): Partial<T> {
+      const slize = blob.slice(pos, pos + numBytes);
+      pos += numBytes;
+      const jsonPart = readBlobSync(slize, 'text');
       const result = parser.write(jsonPart);
       rv.result = result || {};
       return result;

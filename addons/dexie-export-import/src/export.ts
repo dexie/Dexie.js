@@ -49,10 +49,14 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
     totalTables: db.tables.length
   };
 
-  if (options!.noTransaction) {
-    await exportAll();
-  } else {
-    await db.transaction('r', db.tables, exportAll);
+  try {
+    if (options!.noTransaction) {
+      await exportAll();
+    } else {
+      await db.transaction('r', db.tables, exportAll);
+    }
+  } finally {
+    TSON.finalize(); // Free up mem if error has occurred
   }
 
   if (progressCallback) {
@@ -120,9 +124,12 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
           const filteredValues = filter ?
             values.filter(value => filter(tableName, value)) :
             values;
-          const tsonValues = await Dexie.waitFor(
-            Promise.all(
-              filteredValues.map(value => TSON.encapsulateAsync(value))));
+
+          const tsonValues = filteredValues.map(value => TSON.encapsulate(value));
+          if (TSON.mustFinalize()) {
+            await Dexie.waitFor(TSON.finalize(tsonValues));
+          }
+
           let json = JSON.stringify(tsonValues, undefined, prettyJson ? 2 : undefined);
           if (prettyJson) json = json.split('\n').join('\n      ');
 
@@ -134,8 +141,12 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
           const keys = await chunkedCollection.primaryKeys();
           let keyvals = keys.map((key, i) => [key, values[i]]);
           if (filter) keyvals = keyvals.filter(([key, value]) => filter(tableName, value, key));
-          const tsonTuples = await Dexie.waitFor(Promise.all(
-            keyvals.map(tuple => TSON.encapsulateAsync(tuple))));
+
+          const tsonTuples = keyvals.map(tuple => TSON.encapsulate(tuple));
+          if (TSON.mustFinalize()) {
+            await Dexie.waitFor(TSON.finalize(tsonTuples));
+          }
+
           let json = JSON.stringify(tsonTuples, undefined, prettyJson ? 2 : undefined);
           if (prettyJson) json = json.split('\n').join('\n      ');
 
