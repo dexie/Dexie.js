@@ -7,16 +7,12 @@
   "typings": "dist/dexie-export-import.d.ts",
   "scripts": {
     "test": "karma start test/karma.conf.js --single-run",
-    "build": "just-build src",
-    "watch": "just-build test --watch",
+    "build": "just-build",
+    "watch": "just-build --watch",
     "clean": "rm -rf tools/tmp dist/*.js dist/*.mjs dist/*.map dist/*.d.ts test/bundle.*"
   },
   "just-build": {
-    "src": [
-      "tsc -p src [--watch 'Watching for file changes.']",
-      "rollup -c tools/build-configs/rollup.config.js"
-    ],
-    "test": [
+    "default": [
       "tsc -p test [--watch 'Watching for file changes.']",
       "rollup -c tools/build-configs/rollup.config.js",
       "rollup -c tools/build-configs/rollup.tests.config.js"
