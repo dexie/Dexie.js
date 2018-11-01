@@ -9,7 +9,7 @@
     "test": "karma start test/karma.conf.js --single-run",
     "build": "just-build src",
     "watch": "just-build test --watch",
-    "clean": "rm -rf tools/tmp dist/*.js dist/*.mjs dist/*.map dist/*.d.ts"
+    "clean": "rm -rf tools/tmp dist/*.js dist/*.mjs dist/*.map dist/*.d.ts test/bundle.*"
   },
   "just-build": {
     "src": [
