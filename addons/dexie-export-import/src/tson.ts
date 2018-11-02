@@ -67,8 +67,9 @@ TSON.finalize = async (items?: any[]) => {
         const arrayType = types.$;
         if (arrayType) types = types.$;
         for (let keyPath in types) {
-          const typeSpec = TSON.types[types[keyPath]];
-          if (typeSpec.finalize) {
+          const typeName = types[keyPath];
+          const typeSpec = TSON.types[typeName];
+          if (typeSpec && typeSpec.finalize) {
             const b = Dexie.getByKeyPath(item, arrayType ? "$." + keyPath : keyPath);
             typeSpec.finalize(b, allChunks.slice(b.start, b.end));
           }
