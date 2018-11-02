@@ -55,11 +55,12 @@ await db.import(blob, [options]);
 
 # Compatibility
 
-| Product | Required version          |
+| Product | Supported versions        |
 | ------- | ------------------------- |
-| dexie   | ^2.0.4 and ^3.0.0-alpha.5 |
+| dexie   | ^2.0.4 or ^3.0.0-alpha.5  |
 | Safari  | ^10.1                     |
-| IE      | ^11                       |
+| IE      | 11                        |
+| Edge    | any version               |
 | Chrome  | any version               |
 | FF      | any version               |
 
