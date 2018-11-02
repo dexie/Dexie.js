@@ -62,7 +62,8 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
   }
 
   if (progressCallback) {
-    if (progressCallback(progress)) throw new Error("Operation aborted");
+    // Keep ongoing transaction private
+    Dexie.ignoreTransaction(()=>progressCallback(progress));
   }
   return new Blob(slices,{type: "text/json"});
 
@@ -114,7 +115,8 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
       let hasMore = true;
       while (hasMore) {
         if (progressCallback) {
-          if (progressCallback(progress)) throw new Error("Operation aborted");
+          // Keep ongoing transaction private
+          Dexie.ignoreTransaction(()=>progressCallback(progress));
         }
         const chunkedCollection = lastKey == null ?
           table.limit(LIMIT) :
@@ -174,7 +176,8 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
     slices.push(emptyExportJson.substr(posEndDataArray));
     progress.done = true;
     if (progressCallback) {
-      if (progressCallback(progress)) throw new Error("Operation aborted");
+      // Keep ongoing transaction private
+      Dexie.ignoreTransaction(()=>progressCallback(progress));
     }
   }
 }

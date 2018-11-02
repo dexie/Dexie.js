@@ -70,8 +70,8 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
     totalTables: dbExport.tables.length
   };
   if (progressCallback) {
-    if (progressCallback(progress))
-      throw new Error("Operation aborted");
+    // Keep ongoing transaction private
+    Dexie.ignoreTransaction(()=>progressCallback(progress));
   }
 
   if (options.noTransaction) {
@@ -88,8 +88,8 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
           continue;
 
         if (progressCallback) {
-          if (progressCallback(progress))
-            throw new Error("Operation aborted");
+          // Keep ongoing transaction private
+          Dexie.ignoreTransaction(()=>progressCallback(progress));
         }
         const tableName = tableExport.tableName;
         const table = db.table(tableName);
@@ -150,8 +150,8 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
   }
   progress.done = true;
   if (progressCallback) {
-    if (progressCallback(progress))
-      throw new Error("Operation aborted");
+    // Keep ongoing transaction private
+    Dexie.ignoreTransaction(()=>progressCallback(progress));
   }
 }
 
