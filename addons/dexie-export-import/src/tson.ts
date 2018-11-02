@@ -3,6 +3,8 @@ import StructuredCloning from 'typeson-registry/dist/presets/structured-cloning'
 import { encode as encodeB64, decode as decodeB64 } from 'base64-arraybuffer-es6';
 import Dexie from 'dexie';
 import { readBlobSync, readBlobAsync } from './helpers';
+import typedArray from './tson-typed-array';
+import arrayBuffer from './tson-arraybuffer';
 
 export const TSON = new Typeson().register(StructuredCloning);
 
@@ -15,55 +17,61 @@ let blobsToAwaitPos = 0;
 // Also, current version of typespn-registry-1.0.0-alpha.21 does not
 // encapsulate/revive Blobs correctly (fails one of the unit tests in
 // this library (test 'export-format'))
-TSON.register({
-  blobTwoStep: {
-    test(x) { return Typeson.toStringTag(x) === 'Blob'; },
-    replace(b) {
-        if (b.isClosed) { // On MDN, but not in https://w3c.github.io/FileAPI/#dfn-Blob
-          throw new Error('The Blob is closed');
-        }
-        if (readBlobsSynchronously) {
-          const data = readBlobSync(b, 'binary');
-          const base64 = encodeB64(data);
-          return {
-            type: b.type,
-            data: base64
+TSON.register([
+  arrayBuffer,
+  typedArray, {
+    blobTwoStep: {
+      test(x) { return Typeson.toStringTag(x) === 'Blob'; },
+      replace(b) {
+          if (b.isClosed) { // On MDN, but not in https://w3c.github.io/FileAPI/#dfn-Blob
+            throw new Error('The Blob is closed');
           }
-        } else {
-          blobsToAwait.push(b); // This will also make TSON.mustFinalize() return true.
-          const result = {
-            type: b.type,
-            data: {start: blobsToAwaitPos, end: blobsToAwaitPos + b.size}
+          if (readBlobsSynchronously) {
+            const data = readBlobSync(b, 'binary');
+            const base64 = encodeB64(data, 0, data.byteLength);
+            return {
+              type: b.type,
+              data: base64
+            }
+          } else {
+            blobsToAwait.push(b); // This will also make TSON.mustFinalize() return true.
+            const result = {
+              type: b.type,
+              data: {start: blobsToAwaitPos, end: blobsToAwaitPos + b.size}
+            }
+            console.log("b.size: " + b.size);
+            blobsToAwaitPos += b.size;
+            return result;
           }
-          blobsToAwaitPos += b.size;
-          return result;
-        }
-    },
-    finalize(b, ba: ArrayBuffer) {
-      b.data = encodeB64(ba);
-    },
-    revive ({type, data}) {
-      return new Blob([decodeB64(data)], {type});
+      },
+      finalize(b, ba: ArrayBuffer) {
+        b.data = encodeB64(ba, 0, ba.byteLength);
+      },
+      revive ({type, data}) {
+        return new Blob([decodeB64(data)], {type});
+      }
     }
   }
-});
+]);
 
 TSON.mustFinalize = ()=>blobsToAwait.length > 0;
 
-TSON.finalize = async (items: any[]) => {
+TSON.finalize = async (items?: any[]) => {
   const allChunks = await readBlobAsync(new Blob(blobsToAwait), 'binary');
-  for (const item of items) {
-    // Manually go through all "blob" types in the result
-    // and lookup the data slice they point at.
-    if (item.$types) {
-      let types = item.$types;
-      const arrayType = types.$;
-      if (arrayType) types = types.$;
-      for (let keyPath in types) {
-        const typeSpec = TSON.types[types[keyPath]];
-        if (typeSpec.finalize) {
-          const b = Dexie.getByKeyPath(item, arrayType ? "$." + keyPath : keyPath);
-          typeSpec.finalize(b, allChunks.slice(b.start, b.end));
+  if (items) {
+    for (const item of items) {
+      // Manually go through all "blob" types in the result
+      // and lookup the data slice they point at.
+      if (item.$types) {
+        let types = item.$types;
+        const arrayType = types.$;
+        if (arrayType) types = types.$;
+        for (let keyPath in types) {
+          const typeSpec = TSON.types[types[keyPath]];
+          if (typeSpec.finalize) {
+            const b = Dexie.getByKeyPath(item, arrayType ? "$." + keyPath : keyPath);
+            typeSpec.finalize(b, allChunks.slice(b.start, b.end));
+          }
         }
       }
     }
