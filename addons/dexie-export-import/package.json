@@ -13,6 +13,14 @@
   },
   "just-build": {
     "default": [
+      "just-build src",
+      "just-build test"
+    ],
+    "src": [
+      "tsc -p src",
+      "rollup -c tools/build-configs/rollup.config.js"
+    ],
+    "test": [
       "tsc -p test [--watch 'Watching for file changes.']",
       "rollup -c tools/build-configs/rollup.config.js",
       "rollup -c tools/build-configs/rollup.tests.config.js"
