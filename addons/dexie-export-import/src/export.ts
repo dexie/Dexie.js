@@ -5,8 +5,8 @@ import { DexieExportedTable, DexieExportJsonStructure } from './json-structure';
 import { TSON } from './tson';
 
 export interface ExportOptions {
-  numRowsPerChunk?: number;
   noTransaction?: boolean;
+  numRowsPerChunk?: number;
   prettyJson?: boolean;
   filter?: (table: string, value: any, key?: any) => boolean;
   progressCallback?: (progress: ExportProgress) => boolean;
@@ -19,6 +19,8 @@ export interface ExportProgress {
   completedRows: number;
   done: boolean;
 }
+
+const DEFAULT_ROWS_PER_CHUNK = 2000;
 
 export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob> {
   options = options || {};
@@ -82,7 +84,7 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
       const table = db.table(tableName);
       const {primKey} = table.schema;
       const inbound = !!primKey.keyPath;
-      const LIMIT = options!.numRowsPerChunk || 2000;
+      const LIMIT = options!.numRowsPerChunk || DEFAULT_ROWS_PER_CHUNK;
       const emptyTableExport: DexieExportedTable = inbound ? {
         tableName: table.name,
         inbound: true,

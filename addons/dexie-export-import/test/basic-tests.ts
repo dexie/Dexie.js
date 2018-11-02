@@ -2,7 +2,6 @@ import Dexie from 'dexie';
 import "dexie-export-import";
 import {module, asyncTest, start, stop, strictEqual, deepEqual, ok, equal} from 'qunit';
 import {promisedTest, readBlob, readBlobBinary} from './tools';
-//const {module, asyncTest, start, stop, strictEqual, deepEqual, ok} = QUnit;
 import {DexieExportJsonStructure} from '../src/json-structure';
 
 module("basic-tests");
