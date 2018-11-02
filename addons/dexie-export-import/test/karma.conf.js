@@ -7,7 +7,7 @@ module.exports = function (config) {
     // If trying bs_safari it just times out.
     // Unit tests have been manually tested on Safari 12 though.
     ci: defaultBrowserMatrix.ci.filter(b => b !== 'bs_iphone7'),
-    //local: ["bs_ie11"], // Uncomment to use browserstack browsers from home
+    //local: ["bs_safari_latest_supported"], // Uncomment to use browserstack browsers from home
     // bs_iphone bails out before running any test at all.
     pre_npm_publish: defaultBrowserMatrix.pre_npm_publish.filter(b => !/bs_iphone7/i.test(b))
   }, {

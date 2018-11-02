@@ -13,8 +13,6 @@ const karmaCommon = {
       captureConsole: false
     },
 
-    port: 19144,
-    
     colors: true,
 
     browserNoActivityTimeout: 2 * 60 * 1000,

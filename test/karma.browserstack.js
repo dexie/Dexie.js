@@ -54,12 +54,19 @@ module.exports = {
       os: 'Windows',
       os_version: 10
     },
-    bs_safari: {
+    bs_safari_oldest_supported: {
       base: 'BrowserStack',
       browser: "Safari",
-      browser_version: "11.1",
+      browser_version: "10.1",
       os: 'OS X',
       os_version: 'Sierra'
+    },
+    bs_safari_latest_supported: {
+      base: 'BrowserStack',
+      browser: "Safari",
+      browser_version: "12",
+      os: 'OS X',
+      os_version: 'Mojave'
     },
     bs_iphone7: {
       base: 'BrowserStack',
