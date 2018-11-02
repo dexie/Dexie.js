@@ -10,7 +10,7 @@
     "url": "https://github.com/dfahlander/Dexie.js.git"
   },
   "scripts": {
-    "test": "npm run build && npx karma start test/karma.conf.js --single-run",
+    "test": "just-build test && npx karma start test/karma.conf.js --single-run",
     "build": "just-build",
     "watch": "just-build --watch",
     "clean": "rm -rf tools/tmp dist/*.js dist/*.mjs dist/*.map dist/*.d.ts test/bundle.*"
