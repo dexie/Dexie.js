@@ -19,8 +19,8 @@ export function createIndexSpec(
   }
 }
 
-export function nameFromKeyPath (keyPath: string | string[]): string {
+export function nameFromKeyPath (keyPath?: string | string[]): string {
   return typeof keyPath === 'string' ?
     keyPath :
-    keyPath ? ('[' + [].join.call(keyPath, '+') + ']') : '';
+    keyPath ? ('[' + [].join.call(keyPath, '+') + ']') : "";
 }
