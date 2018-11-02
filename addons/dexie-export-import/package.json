@@ -5,6 +5,10 @@
   "main": "dist/dexie-export-import.js",
   "module": "dist/dexie-export-import.mjs",
   "typings": "dist/dexie-export-import.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dfahlander/Dexie.js.git"
+  },
   "scripts": {
     "test": "npm run build && npx karma start test/karma.conf.js --single-run",
     "build": "just-build",
