@@ -10,34 +10,6 @@ npm install dexie
 npm install dexie-export-import
 ```
 
-# Features
-
-* Export of IndexedDB Database to JSON Blob.
-* Import from Blob back to IndexedDB Database.
-* An import Blob can be retrieved from an URL (using fetch()) or from a user-input file (dropped or browsed to).
-* An export Blob can be either given end-user to be stored in Downloaded Files, or be send to a server over HTTP(S) using fetch().
-* Chunk-wise / Streaming - does not read the entire DB into RAM
-* Progress callback (typically for showing progress bar)
-* Optional filter allows to import/export subset of data
-* Support for all structured clonable exotic types (Date, ArrayBuffer, Blob, etc) except CryptoKeys (which by design cannot be exported)
-* Atomic - import / export within one database transaction (optional)
-* Export speed: Using getAll() in chunks rather than openCursor().
-* Import speed: Using bulkPut() in chunks rather than put().
-* Can well be run from a Web Worker (better speed + doesn't lock GUI).
-* Can also export IndexedDB databases that was not created with Dexie.
-
-# Similar Libraries
-## [indexeddb-export-import](https://github.com/Polarisation/indexeddb-export-import)
- 
-Much smaller in size, but also much lighter than dexie-export-import.
-
-[Indexeddb-export-import](https://github.com/Polarisation/indexeddb-export-import) can be better choice if:
-
-* your data contains no Dates, ArrayBuffers, TypedArrays or Blobs (only objects, strings, numbers, booleans and arrays).
-* your database is small enough to fit in RAM on your target devices.
-
-Dexie-export-import was build to scale when exporting large databases without consuming much RAM. It does also support importing/exporting exotic types.
-
 # Usage
 
 Here's the basic usage. There's a lot you can do by supplying optional `[options]` arguments. The available options are described later on in this README (See Typescript interfaces below).
@@ -65,7 +37,45 @@ await db.import(blob, [options]);
 
 ```
 
-# Extended Dexie Interface
+# Features
+
+* Export of IndexedDB Database to JSON Blob.
+* Import from Blob back to IndexedDB Database.
+* An import Blob can be retrieved from an URL (using fetch()) or from a user-input file (dropped or browsed to).
+* An export Blob can be either given end-user to be stored in Downloaded Files, or be send to a server over HTTP(S) using fetch().
+* Chunk-wise / Streaming - does not read the entire DB into RAM
+* Progress callback (typically for showing progress bar)
+* Optional filter allows to import/export subset of data
+* Support for all structured clonable exotic types (Date, ArrayBuffer, Blob, etc) except CryptoKeys (which by design cannot be exported)
+* Atomic - import / export within one database transaction (optional)
+* Export speed: Using getAll() in chunks rather than openCursor().
+* Import speed: Using bulkPut() in chunks rather than put().
+* Can well be run from a Web Worker (better speed + doesn't lock GUI).
+* Can also export IndexedDB databases that was not created with Dexie.
+
+# Compatibility
+
+| Product | Required version          |
+| ------- | ------------------------- |
+| dexie   | ^2.0.4 and ^3.0.0-alpha.5 |
+| Safari  | ^10.1                     |
+| IE      | ^11                       |
+| Chrome  | any version               |
+| FF      | any version               |
+
+# Similar Libraries
+## [indexeddb-export-import](https://github.com/Polarisation/indexeddb-export-import)
+ 
+Much smaller in size, but also much lighter than dexie-export-import.
+
+[Indexeddb-export-import](https://github.com/Polarisation/indexeddb-export-import) can be better choice if:
+
+* your data contains no Dates, ArrayBuffers, TypedArrays or Blobs (only objects, strings, numbers, booleans and arrays).
+* your database is small enough to fit in RAM on your target devices.
+
+Dexie-export-import was build to scale when exporting large databases without consuming much RAM. It does also support importing/exporting exotic types.
+
+# Interface
 
 Importing this module will extend Dexie and Dexie.prototype as follows.
 Even though this is conceptually a Dexie.js addon, there is no addon instance.
@@ -88,18 +98,9 @@ declare module 'dexie' {
 }
 ```
 
-# Compatibility
+## StaticImportOptions and ImportOptions
 
-| Product | Required version          |
-| ------- | ------------------------- |
-| dexie   | ^2.0.4 and ^3.0.0-alpha.5 |
-| Safari  | ^10.1                     |
-| IE      | ^11                       |
-| Chrome  | any version               |
-| FF      | any version               |
-
-
-## Import Options
+These are the interfaces of the `options` optional arguments to Dexie.import() and Dexie.prototype.import(). All options are optional and defaults to undefined (falsy).
 
 ```ts
 export interface StaticImportOptions {
@@ -124,7 +125,9 @@ export interface ImportOptions extends StaticImportOptions {
 
 ```
 
-## Import Progress
+## ImportProgress
+
+This is the interface sent to the progressCallback.
 
 ```ts
 export interface ImportProgress {
@@ -136,7 +139,9 @@ export interface ImportProgress {
 }
 ``` 
 
-## Export Options
+## ExportOptions
+
+This is the interface of the `options` optional arguments to Dexie.prototype.export(). All options are optional and defaults to undefined (falsy).
 
 ```ts
 export interface ExportOptions {
@@ -148,7 +153,9 @@ export interface ExportOptions {
 }
 ```
 
-## Export Progress
+## ExportProgress
+
+This is the interface sent to the ExportOptions.progressCallback.
 
 ```ts
 export interface ExportProgress {
@@ -161,6 +168,9 @@ export interface ExportProgress {
 ```
 
 ## Defaults
+
+These are the default chunk sizes used when not specified in the options object. We allow quite large chunks, but still not that large (1MB RAM is not much even for a small device).
+
 ```ts
 const DEFAULT_KILOBYTES_PER_CHUNK = 1024; // When importing blob
 const DEFAULT_ROWS_PER_CHUNK = 2000; // When exporting db
