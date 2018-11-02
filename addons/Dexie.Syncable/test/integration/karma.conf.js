@@ -14,8 +14,6 @@ module.exports = function (config) {
   const cfg = getKarmaConfig(browserMatrixOverrides, {
     // Base path should point at the root 
     basePath: '../../../../',
-    // Use alternate port than the unit test uses, so they can run in parallel on a dev machine.
-    port: karmaCommon.port + 1,
     // The files needed to apply dexie-observable to the standard dexie unit tests.
     files: karmaCommon.files.concat([
       'dist/dexie.js',
