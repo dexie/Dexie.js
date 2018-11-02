@@ -14,6 +14,8 @@ npm install dexie-export-import
 
 * Export of IndexedDB Database to JSON Blob.
 * Import from Blob back to IndexedDB Database.
+* An import Blob can be retrieved from an URL (using fetch()) or from a user-input file (dropped or browsed to).
+* An export Blob can be either given end-user to be stored in Downloaded Files, or be send to a server over HTTP(S) using fetch().
 * Chunk-wise / Streaming - does not read the entire DB into RAM
 * Progress callback (typically for showing progress bar)
 * Optional filter allows to import/export subset of data
@@ -21,6 +23,7 @@ npm install dexie-export-import
 * Atomic - import / export within one database transaction (optional)
 * Export speed: Using getAll() in chunks rather than openCursor().
 * Import speed: Using bulkPut() in chunks rather than put().
+* Can well be run from a Web Worker (better speed + doesn't lock GUI).
 * Can also export IndexedDB databases that was not created with Dexie.
 
 # Similar Libraries
@@ -28,12 +31,12 @@ npm install dexie-export-import
  
 Much smaller in size, but also much lighter than dexie-export-import.
 
-[Indexeddb-export-import](https://github.com/Polarisation/indexeddb-export-import) can be better choice if...
+[Indexeddb-export-import](https://github.com/Polarisation/indexeddb-export-import) can be better choice if:
 
-* ...your data contains no Dates, ArrayBuffers, TypedArrays or Blobs (only objects, strings, numbers, booleans and arrays).
-* ...your database is small enough to fit in RAM on your target devices.
+* your data contains no Dates, ArrayBuffers, TypedArrays or Blobs (only objects, strings, numbers, booleans and arrays).
+* your database is small enough to fit in RAM on your target devices.
 
-Dexie-export-import tries to scale and support
+Dexie-export-import was build to scale when exporting large databases without consuming much RAM. It does also support importing/exporting exotic types.
 
 # Usage
 
