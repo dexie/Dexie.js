@@ -1,22 +1,39 @@
 # Export and Import IndexedDB Database
 
-Finally, the [most voted Dexie feature](https://feathub.com/dfahlander/Dexie.js/+9) is here, in forms of an addon.
+Export / Import IndexedDB <---> Blob
 
-# Features
-
-* Export IndexedDB Database to streaming JSON (via Blob)
-* Import from Blob back to IndexedDB
-* Progress callback
-* Filter callback
-* Configurable (chunk sizes for the streaming process)
-* Support for all structured clonable types (Date, ArrayBuffer, Blob, etc)
-* Atomic - import / export within one database transaction.
+This module extends 'dexie' module with new methods for importing / exporting databases to / from blobs.
 
 # Install
 ```
 npm install dexie
 npm install dexie-export-import
 ```
+
+# Features
+
+* Export of IndexedDB Database to JSON Blob.
+* Import from Blob back to IndexedDB Database.
+* Chunk-wise / Streaming - does not read the entire DB into RAM
+* Progress callback (typically for showing progress bar)
+* Optional filter allows to import/export subset of data
+* Support for all structured clonable exotic types (Date, ArrayBuffer, Blob, etc) except CryptoKeys (which by design cannot be exported)
+* Atomic - import / export within one database transaction (optional)
+* Export speed: Using getAll() in chunks rather than openCursor().
+* Import speed: Using bulkPut() in chunks rather than put().
+* Can also export IndexedDB databases that was not created with Dexie.
+
+# Similar Libraries
+## [indexeddb-export-import](https://github.com/Polarisation/indexeddb-export-import)
+ 
+Much smaller in size, but also much lighter than dexie-export-import.
+
+[Indexeddb-export-import](https://github.com/Polarisation/indexeddb-export-import) can be better choice if...
+
+* ...your data contains no Dates, ArrayBuffers, TypedArrays or Blobs (only objects, strings, numbers, booleans and arrays).
+* ...your database is small enough to fit in RAM on your target devices.
+
+Dexie-export-import tries to scale and support
 
 # Usage
 
@@ -279,6 +296,27 @@ document.addEventListener('DOMContentLoaded', ()=>{
 });
 
 ```
+
+# Exporting IndexedDB Databases that wasn't generated with Dexie
+As Dexie can dynamically open non-Dexie IndexedDB databases, this is not an issue.
+Sample provided here:
+
+```js
+import Dexie from 'dexie';
+import 'dexie-export-import';
+
+async function exportDatabase(databaseName) {
+  const db = await new Dexie(databaseName).open();
+  const blob = await db.export();
+  return blob;
+}
+
+async function importDatabase(file) {
+  const db = await Dexie.import(file);
+  return db.backendDB();
+}
+```
+
 
 ## Background / Why
 
