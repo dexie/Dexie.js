@@ -62,6 +62,7 @@ promisedTest("simple-import", async ()=>{
   await db.import(blob, { overwriteValues: true });
   const friends2 = await db.table("friends").toArray();
   deepEqual(IMPORT_DATA.data.data[0].rows, friends2, "Imported data should equal");
+  db.close();
 
   await Dexie.delete(DATABASE_NAME);
 });
@@ -132,6 +133,7 @@ promisedTest("export-format", async() => {
   equal( inboundValues[0].binary[1], 2, "First binary[0] should be 2");
   equal( inboundValues[0].binary[2], 3, "First binary[0] should be 3");
   equal( inboundValues[0].text, "foo", "First text should be 'foo'");
+  importedDB.close();
 
   await Dexie.delete(DATABASE_NAME);
 });
