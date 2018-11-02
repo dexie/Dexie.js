@@ -7,7 +7,7 @@ export default {
         replace (b) {
             return encode(b, 0, b.byteLength);
         },
-        revive (b64, stateObj) {
+        revive (b64) {
             const buffer = decode(b64);
             return buffer;
         }

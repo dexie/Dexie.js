@@ -21,7 +21,7 @@ const exportObj = {};
     const arrType = typeName;
     const TypedArray = _global[arrType];
     if (TypedArray) {
-        exportObj[typeName.toLowerCase()] = {
+        exportObj[typeName.toLowerCase()+"2"] = {
             test (x) { return Typeson.toStringTag(x) === arrType; },
             replace ({buffer, byteOffset, length}) {
                 return {

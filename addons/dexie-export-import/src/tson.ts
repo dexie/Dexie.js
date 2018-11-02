@@ -20,7 +20,7 @@ let blobsToAwaitPos = 0;
 TSON.register([
   arrayBuffer,
   typedArray, {
-    blobTwoStep: {
+    blob2: {
       test(x) { return Typeson.toStringTag(x) === 'Blob'; },
       replace(b) {
           if (b.isClosed) { // On MDN, but not in https://w3c.github.io/FileAPI/#dfn-Blob

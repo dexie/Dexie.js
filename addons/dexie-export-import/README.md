@@ -193,6 +193,83 @@ export interface DexieExportJsonStructure {
 }
 ```
 
+## Example JSON File
+
+```json
+{
+  "formatName": "dexie",
+  "formatVersion": 1,
+  "data": {
+    "databaseName": "dexie-export-import-basic-tests",
+    "databaseVersion": 1,
+    "tables": [
+      {
+        "name": "outbound",
+        "schema": "",
+        "rowCount": 2
+      },
+      {
+        "name": "inbound",
+        "schema": "++id",
+        "rowCount": 3
+      }
+    ],
+    "data": [{
+      "tableName": "outbound",
+      "inbound": false,
+      "rows": [
+        [
+          1,
+          {
+            "foo": "bar"
+          }
+        ],
+        [
+          2,
+          {
+            "bar": "foo"
+          }
+        ]
+      ]
+    },{
+      "tableName": "inbound",
+      "inbound": true,
+      "rows": [
+        {
+          "id": 1,
+          "date": 1,
+          "fullBlob": {
+            "type": "",
+            "data": "AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8gISIjJCUmJygpKissLS4vMDEyMzQ1Njc4OTo7PD0+P0BBQkNERUZHSElKS0xNTk9QUVJTVFVWV1hZWltcXV5fYGFiY2RlZmdoaWprbG1ub3BxcnN0dXZ3eHl6e3x9fn+AgYKDhIWGh4iJiouMjY6PkJGSk5SVlpeYmZqbnJ2en6ChoqOkpaanqKmqq6ytrq+wsbKztLW2t7i5uru8vb6/wMHCw8TFxsfIycrLzM3Oz9DR0tPU1dbX2Nna29zd3t/g4eLj5OXm5+jp6uvs7e7v8PHy8/T19vf4+fr7/P3+/w=="
+          },
+          "binary": {
+            "buffer": "AQID",
+            "byteOffset": 0,
+            "length": 3
+          },
+          "text": "foo",
+          "bool": false,
+          "$types": {
+            "date": "date",
+            "fullBlob": "blob2",
+            "binary": "uint8array2",
+            "binary.buffer": "arraybuffer"
+          }
+        },
+        {
+          "id": 2,
+          "foo": "bar"
+        },
+        {
+          "id": 3,
+          "bar": "foo"
+        }
+      ]
+    }]
+  }
+
+```
+
 # Sample
 
 This sample shows a download link and a drop area for importing files back into the database.
