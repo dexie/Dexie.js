@@ -1,0 +1,6 @@
+tools/
+src/
+.*
+tmp/
+**/tmp/
+test
