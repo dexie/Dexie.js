@@ -39,7 +39,7 @@ await db.import(blob, [options]);
 
 # Sample
 
-[Sample code](https://codepen.io/dfahlander/pen/RqwoaB/) on [CodePen](https://codepen.io)
+[Here's a working sample](https://codepen.io/dfahlander/pen/RqwoaB/) on CodePen
 
 # Features
 
