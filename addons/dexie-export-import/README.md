@@ -39,7 +39,9 @@ await db.import(blob, [options]);
 
 # Sample
 
-[Here's a working sample](https://codepen.io/dfahlander/pen/RqwoaB/) on CodePen
+[Here's a working sample](https://codepen.io/dfahlander/pen/RqwoaB/) on CodePen. It uses [downloadjs](https://www.npmjs.com/package/downloadjs) to deliver the blob as a "file download" to the user. For receiving an import file, it uses a drop area where you can drop your JSON file. Click the Console tab in the bottom to see what progressCallbacks receive.
+
+Even though this sample doesn't show it, blobs can also be sent or retrieved to/from a server, using the [fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API). 
 
 # Features
 
