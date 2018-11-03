@@ -39,7 +39,10 @@ await db.import(blob, [options]);
 
 # Sample
 
-<p data-height="265" data-theme-id="0" data-slug-hash="RqwoaB" data-default-tab="js,result" data-user="dfahlander" data-pen-title="dexie-export-import1" class="codepen">See the Pen <a href="https://codepen.io/dfahlander/pen/RqwoaB/">dexie-export-import1</a> by David Fahlander (<a href="https://codepen.io/dfahlander">@dfahlander</a>) on <a href="https://codepen.io">CodePen</a>.</p>
+[Sample code](https://codepen.io/dfahlander/pen/RqwoaB/) on [CodePen](https://codepen.io)
+
+<iframe height='265' scrolling='no' title='dexie-export-import1' src='//codepen.io/dfahlander/embed/RqwoaB/?height=265&theme-id=0&default-tab=js,result' frameborder='no' allowtransparency='true' allowfullscreen='true' style='width: 100%;'>See the Pen <a href='https://codepen.io/dfahlander/pen/RqwoaB/'>dexie-export-import1</a> by David Fahlander (<a href='https://codepen.io/dfahlander'>@dfahlander</a>) on <a href='https://codepen.io'>CodePen</a>.
+</iframe>
 
 # Features
 
