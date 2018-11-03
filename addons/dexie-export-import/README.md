@@ -37,6 +37,12 @@ await db.import(blob, [options]);
 
 ```
 
+# Sample
+
+<p data-height="265" data-theme-id="0" data-slug-hash="RqwoaB" data-default-tab="js,result" data-user="dfahlander" data-pen-title="dexie-export-import1" class="codepen">See the Pen <a href="https://codepen.io/dfahlander/pen/RqwoaB/">dexie-export-import1</a> by David Fahlander (<a href="https://codepen.io/dfahlander">@dfahlander</a>) on <a href="https://codepen.io">CodePen</a>.</p>
+<script async src="https://static.codepen.io/assets/embed/ei.js"></script>
+
+
 # Features
 
 * Export of IndexedDB Database to JSON Blob.
@@ -280,13 +286,6 @@ export interface DexieExportJsonStructure {
   }
 
 ```
-
-# Sample
-
-This sample shows a download link and a drop area for importing files back into the database.
-
-https://codepen.io/dfahlander/pen/RqwoaB/
-
 
 # Exporting IndexedDB Databases that wasn't generated with Dexie
 As Dexie can dynamically open non-Dexie IndexedDB databases, this is not an issue.
