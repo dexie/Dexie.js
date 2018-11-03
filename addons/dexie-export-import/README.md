@@ -37,6 +37,12 @@ await db.import(blob, [options]);
 
 ```
 
+# Sample
+
+[Here's a working sample](https://codepen.io/dfahlander/pen/RqwoaB/) on CodePen. It uses [downloadjs](https://www.npmjs.com/package/downloadjs) to deliver the blob as a "file download" to the user. For receiving an import file, it uses a drop area where you can drop your JSON file. Click the Console tab in the bottom to see what progressCallbacks receive.
+
+Even though this sample doesn't show it, blobs can also be sent or retrieved to/from a server, using the [fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API). 
+
 # Features
 
 * Export of IndexedDB Database to JSON Blob.
@@ -278,113 +284,6 @@ export interface DexieExportJsonStructure {
       ]
     }]
   }
-
-```
-
-# Sample
-
-This sample shows a download link and a drop area for importing files back into the database.
-
-## NPM
-
-```npm
-npm install dexie
-npm install dexie-export-import
-npm install downloadjs
-```
-
-## CSS
-
-```css
-#dropzone {
-  width: 600px;
-  height: 100px;
-  border: 2px dotted #bbb;
-  border-radius: 10px;
-  padding: 35px;
-  color: #bbb;
-  text-align: center;
-}
-```
-
-## HTML
-
-```html
-<p>
-  <a id="exportLink" href="#">Click here to export the database</a>
-</p>
-<div id="dropzone">
-  Drop dexie export JSON file here
-</div>
-```
-
-## Javascript
-
-```js
-import Dexie from 'dexie';
-import 'dexie-export-import';
-import download from 'downloadjs';
-
-//
-// Declare Database and pre-populate it
-//
-const db = new Dexie('exportSample');
-db.version(1).stores({
-  foos: 'id'
-});
-db.on('populate', ()=>{
-  return db.foos.bulkAdd([
-    {
-      id: 1,
-      foo: 'foo',
-      date: new Date(), // Dates, Blobs, ArrayBuffers, etc are supported
-    },{
-      id: 2,
-      foo: 'bar',
-    }
-  ]);
-});
-
-//
-// When document is ready, bind export/import funktions to HTML elements
-//
-document.addEventListener('DOMContentLoaded', ()=>{
-  const dropZoneDiv = document.getElementById('drop-zone');
-  const exportLink = document.getElementById('exportLink');
-
-  // Configure exportLink
-  exportLink.onclick = async ()=>{
-    try {
-      const blob = await db.export({prettyJson: true});
-      download(blob, "dexie-export.json", "application/json");
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
-  // Configure dropZoneDiv
-  dropZoneDiv.ondragover = event => {
-    event.stopPropagation();
-    event.preventDefault();
-    event.dataTransfer.dropEffect = 'copy';
-  };
-
-  // Handle file drop:
-  dropZoneDiv.ondragover = async event => {
-    event.stopPropagation();
-    event.preventDefault();
-
-    // Pick the File from the drop event (a File is also a Blob):
-    const file = ev.dataTransfer.files[0];
-    try {
-      if (!file) throw new Error(`Only files can be dropped here`);
-      await db.import(file);
-      console.log("Import complete");
-    } catch (error) {
-      console.error(error);
-    }
-  }
-});
 
 ```
 
