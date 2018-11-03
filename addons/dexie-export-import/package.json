@@ -1,6 +1,6 @@
 {
   "name": "dexie-export-import",
-  "version": "1.0.0-alpha.7",
+  "version": "1.0.0-alpha.8",
   "description": "Dexie addon that adds export and import capabilities",
   "main": "dist/dexie-export-import.js",
   "module": "dist/dexie-export-import.mjs",
