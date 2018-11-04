@@ -4,6 +4,7 @@ import { Collection } from './collection';
 import { WhereClause } from '../where-clause/where-clause';
 import { AnyRange } from '../../dbcore/keyrange';
 import { KeyRange } from '../../public/types/dbcore';
+import { mirror } from '../../functions/chaining-functions';
 
 /** Constructs a Collection instance. */
 export interface CollectionConstructor {
@@ -36,6 +37,7 @@ export function createCollectionConstructor(db: Dexie) {
 
       const whereCtx = whereClause._ctx;
       const table = whereCtx.table;
+      const readingHook = table.hook.reading.fire;
       this._ctx = {
         table: table,
         index: whereCtx.index,
@@ -53,7 +55,7 @@ export function createCollectionConstructor(db: Dexie) {
         limit: Infinity,
         error: error, // If set, any promise must be rejected with this error
         or: whereCtx.or,
-        valueMapper: table.hook.reading.fire
+        valueMapper: readingHook !== mirror ? readingHook : null
       };
     }
   );

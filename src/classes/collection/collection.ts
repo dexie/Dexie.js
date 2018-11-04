@@ -170,7 +170,7 @@ export class Collection implements ICollection {
       if (ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
         // Special optimation if we could use IDBObjectStore.getAll() or
         // IDBKeyRange.getAll():
-        const readingHook = ctx.table.hook.reading.fire;
+        const {valueMapper} = ctx;
         const index = getIndexOrStore(ctx, ctx.table.core.schema);
         return ctx.table.core.query({
           trans,
@@ -180,7 +180,7 @@ export class Collection implements ICollection {
             index,
             range: ctx.range
           }
-        }).then(({result}) => readingHook === mirror ? result : result.map(readingHook));
+        }).then(({result}) => valueMapper ? result.map(valueMapper) : result);
       } else {
         // Getting array through a cursor.
         const a = [];
