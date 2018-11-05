@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, spawnedTest} from './dexie-unittest-utils';
+import {resetDatabase, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
 const async = Dexie.async;
 
@@ -26,6 +26,42 @@ module("misc", {
 //
 // Misc Tests
 //
+
+promisedTest("issue#729", async () => {
+    const onUnhandled = ev => {
+        ok(false, 'Unhandled rejection triggered: ' + ev.reason);
+    }
+    window.addEventListener("unhandledrejection", onUnhandled);
+    try {
+        await db.foo.bulkPut([{
+            id: 1,
+            foo: 'foo',
+          },{
+            id: 2,
+            foo: 'bar',
+          }
+        ]);
+    } catch (err) {
+        ok(false, "Couldn't populate data: " + err);
+    }
+    try {
+        const f = await db.foo.add({id: 1, foo: "bar"}); // id 1 already exists.
+    } catch (err) {
+        ok(true, "Got the err:" + err);
+    }  
+    try {
+        const f = await db.foo.get(false); // Invalid key used
+    } catch (err) {
+        ok(true, "Got the err:" + err);
+    }
+    try {
+        const f = await db.foo.where({id: 1})
+            .modify({id: 2, foo: "bar"}); // Changing primary key should fail + id 2 already exists.
+    } catch (err) {
+        ok(true, "Got the err:" + err);
+    }
+    window.removeEventListener("unhandledrejection", onUnhandled);
+});
 
 asyncTest("Adding object with falsy keys", function () {
     db.keyless.add({ name: "foo" }, 1).then(function (id) {
