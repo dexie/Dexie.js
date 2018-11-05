@@ -28,10 +28,11 @@ module("misc", {
 //
 
 promisedTest("issue#729", async () => {
-    const onUnhandled = ev => {
-        ok(false, 'Unhandled rejection triggered: ' + ev.reason);
+    const onConsoleWarn = txt => {
+        ok(false, 'console warn happened: ' + txt);
     }
-    window.addEventListener("unhandledrejection", onUnhandled);
+    const warnDescriptor = Object.getOwnPropertyDescriptor(console, 'warn');
+    console.warn = onConsoleWarn;
     try {
         await db.foo.bulkPut([{
             id: 1,
@@ -60,7 +61,9 @@ promisedTest("issue#729", async () => {
     } catch (err) {
         ok(true, "Got the err:" + err);
     }
-    window.removeEventListener("unhandledrejection", onUnhandled);
+    if (warnDescriptor) {
+        Object.defineProperty(console, 'warn', warnDescriptor);
+    }
 });
 
 asyncTest("Adding object with falsy keys", function () {
