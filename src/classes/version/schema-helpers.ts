@@ -49,8 +49,10 @@ export function runUpgraders(db: Dexie, oldVersion: number, idbUpgradeTrans: IDB
   trans.create(idbUpgradeTrans);
   trans._completion.catch(reject);
   const rejectTransaction = trans._reject.bind(trans);
+  const transless = PSD.transless || PSD;
   newScope(() => {
     PSD.trans = trans;
+    PSD.transless = transless;
     if (oldVersion === 0) {
       // Create tables:
       keys(globalSchema).forEach(tableName => {
