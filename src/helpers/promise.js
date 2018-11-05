@@ -836,7 +836,7 @@ function globalError(err, promise) {
                 // No native support for PromiseRejectionEvent but user has set window.onunhandledrejection. Manually call it.
                 try {_global.onunhandledrejection(event);} catch (_) {}
         }
-        if (event && !event.defaultPrevented) {
+        if (debug && event && !event.defaultPrevented) {
             console.warn(`Unhandled rejection: ${err.stack || err}`);
         }
     } catch (e) {}
