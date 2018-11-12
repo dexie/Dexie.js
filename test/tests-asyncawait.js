@@ -111,6 +111,52 @@ test("Should be able to use native async await", function(assert) {
     }).then(done);
 });
 
+test("Should be able to use native async await from upgrade handler (issue #612)", function(assert) {
+    let done = assert.async();
+    Dexie.Promise.resolve(idbAndPromiseCompatible).then(()=>{
+        let f = new Function('ok','equal', 'Dexie', `
+        return Dexie.delete('issue612').then(async ()=>{
+          const log = [];
+          const db = new Dexie('issue612');
+          db.version(1).stores({foo: 'id'});
+          await db.open();
+          await db.foo.add({id: 1, name: "Foo Bar"});
+          db.close();
+          db.version(2).stores({foo: 'id, firstName, lastName'}).upgrade(async tx => {
+            log.push("2:1");
+            await tx.foo.toCollection().modify(x => {
+                const [firstName, lastName] = x.name.split(' ');
+                x.firstName = firstName;
+                x.lastName = lastName;
+                ++x.v
+            });
+            log.push("2:2");
+          });
+          db.version(3).upgrade(async tx => {
+            log.push("3:1");
+            await tx.foo.toArray();
+            log.push("3:2");
+          });
+          await db.open();
+          const count = await db.foo.where({firstName: 'Foo'}).count();
+          equal(count, 1, "Should find base on the upgraded index");
+          equal(log.join(','), "2:1,2:2,3:1,3:2", "Execution order of upgraders should be correct");
+          db.close();
+        });`);
+        return f(ok, equal, Dexie);
+    }).catch('IdbPromiseIncompatibleError', e => {
+        ok (true, `Promise and IndexedDB is incompatible on this browser. Native async await fails in idb transaction by reality`)
+    }).catch(e => {
+        if (hasNativeAsyncFunctions)
+            ok(false, `Error: ${e.stack || e}`);
+        else 
+            ok(true, `This browser does not support native async functions`);
+    }).then(()=>{
+        return Dexie.delete("issue612");
+    }).then(done);
+});
+
+
 const NativePromise = (()=>{
     try {
         return new Function("return (async ()=>{})().constructor")();
@@ -497,3 +543,4 @@ promisedTest ("Should behave outside transactions as well", async () => {
     return doSomething();
     `))(ok, equal, Dexie, db, GlobalPromise)
 });
+
