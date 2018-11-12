@@ -3,7 +3,7 @@ import { DbSchema } from '../../public/types/db-schema';
 import { setProp, keys, slice, _global, isArray, shallowClone } from '../../functions/utils';
 import { Transaction } from '../transaction';
 import { Version } from './version';
-import Promise, { PSD, newScope } from '../../helpers/promise';
+import Promise, { PSD, newScope, NativePromise, decrementExpectedAwaits, AsyncFunction, incrementExpectedAwaits } from '../../helpers/promise';
 import { exceptions } from '../../errors';
 import { TableSchema } from '../../public/types/table-schema';
 import { IndexSpec } from '../../public/types/index-spec';
@@ -136,9 +136,23 @@ export function updateTablesAndIndexes(
         setApiOnPlace(db, [db.Transaction.prototype], keys(upgradeSchema), upgradeSchema);
         trans.schema = upgradeSchema;
 
-        return Promise.follow(() => {
-          contentUpgrade(trans);
+        // Support for native async await.
+        if (contentUpgrade.constructor === AsyncFunction) {
+          incrementExpectedAwaits();
+        }
+        let returnValue: any;
+        const promiseFollowed = Promise.follow(() => {
+          // Finally, call the scope function with our table and transaction arguments.
+          returnValue = contentUpgrade(trans);
+          if (returnValue) {
+            if (returnValue.constructor === NativePromise) {
+              var decrementor = decrementExpectedAwaits.bind(null, null);
+              returnValue.then(decrementor, decrementor);
+            }
+          }
         });
+        return (returnValue && typeof returnValue.then === 'function' ?
+          Promise.resolve(returnValue) : promiseFollowed.then(()=>returnValue));
       }
     });
     queue.push(idbtrans => {
