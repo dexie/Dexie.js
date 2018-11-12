@@ -114,7 +114,7 @@ promisedTest("#770", async () => {
 
         await db.open();
         deepEqual(runnedVersions, [2, 3], "Versions 3 did indeed proceed (as well as version 2)");
-        const otherDB = new Dexie(dbName + '-another-unrelated-db');
+        const otherDB = new Dexie(dbName + '-another-unrelated-db', {addons: []});
         otherDB.version(1).stores({foo: 'id'});
         const otherDbRows = await otherDB.foo.toArray();
         const origDbRows = await db.test.toArray();
@@ -125,7 +125,7 @@ promisedTest("#770", async () => {
         ok(false, "Error " + err);
     } finally {
         await db.delete();
-        await Dexie.delete(dbName + '-another-unrelated-db');
+        await new Dexie(dbName + '-another-unrelated-db', {addons: []}).delete();
     }
 });
 
