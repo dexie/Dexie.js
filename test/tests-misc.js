@@ -124,6 +124,7 @@ promisedTest("#770", async () => {
         deepEqual(otherDbRows, origDbRows, "All rows was copied atomically");
         //await db.test.put({ id: 2 });
         db.close();
+        otherDB.close();
     } catch (err) {
         ok(false, "Error " + err);
     } finally {
