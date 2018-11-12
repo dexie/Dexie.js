@@ -65,7 +65,7 @@ export function runUpgraders(db: Dexie, oldVersion: number, idbUpgradeTrans: IDB
   });
 }
 
-export type UpgradeQueueItem = (idbtrans: IDBTransaction) => Promise | void;
+export type UpgradeQueueItem = (idbtrans: IDBTransaction) => PromiseLike<any> | void;
 
 export function updateTablesAndIndexes(
   db: Dexie,
