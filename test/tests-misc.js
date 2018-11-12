@@ -1,5 +1,5 @@
 import Dexie from 'dexie';
-import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
+import {module, stop, start, asyncTest, equal, deepEqual, ok} from 'QUnit';
 import {resetDatabase, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
 const async = Dexie.async;
@@ -84,6 +84,52 @@ asyncTest("Adding object with falsy keys", function () {
     }).catch(function (e) {
         ok(false, e);
     }).finally(start);
+});
+
+promisedTest("#770", async () => {
+    const dbName = 'TestDB-' + Math.random();
+    const db = new Dexie(dbName);
+    const runnedVersions = [];
+    try {
+        db.version(1).stores({ test: 'id' });
+        await db.test.put({ id: 1 });
+        await db.open();
+        db.close();
+        db = new Dexie(dbName);
+        db.version(1).stores({ test: 'id' });
+        db.version(2).stores({ test: 'id' }).upgrade(async t => {
+            runnedVersions.push(2);
+            const rowsToCopy = await t.test.toArray();
+            await Dexie.waitFor((async ()=>{
+                const otherDB = new Dexie(dbName + '-another-unrelated-db');
+                otherDB.version(1).stores({foo: 'id'});
+                await otherDB.open();
+                await otherDB.foo.bulkAdd(rowsToCopy);
+                otherDB.close();
+            })());
+            //const p = new Promise(resolve => setTimeout(() => resolve(), 1000));
+            //const p = new Promise(resolve => resolve());
+        });
+        db.version(3).stores({ test: 'id' }).upgrade(t => {
+            runnedVersions.push(3);
+        });
+
+        await db.open();
+        //await new Dexie.Promise(resolve => resolve).timeout(500).catch(err=>{});
+        deepEqual(runnedVersions, [2, 3], "Versions 3 did indeed proceed (as well as version 2)");
+        const otherDB = new Dexie(dbName + '-another-unrelated-db');
+        otherDB.version(1).stores({foo: 'id'});
+        const otherDbRows = await otherDB.foo.toArray();
+        const origDbRows = await db.test.toArray();
+        deepEqual(otherDbRows, origDbRows, "All rows was copied atomically");
+        //await db.test.put({ id: 2 });
+        db.close();
+    } catch (err) {
+        ok(false, "Error " + err);
+    } finally {
+        await db.delete();
+        await Dexie.delete(dbName + '-another-unrelated-db');
+    }
 });
 
 asyncTest("#102 Passing an empty array to anyOf throws exception", async(function* () {
