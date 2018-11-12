@@ -27,6 +27,28 @@ module("misc", {
 // Misc Tests
 //
 
+promisedTest("issue#751", async ()=>{
+    const db = new Dexie("issue751");
+    db.version(1).stores({
+        foo: `
+            ++id,
+            name,
+            [id+name]`
+    });
+    try {
+        const key = await db.foo.add({name: "Foo"});
+        equal(key, 1, "The first autoincremented key on a newly created db should be 1.")
+        const theFoo = await db.foo.get({
+            id: key,
+            name: "Foo"
+        });
+        ok(!!theFoo, "Should have found the item by its compound index");
+        equal(theFoo.name, "Foo", "The item should have the name 'Foo'");
+    } finally {
+        await db.delete();
+    }
+});
+
 promisedTest("issue#729", async () => {
     const onConsoleWarn = txt => {
         ok(false, 'console warn happened: ' + txt);
