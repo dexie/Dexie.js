@@ -6,10 +6,8 @@ import { Transaction } from '../transaction';
 import { awaitIterator } from '../../helpers/yield-support';
 import Promise, {
   PSD,
-  NativePromise,
   decrementExpectedAwaits,
   rejection,
-  AsyncFunction,
   incrementExpectedAwaits
 } from '../../helpers/promise';
 
@@ -54,19 +52,20 @@ export function enterTransactionScope(
     }
 
     // Support for native async await.
-    if (scopeFunc.constructor === AsyncFunction) {
-      incrementExpectedAwaits();
-    }
+    const nativeAsync = scopeFunc.constructor.name === 'AsyncFunction';
+    if (nativeAsync) incrementExpectedAwaits();
 
     let returnValue;
     const promiseFollowed = Promise.follow(() => {
       // Finally, call the scope function with our table and transaction arguments.
       returnValue = scopeFunc.call(trans, trans);
-      if (returnValue) {
-        if (returnValue.constructor === NativePromise) {
-          var decrementor = decrementExpectedAwaits.bind(null, null);
-          returnValue.then(decrementor, decrementor);
-        } else if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
+      if (nativeAsync && returnValue && typeof returnValue.then === 'function' && returnValue.constructor !== Promise) {
+        var decrementor = decrementExpectedAwaits.bind(null, null);
+        returnValue.then(decrementor, decrementor);
+      } else {
+        // No native async/await support needed if a Dexie.Promise was returned.
+        if (nativeAsync) decrementExpectedAwaits();
+        if (returnValue && typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
           // scopeFunc returned an iterator with throw-support. Handle yield as await.
           returnValue = awaitIterator(returnValue);
         }

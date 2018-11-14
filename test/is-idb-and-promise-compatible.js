@@ -1,8 +1,7 @@
 import Dexie from 'dexie';
-import {NativePromise} from '../src/helpers/promise';
 
-var _resolve = NativePromise.resolve.bind(NativePromise);
-var _then = NativePromise.prototype.then;
+const _resolve = typeof Promise !== 'undefined' && Promise.resolve.bind(Promise);
+const _then = typeof Promise !== 'undefined' && Promise.prototype.then;
 
 export class IdbPromiseIncompatibleError extends Error {
     constructor() {

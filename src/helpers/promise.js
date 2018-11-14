@@ -41,24 +41,21 @@ const
     // When calling error.stack or promise.stack, limit the number of asyncronic stacks to print out. 
     MAX_LONG_STACKS = 20,
     ZONE_ECHO_LIMIT = 7,
-    nativePromiseInstanceAndProto = (()=>{
-        try {
-            // Be able to patch native async functions
-            return new Function(`let F=async ()=>{},p=F();return [p,Object.getPrototypeOf(p),Promise.resolve(),F.constructor];`)();
-        } catch(e) {
-            var P = _global.Promise;
-            return P ?
-                [P.resolve(), P.prototype, P.resolve()] :
-                []; 
-        }
-    })(),
-    resolvedNativePromise = nativePromiseInstanceAndProto[0],
-    nativePromiseProto = nativePromiseInstanceAndProto[1],
-    resolvedGlobalPromise = nativePromiseInstanceAndProto[2],
-    nativePromiseThen = nativePromiseProto && nativePromiseProto.then;
+    resolvedGlobalPromise = _global.Promise && _global.Promise.resolve()
 
-export const NativePromise = resolvedNativePromise && resolvedNativePromise.constructor;
-export const AsyncFunction = nativePromiseInstanceAndProto[3];
+    if (resolvedGlobalPromise) {
+        // Copy property _global.Promise.prototype.then into
+        // resolvedGlobalPromise.origThen.
+        // This will be used when we need to schedule a micro task.
+        // In normal environment, this is the native promise.
+        // If angular's zone.js is used, this will be a ZoneAwarePromise - which
+        // is not really needed, but won't harm.
+        // If zone.js or other zone system will be using zone echoing to support async/await as we do,
+        // we MUST copy the property descriptor and not just the value. Otherwise
+        // scheduling echoes would cause that zone system to schedule echoes in its turn.
+        Object.defineProperty(resolvedGlobalPromise, 'origThen', getPropertyDescriptor(resolvedGlobalPromise, 'then'));
+    }
+
 const patchGlobalPromise = !!resolvedGlobalPromise;
 
 var stack_being_generated = false;
@@ -71,7 +68,7 @@ var stack_being_generated = false;
    indexedDB-compatible emulated micro task loop.
 */
 var schedulePhysicalTick = resolvedGlobalPromise ?
-    () => {resolvedGlobalPromise.then(physicalTick);}
+    () => {resolvedGlobalPromise.origThen(physicalTick);}
     :
     _global.setImmediate ? 
         // setImmediate supported. Those modern platforms also supports Function.bind().
@@ -691,7 +688,7 @@ export function decrementExpectedAwaits(sourceTaskId) {
 
 // Call from Promise.all() and Promise.race()
 export function onPossibleParallellAsync (possiblePromise) {
-    if (task.echoes && possiblePromise && possiblePromise.constructor === NativePromise) {
+    if (task.echoes && possiblePromise && typeof possiblePromise.then === 'function' && possiblePromise.constructor !== Promise) {
         incrementExpectedAwaits(); 
         return possiblePromise.then(x => {
             decrementExpectedAwaits();
@@ -742,7 +739,6 @@ function switchToZone (targetZone, bEnteringZone) {
 
         // Change Promise.prototype.then for native and global Promise (they MAY differ on polyfilled environments, but both can be accessed)
         // Must be done on each zone change because the patched method contains targetZone in its closure.
-        nativePromiseProto.then = targetEnv.nthen;
         GlobalPromise.prototype.then = targetEnv.gthen;
 
         if (currentZone.global || targetZone.global) {
@@ -770,7 +766,6 @@ function snapShot () {
         race: GlobalPromise.race,
         resolve: GlobalPromise.resolve,
         reject: GlobalPromise.reject,
-        nthen: nativePromiseProto.then,
         gthen: GlobalPromise.prototype.then
     } : {};
 }
@@ -785,12 +780,7 @@ export function usePSD (psd, fn, a1, a2, a3) {
     }
 }
 
-function enqueueNativeMicroTask (job) {
-    //
-    // Precondition: nativePromiseThen !== undefined
-    //
-    nativePromiseThen.call(resolvedNativePromise, job);
-}
+const enqueueNativeMicroTask = job => resolvedGlobalPromise.origThen(job);
 
 function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
     return typeof fn !== 'function' ? fn : function () {

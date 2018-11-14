@@ -21,8 +21,6 @@ export interface DexiePromiseConstructor extends PromiseExtendedConstructor {
   rejectionMapper: (e?: any) => Error;
 }
 
-export const NativePromise : PromiseConstructor;
-export const AsyncFunction : FunctionConstructor;
 export var globalPSD;
 export var PSD;
 export function wrap<F extends Function>(f: F, errorCatcher?: (err) => void) : F;
