@@ -5,7 +5,10 @@ export function promisedTest(name: string, tester: ()=>Promise<any>) {
     try {
       await tester();
     } catch (error) {
-      ok(false, "Got error: " + error);
+      ok(false, "Got error: " + (error ?
+        error.name + (error.code ? ` (code: ${error.code})` : ``) + 
+        (error.stack ? "\n" + error.stack : '') :
+        "null"));
     } finally {
       start();
     }
