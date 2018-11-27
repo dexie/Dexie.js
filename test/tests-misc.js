@@ -95,7 +95,7 @@ promisedTest("#770", async () => {
         await db.test.put({ id: 1 });
         await db.open();
         db.close();
-        db = new Dexie(dbName);
+        db = new Dexie(dbName, {addons: []});
         db.version(1).stores({ test: 'id' });
         db.version(2).stores({ test: 'id' }).upgrade(async t => {
             runnedVersions.push(2);
