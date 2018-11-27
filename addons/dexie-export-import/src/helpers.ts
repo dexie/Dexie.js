@@ -30,7 +30,7 @@ declare var FileReaderSync: {
 };
 // -----------------------------------------------
 
-interface TypeMapper {
+export interface TypeMapper {
   binary: ArrayBuffer;
   text: string;
 }
