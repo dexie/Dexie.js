@@ -6,9 +6,10 @@ export function promisedTest(name: string, tester: ()=>Promise<any>) {
       await tester();
     } catch (error) {
       ok(false, "Got error: " + (error ?
-        error.name + (error.code ? ` (code: ${error.code})` : ``) + 
-        (error.stack ? "\n" + error.stack : '') :
-        "null"));
+        error +
+          (error.code ? ` (code: ${error.code})` : ``) + 
+          (error.stack ? "\n" + error.stack : '') :
+        error));
     } finally {
       start();
     }
