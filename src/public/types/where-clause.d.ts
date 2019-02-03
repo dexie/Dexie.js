@@ -14,7 +14,7 @@ export interface WhereClause<T=any, TKey=IndexableType> {
   between(lower: any, upper: any, includeLower?: boolean, includeUpper?: boolean): Collection<T, TKey>;
   equals(key: any): Collection<T, TKey>;
   equalsIgnoreCase(key: string): Collection<T, TKey>;
-  inAnyRange(ranges: ReadonlyArray<{0: any, 1: any}>): Collection<T, TKey>;
+  inAnyRange(ranges: ReadonlyArray<{0: any, 1: any}>, options?: { includeLowers?: boolean, includeUppers?: boolean }): Collection<T, TKey>;
   startsWith(key: string): Collection<T, TKey>;
   startsWithAnyOf(prefixes: string[]): Collection<T, TKey>;
   startsWithAnyOf(...prefixes: string[]): Collection<T, TKey>;
