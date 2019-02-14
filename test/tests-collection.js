@@ -317,25 +317,20 @@ promisedTest("modify-primary-key", async ()=>{
     equal(user88.first, "Olle", "Retrieved user should be David");
 });
 
+//
 // Issue #594 (A Safari issue)
 //
-// The test below fails in Safari 10 and 11. Collection.modify currently uses IDBCursor.update().
-// This seems not to work in Safari if the cursor is iterating an index (using where() with Dexie).
-// I tried to replace IDBCursor.update() with the equivalent IDBObjectStore.put() but we got the
-// same issue then as well.
-// 
-// Before enabling this test, Safari must have solved the issue (not yet reported to the webkit team),
-// or we could do another implementation of Collection.modify() that performs the modification afterwards
-// of iterating the collection.
-//
-/*promisedTest("modify-with-where(issue-594)", async ()=>{
+promisedTest("modify-with-where(issue-594)", async ()=>{
     db.users.add({ id: 3, first: "David", last: "Fahlander2", username: "dfahlander2", email: ["david2@awarica.com"], pets: [] });
     db.users.add({ id: 4, first: "David", last: "Fahlander3", username: "dfahlander3", email: ["david3@awarica.com"], pets: [] });
     const numDavids = (await db.users.where('first').equals("David").toArray()).length;
     equal(numDavids, 3, "There should be 3 Davids");
     const numModifications = await db.users.where('first').equals("David").modify((object) => { object.anotherProperty = 'test'; });
     equal(numModifications, 3, "There should have been 3 modifications");
-});*/
+    // Also verify that the modification did really happen:
+    const davids = await db.users.where({first: 'David'}).toArray();
+    ok(davids.every(david => david.anotherProperty === 'test'), "All Davids where modified indeed");
+});
 
 
 asyncTest("delete", 2, function () {
