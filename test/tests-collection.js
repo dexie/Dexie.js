@@ -327,6 +327,9 @@ promisedTest("modify-with-where(issue-594)", async ()=>{
     equal(numDavids, 3, "There should be 3 Davids");
     const numModifications = await db.users.where('first').equals("David").modify((object) => { object.anotherProperty = 'test'; });
     equal(numModifications, 3, "There should have been 3 modifications");
+    // Also verify that the modification did really happen:
+    const davids = await db.users.where({first: 'David'}).toArray();
+    ok(davids.every(david => david.anotherProperty === 'test'), "All Davids where modified indeed");
 });
 
 
