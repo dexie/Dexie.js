@@ -155,13 +155,14 @@ interface Friend {
 // Declare Database
 //
 class FriendDatabase extends Dexie {
-    public friends!: Dexie.Table<Friend, number>; // id is number in this case
+    public friends: Dexie.Table<Friend, number>; // id is number in this case
 
     public constructor() {
         super("FriendDatabase");
         this.version(1).stores({
             friends: "++id,name,age"
         });
+        this.friends = this.table("friends");
     }
 }
 
