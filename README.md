@@ -8,7 +8,7 @@ Dexie.js is a wrapper library for indexedDB - the standard database in the brows
 #### Why?
 Dexie solves three main issues with the native IndexedDB API:
 
- 1. Ambivalent error handling
+ 1. Ambiguous error handling
  2. Poor queries
  3. Code complexity
 
@@ -54,7 +54,7 @@ Yes, it's that simple.
 
 ### Performance
 
-Dexie has a kick-ass performance. It's [bulk methods](http://dexie.org/docs/Table/Table.bulkPut()) take advantage of a not well known feature in indexedDB that makes it possible to store stuff without listening to every onsuccess event. This speeds up the performance to a maximum.
+Dexie has kick-ass performance. Its [bulk methods](http://dexie.org/docs/Table/Table.bulkPut()) take advantage of a lesser-known feature in IndexedDB that makes it possible to store stuff without listening to every onsuccess event. This speeds up the performance to a maximum.
 
 #### Supported operations
 ```js
