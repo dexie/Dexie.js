@@ -762,7 +762,7 @@ function switchToZone (targetZone, bEnteringZone) {
 }
 
 function snapShot () {
-    var GlobalPromise = _global.Promise;
+    var GlobalPromise = _global.Promise || Promise;
     return patchGlobalPromise ? {
         Promise: GlobalPromise,
         PromiseProp: Object.getOwnPropertyDescriptor(_global, "Promise"),
