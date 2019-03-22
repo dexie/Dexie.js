@@ -5,7 +5,7 @@ const _global =
     typeof self !== 'undefined' ? self :
     typeof window !== 'undefined' ? window :
     global;
-if (!_global.Promise){
+if (typeof Promise === 'object' && !_global.Promise){
     _global.Promise = Promise;
 }
 export { _global }
