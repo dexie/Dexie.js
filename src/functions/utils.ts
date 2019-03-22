@@ -5,7 +5,9 @@ const _global =
     typeof self !== 'undefined' ? self :
     typeof window !== 'undefined' ? window :
     global;
-_global.Promise = Promise;
+if (!_global.Promise){
+    _global.Promise = Promise;
+}
 export { _global }
 
 export function extend(obj, extension) {
