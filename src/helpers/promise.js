@@ -44,7 +44,7 @@ const
     nativePromiseInstanceAndProto = (()=>{
         try {
             // Be able to patch native async functions
-            return new Function(`let F=async ()=>{},p=F();return [p,Object.getPrototypeOf(p),Promise.resolve(),F.constructor];`)();
+            return new Function('let F=async ()=>{},p=F();return [p,Object.getPrototypeOf(p),Promise.resolve(),F.constructor];')();
         } catch(e) {
             var P = _global.Promise;
             return P ?

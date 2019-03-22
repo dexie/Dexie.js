@@ -1,10 +1,14 @@
 ﻿declare var global;
 export const keys = Object.keys;
 export const isArray = Array.isArray;
-export const _global =
+const _global =
     typeof self !== 'undefined' ? self :
     typeof window !== 'undefined' ? window :
     global;
+if (!_global.Promise){
+    _global.Promise = Promise;
+}
+export { _global }
 
 export function extend(obj, extension) {
     if (typeof extension !== 'object') return obj;
