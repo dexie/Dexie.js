@@ -5,7 +5,10 @@ const _global =
     typeof self !== 'undefined' ? self :
     typeof window !== 'undefined' ? window :
     global;
-if (typeof Promise === 'object' && !_global.Promise){
+if (typeof Promise !== 'undefined' && !_global.Promise){
+    // In jsdom, this it can be the case that Promise is not put on the global object.
+    // If so, we need to patch the global object for the rest of the code to work as expected.
+    // Other dexie code expects Promise to be on the global object (like normal browser environments)
     _global.Promise = Promise;
 }
 export { _global }
