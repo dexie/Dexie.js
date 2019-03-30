@@ -7,15 +7,15 @@ import { nop } from '../functions/chaining-functions';
 import { PromiseExtended } from '../public/types/promise-extended';
 import { DBNAMES_DB } from '../globals/constants';
 
-export let databaseEnumerator: DatabaseEnumerator;
+export let databaseEnumerator: IDatabaseEnumerator;
 
-export interface DatabaseEnumerator {
+export interface IDatabaseEnumerator {
   getDatabaseNames (): PromiseExtended<string[]>;
   add (name: string): undefined | PromiseExtended;
   remove (name: string): undefined | PromiseExtended;
 }
 
-export function DatabaseEnumerator (indexedDB: IDBFactory & {getDatabaseNames?, webkitGetDatabaseNames?}) : DatabaseEnumerator {
+export function databaseEnumeratorFactory (indexedDB: IDBFactory & {getDatabaseNames?, webkitGetDatabaseNames?}) : IDatabaseEnumerator {
   const getDatabaseNamesNative = indexedDB && (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
   let dbNamesTable: Table<{name: string}, string>;
 
@@ -44,9 +44,9 @@ export function DatabaseEnumerator (indexedDB: IDBFactory & {getDatabaseNames?, 
   };
 }
 
-export function initDatabaseEnumerator(indexedDB: IDBFactory) {
+export function setDatabaseEnumerator(indexedDB: IDBFactory) {
   try {
-    databaseEnumerator = DatabaseEnumerator(indexedDB);
+    databaseEnumerator = databaseEnumeratorFactory(indexedDB);
   } catch (e) {}
 }
 
