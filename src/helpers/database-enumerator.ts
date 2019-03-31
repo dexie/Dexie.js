@@ -6,6 +6,7 @@ import { Table } from '../public/types/table';
 import { nop } from '../functions/chaining-functions';
 import { PromiseExtended } from '../public/types/promise-extended';
 import { DBNAMES_DB } from '../globals/constants';
+import { DexiePromise } from '../helpers/promise';
 
 export let databaseEnumerator: IDatabaseEnumerator;
 
@@ -44,9 +45,27 @@ export function databaseEnumeratorFactory (indexedDB: IDBFactory & {getDatabaseN
   };
 }
 
-export function setDatabaseEnumerator(indexedDB: IDBFactory) {
-  try {
-    databaseEnumerator = databaseEnumeratorFactory(indexedDB);
-  } catch (e) {}
+export function setDatabaseEnumerator(indexedDB: IDBFactory | undefined) {
+  if (indexedDB){
+    try {
+      databaseEnumerator = databaseEnumeratorFactory(indexedDB);
+    } catch (e) {}
+  } else {
+    databaseEnumerator = getEmptyDbEnumerator();
+  }
+}
+
+function getEmptyDbEnumerator(): IDatabaseEnumerator {
+  return {
+      getDatabaseNames(){
+          return DexiePromise.reject('indexedDB is currently set to undefined. usually this is because window.indexedDB did not exist as the module was run');
+      },
+      add(name: string){
+          return void 0;
+      },
+      remove(name: string){
+          return void 0;
+      }
+  }
 }
 

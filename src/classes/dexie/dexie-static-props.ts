@@ -16,7 +16,7 @@ import { exceptions } from '../../errors';
 import { errnames } from '../../errors';
 import { getMaxKey } from '../../functions/quirks';
 import { vip } from './vip';
-import { DexieDependencies } from './dexieDependencies';
+import { DexieDependencies } from './dexie-dependencies';
 
 /* (Dexie) is an instance of DexieConstructor, as defined in public/types/dexie-constructor.d.ts
 *  (new Dexie()) is an instance of Dexie, as defined in public/types/dexie.d.ts
