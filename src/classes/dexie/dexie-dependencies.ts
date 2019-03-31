@@ -1,4 +1,4 @@
-import { setDatabaseEnumerator } from '../../helpers/database-enumerator';
+import { setDatabaseEnumerator, databaseEnumerator } from './../../helpers/database-enumerator';
 
 export interface IDexieDependencies{
     indexedDB?: IDBFactory,
@@ -21,7 +21,7 @@ export class DexieDependencies implements IDexieDependencies{
     {
         if (value !== this.pIndexedDB) {
             this.pIndexedDB = value;
-            setDatabaseEnumerator(value)
+            setDatabaseEnumerator(value);
         }
     }
 }
