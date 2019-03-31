@@ -10,8 +10,9 @@ import { setDatabaseEnumerator } from './helpers/database-enumerator';
 // (implement interface DexieConstructor):
 import './classes/dexie/dexie-static-props';
 
-// Init Database Enumerator (for Dexie.getDatabaseNames())
-setDatabaseEnumerator((Dexie as any as DexieConstructor).dependencies.indexedDB);
+// below will no longer be needed as it is called when dexie-static-properties assigns dependencies
+// leaving it in will result in a second & unnecessary call
+// setDatabaseEnumerator((Dexie as any as DexieConstructor).dependencies.indexedDB);
 
 // Set rejectionMapper of DexiePromise so that it generally tries to map
 // DOMErrors and DOMExceptions to a DexieError instance with same name but with
