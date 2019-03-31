@@ -16,6 +16,10 @@ export interface DexieOptions {
   allowEmptyDB?: boolean;
 }
 
+export /* internal */ interface _dexieOptions extends DexieOptions {
+  _isDBNamesDB?: boolean
+}
+
 export interface DexieConstructor extends DexieExceptionClasses {
   new(databaseName: string, options?: DexieOptions) : Dexie;
   prototype: Dexie;

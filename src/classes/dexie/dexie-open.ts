@@ -96,7 +96,7 @@ export function dexieOpen (db: Dexie) {
               db.on("versionchange").fire(ev);
           });
           
-          databaseEnumerator.add(dbName);
+          db._deps.databaseEnumerator.add(dbName);
 
           resolve();
 
