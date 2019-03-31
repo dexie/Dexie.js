@@ -8,8 +8,8 @@ export interface IDexieDependencies{
 export class DexieDependencies implements IDexieDependencies{
     public constructor(args?: IDexieDependencies){
         if (args !== void 0){
-            this.indexedDB = args.indexedDB;
             this.IDBKeyRange = args.IDBKeyRange;
+            this.indexedDB = args.indexedDB;
         }
     }
     private pIndexedDB?: IDBFactory;
