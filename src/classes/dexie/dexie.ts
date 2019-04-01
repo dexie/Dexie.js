@@ -83,7 +83,7 @@ export class Dexie implements IDexie {
   Transaction: TransactionConstructor;
 
   constructor(name: string, options?: DexieOptions) {
-    const deps = (Dexie as any as DexieConstructor).dependencies;
+    const deps = (Dexie as any as DexieConstructor).dependencies || ({} as DexieDOMDependencies); //when dexie is 1st being setup (indexedDB will be injected)
     this._options = options = {
       // Default Options
       addons: (Dexie as any as DexieConstructor).addons, // Pick statically registered addons by default

@@ -21,7 +21,7 @@ export function databaseEnumeratorFactory (indexedDB: IDBFactory & {getDatabaseN
   let dbNamesTable: Table<{name: string}, string>;
 
   if (!getDatabaseNamesNative) {
-    const db = new Dexie (DBNAMES_DB, {addons: []});
+    const db = new Dexie (DBNAMES_DB, {addons: [], indexedDB: indexedDB});
     db.version(1).stores({dbnames: 'name'});
     dbNamesTable = db.table<{name: string}, string>('dbnames');
   }
@@ -46,12 +46,9 @@ export function databaseEnumeratorFactory (indexedDB: IDBFactory & {getDatabaseN
 }
 
 export function setDatabaseEnumerator(indexedDB: IDBFactory | undefined) {
+  databaseEnumerator = getEmptyDbEnumerator();
   if (indexedDB){
-    try {
       databaseEnumerator = databaseEnumeratorFactory(indexedDB);
-    } catch (e) {}
-  } else {
-    databaseEnumerator = getEmptyDbEnumerator();
   }
 }
 

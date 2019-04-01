@@ -95,7 +95,6 @@ export function dexieOpen (db: Dexie) {
               state.vcFired = true; // detect implementations that not support versionchange (IE/Edge/Safari)
               db.on("versionchange").fire(ev);
           });
-          
           databaseEnumerator.add(dbName);
 
           resolve();
