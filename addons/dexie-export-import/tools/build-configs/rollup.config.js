@@ -3,14 +3,12 @@ import {readFileSync} from 'fs';
 import path from 'path';
 import commonjs from 'rollup-plugin-commonjs';
 import nodeResolve from 'rollup-plugin-node-resolve';
+import alias from 'rollup-plugin-alias';
 
 const version = require(path.resolve(__dirname, '../../package.json')).version;
 
 const ERRORS_TO_IGNORE = [
   "THIS_IS_UNDEFINED",
-  "UNRESOLVED_IMPORT", // 'stream' is imported by clarinet
-  "MISSING_GLOBAL_NAME", // global name "stream" (also clarinet)
-  "MISSING_NODE_BUILTINS" // "stream" (also clarinet)
 ];
 
 export default {
@@ -36,7 +34,11 @@ export default {
   external: ['dexie'],
   plugins: [
     sourcemaps(),
-    nodeResolve({browser: true}),
+    alias({stream: path.resolve(__dirname, './fake-stream')}),
+    nodeResolve({
+      browser: true,
+      preferBuiltins: false
+    }),
     commonjs()
   ],
   onwarn ({loc, frame, code, message}) {
