@@ -4,7 +4,8 @@ import nodeResolve from 'rollup-plugin-node-resolve';
 import path from 'path';
 
 const ERRORS_TO_IGNORE = [
-  "THIS_IS_UNDEFINED"
+  "THIS_IS_UNDEFINED",
+  "CIRCULAR_DEPENDENCY" // Circular imports are OK. See https://github.com/rollup/rollup/issues/2271
 ];
 
 export default {
