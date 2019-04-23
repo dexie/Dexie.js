@@ -8,9 +8,9 @@ module.exports = {
     bs_firefox_latest_supported: { 
       base: 'BrowserStack',
       browser: 'firefox',
-      browser_version: '59',
+      browser_version: '66',
       os: 'Windows',
-      os_version: 7
+      os_version: 10
     },
     bs_firefox_oldest_supported: {
       base: 'BrowserStack',
@@ -29,7 +29,7 @@ module.exports = {
     bs_edge_latest_supported: {
       base: 'BrowserStack',
       browser: 'Edge',
-      browser_version: '17',
+      browser_version: '18',
       os: 'Windows',
       os_version: '10'
     },
@@ -50,7 +50,7 @@ module.exports = {
     bs_chrome_latest_supported: {      
       base: 'BrowserStack',
       browser: "Chrome",
-      browser_version: "66",
+      browser_version: "73",
       os: 'Windows',
       os_version: 10
     },
