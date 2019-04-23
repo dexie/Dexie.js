@@ -50,7 +50,7 @@ module.exports = {
     bs_chrome_latest_supported: {      
       base: 'BrowserStack',
       browser: "Chrome",
-      browser_version: "73",
+      browser_version: "72",
       os: 'Windows',
       os_version: 10
     },
