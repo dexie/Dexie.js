@@ -89,7 +89,7 @@
     "dts-bundle-generator": "^1.6.1",
     "just-build": "^0.9.16",
     "karma": "^3.1.4",
-    "karma-browserstack-launcher": "git+https://github.com/karma-runner/karma-browserstack-launcher.git",
+    "karma-browserstack-launcher": "^1.5.1",
     "karma-chrome-launcher": "^2.0.0",
     "karma-firefox-launcher": "^1.1.0",
     "karma-mocha-reporter": "^2.2.5",
