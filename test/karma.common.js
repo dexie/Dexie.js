@@ -19,6 +19,7 @@ const karmaCommon = {
     browserDisconnectTimeout: 10000,
     processKillTimeout: 10000,
     browserSocketTimeout: 20000,
+    concurrency: 1,
 
     plugins: [
       'karma-qunit',
