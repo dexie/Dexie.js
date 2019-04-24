@@ -44,6 +44,7 @@ export interface Table<T=any, TKey=IndexableType> {
   put(item: T, key?: TKey): PromiseExtended<TKey>;
   delete(key: TKey): PromiseExtended<void>;
   clear(): PromiseExtended<void>;
+  bulkGet(keys: TKey[]): PromiseExtended<T[]>;
   bulkAdd(items: T[], keys?: IndexableTypeArrayReadonly): PromiseExtended<TKey>;
   bulkPut(items: T[], keys?: IndexableTypeArrayReadonly): PromiseExtended<TKey>;
   bulkDelete(keys: IndexableTypeArrayReadonly) : PromiseExtended<void>;
