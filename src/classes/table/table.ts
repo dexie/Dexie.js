@@ -358,6 +358,21 @@ export class Table implements ITable<any, IndexableType> {
         .then(res => res.numFailures ? Promise.reject(res.failures[0]) : undefined);
   }
 
+  /** Table.bulkGet()
+   * 
+   * http://dexie.org/docs/Table/Table.bulkGet()
+   * 
+   * @param keys 
+   */
+  bulkGet(keys: IndexableType[]) {
+    return this._trans('readonly', trans => {
+      return this.core.getMany({
+        keys,
+        trans
+      });
+    });
+  }
+
   /** Table.bulkAdd()
    * 
    * http://dexie.org/docs/Table/Table.bulkAdd()
