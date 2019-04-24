@@ -88,13 +88,13 @@
   "devDependencies": {
     "dts-bundle-generator": "^1.6.1",
     "just-build": "^0.9.16",
-    "karma": "^3.1.4",
-    "karma-browserstack-launcher": "git+https://github.com/karma-runner/karma-browserstack-launcher.git",
+    "karma": "^4.1.0",
+    "karma-browserstack-launcher": "^1.5.1",
     "karma-chrome-launcher": "^2.0.0",
     "karma-firefox-launcher": "^1.1.0",
     "karma-mocha-reporter": "^2.2.5",
-    "karma-qunit": "^1.2.1",
-    "qunit": "^2.9.1",
+    "karma-qunit": "^3.1.2",
+    "qunit": "^2.9.2",
     "qunitjs": "^1.23.1",
     "rollup": "^0.55.5",
     "rollup-plugin-cleanup": "^2.0.1",
@@ -104,7 +104,7 @@
     "serve-static": "^1.13.2",
     "tslib": "^1.9.3",
     "typescript": "^2.9.2",
-    "uglify-js": "^3.4.9"
+    "uglify-js": "^3.5.6"
   },
   "dependencies": {}
 }
