@@ -16,6 +16,9 @@ const karmaCommon = {
     colors: true,
 
     browserNoActivityTimeout: 2 * 60 * 1000,
+    browserDisconnectTimeout: 10000,
+    processKillTimeout: 10000,
+    browserSocketTimeout: 20000,
 
     plugins: [
       'karma-qunit',
