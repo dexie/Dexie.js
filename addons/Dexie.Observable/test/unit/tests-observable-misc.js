@@ -1,4 +1,5 @@
-﻿import {module, asyncTest, equal, strictEqual, deepEqual, ok, start} from 'QUnit';
+﻿import {module, asyncTest, equal, strictEqual, ok, start} from 'QUnit';
+import {deepEqual} from './deep-equal';
 import Dexie from 'dexie';
 import 'dexie-observable';
 
