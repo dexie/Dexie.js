@@ -1,5 +1,6 @@
 import Dexie from 'dexie';
-import {module, asyncTest, start, stop, strictEqual, deepEqual, ok} from 'QUnit';
+import {module, asyncTest, start, stop, strictEqual, ok} from 'QUnit';
+import {deepEqual} from '../deep-equal';
 import {resetDatabase} from '../../../../../test/dexie-unittest-utils';
 import initUpdatingHook from '../../../src/hooks/updating';
 import initWakeupObservers from '../../../src/wakeup-observers';
