@@ -1,7 +1,8 @@
 module.exports = {
   browserStack: {
     username: process.env.BROWSER_STACK_USERNAME,
-    accessKey: process.env.BROWSER_STACK_ACCESS_KEY
+    accessKey: process.env.BROWSER_STACK_ACCESS_KEY,
+    timeout: 1800
   },
 
   customLaunchers: {
