@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, supports, spawnedTest} from './dexie-unittest-utils';
+import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBTable");
 db.version(1).stores({
@@ -685,4 +685,29 @@ asyncTest("failNotIncludedStoreTrans", () => {
     }).catch (e => {
         ok(false, "Oops: " + e.stack);
     }).then(start);
+});
+
+// Must use this rather than QUnit's deepEqual() because that one fails on Safari when run via karma-browserstack-launcher
+export function deepEqual(a, b, description) {
+    equal(JSON.stringify(a, null, 2), JSON.stringify(b, null, 2), description);
+}
+  
+promisedTest("bulkGet()", async () => {
+    const bulkData = [];
+    for (let i=0; i<400; ++i) {
+        bulkData.push({id: i, first: "Foo"+i, last: "Bar" + i});
+    }
+    ok(`Putting ${bulkData.length} users into the table`);
+    await db.users.bulkPut(bulkData);
+    ok(`Done putting users. Now getting them using bulkGet()`);
+    const keys = bulkData.map(({id}) => id);
+    const retrieved = await db.users.bulkGet(keys);
+    deepEqual(retrieved, bulkData, "Put and retrieved should be the same");
+
+    ok("Now validating that is should be possible to request nonexisting keys but yet get all results in the order of the given keys");
+    const [u1, u2, u3, u4] = await db.users.bulkGet(["x", "y", 100, "z"]);
+    ok(u1 === undefined, "First result should be undefined, as there where no object with that key");
+    ok(u2 === undefined, "Second objects -''-");
+    ok(u3 && u3.first === 'Foo100', "Third should be Foo100");
+    ok(u4 === undefined, "Forth should be undefined");
 });

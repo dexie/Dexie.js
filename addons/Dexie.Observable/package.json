@@ -79,18 +79,19 @@
   },
   "devDependencies": {
     "dexie": "^2.0.4",
-    "eslint": "^5.6.0",
+    "eslint": "^5.16.0",
     "just-build": "^0.9.16",
-    "karma": "^3.0.0",
-    "karma-browserstack-launcher": "git+https://github.com/karma-runner/karma-browserstack-launcher.git",
+    "karma": "^4.1.0",
+    "karma-browserstack-launcher": "^1.5.1",
     "karma-chrome-launcher": "^2.0.0",
     "karma-firefox-launcher": "^1.1.0",
     "karma-mocha-reporter": "^2.2.5",
-    "karma-qunit": "^1.2.1",
-    "qunitjs": "^1.23.1",
+    "karma-qunit": "^3.1.2",
+    "qunit": "^2.9.2",
     "rollup": "^0.55.5",
     "rollup-plugin-sourcemaps": "^0.4.1",
     "typescript": "^2.8.3",
     "uglifyjs": "^2.4.10"
-  }
+  },
+  "dependencies": {}
 }
