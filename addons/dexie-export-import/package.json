@@ -1,6 +1,6 @@
 {
   "name": "dexie-export-import",
-  "version": "1.0.0-alpha.9",
+  "version": "1.0.0-alpha.10",
   "description": "Dexie addon that adds export and import capabilities",
   "main": "dist/dexie-export-import.js",
   "module": "dist/dexie-export-import.mjs",
@@ -43,6 +43,7 @@
     "karma-mocha-reporter": "^2.2.5",
     "karma-qunit": "^1.2.1",
     "rollup": "^0.66.6",
+    "rollup-plugin-alias": "^1.5.1",
     "rollup-plugin-commonjs": "^9.2.0",
     "rollup-plugin-node-resolve": "^3.4.0",
     "typescript": "^3.1.3",
