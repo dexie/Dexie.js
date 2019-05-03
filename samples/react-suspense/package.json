@@ -6,10 +6,9 @@
     "react-scripts": "^1.1.5"
   },
   "dependencies": {
-    "dexie": "^2.0.4",
-    "prop-types": "^15.6.1",
-    "react": "^16.4.1",
-    "react-dom": "^16.4.1"
+    "dexie": "^3.0.0-alpha.8",
+    "react": "^16.8.6",
+    "react-dom": "^16.8.6"
   },
   "scripts": {
     "start": "react-scripts start",
