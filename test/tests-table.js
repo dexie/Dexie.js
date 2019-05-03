@@ -39,6 +39,18 @@ module("table", {
     }
 });
 
+promisedTest("Issue #841 - put() ignores date changes", async ()=> {
+    const date1 = new Date("2019-05-03");
+    const date2 = new Date("2020-01-01");
+    ok(date1.getTime() !== date2.getTime(), "Just verifying input data so that date1 !== date2");
+    const id = await db.folks.add({first: "Foo", last: "Bar", date: date1});
+    let obj = await db.folks.get(id);
+    equal(obj.date.getTime(), date1.getTime(), "Date should first equal date1");
+    await db.folks.update(id, {date: date2});
+    obj = await db.folks.get(id);
+    equal(obj.date.getTime(), date2.getTime(), "Date should have been successfully updated to be date2");
+});
+
 asyncTest("get", 4, function () {
     db.table("users").get(idOfFirstUser).then(function(obj) {
         equal(obj.first, "David", "Got the first object");
@@ -711,3 +723,4 @@ promisedTest("bulkGet()", async () => {
     ok(u3 && u3.first === 'Foo100', "Third should be Foo100");
     ok(u4 === undefined, "Forth should be undefined");
 });
+
