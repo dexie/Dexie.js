@@ -14,3 +14,9 @@
   margin-bottom: 40px;
   color: white;
 }
+
+.App div.error {
+  background-color: #a55;
+  color: black;
+  padding: 20px;
+}
