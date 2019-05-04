@@ -40,14 +40,37 @@ module("table", {
 });
 
 promisedTest("Issue #841 - put() ignores date changes", async ()=> {
+    db.folks.hook("updating", (mods) => {
+        equal(mods.first, first2, `first value should be ${first2} but is ${mods.first}`)
+        
+        equal(!!mods.date, true, "date should be included in modifications");
+
+        if (mods.date) {
+            equal(mods.date.getTime(), date2.getTime(), `date should be ${date2} but is ${mods.date}`)
+        }
+    });
+
     const date1 = new Date("2019-05-03");
     const date2 = new Date("2020-01-01");
+
+    const first1 = "Foo1";
+    const first2 = "Foo2";
+
     ok(date1.getTime() !== date2.getTime(), "Just verifying input data so that date1 !== date2");
-    const id = await db.folks.add({first: "Foo", last: "Bar", date: date1});
+    ok(first1 != first2, "first1 different first2");
+
+    const id = await db.folks.add({first: first1, last: "Bar", date: date1});
     let obj = await db.folks.get(id);
     equal(obj.date.getTime(), date1.getTime(), "Date should first equal date1");
-    await db.folks.update(id, {date: date2});
+    equal(obj.first, first1, `first should be '${first1}'`);
+
+    obj.first = first2;
+    obj.date = date2;
+
+    await db.folks.put(obj, id);
+
     obj = await db.folks.get(id);
+    equal(obj.first, first2, `first should have been successfully updated to '${first2}'`);
     equal(obj.date.getTime(), date2.getTime(), "Date should have been successfully updated to be date2");
 });
 
