@@ -5,50 +5,50 @@ import './App.css';
 import db from './db';
 import { AddTodo } from './AddTodo';
 import { TodoList } from './TodoList';
+import { ErrorBoundary } from './ErrorBoundary';
 
 export const App = () => {
   // State
-  const [error, setError] = useState(null);
+  const errorBoundary = useRef(null);
   const [showCompletedTodos, setShowCompletedTodos] = useState(false);
 
+  // Create a query depending on whether showCompletedTodos was checked or not:
+  const todoQuery = showCompletedTodos ?
+    db.todos.orderBy('done') : // List undone first, then by date/time
+    db.todos.where({done: 0})  // List only undone
+
   // View
-  return <Observe>
-    <div className="App">
-      <div className="App-header">
-        <h2>React Suspense + Dexie Todo Example</h2>
-      </div>
+  return <div className="App">
+    <ErrorBoundary ref={errorBoundary}>
+      <React.Suspense fallback={<p>Loading...</p>}>
+        <div className="App-header">
+          <h2>React Suspense + Dexie Todo Example</h2>
+        </div>
 
-      <AddTodo handleAddTodo={title =>
-        db.todos.add({title, done: 0}).catch(setError)} />
+        <AddTodo handleAddTodo={title =>
+          db.todos.add({title, done: 0}).catch(errorBoundary.handleError)} />
 
-      <div>
-        <input
-          type="checkbox"
-          checked={showCompletedTodos}
-          onChange={ev => setShowCompletedTodos(ev.target.checked)}
-        />
-        <span>Show completed</span>
-      </div>
-      
-      <TodoList
-        todos={showCompletedTodos ?
-          db.todos.orderBy('done') : // List undone first, then by date/time
-          db.todos.where({done: 0})  // List only undone
-        }
+        <div>
+          <input
+            type="checkbox"
+            checked={showCompletedTodos}
+            onChange={ev => setShowCompletedTodos(ev.target.checked)}
+          />
+          <span>Show completed</span>
+        </div>
         
-        handleToggleTodo={(id, done) =>
-          db.todos.update(id, {done}).catch(setError)}
-
-        handleDeleteTodo={id =>
-          db.todos.delete(id).catch(setError)}
+        <TodoList
+          todoQuery={todoQuery}
           
-      />
+          handleToggleTodo={(id, done) =>
+            db.todos.update(id, {done}).catch(errorBoundary.handleError)}
 
-      {error && <div className="error">
-        <p>An error has occurred: {error}</p>
-        <button onClick={()=>setError(null)}>Got it!</button>
-      </div>}
+          handleDeleteTodo={id =>
+            db.todos.delete(id).catch(errorBoundary.handleError)}
+            
+        />
+      </React.Suspense>
+    </ErrorBoundary>
+  </div>
 
-    </div>
-  </Observe>
 }

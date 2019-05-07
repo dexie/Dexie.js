@@ -1,11 +1,16 @@
 import React from 'react';
 import {Todo} from './Todo';
 
-export const TodoList = ({todos, handleToggleTodo, handleDeleteTodo}) => <ul>
-  {todos.load().map(todo => <Todo
-    key={todo.id}
-    {...todo}
-    handleToggleTodo={handleToggleTodo}
-    handleDeleteTodo={handleDeleteTodo}
-  />)}
-</ul>;
+export function TodoList ({todoQuery, handleToggleTodo, handleDeleteTodo}) {
+  const todos = useSubscription(todoQuery);
+
+  return <ul>
+    {todos.map(todo => <Todo
+      key={todo.id}
+      {...todo}
+      handleToggleTodo={handleToggleTodo}
+      handleDeleteTodo={handleDeleteTodo}
+    />)}
+  </ul>;
+}
+
