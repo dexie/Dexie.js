@@ -24,12 +24,8 @@ interface VirtualIndex extends DBCoreIndex {
 
 // Move into some util:
 export function pad (a: any | any[], value: any, count: number) {
-  if (!isArray(a)) a = [a];
-  const {length} = a;
-  const result = new Array(length + count);
-  for (let i=a.length+count-1; i>=length; --i) {
-    result[i] = value;
-  }
+  const result = isArray(a) ? a.slice() : [a];
+  for (let i=0; i<count; ++i) result.push(value);
   return result;
 }
 
@@ -136,19 +132,28 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
                   cursor.continue(pad(cursor.key, req.reverse ? down.MIN_KEY : down.MAX_KEY, keyTail)) :
                   cursor.continue()
             }
-            return {
-              ...cursor,
-              continue: _continue,
-              continuePrimaryKey: (key: Key, primaryKey: Key) => {
-                cursor.continuePrimaryKey(pad(key, down.MAX_KEY, keyTail), primaryKey);
+            const virtualCursor = Object.create(cursor, {
+              continue: {value: _continue},
+              continuePrimaryKey: {
+                value(key: Key, primaryKey: Key) {
+                  cursor.continuePrimaryKey(pad(key, down.MAX_KEY, keyTail), primaryKey);
+                }
               },
-              get key() {
-                const key = cursor.key as Key[]; // A virtual cursor always operates on compound key
-                return keyLength === 1 ?
-                  key[0] : // Cursor.key should not be an array.
-                  key.slice(0, keyLength); // Cursor.key should be first part of array.
+              key: {
+                get() {
+                  const key = cursor.key as Key[]; // A virtual cursor always operates on compound key
+                  return keyLength === 1 ?
+                    key[0] : // Cursor.key should not be an array.
+                    key.slice(0, keyLength); // Cursor.key should be first part of array.
+                }
+              },
+              value: {
+                get() {
+                  return cursor.value;
+                }
               }
-            };
+            });
+            return virtualCursor;
           }
     
           return table.openCursor(translateRequest(req))
