@@ -811,3 +811,35 @@ promisedTest("Issue #696 - Query on multiple multi-entry indexes doesn't seem to
         .toArray();
     equal(cat_a_tag_a.length, 1, "Should get one item here as well");
 });
+
+promisedTest("Virtual Index", async () => {
+    if (!supports('compound'))
+        return ok(true, "SKIPPED - COMPOUND UNSUPPORTED");
+
+    await db.chaps.bulkAdd([{
+        name: "David",
+        number: 2
+    },{
+        name: "David",
+        number: 3
+    },{
+        name: "David",
+        number: 1
+    },{
+        name: "Mambo",
+        number: 5
+    }]);
+
+    // Verify that Dexie can use the [name+number] index to query name only:
+    const davids = await db.chaps.where({name: "David"}).toArray();
+    equal(davids.length, 3, "There should be 3 Davids in the result");
+    // Verify that equalsIgnoreCase also works:
+    const daves = await db.chaps.where('name').equalsIgnoreCase('david').toArray();
+    equal(JSON.stringify(daves.map(({name, number}) => ({name, number})), null, 2),
+        JSON.stringify([
+            {name: "David", number: 1},
+            {name: "David", number: 2},
+            {name: "David", number: 3}
+        ], null, 2), "equalsIgnoreCase() should work with virtual indexes");
+    //equal(daves.length, 3, "There should be 3 davids in the result when using equalsIgnoreCase()");
+});
