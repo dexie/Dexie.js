@@ -18,9 +18,9 @@ promisedTest("chunkedExport (issue #854)", async ()=>{
   const exportBlob2 = await db.export({numRowsPerChunk: 1});
   ok(true, "Could export using numRowsPerChunk: 1");
   const json1 = await readBlob(exportBlob1);
-  ok(true, "Could read back first blob");
+  ok(true, "Could read back first blob: " + json1);
   const json2 = await readBlob(exportBlob2);
-  ok(true, "Could read back second blob");
+  ok(true, "Could read back second blob: " + json2);
   const parsed1 = JSON.parse(json1);
   ok(true, "Could parse first export");
   const parsed2 = JSON.parse(json2);
