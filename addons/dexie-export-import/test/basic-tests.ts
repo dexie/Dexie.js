@@ -2,43 +2,12 @@ import Dexie from 'dexie';
 import "dexie-export-import";
 import {module, asyncTest, start, stop, strictEqual, ok, equal} from 'qunit';
 import {promisedTest, readBlob, readBlobBinary, deepEqual} from './tools';
-import {DexieExportJsonStructure} from '../src/json-structure';
+import {getSimpleImportData} from './test-data';
 
 module("basic-tests");
 
 const DATABASE_NAME = "dexie-export-import-basic-tests";
-const IMPORT_DATA: DexieExportJsonStructure = {
-  formatName: "dexie",
-  formatVersion: 1,
-  data: {
-    databaseName: DATABASE_NAME,
-    databaseVersion: 1,
-    tables: [{
-      name: "friends",
-      schema: "++id,name,age",
-      rowCount: NaN
-    }],
-    data: [{
-      inbound: true,
-      tableName: "friends",
-      rows: [{
-        id: 1,
-        name: "Foo",
-        age: 33
-      },{
-        id: 2,
-        name: "Bar",
-        age: 44,
-      },{
-        id: 3,
-        name: "Bee",
-        age: 55
-      }]
-    }]
-  }
-}
-// Set correct row count:
-IMPORT_DATA.data.tables[0].rowCount = IMPORT_DATA.data.data[0].rows.length;
+const IMPORT_DATA = getSimpleImportData(DATABASE_NAME);
 
 promisedTest("simple-import", async ()=>{
   const blob = new Blob([JSON.stringify(IMPORT_DATA)]);
