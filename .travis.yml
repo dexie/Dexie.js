@@ -5,9 +5,8 @@ node_js:
   - "8"
 matrix:
   fast_finish: true
-before_script:
-  - export DISPLAY=:99.0
-  - sh -e /etc/init.d/xvfb start
+services:
+  - xvfb
 env:
   - TF=test
   - TF=addons/Dexie.Observable/test/unit
