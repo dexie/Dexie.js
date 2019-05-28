@@ -112,8 +112,8 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
       const posEndRowsArray = emptyTableExportJson.lastIndexOf(']');
       slices.push(emptyTableExportJson.substring(0, posEndRowsArray));
       let lastKey: any = null;
-      let hasMore = true;
-      while (hasMore) {
+      let mayHaveMoreRows = true;
+      while (mayHaveMoreRows) {
         if (progressCallback) {
           // Keep ongoing transaction private
           Dexie.ignoreTransaction(()=>progressCallback(progress));
@@ -123,7 +123,19 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
           table.where(':id').above(lastKey).limit(LIMIT);
 
         const values = await chunkedCollection.toArray();
-        hasMore = values.length === LIMIT;
+
+        if (values.length === 0) break;
+
+        if (lastKey != null) {
+          // Not initial chunk. Must add a comma:
+          slices.push(",");
+          if (prettyJson) {
+            slices.push("\n      ");
+          }
+        }
+
+        mayHaveMoreRows = values.length === LIMIT;
+        
         if (inbound) {
           const filteredValues = filter ?
             values.filter(value => filter(tableName, value)) :
@@ -159,12 +171,6 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
           // By generating a blob here, we give web platform the opportunity to store the contents
           // on disk and release RAM.
           slices.push(new Blob([json.substring(1, json.length - 1)]));
-          if (hasMore) {
-            slices.push(",");
-            if (prettyJson) {
-              slices.push("\n      ");
-            }
-          }
           lastKey = keys.length > 0 ?
             keys[keys.length - 1] :
             null;
