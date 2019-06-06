@@ -76,15 +76,22 @@ import './test-extend-dexie';
         prop1: Date;
     }
 
+    interface CompoundKeyEntity {
+        firstName: string;
+        lastName: string;
+    }
+
     class MyDatabase extends Dexie {
         friends: Dexie.Table<Friend, number>;
         table2: Dexie.Table<Entity2, string>;
+        compoundTable: Dexie.Table<CompoundKeyEntity, [string, string]>;
 
         constructor () {
             super ('MyDatabase');
             this.version(1).stores({
                 table1: '++id',
-                table2: 'oid'
+                table2: 'oid',
+                compoundTable: '[firstName+lastName]'
             });
         }
     }
@@ -112,6 +119,12 @@ import './test-extend-dexie';
 
     // Table.where
     db.friends.where('name').equalsIgnoreCase('kalle').count(count => count.toExponential());
+    // Table.where with compound key
+    db.compoundTable.where('[firstName+lastName]').anyOf([['Kalle', 'Smith'], ['Fred', 'Smith']]);
+    db.compoundTable.where('[firstName+lastName]').anyOf(['Kalle', 'Smith'], ['Fred', 'Smith']);
+    db.compoundTable.where('[firstName+lastName]').noneOf([['Kalle', 'Smith'], ['Fred', 'Smith']]);
+    db.compoundTable.where('[firstName+lastName]').equals(['Kalle', 'Smith'])
+    db.compoundTable.where('[firstName+lastName]').notEqual(['Kalle', 'Smith'])
     // Table.filter
     db.friends.filter(friend => /kalle/.test(friend.name)).count();
     // Table.count
