@@ -36,7 +36,7 @@
     "base64-arraybuffer-es6": "*",
     "clarinet": "^0.12.1",
     "just-build": "^0.9.16",
-    "karma": "^3.1.1",
+    "karma": "^4.1.0",
     "karma-browserstack-launcher": "^1.5.1",
     "karma-chrome-launcher": "^2.0.0",
     "karma-firefox-launcher": "^1.1.0",
