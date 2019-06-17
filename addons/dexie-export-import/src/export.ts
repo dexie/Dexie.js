@@ -112,6 +112,7 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
       const posEndRowsArray = emptyTableExportJson.lastIndexOf(']');
       slices.push(emptyTableExportJson.substring(0, posEndRowsArray));
       let lastKey: any = null;
+      let lastNumRows = 0;
       let mayHaveMoreRows = true;
       while (mayHaveMoreRows) {
         if (progressCallback) {
@@ -126,7 +127,7 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
 
         if (values.length === 0) break;
 
-        if (lastKey != null) {
+        if (lastKey != null && lastNumRows > 0) {
           // Not initial chunk. Must add a comma:
           slices.push(",");
           if (prettyJson) {
@@ -152,6 +153,7 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
           // By generating a blob here, we give web platform the opportunity to store the contents
           // on disk and release RAM.
           slices.push(new Blob([json.substring(1, json.length - 1)]));
+          lastNumRows = filteredValues.length;
           lastKey = values.length > 0 ?
             Dexie.getByKeyPath(values[values.length -1], primKey.keyPath as string) :
             null;
@@ -171,6 +173,7 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
           // By generating a blob here, we give web platform the opportunity to store the contents
           // on disk and release RAM.
           slices.push(new Blob([json.substring(1, json.length - 1)]));
+          lastNumRows = keyvals.length;
           lastKey = keys.length > 0 ?
             keys[keys.length - 1] :
             null;
