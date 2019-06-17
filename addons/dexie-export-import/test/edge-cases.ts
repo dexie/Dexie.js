@@ -38,7 +38,7 @@ promisedTest("chunkedExport (issue #854)", async ()=>{
   equal (rejson2, rejson3, "Second and third expots are equal");
 });
 
-promisedTest("filtered-chunkedExport (issue #854)", async ()=>{
+promisedTest("filtered-chunkedExport (issue #862)", async ()=>{
   const blob = new Blob([JSON.stringify(IMPORT_DATA)]);
   await Dexie.delete(DATABASE_NAME);
   const db = await Dexie.import(blob);
