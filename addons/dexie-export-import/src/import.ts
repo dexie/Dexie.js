@@ -84,7 +84,7 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
     do {
       for (const tableExport of dbExport.data) {
         if (!tableExport.rows) break; // Need to pull more!
-        if ((tableExport.rows as any).complete && tableExport.rows.length === 0)
+        if (!(tableExport.rows as any).incomplete && tableExport.rows.length === 0)
           continue;
 
         if (progressCallback) {
@@ -104,7 +104,20 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
           tableSchemaStr.split(',')[0] != table.schema.primKey.src) {
           throw new Error(`Primary key differs for table ${tableExport.tableName}. `);
         }
-        const rows = tableExport.rows.map(row => TSON.revive(row));
+
+        const sourceRows = tableExport.rows.map(row => row);
+        
+        // Our rows may be partial, so we need to ensure each one is completed before using it
+        const rows: any[] = [];
+        for(let i = 0; i < sourceRows.length; i++) {
+          const obj = sourceRows[i];
+          if (!obj.incomplete) {
+            rows.push(TSON.revive(obj));
+          } else {
+            break;
+          }
+        }
+
         const filter = options!.filter;
         const filteredRows = filter ?
           tableExport.inbound ?
@@ -124,14 +137,14 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
           await table.bulkAdd(values, keys);
           
         progress.completedRows += rows.length;
-        if ((rows as any).complete) {
+        if (!(rows as any).incomplete) {
           progress.completedTables += 1;
         }
-        rows.splice(0, rows.length); // Free up RAM, keep existing array instance.
+        tableExport.rows.splice(0, rows.length); // Free up RAM, keep existing array instance.
       }
 
       // Avoid unnescessary loops in "for (const tableExport of dbExport.data)" 
-      while (dbExport.data.length > 0 && dbExport.data[0].rows && (dbExport.data[0].rows as any).complete) {
+      while (dbExport.data.length > 0 && dbExport.data[0].rows && !(dbExport.data[0].rows as any).incomplete) {
         // We've already imported all rows from the first table. Delete its occurrence
         dbExport.data.splice(0, 1); 
       }
@@ -145,8 +158,8 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
         } else {
           await Dexie.waitFor(jsonStream.pullAsync(CHUNK_SIZE));
         }
-      }
-    } while (!jsonStream.done() && !jsonStream.eof());
+      } else break;
+    } while (true)
   }
   progress.done = true;
   if (progressCallback) {
@@ -160,8 +173,11 @@ async function loadUntilWeGotEnoughData(exportedData: Blob | JsonStream<DexieExp
     JsonStream<DexieExportJsonStructure>(exportedData) :
     exportedData);
 
-  while (!stream.eof() && (!stream.result.data || !stream.result.data.data)) {
+  while (!stream.eof()) {
     await stream.pullAsync(CHUNK_SIZE);
+
+    if (stream.result.data && stream.result.data!.data)
+      break;
   }
   const dbExportFile = stream.result;
   if (!dbExportFile || dbExportFile.formatName != "dexie")

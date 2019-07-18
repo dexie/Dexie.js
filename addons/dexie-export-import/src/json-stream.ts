@@ -11,7 +11,7 @@ export interface JsonStream<T> {
 
 export function JsonStream<T>(blob: Blob):  JsonStream<T> {
   let pos = 0;
-  const parser = JsonParser();
+  const parser = JsonParser(true);
 
   const rv = {
     async pullAsync(numBytes: number): Promise<Partial<T>> {
@@ -43,7 +43,7 @@ export function JsonStream<T>(blob: Blob):  JsonStream<T> {
 }
 
 
-export function JsonParser () {
+export function JsonParser (allowPartial: boolean) {
   const parser = (clarinet as any).parser();
   let level = 0;
   let result: any;
@@ -55,8 +55,18 @@ export function JsonParser () {
 
   parser.onopenobject = newKey => {
     const newObj = {};
+    (newObj as any).incomplete = true;
     if (!result) result = newObj;
-    if (obj) stack.push([key,obj,array])
+    if (obj) {
+      stack.push([key,obj,array])
+      if (allowPartial) {
+        if (array) {
+          obj.push(newObj);
+        } else {
+          obj[key!] = newObj;
+        }
+      }
+    }
     obj = newObj;
     key = newKey;
     array = false;
@@ -65,41 +75,55 @@ export function JsonParser () {
   parser.onkey = newKey => key = newKey;
   parser.onvalue = value => array ? obj.push(value) : obj[key!] = value;
   parser.oncloseobject = ()=>{
+    delete obj.incomplete;
     key = null;
     if (--level === 0) {
       done = true;
     } else {
       const completedObj = obj;
       [key, obj, array] = stack.pop()!;
-      if (array) {
-        obj.push(completedObj);
-      } else {
-        obj[key!] = completedObj;
+      if (!allowPartial) {
+        if (array) {
+          obj.push(completedObj);
+        } else {
+          obj[key!] = completedObj;
+        }
       }
     }
   }
   parser.onopenarray = () => {
     const newObj = [];
-    (newObj as any).complete = false;
+    (newObj as any).incomplete = true;
     if (!result) result = newObj;
-    if (obj) stack.push([key, obj, array]);
+    if (obj) {
+      stack.push([key,obj,array])
+      if (allowPartial) {
+        if (array) {
+          obj.push(newObj);
+        } else {
+          obj[key!] = newObj;
+        }
+      }
+    }
     obj = newObj;
     array = true;
     key = null;
     ++level;
   }
   parser.onclosearray = () => {
-    obj.complete = true;
+    delete obj.incomplete;
     key = null;
     if (--level === 0) {
       done = true;
     } else {
       const completedObj = obj;
       [key, obj, array] = stack.pop()!;
-      if (array) {
-        obj.push(completedObj);
-      } else {
-        obj[key!] = completedObj;
+      if (!allowPartial) {
+        if (array) {
+          obj.push(completedObj);
+        } else {
+          obj[key!] = completedObj;
+        }
       }
     }
   }
