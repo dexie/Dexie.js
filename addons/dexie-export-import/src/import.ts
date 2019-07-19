@@ -105,7 +105,7 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
           throw new Error(`Primary key differs for table ${tableExport.tableName}. `);
         }
 
-        const sourceRows = tableExport.rows.map(row => row);
+        const sourceRows = tableExport.rows
         
         // Our rows may be partial, so we need to ensure each one is completed before using it
         const rows: any[] = [];
@@ -140,7 +140,7 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
         if (!(rows as any).incomplete) {
           progress.completedTables += 1;
         }
-        tableExport.rows.splice(0, rows.length); // Free up RAM, keep existing array instance.
+        sourceRows.splice(0, rows.length); // Free up RAM, keep existing array instance.
       }
 
       // Avoid unnescessary loops in "for (const tableExport of dbExport.data)" 
