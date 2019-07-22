@@ -20,7 +20,7 @@
   "author": "David Fahlander",
   "license": "Apache-2.0",
   "devDependencies": {
-    "http-server": "^0.9.0",
+    "http-server": "^0.11.1",
     "requirejs": "^2.1.22",
     "typescript": "^2.1.4"
   },
