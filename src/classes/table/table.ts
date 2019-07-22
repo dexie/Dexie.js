@@ -386,11 +386,12 @@ export class Table implements ITable<any, IndexableType> {
       if (keys && keys.length !== objects.length)
         throw new exceptions.InvalidArgument("Arguments objects and keys must have the same length");
 
+      const numObjects = objects.length; // Pick length here to allow garbage collection of objects later
       return this.core.mutate({trans, type: 'add', keys: keys as IndexableType[], values: objects})
         .then(({numFailures, lastResult, failures}) => {
           if (numFailures === 0) return lastResult;
           throw new BulkError(
-            `${this.name}.bulkAdd(): ${numFailures} of ${objects.length} operations failed`,
+            `${this.name}.bulkAdd(): ${numFailures} of ${numObjects} operations failed`,
               Object.keys(failures).map(pos => failures[pos]));
         });
     });
@@ -410,11 +411,12 @@ export class Table implements ITable<any, IndexableType> {
       if (keys && keys.length !== objects.length)
         throw new exceptions.InvalidArgument("Arguments objects and keys must have the same length");
 
+      const numObjects = objects.length; // Pick length here to allow garbage collection of objects later
       return this.core.mutate({trans, type: 'put', keys: keys as IndexableType[], values: objects})
         .then(({numFailures, lastResult, failures}) => {
           if (numFailures === 0) return lastResult;
           throw new BulkError(
-            `${this.name}.bulkPut(): ${numFailures} of ${objects.length} operations failed`,
+            `${this.name}.bulkPut(): ${numFailures} of ${numObjects} operations failed`,
               Object.keys(failures).map(pos => failures[pos]));
         });
     });
@@ -426,12 +428,13 @@ export class Table implements ITable<any, IndexableType> {
    * 
    **/
   bulkDelete(keys: ReadonlyArray<IndexableType>): PromiseExtended<void> {
+    const numKeys = keys.length;
     return this._trans('readwrite', trans => {
       return this.core.mutate({trans, type: 'delete', keys: keys as IndexableType[]});
     }).then(({numFailures, lastResult, failures}) => {
       if (numFailures === 0) return lastResult;
       throw new BulkError(
-        `${this.name}.bulkDelete(): ${numFailures} of ${keys.length} operations failed`, failures);
+        `${this.name}.bulkDelete(): ${numFailures} of ${numKeys} operations failed`, failures);
     });
   }
 }
