@@ -21,6 +21,8 @@ export interface Dexie extends Database {
   
   readonly _allTables: {[name: string]: Table<any,IndexableType>};
 
+  readonly core: DBCore;
+
   _createTransaction: (
     this: Dexie,
     mode: IDBTransactionMode,

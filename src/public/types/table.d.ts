@@ -7,12 +7,14 @@ import { WhereClause } from "./where-clause";
 import { PromiseExtended } from "./promise-extended";
 import { Database } from "./database";
 import { IndexableType } from "./indexable-type";
+import { DBCoreTable } from "./dbcore";
 
 export interface Table<T=any, TKey=IndexableType> {
   db: Database;
   name: string;
   schema: TableSchema;
   hook: TableHooks<T, TKey>;
+  core: DBCoreTable;
 
   get(key: TKey): PromiseExtended<T | undefined>;
   get<R>(key: TKey, thenShortcut: ThenShortcut<T | undefined,R>): PromiseExtended<R>;
