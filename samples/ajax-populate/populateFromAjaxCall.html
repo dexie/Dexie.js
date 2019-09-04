@@ -83,8 +83,8 @@
                         // By returning the a promise, framework will keep
                         // waiting for this promise to complete before resuming other
                         // db-operations.
-                        console.log("Adding objects", data.someInitArray);
-                        return db.someTable.bulkAdd(data.someInitArray);
+                        console.log("Adding objects", data.someInitArrayOfObjects);
+                        return db.someTable.bulkAdd(data.someInitArrayOfObjects);
                     }).then(function () {
                         console.log ("Done populating.");
                     });
