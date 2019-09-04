@@ -32,6 +32,9 @@
                 tr.appendChild(td);
                 this.table.appendChild(tr);
             }
+            this.warn = function (txt) {
+                this.log(txt, "WARN");
+            }
             this.error = function (txt) {
                 this.log(txt, "ERROR!");
             }
