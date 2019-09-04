@@ -80,23 +80,17 @@
                         });
                     }).then(function (data) {
                         console.log("Got ajax response. We'll now add the objects.");
-                        // By returning the db.transaction() promise, framework will keep
-                        // waiting for this transaction to commit before resuming other
+                        // By returning the a promise, framework will keep
+                        // waiting for this promise to complete before resuming other
                         // db-operations.
-                        return db.transaction('rw', db.someTable, function () {
-                            data.someInitArrayOfObjects.forEach(function (item) {
-                                console.log("Adding object: " + JSON.stringify(item));
-                                db.someTable.add(item);
-                            });
-                        });
+                        console.log("Adding objects", data.someInitArray);
+                        return db.someTable.bulkAdd(data.someInitArray);
                     }).then(function () {
-                        console.log("Transaction committed");
+                        console.log ("Done populating.");
                     });
                 }
             });
         });
-
-        db.open(); // Will resolve when data is fully populated (or fail if error)
 
         // Following operation will be queued until we're finished populating data:
         db.someTable.each(function (obj) {
