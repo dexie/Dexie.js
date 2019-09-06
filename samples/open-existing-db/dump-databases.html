@@ -61,7 +61,8 @@
         Dexie.getDatabaseNames(function (databaseNames) {
             if (databaseNames.length === 0) {
                 // No databases at this origin as we know of.
-                console.log("There are no databases at current origin. Try loading another sample and then go back to this page.");
+                console.log("Could not find databases on current origin.");
+                console.log("Was your database created without using Dexie? Try the [Add database] button above!");
             } else {
                 // At least one database to dump
                 dump(databaseNames);
@@ -91,13 +92,36 @@
                 } else {
                     console.log("Finished dumping databases");
                     console.log("==========================");
+                    console.log("Hint: Is your DB not listed? Try using the [Add database] button above!");
                 }
             }
         });
 
+        function addDatabase(ev) {
+            const dbname = prompt("Enter name of a database on this origin (" + location.host + ")");
+            if (!dbname) return; // User cancelled dialog
+            console.log("Trying to open " + dbname);
+            return new Dexie(dbname, {addons: []}).open().then(function (db) {
+                console.log("Database " + dbname + " found. Adding it to __dbnames db");
+                db.close();
+            }).then(function () {
+                return new Dexie ("__dbnames", {addons: []}).open();
+            }).then(function (db) {
+                return db.table("dbnames").put({name: dbname}).then(function() {
+                    db.close();
+                });
+            }).then(function(){
+                console.log("Succcessfully added " + dbname + ". Please reload page to dump it!");
+            }).catch(function (error) {
+                console.error(error);
+            });
+        }
     </script>
 </head>
 <body>
+    <div class="buttons">
+        <button onclick="addDatabase(event);">Add database</button>
+    </div>
     <div id="consoleArea"></div>
 </body>
 </html>
