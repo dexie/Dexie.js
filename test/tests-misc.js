@@ -8,7 +8,8 @@ var db = new Dexie("TestIssuesDB");
 db.version(1).stores({
     users: "id,first,last,&username,*&email,*pets",
     keyless: ",name",
-    foo: "id"
+    foo: "id",
+    bar: ['++id', '&username', 'password']
     // If required for your test, add more tables here
 });
 
@@ -288,4 +289,50 @@ spawnedTest ("delByKeyPath not working correctly for arrays", function* () {
     const jsonResult2 = JSON.stringify(obj2);
     console.log("jsonResult2 = ", jsonResult2);
     equal(jsonResult, jsonResult2, `Should be equal ${jsonResult} ${jsonResult2}`);
+});
+
+promisedTest('Test array of column names is provided in stores', async () => {
+    try {
+        await db.bar.bulkPut([
+            {
+                username: 'admin',
+                password: 'root'
+            },
+            {
+                username: 'moderator',
+                password: 'qwerty'
+            }
+        ]);
+    } catch (error) {
+        ok(false, `Couldn't populate data: ${error}`);
+    }
+
+    try {
+        await db.bar.add({
+            username: 'moderator',
+            password: 'new_password'
+        });
+    } catch (error) {
+        ok(true, `Couldn't put entity, username already claimed: ${error}`);
+    }
+
+    try {
+        await db.bar.where({
+            username: 'moderator'
+        })
+            .modify({
+                username: 'user'
+            });
+    } catch (error) {
+        ok(false, `Couldn't modify entity: ${error}`);
+    }
+
+    try {
+        await db.bar.add({
+            username: 'moderator',
+            password: 'new_password'
+        });
+    } catch (error) {
+        ok(false, `Couldn't put entity: ${error}`);
+    }
 });
