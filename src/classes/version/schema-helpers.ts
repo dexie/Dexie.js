@@ -334,9 +334,10 @@ export function adjustToExistingIndexNames(db: Dexie, schema: DbSchema, idbtrans
   }
 }
 
-export function parseIndexSyntax(indexes: string): IndexSpec[] {
+export function parseIndexSyntax(indexes: string|string[]): IndexSpec[] {
   const rv = [];
-  indexes.split(',').forEach(index => {
+  const _indexes = indexes instanceof Array ? indexes : indexes.split(',');
+  _indexes.forEach(index => {
     index = index.trim();
     const name = index.replace(/([&*]|\+\+)/g, ""); // Remove "&", "++" and "*"
     // Let keyPath of "[a+b]" be ["a","b"]:
