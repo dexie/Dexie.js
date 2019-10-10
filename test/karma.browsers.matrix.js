@@ -21,17 +21,15 @@ module.exports = {
         'bs_firefox_latest_supported', 
         // Internet Explorer - an old beast. Enforces legacy compatibility for every PR!
         'bs_ie11',
-        // Safari 10.1 - another beast. Enforces native Safari support for every PR!
+        // Safari. Enforces native Safari support for every PR!
         'bs_safari_latest_supported'
     ],
 
     // Test matrix used before every npm publish.
     pre_npm_publish: [
-        'bs_chrome_oldest_supported',
-        'bs_chrome_latest_supported',
-        'bs_firefox_oldest_supported',
-        'bs_firefox_latest_supported',
-        "bs_iphone7", // Safari 10.1 on iOS 10.3
-        "bs_safari_latest_supported" // Safari 12 on Mojave
+        'bs_chrome_oldest_supported', // ...because not tested in CI!
+        'bs_chrome_latest_supported', // ...because not tested in CI!
+        'bs_firefox_oldest_supported', // ...because not tested in CI!
+        "bs_safari_oldest_supported", // ...because not tested in CI!
     ]
 }
