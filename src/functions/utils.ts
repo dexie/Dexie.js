@@ -189,11 +189,13 @@ export function flatten<T> (a: (T | T[])[]) : T[] {
 }
 
 //https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm
-const intrinsicTypes =
+const intrinsicTypeNames =
     "Boolean,String,Date,RegExp,Blob,File,FileList,ArrayBuffer,DataView,Uint8ClampedArray,ImageData,Map,Set"
     .split(',').concat(
         flatten([8,16,32,64].map(num=>["Int","Uint","Float"].map(t=>t+num+"Array")))
-    ).filter(t=>_global[t]).map(t=>_global[t])
+    ).filter(t=>_global[t]);
+const intrinsicTypes = intrinsicTypeNames.map(t=>_global[t]);
+const intrinsicTypeNameSet = arrayToObject(intrinsicTypeNames, x=>[x,true]);
 
 export function deepClone<T>(any: T): T {
     if (!any || typeof any !== 'object') return any;
@@ -216,7 +218,19 @@ export function deepClone<T>(any: T): T {
     return rv;
 }
 
-export function getObjectDiff(a, b, rv?, prfx?) {
+const {toString} = {};
+export function toStringTag(o: Object) {
+    return toString.call(o).slice(8, -1);
+}
+
+export const getValueOf = (val:any, type: string) => 
+    type === "Array" ? ''+val.map(v => getValueOf(v, toStringTag(v))) :
+    type === "ArrayBuffer" ? ''+new Uint8Array(val) :
+    type === "Date" ? val.getTime() :
+    ArrayBuffer.isView(val) ? ''+new Uint8Array(val.buffer) :
+    val;
+
+ export function getObjectDiff(a, b, rv?, prfx?) {
     // Compares objects a and b and produces a diff object.
     rv = rv || {};
     prfx = prfx || '';
@@ -226,13 +240,27 @@ export function getObjectDiff(a, b, rv?, prfx?) {
         else {
             var ap = a[prop],
                 bp = b[prop];
-            if (typeof ap === 'object' && typeof bp === 'object' &&
-                    ap && bp &&
-                    // Now compare constructors are same (not equal because wont work in Safari)
-                    (''+ap.constructor) === (''+bp.constructor))
-                // Same type of object but its properties may have changed
-                getObjectDiff (ap, bp, rv, prfx + prop + ".");
-            else if (ap !== bp)
+            if (typeof ap === 'object' && typeof bp === 'object' && ap && bp)
+            {
+                const apTypeName = toStringTag(ap);
+                const bpTypeName = toStringTag(bp);
+
+                if (apTypeName === bpTypeName) {
+                    if (intrinsicTypeNameSet[apTypeName]) {
+                        // This is an intrinsic type. Don't go deep diffing it.
+                        // Instead compare its value in best-effort:
+                        // (Can compare real values of Date, ArrayBuffers and views)
+                        if (getValueOf(ap, apTypeName) !== getValueOf(bp, bpTypeName)) {
+                            rv[prfx + prop] = b[prop]; // Date / ArrayBuffer etc is of different value
+                        }
+                    } else {
+                        // This is not an intrinsic object. Compare the it deeply:
+                        getObjectDiff(ap, bp, rv, prfx + prop + ".");
+                    }
+                } else {
+                    rv[prfx + prop] = b[prop];// Property changed to other type
+                }                
+            } else if (ap !== bp)
                 rv[prfx + prop] = b[prop];// Primitive value changed
         }
     });
