@@ -8,7 +8,7 @@ module.exports = function (config) {
     // This addon is not yet ready for full-blown tests on iphone/Safari. That's one of the reason it is still in beta.
     // Firefox 55 has bug that is triggered when addons are present. Bug is fixed for FF57: https://bugzilla.mozilla.org/show_bug.cgi?id=1395071
     pre_npm_publish: defaultBrowserMatrix.pre_npm_publish.filter(b => 
-      !/bs_iphone7|bs_firefox_latest_supported/i.test(b))
+      !/bs_safari_oldest_supported|bs_firefox_latest_supported/i.test(b))
   };
 
   const cfg = getKarmaConfig(browserMatrixOverrides, {

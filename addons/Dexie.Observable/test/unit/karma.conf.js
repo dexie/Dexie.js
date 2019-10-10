@@ -6,7 +6,7 @@ module.exports = function (config) {
     // Be fine with testing on local travis firefox + browserstack chrome, latest supported.
     ci: ["Firefox", "bs_chrome_latest_supported"],
     // This addon is not yet ready for full-blown tests on iphone/Safari. That's one of the reason it is still in beta.
-    pre_npm_publish: defaultBrowserMatrix.pre_npm_publish.filter(b => !/bs_iphone7/i.test(b))
+    pre_npm_publish: defaultBrowserMatrix.pre_npm_publish.filter(b => !/bs_safari_oldest_supported/i.test(b))
   };
 
   const cfg = getKarmaConfig(browserMatrixOverrides, {
