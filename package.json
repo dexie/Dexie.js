@@ -50,7 +50,7 @@
     "dexie": [
       "# Build dist/dexie.js, dist/dexie.mjs and dist/dexie.d.ts",
       "cd src",
-      "tsc [--watch 'Compilation complete.']",
+      "tsc [--watch 'Watching for file changes']",
       "rollup -c ../tools/build-configs/rollup.config.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.mjs",
@@ -77,7 +77,7 @@
     "test": [
       "# Build the test suite.",
       "cd test",
-      "tsc [--watch 'Compilation complete.']",
+      "tsc [--watch 'Watching for file changes']",
       "rollup -c ../tools/build-configs/rollup.tests.config.js"
     ]
   },

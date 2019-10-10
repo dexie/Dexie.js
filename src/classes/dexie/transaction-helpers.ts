@@ -9,7 +9,6 @@ import Promise, {
   NativePromise,
   decrementExpectedAwaits,
   rejection,
-  AsyncFunction,
   incrementExpectedAwaits
 } from '../../helpers/promise';
 
@@ -54,9 +53,7 @@ export function enterTransactionScope(
     }
 
     // Support for native async await.
-    if (scopeFunc.constructor === AsyncFunction) {
-      incrementExpectedAwaits();
-    }
+    incrementExpectedAwaits();
 
     let returnValue;
     const promiseFollowed = Promise.follow(() => {
@@ -66,10 +63,15 @@ export function enterTransactionScope(
         if (returnValue.constructor === NativePromise) {
           var decrementor = decrementExpectedAwaits.bind(null, null);
           returnValue.then(decrementor, decrementor);
-        } else if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
-          // scopeFunc returned an iterator with throw-support. Handle yield as await.
-          returnValue = awaitIterator(returnValue);
+        } else {
+          decrementExpectedAwaits();
+          if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
+            // scopeFunc returned an iterator with throw-support. Handle yield as await.
+            returnValue = awaitIterator(returnValue);
+          }
         }
+      } else {
+        decrementExpectedAwaits();
       }
     }, zoneProps);
     return (returnValue && typeof returnValue.then === 'function' ?
