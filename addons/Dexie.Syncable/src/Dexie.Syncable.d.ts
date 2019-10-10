@@ -22,13 +22,13 @@ declare module 'dexie' {
              * Stop syncing with given url.. See docs at:
              * https://github.com/dfahlander/Dexie.js/wiki/db.syncable.disconnect()
              */
-            disconnect(url: string): void;
+            disconnect(url: string): Dexie.Promise<void>;
 
             /**
              * Stop syncing and delete all sync state for given URL. See docs at:
              * https://github.com/dfahlander/Dexie.js/wiki/db.syncable.delete()
              */
-            delete(url: string): void;
+            delete(url: string): Dexie.Promise<void>;
 
             /**
              * List remote URLs. See docs at:
