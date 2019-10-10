@@ -40,25 +40,24 @@ const
     LONG_STACKS_CLIP_LIMIT = 100,
     // When calling error.stack or promise.stack, limit the number of asyncronic stacks to print out. 
     MAX_LONG_STACKS = 20,
-    ZONE_ECHO_LIMIT = 7,
-    nativePromiseInstanceAndProto = (()=>{
-        try {
-            // Be able to patch native async functions
-            return new Function('let F=async ()=>{},p=F();return [p,Object.getPrototypeOf(p),Promise.resolve(),F.constructor];')();
-        } catch(e) {
-            var P = _global.Promise;
-            return P ?
-                [P.resolve(), P.prototype, P.resolve()] :
-                []; 
-        }
-    })(),
-    resolvedNativePromise = nativePromiseInstanceAndProto[0],
-    nativePromiseProto = nativePromiseInstanceAndProto[1],
-    resolvedGlobalPromise = nativePromiseInstanceAndProto[2],
+    ZONE_ECHO_LIMIT = 100,
+    [resolvedNativePromise, nativePromiseProto, resolvedGlobalPromise] = typeof Promise === 'undefined' ?
+        [] :
+        (()=>{
+            let globalP = Promise.resolve();
+            if (typeof crypto === 'undefined' || !crypto.subtle)
+                return [globalP, globalP.__proto__, globalP];
+            // Generate a native promise (as window.Promise may have been patched)
+            const nativeP = crypto.subtle.digest("SHA-512", new Uint8Array([0]));
+            return [
+                nativeP,
+                nativeP.__proto__,
+                globalP
+            ];
+        })(),
     nativePromiseThen = nativePromiseProto && nativePromiseProto.then;
 
 export const NativePromise = resolvedNativePromise && resolvedNativePromise.constructor;
-export const AsyncFunction = nativePromiseInstanceAndProto[3];
 const patchGlobalPromise = !!resolvedGlobalPromise;
 
 var stack_being_generated = false;
@@ -134,7 +133,7 @@ export var microtickQueue = []; // Callbacks to call in this or next physical ti
 export var numScheduledCalls = 0; // Number of listener-calls left to do in this physical tick.
 export var tickFinalizers = []; // Finalizers to call when there are no more async calls scheduled within current physical tick.
 
-export default function Promise(fn) {
+export default function DexiePromise(fn) {
     if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');    
     this._listeners = [];
     this.onuncatched = nop; // Deprecate in next major. Not needed. Better to use global error handler.
@@ -180,7 +179,7 @@ const thenProp = {
         function then (onFulfilled, onRejected) {
             var possibleAwait = !psd.global && (psd !== PSD || microTaskId !== totalEchoes);
             if (possibleAwait) decrementExpectedAwaits();
-            var rv = new Promise((resolve, reject) => {
+            var rv = new DexiePromise((resolve, reject) => {
                 propagateToListener(this, new Listener(
                     nativeAwaitCompatibleWrap(onFulfilled, psd, possibleAwait),
                     nativeAwaitCompatibleWrap(onRejected, psd, possibleAwait),
@@ -211,7 +210,7 @@ const thenProp = {
     }
 };
 
-props(Promise.prototype, {
+props(DexiePromise.prototype, {
     then: thenProp, // Defined above.
     _then: function (onFulfilled, onRejected) {
         // A little tinier version of then() that don't have to create a resulting promise.
@@ -261,7 +260,7 @@ props(Promise.prototype, {
 
     timeout: function (ms, msg) {
         return ms < Infinity ?
-            new Promise((resolve, reject) => {
+            new DexiePromise((resolve, reject) => {
                 var handle = setTimeout(() => reject(new exceptions.Timeout(msg)), ms);
                 this.then(resolve, reject).finally(clearTimeout.bind(null, handle));
             }) : this;
@@ -269,7 +268,7 @@ props(Promise.prototype, {
 });
 
 if (typeof Symbol !== 'undefined' && Symbol.toStringTag)
-    setProp(Promise.prototype, Symbol.toStringTag, 'Promise');
+    setProp(DexiePromise.prototype, Symbol.toStringTag, 'Dexie.Promise');
 
 // Now that Promise.prototype is defined, we have all it takes to set globalPSD.env.
 // Environment globals snapshotted on leaving global zone
@@ -284,14 +283,14 @@ function Listener(onFulfilled, onRejected, resolve, reject, zone) {
 }
 
 // Promise Static Properties
-props (Promise, {
+props (DexiePromise, {
     all: function () {
         var values = getArrayOf.apply(null, arguments) // Supports iterables, implicit arguments and array-like.
             .map(onPossibleParallellAsync); // Handle parallell async/awaits 
-        return new Promise(function (resolve, reject) {
+        return new DexiePromise(function (resolve, reject) {
             if (values.length === 0) resolve([]);
             var remaining = values.length;
-            values.forEach((a,i) => Promise.resolve(a).then(x => {
+            values.forEach((a,i) => DexiePromise.resolve(a).then(x => {
                 values[i] = x;
                 if (!--remaining) resolve(values);
             }, reject));
@@ -299,11 +298,11 @@ props (Promise, {
     },
     
     resolve: value => {
-        if (value instanceof Promise) return value;
-        if (value && typeof value.then === 'function') return new Promise((resolve, reject)=>{
+        if (value instanceof DexiePromise) return value;
+        if (value && typeof value.then === 'function') return new DexiePromise((resolve, reject)=>{
             value.then(resolve, reject);
         });
-        var rv = new Promise(INTERNAL, true, value);
+        var rv = new DexiePromise(INTERNAL, true, value);
         linkToPreviousPromise(rv, currentFulfiller);
         return rv;
     },
@@ -312,8 +311,8 @@ props (Promise, {
     
     race: function () {
         var values = getArrayOf.apply(null, arguments).map(onPossibleParallellAsync);
-        return new Promise((resolve, reject) => {
-            values.map(value => Promise.resolve(value).then(resolve, reject));
+        return new DexiePromise((resolve, reject) => {
+            values.map(value => DexiePromise.resolve(value).then(resolve, reject));
         });
     },
 
@@ -341,7 +340,7 @@ props (Promise, {
     },
             
     follow: (fn, zoneProps) => {
-        return new Promise((resolve, reject) => {
+        return new DexiePromise((resolve, reject) => {
             return newScope((resolve, reject) => {
                 var psd = PSD;
                 psd.unhandleds = []; // For unhandled standard- or 3rd party Promises. Checked at psd.finalize()
@@ -376,7 +375,7 @@ function executePromiseTask (promise, fn) {
             var shouldExecuteTick = promise._lib && beginMicroTickScope();
             if (value && typeof value.then === 'function') {
                 executePromiseTask(promise, (resolve, reject) => {
-                    value instanceof Promise ?
+                    value instanceof DexiePromise ?
                         value._then(resolve, reject) :
                         value.then(resolve, reject);
                 });
@@ -605,7 +604,7 @@ function markErrorAsHandled(promise) {
 }
 
 function PromiseReject (reason) {
-    return new Promise(INTERNAL, false, reason);
+    return new DexiePromise(INTERNAL, false, reason);
 }
 
 export function wrap (fn, errorCatcher) {
@@ -648,12 +647,12 @@ export function newScope (fn, props, a1, a2) {
     // Prepare for promise patching (done in usePSD):
     var globalEnv = globalPSD.env;
     psd.env = patchGlobalPromise ? {
-        Promise: Promise, // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
-        PromiseProp: {value: Promise, configurable: true, writable: true},
-        all: Promise.all,
-        race: Promise.race,
-        resolve: Promise.resolve,
-        reject: Promise.reject,
+        Promise: DexiePromise, // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
+        PromiseProp: {value: DexiePromise, configurable: true, writable: true},
+        all: DexiePromise.all,
+        race: DexiePromise.race,
+        resolve: DexiePromise.resolve,
+        reject: DexiePromise.reject,
         nthen: getPatchedPromiseThen (globalEnv.nthen, psd), // native then
         gthen: getPatchedPromiseThen (globalEnv.gthen, psd) // global then
     } : {};
@@ -680,6 +679,7 @@ export function incrementExpectedAwaits() {
     task.echoes += ZONE_ECHO_LIMIT;
     return task.id;
 }
+
 // Function to call when 'then' calls back on a native promise where onAwaitExpected() had been called.
 // Also call this when a native await calls then method on a promise. In that case, don't supply
 // sourceTaskId because we already know it refers to current task.
@@ -687,6 +687,12 @@ export function decrementExpectedAwaits(sourceTaskId) {
     if (!task.awaits || (sourceTaskId && sourceTaskId !== task.id)) return;
     if (--task.awaits === 0) task.id = 0;
     task.echoes = task.awaits * ZONE_ECHO_LIMIT; // Will reset echoes to 0 if awaits is 0.
+}
+
+if ((''+nativePromiseThen).indexOf('[native code]') === -1) {
+    // If the native promise' prototype is patched, we cannot rely on zone echoing.
+    // Disable that here:
+    incrementExpectedAwaits = decrementExpectedAwaits = nop;
 }
 
 // Call from Promise.all() and Promise.race()
@@ -706,6 +712,7 @@ export function onPossibleParallellAsync (possiblePromise) {
 
 function zoneEnterEcho(targetZone) {
     ++totalEchoes;
+    //console.log("Total echoes ", totalEchoes);
     if (!task.echoes || --task.echoes === 0) {
         task.echoes = task.id = 0; // Cancel zone echoing.
     }
@@ -842,6 +849,6 @@ function globalError(err, promise) {
     } catch (e) {}
 }
 
-export var rejection = Promise.reject;
+export var rejection = DexiePromise.reject;
 
-export {Promise as DexiePromise};
+export {DexiePromise};

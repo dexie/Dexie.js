@@ -22,7 +22,6 @@ export interface DexiePromiseConstructor extends PromiseExtendedConstructor {
 }
 
 export const NativePromise : PromiseConstructor;
-export const AsyncFunction : FunctionConstructor;
 export var globalPSD;
 export var PSD;
 export function wrap<F extends Function>(f: F, errorCatcher?: (err) => void) : F;
