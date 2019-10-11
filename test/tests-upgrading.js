@@ -716,7 +716,7 @@ promisedTest(
     ok(true, `Could open v1: ${await db.friends.toArray()}`);
     db.close();
 
-    db = new Dexie("FriendDatabase");
+    db = new Dexie("issue919");
     // add a new store, `friends` store remains as before
     db.version(2).stores({
       enemies: "++id,name"
@@ -728,5 +728,6 @@ promisedTest(
     await db.open();
     // fails with: NotFoundError: `The operation failed because the requested database object could not be found. For example, an object store did not exist but was being opened.`
     ok(true, `Could open version 2: ${await db.friends.toArray()}`);
+    await db.delete();
   }
 );
