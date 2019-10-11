@@ -26,7 +26,6 @@ export function createVersionConstructor(db: Dexie) {
         tables: {},
         contentUpgrade: null
       };
-      this.stores({}); // Derive earlier schemas by default.
     });
 
 }
