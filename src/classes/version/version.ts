@@ -45,12 +45,12 @@ export class Version implements IVersion {
 
     // Derive stores from earlier versions if they are not explicitely specified as null or a new syntax.
     const storesSpec: { [key: string]: string; } = {};
+    let dbschema = {};
     versions.forEach(version => { // 'versions' is always sorted by lowest version first.
       extend(storesSpec, version._cfg.storesSource);
+      dbschema = (version._cfg.dbschema = {});
+      this._parseStoresSpec(storesSpec, dbschema);
     });
-
-    const dbschema = (this._cfg.dbschema = {});
-    this._parseStoresSpec(storesSpec, dbschema);
     // Update the latest schema to this version
     db._dbSchema = dbschema;
     // Update APIs

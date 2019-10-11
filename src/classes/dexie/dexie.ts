@@ -222,6 +222,7 @@ export class Dexie implements IDexie {
     versionInstance = new this.Version(versionNumber);
     versions.push(versionInstance);
     versions.sort(lowerVersionFirst);
+    versionInstance.stores({}); // Derive earlier schemas by default.
     // Disable autoschema mode, as at least one version is specified.
     this._state.autoSchema = false;
     return versionInstance;
