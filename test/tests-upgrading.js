@@ -701,3 +701,32 @@ promisedTest("Changing primary key (short)", async ()=> {
     ok(foo2 != null, "Should get a match");
     equal(foo2.objId, "obj:2", "The expected ID was returned");
 });
+
+
+promisedTest(
+  "Issue 919: Store not found when versions declared in decending order",
+  async () => {
+    await Dexie.delete("issue919");
+    let db = new Dexie("issue919");
+    db.version(1).stores({
+      friends: "++id,name,age"
+    });
+    await db.open();
+    // succeeds
+    ok(true, `Could open v1: ${await db.friends.toArray()}`);
+    db.close();
+
+    db = new Dexie("FriendDatabase");
+    // add a new store, `friends` store remains as before
+    db.version(2).stores({
+      enemies: "++id,name"
+    });
+    db.version(1).stores({
+      friends: "++id,name,age"
+    });
+
+    await db.open();
+    // fails with: NotFoundError: `The operation failed because the requested database object could not be found. For example, an object store did not exist but was being opened.`
+    ok(true, `Could open version 2: ${await db.friends.toArray()}`);
+  }
+);
