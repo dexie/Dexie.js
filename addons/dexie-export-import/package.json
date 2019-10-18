@@ -1,6 +1,6 @@
 {
   "name": "dexie-export-import",
-  "version": "1.0.0-beta.13",
+  "version": "1.0.0-beta.14",
   "description": "Dexie addon that adds export and import capabilities",
   "main": "dist/dexie-export-import.js",
   "module": "dist/dexie-export-import.mjs",
@@ -34,7 +34,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "base64-arraybuffer-es6": "*",
-    "clarinet": "^0.12.1",
+    "clarinet": "^0.12.4",
     "just-build": "^0.9.16",
     "karma": "^4.1.0",
     "karma-browserstack-launcher": "^1.5.1",
