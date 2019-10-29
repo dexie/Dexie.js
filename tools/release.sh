@@ -1,6 +1,7 @@
 #!/bin/bash -e
 
 export NODE_ENV=release
+previous_commit=$(git rev-parse HEAD)
 
 if ! [ -e tools/release.sh ]; then
   echo >&2 "Please run tools/release.sh from the repo root"
@@ -115,7 +116,11 @@ do
   n=$[$n+1]
   printf "Browserstack tests failed.\n"
 done
-
+if  [ $n -ge 4 ]; then
+  printf "Browserstack failed 3 times. Quitting!"
+  git reset --hard $previous_commit
+  exit 1
+fi
 printf "Browserstack tests for Dexie.js passed.\n"
 
 #
@@ -144,6 +149,11 @@ do
       n=$[$n+1]
       printf "${addon} Browserstack tests failed.\n"
     done
+    if  [ $n -ge 4 ]; then
+      printf "${addon} tests failed 3 times. Quitting!"
+      git reset --hard $previous_commit
+      exit 1
+    fi
 
     printf "${addon} Browserstack tests passed.\n"
     
