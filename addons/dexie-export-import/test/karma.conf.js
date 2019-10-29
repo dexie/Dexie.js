@@ -3,13 +3,13 @@ const {karmaCommon, getKarmaConfig, defaultBrowserMatrix} = require('../../../te
 
 module.exports = function (config) {
   const cfg = getKarmaConfig({
-    // I get error from browserstack/karma (not our code) when trying bs_iphone7.
-    // If trying bs_safari it just times out.
-    // Unit tests have been manually tested on Safari 12 though.
-    ci: defaultBrowserMatrix.ci.filter(b => b !== 'bs_iphone7'),
-    //local: ["bs_safari_latest_supported"], // Uncomment to use browserstack browsers from home
-    // bs_iphone bails out before running any test at all.
-    pre_npm_publish: defaultBrowserMatrix.pre_npm_publish.filter(b => !/bs_iphone7/i.test(b))
+    // Be fine with testing on local travis firefox + browserstack chrome, latest supported.
+    ci: ["Firefox", "bs_chrome_latest_supported"],
+    // Safari fails to reply on browserstack. Need to not have it here.
+    // Just complement with old chrome browser that is not part of CI test suite.
+    pre_npm_publish: [
+      "bs_chrome_oldest_supported",
+    ]
   }, {
     // Base path should point at the root 
     basePath: '../../../',

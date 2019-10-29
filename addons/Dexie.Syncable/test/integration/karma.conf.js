@@ -5,10 +5,11 @@ module.exports = function (config) {
   const browserMatrixOverrides = {
     // Be fine with testing on local travis firefox + browserstack chrome, latest supported.
     ci: ["Firefox", "bs_chrome_latest_supported"],
-    // This addon is not yet ready for full-blown tests on iphone/Safari. That's one of the reason it is still in beta.
-    // Firefox 55 has bug that is triggered when addons are present. Bug is fixed for FF57: https://bugzilla.mozilla.org/show_bug.cgi?id=1395071
-    pre_npm_publish: defaultBrowserMatrix.pre_npm_publish.filter(b => 
-      !/bs_iphone7|bs_firefox_latest_supported/i.test(b))
+    // Safari fails to reply on browserstack. Need to not have it here.
+    // Just complement with old chrome browser that is not part of CI test suite.
+    pre_npm_publish: [
+      "bs_chrome_oldest_supported",
+    ]
   };
 
   const cfg = getKarmaConfig(browserMatrixOverrides, {
