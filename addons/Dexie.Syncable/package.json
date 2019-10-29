@@ -64,7 +64,8 @@
       "node -e \"fs.writeFileSync('dist/dexie-syncable.d.ts', fs.readFileSync('src/Dexie.Syncable.d.ts'))\"",
       "node tools/replaceVersionAndDate.js dist/dexie-syncable.d.ts",
       "# Minify the default ES5 UMD module",
-      "uglifyjs dist/dexie-syncable.js -m -c -o dist/dexie-syncable.min.js --source-map dist/dexie-syncable.min.js.map  --in-source-map dist/dexie-syncable.js.map"
+      "cd dist",
+      "uglifyjs dexie-syncable.js -m -c negate_iife=0 -o dexie-syncable.min.js --source-map"
     ]
   },
   "homepage": "http://dexie.org",
@@ -87,6 +88,6 @@
     "rollup": "^0.41.4",
     "rollup-plugin-sourcemaps": "^0.4.1",
     "typescript": "^2.6.2",
-    "uglifyjs": "^2.4.10"
+    "uglify-js": "^3.5.6"
   }
 }
