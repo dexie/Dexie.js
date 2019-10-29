@@ -63,6 +63,8 @@ promisedTest("issue#729", async () => {
     }
     if (warnDescriptor) {
         Object.defineProperty(console, 'warn', warnDescriptor);
+    } else {
+        delete console.warn;
     }
 });
 
