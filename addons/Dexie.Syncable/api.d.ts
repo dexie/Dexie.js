@@ -30,12 +30,7 @@
 
 import {IDatabaseChange} from 'dexie-observable/api';
 export type IDatabaseChange = IDatabaseChange;
-export enum DatabaseChangeType {
-    Create = 1,
-    Update = 2,
-    Delete = 3
-}
-
+export {DatabaseChangeType} from 'dexie-observable/api';
 
 /* ISyncProtocol
 

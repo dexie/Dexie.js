@@ -1,4 +1,3 @@
-import Dexie from 'dexie';
 import { CREATE, DELETE, UPDATE } from './change_types';
 import bulkUpdate from './bulk-update';
 
