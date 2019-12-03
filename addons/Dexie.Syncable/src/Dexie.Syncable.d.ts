@@ -4,7 +4,8 @@
 
 import Dexie from 'dexie';
 import 'dexie-observable';
-import { IDatabaseChange, ISyncProtocol, SyncStatus } from '../api';
+import { ISyncProtocol, SyncStatus } from '../api';
+import {IDatabaseChange} from 'dexie-observable/api';
 
 //
 // Extend Dexie interface
@@ -17,7 +18,7 @@ declare module 'dexie' {
              * https://github.com/dfahlander/Dexie.js/wiki/db.syncable.connect()
              */
             connect(protocol: string, url: string, options?: any): Dexie.Promise<void>;
-            
+
             /**
              * Stop syncing with given url.. See docs at:
              * https://github.com/dfahlander/Dexie.js/wiki/db.syncable.disconnect()
@@ -52,7 +53,7 @@ declare module 'dexie' {
         /**
          * Table used for storing uncommitted changes when downloading partial change sets from
          * a sync server.
-         * 
+         *
          * Each change is bound to a node id (represents the remote server that the change was
          * downloaded from)
          */
@@ -65,8 +66,8 @@ declare module 'dexie' {
         // allow storing remote nodes in table _syncNodes.
         module Observable {
             interface SyncNode {
-                url: string, // Only applicable for "remote" nodes. Only used in Dexie.Syncable.                
-                syncProtocol: string, // Tells which implementation of ISyncProtocol to use for remote syncing. 
+                url: string, // Only applicable for "remote" nodes. Only used in Dexie.Syncable.
+                syncProtocol: string, // Tells which implementation of ISyncProtocol to use for remote syncing.
                 syncContext: any,
                 syncOptions: any,
                 status: number,
@@ -77,7 +78,7 @@ declare module 'dexie' {
                     currentTable: string,
                     currentKey: any,
                     localBaseRevision: number
-                }                
+                }
             }
         }
 
