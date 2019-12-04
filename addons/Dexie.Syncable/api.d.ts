@@ -17,19 +17,18 @@
  *
  * By separating module 'dexie-syncable' from 'dexie-syncable/api' we
  * distinguish that:
- * 
+ *
  *   import {...} from 'dexie-syncable/api' is only for getting access to its
  *                                          interfaces and has no side-effects.
  *                                          Typescript-only import.
- * 
+ *
  *   import 'dexie-syncable' is only for side effects - to extend Dexie with
  *                           functionality of dexie-syncable.
  *                           Javascript / Typescript import.
- * 
+ *
  */
 
 import {IDatabaseChange} from 'dexie-observable/api';
-export type IDatabaseChange = IDatabaseChange;
 export {DatabaseChangeType} from 'dexie-observable/api';
 
 /* ISyncProtocol
@@ -48,9 +47,9 @@ export {DatabaseChangeType} from 'dexie-observable/api';
 
 /**
  * The interface to implement to provide sync towards a remote server.
- * 
+ *
  * Documentation for this interface: https://github.com/dfahlander/Dexie.js/wiki/Dexie.Syncable.ISyncProtocol
- * 
+ *
  */
 export interface ISyncProtocol {
     partialsThreshold?: number;
@@ -108,7 +107,7 @@ export interface ReactiveContinuation {
 
         /** If true, it means that reach() will be called upon again with additional changes once you'version
          * called onChangesAccepted(). An implementation may handle this transactionally, i.e. wait with applying
-         * these changes and instead buffer them in a temporary table and the apply everything once reac() is called 
+         * these changes and instead buffer them in a temporary table and the apply everything once reac() is called
          * with partial=false.
          */
         partial: boolean,
