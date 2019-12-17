@@ -41,7 +41,7 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
       data: []
     }
   };
-  
+
   const {progressCallback} = options!;
   const progress: ExportProgress = {
     done: false,
@@ -51,14 +51,10 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
     totalTables: db.tables.length
   };
 
-  try {
-    if (options!.noTransaction) {
-      await exportAll();
-    } else {
-      await db.transaction('r', db.tables, exportAll);
-    }
-  } finally {
-    TSON.finalize(); // Free up mem if error has occurred
+  if (options!.noTransaction) {
+    await exportAll();
+  } else {
+    await db.transaction('r', db.tables, exportAll);
   }
 
   if (progressCallback) {
@@ -104,7 +100,7 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
         //     ...
         //     data: [
         // 123456<---- here
-        //     ] 
+        //     ]
         //   ]
         // }
         emptyTableExportJson = emptyTableExportJson.split('\n').join('\n    ');
@@ -136,16 +132,13 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
         }
 
         mayHaveMoreRows = values.length === LIMIT;
-        
+
         if (inbound) {
           const filteredValues = filter ?
             values.filter(value => filter(tableName, value)) :
             values;
 
           const tsonValues = filteredValues.map(value => TSON.encapsulate(value));
-          if (TSON.mustFinalize()) {
-            await Dexie.waitFor(TSON.finalize(tsonValues));
-          }
 
           let json = JSON.stringify(tsonValues, undefined, prettyJson ? 2 : undefined);
           if (prettyJson) json = json.split('\n').join('\n      ');
@@ -163,9 +156,6 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
           if (filter) keyvals = keyvals.filter(([key, value]) => filter(tableName, value, key));
 
           const tsonTuples = keyvals.map(tuple => TSON.encapsulate(tuple));
-          if (TSON.mustFinalize()) {
-            await Dexie.waitFor(TSON.finalize(tsonTuples));
-          }
 
           let json = JSON.stringify(tsonTuples, undefined, prettyJson ? 2 : undefined);
           if (prettyJson) json = json.split('\n').join('\n      ');
