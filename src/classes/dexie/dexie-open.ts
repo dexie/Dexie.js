@@ -65,6 +65,7 @@ export function dexieOpen (db: Dexie) {
           } else {
               upgradeTransaction.onerror = eventRejectHandler(reject);
               var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
+              db.idbdb = req.result;
               runUpgraders(db, oldVer / 10, upgradeTransaction, reject);
           }
       }, reject);

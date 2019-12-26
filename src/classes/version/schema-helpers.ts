@@ -77,13 +77,10 @@ export function updateTablesAndIndexes(
   // Each transaction object will contain the table set that was current in that version (but also not-yet-deleted tables from its previous version)
   const queue: UpgradeQueueItem[] = [];
   const versions = db._versions;
-  const oldVersionStruct = versions.filter(version => version._cfg.version === oldVersion)[0];
-  if (!oldVersionStruct) throw new exceptions.Upgrade(
-    "Dexie specification of currently installed DB version is missing");
-  let globalSchema = db._dbSchema = oldVersionStruct._cfg.dbschema;
+  let globalSchema = db._dbSchema = buildGlobalSchema(db, db.idbdb, idbUpgradeTrans);
   let anyContentUpgraderHasRun = false;
 
-  const versToRun = versions.filter(v => v._cfg.version > oldVersion);
+  const versToRun = versions.filter(v => v._cfg.version >= oldVersion);
   versToRun.forEach(version => {
     queue.push(() => {
       const oldSchema = globalSchema;
@@ -118,7 +115,7 @@ export function updateTablesAndIndexes(
 
       const contentUpgrade = version._cfg.contentUpgrade;
 
-      if (contentUpgrade) {
+      if (contentUpgrade && version._cfg.version > oldVersion) {
         // Update db.core with new tables and indexes:
         generateMiddlewareStacks(db, idbUpgradeTrans);
 
@@ -286,24 +283,48 @@ export function addIndex(store: IDBObjectStore, idx: IndexSpec) {
   store.createIndex(idx.name, idx.keyPath, { unique: idx.unique, multiEntry: idx.multi });
 }
 
-export function readGlobalSchema(db: Dexie, idbdb: IDBDatabase, tmpTrans: IDBTransaction) {
-  db.verno = idbdb.version / 10;
-  const globalSchema = db._dbSchema = {};
-  const dbStoreNames = db._storeNames = slice(idbdb.objectStoreNames, 0);
+function buildGlobalSchema(
+  db: Dexie,
+  idbdb: IDBDatabase,
+  tmpTrans: IDBTransaction
+) {
+  const globalSchema = {};
+  const dbStoreNames = slice(idbdb.objectStoreNames, 0);
   if (dbStoreNames.length === 0) return; // Database contains no stores.
   dbStoreNames.forEach(storeName => {
     const store = tmpTrans.objectStore(storeName);
     let keyPath = store.keyPath;
-    const primKey = createIndexSpec(nameFromKeyPath(keyPath), keyPath || "", false, false, !!store.autoIncrement, keyPath && typeof keyPath !== 'string');
+    const primKey = createIndexSpec(
+      nameFromKeyPath(keyPath),
+      keyPath || "",
+      false,
+      false,
+      !!store.autoIncrement,
+      keyPath && typeof keyPath !== "string"
+    );
     const indexes: IndexSpec[] = [];
     for (let j = 0; j < store.indexNames.length; ++j) {
       const idbindex = store.index(store.indexNames[j]);
       keyPath = idbindex.keyPath;
-      var index = createIndexSpec(idbindex.name, keyPath, !!idbindex.unique, !!idbindex.multiEntry, false, keyPath && typeof keyPath !== 'string');
+      var index = createIndexSpec(
+        idbindex.name,
+        keyPath,
+        !!idbindex.unique,
+        !!idbindex.multiEntry,
+        false,
+        keyPath && typeof keyPath !== "string"
+      );
       indexes.push(index);
     }
     globalSchema[storeName] = createTableSchema(storeName, primKey, indexes);
   });
+  return globalSchema;
+}
+
+export function readGlobalSchema(db: Dexie, idbdb: IDBDatabase, tmpTrans: IDBTransaction) {
+  db.verno = idbdb.version / 10;
+  const globalSchema = db._dbSchema = buildGlobalSchema(db, idbdb, tmpTrans);
+  db._storeNames = slice(idbdb.objectStoreNames, 0);
   setApiOnPlace(db, [db._allTables], keys(globalSchema), globalSchema);
 }
 
@@ -322,7 +343,11 @@ export function adjustToExistingIndexNames(db: Dexie, schema: DbSchema, idbtrans
       const dexieName = typeof keyPath === 'string' ? keyPath : "[" + slice(keyPath).join('+') + "]";
       if (schema[storeName]) {
         const indexSpec = schema[storeName].idxByName[dexieName];
-        if (indexSpec) indexSpec.name = indexName;
+        if (indexSpec) {
+          indexSpec.name = indexName;
+          delete schema[storeName].idxByName[dexieName];
+          schema[storeName].idxByName[indexName] = indexSpec;
+        }
       }
     }
   }
