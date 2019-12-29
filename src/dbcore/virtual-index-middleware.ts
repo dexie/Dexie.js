@@ -1,8 +1,7 @@
-import { DBCore, DBCoreIndex, KeyRange, DBCoreQueryRequest, RangeType, DBCoreOpenCursorRequest, DBCoreCountRequest, DBCoreQuery, Key, DBCoreCursor, DBCoreTable } from '../public/types/dbcore';
+import { DBCore, DBCoreIndex, KeyRange, DBCoreQueryRequest, RangeType, DBCoreOpenCursorRequest, DBCoreCountRequest, Key, DBCoreCursor, DBCoreTable } from '../public/types/dbcore';
 //import { DBCoreUp1, VirtualIndex, KeyPathQuery, DBCoreUp1Table } from '../public/types/dbcore-up-1';
-import { isArray, flatten } from '../functions/utils';
+import { isArray } from '../functions/utils';
 import { getKeyExtractor } from './get-key-extractor';
-import { exceptions } from '../errors';
 import { getKeyPathAlias } from './dbcore-indexeddb';
 import { Middleware } from '../public/types/middleware';
 
@@ -66,18 +65,18 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
         indexList.sort((a,b) => a.keyTail - b.keyTail); // Shortest keyTail is the best one (represents real index)
         return virtualIndex;
       }
-    
+
       const primaryKey = addVirtualIndexes(schema.primaryKey.keyPath, 0, schema.primaryKey);
       indexLookup[":id"] = [primaryKey];
       for (const index of schema.indexes) {
         addVirtualIndexes(index.keyPath, 0, index);
       }
-    
+
       function findBestIndex(keyPath: null | string | string[]): VirtualIndex {
         const result = indexLookup[getKeyPathAlias(keyPath)];
         return result && result[0];
       }
-    
+
       function translateRange (range: KeyRange, keyTail: number): KeyRange {
         return {
           type: range.type === RangeType.Equal ?
@@ -89,7 +88,7 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
           upperOpen: true // doesn't matter true or false
         };
       }
-    
+
       function translateRequest (req: DBCoreQueryRequest): DBCoreQueryRequest;
       function translateRequest (req: DBCoreOpenCursorRequest): DBCoreOpenCursorRequest;
       function translateRequest (req: DBCoreCountRequest): DBCoreCountRequest {
@@ -102,7 +101,7 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
           }
         } : req;
       }
-    
+
       const result: DBCoreTable = {
         ...table,
         schema: {
@@ -114,16 +113,16 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
 
         count(req) {
           return table.count(translateRequest(req));
-        },    
-    
+        },
+
         query(req) {
           return table.query(translateRequest(req));
         },
-    
+
         openCursor(req) {
           const {keyTail, isVirtual, keyLength} = (req.query.index as VirtualIndex);
           if (!isVirtual) return table.openCursor(req);
-    
+
           function createVirtualCursor(cursor: DBCoreCursor) : DBCoreCursor {
             function _continue (key?: Key) {
               key != null ?
@@ -155,7 +154,7 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
             });
             return virtualCursor;
           }
-    
+
           return table.openCursor(translateRequest(req))
             .then(cursor => cursor && createVirtualCursor(cursor));
         }
@@ -171,4 +170,3 @@ export const virtualIndexMiddleware : Middleware<DBCore> = {
   level: 1,
   create: createVirtualIndexMiddleware
 };
-

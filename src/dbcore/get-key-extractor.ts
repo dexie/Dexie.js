@@ -1,5 +1,4 @@
-import { exceptions } from '../errors';
-import { isArray, getByKeyPath } from '../functions/utils';
+import { getByKeyPath } from '../functions/utils';
 import { Key } from '../public/types/dbcore';
 
 export function getKeyExtractor (keyPath: null | string | string[]) : (a: any) => Key {

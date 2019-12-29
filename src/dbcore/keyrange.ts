@@ -1,7 +1,5 @@
 import { KeyRange, RangeType } from '../public/types/dbcore';
 
-var x: KeyRange;
-
 export const AnyRange: KeyRange = {
   type: RangeType.Any,
   lower: -Infinity,
