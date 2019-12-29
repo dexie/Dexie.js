@@ -1,4 +1,4 @@
-import { arrayToObject, derive } from './utils';
+import { derive } from './utils';
 
 
 export function makeClassConstructor<TConstructor> (prototype: Object, constructor: Function) {
@@ -19,5 +19,5 @@ export function makeClassConstructor<TConstructor> (prototype: Object, construct
   // The code below will only create a prototypal inheritance from given constructor function
   // to given prototype.
   derive(constructor).from({prototype});
-  return constructor as any as TConstructor;  
+  return constructor as any as TConstructor;
 }

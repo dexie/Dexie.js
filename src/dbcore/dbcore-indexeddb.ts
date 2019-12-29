@@ -1,8 +1,8 @@
-import { DBCore, DBCoreCursor, DBCoreOpenCursorRequest, DBCoreQueryRequest, DBCoreCountRequest,
+import { DBCore, DBCoreCursor, DBCoreOpenCursorRequest, DBCoreQueryRequest,
   DBCoreIndex, KeyRange, DBCoreQueryResponse, RangeType, DBCoreSchema, DBCoreTableSchema, DBCoreTable,
-  MutateRequest, AddRequest, PutRequest, DeleteRequest, DeleteRangeRequest, MutateResponse, DBCoreTransaction }
+  MutateResponse }
   from '../public/types/dbcore';
-import { isArray, trycatcher } from '../functions/utils';
+import { isArray } from '../functions/utils';
 import { eventRejectHandler, preventDefault } from '../functions/event-wrappers';
 import { wrap } from '../helpers/promise';
 import { getMaxKey } from '../functions/quirks';
@@ -35,7 +35,7 @@ export function createDBCore (
   tmpTrans: IDBTransaction) : DBCore
 {
   const cmp = indexedDB.cmp.bind(indexedDB);
-  
+
   function extractSchema(db: IDBDatabase, trans: IDBTransaction) : {schema: DBCoreSchema, hasGetAll: boolean} {
     const tables = arrayify(db.objectStoreNames);
     return {
@@ -107,7 +107,7 @@ export function createDBCore (
     const tableName = tableSchema.name;
 
     function mutate ({trans, type, keys, values, range, wantResults}) {
-      return new Promise<MutateResponse>((resolve, reject) => {
+      return new Promise<MutateResponse>((resolve) => {
         resolve = wrap(resolve);
         const store = (trans as IDBTransaction).objectStore(tableName);
         const outbound = store.keyPath == null;
@@ -126,11 +126,11 @@ export function createDBCore (
         const results = wantResults && [...(keys ?
           keys : // keys already resolved in an earlier middleware. Don't re-resolve them.
           getEffectiveKeys(tableSchema.primaryKey, {type, keys, values}))];
-          
+
         let req: IDBRequest & { _reqno?};
         const failures: {[operationNumber: number]: Error} = [];
         let numFailures = 0;
-        const errorHandler = 
+        const errorHandler =
           event => {
             ++numFailures;
             preventDefault(event);
@@ -140,7 +140,7 @@ export function createDBCore (
         const setResult = ({target}) => {
           results[target._reqno] = target.result;
         }
-  
+
         if (type === 'deleteRange') {
           // Here the argument is the range
           if (range.type === RangeType.Never)
@@ -188,16 +188,16 @@ export function createDBCore (
             lastResult
           });
         };
-  
+
         req.onerror = event => { // wrap() not needed. All paths calling outside will wrap!
           errorHandler(event);
           done(event);
         };
-  
+
         req.onsuccess = done;
       });
     }
-    
+
     function openCursor ({trans, values, query, reverse, unique}: DBCoreOpenCursorRequest): Promise<DBCoreCursor>
     {
       return new Promise((resolve, reject) => {
@@ -220,12 +220,12 @@ export function createDBCore (
         const req = values || !('openKeyCursor' in source) ?
           source.openCursor(makeIDBKeyRange(range), direction) :
           source.openKeyCursor(makeIDBKeyRange(range), direction);
-          
+
         // iteration
         req.onerror = eventRejectHandler(reject);
-        req.onsuccess = wrap(ev => {
+        req.onsuccess = wrap(() => {
 
-          const cursor = req.result as DBCoreCursor;
+          const cursor = (req.result as any) as DBCoreCursor;
           if (!cursor) {
             resolve(null);
             return;
@@ -274,7 +274,7 @@ export function createDBCore (
                 cursor.stop();
               }
             }
-            req.onsuccess = wrap(ev => {
+            req.onsuccess = wrap(() => {
               //cursor.continue = _cursorContinue;
               //cursor.continuePrimaryKey = _cursorContinuePrimaryKey;
               //cursor.advance = _cursorAdvance;
@@ -288,10 +288,10 @@ export function createDBCore (
             return iterationPromise;
           };
           resolve(cursor);
-        }, reject); 
+        }, reject);
       });
     }
-  
+
     function query (hasGetAll: boolean) {
       return (request: DBCoreQueryRequest) => {
         return new Promise<DBCoreQueryResponse>((resolve, reject) => {
@@ -315,7 +315,7 @@ export function createDBCore (
               source.openCursor(idbKeyRange) :
               source.openKeyCursor(idbKeyRange)
             const result = [];
-            req.onsuccess = event => {
+            req.onsuccess = () => {
               const cursor = req.result as IDBCursorWithValue;
               if (!cursor) return resolve({result});
               result.push(values ? cursor.value : cursor.primaryKey);
@@ -327,11 +327,11 @@ export function createDBCore (
         });
       };
     }
-  
+
     return {
       name: tableName,
       schema: tableSchema,
-      
+
       mutate,
 
       getMany ({trans, keys}) {
@@ -342,16 +342,16 @@ export function createDBCore (
           const result = new Array(length);
           let keyCount = 0;
           let callbackCount = 0;
-          let valueCount = 0;
+          // let valueCount = 0;
           let req: IDBRequest & {_pos?: number};
-    
+
           const successHandler = event => {
             const req = event.target;
-            if ((result[req._pos] = req.result) != null) ++valueCount;
+            result[req._pos] = req.result
             if (++callbackCount === keyCount) resolve(result);
           };
           const errorHandler = eventRejectHandler(reject);
-    
+
           for (let i=0; i<length; ++i) {
             const key = keys[i];
             if (key != null) {
@@ -377,7 +377,7 @@ export function createDBCore (
       },
 
       query: query(hasGetAll),
-      
+
       openCursor,
 
       count ({query, trans}) {
@@ -387,7 +387,7 @@ export function createDBCore (
           const source = index.isPrimaryKey ? store : store.index(index.name);
           const idbKeyRange = makeIDBKeyRange(range);
           const req = idbKeyRange ? source.count(idbKeyRange) : source.count();
-          req.onsuccess = wrap(ev => resolve(ev.target.result));
+          req.onsuccess = wrap(ev => resolve((ev.target as any).result));
           req.onerror = eventRejectHandler(reject);
         });
       }
@@ -400,7 +400,7 @@ export function createDBCore (
   tables.forEach(table => tableMap[table.name] = table);
   return {
     stack: "dbcore",
-    
+
     transaction: db.transaction.bind(db),
 
     table(name: string) {

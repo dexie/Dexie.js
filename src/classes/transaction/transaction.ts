@@ -8,13 +8,12 @@ import { exceptions } from '../../errors';
 import { safariMultiStoreFix } from '../../functions/quirks';
 import { preventDefault } from '../../functions/event-wrappers';
 import { newScope } from '../../helpers/promise';
-import * as Debug from '../../helpers/debug';
 import { Table } from '../table';
 
 /** Transaction
- * 
+ *
  * http://dexie.org/docs/Transaction/Transaction
- * 
+ *
  **/
 export class Transaction implements ITransaction {
   db: Dexie;
@@ -41,7 +40,7 @@ export class Transaction implements ITransaction {
   //
 
   /** Transaction._lock()
-   * 
+   *
    * Internal method.
    */
   _lock() {
@@ -53,7 +52,7 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction._unlock()
-   * 
+   *
    * Internal method.
    */
   _unlock() {
@@ -69,7 +68,7 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction._lock()
-   * 
+   *
    * Internal method.
    */
   _locked() {
@@ -87,9 +86,9 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction.create()
-   * 
+   *
    * Internal method.
-   * 
+   *
    */
   create(idbtrans?: IDBTransaction) {
     if (!this.mode) return this;
@@ -131,7 +130,7 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction._promise()
-   * 
+   *
    * Internal method.
    */
   _promise(
@@ -175,7 +174,7 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction._root()
-   * 
+   *
    * Internal method. Retrieves the root transaction in the tree of sub transactions.
    */
   _root() {
@@ -183,10 +182,10 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction.waitFor()
-   * 
+   *
    * Internal method. Can be accessed from the public API through
    * Dexie.waitFor(): http://dexie.org/docs/Dexie/Dexie.waitFor()
-   * 
+   *
    **/
   waitFor(promiseLike: PromiseLike<any>) {
     // Always operate on the root transaction (in case this is a sub stransaction)
@@ -221,10 +220,10 @@ export class Transaction implements ITransaction {
         }
       });
     });
-  }  
+  }
 
   /** Transaction.abort()
-   * 
+   *
    * http://dexie.org/docs/Transaction/Transaction.abort()
    */
   abort() {
@@ -233,7 +232,7 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction.table()
-   * 
+   *
    * http://dexie.org/docs/Transaction/Transaction.table()
    */
   table(tableName: string) {
@@ -242,7 +241,7 @@ export class Transaction implements ITransaction {
       return memoizedTables[tableName];
     const tableSchema = this.schema[tableName];
     if (!tableSchema) {
-      throw new exceptions.NotFound("Table " + tableName + " not part of transaction");        
+      throw new exceptions.NotFound("Table " + tableName + " not part of transaction");
     }
 
     const transactionBoundTable = new this.db.Table(tableName, tableSchema, this);

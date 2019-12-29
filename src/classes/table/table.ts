@@ -1,27 +1,23 @@
-import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from '../../errors';
+import { BulkError, exceptions } from '../../errors';
 import { Table as ITable } from '../../public/types/table';
 import { TableSchema } from '../../public/types/table-schema';
 import { TableHooks } from '../../public/types/table-hooks';
-import { DexiePromise as Promise, PSD, newScope, wrap, rejection, beginMicroTickScope, endMicroTickScope } from '../../helpers/promise';
-import Events from '../../helpers/Events';
-import { hookCreatingChain, nop, pureFunctionChain, mirror, hookUpdatingChain, hookDeletingChain } from '../../functions/chaining-functions';
+import { DexiePromise as Promise, PSD, newScope, rejection, beginMicroTickScope, endMicroTickScope } from '../../helpers/promise';
 import { Transaction } from '../transaction';
 import { Dexie } from '../dexie';
 import { tempTransaction } from '../../functions/temp-transaction';
-import { eventRejectHandler, hookedEventRejectHandler, hookedEventSuccessHandler, BulkErrorHandlerCatchAll, eventSuccessHandler } from '../../functions/event-wrappers';
-import { WhereClause } from '../where-clause/where-clause';
 import { Collection } from '../collection';
-import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, deepClone, tryCatch, arrayToObject, extend } from '../../functions/utils';
+import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, extend } from '../../functions/utils';
 import { maxString } from '../../globals/constants';
 import { combine } from '../../functions/combine';
 import { PromiseExtended } from "../../public/types/promise-extended";
 import { IndexableType } from '../../public/types/indexable-type';
 import { debug } from '../../helpers/debug';
-import { DBCoreTransactionMode, DBCore, DBCoreTransaction, DBCoreTable, RangeType } from '../../public/types/dbcore';
+import { DBCoreTable } from '../../public/types/dbcore';
 import { AnyRange } from '../../dbcore/keyrange';
 
 /** class Table
- * 
+ *
  * http://dexie.org/docs/Table/Table
  */
 export class Table implements ITable<any, IndexableType> {
@@ -39,8 +35,8 @@ export class Table implements ITable<any, IndexableType> {
   {
     const trans: Transaction = this._tx || PSD.trans;
     const tableName = this.name;
-    
-    function checkTableInTransaction(resolve, reject, trans: Transaction) {
+
+    function checkTableInTransaction(_resolve, _reject, trans: Transaction) {
       if (!trans.schema[tableName])
         throw new exceptions.NotFound("Table " + tableName + " not part of transaction");
       return fn(trans.idbtrans, trans);
@@ -71,9 +67,9 @@ export class Table implements ITable<any, IndexableType> {
   }
 
   /** Table.get()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.get()
-   * 
+   *
    **/
   get(keyOrCrit, cb?) {
     if (keyOrCrit && keyOrCrit.constructor === Object)
@@ -86,16 +82,16 @@ export class Table implements ITable<any, IndexableType> {
   }
 
   /** Table.where()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.where()
-   * 
+   *
    **/
   where(indexOrCrit: string | string[] | { [key: string]: IndexableType }) {
     if (typeof indexOrCrit === 'string')
       return new this.db.WhereClause(this, indexOrCrit);
     if (isArray(indexOrCrit))
       return new this.db.WhereClause(this, `[${indexOrCrit.join('+')}]`);
-    // indexOrCrit is an object map of {[keyPath]:value} 
+    // indexOrCrit is an object map of {[keyPath]:value}
     const keyPaths = keys(indexOrCrit);
     if (keyPaths.length === 1)
       // Only one critera. This was the easy case:
@@ -161,72 +157,72 @@ export class Table implements ITable<any, IndexableType> {
   }
 
   /** Table.filter()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.filter()
-   * 
+   *
    **/
   filter(filterFunction: (obj: any) => boolean) {
     return this.toCollection().and(filterFunction);
   }
 
   /** Table.count()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.count()
-   * 
+   *
    **/
   count(thenShortcut?: any) {
     return this.toCollection().count(thenShortcut);
   }
 
   /** Table.offset()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.offset()
-   * 
+   *
    **/
   offset(offset: number) {
     return this.toCollection().offset(offset);
   }
 
   /** Table.limit()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.limit()
-   * 
+   *
    **/
   limit(numRows: number) {
     return this.toCollection().limit(numRows);
   }
 
   /** Table.each()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.each()
-   * 
+   *
    **/
   each(callback: (obj: any, cursor: { key: IndexableType, primaryKey: IndexableType }) => any) {
     return this.toCollection().each(callback);
   }
 
   /** Table.toArray()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.toArray()
-   * 
+   *
    **/
   toArray(thenShortcut?: any) {
     return this.toCollection().toArray(thenShortcut);
   }
 
   /** Table.toCollection()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.toCollection()
-   * 
+   *
    **/
   toCollection() {
     return new this.db.Collection(new this.db.WhereClause(this));
   }
 
   /** Table.orderBy()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.orderBy()
-   * 
+   *
    **/
   orderBy(index: string | string[]) {
     return new this.db.Collection(
@@ -236,18 +232,18 @@ export class Table implements ITable<any, IndexableType> {
   }
 
   /** Table.reverse()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.reverse()
-   * 
+   *
    **/
   reverse(): Collection {
     return this.toCollection().reverse();
   }
 
   /** Table.mapToClass()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.mapToClass()
-   * 
+   *
    **/
   mapToClass(constructor: Function) {
     this.schema.mappedClass = constructor;
@@ -279,9 +275,9 @@ export class Table implements ITable<any, IndexableType> {
   }
 
   /** Table.add()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.add()
-   * 
+   *
    **/
   add(obj, key?: IndexableType): PromiseExtended<IndexableType> {
     return this._trans('readwrite', trans => {
@@ -296,9 +292,9 @@ export class Table implements ITable<any, IndexableType> {
   }
 
   /** Table.update()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.update()
-   * 
+   *
    **/
   update(keyOrObject, modifications: { [keyPath: string]: any; }): PromiseExtended<number> {
     if (typeof modifications !== 'object' || isArray(modifications))
@@ -319,9 +315,9 @@ export class Table implements ITable<any, IndexableType> {
   }
 
   /** Table.put()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.put()
-   * 
+   *
    **/
   put(obj, key?: IndexableType): PromiseExtended<IndexableType> {
     return this._trans(
@@ -337,9 +333,9 @@ export class Table implements ITable<any, IndexableType> {
   }
 
   /** Table.delete()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.delete()
-   * 
+   *
    **/
   delete(key: IndexableType): PromiseExtended<void> {
     return this._trans('readwrite',
@@ -348,9 +344,9 @@ export class Table implements ITable<any, IndexableType> {
   }
 
   /** Table.clear()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.clear()
-   * 
+   *
    **/
   clear() {
     return this._trans('readwrite',
@@ -359,10 +355,10 @@ export class Table implements ITable<any, IndexableType> {
   }
 
   /** Table.bulkGet()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.bulkGet()
-   * 
-   * @param keys 
+   *
+   * @param keys
    */
   bulkGet(keys: IndexableType[]) {
     return this._trans('readonly', trans => {
@@ -374,9 +370,9 @@ export class Table implements ITable<any, IndexableType> {
   }
 
   /** Table.bulkAdd()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.bulkAdd()
-   * 
+   *
    **/
   bulkAdd(objects: any[], keys?: ReadonlyArray<IndexableType>) {
     return this._trans('readwrite', trans => {
@@ -399,9 +395,9 @@ export class Table implements ITable<any, IndexableType> {
 
 
   /** Table.bulkPut()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.bulkPut()
-   * 
+   *
    **/
   bulkPut(objects: any[], keys?: ReadonlyArray<IndexableType>) {
     return this._trans('readwrite', trans => {
@@ -423,9 +419,9 @@ export class Table implements ITable<any, IndexableType> {
   }
 
   /** Table.bulkDelete()
-   * 
+   *
    * http://dexie.org/docs/Table/Table.bulkDelete()
-   * 
+   *
    **/
   bulkDelete(keys: ReadonlyArray<IndexableType>): PromiseExtended<void> {
     const numKeys = keys.length;

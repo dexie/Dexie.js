@@ -1,9 +1,7 @@
 import { WhereClause } from './where-clause';
 import { Collection } from '../collection';
-import { Dexie } from '../dexie';
 import { STRING_EXPECTED } from '../../globals/constants';
 import { simpleCompare, simpleCompareReverse } from '../../functions/compare-functions';
-import { CollectionConstructor } from '../collection';
 import { IndexableType } from '../../public';
 import { KeyRange, RangeType } from '../../public/types/dbcore';
 
@@ -11,7 +9,7 @@ export function fail(collectionOrWhereClause: Collection | WhereClause, err, T?)
   var collection = collectionOrWhereClause instanceof WhereClause ?
       new collectionOrWhereClause.Collection (collectionOrWhereClause) :
       collectionOrWhereClause;
-      
+
   collection._ctx.error = T ? new T(err) : new TypeError(err);
   return collection;
 }
@@ -50,8 +48,7 @@ export function nextCasing(key, lowerKey, upperNeedle, lowerNeedle, cmp, dir) {
   return (llp < 0 ? null : key.substr(0, llp) + lowerNeedle[llp] + upperNeedle.substr(llp + 1));
 }
 
-export function addIgnoreCaseAlgorithm(whereClause: WhereClause, match, needles, suffix) {
-  /// <param name="needles" type="Array" elementType="String"></param>
+export function addIgnoreCaseAlgorithm(whereClause: WhereClause, match, needles: [String], suffix) {
   var upper, lower, compare, upperNeedles, lowerNeedles, direction, nextKeySuffix,
       needlesLen = needles.length;
   if (!needles.every(s => typeof s === 'string')) {
@@ -66,8 +63,8 @@ export function addIgnoreCaseAlgorithm(whereClause: WhereClause, match, needles,
       }).sort(function(a,b) {
           return compare(a.lower, b.lower);
       });
-      upperNeedles = needleBounds.map(function (nb){ return nb.upper; });
-      lowerNeedles = needleBounds.map(function (nb){ return nb.lower; });
+      upperNeedles = needleBounds.map(nb => nb.upper);
+      lowerNeedles = needleBounds.map(nb => nb.lower);
       direction = dir;
       nextKeySuffix = (dir === "next" ? "" : suffix);
   }
@@ -85,10 +82,7 @@ export function addIgnoreCaseAlgorithm(whereClause: WhereClause, match, needles,
 
   var firstPossibleNeedle = 0;
 
-  c._addAlgorithm(function (cursor, advance, resolve) {
-      /// <param name="cursor" type="IDBCursor"></param>
-      /// <param name="advance" type="Function"></param>
-      /// <param name="resolve" type="Function"></param>
+  c._addAlgorithm(function (cursor: IDBCursor, advance: Function, resolve: Function) {
       var key = cursor.key;
       if (typeof key !== 'string') return false;
       var lowerKey = lower(key);

@@ -55,7 +55,7 @@ var override = Dexie.override;
 var Promise = Dexie.Promise;
 var browserIsShuttingDown = false;
 
-export default function Observable(db) {
+export default function Observable(db: Dexie) {
     /// <summary>
     ///   Extension to Dexie providing Syncronization capabilities to Dexie.
     /// </summary>

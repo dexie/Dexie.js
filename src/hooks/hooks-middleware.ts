@@ -1,6 +1,6 @@
 import { DBCore, DBCoreTable, MutateResponse, DeleteRangeRequest, AddRequest, PutRequest, DeleteRequest, DBCoreTransaction, KeyRange } from '../public/types/dbcore';
 import { nop } from '../functions/chaining-functions';
-import { tryCatch, getObjectDiff, setByKeyPath } from '../functions/utils';
+import { getObjectDiff, setByKeyPath } from '../functions/utils';
 import { PSD } from '../helpers/promise';
 //import { LockableTableMiddleware } from '../dbcore/lockable-table-middleware';
 import { getEffectiveKeys, getExistingValues } from '../dbcore/get-effective-keys';
@@ -16,7 +16,7 @@ export const hooksMiddleware: Middleware<DBCore>  = {
     table(tableName: string) {
       const downTable = downCore.table(tableName);
       const {primaryKey} = downTable.schema;
-  
+
       const tableMiddleware: DBCoreTable = {
         ...downTable,
         mutate(req):Promise<MutateResponse> {
@@ -52,7 +52,7 @@ export const hooksMiddleware: Middleware<DBCore>  = {
               {...req};
             if (req.type !== 'delete') req.values = [...req.values];
             if (req.keys) req.keys = [...req.keys];
-  
+
             return getExistingValues(downTable, req, keys).then (existingValues => {
               const contexts = keys.map((key, i) => {
                 const existingValue = existingValues[i];
@@ -104,11 +104,11 @@ export const hooksMiddleware: Middleware<DBCore>  = {
               });
             });
           }
-  
+
           function deleteRange(req: DeleteRangeRequest): Promise<MutateResponse> {
             return deleteNextChunk(req.trans, req.range, 10000);
           }
-  
+
           function deleteNextChunk(trans: DBCoreTransaction, range: KeyRange, limit: number) {
             // Query what keys in the DB within the given range
             return downTable.query({trans, values: false, query: {index: primaryKey, range}, limit})

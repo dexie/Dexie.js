@@ -8,7 +8,6 @@ import { exceptions } from '../../errors';
 import { TableSchema } from '../../public/types/table-schema';
 import { IndexSpec } from '../../public/types/index-spec';
 import { hasIEDeleteObjectStoreBug } from '../../globals/constants';
-import { safariMultiStoreFix } from '../../functions/quirks';
 import { createIndexSpec, nameFromKeyPath } from '../../helpers/index-spec';
 import { createTableSchema } from '../../helpers/table-schema';
 import { generateMiddlewareStacks } from '../dexie/generate-middleware-stacks';
@@ -94,7 +93,7 @@ export function updateTablesAndIndexes(
       globalSchema = db._dbSchema = newSchema;
 
       const diff = getSchemaDiff(oldSchema, newSchema);
-      // Add tables           
+      // Add tables
       diff.add.forEach(tuple => {
         createTable(idbUpgradeTrans, tuple[0], tuple[1].primKey, tuple[1].indexes);
       });
@@ -140,7 +139,7 @@ export function updateTablesAndIndexes(
 
         // Support for native async await.
         incrementExpectedAwaits();
-        
+
         let returnValue: any;
         const promiseFollowed = Promise.follow(() => {
           // Finally, call the scope function with our table and transaction arguments.
