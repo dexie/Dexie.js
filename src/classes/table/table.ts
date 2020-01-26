@@ -378,7 +378,15 @@ export class Table implements ITable<any, IndexableType> {
    * http://dexie.org/docs/Table/Table.bulkAdd()
    * 
    **/
-  bulkAdd(objects: any[], keys?: ReadonlyArray<IndexableType>) {
+  bulkAdd(
+    objects: any[],
+    keysOrOptions?: ReadonlyArray<IndexableType> | { allKeys?: boolean },
+    options?: { allKeys?: boolean }
+  ) {    
+    const keys = Array.isArray(keysOrOptions) ? keysOrOptions : undefined;
+    options = options || (keys ? undefined : keysOrOptions as { allKeys?: boolean });
+    const wantResults = options ? options.allKeys : undefined;
+
     return this._trans('readwrite', trans => {
       const {outbound} = this.core.schema.primaryKey;
       if (!outbound && keys)
@@ -387,9 +395,12 @@ export class Table implements ITable<any, IndexableType> {
         throw new exceptions.InvalidArgument("Arguments objects and keys must have the same length");
 
       const numObjects = objects.length; // Pick length here to allow garbage collection of objects later
-      return this.core.mutate({trans, type: 'add', keys: keys as IndexableType[], values: objects})
-        .then(({numFailures, lastResult, failures}) => {
-          if (numFailures === 0) return lastResult;
+      return this.core.mutate(
+        {trans, type: 'add', keys: keys as IndexableType[], values: objects, wantResults}
+      )
+        .then(({numFailures, results,lastResult, failures}) => {
+          const result = wantResults ? results : lastResult;
+          if (numFailures === 0) return result;
           throw new BulkError(
             `${this.name}.bulkAdd(): ${numFailures} of ${numObjects} operations failed`,
               Object.keys(failures).map(pos => failures[pos]));
@@ -397,13 +408,20 @@ export class Table implements ITable<any, IndexableType> {
     });
   }
 
-
   /** Table.bulkPut()
    * 
    * http://dexie.org/docs/Table/Table.bulkPut()
    * 
    **/
-  bulkPut(objects: any[], keys?: ReadonlyArray<IndexableType>) {
+  bulkPut(
+    objects: any[],
+    keysOrOptions?: ReadonlyArray<IndexableType> | { allKeys?: boolean },
+    options?: { allKeys?: boolean }
+  ) {   
+    const keys = Array.isArray(keysOrOptions) ? keysOrOptions : undefined;
+    options = options || (keys ? undefined : keysOrOptions as { allKeys?: boolean });
+    const wantResults = options ? options.allKeys : undefined;
+
     return this._trans('readwrite', trans => {
       const {outbound} = this.core.schema.primaryKey;
       if (!outbound && keys)
@@ -412,9 +430,12 @@ export class Table implements ITable<any, IndexableType> {
         throw new exceptions.InvalidArgument("Arguments objects and keys must have the same length");
 
       const numObjects = objects.length; // Pick length here to allow garbage collection of objects later
-      return this.core.mutate({trans, type: 'put', keys: keys as IndexableType[], values: objects})
-        .then(({numFailures, lastResult, failures}) => {
-          if (numFailures === 0) return lastResult;
+      return this.core.mutate(
+        {trans, type: 'put', keys: keys as IndexableType[], values: objects, wantResults}
+      )
+        .then(({numFailures, results, lastResult, failures}) => {
+          const result = wantResults ? results : lastResult;
+          if (numFailures === 0) return result;
           throw new BulkError(
             `${this.name}.bulkPut(): ${numFailures} of ${numObjects} operations failed`,
               Object.keys(failures).map(pos => failures[pos]));
