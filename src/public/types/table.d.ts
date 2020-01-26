@@ -47,7 +47,14 @@ export interface Table<T=any, TKey=IndexableType> {
   delete(key: TKey): PromiseExtended<void>;
   clear(): PromiseExtended<void>;
   bulkGet(keys: TKey[]): PromiseExtended<T[]>;
-  bulkAdd(items: T[], keys?: IndexableTypeArrayReadonly): PromiseExtended<TKey>;
-  bulkPut(items: T[], keys?: IndexableTypeArrayReadonly): PromiseExtended<TKey>;
-  bulkDelete(keys: IndexableTypeArrayReadonly) : PromiseExtended<void>;
+
+  bulkAdd<B extends boolean>(items: T[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): B extends true ? Promise<TKey[]> : Promise<TKey>;
+  bulkAdd<B extends boolean>(items: T[], options: { allKeys: B }): B extends true ? Promise<TKey[]> : Promise<TKey>;
+  bulkAdd(items: T[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): Promise<TKey>;
+
+  bulkPut<B extends boolean>(items: T[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): B extends true ? Promise<TKey[]> : Promise<TKey>;
+  bulkPut<B extends boolean>(items: T[], options: { allKeys: B }): B extends true ? Promise<TKey[]> : Promise<TKey>;
+  bulkPut(items: T[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): Promise<TKey>;
+
+  bulkDelete(keys: IndexableTypeArrayReadonly): PromiseExtended<void>;
 }
