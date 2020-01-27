@@ -731,3 +731,31 @@ promisedTest(
     await db.delete();
   }
 );
+
+
+promisedTest(
+    "PR #959: Dexie should no more require users to keep old versions if they don't attach an upgrader to it",
+    async ()=>{
+        const DBNAME = "pr959";
+
+        await Dexie.delete(DBNAME);
+        let db = new Dexie(DBNAME);
+        db.version(1).stores({
+            friends: "id"
+        });
+        await db.open();
+        ok(true, "Could open v1");
+        await db.friends.add({id: 1, name: "Foo 959"});
+        db.close();
+        db = new Dexie(DBNAME);
+        db.version(2).stores({
+            friends: "id, name"
+        });
+        await db.open();
+        ok(true, "Could open v2 without having v1 specified. Name should now be indexed.");
+        const foo = await db.friends.where("name").startsWith("Foo").first();
+        ok(!!foo, "Could find friend using newly added index");
+        equal(foo.id, 1, "Got the right foo here");
+        db.close();
+    }
+);
