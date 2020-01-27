@@ -81,7 +81,7 @@
   "devDependencies": {
     "dexie": "^2.0.4",
     "eslint": "^5.16.0",
-    "just-build": "^0.9.16",
+    "just-build": "^0.9.19",
     "karma": "^4.1.0",
     "karma-browserstack-launcher": "^1.5.1",
     "karma-chrome-launcher": "^2.0.0",

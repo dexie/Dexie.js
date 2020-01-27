@@ -29,7 +29,7 @@
   },
   "homepage": "https://github.com/dfahlander/Dexie.js#readme",
   "dependencies": {
-    "just-build": "0.9.16",
-    "dexie-relationships": "1.2.1"
+    "dexie-relationships": "^1.2.11",
+    "just-build": "^0.9.19"
   }
 }
