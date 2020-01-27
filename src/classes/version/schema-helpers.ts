@@ -7,7 +7,7 @@ import Promise, { PSD, newScope, NativePromise, decrementExpectedAwaits, increme
 import { exceptions } from '../../errors';
 import { TableSchema } from '../../public/types/table-schema';
 import { IndexSpec } from '../../public/types/index-spec';
-import { hasIEDeleteObjectStoreBug } from '../../globals/constants';
+import { hasIEDeleteObjectStoreBug, isIEOrEdge } from '../../globals/constants';
 import { safariMultiStoreFix } from '../../functions/quirks';
 import { createIndexSpec, nameFromKeyPath } from '../../helpers/index-spec';
 import { createTableSchema } from '../../helpers/table-schema';
@@ -219,7 +219,10 @@ export function getSchemaDiff(oldSchema: DbSchema, newSchema: DbSchema): SchemaD
         add: [],
         change: []
       };
-      if (oldDef.primKey.src !== newDef.primKey.src) {
+      if (oldDef.primKey.src !== newDef.primKey.src &&
+          !isIEOrEdge // IE and non-chromium Edge has a bug reading spec of primary key
+         ) 
+      { 
         // Primary key has changed. Remove and re-add table.
         change.recreate = true;
         diff.change.push(change);
