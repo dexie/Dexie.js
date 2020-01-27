@@ -308,6 +308,68 @@ spawnedTest("bulkAdd", function*(){
     equal (result, highestKey + 2, "Result of bulkAdd() operation was equal to highestKey + 2");
 });
 
+spawnedTest("bulkAdd-all-results", function* () {
+    var dbBulkAddAll = new Dexie("TestDBTableBulkAddAllResults");
+    dbBulkAddAll.version(1).stores({
+        dudes: "++,first,last"
+    });
+    var highestKey = yield dbBulkAddAll.dudes.add({ username: "fsdkljfd", email: "fjkljslk", find: "bulkAddAll" });
+
+    // should be able to get all keys with options object as second argument
+    var allKeys = yield dbBulkAddAll.dudes.bulkAdd([
+        { first: "Åke1", last: "Persbrant1", find: "bulkAddAll" },
+        { first: "Åke2", last: "Persbrant2", find: "bulkAddAll" }
+    ], { allKeys: true });
+    var expectedKeys = [highestKey + 1, highestKey + 2];
+    deepEqual(allKeys, expectedKeys,
+        "Result of bulkAdd(objects, { allKeys: true }) operation was equal to [highestKey + 1, highestKey + 2]");
+
+    // should be able to get all keys with options object as third argument
+    highestKey = yield dbBulkAddAll.dudes.add({ username: "fsdkljfd", email: "fjkljslk", find: "bulkAddAll" });
+    var allKeys2 = yield dbBulkAddAll.dudes.bulkAdd([
+        { first: "Åke1", last: "Persbrant1", find: "bulkAddAll" },
+        { first: "Åke2", last: "Persbrant2", find: "bulkAddAll" }
+    ], undefined, { allKeys: true });
+    var expectedKeys2 = [highestKey + 1, highestKey + 2];
+    deepEqual(allKeys2, expectedKeys2,
+        "Result of bulkAdd(objects, undefined, { allKeys: true }) operation was equal to [highestKey + 1, highestKey + 2]");
+
+    // should be able to get all keys with options object as third argument with some keys
+    var allKeys3 = yield dbBulkAddAll.dudes.bulkAdd([
+        { first: "Åke1", last: "Persbrant1" },
+        { first: "Åke2", last: "Persbrant2" }
+    ], ['sd5fs2df', 'dasfsd3fs7df'], { allKeys: true });
+    deepEqual(allKeys3, ['sd5fs2df', 'dasfsd3fs7df'],
+        "Result of bulkAdd(objects, ['sd5fs2df', 'dasfsd3fs7df'], { allKeys: true }) operation was equal to ['sd5fs2df', 'dasfsd3fs7df']");
+
+    // should return last key with 1 argument and options: { allKeys: false }
+    highestKey = yield dbBulkAddAll.dudes.add({ username: "fsdkljfd", email: "fjkljslk", find: "bulkAddAll" });
+    var lastKey = yield dbBulkAddAll.dudes.bulkAdd([
+        { first: "Åke1", last: "Persbrant1" },
+        { first: "Åke2", last: "Persbrant2" }
+    ], { allKeys: false });
+    equal(lastKey, highestKey + 2,
+        "Result of bulkAdd(objects, { allKeys: false }) operation was equal to highestKey + 2");
+
+    // should return last key with 2 arguments and options: { allKeys: false }
+    var lastKey = yield dbBulkAddAll.dudes.bulkAdd([
+        { first: "Åke1", last: "Persbrant1" },
+        { first: "Åke2", last: "Persbrant2" }
+    ], ['cv4btr45fbrt', 'b33vn3fytn'], { allKeys: false });
+    equal(lastKey, 'b33vn3fytn',
+        "Result of bulkAdd(objects, ['cv4btr45fbrt', 'b33vn3fytn'], { allKeys: false }) operation was equal to 'b33vn3fytn'");
+
+    // should return last key with 2 arguments and no options object
+    var lastKey = yield dbBulkAddAll.dudes.bulkAdd([
+        { first: "Åke1", last: "Persbrant1" },
+        { first: "Åke2", last: "Persbrant2" }
+    ], ['dfgd2vdfh4d', 'ty1jxdbd9']);
+    equal(lastKey, 'ty1jxdbd9',
+        "Result of bulkAdd(objects, ['dfgd2vdfh4d', 'ty1jxdbd9']) operation was equal to 'ty1jxdbd9'");
+
+    yield dbBulkAddAll.delete();
+});
+
 spawnedTest("bulkAdd-catching errors", function*() {
     yield db.transaction("rw", db.users, function() {
         var newUsers = [
@@ -443,6 +505,84 @@ spawnedTest("bulkPut", function*(){
     equal(ourAddedUsers.length, 3, "Should have put 3 users there (two additions and one replaced");
     let replacedDfahlander = yield db.users.get(idOfFirstUser);
     equal(replacedDfahlander.username, "aper2", "dfahlander Should now be aper2 instead");
+});
+
+spawnedTest("bulkPut-all-results", function* () {
+    var dbBulkPutAll = new Dexie("TestDBTableBulkPutAllResults");
+    dbBulkPutAll.version(1).stores({
+        users: "++id,first,last,find",
+        mates: "++id,first,last,find",
+        dudes: "++,first,last,find",
+    });
+    var highestKey = yield dbBulkPutAll.users.add({ first: "fsdkljfd", last: "fjkljslk", find: "bulkPutAll" });
+
+    // should be able to get all keys with options object as second argument (users)
+    var allKeys = yield dbBulkPutAll.users.bulkPut([
+        { first: "Åke1", last: "Persbrant1", find: "bulkPutAll" },
+        { id: highestKey, first: "Åke2", last: "Persbrant2", find: "bulkPutAll" },
+        { first: "Åke3", last: "Persbrant3", find: "bulkPutAll" }
+    ], { allKeys: true });
+    deepEqual(allKeys, [highestKey + 1, highestKey, highestKey + 2],
+        "Result of bulkAdd(objects, { allKeys: true }) operation was equal to [highestKey + 1, highestKey, highestKey + 2]");
+    let ourAddedUsers = yield dbBulkPutAll.users.where('find').startsWith("bulkPutAll").toArray();
+    equal(ourAddedUsers.length, 3, "Should have put 3 users there (two additions and one replaced");
+    let replacedRecord = yield dbBulkPutAll.users.get(highestKey);
+    equal(replacedRecord.last, "Persbrant2", "fjkljslk should now be Persbrant2 instead");
+
+    // should be able to get all keys with options object as third argument (mates)
+    highestKey = yield dbBulkPutAll.mates.add({ first: "fsdkljfd", last: "fjkljslk", find: "bulkPutAll" });
+    var allKeys2 = yield dbBulkPutAll.mates.bulkPut([
+        { first: "Åke1", last: "Persbrant1", find: "bulkPutAll" },
+        { id: highestKey, first: "Åke2", last: "Persbrant2", find: "bulkPutAll" },
+        { first: "Åke3", last: "Persbrant3", find: "bulkPutAll" }
+    ], undefined, { allKeys: true });
+    deepEqual(allKeys2, [highestKey + 1, highestKey, highestKey + 2],
+        "Result of bulkPut(objects, undefined, { allKeys: true }) operation was equal to [highestKey + 1, highestKey, highestKey + 2]");
+    let ourAddedUsers2 = yield dbBulkPutAll.mates.where('find').startsWith("bulkPutAll").toArray();
+    equal(ourAddedUsers2.length, 3, "Should have put 3 users there (two additions and one replaced");
+    let replacedRecord2 = yield dbBulkPutAll.mates.get(highestKey);
+    equal(replacedRecord2.last, "Persbrant2", "fjkljslk should now be Persbrant2 instead");
+
+    // should be able to get all keys with options object as third argument with keys array (dudes)
+    highestKey = yield dbBulkPutAll.dudes.add({ first: "fsdkljfd", last: "fjkljslk", find: "bulkPutAll" });
+    var allKeys3 = yield dbBulkPutAll.dudes.bulkPut([
+        { first: "Åke1", last: "Persbrant1", find: "bulkPutAll" },
+        { id: highestKey, first: "Åke2", last: "Persbrant2", find: "bulkPutAll" },
+        { first: "Åke3", last: "Persbrant3", find: "bulkPutAll" }
+    ], ['sd5fs2df', highestKey, 'dasfsd3fs7df'], { allKeys: true });
+    deepEqual(allKeys3, ['sd5fs2df', highestKey, 'dasfsd3fs7df'],
+        "Result of bulkPut(objects, ['sd5fs2df', highestKey, 'dasfsd3fs7df'], { allKeys: true }) operation was equal to ['sd5fs2df', highestKey, 'dasfsd3fs7df']");
+    let ourAddedUsers3 = yield dbBulkPutAll.dudes.where('find').startsWith("bulkPutAll").toArray();
+    equal(ourAddedUsers3.length, 3, "Should have put 3 users there (two additions and one replaced");
+    let replacedRecord3 = yield dbBulkPutAll.dudes.get(highestKey);
+    equal(replacedRecord3.last, "Persbrant2", "fjkljslk should now be Persbrant2 instead");
+
+    // should return last key with 1 argument and options: { allKeys: false }
+    highestKey = yield dbBulkPutAll.dudes.add({ username: "fsdkljfd", email: "fjkljslk", find: "bulkAddAll" });
+    var lastKey = yield dbBulkPutAll.dudes.bulkAdd([
+        { first: "Åke1", last: "Persbrant1" },
+        { first: "Åke2", last: "Persbrant2" }
+    ], { allKeys: false });
+    equal(lastKey, highestKey + 2,
+        "Result of bulkAdd(objects, { allKeys: false }) operation was equal to highestKey + 2");
+
+    // should return last key with 2 arguments and options: { allKeys: false }
+    var lastKey = yield dbBulkPutAll.dudes.bulkAdd([
+        { first: "Åke1", last: "Persbrant1" },
+        { first: "Åke2", last: "Persbrant2" }
+    ], ['cv4btr45fbrt', 'b33vn3fytn'], { allKeys: false });
+    equal(lastKey, 'b33vn3fytn',
+        "Result of bulkAdd(objects, ['cv4btr45fbrt', 'b33vn3fytn'], { allKeys: false }) operation was equal to 'b33vn3fytn'");
+
+    // should return last key with 2 arguments and no options object
+    var lastKey = yield dbBulkPutAll.dudes.bulkAdd([
+        { first: "Åke1", last: "Persbrant1" },
+        { first: "Åke2", last: "Persbrant2" }
+    ], ['dfgd2vdfh4d', 'ty1jxdbd9']);
+    equal(lastKey, 'ty1jxdbd9',
+        "Result of bulkAdd(objects, ['dfgd2vdfh4d', 'ty1jxdbd9']) operation was equal to 'ty1jxdbd9'");
+
+    yield dbBulkPutAll.delete();
 });
 
 spawnedTest("bulkPut with overlapping objects", function*(){
