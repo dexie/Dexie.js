@@ -3,7 +3,8 @@ import Dexie from 'dexie';
 import 'dexie-observable';
 import '../../src/Dexie.Syncable';
 import dexieSyncable from '../../src/Dexie.Syncable';
-import {IDatabaseChange, DatabaseChangeType} from '../../api';
+import {DatabaseChangeType} from '../../api';
+import {IDatabaseChange} from 'dexie-observable/api';
 
 //
 // Typings for registerSyncProtocol():
