@@ -225,7 +225,7 @@ export function createDBCore (
         req.onerror = eventRejectHandler(reject);
         req.onsuccess = wrap(ev => {
 
-          const cursor = req.result as DBCoreCursor;
+          const cursor = req.result as unknown as DBCoreCursor;
           if (!cursor) {
             resolve(null);
             return;
@@ -387,7 +387,7 @@ export function createDBCore (
           const source = index.isPrimaryKey ? store : store.index(index.name);
           const idbKeyRange = makeIDBKeyRange(range);
           const req = idbKeyRange ? source.count(idbKeyRange) : source.count();
-          req.onsuccess = wrap(ev => resolve(ev.target.result));
+          req.onsuccess = wrap(ev => resolve((ev.target as IDBRequest).result));
           req.onerror = eventRejectHandler(reject);
         });
       }

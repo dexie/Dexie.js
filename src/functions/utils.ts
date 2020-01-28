@@ -76,6 +76,7 @@ export function assert (b) {
 }
 
 export function asap(fn) {
+    // @ts-ignore
     if (_global.setImmediate) setImmediate(fn); else setTimeout(fn, 0);
 }
 
