@@ -1,0 +1,20 @@
+{
+  "name": "test-dexie-relationships",
+  "version": "1.0.0",
+  "description": "",
+  "private": true,
+  "main": "index.js",
+  "scripts": {
+    "test": "webpack --mode development && npm run test:karma",
+    "test:karma": "../../../node_modules/karma/bin/karma start karma.conf.js --single-run"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "dexie-relationships": "^1.2.11"
+  },
+  "devDependencies": {
+    "webpack": "^4.41.5",
+    "webpack-cli": "^3.3.10"
+  }
+}
