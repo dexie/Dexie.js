@@ -24,12 +24,12 @@
   },
   "homepage": "https://github.com/dfahlander/Dexie.js#readme",
   "dependencies": {
-    "dexie": "^2.0.0-beta.2"
+    "dexie": "^3.0.0-rc.2"
   },
   "devDependencies": {
     "rollup": "0.36.3",
     "rollup-plugin-commonjs": "5.0.5",
     "rollup-plugin-node-resolve": "2.0.0",
-    "typescript": "2.1.0-dev.20161012"
+    "typescript": "^3.7.5"
   }
 }
