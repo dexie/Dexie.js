@@ -2,11 +2,11 @@
   "name": "dexie-sample-typescript-simple",
   "version": "1.0.0",
   "description": "Simples possible typescript sample with requirejs to minimize build steps",
-  "main": "app.js",
+  "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node node_modules/http-server/bin/http-server . -a localhost -p 8081",
-    "build": "node node_modules/typescript/bin/tsc"
+    "start": "webpack-dev-server --open",
+    "build": "webpack --mode production"
   },
   "repository": {
     "type": "git",
@@ -20,11 +20,13 @@
   "author": "David Fahlander",
   "license": "Apache-2.0",
   "devDependencies": {
-    "http-server": "^0.11.1",
-    "requirejs": "^2.1.22",
-    "typescript": "^2.1.4"
+    "ts-loader": "^6.2.1",
+    "typescript": "^3.7.5",
+    "webpack": "^4.41.5",
+    "webpack-cli": "^3.3.10",
+    "webpack-dev-server": "^3.10.1"
   },
   "dependencies": {
-    "dexie": "^2.0.0-beta.6"
+    "dexie": "^3.0.0-rc.2"
   }
 }
