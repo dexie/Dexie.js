@@ -15,10 +15,10 @@ module.exports = function (config) {
     // The files needed to apply dexie-observable to the standard dexie unit tests.
     files: karmaCommon.files.concat([
       'dist/dexie.js', // Dexie
-      'test/integrations/node_modules/dexie-relationships/dist/index.js', // dexieRelationships
-      'test/integrations/dexie-relationships/test-bundle.js',
-      { pattern: 'test/integrations/dexie-relationships/test-bundle.js.map', included: false },
-      { pattern: 'test/integrations/node_modules/dexie-relationships/dist/*.map', included: false },
+      'test/integrations/test-dexie-relationships/node_modules/dexie-relationships/dist/index.js', // dexieRelationships
+      'test/integrations/test-dexie-relationships/dist/test-bundle.js',
+      { pattern: 'test/integrations/test-dexie-relationships/dist/test-bundle.js.map', included: false },
+      { pattern: 'test/integrations/test-dexie-relationships/node_modules/dexie-relationships/dist/*.map', included: false },
     ])
   });
 
