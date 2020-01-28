@@ -88,23 +88,23 @@
   "devDependencies": {
     "dts-bundle-generator": "^1.6.1",
     "just-build": "^0.9.19",
-    "karma": "^4.1.0",
+    "karma": "^4.4.1",
     "karma-browserstack-launcher": "^1.5.1",
     "karma-chrome-launcher": "^2.0.0",
-    "karma-firefox-launcher": "^1.1.0",
+    "karma-firefox-launcher": "^1.3.0",
     "karma-mocha-reporter": "^2.2.5",
-    "karma-qunit": "^3.1.2",
-    "qunit": "^2.9.2",
+    "karma-qunit": "^3.1.3",
+    "qunit": "^2.9.3",
     "qunitjs": "^1.23.1",
     "rollup": "^0.55.5",
     "rollup-plugin-cleanup": "^2.0.1",
     "rollup-plugin-commonjs": "^8.4.1",
     "rollup-plugin-node-resolve": "^3.4.0",
     "rollup-plugin-sourcemaps": "^0.4.1",
-    "serve-static": "^1.13.2",
-    "tslib": "^1.9.3",
+    "serve-static": "^1.14.1",
+    "tslib": "^1.10.0",
     "typescript": "^2.9.2",
-    "uglify-js": "^3.5.6"
+    "uglify-js": "^3.7.6"
   },
   "dependencies": {}
 }
