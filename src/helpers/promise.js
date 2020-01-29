@@ -316,6 +316,34 @@ props (DexiePromise, {
         });
     },
 
+    allSettled() {
+        const possiblePromises = getArrayOf.apply(null, arguments).map(onPossibleParallellAsync);
+        return new DexiePromise((resolve, reject) => {
+            if (possiblePromises.length === 0) resolve([]);
+            let remaining = possiblePromises.length;
+            const results = possiblePromises.map(possibleValue => ({status: "fulfilled", value: possibleValue}));
+            possiblePromises.forEach((p, i) => DexiePromise.resolve(p).then(
+                value => results[i] = {status: "fulfilled", value},
+                reason => results[i] = {status: "rejected", reason})
+                .then(()=>--remaining || resolve(results)));
+        });
+    },
+
+    any() {
+        const possiblePromises = getArrayOf.apply(null, arguments).map(onPossibleParallellAsync);
+        return new DexiePromise((resolve, reject) => {
+            if (possiblePromises.length === 0) reject(new AggregateError([]));
+            let remaining = possiblePromises.length;
+            const failures = [];
+            possiblePromises.forEach(p => DexiePromise.resolve(p).then(
+                value => resolve(value),
+                failure => {
+                    failures.push(failure);
+                    if (!--remaining) reject(new AggregateError(failures));
+                }));
+        });
+    },
+
     PSD: {
         get: ()=>PSD,
         set: value => PSD = value
@@ -651,6 +679,8 @@ export function newScope (fn, props, a1, a2) {
         PromiseProp: {value: DexiePromise, configurable: true, writable: true},
         all: DexiePromise.all,
         race: DexiePromise.race,
+        allSettled: DexiePromise.allSettled,
+        any: DexiePromise.any,
         resolve: DexiePromise.resolve,
         reject: DexiePromise.reject,
         nthen: getPatchedPromiseThen (globalEnv.nthen, psd), // native then
@@ -764,6 +794,8 @@ function switchToZone (targetZone, bEnteringZone) {
             GlobalPromise.race = targetEnv.race;
             GlobalPromise.resolve = targetEnv.resolve;
             GlobalPromise.reject = targetEnv.reject;
+            GlobalPromise.allSettled = targetEnv.allSettled;
+            GlobalPromise.any = targetEnv.any;
         }
     }
 }
@@ -775,6 +807,8 @@ function snapShot () {
         PromiseProp: Object.getOwnPropertyDescriptor(_global, "Promise"),
         all: GlobalPromise.all,
         race: GlobalPromise.race,
+        allSettled: GlobalPromise.allSettled,
+        any: GlobalPromise.any,
         resolve: GlobalPromise.resolve,
         reject: GlobalPromise.reject,
         nthen: nativePromiseProto.then,
