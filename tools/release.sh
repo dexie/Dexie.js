@@ -51,7 +51,7 @@ next_ref="v$next_version"
 # Auto-publish addons?
 ADDONS_DIR="addons/"
 # Use an array to make sure that Observable is built before Syncable
-addons=("Dexie.Observable" "Dexie.Syncable")
+addons=("Dexie.Observable" "Dexie.Syncable" "dexie-export-import")
 
 autoPublishAddons=false
 # build addons
