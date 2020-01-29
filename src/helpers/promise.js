@@ -318,10 +318,10 @@ props (DexiePromise, {
 
     allSettled() {
         const possiblePromises = getArrayOf.apply(null, arguments).map(onPossibleParallellAsync);
-        return new DexiePromise((resolve, reject) => {
+        return new DexiePromise(resolve => {
             if (possiblePromises.length === 0) resolve([]);
             let remaining = possiblePromises.length;
-            const results = possiblePromises.map(possibleValue => ({status: "fulfilled", value: possibleValue}));
+            const results = new Array(remaining);
             possiblePromises.forEach((p, i) => DexiePromise.resolve(p).then(
                 value => results[i] = {status: "fulfilled", value},
                 reason => results[i] = {status: "rejected", reason})
@@ -334,11 +334,11 @@ props (DexiePromise, {
         return new DexiePromise((resolve, reject) => {
             if (possiblePromises.length === 0) reject(new AggregateError([]));
             let remaining = possiblePromises.length;
-            const failures = [];
-            possiblePromises.forEach(p => DexiePromise.resolve(p).then(
+            const failures = new Array(remaining);
+            possiblePromises.forEach((p, i) => DexiePromise.resolve(p).then(
                 value => resolve(value),
                 failure => {
-                    failures.push(failure);
+                    failures[i] = failure;
                     if (!--remaining) reject(new AggregateError(failures));
                 }));
         });
