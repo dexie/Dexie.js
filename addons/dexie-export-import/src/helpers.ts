@@ -57,5 +57,5 @@ export function readBlobSync<T extends keyof TypeMapper>(blob: Blob, type: T): T
     reader.readAsArrayBuffer(blob) :
     reader.readAsText(blob);
 
-  return data;
+  return data as TypeMapper[T];
 }

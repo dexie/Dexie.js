@@ -8,7 +8,7 @@
     "noImplicitAny": false,
     "noImplicitReturns": true,
     "moduleResolution": "node",
-    "lib": ["es2015", "dom"],
+    "lib": ["ES2015", "DOM"],
     "forceConsistentCasingInFileNames": true,
     "outDir": "../tools/tmp/src/",
     "declarationDir": "../dist/",
