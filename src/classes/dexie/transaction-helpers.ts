@@ -53,8 +53,8 @@ export function enterTransactionScope(
     }
 
     // Support for native async await.
-    const asyncScopeFunc = isAsyncFunction(scopeFunc);
-    if (asyncScopeFunc) {
+    const scopeFuncIsAsync = isAsyncFunction(scopeFunc);
+    if (scopeFuncIsAsync) {
       incrementExpectedAwaits();
     }
 
@@ -63,7 +63,7 @@ export function enterTransactionScope(
       // Finally, call the scope function with our table and transaction arguments.
       returnValue = scopeFunc.call(trans, trans);
       if (returnValue) {
-        if (asyncScopeFunc) {
+        if (scopeFuncIsAsync) {
           // scopeFunc is a native async function - we know for sure returnValue is native promise.
           var decrementor = decrementExpectedAwaits.bind(null, null);
           returnValue.then(decrementor, decrementor);
