@@ -1,6 +1,6 @@
 import { Dexie } from '../dexie';
 import { DbSchema } from '../../public/types/db-schema';
-import { setProp, keys, slice, _global, isArray, shallowClone } from '../../functions/utils';
+import { setProp, keys, slice, _global, isArray, shallowClone, isAsyncFunction } from '../../functions/utils';
 import { Transaction } from '../transaction';
 import { Version } from './version';
 import Promise, { PSD, newScope, NativePromise, decrementExpectedAwaits, incrementExpectedAwaits } from '../../helpers/promise';
@@ -136,21 +136,21 @@ export function updateTablesAndIndexes(
         trans.schema = upgradeSchema;
 
         // Support for native async await.
-        incrementExpectedAwaits();
+        const contentUpgradeIsAsync = isAsyncFunction(contentUpgrade);
+        if (contentUpgradeIsAsync) {
+          incrementExpectedAwaits();
+        }
         
         let returnValue: any;
         const promiseFollowed = Promise.follow(() => {
           // Finally, call the scope function with our table and transaction arguments.
           returnValue = contentUpgrade(trans);
           if (returnValue) {
-            if (returnValue.constructor === NativePromise) {
+            if (contentUpgradeIsAsync) {
+              // contentUpgrade is a native async function - we know for sure returnValue is native promise.
               var decrementor = decrementExpectedAwaits.bind(null, null);
               returnValue.then(decrementor, decrementor);
-            } else {
-              decrementExpectedAwaits();
             }
-          } else {
-            decrementExpectedAwaits();
           }
         });
         return (returnValue && typeof returnValue.then === 'function' ?
