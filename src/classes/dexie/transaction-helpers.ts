@@ -1,6 +1,6 @@
 import { TransactionMode } from '../../public/types/transaction-mode';
 import { exceptions } from '../../errors';
-import { flatten } from '../../functions/utils';
+import { flatten, isAsyncFunction } from '../../functions/utils';
 import { Dexie } from './dexie';
 import { Transaction } from '../transaction';
 import { awaitIterator } from '../../helpers/yield-support';
@@ -53,25 +53,24 @@ export function enterTransactionScope(
     }
 
     // Support for native async await.
-    incrementExpectedAwaits();
+    const asyncScopeFunc = isAsyncFunction(scopeFunc);
+    if (asyncScopeFunc) {
+      incrementExpectedAwaits();
+    }
 
     let returnValue;
     const promiseFollowed = Promise.follow(() => {
       // Finally, call the scope function with our table and transaction arguments.
       returnValue = scopeFunc.call(trans, trans);
       if (returnValue) {
-        if (returnValue.constructor === NativePromise) {
+        if (asyncScopeFunc) {
+          // scopeFunc is a native async function - we know for sure returnValue is native promise.
           var decrementor = decrementExpectedAwaits.bind(null, null);
           returnValue.then(decrementor, decrementor);
-        } else {
-          decrementExpectedAwaits();
-          if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
-            // scopeFunc returned an iterator with throw-support. Handle yield as await.
-            returnValue = awaitIterator(returnValue);
-          }
+        } else if (typeof returnValue.next === 'function' && typeof returnValue.throw === 'function') {
+          // scopeFunc returned an iterator with throw-support. Handle yield as await.
+          returnValue = awaitIterator(returnValue);
         }
-      } else {
-        decrementExpectedAwaits();
       }
     }, zoneProps);
     return (returnValue && typeof returnValue.then === 'function' ?

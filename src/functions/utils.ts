@@ -313,3 +313,6 @@ export function getArrayOf (arrayLike) {
     while (i--) a[i] = arguments[i];
     return a;
 }
+export const isAsyncFunction = typeof Symbol !== 'undefined'
+    ? (fn: Function) => fn[Symbol.toStringTag] === 'AsyncFunction'
+    : ()=>false;
