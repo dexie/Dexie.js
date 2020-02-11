@@ -211,6 +211,7 @@ export class Dexie implements IDexie {
   }
 
   version(versionNumber: number): Version {
+    if (isNaN(versionNumber) || versionNumber < 0.1) throw new exceptions.Type(`Given version is not a positive number`);
     versionNumber = Math.round(versionNumber * 10) / 10;
     if (this.idbdb || this._state.isBeingOpened)
       throw new exceptions.Schema("Cannot add version when database is open");
