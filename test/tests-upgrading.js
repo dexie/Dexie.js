@@ -759,3 +759,37 @@ promisedTest(
         db.close();
     }
 );
+
+promisedTest("Issue #959 - Should migrate successfully with an explicit unique modifier of the primary key",
+    async () => {
+        await Dexie.delete("issue959");
+        let db = new Dexie("issue959");
+
+        db.version(1).stores({
+            friends: "&name, age"
+        });
+        await db.friends.bulkAdd([
+            { name: "Foo", age: 25, weight: 70 },
+            { name: "Bar", age: 75, weight: 100 }
+        ]);
+        db.close();
+    
+        db = new Dexie("issue959");
+        db.version(1).stores({
+        friends: "&name, age"
+        });
+        db.version(2).stores({
+            friends2: "&name, age, weight"
+        });
+
+        // Now, verify we have what we expect
+        const result = await db.friends.toArray();
+        equal(result.length, 2, "Should get 2 friends");
+        equal(result[0].name, "Foo", "First friend is 'Foo'");
+        equal(result[1].name, "Bar", "First friend is 'Bar'");
+        // Verify we can use the new index as well
+        const result2 = await db.friends.get({ weight: 100 });
+        ok(result2 != null, "Should get a match");
+        equal(result2.name, "Bar", "The expected friends was returned");
+    }
+);
