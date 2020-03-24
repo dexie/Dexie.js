@@ -776,14 +776,14 @@ promisedTest("Issue #959 - Should migrate successfully with an explicit unique m
     
         db = new Dexie("issue959");
         db.version(1).stores({
-        friends: "&name, age"
+            friends: "&name, age"
         });
         db.version(2).stores({
-            friends2: "&name, age, weight"
+            friends: "&name, age, weight"
         });
 
         // Now, verify we have what we expect
-        const result = await db.friends.toArray();
+        const result = await db.friends.orderBy("age").toArray();
         equal(result.length, 2, "Should get 2 friends");
         equal(result[0].name, "Foo", "First friend is 'Foo'");
         equal(result[1].name, "Bar", "First friend is 'Bar'");
