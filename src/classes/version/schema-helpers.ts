@@ -303,7 +303,8 @@ function buildGlobalSchema(
       false,
       false,
       !!store.autoIncrement,
-      keyPath && typeof keyPath !== "string"
+      keyPath && typeof keyPath !== "string",
+      true
     );
     const indexes: IndexSpec[] = [];
     for (let j = 0; j < store.indexNames.length; ++j) {
@@ -315,7 +316,8 @@ function buildGlobalSchema(
         !!idbindex.unique,
         !!idbindex.multiEntry,
         false,
-        keyPath && typeof keyPath !== "string"
+        keyPath && typeof keyPath !== "string",
+        false
       );
       indexes.push(index);
     }
@@ -365,22 +367,21 @@ export function adjustToExistingIndexNames(db: Dexie, schema: DbSchema, idbtrans
   }
 }
 
-export function parseIndexSyntax(indexes: string): IndexSpec[] {
-  const rv = [];
-  indexes.split(',').forEach(index => {
+export function parseIndexSyntax(primKeyAndIndexes: string): IndexSpec[] {
+  return primKeyAndIndexes.split(',').map((index, indexNum) => {
     index = index.trim();
     const name = index.replace(/([&*]|\+\+)/g, ""); // Remove "&", "++" and "*"
     // Let keyPath of "[a+b]" be ["a","b"]:
     const keyPath = /^\[/.test(name) ? name.match(/^\[(.*)\]$/)[1].split('+') : name;
 
-    rv.push(createIndexSpec(
+    return createIndexSpec(
       name,
       keyPath || null,
       /\&/.test(index),
       /\*/.test(index),
       /\+\+/.test(index),
-      isArray(keyPath)
-    ));
+      isArray(keyPath),
+      indexNum === 0
+    );
   });
-  return rv;
 }
