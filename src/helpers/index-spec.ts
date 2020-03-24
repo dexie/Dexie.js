@@ -2,11 +2,12 @@ import { IndexSpec } from '../public/types/index-spec';
 
 export function createIndexSpec(
   name: string,
-  keyPath?: string | string[],
-  unique?: boolean,
-  multi?: boolean,
-  auto?: boolean,
-  compound?: boolean,
+  keyPath: string | string[],
+  unique: boolean,
+  multi: boolean,
+  auto: boolean,
+  compound: boolean,
+  isPrimKey: boolean
 ): IndexSpec {
   return {
     name,
@@ -15,7 +16,7 @@ export function createIndexSpec(
     multi,
     auto,
     compound,
-    src: (unique ? '&' : '') + (multi ? '*' : '') + (auto ? "++" : "") + nameFromKeyPath(keyPath)
+    src: (unique && !isPrimKey ? '&' : '') + (multi ? '*' : '') + (auto ? "++" : "") + nameFromKeyPath(keyPath)
   }
 }
 
