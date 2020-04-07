@@ -293,7 +293,6 @@ function buildGlobalSchema(
 ) {
   const globalSchema = {};
   const dbStoreNames = slice(idbdb.objectStoreNames, 0);
-  if (dbStoreNames.length === 0) return; // Database contains no stores.
   dbStoreNames.forEach(storeName => {
     const store = tmpTrans.objectStore(storeName);
     let keyPath = store.keyPath;
