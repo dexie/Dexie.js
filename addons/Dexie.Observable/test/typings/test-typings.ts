@@ -1,7 +1,7 @@
 import Dexie from 'dexie';
 import '../../src/Dexie.Observable';
 import dexieObservable from '../../src/Dexie.Observable';
-import { IDatabaseChange, DatabaseChangeType } from '../../api';
+import {IDatabaseChange, DatabaseChangeType} from '../../api';
 
 interface Foo {
     id: string;
@@ -11,8 +11,8 @@ class MyDb extends Dexie {
     foos: Dexie.Table<Foo, string>;
 
     constructor() {
-        super('testdb', { addons: [dexieObservable, Dexie.Observable] });
-        this.version(1).stores({ foos: '$$id' });
+        super('testdb', {addons: [dexieObservable, Dexie.Observable]});
+        this.version(1).stores({foos: '$$id'});
     }
 }
 
@@ -32,10 +32,10 @@ db.on('message', (msg) => {
     msg.resolve('foo');
     msg.reject(new Error('Foo'));
 });
-db.observable.sendMessage('myMsgType', { foo: 'bar' }, 13, { wantReply: true });
-db.observable.sendMessage('myMsgType', 'foobar', 13, { wantReply: false });
+db.observable.sendMessage('myMsgType', {foo: 'bar'}, 13, {wantReply: true});
+db.observable.sendMessage('myMsgType', 'foobar', 13, {wantReply: false});
 
-db.observable.broadcastMessage('myBroadcastMsgType', { foo2: 'bar2' }, false);
+db.observable.broadcastMessage('myBroadcastMsgType', {foo2: 'bar2'}, false);
 
 db.on('changes', (changes) => {
     changes.forEach((change) => {

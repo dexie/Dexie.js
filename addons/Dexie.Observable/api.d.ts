@@ -32,7 +32,7 @@ export interface IUpdateChange {
     type: DatabaseChangeType.Update;
     table: string;
     key: any;
-    mods: { [keyPath: string]: any | undefined };
+    mods: {[keyPath: string]: any | undefined};
     obj: any;
     oldObj: any;
 }
