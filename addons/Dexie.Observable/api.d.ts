@@ -16,32 +16,32 @@
  *
  */
 export const enum DatabaseChangeType {
-  Create = 1,
-  Update = 2,
-  Delete = 3,
+    Create = 1,
+    Update = 2,
+    Delete = 3,
 }
 
 export interface ICreateChange {
-  type: DatabaseChangeType.Create;
-  table: string;
-  key: any;
-  obj: any;
+    type: DatabaseChangeType.Create;
+    table: string;
+    key: any;
+    obj: any;
 }
 
 export interface IUpdateChange {
-  type: DatabaseChangeType.Update;
-  table: string;
-  key: any;
-  mods: { [keyPath: string]: any | undefined };
-  obj: any;
-  oldObj: any;
+    type: DatabaseChangeType.Update;
+    table: string;
+    key: any;
+    mods: { [keyPath: string]: any | undefined };
+    obj: any;
+    oldObj: any;
 }
 
 export interface IDeleteChange {
-  type: DatabaseChangeType.Delete;
-  table: string;
-  key: any;
-  oldObj: any;
+    type: DatabaseChangeType.Delete;
+    table: string;
+    key: any;
+    oldObj: any;
 }
 
 export type IDatabaseChange = ICreateChange | IUpdateChange | IDeleteChange;
