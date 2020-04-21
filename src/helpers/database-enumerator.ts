@@ -15,11 +15,11 @@ export interface DatabaseEnumerator {
   remove (name: string): undefined | PromiseExtended;
 }
 
-export function DatabaseEnumerator (indexedDB: IDBFactory & {getDatabaseNames?, webkitGetDatabaseNames?}) : DatabaseEnumerator {
-  const getDatabaseNamesNative = indexedDB && (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
+export function DatabaseEnumerator (indexedDB: IDBFactory & {databases?: ()=>Promise<{name: string}[]>}) : DatabaseEnumerator {
+  const hasDatabasesNative = indexedDB && typeof indexedDB.databases === 'function';
   let dbNamesTable: Table<{name: string}, string>;
 
-  if (!getDatabaseNamesNative) {
+  if (!hasDatabasesNative) {
     const db = new Dexie (DBNAMES_DB, {addons: []});
     db.version(1).stores({dbnames: 'name'});
     dbNamesTable = db.table<{name: string}, string>('dbnames');
@@ -27,19 +27,27 @@ export function DatabaseEnumerator (indexedDB: IDBFactory & {getDatabaseNames?, 
 
   return {
     getDatabaseNames () {
-      return getDatabaseNamesNative ? new Promise((resolve, reject) => {
-          const req = getDatabaseNamesNative.call(indexedDB);
-          req.onsuccess = event => resolve(slice(event.target.result, 0))
-          req.onerror = eventRejectHandler(reject);
-      }) : dbNamesTable.toCollection().primaryKeys();
+      return hasDatabasesNative
+        ?
+          // Use Promise.resolve() to wrap the native promise into a Dexie promise,
+          // to keep PSD zone.
+          Promise.resolve(indexedDB.databases()).then(infos => infos
+            // Select name prop of infos:
+            .map(info => info.name)
+            // Filter out DBNAMES_DB as previous Dexie or browser version would not have included it in the result.
+            .filter(name => name !== DBNAMES_DB)
+          )
+        :
+          // Use dexie's manually maintained list of database names:
+          dbNamesTable.toCollection().primaryKeys();
     },
 
     add (name: string) : PromiseExtended<any> | undefined {
-      return !getDatabaseNamesNative && name !== DBNAMES_DB && dbNamesTable.put({name}).catch(nop);
+      return !hasDatabasesNative && name !== DBNAMES_DB && dbNamesTable.put({name}).catch(nop);
     },
 
     remove (name: string) : PromiseExtended<any> | undefined {
-      return !getDatabaseNamesNative && name !== DBNAMES_DB && dbNamesTable.delete(name).catch(nop);
+      return !hasDatabasesNative && name !== DBNAMES_DB && dbNamesTable.delete(name).catch(nop);
     }
   };
 }
