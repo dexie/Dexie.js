@@ -1,6 +1,4 @@
 import Promise from './promise';
-import { slice } from '../functions/utils';
-import { eventRejectHandler } from '../functions/event-wrappers';
 import { Dexie } from '../classes/dexie/dexie';
 import { Table } from '../public/types/table';
 import { nop } from '../functions/chaining-functions';
