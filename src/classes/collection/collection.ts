@@ -1,5 +1,4 @@
 import { Collection as ICollection } from "../../public/types/collection";
-import { WhereClause } from "../where-clause/where-clause";
 import { Dexie } from "../dexie";
 import { Table } from "../table";
 import { IndexableType, IndexableTypeArrayReadonly } from "../../public/types/indexable-type";
@@ -7,15 +6,12 @@ import { PromiseExtended } from "../../public/types/promise-extended";
 import { iter, isPlainKeyRange, getIndexOrStore, addReplayFilter, addFilter, addMatchFilter } from "./collection-helpers";
 import { rejection } from "../../helpers/promise";
 import { combine } from "../../functions/combine";
-import { extend, hasOwn, deepClone, getObjectDiff, keys, setByKeyPath, getByKeyPath, shallowClone, tryCatch, flatten } from "../../functions/utils";
-import { eventRejectHandler, eventSuccessHandler, hookedEventRejectHandler, hookedEventSuccessHandler } from "../../functions/event-wrappers";
-import { mirror, nop } from "../../functions/chaining-functions";
+import { extend, hasOwn, deepClone, keys, setByKeyPath, getByKeyPath } from "../../functions/utils";
 import { ModifyError } from "../../errors";
 import { hangsOnDeleteLargeKeyRange } from "../../globals/constants";
 import { ThenShortcut } from "../../public/types/then-shortcut";
 import { Transaction } from '../transaction';
-import { DBCoreCursor, DBCoreTransaction, RangeType, MutateResponse, KeyRange } from '../../public/types/dbcore';
-import { AnyRange } from '../../dbcore/keyrange';
+import { DBCoreCursor, DBCoreTransaction, DBCoreRangeType, DBCoreMutateResponse, DBCoreKeyRange } from '../../public/types/dbcore';
 
 /** class Collection
  * 
@@ -27,7 +23,7 @@ export class Collection implements ICollection {
     table: Table;
     index?: string | null;
     isPrimKey?: boolean;
-    range: KeyRange;
+    range: DBCoreKeyRange;
     keysOnly: boolean;
     dir: "next" | "prev";
     unique: "" | "unique";
@@ -493,7 +489,7 @@ export class Collection implements ICollection {
       const totalFailures = [];
       let successCount = 0;
       const failedKeys: IndexableType[] = [];
-      const applyMutateResult = (expectedCount: number, res: MutateResponse) => {
+      const applyMutateResult = (expectedCount: number, res: DBCoreMutateResponse) => {
         const {failures, numFailures} = res;
         successCount += expectedCount - numFailures;
         for (let pos of keys(failures)) {
@@ -574,7 +570,7 @@ export class Collection implements ICollection {
       //deletingHook = ctx.table.hook.deleting.fire,
       //hasDeleteHook = deletingHook !== nop;
     if (isPlainKeyRange(ctx) &&
-      ((ctx.isPrimKey && !hangsOnDeleteLargeKeyRange) || range.type === RangeType.Any)) // if no range, we'll use clear().
+      ((ctx.isPrimKey && !hangsOnDeleteLargeKeyRange) || range.type === DBCoreRangeType.Any)) // if no range, we'll use clear().
     {
       // May use IDBObjectStore.delete(IDBKeyRange) in this case (Issue #208)
       // For chromium, this is the way most optimized version.

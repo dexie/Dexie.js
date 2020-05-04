@@ -3,12 +3,12 @@ import { makeClassConstructor } from '../../functions/make-class-constructor';
 import { Collection } from './collection';
 import { WhereClause } from '../where-clause/where-clause';
 import { AnyRange } from '../../dbcore/keyrange';
-import { KeyRange } from '../../public/types/dbcore';
+import { DBCoreKeyRange } from '../../public/types/dbcore';
 import { mirror } from '../../functions/chaining-functions';
 
 /** Constructs a Collection instance. */
 export interface CollectionConstructor {
-  new(whereClause?: WhereClause | null, keyRangeGenerator?: () => KeyRange): Collection;
+  new(whereClause?: WhereClause | null, keyRangeGenerator?: () => DBCoreKeyRange): Collection;
   prototype: Collection;
 }
 
@@ -25,7 +25,7 @@ export function createCollectionConstructor(db: Dexie) {
     function Collection(
       this: Collection,
       whereClause?: WhereClause | null,
-      keyRangeGenerator?: () => KeyRange)
+      keyRangeGenerator?: () => DBCoreKeyRange)
     {
       this.db = db;
       let keyRange = AnyRange, error = null;

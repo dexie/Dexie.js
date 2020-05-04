@@ -1,17 +1,15 @@
-import { KeyRange, RangeType } from '../public/types/dbcore';
+import { DBCoreKeyRange, DBCoreRangeType } from '../public/types/dbcore';
 
-var x: KeyRange;
-
-export const AnyRange: KeyRange = {
-  type: RangeType.Any,
+export const AnyRange: DBCoreKeyRange = {
+  type: DBCoreRangeType.Any,
   lower: -Infinity,
   lowerOpen: false,
   upper: [[]], // BUGBUG: depends on indexeddb impl.
   upperOpen: false
 }
 
-export const NeverRange: KeyRange = {
-  type: RangeType.Never,
+export const NeverRange: DBCoreKeyRange = {
+  type: DBCoreRangeType.Never,
   lower: -Infinity,
   lowerOpen: true,
   upper: -Infinity,
