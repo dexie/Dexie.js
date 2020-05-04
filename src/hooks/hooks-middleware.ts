@@ -1,6 +1,16 @@
-import { DBCore, DBCoreTable, MutateResponse, DeleteRangeRequest, AddRequest, PutRequest, DeleteRequest, DBCoreTransaction, KeyRange } from '../public/types/dbcore';
+import {
+  DBCore,
+  DBCoreTable,
+  DBCoreMutateResponse,
+  DBCoreDeleteRangeRequest,
+  DBCoreAddRequest,
+  DBCorePutRequest,
+  DBCoreDeleteRequest,
+  DBCoreTransaction,
+  DBCoreKeyRange,
+} from "../public/types/dbcore";
 import { nop } from '../functions/chaining-functions';
-import { tryCatch, getObjectDiff, setByKeyPath } from '../functions/utils';
+import { getObjectDiff, setByKeyPath } from '../functions/utils';
 import { PSD } from '../helpers/promise';
 //import { LockableTableMiddleware } from '../dbcore/lockable-table-middleware';
 import { getEffectiveKeys, getExistingValues } from '../dbcore/get-effective-keys';
@@ -19,7 +29,7 @@ export const hooksMiddleware: Middleware<DBCore>  = {
   
       const tableMiddleware: DBCoreTable = {
         ...downTable,
-        mutate(req):Promise<MutateResponse> {
+        mutate(req):Promise<DBCoreMutateResponse> {
           const dxTrans = PSD.trans as Transaction;
           // Hooks can be transaction-bound. Need to grab them from transaction.table and not
           // db.table!
@@ -42,7 +52,7 @@ export const hooksMiddleware: Middleware<DBCore>  = {
           return downTable.mutate(req);
 
 
-          function addPutOrDelete(req: AddRequest | PutRequest | DeleteRequest): Promise<MutateResponse> {
+          function addPutOrDelete(req: DBCoreAddRequest | DBCorePutRequest | DBCoreDeleteRequest): Promise<DBCoreMutateResponse> {
             const dxTrans = PSD.trans;
             const keys = req.keys || getEffectiveKeys(primaryKey, req);
             if (!keys) throw new Error("Keys missing");
@@ -105,11 +115,11 @@ export const hooksMiddleware: Middleware<DBCore>  = {
             });
           }
   
-          function deleteRange(req: DeleteRangeRequest): Promise<MutateResponse> {
+          function deleteRange(req: DBCoreDeleteRangeRequest): Promise<DBCoreMutateResponse> {
             return deleteNextChunk(req.trans, req.range, 10000);
           }
   
-          function deleteNextChunk(trans: DBCoreTransaction, range: KeyRange, limit: number) {
+          function deleteNextChunk(trans: DBCoreTransaction, range: DBCoreKeyRange, limit: number) {
             // Query what keys in the DB within the given range
             return downTable.query({trans, values: false, query: {index: primaryKey, range}, limit})
             .then(({result}) => {
@@ -118,7 +128,7 @@ export const hooksMiddleware: Middleware<DBCore>  = {
               return addPutOrDelete({type: 'delete', keys: result, trans}).then(res => {
                 if (res.numFailures > 0) return Promise.reject(res.failures[0]);
                 if (result.length < limit) {
-                  return {failures: [], numFailures: 0, lastResult: undefined} as MutateResponse;
+                  return {failures: [], numFailures: 0, lastResult: undefined} as DBCoreMutateResponse;
                 } else {
                   return deleteNextChunk(trans, {...range, lower: result[result.length - 1], lowerOpen: true}, limit);
                 }

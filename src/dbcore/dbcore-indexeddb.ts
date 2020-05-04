@@ -1,8 +1,18 @@
-import { DBCore, DBCoreCursor, DBCoreOpenCursorRequest, DBCoreQueryRequest, DBCoreCountRequest,
-  DBCoreIndex, KeyRange, DBCoreQueryResponse, RangeType, DBCoreSchema, DBCoreTableSchema, DBCoreTable,
-  MutateRequest, AddRequest, PutRequest, DeleteRequest, DeleteRangeRequest, MutateResponse, DBCoreTransaction }
-  from '../public/types/dbcore';
-import { isArray, trycatcher } from '../functions/utils';
+import {
+  DBCore,
+  DBCoreCursor,
+  DBCoreOpenCursorRequest,
+  DBCoreQueryRequest,
+  DBCoreIndex,
+  DBCoreKeyRange,
+  DBCoreQueryResponse,
+  DBCoreRangeType,
+  DBCoreSchema,
+  DBCoreTableSchema,
+  DBCoreTable,
+  DBCoreMutateResponse,
+} from "../public/types/dbcore";
+import { isArray } from '../functions/utils';
 import { eventRejectHandler, preventDefault } from '../functions/event-wrappers';
 import { wrap } from '../helpers/promise';
 import { getMaxKey } from '../functions/quirks';
@@ -89,9 +99,9 @@ export function createDBCore (
     };
   }
 
-  function makeIDBKeyRange (range: KeyRange) : IDBKeyRange | null {
-    if (range.type === RangeType.Any) return null;
-    if (range.type === RangeType.Never) throw new Error("Cannot convert never type to IDBKeyRange");
+  function makeIDBKeyRange (range: DBCoreKeyRange) : IDBKeyRange | null {
+    if (range.type === DBCoreRangeType.Any) return null;
+    if (range.type === DBCoreRangeType.Never) throw new Error("Cannot convert never type to IDBKeyRange");
     const {lower, upper, lowerOpen, upperOpen} = range;
     const idbRange = lower === undefined ?
       upper === undefined ?
@@ -107,7 +117,7 @@ export function createDBCore (
     const tableName = tableSchema.name;
 
     function mutate ({trans, type, keys, values, range, wantResults}) {
-      return new Promise<MutateResponse>((resolve, reject) => {
+      return new Promise<DBCoreMutateResponse>((resolve, reject) => {
         resolve = wrap(resolve);
         const store = (trans as IDBTransaction).objectStore(tableName);
         const outbound = store.keyPath == null;
@@ -143,9 +153,9 @@ export function createDBCore (
   
         if (type === 'deleteRange') {
           // Here the argument is the range
-          if (range.type === RangeType.Never)
+          if (range.type === DBCoreRangeType.Never)
             return resolve({numFailures, failures, results, lastResult: undefined}); // Deleting the Never range shoulnt do anything.
-          if (range.type === RangeType.Any)
+          if (range.type === DBCoreRangeType.Any)
             req = store.clear(); // Deleting the Any range is equivalent to store.clear()
           else
             req = store.delete(makeIDBKeyRange(range));

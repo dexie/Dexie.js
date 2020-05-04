@@ -1,19 +1,17 @@
 // For public interface
 
-export type Key = any;
-
-export const enum RangeType {
+export const enum DBCoreRangeType {
   Equal = 1,
   Range = 2,
   Any = 3,
   Never = 4
 }
 
-export interface KeyRange {
-  readonly type: RangeType;
-  readonly lower: Key | undefined;
+export interface DBCoreKeyRange {
+  readonly type: DBCoreRangeType;
+  readonly lower: any;
   readonly lowerOpen?: boolean;
-  readonly upper: Key | undefined;
+  readonly upper: any;
   readonly upperOpen?: boolean;
   //includes (key: Key) : boolean; Despite IDBKeyRange api - it's no good to have this as a method. Benefit from using a more functional approach.
 }
@@ -24,98 +22,96 @@ export interface DBCoreTransaction {
 
 export interface DBCoreTransactionRequest {
   tables: string[];
-  mode: DBCoreTransactionMode;
+  mode: 'readonly' | 'readwrite';
 }
 
-export type DBCoreTransactionMode = 'readonly' | 'readwrite';
+export type DBCoreMutateRequest = DBCoreAddRequest | DBCorePutRequest | DBCoreDeleteRequest | DBCoreDeleteRangeRequest;
 
-export type MutateRequest = AddRequest | PutRequest | DeleteRequest | DeleteRangeRequest;
-
-export interface MutateResponse {
+export interface DBCoreMutateResponse {
   numFailures: number,
   failures: {[operationNumber: number]: Error};
-  lastResult: Key;
-  results?: Key[]; // Present on AddRequest and PutRequest if request.wantResults is truthy.
+  lastResult: any;
+  results?: any[]; // Present on AddRequest and PutRequest if request.wantResults is truthy.
 }
 
-export interface AddRequest {
+export interface DBCoreAddRequest {
   type: 'add';
   trans: DBCoreTransaction;
   values: any[];
-  keys?: Key[];
+  keys?: any[];
   wantResults?: boolean;
 }
 
-export interface PutRequest {
+export interface DBCorePutRequest {
   type: 'put';
   trans: DBCoreTransaction;
   values: any[];
-  keys?: Key[];
+  keys?: any[];
   wantResults?: boolean;
 }
 
-export interface DeleteRequest {
+export interface DBCoreDeleteRequest {
   type: 'delete';
   trans: DBCoreTransaction;
-  keys: Key[];
+  keys: any[];
 }
 
-export interface DeleteRangeRequest {
+export interface DBCoreDeleteRangeRequest {
   type: 'deleteRange';
   trans: DBCoreTransaction;
-  range: KeyRange;
+  range: DBCoreKeyRange;
 }
 
 export interface DBCoreGetManyRequest {
   trans: DBCoreTransaction;
-  keys: Key[];
+  keys: any[];
 }
 
 export interface DBCoreGetRequest {
   trans: DBCoreTransaction;
-  key: Key;  
+  key: any;  
 }
 
 export interface DBCoreQuery {
   index: DBCoreIndex;//keyPath: null | string | string[]; // null represents primary key. string a property, string[] several properties.
-  range: KeyRange;
+  range: DBCoreKeyRange;
 }
 
-export interface DBCoreQueryRequest<TQuery=DBCoreQuery> {
+export interface DBCoreQueryRequest {
   trans: DBCoreTransaction;
   values?: boolean;
   limit?: number;
-  query: TQuery;
+  query: DBCoreQuery;
 }
 
 export interface DBCoreQueryResponse {
   result: any[];
 }
 
-export interface DBCoreOpenCursorRequest<TQuery=DBCoreQuery> {
+export interface DBCoreOpenCursorRequest {
   trans: DBCoreTransaction;
   values?: boolean;
   unique?: boolean;
   reverse?: boolean;
-  query: TQuery;
+  query: DBCoreQuery;
 }
 
-export interface DBCoreCountRequest<TQuery=DBCoreQuery> {
+export interface DBCoreCountRequest {
   trans: DBCoreTransaction;
-  query: TQuery;
+  query: DBCoreQuery;
 }
 
-export interface DBCoreCursor<TResult=any> {
+export interface DBCoreCursor {
   readonly trans: DBCoreTransaction;
-  readonly key: Key;
-  readonly primaryKey: Key;
+  readonly key: any;
+  readonly primaryKey: any;
   readonly value?: any;
   readonly done?: boolean;
   continue(key?: any): void;
-  continuePrimaryKey(key: Key, primaryKey: Key): void;
+  continuePrimaryKey(key: any, primaryKey: any): void;
   advance(count: number): void;
-  start(onNext: ()=>void): Promise<TResult>
-  stop(value?: TResult | Promise<TResult>): void;
+  start(onNext: ()=>void): Promise<any>
+  stop(value?: any | Promise<any>): void;
   next(): Promise<DBCoreCursor>;
   fail(error: Error): void;
 }
@@ -124,7 +120,6 @@ export interface DBCoreSchema {
   name: string;
   tables: DBCoreTableSchema[];
 }
-
 export interface DBCoreTableSchema {
   readonly name: string;
   readonly primaryKey: DBCoreIndex;
@@ -150,33 +145,42 @@ export interface DBCoreIndex {
   /** Whether index is multiEntry. */
   readonly multiEntry?: boolean;
   /** Extract (using keyPath) a key from given value (object) */
-  readonly extractKey: (value: any) => Key;
+  readonly extractKey: (value: any) => any;
 }
 
-export interface DBCore<TQuery=DBCoreQuery> {
+export interface DBCore {
   stack: "dbcore";
   // Transaction and Object Store
   transaction(req: DBCoreTransactionRequest): DBCoreTransaction;
 
   // Utility methods
   cmp(a: any, b: any) : number;
-  //rangeIncludes(range: KeyRange): (key: Key) => boolean;
-  //comparer(table: string, index: string | null): (a: any, b: any) => number;
-  //readonly schema: DBCoreSchema;
-  readonly MIN_KEY: Key;
-  readonly MAX_KEY: Key;
+  readonly MIN_KEY: any;
+  readonly MAX_KEY: any;
   readonly schema: DBCoreSchema;
-  table(name: string): DBCoreTable<TQuery>;
+  table(name: string): DBCoreTable;
 }
 
-export interface DBCoreTable<TQuery=DBCoreQuery> {
+export interface DBCoreTable {
   readonly name: string;
   readonly schema: DBCoreTableSchema;
 
-  mutate(req: MutateRequest): Promise<MutateResponse>;
+  mutate(req: DBCoreMutateRequest): Promise<DBCoreMutateResponse>;
   get(req: DBCoreGetRequest): Promise<any>;
   getMany(req: DBCoreGetManyRequest): Promise<any[]>;
-  query(req: DBCoreQueryRequest<TQuery>): Promise<DBCoreQueryResponse>;
-  openCursor(req: DBCoreOpenCursorRequest<TQuery>): Promise<DBCoreCursor | null>;
-  count(req: DBCoreCountRequest<TQuery>): Promise<number>;
+  query(req: DBCoreQueryRequest): Promise<DBCoreQueryResponse>;
+  openCursor(req: DBCoreOpenCursorRequest): Promise<DBCoreCursor | null>;
+  count(req: DBCoreCountRequest): Promise<number>;
 }
+
+// Type aliases for backward compatibility against v3.0.0:
+export type Key = any;
+export type RangeType = DBCoreRangeType;
+export type KeyRange = DBCoreKeyRange;
+export type MutateRequest = DBCoreMutateRequest;
+export type AddRequest = DBCoreAddRequest;
+export type PutRequest = DBCorePutRequest;
+export type DeleteRequest = DBCoreDeleteRequest;
+export type DeleteRangeRequest = DBCoreDeleteRangeRequest;
+export type MutateResponse = DBCoreMutateResponse;
+export type DBCoreTransactionMode = 'readonly' | 'readwrite';

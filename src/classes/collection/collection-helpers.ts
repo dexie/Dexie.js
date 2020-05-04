@@ -1,11 +1,9 @@
 import { combine } from "../../functions/combine";
 import { exceptions } from "../../errors";
-import { hasOwn, trycatcher } from "../../functions/utils";
+import { hasOwn } from "../../functions/utils";
 import { wrap } from "../../helpers/promise";
-import { eventRejectHandler } from "../../functions/event-wrappers";
 import { Collection } from './';
-import { DBCoreCursor, DBCoreTable, DBCoreTransaction, DBCoreTableSchema, RangeType } from '../../public/types/dbcore';
-import { Table } from '../table';
+import { DBCoreCursor, DBCoreTable, DBCoreTransaction, DBCoreTableSchema, DBCoreRangeType } from '../../public/types/dbcore';
 import { nop } from '../../functions/chaining-functions';
 
 type CollectionContext = Collection["_ctx"];

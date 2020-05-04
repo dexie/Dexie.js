@@ -1,11 +1,11 @@
-import { DBCoreCursor, Key } from '../public/types/dbcore';
+import { DBCoreCursor } from '../public/types/dbcore';
 
 export interface ProxyCursorHooks {
   // Methods
-  getKey?: () => Key;
-  getPrimaryKey?: () => Key;
+  getKey?: () => any;
+  getPrimaryKey?: () => any;
   getValue?: ( )=> any;
-  continue?: (key?: Key, primaryKey?: Key) => void;
+  continue?: (key?: any, primaryKey?: any) => void;
   start?: (onNext: ()=>void) => Promise<any>;
 }
 

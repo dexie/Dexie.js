@@ -1,15 +1,11 @@
-import { ModifyError, BulkError, errnames, exceptions, fullNameExceptions, mapError } from '../../errors';
+import { BulkError, exceptions } from '../../errors';
 import { Table as ITable } from '../../public/types/table';
 import { TableSchema } from '../../public/types/table-schema';
 import { TableHooks } from '../../public/types/table-hooks';
 import { DexiePromise as Promise, PSD, newScope, wrap, rejection, beginMicroTickScope, endMicroTickScope } from '../../helpers/promise';
-import Events from '../../helpers/Events';
-import { hookCreatingChain, nop, pureFunctionChain, mirror, hookUpdatingChain, hookDeletingChain } from '../../functions/chaining-functions';
 import { Transaction } from '../transaction';
 import { Dexie } from '../dexie';
 import { tempTransaction } from '../../functions/temp-transaction';
-import { eventRejectHandler, hookedEventRejectHandler, hookedEventSuccessHandler, BulkErrorHandlerCatchAll, eventSuccessHandler } from '../../functions/event-wrappers';
-import { WhereClause } from '../where-clause/where-clause';
 import { Collection } from '../collection';
 import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, deepClone, tryCatch, arrayToObject, extend } from '../../functions/utils';
 import { maxString } from '../../globals/constants';
@@ -17,7 +13,7 @@ import { combine } from '../../functions/combine';
 import { PromiseExtended } from "../../public/types/promise-extended";
 import { IndexableType } from '../../public/types/indexable-type';
 import { debug } from '../../helpers/debug';
-import { DBCoreTransactionMode, DBCore, DBCoreTransaction, DBCoreTable, RangeType } from '../../public/types/dbcore';
+import { DBCoreTable } from '../../public/types/dbcore';
 import { AnyRange } from '../../dbcore/keyrange';
 
 /** class Table

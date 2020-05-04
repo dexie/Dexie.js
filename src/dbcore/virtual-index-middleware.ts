@@ -1,8 +1,16 @@
-import { DBCore, DBCoreIndex, KeyRange, DBCoreQueryRequest, RangeType, DBCoreOpenCursorRequest, DBCoreCountRequest, DBCoreQuery, Key, DBCoreCursor, DBCoreTable } from '../public/types/dbcore';
-//import { DBCoreUp1, VirtualIndex, KeyPathQuery, DBCoreUp1Table } from '../public/types/dbcore-up-1';
-import { isArray, flatten } from '../functions/utils';
+import {
+  DBCore,
+  DBCoreIndex,
+  DBCoreKeyRange,
+  DBCoreQueryRequest,
+  DBCoreRangeType,
+  DBCoreOpenCursorRequest,
+  DBCoreCountRequest,
+  DBCoreCursor,
+  DBCoreTable,
+} from "../public/types/dbcore";
+import { isArray } from '../functions/utils';
 import { getKeyExtractor } from './get-key-extractor';
-import { exceptions } from '../errors';
 import { getKeyPathAlias } from './dbcore-indexeddb';
 import { Middleware } from '../public/types/middleware';
 
@@ -78,10 +86,10 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
         return result && result[0];
       }
     
-      function translateRange (range: KeyRange, keyTail: number): KeyRange {
+      function translateRange (range: DBCoreKeyRange, keyTail: number): DBCoreKeyRange {
         return {
-          type: range.type === RangeType.Equal ?
-            RangeType.Range :
+          type: range.type === DBCoreRangeType.Equal ?
+            DBCoreRangeType.Range :
             range.type,
           lower: pad(range.lower, range.lowerOpen ? down.MAX_KEY : down.MIN_KEY, keyTail),
           lowerOpen: true, // doesn't matter true or false
@@ -125,7 +133,7 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
           if (!isVirtual) return table.openCursor(req);
     
           function createVirtualCursor(cursor: DBCoreCursor) : DBCoreCursor {
-            function _continue (key?: Key) {
+            function _continue (key?: any) {
               key != null ?
                 cursor.continue(pad(key, req.reverse ? down.MAX_KEY : down.MIN_KEY, keyTail)) :
                 req.unique ?
@@ -135,13 +143,13 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
             const virtualCursor = Object.create(cursor, {
               continue: {value: _continue},
               continuePrimaryKey: {
-                value(key: Key, primaryKey: Key) {
+                value(key: any, primaryKey: any) {
                   cursor.continuePrimaryKey(pad(key, down.MAX_KEY, keyTail), primaryKey);
                 }
               },
               key: {
                 get() {
-                  const key = cursor.key as Key[]; // A virtual cursor always operates on compound key
+                  const key = cursor.key as any[]; // A virtual cursor always operates on compound key
                   return keyLength === 1 ?
                     key[0] : // Cursor.key should not be an array.
                     key.slice(0, keyLength); // Cursor.key should be first part of array.

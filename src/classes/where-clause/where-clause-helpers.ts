@@ -1,11 +1,9 @@
 import { WhereClause } from './where-clause';
 import { Collection } from '../collection';
-import { Dexie } from '../dexie';
 import { STRING_EXPECTED } from '../../globals/constants';
 import { simpleCompare, simpleCompareReverse } from '../../functions/compare-functions';
-import { CollectionConstructor } from '../collection';
 import { IndexableType } from '../../public';
-import { KeyRange, RangeType } from '../../public/types/dbcore';
+import { DBCoreKeyRange, DBCoreRangeType } from '../../public/types/dbcore';
 
 export function fail(collectionOrWhereClause: Collection | WhereClause, err, T?) {
   var collection = collectionOrWhereClause instanceof WhereClause ?
@@ -115,9 +113,9 @@ export function addIgnoreCaseAlgorithm(whereClause: WhereClause, match, needles,
   return c;
 }
 
-export function createRange (lower: IndexableType, upper: IndexableType, lowerOpen?: boolean, upperOpen?: boolean): KeyRange {
+export function createRange (lower: IndexableType, upper: IndexableType, lowerOpen?: boolean, upperOpen?: boolean): DBCoreKeyRange {
     return {
-        type: RangeType.Range,
+        type: DBCoreRangeType.Range,
         lower,
         upper,
         lowerOpen,
@@ -125,9 +123,9 @@ export function createRange (lower: IndexableType, upper: IndexableType, lowerOp
     };
 }
 
-export function rangeEqual (value: IndexableType) : KeyRange {
+export function rangeEqual (value: IndexableType) : DBCoreKeyRange {
     return {
-        type: RangeType.Equal,
+        type: DBCoreRangeType.Equal,
         lower: value,
         upper: value
     };

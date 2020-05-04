@@ -1,8 +1,6 @@
-import { exceptions } from '../errors';
-import { isArray, getByKeyPath } from '../functions/utils';
-import { Key } from '../public/types/dbcore';
+import { getByKeyPath } from '../functions/utils';
 
-export function getKeyExtractor (keyPath: null | string | string[]) : (a: any) => Key {
+export function getKeyExtractor (keyPath: null | string | string[]) : (a: any) => any {
   if (keyPath == null) {
     return () => undefined;
   } else if (typeof keyPath === 'string') {
