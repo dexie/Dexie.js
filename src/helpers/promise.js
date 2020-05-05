@@ -332,14 +332,14 @@ props (DexiePromise, {
     any() {
         const possiblePromises = getArrayOf.apply(null, arguments).map(onPossibleParallellAsync);
         return new DexiePromise((resolve, reject) => {
-            if (possiblePromises.length === 0) reject(new AggregateError([]));
+            if (possiblePromises.length === 0) reject(new _global.AggregateError([]));
             let remaining = possiblePromises.length;
             const failures = new Array(remaining);
             possiblePromises.forEach((p, i) => DexiePromise.resolve(p).then(
                 value => resolve(value),
                 failure => {
                     failures[i] = failure;
-                    if (!--remaining) reject(new AggregateError(failures));
+                    if (!--remaining) reject(new _global.AggregateError(failures));
                 }));
         });
     },
