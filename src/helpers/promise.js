@@ -316,34 +316,6 @@ props (DexiePromise, {
         });
     },
 
-    allSettled() {
-        const possiblePromises = getArrayOf.apply(null, arguments).map(onPossibleParallellAsync);
-        return new DexiePromise(resolve => {
-            if (possiblePromises.length === 0) resolve([]);
-            let remaining = possiblePromises.length;
-            const results = new Array(remaining);
-            possiblePromises.forEach((p, i) => DexiePromise.resolve(p).then(
-                value => results[i] = {status: "fulfilled", value},
-                reason => results[i] = {status: "rejected", reason})
-                .then(()=>--remaining || resolve(results)));
-        });
-    },
-
-    any() {
-        const possiblePromises = getArrayOf.apply(null, arguments).map(onPossibleParallellAsync);
-        return new DexiePromise((resolve, reject) => {
-            if (possiblePromises.length === 0) reject(new AggregateError([]));
-            let remaining = possiblePromises.length;
-            const failures = new Array(remaining);
-            possiblePromises.forEach((p, i) => DexiePromise.resolve(p).then(
-                value => resolve(value),
-                failure => {
-                    failures[i] = failure;
-                    if (!--remaining) reject(new AggregateError(failures));
-                }));
-        });
-    },
-
     PSD: {
         get: ()=>PSD,
         set: value => PSD = value
@@ -386,6 +358,35 @@ props (DexiePromise, {
         });
     }
 });
+
+if (NativePromise) {
+    if (NativePromise.allSettled) setProp (DexiePromise, "allSettled", function() {
+        const possiblePromises = getArrayOf.apply(null, arguments).map(onPossibleParallellAsync);
+        return new DexiePromise(resolve => {
+            if (possiblePromises.length === 0) resolve([]);
+            let remaining = possiblePromises.length;
+            const results = new Array(remaining);
+            possiblePromises.forEach((p, i) => DexiePromise.resolve(p).then(
+                value => results[i] = {status: "fulfilled", value},
+                reason => results[i] = {status: "rejected", reason})
+                .then(()=>--remaining || resolve(results)));
+        });
+    });
+    if (NativePromise.any && typeof AggregateError !== 'undefined') setProp(DexiePromise, "any", function() {
+        const possiblePromises = getArrayOf.apply(null, arguments).map(onPossibleParallellAsync);
+        return new DexiePromise((resolve, reject) => {
+            if (possiblePromises.length === 0) reject(new AggregateError([]));
+            let remaining = possiblePromises.length;
+            const failures = new Array(remaining);
+            possiblePromises.forEach((p, i) => DexiePromise.resolve(p).then(
+                value => resolve(value),
+                failure => {
+                    failures[i] = failure;
+                    if (!--remaining) reject(new AggregateError(failures));
+                }));
+        });
+    });
+}
 
 /**
 * Take a potentially misbehaving resolver function and make sure
@@ -794,8 +795,8 @@ function switchToZone (targetZone, bEnteringZone) {
             GlobalPromise.race = targetEnv.race;
             GlobalPromise.resolve = targetEnv.resolve;
             GlobalPromise.reject = targetEnv.reject;
-            GlobalPromise.allSettled = targetEnv.allSettled;
-            GlobalPromise.any = targetEnv.any;
+            if (targetEnv.allSettled) GlobalPromise.allSettled = targetEnv.allSettled;
+            if (targetEnv.any) GlobalPromise.any = targetEnv.any;
         }
     }
 }
