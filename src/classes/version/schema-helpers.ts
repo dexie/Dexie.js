@@ -1,6 +1,6 @@
 import { Dexie } from '../dexie';
 import { DbSchema } from '../../public/types/db-schema';
-import { setProp, keys, slice, _global, isArray, shallowClone, isAsyncFunction } from '../../functions/utils';
+import { setProp, keys, slice, _global, isArray, shallowClone, isAsyncFunction, defineProperty } from '../../functions/utils';
 import { Transaction } from '../transaction';
 import { Version } from './version';
 import Promise, { PSD, newScope, NativePromise, decrementExpectedAwaits, incrementExpectedAwaits } from '../../helpers/promise';
@@ -21,7 +21,14 @@ export function setApiOnPlace(db: Dexie, objs: Object[], tableNames: string[], d
         if (obj === db.Transaction.prototype || obj instanceof db.Transaction) {
           // obj is a Transaction prototype (or prototype of a subclass to Transaction)
           // Make the API a getter that returns this.table(tableName)
-          setProp(obj, tableName, { get(this: Transaction) { return this.table(tableName); } });
+          setProp(obj, tableName, {
+            get(this: Transaction) { return this.table(tableName); },
+            set(value: any) {
+              // Issue #1039
+              // Let "this.schema = dbschema;" and other props in transaction constructor work even if there's a name collision with the table name.
+              defineProperty(this, tableName, {value, writable: true, configurable: true, enumerable: true});
+            }
+          });
         } else {
           // Table will not be bound to a transaction (will use Dexie.currentTransaction)
           obj[tableName] = new db.Table(tableName, schema);
