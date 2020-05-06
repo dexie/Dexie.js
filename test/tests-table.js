@@ -5,7 +5,8 @@ import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unitte
 var db = new Dexie("TestDBTable");
 db.version(1).stores({
     users: "++id,first,last,&username,*&email,*pets",
-    folks: "++,first,last"
+    folks: "++,first,last",
+    schema: "" // Test issue #1039
 });
 
 var User = db.users.defineClass({
@@ -886,4 +887,3 @@ promisedTest("bulkGet()", async () => {
     ok(u3 && u3.first === 'Foo100', "Third should be Foo100");
     ok(u4 === undefined, "Forth should be undefined");
 });
-
