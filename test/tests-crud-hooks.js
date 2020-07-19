@@ -516,6 +516,7 @@ spawnedTest("creating using Table.bulkPut()", function*(){
 // READING hooks test
 // Ways to produce READs:
 //  Table.get()
+//  Table.bulkGet()
 //  Collection.toArray()
 //  Collection.each()
 //  Collection.first()
@@ -550,12 +551,19 @@ spawnedTest("reading tests", function* (){
     },{
         op: "read", // last()
         obj: {fee: "bore"}
+    },{
+        op: "read", // bulkGet() (1)
+        obj: {foo: "bar"}
+    },{
+        op: "read", // bulkGet() (2)
+        obj: {fee: "bore"}
     }], ()=> db.transaction('rw', 'table5', function*(){
         yield db.table5.bulkAdd([{foo: "bar"}, {fee: "bore"}], [1, 2]);
         yield db.table5.toArray();
         yield db.table5.reverse().each(x => {});
         yield db.table5.orderBy(':id').first();
         yield db.table5.orderBy(':id').last();
+        yield db.table5.bulkGet([1, 2]);
         yield db.table5.filter(x => false).toArray();
     }));
 
