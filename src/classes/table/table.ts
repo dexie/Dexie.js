@@ -365,7 +365,7 @@ export class Table implements ITable<any, IndexableType> {
       return this.core.getMany({
         keys,
         trans
-      });
+      }).then(result => result.map(res => this.hook.reading.fire(res)));
     });
   }
 
