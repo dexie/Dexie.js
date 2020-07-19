@@ -291,3 +291,29 @@ spawnedTest ("delByKeyPath not working correctly for arrays", function* () {
     console.log("jsonResult2 = ", jsonResult2);
     equal(jsonResult, jsonResult2, `Should be equal ${jsonResult} ${jsonResult2}`);
 });
+
+asyncTest ("#1079 mapToClass", function(){
+    class Foo {
+    }
+    db.foo.mapToClass(Foo);
+
+    db.transaction('rw', db.foo, function () {
+        db.foo.put({id:1});
+    }).catch(e => {
+        ok(true, `Unexpected error from put: ${e.stack || e}`);
+    }).then(() => {
+        return db.foo.get(1);
+    }).then (getResult => {
+        ok(getResult instanceof Foo, "Result of get not mapped to class");
+    }).catch(e => {
+        ok(true, `Unexpected error from get: ${e.stack || e}`);
+    }).then(() => {
+        return db.foo.bulkGet([1]);
+    }).then(bulkGetResult => {
+        ok(bulkGetResult.length === 1, `Unexpected array length ${bulkGetResult.length} from bulkGet`);
+        ok(bulkGetResult[0] instanceof Foo, "Result of bulkGet not mapped to class");
+    }).catch(e => {
+        ok(true, `Unexpected error from bulkGet: ${e.stack || e}`);
+    }).finally(start);
+
+});
