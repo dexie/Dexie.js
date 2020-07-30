@@ -4,3 +4,4 @@ src/
 tmp/
 **/tmp/
 test
+*.log
