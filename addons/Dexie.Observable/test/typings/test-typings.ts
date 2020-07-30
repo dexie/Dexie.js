@@ -70,6 +70,7 @@ Dexie.Observable.on('intercomm', dbName=>{dbName.toLowerCase()});
 Dexie.Observable.on('beforeunload', ()=>{});
 
 Dexie.Observable.on('latestRevisionIncremented').unsubscribe(()=>{});
-var x: IDatabaseChange = {key: 1, table: "", type: DatabaseChangeType.Delete};
+var x: IDatabaseChange = {key: 1, table: "", type: DatabaseChangeType.Delete, oldObj: {}};
 x.key;
 x.type;
+x.oldObj;
