@@ -5,7 +5,7 @@ import { exceptions } from '../../errors';
 import { eventRejectHandler, preventDefault } from '../../functions/event-wrappers';
 import Promise, { wrap } from '../../helpers/promise';
 import { connections } from '../../globals/constants';
-import { runUpgraders, readGlobalSchema, adjustToExistingIndexNames } from '../version/schema-helpers';
+import { runUpgraders, readGlobalSchema, adjustToExistingIndexNames, verifyInstalledSchema } from '../version/schema-helpers';
 import { safariMultiStoreFix } from '../../functions/quirks';
 import { databaseEnumerator } from '../../helpers/database-enumerator';
 import { vip } from './vip';
@@ -79,7 +79,17 @@ export function dexieOpen (db: Dexie) {
           if (objectStoreNames.length > 0) try {
             const tmpTrans = idbdb.transaction(safariMultiStoreFix(objectStoreNames), 'readonly');
             if (state.autoSchema) readGlobalSchema(db, idbdb, tmpTrans);
-            else adjustToExistingIndexNames(db, db._dbSchema, tmpTrans);
+            else {
+                adjustToExistingIndexNames(db, db._dbSchema, tmpTrans);
+                try {
+                    verifyInstalledSchema(db, idbdb, tmpTrans, db._dbSchema);
+                } catch(e) {
+                    idbdb.close();
+                    db.idbdb = null;
+                    reject(e);
+                    return;
+                }
+            }
             generateMiddlewareStacks(db, tmpTrans);
           } catch (e) {
             // Safari 8 may bail out if > 1 store names. However, this shouldnt be a showstopper. Issue #120.
