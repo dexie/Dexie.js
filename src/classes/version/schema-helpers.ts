@@ -339,6 +339,14 @@ export function readGlobalSchema(db: Dexie, idbdb: IDBDatabase, tmpTrans: IDBTra
   setApiOnPlace(db, [db._allTables], keys(globalSchema), globalSchema);
 }
 
+export function verifyInstalledSchema(db: Dexie, idbdb: IDBDatabase, tmpTrans: IDBTransaction, declaredSchema: DbSchema) {
+  const installedSchema = buildGlobalSchema(db, idbdb, tmpTrans);
+  const diff = getSchemaDiff(installedSchema, declaredSchema);
+  if (diff.add.length || diff.change.some(ch => ch.add.length || ch.change.length)) {
+    throw new exceptions.Schema(`Version number passed to db.version() needs to be increased`);
+  }
+}
+
 export function adjustToExistingIndexNames(db: Dexie, schema: DbSchema, idbtrans: IDBTransaction) {
   // Issue #30 Problem with existing db - adjust to existing index names when migrating from non-dexie db
   const storeNames = idbtrans.db.objectStoreNames;

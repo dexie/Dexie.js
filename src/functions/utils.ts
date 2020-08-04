@@ -89,7 +89,7 @@ export function getUniqueArray(a) {
  *        instert on the resulting object for each item in the array. If this function returns a falsy value, the
  *        current item wont affect the resulting object.
  */
-export function arrayToObject (array, extractor) {
+export function arrayToObject<T,R> (array: T[], extractor: (x:T, idx: number)=>[string, R]): {[name: string]: R} {
     return array.reduce((result, item, i) => {
         var nameAndValue = extractor(item, i);
         if (nameAndValue) result[nameAndValue[0]] = nameAndValue[1];

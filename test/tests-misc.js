@@ -317,3 +317,42 @@ asyncTest ("#1079 mapToClass", function(){
     }).finally(start);
 
 });
+
+asyncTest("#??? ", async ()=>{
+    const DBNAME = "IssueXXX";
+    let db = new Dexie(DBNAME);
+    db.version(1).stores({
+        foo: "id"
+    });
+    await db.open();
+    ok(true, `${DBNAME} could be opened`);
+    db.close();
+
+    // Adding an index without updating version number:
+    db = new Dexie(DBNAME);
+    db.version(1).stores({
+        foo: "id,name"
+    });
+    try {
+        await db.open();
+        ok(false, "Should not succeed to open a db with added index");
+    } catch (e) {
+        ok(e instanceof Dexie.SchemaError, "Should get SchemaError when a new index was declared without incrementing version number");
+    }
+    db.close();
+
+    // Adding an index without updating version number:
+    db = new Dexie(DBNAME);
+    db.version(1).stores({
+        foo: "id",
+        bar: ""
+    });
+    try {
+        await db.open();
+        ok(false, "Should not succeed to open a db with added table");
+    } catch (e) {
+        ok(e instanceof Dexie.SchemaError, "Should get SchemaError when a new table was declared without incrementing version number");
+    }
+    db.close();
+    start();
+});

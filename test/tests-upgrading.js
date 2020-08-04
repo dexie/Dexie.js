@@ -430,7 +430,7 @@ test("Issue #30 - Problem with existing db", (assert) => {
         db = new Dexie("raw-db", {addons: []}); // Explicitely don't use addons here. Syncable would fail to open an existing db.
         db.version(0.2).stores({
             people: "_id",
-            messages: "++,text,words,id,[size+color]",
+            messages: "++,text,*words,&id",
             umbrellas: "[date+time],[size+color]"
         });
         return db.open();
