@@ -145,6 +145,11 @@ import './test-extend-dexie';
     db.friends.toCollection().eachPrimaryKey(key => key.toExponential());
     // Table.orderBy
     db.friends.orderBy('name').eachPrimaryKey(key => key.toFixed());
+    // Table.bulkGet
+    db.friends.bulkGet([1, 2, 3]).then(friends => friends.map(
+        // friend => friend.address // should cause TS2532: Object is possibly 'undefined'
+        friend => friend === undefined ? "missing" : friend.address
+    ));
 
     // Hooks
     db.friends.hook('creating', function(key, friend) {
