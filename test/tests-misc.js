@@ -318,12 +318,12 @@ asyncTest ("#1079 mapToClass", function(){
 
 });
 
-asyncTest("#??? ", async ()=>{
+asyncTest("PR #1108", async ()=>{
     const origConsoleWarn = console.warn;
     const warnings = [];
     console.warn = function(msg){warnings.push(msg); return origConsoleWarn.apply(this, arguments)};
     try {
-        const DBNAME = "IssueXXX";
+        const DBNAME = "PR1108";
         let db = new Dexie(DBNAME);
         db.version(1).stores({
             foo: "id"
