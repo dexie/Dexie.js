@@ -343,7 +343,7 @@ asyncTest("PR #1108", async ()=>{
         db.close();
         warnings = [];
 
-        // Adding an index without updating version number:
+        // Adding a table without updating version number:
         db = new Dexie(DBNAME);
         db.version(1).stores({
             foo: "id",
