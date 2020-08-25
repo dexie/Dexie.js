@@ -319,40 +319,44 @@ asyncTest ("#1079 mapToClass", function(){
 });
 
 asyncTest("#??? ", async ()=>{
-    const DBNAME = "IssueXXX";
-    let db = new Dexie(DBNAME);
-    db.version(1).stores({
-        foo: "id"
-    });
-    await db.open();
-    ok(true, `${DBNAME} could be opened`);
-    db.close();
-
-    // Adding an index without updating version number:
-    db = new Dexie(DBNAME);
-    db.version(1).stores({
-        foo: "id,name"
-    });
+    const origConsoleWarn = console.warn;
+    const warnings = [];
+    console.warn = function(msg){warnings.push(msg); return origConsoleWarn.apply(this, arguments)};
     try {
+        const DBNAME = "IssueXXX";
+        let db = new Dexie(DBNAME);
+        db.version(1).stores({
+            foo: "id"
+        });
         await db.open();
-        ok(false, "Should not succeed to open a db with added index");
-    } catch (e) {
-        ok(e instanceof Dexie.SchemaError, "Should get SchemaError when a new index was declared without incrementing version number");
-    }
-    db.close();
+        ok(!warnings.some(x => /SchemaDiff/.test(x)), `${DBNAME} could be opened without SchemaDiff warnings`);
+        db.close();
 
-    // Adding an index without updating version number:
-    db = new Dexie(DBNAME);
-    db.version(1).stores({
-        foo: "id",
-        bar: ""
-    });
-    try {
+        // Adding an index without updating version number:
+        db = new Dexie(DBNAME);
+        db.version(1).stores({
+            foo: "id,name"
+        });
+        warnings = [];
         await db.open();
-        ok(false, "Should not succeed to open a db with added table");
-    } catch (e) {
-        ok(e instanceof Dexie.SchemaError, "Should get SchemaError when a new table was declared without incrementing version number");
+        ok(warnings.some(x => /SchemaDiff/.test(x)), "Should warn when a new index was declared without incrementing version number");
+        db.close();
+        warnings = [];
+
+        // Adding an index without updating version number:
+        db = new Dexie(DBNAME);
+        db.version(1).stores({
+            foo: "id",
+            bar: ""
+        });
+        await db.open();
+        ok(warnings.some(x => /SchemaDiff/.test(x)), "Should warn when a new table was declared without incrementing version number");
+        db.close();
+        warnings = [];
+    } catch(error) {
+        ok(false, error);
+    } finally {
+        console.warn = origConsoleWarn;
+        start();
     }
-    db.close();
-    start();
 });

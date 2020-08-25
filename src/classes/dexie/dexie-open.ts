@@ -81,13 +81,8 @@ export function dexieOpen (db: Dexie) {
             if (state.autoSchema) readGlobalSchema(db, idbdb, tmpTrans);
             else {
                 adjustToExistingIndexNames(db, db._dbSchema, tmpTrans);
-                try {
-                    verifyInstalledSchema(db, idbdb, tmpTrans, db._dbSchema);
-                } catch(e) {
-                    idbdb.close();
-                    db.idbdb = null;
-                    reject(e);
-                    return;
+                if (!verifyInstalledSchema(db, tmpTrans)) {
+                    console.warn(`Dexie SchemaDiff: Schema was extended without increasing the number passed to db.version(). Some queries may fail.`);
                 }
             }
             generateMiddlewareStacks(db, tmpTrans);
