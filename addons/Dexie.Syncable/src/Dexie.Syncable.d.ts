@@ -1,4 +1,4 @@
-// Type definitions for dexie-syncable v1.0.0-beta.8
+// Type definitions for dexie-syncable v{version}
 // Project: https://github.com/dfahlander/Dexie.js/tree/master/addons/Dexie.Syncable
 // Definitions by: David Fahlander <http://github.com/dfahlander>
 
@@ -18,6 +18,7 @@ export interface SyncableEventSet extends DexieEventSet {
 declare module 'dexie' {
     interface Dexie {
         syncable: {
+            version: string;
             /**
              * Connect to given URL using given protocol and options. See documentation at:
              * https://github.com/dfahlander/Dexie.js/wiki/db.syncable.connect()
@@ -68,9 +69,12 @@ declare module 'dexie' {
     interface DexieConstructor {
         Syncable: {
             (db: Dexie) : void;
+
+            version: string;
+
             /**
              * See documentation at:
-             * https://github.com/dfahlander/Dexie.js/wiki/Dexie.Syncable.registerSyncProtocol()
+             * https://dexie.org/docs/Syncable/Dexie.Syncable.registerSyncProtocol()
              */
             registerSyncProtocol: (name: string, prototocolInstance: ISyncProtocol) => void;
 

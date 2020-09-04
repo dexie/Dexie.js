@@ -55,11 +55,17 @@ var override = Dexie.override;
 var Promise = Dexie.Promise;
 var browserIsShuttingDown = false;
 
+/** Dexie addon for change tracking and real-time observation.
+ * 
+ * @param {Dexie} db 
+ */
 export default function Observable(db) {
-    /// <summary>
-    ///   Extension to Dexie providing Syncronization capabilities to Dexie.
-    /// </summary>
-    /// <param name="db" type="Dexie"></param>
+    if (!/^3\./.test(Dexie.version))
+        throw new Error(`Missing dexie version 3.x`);
+    if (db.observable) {
+        if (db.observable.version !== "{version}") throw new Error(`Mixed versions of dexie-observable`);
+        return; // Addon already active.
+    }
 
     var NODE_TIMEOUT = 20000, // 20 seconds before local db instances are timed out. This is so that old changes can be deleted when not needed and to garbage collect old _syncNodes objects.
         HIBERNATE_GRACE_PERIOD = 20000, // 20 seconds
@@ -99,7 +105,7 @@ export default function Observable(db) {
         }
     });
 
-    db.observable = {};
+    db.observable = {version: "{version}"};
     db.observable.SyncNode = SyncNode;
 
     const wakeupObservers = initWakeupObservers(db, Observable, localStorage);
@@ -488,6 +494,7 @@ export default function Observable(db) {
 // Static properties and methods
 // 
 
+Observable.version = "{version}";
 Observable.latestRevision = {}; // Latest revision PER DATABASE. Example: Observable.latestRevision.FriendsDB = 37;
 Observable.on = Dexie.Events(null, "latestRevisionIncremented", "suicideNurseCall", "intercomm", "beforeunload"); // fire(dbname, value);
 Observable.createUUID = createUUID;
@@ -511,6 +518,13 @@ if (global.addEventListener) {
     global.addEventListener("storage", Observable._onStorage);
     global.addEventListener("beforeunload", Observable._onBeforeUnload);
 }
-// Register addon:
-Dexie.Observable = Observable;
-Dexie.addons.push(Observable);
+
+if (Dexie.Observable) {
+    if (Dexie.Observable.version !== "{version}") {
+        throw new Error (`Mixed versions of dexie-observable`);
+    }
+} else {
+    // Register addon:
+    Dexie.Observable = Observable;
+    Dexie.addons.push(Observable);
+}
