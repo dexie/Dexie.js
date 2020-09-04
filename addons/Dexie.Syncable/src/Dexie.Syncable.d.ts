@@ -1,11 +1,16 @@
-// Type definitions for dexie-syncable v{version}
+// Type definitions for dexie-syncable v1.0.0-beta.8
 // Project: https://github.com/dfahlander/Dexie.js/tree/master/addons/Dexie.Syncable
 // Definitions by: David Fahlander <http://github.com/dfahlander>
 
-import Dexie from 'dexie';
+import Dexie, { DexieEventSet } from 'dexie';
 import 'dexie-observable';
 import { ISyncProtocol, SyncStatus } from '../api';
 import {IDatabaseChange} from 'dexie-observable/api';
+
+
+export interface SyncableEventSet extends DexieEventSet {
+    (eventName: 'statusChanged', subscriber: (status: number, url: string) => void): void;
+}
 
 //
 // Extend Dexie interface
@@ -47,7 +52,7 @@ declare module 'dexie' {
              * Syncable events. See docs at:
              * https://github.com/dfahlander/Dexie.js/wiki/db.syncable.on('statusChanged')
              */
-            on: Dexie.Syncable.SyncableEventSet;
+            on: SyncableEventSet;
         }
 
         /**
@@ -60,29 +65,8 @@ declare module 'dexie' {
         _uncommittedChanges: Dexie.Table<IDatabaseChange & {id: number, node: number}, number>;
     }
 
-    module Dexie {
-
-        // Extend SyncNode interface from Dexie.Observable to
-        // allow storing remote nodes in table _syncNodes.
-        module Observable {
-            interface SyncNode {
-                url: string, // Only applicable for "remote" nodes. Only used in Dexie.Syncable.
-                syncProtocol: string, // Tells which implementation of ISyncProtocol to use for remote syncing.
-                syncContext: any,
-                syncOptions: any,
-                status: number,
-                appliedRemoteRevision: any,
-                remoteBaseRevisions: { local: number, remote: any }[],
-                dbUploadState: {
-                    tablesToUpload: string[],
-                    currentTable: string,
-                    currentKey: any,
-                    localBaseRevision: number
-                }
-            }
-        }
-
-        var Syncable : {
+    interface DexieConstructor {
+        Syncable: {
             (db: Dexie) : void;
             /**
              * See documentation at:
@@ -93,11 +77,28 @@ declare module 'dexie' {
             /** Translates a sync status number into a string "ERROR_WILL_RETRY", "ERROR", etc */
             StatusTexts: {[syncStatus:number]: string};
         }
+    }
+}
 
-        module Syncable {
-            interface SyncableEventSet extends DexieEventSet {
-                (eventName: 'statusChanged', subscriber: (status: number, url: string) => void): void;
-            }
+//
+// Extend dexie-observable interfaces
+//
+declare module "dexie-observable" {
+    // Extend SyncNode interface from Dexie.Observable to
+    // allow storing remote nodes in table _syncNodes.
+    interface SyncNode {
+        url: string, // Only applicable for "remote" nodes. Only used in Dexie.Syncable.
+        syncProtocol: string, // Tells which implementation of ISyncProtocol to use for remote syncing.
+        syncContext: any,
+        syncOptions: any,
+        status: number,
+        appliedRemoteRevision: any,
+        remoteBaseRevisions: { local: number, remote: any }[],
+        dbUploadState: {
+            tablesToUpload: string[],
+            currentTable: string,
+            currentKey: any,
+            localBaseRevision: number
         }
     }
 }
