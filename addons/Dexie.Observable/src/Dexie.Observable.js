@@ -59,7 +59,7 @@ var browserIsShuttingDown = false;
  * 
  * @param {Dexie} db 
  */
-export default function Observable(db) {
+function Observable(db) {
     if (!/^3\./.test(Dexie.version))
         throw new Error(`Missing dexie version 3.x`);
     if (db.observable) {
@@ -528,3 +528,5 @@ if (Dexie.Observable) {
     Dexie.Observable = Observable;
     Dexie.addons.push(Observable);
 }
+
+export default Dexie.Observable;

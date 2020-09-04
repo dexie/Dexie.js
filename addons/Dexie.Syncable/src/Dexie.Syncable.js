@@ -36,7 +36,7 @@ var override = Dexie.override,
  * 
  * @param {Dexie} db 
  */
-export default function Syncable (db) {
+function Syncable (db) {
     if (!/^3\./.test(Dexie.version))
         throw new Error(`Missing dexie version 3.x`);
     if (!db.observable || (db.observable.version !== "{version}" && !/^3\./.test(db.observable.version)))
@@ -286,3 +286,5 @@ if (Dexie.Syncable) {
     Dexie.Syncable = Syncable;
     Dexie.addons.push(Syncable);
 }
+
+export default Dexie.Syncable;
