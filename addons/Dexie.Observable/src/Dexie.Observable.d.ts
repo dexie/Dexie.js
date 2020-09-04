@@ -1,4 +1,4 @@
-// Type definitions for dexie-observable v1.0.0-beta.8
+// Type definitions for dexie-observable v{version}
 // Project: https://github.com/dfahlander/Dexie.js/tree/master/addons/Dexie.Observable
 // Definitions by: David Fahlander <http://github.com/dfahlander>
 
@@ -58,6 +58,7 @@ declare module 'dexie' {
         // Placeholder where to access the SyncNode class constructor.
         // (makes it valid to do new db.observable.SyncNode())
         observable: {
+            version: string;
             SyncNode: SyncNodeConstructor;
             sendMessage(
                 type: string, // Don't use 'response' as it is used internally by the framework
@@ -98,9 +99,7 @@ declare module 'dexie' {
         Observable: {
             (db: Dexie) : void;
 
-            //
-            //
-            //
+            version: string;
             createUUID: () => string;
             on: ObservableEventSet;
             localStorageImpl: {

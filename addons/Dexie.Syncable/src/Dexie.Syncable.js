@@ -32,8 +32,19 @@ var override = Dexie.override,
     Promise = Dexie.Promise,
     Observable = Dexie.Observable;
 
+/** Dexie addon for remote database sync.
+ * 
+ * @param {Dexie} db 
+ */
 export default function Syncable (db) {
-    /// <param name="db" type="Dexie"></param>
+    if (!/^3\./.test(Dexie.version))
+        throw new Error(`Missing dexie version 3.x`);
+    if (!db.observable || (db.observable.version !== "{version}" && !/^3\./.test(db.observable.version)))
+        throw new Error(`Missing dexie-observable version 3.x`);
+    if (db.syncable) {
+        if (db.syncable.version !== "{version}") throw new Error(`Mixed versions of dexie-syncable`);
+        return; // Addon already active.
+    }
 
     var activePeers = [];
 
@@ -114,7 +125,9 @@ export default function Syncable (db) {
         }
     }, true); // True means the ready event will survive a db reopen - db.close()/db.open()
 
-    db.syncable = {};
+    db.syncable = {
+        version: "{version}"
+    };
 
     db.syncable.getStatus = function(url, cb) {
         if (db.isOpen()) {
@@ -236,6 +249,8 @@ export default function Syncable (db) {
      });
 }
 
+Syncable.version = "{version}";
+
 Syncable.Statuses = Statuses;
 
 Syncable.StatusTexts = StatusTexts;
@@ -262,6 +277,12 @@ Syncable.registerSyncProtocol = function(name, protocolInstance) {
     Syncable.registeredProtocols[name] = protocolInstance;
 };
 
-// Register addon in Dexie:
-Dexie.Syncable = Syncable;
-Dexie.addons.push(Syncable);
+if (Dexie.Syncable) {
+    if (Dexie.Syncable.version !== "{version}") {
+        throw new Error (`Mixed versions of dexie-syncable`);
+    }
+} else {
+    // Register addon in Dexie:
+    Dexie.Syncable = Syncable;
+    Dexie.addons.push(Syncable);
+}
