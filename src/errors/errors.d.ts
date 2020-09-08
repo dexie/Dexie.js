@@ -1,6 +1,7 @@
 import {
   DexieError,
   DexieErrorConstructor,
+  DexieErrors,
   ModifyError,
   ModifyErrorConstructor,
   BulkError,
@@ -17,6 +18,6 @@ export declare const exceptions : ExceptionAliasSet & {
   Type: ErrorConstructor,
   Range: ErrorConstructor
 };
-export declare const errnames : {[P in keyof ExceptionSet]: P};
+export declare const errnames : DexieErrors;
 export declare const fullNameExceptions : ExceptionSet;
 export declare function mapError (domError, message?) : DexieError;

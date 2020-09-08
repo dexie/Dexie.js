@@ -3,7 +3,7 @@ import { Transaction } from "./transaction";
 import { ThenShortcut } from "./then-shortcut";
 import { TableSchema } from "./table-schema";
 import { IndexSpec } from "./index-spec";
-import { DexieExceptionClasses } from "./errors";
+import { DexieExceptionClasses, DexieErrors } from "./errors";
 import { PromiseExtendedConstructor } from "./promise-extended";
 import { DexieEventSet } from "./dexie-event-set";
 import { DexieDOMDependencies } from "./dexie-dom-dependencies";
@@ -50,5 +50,5 @@ export interface DexieConstructor extends DexieExceptionClasses {
   //IndexSpec: {new():IndexSpec}; //? Deprecate
   Events: (ctx?: any)=>DexieEventSet;
 
-  errnames: {[P in keyof DexieExceptionClasses]: P};
+  errnames: DexieErrors;
 }
