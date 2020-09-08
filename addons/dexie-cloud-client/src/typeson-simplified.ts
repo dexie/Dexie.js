@@ -33,15 +33,8 @@ const buildInDefs: TypeDefSet = {
   },
   NaN: { revive: () => NaN },
   Infinity: { revive: () => Infinity },
-  NegativeInfinity: { revive: () => -Infinity },
-  Date: {
-    replace: (date: Date) => ({ $type: "Date", value: date.getTime() }),
-    revive: ({ value }) => new Date(value),
-  },
+  NegativeInfinity: { revive: () => -Infinity }
 };
-
-// TODO: Add support for all typed arrays and maybe a default arrayBuffer implementation converting it to hex.
-// TODO: Could remove Date from here and put it into another module.
 
 const replacerMap = new WeakMap<
   object,
