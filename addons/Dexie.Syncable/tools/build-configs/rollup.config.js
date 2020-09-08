@@ -14,9 +14,7 @@ export default {
     format: 'es'
   }],
   sourceMap: true,
-  banner: readFileSync(path.resolve(__dirname, 'banner.txt'))+""
-    .replace(/{version}/g, version)
-    .replace(/{date}/g, new Date().toDateString()),
+  banner: readFileSync(path.resolve(__dirname, 'banner.txt')),
   moduleName: 'Dexie.Syncable',
   globals: {dexie: "Dexie", "dexie-observable": "Dexie.Observable"},
   external: ['dexie', 'dexie-observable'],
