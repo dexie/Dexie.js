@@ -5,7 +5,7 @@ import { TSON } from "./TSON2";
 // Constants:
 var RECONNECT_DELAY = 5000; // Reconnect delay in case of errors such as network down.
 
-export const socketIOSyncProtocol: ISyncProtocol = {
+export const dexieCloudSyncProtocol: ISyncProtocol = {
   sync(
     context,
     url,

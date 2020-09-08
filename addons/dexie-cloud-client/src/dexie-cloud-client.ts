@@ -1,13 +1,13 @@
 import Dexie from "dexie";
 import dexieObservable from "dexie-observable";
 import dexieSyncable from "dexie-syncable";
-import { socketIOSyncProtocol } from "./websocket-sync-protocol";
+import { dexieCloudSyncProtocol } from "./dexieCloudSyncProtocol";
 
 const DEXIE_CLOUD_PROTOCOL_NAME = "dexie.cloud";
 
 dexieSyncable.registerSyncProtocol(
   DEXIE_CLOUD_PROTOCOL_NAME,
-  socketIOSyncProtocol
+  dexieCloudSyncProtocol
 );
 
 //
