@@ -9,18 +9,14 @@ export default {
   output: [{
     file: 'dist/dexie-observable.js',
     format: 'umd',
-    banner: readFileSync(path.resolve(__dirname, 'banner.txt'))+""
-        .replace(/{version}/g, version)
-        .replace(/{date}/g, new Date().toDateString()),
+    banner: readFileSync(path.resolve(__dirname, 'banner.txt'),
     globals: {dexie: "Dexie"},
     name: 'Dexie.Observable',
     sourcemap: true
   },{
     file: 'dist/dexie-observable.es.js',
     format: 'es',
-    banner: readFileSync(path.resolve(__dirname, 'banner.txt'))+""
-        .replace(/{version}/g, version)
-        .replace(/{date}/g, new Date().toDateString()),
+    banner: readFileSync(path.resolve(__dirname, 'banner.txt'),
     globals: {dexie: "Dexie"},
     name: 'Dexie.Observable',
     sourcemap: true
