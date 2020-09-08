@@ -32,6 +32,7 @@ export const dexieCloudSyncProtocol: ISyncProtocol = {
           options.token
         )}&clientIdentity=${encodeURIComponent(context.clientIdentity || "")}`
     );
+    ws.binaryType = "arraybuffer";
 
     // Send our changes if we have any:
     if (changes.length > 0) {
