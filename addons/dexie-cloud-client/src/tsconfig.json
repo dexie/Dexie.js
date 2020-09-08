@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "es5",
+    "module": "es2015",
+    "declaration": true,
+    "importHelpers": true,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "noImplicitReturns": true,
+    "moduleResolution": "node",
+    "lib": ["ES2018", "DOM"],
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "../tools/tmp/src/",
+    "sourceMap": true,
+    "rootDir": "."
+  },
+  "files": [
+    "dexie-cloud-client.ts"
+  ]
+}

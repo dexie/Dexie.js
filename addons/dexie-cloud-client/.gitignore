@@ -1,0 +1,8 @@
+dist/*.js
+dist/*.map
+dist/*.ts
+dist/*.gz
+dist/*.mjs
+.eslintcache
+**/tmp/
+test/**/bundle.*
