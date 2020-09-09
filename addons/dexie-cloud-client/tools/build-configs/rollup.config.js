@@ -16,9 +16,7 @@ export default {
   output: [{
     file: 'dist/dexie-cloud-client.js',
     format: 'umd',
-    banner: readFileSync(path.resolve(__dirname, 'banner.txt'), "utf-8")
-        .replace(/{version}/g, version)
-        .replace(/{date}/g, new Date().toDateString()),
+    banner: readFileSync(path.resolve(__dirname, 'banner.txt'), "utf-8"),
     globals: {
       dexie: "Dexie",
       "dexie-observable": "Dexie.Observable",
