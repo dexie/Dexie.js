@@ -16,7 +16,7 @@ export default {
   output: [{
     file: 'dist/dexie-export-import.js',
     format: 'umd',
-    banner: readFileSync(path.resolve(__dirname, 'banner.txt'))+""
+    banner: readFileSync(path.resolve(__dirname, 'banner.txt'), "utf-8")
         .replace(/{version}/g, version)
         .replace(/{date}/g, new Date().toDateString()),
     globals: {dexie: "Dexie"},
@@ -26,7 +26,7 @@ export default {
   },{
     file: 'dist/dexie-export-import.mjs',
     format: 'es',
-    banner: readFileSync(path.resolve(__dirname, 'banner.txt'))+""
+    banner: readFileSync(path.resolve(__dirname, 'banner.txt'), "utf-8")
         .replace(/{version}/g, version)
         .replace(/{date}/g, new Date().toDateString()),
     sourcemap: true
