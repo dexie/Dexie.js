@@ -8,7 +8,8 @@ var db = new Dexie("TestIssuesDB");
 db.version(1).stores({
     users: "id,first,last,&username,*&email,*pets",
     keyless: ",name",
-    foo: "id"
+    foo: "id",
+    bars: "++id,text"
     // If required for your test, add more tables here
 });
 
@@ -357,6 +358,38 @@ asyncTest("PR #1108", async ()=>{
         ok(false, error);
     } finally {
         console.warn = origConsoleWarn;
+        start();
+    }
+});
+
+asyncTest("Issue #1112", async ()=>{
+    function Bar(text) {
+        this.id = undefined;
+        this.text = text;
+    }
+
+    try {
+        // Verify the workaround for that IDB will tread explicit undefined as if key was provided,
+        // which is not very compatible with classs fields and typescript.
+        const id1 = await db.bars.add(new Bar("hello1"));
+        ok(!isNaN(id1), "got a real autoincremented id for my bar using add()");
+        const id2 = await db.bars.put(new Bar("hello2"));
+        ok(!isNaN(id2), "got a real autoincremented id for my bar using put()");
+        const id3 = await db.bars.bulkAdd([new Bar("hello3")]);
+        ok(!isNaN(id3), "got a real autoincremented id for my bar using bulkAdd()");
+        const id4 = await db.bars.bulkPut([new Bar("hello4")]);
+        ok(!isNaN(id4), "got a real autoincremented id for my bar using bulkPut()");
+
+        // Regression: possible to put back an item without anything getting destroyed:
+        const bar3 = await db.bars.get(id3);
+        equal(bar3.text, "hello3", "Should get the object with text hello3");
+        bar3.text = "hello3 modified";
+        await db.bars.put(bar3);
+        const bar3_2 = await db.bars.get(id3);
+        equal(bar3_2.text, "hello3 modified", "Could successfully change a prop and put back.");
+    } catch (error) {
+        ok(false, error);
+    } finally {
         start();
     }
 });
