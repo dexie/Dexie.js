@@ -15,6 +15,7 @@ import { IndexableType } from '../../public/types/indexable-type';
 import { debug } from '../../helpers/debug';
 import { DBCoreTable } from '../../public/types/dbcore';
 import { AnyRange } from '../../dbcore/keyrange';
+import { workaroundForUndefinedPrimKey } from '../../functions/workaround-undefined-primkey';
 
 /** class Table
  * 
@@ -280,12 +281,20 @@ export class Table implements ITable<any, IndexableType> {
    * 
    **/
   add(obj, key?: IndexableType): PromiseExtended<IndexableType> {
+    const {auto, keyPath} = this.schema.primKey;
+    let objToAdd = obj;
+    if (keyPath && auto) {
+      objToAdd = workaroundForUndefinedPrimKey(keyPath)(obj);
+    }
     return this._trans('readwrite', trans => {
-      return this.core.mutate({trans, type: 'add', keys: key != null ? [key] : null, values: [obj]});
+      return this.core.mutate({trans, type: 'add', keys: key != null ? [key] : null, values: [objToAdd]});
     }).then(res => res.numFailures ? Promise.reject(res.failures[0]) : res.lastResult)
     .then(lastResult => {
-      if (!this.core.schema.primaryKey.outbound) {
-        try{setByKeyPath(obj, this.core.schema.primaryKey.keyPath, lastResult);}catch(_){};
+      if (keyPath) {
+        // This part should be here for backward compatibility.
+        // If ever feeling too bad about this, please wait to a new major before removing it,
+        // and document the change thoroughly.
+        try{setByKeyPath(obj, keyPath, lastResult);}catch(_){};
       }
       return lastResult;
     });
@@ -320,13 +329,21 @@ export class Table implements ITable<any, IndexableType> {
    * 
    **/
   put(obj, key?: IndexableType): PromiseExtended<IndexableType> {
+    const {auto, keyPath} = this.schema.primKey;
+    let objToAdd = obj;
+    if (keyPath && auto) {
+      objToAdd = workaroundForUndefinedPrimKey(keyPath)(obj);
+    }
     return this._trans(
       'readwrite',
-      trans => this.core.mutate({trans, type: 'put', values: [obj], keys: key != null ? [key] : null}))
+      trans => this.core.mutate({trans, type: 'put', values: [objToAdd], keys: key != null ? [key] : null}))
     .then(res => res.numFailures ? Promise.reject(res.failures[0]) : res.lastResult)
     .then(lastResult => {
-      if (!this.core.schema.primaryKey.outbound) {
-        try{setByKeyPath(obj, this.core.schema.primaryKey.keyPath, lastResult);}catch(_){};
+      if (keyPath) {
+        // This part should be here for backward compatibility.
+        // If ever feeling too bad about this, please wait to a new major before removing it,
+        // and document the change thoroughly.
+        try{setByKeyPath(obj, keyPath, lastResult);}catch(_){};
       }
       return lastResult;
     });
@@ -384,15 +401,18 @@ export class Table implements ITable<any, IndexableType> {
     const wantResults = options ? options.allKeys : undefined;
 
     return this._trans('readwrite', trans => {
-      const {outbound} = this.core.schema.primaryKey;
-      if (!outbound && keys)
+      const {auto, keyPath} = this.schema.primKey;
+      if (keyPath && keys)
         throw new exceptions.InvalidArgument("bulkAdd(): keys argument invalid on tables with inbound keys");
       if (keys && keys.length !== objects.length)
         throw new exceptions.InvalidArgument("Arguments objects and keys must have the same length");
 
       const numObjects = objects.length; // Pick length here to allow garbage collection of objects later
+      let objectsToAdd = keyPath && auto ?
+        objects.map(workaroundForUndefinedPrimKey(keyPath)) :
+        objects;
       return this.core.mutate(
-        {trans, type: 'add', keys: keys as IndexableType[], values: objects, wantResults}
+        {trans, type: 'add', keys: keys as IndexableType[], values: objectsToAdd, wantResults}
       )
         .then(({numFailures, results,lastResult, failures}) => {
           const result = wantResults ? results : lastResult;
@@ -419,15 +439,19 @@ export class Table implements ITable<any, IndexableType> {
     const wantResults = options ? options.allKeys : undefined;
 
     return this._trans('readwrite', trans => {
-      const {outbound} = this.core.schema.primaryKey;
-      if (!outbound && keys)
+      const {auto, keyPath} = this.schema.primKey;
+      if (keyPath && keys)
         throw new exceptions.InvalidArgument("bulkPut(): keys argument invalid on tables with inbound keys");
       if (keys && keys.length !== objects.length)
         throw new exceptions.InvalidArgument("Arguments objects and keys must have the same length");
 
       const numObjects = objects.length; // Pick length here to allow garbage collection of objects later
+      let objectsToPut = keyPath && auto ?
+        objects.map(workaroundForUndefinedPrimKey(keyPath)) :
+        objects;
+
       return this.core.mutate(
-        {trans, type: 'put', keys: keys as IndexableType[], values: objects, wantResults}
+        {trans, type: 'put', keys: keys as IndexableType[], values: objectsToPut, wantResults}
       )
         .then(({numFailures, results, lastResult, failures}) => {
           const result = wantResults ? results : lastResult;
