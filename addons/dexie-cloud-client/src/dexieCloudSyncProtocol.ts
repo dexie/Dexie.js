@@ -1,6 +1,6 @@
 import { IDatabaseChange } from "dexie-observable/api";
 import { ISyncProtocol } from "dexie-syncable/api";
-import { TSON } from "./TSON2";
+import { TSON } from "./TSON";
 
 // Constants:
 var RECONNECT_DELAY = 5000; // Reconnect delay in case of errors such as network down.
@@ -68,7 +68,7 @@ export const dexieCloudSyncProtocol: ISyncProtocol = {
     // accurate as possible. Specifically when connected the first time and the entire DB is being synced down to the browser,
     // it is important that queries starts running first when db is in sync.
     let isFirstRound = true;
-    let binaryChunks: any[] = [];
+    let incomingBinaryChunks: any[] = [];
     // When message arrive from the server, deal with the message accordingly:
     ws.onmessage = function (event) {
       try {
@@ -83,10 +83,10 @@ export const dexieCloudSyncProtocol: ISyncProtocol = {
         //     partial: true if server has additionalChanges to send. False if these changes were the last known. (applicable if type="changes")
         // }
         if (typeof event.data !== "string") {
-          binaryChunks.push(event.data);
+          incomingBinaryChunks.push(event.data);
         } else {
-          const requestFromServer = TSON.parse(event.data, binaryChunks);
-          binaryChunks = [];
+          const requestFromServer = TSON.parse(event.data, incomingBinaryChunks);
+          incomingBinaryChunks = [];
           if (requestFromServer.type === "changes") {
             applyRemoteChanges(
               requestFromServer.changes,
@@ -155,14 +155,15 @@ export const dexieCloudSyncProtocol: ISyncProtocol = {
       //  To make the sample simplified, we assume the server has the exact same specification of how changes are structured.
       //  In real world, you would have to pre-process the changes array to fit the server specification.
       //  However, this example shows how to deal with the WebSocket to fullfill the API.
-      const [tson, binaryChunks] = TSON.stringify({
+      const outgoingBinaryChunks = [];
+      const tson = TSON.stringify({
         type: "changes",
         changes,
         partial,
         baseRevision,
         requestId
-      });
-      for (const chunk of binaryChunks) ws.send(chunk);
+      }, outgoingBinaryChunks);
+      for (const chunk of outgoingBinaryChunks) ws.send(chunk);
       ws.send(tson);
     }
   },

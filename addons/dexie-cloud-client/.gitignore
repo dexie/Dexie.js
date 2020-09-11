@@ -1,8 +1,5 @@
-dist/*.js
-dist/*.map
-dist/*.ts
-dist/*.gz
-dist/*.mjs
+dist/
+esnext/
 .eslintcache
 **/tmp/
 test/**/bundle.*

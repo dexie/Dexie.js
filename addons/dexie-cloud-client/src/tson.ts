@@ -1,32 +1,35 @@
-import Typeson from "typeson";
-import StructuredCloning from "typeson-registry/dist/presets/structured-cloning";
-import typedArray from "./tson-typed-array";
+import { TypeDefSet } from "dreambase-library/dist/typeson-simplified/TypeDefSet";
+import { TypesonSimplified } from "dreambase-library/dist/typeson-simplified/TypesonSimplified";
+import builtInTypeDefs from "dreambase-library/dist/typeson-simplified/presets/builtin";
 
-// @ts-ignore
-export const TSON = new Typeson().register(StructuredCloning);
-
-const WEBSOCKET_COMPATIBLE_BINARY_TYPES = ["ArrayBuffer", "Blob", "Buffer"];
-
-TSON.binaryChunks = [] as Array<Blob | ArrayBuffer>;
-TSON.binaryChunkPos = 0;
-
-TSON.register([
-  typedArray,
-  {
-    BinaryChunk: {
-      test(x) {
-        return WEBSOCKET_COMPATIBLE_BINARY_TYPES.includes(
-          //@ts-ignore
-          Typeson.toStringTag(x)
-        );
-      },
-      replace(b: Blob | ArrayBuffer) {
-        TSON.binaryChunks.push(b);
-        return 0;
-      },
-      revive(index: number) {
-        return TSON.binaryChunks[TSON.binaryChunks++];
-      },
+const defs: TypeDefSet = {
+  WSArrayBuffer: {
+    test: (ab: ArrayBuffer, toStringTag) => toStringTag === "ArrayBuffer",
+    replace: (ab: ArrayBuffer, altChannel: (Blob | ArrayBuffer)[]) => {
+      const i = altChannel.length;
+      altChannel.push(ab);
+      return {
+        $t: "WSArrayBuffer",
+        i,
+      };
     },
+    revive: ({ i }, altChannel) => altChannel[i] as ArrayBuffer, // Requires having websocket.binaryType = "arraybuffer"!
   },
-]);
+  WSBlob: {
+    test: (blob: Blob, toStringTag) => toStringTag === "Blob",
+    replace: (blob: Blob, altChannel: (Blob | ArrayBuffer)[]) => {
+      const i = altChannel.length;
+      altChannel.push(blob);
+      return {
+        $t: "WSBlob",
+        mimeType: blob.type,
+        i,
+      };
+    },
+    revive: ({ i, mimeType }, altChannel: ArrayBuffer[]) =>
+      new Blob([altChannel[i]], { type: mimeType }),
+  },
+  ...builtInTypeDefs,
+};
+
+export const TSON = TypesonSimplified(defs);

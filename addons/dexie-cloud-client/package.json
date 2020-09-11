@@ -4,6 +4,7 @@
   "description": "Dexie addon that connects to dexie.cloud",
   "main": "dist/dexie-cloud-client.js",
   "module": "dist/dexie-cloud-client.mjs",
+  "esnext": "esnext/dexie-cloud-client.js",
   "typings": "dist/dexie-cloud-client.d.ts",
   "repository": {
     "type": "git",
@@ -14,7 +15,7 @@
     "test-unit": "karma start test/unit/karma.conf.js --single-run",
     "build": "just-build",
     "watch": "just-build --watch",
-    "clean": "rm -rf tools/tmp dist/*.js dist/*.mjs dist/*.map dist/*.d.ts test/bundle.*"
+    "clean": "rm -rf tools/tmp dist esnext test/unit/bundle.*"
   },
   "just-build": {
     "default": [
@@ -22,21 +23,24 @@
       "just-build test"
     ],
     "release": [
+      "# Build outputs",
       "just-build src",
-      "# Copy dexie-cloud-client.d.ts to dist and replace version in it",
-      "node -e \"fs.writeFileSync('dist/dexie-cloud-client.d.ts', fs.readFileSync('tools/tmp/src/dexie-cloud-client.d.ts'))\"",
-      "node tools/replaceVersionAndDate.js dist/dexie-cloud-client.d.ts",
       "# Minify the default ES5 UMD module",
       "cd dist",
-      "uglifyjs dexie-cloud-client.js -m -c negate_iife=0 -o dexie-cloud-client.min.js --source-map"
+      "uglifyjs dexie-cloud-client.js -m -c negate_iife=0 -o dexie-cloud-client.min.js --source-map",
+      "cd ..",
+      "terser --compress --mangle --source-map -o esnext/dexie-cloud-client.min.js -- esnext/dexie-cloud-client.js",
+      "terser --compress --mangle --source-map -o dist/dexie-cloud-client.min.js -- dist/dexie-cloud-client.mjs"
     ],
     "src": [
-      "tsc -p src",
-      "rollup -c tools/build-configs/rollup.config.js",
-      "node tools/replaceVersionAndDate.js dist/dexie-cloud-client.js dist/dexie-cloud-client.mjs"
-    ],
-    "bundle-dts": [
-      "dts-bundle-generator -o dist/"
+      "tsc -p src -t esnext --outDir tools/tmp/esnext [--watch 'Compilation complete.']",
+      "rollup -c tools/build-configs/rollup.esnext.config.js",
+      "tsc --allowJs -m es2015 -t es5 --sourceMap --outDir tools/tmp/es5 esnext/dexie-cloud-client.js",
+      "rollup -c tools/build-configs/rollup.es5.config.js",
+      "# Copy dexie-cloud-client.d.ts to dist",
+      "node -e \"fs.writeFileSync('dist/dexie-cloud-client.d.ts', fs.readFileSync('tools/tmp/esnext/dexie-cloud-client.d.ts'))\"",
+      "# Replace {version} and {date} in output files",
+      "node tools/replaceVersionAndDate.js dist/dexie-cloud-client.d.ts dist/dexie-cloud-client.js dist/dexie-cloud-client.mjs esnext/dexie-cloud-client.js"
     ],
     "test": [
       "just-build test-unit"
@@ -50,7 +54,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@types/node": "^14.6.3",
-    "base64-arraybuffer-es6": "^0.6.0",
+    "dreambase-library": "^1.0.2",
     "just-build": "^0.9.19",
     "karma": "^5.2.1",
     "karma-browserstack-launcher": "^1.6.0",
@@ -63,9 +67,7 @@
     "rollup-plugin-node-resolve": "^5.2.0",
     "rollup-plugin-sourcemaps": "^0.6.2",
     "tslib": "^2.0.1",
-    "typescript": "^4.0.2",
-    "typeson": "^5.18.2",
-    "typeson-registry": "^1.0.0-alpha.38"
+    "typescript": "^4.0.2"
   },
   "dependencies": {
     "dexie": "^3.0.2",
