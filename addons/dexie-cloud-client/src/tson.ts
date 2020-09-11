@@ -3,7 +3,7 @@ import { TypesonSimplified } from "dreambase-library/dist/typeson-simplified/Typ
 import builtInTypeDefs from "dreambase-library/dist/typeson-simplified/presets/builtin";
 
 const defs: TypeDefSet = {
-  WSArrayBuffer: {
+  ArrayBufferB: {
     test: (ab: ArrayBuffer, toStringTag) => toStringTag === "ArrayBuffer",
     replace: (ab: ArrayBuffer, altChannel: (Blob | ArrayBuffer)[]) => {
       const i = altChannel.length;
@@ -15,7 +15,7 @@ const defs: TypeDefSet = {
     },
     revive: ({ i }, altChannel) => altChannel[i] as ArrayBuffer, // Requires having websocket.binaryType = "arraybuffer"!
   },
-  WSBlob: {
+  BlobB: {
     test: (blob: Blob, toStringTag) => toStringTag === "Blob",
     replace: (blob: Blob, altChannel: (Blob | ArrayBuffer)[]) => {
       const i = altChannel.length;
