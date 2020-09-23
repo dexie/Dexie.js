@@ -66,3 +66,20 @@ promisedTest("filtered-chunkedExport (issue #862)", async ()=>{
   equal (rejson1, rejson2, "First and second exports are equal");
   equal (rejson2, rejson3, "Second and third expots are equal");
 });
+
+promisedTest("filtered-chunkedExport-extra-comma (issue #1070)", async ()=>{
+  const blob = new Blob([JSON.stringify(IMPORT_DATA)]);
+  await Dexie.delete(DATABASE_NAME);
+  const db = await Dexie.import(blob);
+  const filterFunction = (table, value) => {
+    let returnValue = table === "friends" && value.id === 2;
+    return returnValue;
+  }
+  const rowsPerChunkBigger = 4;
+  const rowsPerChunkSmaller = 2;
+  const exportBlob1 = await db.export({numRowsPerChunk: rowsPerChunkSmaller, filter: filterFunction});
+  const exportBlob2 = await db.export({numRowsPerChunk: rowsPerChunkBigger, filter: filterFunction});
+  const size1 =  exportBlob1.size; 
+  const size2 =  exportBlob2.size;
+  equal(size1, size2, "First and second exports are equal");
+});

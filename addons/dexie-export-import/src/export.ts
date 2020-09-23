@@ -85,7 +85,13 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
       const table = db.table(tableName);
       const {primKey} = table.schema;
       const inbound = !!primKey.keyPath;
-      const LIMIT = options!.numRowsPerChunk || DEFAULT_ROWS_PER_CHUNK;
+
+      //issue #1070 //////////////////////////////////
+      const rowsPerChunk= options!.numRowsPerChunk || DEFAULT_ROWS_PER_CHUNK; 
+      const rowCount = await table.count(count => count);
+      const LIMIT = rowCount > rowsPerChunk ? rowCount : rowsPerChunk;
+      ///////////////////////////////////////////////
+      
       const emptyTableExport: DexieExportedTable = inbound ? {
         tableName: table.name,
         inbound: true,
