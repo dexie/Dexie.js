@@ -78,6 +78,24 @@ promisedTest("Issue #841 - put() ignores date changes", async ()=> {
     db.folks.hook("updating").unsubscribe(updateAssertions);
 });
 
+promisedTest("Issue #966 - put() with dotted field in update hook", async () => {
+    const updateAssertions = (mods) => {
+        equal(mods["nested.field"], "value", "mods.nested.field should contain 'value'");
+        equal(mods.nested, undefined, "mods.nested field should be empty");
+        return {...mods};
+    };
+    db.folks.hook("updating", updateAssertions);
+
+    const id = await db.folks.add({first: "first", last: "last"});
+    await db.folks.put({first: "first", last: "last", "nested.field": "value"}, id);
+
+    let obj = await db.folks.get(id);
+    equal(obj["nested.field"], "value", "obj.nested.field should have been successfully updated to 'value'");
+    equal(obj.nested, undefined, "obj.nested field should have remained undefined");
+
+    db.folks.hook("updating").unsubscribe(updateAssertions);
+});
+
 asyncTest("get", 4, function () {
     db.table("users").get(idOfFirstUser).then(function(obj) {
         equal(obj.first, "David", "Got the first object");

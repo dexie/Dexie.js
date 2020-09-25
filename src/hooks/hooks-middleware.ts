@@ -87,7 +87,7 @@ export const hooksMiddleware: Middleware<DBCore>  = {
                   if (additionalChanges) {
                     const requestedValue = req.values[i];
                     Object.keys(additionalChanges).forEach(keyPath => {
-                      setByKeyPath(requestedValue, keyPath, additionalChanges[keyPath]);
+                      requestedValue[keyPath] = additionalChanges[keyPath];
                     });
                   }
                 }
