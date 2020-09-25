@@ -78,6 +78,33 @@ promisedTest("Issue #841 - put() ignores date changes", async ()=> {
     db.folks.hook("updating").unsubscribe(updateAssertions);
 });
 
+promisedTest("Verify #1130 doesn't break contract of hook('updating')", async ()=>{
+    const updateHook = (mods) => {
+        return {"address.postalCode": 111};
+    };
+    try {
+      const id = await db.folks.add({
+        first: "Foo",
+        last: "Bar",
+        address: {
+            city: "Stockholm",
+            street: "Folkungagatan"
+        }
+      });
+      db.folks.hook("updating", updateHook);
+      await db.folks.update(id, {
+          "address.streetNo": 23
+      });
+      let foo = await db.folks.get(id);
+      equal(foo.address.city, "Stockholm", "Correct city Stockholm");
+      equal(foo.address.street, "Folkungagatan", "Correct street Folkungagatan");
+      equal(foo.address.streetNo, 23, "Correct streetNo: 23");
+      equal(foo.address.postalCode, 111, "Hooks should have added postal code");
+    } finally {
+      db.folks.hook("updating").unsubscribe(updateHook);
+    } 
+});
+
 asyncTest("get", 4, function () {
     db.table("users").get(idOfFirstUser).then(function(obj) {
         equal(obj.first, "David", "Got the first object");
