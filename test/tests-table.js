@@ -41,7 +41,7 @@ module("table", {
 });
 
 promisedTest("Issue #841 - put() ignores date changes", async ()=> {
-    db.folks.hook("updating", (mods) => {
+    const updateAssertions = (mods) => {
         equal(mods.first, first2, `first value should be ${first2} but is ${mods.first}`)
         
         equal(!!mods.date, true, "date should be included in modifications");
@@ -49,7 +49,8 @@ promisedTest("Issue #841 - put() ignores date changes", async ()=> {
         if (mods.date) {
             equal(mods.date.getTime(), date2.getTime(), `date should be ${date2} but is ${mods.date}`)
         }
-    });
+    };
+    db.folks.hook("updating", updateAssertions);
 
     const date1 = new Date("2019-05-03");
     const date2 = new Date("2020-01-01");
@@ -73,6 +74,8 @@ promisedTest("Issue #841 - put() ignores date changes", async ()=> {
     obj = await db.folks.get(id);
     equal(obj.first, first2, `first should have been successfully updated to '${first2}'`);
     equal(obj.date.getTime(), date2.getTime(), "Date should have been successfully updated to be date2");
+
+    db.folks.hook("updating").unsubscribe(updateAssertions);
 });
 
 asyncTest("get", 4, function () {
