@@ -22,4 +22,5 @@ DexiePromise.rejectionMapper = mapError;
 // Let the async stack filter focus on app code and filter away frames from dexie.min.js:
 Debug.setDebug(Debug.debug, dexieStackFrameFilter);
 
+export { Dexie }; // Comply with public/index.d.ts.
 export default Dexie;
