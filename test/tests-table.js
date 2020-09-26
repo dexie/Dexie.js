@@ -94,7 +94,7 @@ promisedTest("Issue #966 - put() with dotted field in update hook", async () => 
     equal(obj.nested, undefined, "obj.nested field should have remained undefined");
 
     db.folks.hook("updating").unsubscribe(updateAssertions);
-}
+});
 
 promisedTest("Verify #1130 doesn't break contract of hook('updating')", async ()=>{
     const updateHook = (mods) => {
