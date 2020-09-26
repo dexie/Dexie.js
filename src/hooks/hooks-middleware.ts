@@ -10,7 +10,7 @@ import {
   DBCoreKeyRange,
 } from "../public/types/dbcore";
 import { nop } from '../functions/chaining-functions';
-import { getObjectDiff, setByKeyPath } from '../functions/utils';
+import { getObjectDiff, hasOwn, setByKeyPath } from '../functions/utils';
 import { PSD } from '../helpers/promise';
 //import { LockableTableMiddleware } from '../dbcore/lockable-table-middleware';
 import { getEffectiveKeys, getExistingValues } from '../dbcore/get-effective-keys';
@@ -87,7 +87,13 @@ export const hooksMiddleware: Middleware<DBCore>  = {
                   if (additionalChanges) {
                     const requestedValue = req.values[i];
                     Object.keys(additionalChanges).forEach(keyPath => {
-                      requestedValue[keyPath] = additionalChanges[keyPath];
+                      if (hasOwn(requestedValue, keyPath)) {
+                        // keyPath is already present as a literal property of the object
+                        requestedValue[keyPath] = additionalChanges[keyPath];
+                      } else {
+                        // keyPath represents a new or existing path into the object
+                        setByKeyPath(requestedValue, keyPath, additionalChanges[keyPath]);
+                      }
                     });
                   }
                 }
