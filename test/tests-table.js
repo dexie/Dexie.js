@@ -120,7 +120,7 @@ promisedTest("Verify #1130 doesn't break contract of hook('updating')", async ()
       equal(foo.address.postalCode, 111, "Hooks should have added postal code");
     } finally {
       db.folks.hook("updating").unsubscribe(updateHook);
-    } 
+    }
 });
 
 asyncTest("get", 4, function () {
