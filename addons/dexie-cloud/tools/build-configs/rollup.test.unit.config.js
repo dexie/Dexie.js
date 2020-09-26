@@ -2,28 +2,30 @@
 import sourcemaps from 'rollup-plugin-sourcemaps';
 import commonjs from 'rollup-plugin-commonjs';
 import nodeResolve from 'rollup-plugin-node-resolve';
-import {readFileSync} from 'fs';
-import path from 'path';
 
 const ERRORS_TO_IGNORE = [
   "THIS_IS_UNDEFINED",
 ];
 
 export default {
-  input: 'tools/tmp/esnext/dexie-cloud-client.js',
+  input: 'tools/tmp/test/unit/index.js',
   output: [{
-    file: 'esnext/dexie-cloud-client.js',
-    format: 'es',
-    banner: readFileSync(path.resolve(__dirname, 'banner.txt'), "utf-8"),
-    sourcemap: true
+    file: 'test/unit/bundle.js',
+    format: 'umd',
+    globals: {
+      dexie: "Dexie",
+      "dexie-observable": "Dexie.Observable",
+      "dexie-syncable": "Dexie.Syncable",
+      "dexie-cloud": "Dexie.Cloud"
+    },
+    name: 'DexieCloudTests',
+    sourcemap: true,
+    exports: 'named'
   }],
-  external: ['dexie', 'dexie-observable', 'dexie-syncable'],
+  external: ['dexie', 'dexie-observable', 'dexie-syncable', "dexie-cloud", "qunit"],
   plugins: [
     sourcemaps(),
-    nodeResolve({
-      browser: true,
-      preferBuiltins: false
-    }),
+    nodeResolve({browser: true}),
     commonjs()
   ],
   onwarn ({loc, frame, code, message}) {

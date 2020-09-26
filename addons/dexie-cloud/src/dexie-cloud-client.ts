@@ -38,13 +38,18 @@ export function DexieCloud(db: Dexie) {
   // registering the observable and syncable:
   if (!db.observable) dexieObservable(db);
   if (!db.syncable) dexieSyncable(db);
-  db.cloud.connect = (url) => {
-    return db.syncable.connect(DEXIE_CLOUD_PROTOCOL_NAME, url, {});
-  };
+  db.cloud = {
+    version: "{version}",
+    connect (url) {
+      return db.syncable.connect(DEXIE_CLOUD_PROTOCOL_NAME, url, {});
+    }
+  }
 }
 
 DexieCloud.version = "{version}";
 
 Dexie.Cloud = DexieCloud;
+
+Dexie.addons.push(DexieCloud);
 
 export default DexieCloud;

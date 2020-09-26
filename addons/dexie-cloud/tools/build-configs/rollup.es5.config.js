@@ -8,24 +8,30 @@ const ERRORS_TO_IGNORE = [
 ];
 
 export default {
-  input: 'tools/tmp/test/unit/index.js',
+  input: 'tools/tmp/es5/dexie-cloud-client.js',
   output: [{
-    file: 'test/unit/bundle.js',
+    file: 'dist/dexie-cloud.js',
     format: 'umd',
     globals: {
       dexie: "Dexie",
       "dexie-observable": "Dexie.Observable",
-      "dexie-syncable": "Dexie.Syncable",
-      "dexie-cloud-client": "Dexie.Cloud"
+      "dexie-syncable": "Dexie.Syncable"
     },
-    name: 'DexieCloudTests',
+    name: 'DexieCloud',
     sourcemap: true,
     exports: 'named'
+  },{
+    file: 'dist/dexie-cloud.mjs',
+    format: 'es',
+    sourcemap: true
   }],
-  external: ['dexie', 'dexie-observable', 'dexie-syncable', "dexie-cloud-client", "qunit"],
+  external: ['dexie', 'dexie-observable', 'dexie-syncable'],
   plugins: [
     sourcemaps(),
-    nodeResolve({browser: true}),
+    nodeResolve({
+      browser: true,
+      preferBuiltins: false
+    }),
     commonjs()
   ],
   onwarn ({loc, frame, code, message}) {

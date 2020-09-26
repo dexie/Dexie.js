@@ -19,11 +19,11 @@ module.exports = function (config) {
       'dist/dexie.js',
       'addons/Dexie.Observable/dist/dexie-observable.js',
       'addons/Dexie.Syncable/dist/dexie-syncable.js',
-      'addons/dexie-cloud-client/test/unit/bundle.js',
+      'addons/dexie-cloud/test/unit/bundle.js',
       { pattern: 'addons/Dexie.Observable/dist/*.map', watched: false, included: false },
       { pattern: 'addons/Dexie.Syncable/dist/*.map', watched: false, included: false },
-      { pattern: 'addons/dexie-cloud-client/test/*.map', watched: false, included: false },
-      { pattern: 'addons/dexie-cloud-client/dist/*.map', watched: false, included: false }
+      { pattern: 'addons/dexie-cloud/test/*.map', watched: false, included: false },
+      { pattern: 'addons/dexie-cloud/dist/*.map', watched: false, included: false }
     ])
   });
 
