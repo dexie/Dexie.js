@@ -146,10 +146,6 @@ export function setByKeyPath(obj, keyPath, value) {
     } else {
         var period = keyPath.indexOf('.');
         if (period !== -1) {
-            if (hasOwn(obj, keyPath)) {
-              obj[keyPath] = value;
-              return;
-            }
             var currentKeyPath = keyPath.substr(0, period);
             var remainingKeyPath = keyPath.substr(period + 1);
             if (remainingKeyPath === "")
