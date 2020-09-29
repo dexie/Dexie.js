@@ -6,6 +6,10 @@
   "module": "dist/dexie-cloud.mjs",
   "esnext": "esnext/dexie-cloud.js",
   "typings": "dist/dexie-cloud.d.ts",
+  "engines": {
+    "node": ">=8.2.1"
+  },
+  "bin": "./dexie-cloud",
   "repository": {
     "type": "git",
     "url": "https://github.com/dfahlander/Dexie.js.git"
@@ -14,13 +18,18 @@
     "test": "just-build test && npm run test-unit",
     "test-unit": "karma start test/unit/karma.conf.js --single-run",
     "build": "just-build",
+    "build-cli": "just-build cli",
     "watch": "just-build --watch",
-    "clean": "rm -rf tools/tmp dist esnext test/unit/bundle.*"
+    "clean": "rm -rf tools/tmp dist esnext test/unit/bundle.*",
+    "prepublish": "just-build"
   },
   "just-build": {
     "default": [
-      "just-build release",
-      "just-build test"
+      "just-build release cli test"
+    ],
+    "cli": [
+      "cd bin-src",
+      "tsc --build [--watch 'Compilation complete.']"
     ],
     "release": [
       "# Build outputs",
@@ -70,8 +79,10 @@
     "typescript": "^4.0.2"
   },
   "dependencies": {
+    "commander": "^6.1.0",
     "dexie": "^3.0.2",
     "dexie-observable": "^3.0.0-beta.9",
-    "dexie-syncable": "^3.0.0-beta.9"
+    "dexie-syncable": "^3.0.0-beta.9",
+    "prompts": "^2.3.2"
   }
 }

@@ -1,0 +1,10 @@
+tools/
+src/
+bin-src/
+.*
+tmp/
+**/tmp/
+test
+*.log
+dexie-cloud.key
+dexie-cloud.json

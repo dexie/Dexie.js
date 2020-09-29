@@ -8,7 +8,7 @@ const ERRORS_TO_IGNORE = [
 ];
 
 export default {
-  input: 'tools/tmp/es5/dexie-cloud-client.js',
+  input: 'tools/tmp/es5/dexie-cloud.js',
   output: [{
     file: 'dist/dexie-cloud.js',
     format: 'umd',

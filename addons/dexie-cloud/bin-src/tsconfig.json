@@ -1,0 +1,23 @@
+{
+  "compilerOptions": {
+    "module": "CommonJS",
+    "declaration": true,
+    "importHelpers": false,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "noImplicitReturns": true,
+    "moduleResolution": "node",
+    "lib": ["ES2017", "DOM"],
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true,
+    "rootDir": ".",
+    "outDir": "../bin/",
+    "resolveJsonModule": true
+  },
+  "files": [
+    "index.ts"
+  ],
+  "references": [
+    { "path": "../" }
+  ]
+}
