@@ -1,6 +1,6 @@
 import { Dexie } from '../dexie';
 import { DbSchema } from '../../public/types/db-schema';
-import { setProp, keys, slice, _global, isArray, shallowClone, isAsyncFunction, defineProperty } from '../../functions/utils';
+import { setProp, keys, slice, _global, isArray, shallowClone, isAsyncFunction, defineProperty, getPropertyDescriptor } from '../../functions/utils';
 import { Transaction } from '../transaction';
 import { Version } from './version';
 import Promise, { PSD, newScope, NativePromise, decrementExpectedAwaits, incrementExpectedAwaits } from '../../helpers/promise';
@@ -17,7 +17,9 @@ export function setApiOnPlace(db: Dexie, objs: Object[], tableNames: string[], d
   tableNames.forEach(tableName => {
     const schema = dbschema[tableName];
     objs.forEach(obj => {
-      if (!(tableName in obj)) {
+      const propDesc = getPropertyDescriptor(obj, tableName);
+      if (!propDesc || ("value" in propDesc && propDesc.value === undefined)) {
+        // Either the prop is not declared, or it is initialized to undefined.
         if (obj === db.Transaction.prototype || obj instanceof db.Transaction) {
           // obj is a Transaction prototype (or prototype of a subclass to Transaction)
           // Make the API a getter that returns this.table(tableName)
