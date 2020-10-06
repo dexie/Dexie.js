@@ -242,7 +242,7 @@ function Observable(db) {
                 });
             }
             // Add new sync node or if this is a reopening of the database after a close() call, update it.
-            return db.transaction('rw', '_syncNodes', () => {
+            return Dexie.ignoreTransaction(() => {
                 return db._syncNodes
                     .where('isMaster').equals(1)
                     .first(currentMaster => {
