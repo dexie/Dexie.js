@@ -243,17 +243,20 @@ function Observable(db) {
             }
             // Add new sync node or if this is a reopening of the database after a close() call, update it.
             return db._syncNodes.put(mySyncNode.node).then(Dexie.ignoreTransaction(() => {
+                // By default, this node will become master unless we discover an existing, up-to-date master
                 var mySyncNodeShouldBecomeMaster = 1;
                 return db._syncNodes.orderBy('isMaster').reverse().modify(existingNode => {
                     if (existingNode.isMaster) {
-                        // Master have been inactive for too long
-                        // Take over mastership
                         if (existingNode.lastHeartBeat < Date.now() - NODE_TIMEOUT) {
+                            // Existing master record is out-of-date; demote it
                             existingNode.isMaster = 0;
                         } else {
+                            // An existing up-to-date master record exists, so it will remain master
                             mySyncNodeShouldBecomeMaster = 0;
                         }
                     }
+                    // Assign the local node state
+                    // This is guaranteed to apply *after* any existing master records have been inspected, due to the orderBy clause
                     if (existingNode.id === mySyncNode.node.id) {
                         existingNode.isMaster = mySyncNodeShouldBecomeMaster;
                     }
