@@ -255,6 +255,12 @@ function Observable(db) {
                             mySyncNodeShouldBecomeMaster = 0;
                         }
                     }
+
+                    // TODO: Why is this safety check required?
+                    // Without it, this test fails: https://github.com/dfahlander/Dexie.js/blob/77f0b08c58784bfaaf9e2f5e26dd4e1d7b7d3094/test/tests-exception-handling.js#L411-L494
+                    // ... due to an unhandled global TypeError: Cannot read property 'id' of null
+                    if (!mySyncNode.node) return;
+
                     // Assign the local node state
                     // This is guaranteed to apply *after* any existing master records have been inspected, due to the orderBy clause
                     if (existingNode.id === mySyncNode.node.id) {
