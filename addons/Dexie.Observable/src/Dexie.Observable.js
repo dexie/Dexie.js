@@ -258,7 +258,7 @@ function Observable(db) {
                     // Assign the local node state
                     // This is guaranteed to apply *after* any existing master records have been inspected, due to the orderBy clause
                     if (existingNode.id === mySyncNode.node.id) {
-                        existingNode.isMaster = mySyncNodeShouldBecomeMaster;
+                        existingNode.isMaster = mySyncNode.node.isMaster = mySyncNodeShouldBecomeMaster;
                     }
                 });
             })).then(() => {
