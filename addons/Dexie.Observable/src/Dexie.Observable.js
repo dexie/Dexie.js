@@ -242,37 +242,34 @@ function Observable(db) {
                 });
             }
             // Add new sync node or if this is a reopening of the database after a close() call, update it.
-            return db.transaction('rw', '_syncNodes', () => {
+            return db._syncNodes.put(mySyncNode.node).then(Dexie.ignoreTransaction(() => {
+                var mySyncNodeShouldBecomeMaster = 1;
                 return db._syncNodes
-                    .where('isMaster').equals(1)
-                    .first(currentMaster => {
-                        if (!currentMaster) {
-                            // There's no master. We must be the master
-                            mySyncNode.node.isMaster = 1;
-                        } else if (currentMaster.lastHeartBeat < Date.now() - NODE_TIMEOUT) {
+                    .orderBy('isMaster')
+                    .reverse()
+                    .modify(existingNode => {
+                        if (existingNode.isMaster) {
                             // Master have been inactive for too long
                             // Take over mastership
-                            mySyncNode.node.isMaster = 1;
-                            currentMaster.isMaster = 0;
-                            db.transaction('rw!', '_syncNodes', () => {
-                                return db._syncNodes.put(currentMaster);
-                            });
+                            if (existingNode.lastHeartBeat < Date.now() - NODE_TIMEOUT) {
+                                existingNode.isMaster = 0;
+                            } else {
+                                mySyncNodeShouldBecomeMaster = 0;
+                            }
                         }
-                    }).then(()=>{
-                        db.transaction('rw!', '_syncNodes', () => {
-                            // Add our node to DB and start subscribing to events
-                            return db._syncNodes.add(mySyncNode.node).then(function() {
-                                Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
-                                Observable.on('beforeunload', onBeforeUnload);
-                                Observable.on('suicideNurseCall', onSuicide);
-                                Observable.on('intercomm', onIntercomm);
-                                // Start polling for changes and do cleanups:
-                                pollHandle = setTimeout(poll, LOCAL_POLL);
-                                // Start heartbeat
-                                heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
-                            });
-                        });
-                });
+                        if (existingNode.id === mySyncNode.node.id) {
+                            existingNode.isMaster = mySyncNodeShouldBecomeMaster;
+                        }
+                    });
+            })).then(() => {
+                Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
+                Observable.on('beforeunload', onBeforeUnload);
+                Observable.on('suicideNurseCall', onSuicide);
+                Observable.on('intercomm', onIntercomm);
+                // Start polling for changes and do cleanups:
+                pollHandle = setTimeout(poll, LOCAL_POLL);
+                // Start heartbeat
+                heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
             }).then(function () {
                 cleanup();
             });
