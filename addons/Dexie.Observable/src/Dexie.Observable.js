@@ -254,19 +254,23 @@ function Observable(db) {
                             // Take over mastership
                             mySyncNode.node.isMaster = 1;
                             currentMaster.isMaster = 0;
-                            return db._syncNodes.put(currentMaster);
+                            db.transaction('rw!', '_syncNodes', () => {
+                                return db._syncNodes.put(currentMaster);
+                            });
                         }
                     }).then(()=>{
-                        // Add our node to DB and start subscribing to events
-                        return db._syncNodes.add(mySyncNode.node).then(function() {
-                            Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
-                            Observable.on('beforeunload', onBeforeUnload);
-                            Observable.on('suicideNurseCall', onSuicide);
-                            Observable.on('intercomm', onIntercomm);
-                            // Start polling for changes and do cleanups:
-                            pollHandle = setTimeout(poll, LOCAL_POLL);
-                            // Start heartbeat
-                            heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
+                        db.transaction('rw!', '_syncNodes', () => {
+                            // Add our node to DB and start subscribing to events
+                            return db._syncNodes.add(mySyncNode.node).then(function() {
+                                Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
+                                Observable.on('beforeunload', onBeforeUnload);
+                                Observable.on('suicideNurseCall', onSuicide);
+                                Observable.on('intercomm', onIntercomm);
+                                // Start polling for changes and do cleanups:
+                                pollHandle = setTimeout(poll, LOCAL_POLL);
+                                // Start heartbeat
+                                heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
+                            });
                         });
                 });
             }).then(function () {
