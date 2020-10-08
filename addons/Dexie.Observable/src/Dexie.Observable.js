@@ -244,23 +244,20 @@ function Observable(db) {
             // Add new sync node or if this is a reopening of the database after a close() call, update it.
             return db._syncNodes.put(mySyncNode.node).then(Dexie.ignoreTransaction(() => {
                 var mySyncNodeShouldBecomeMaster = 1;
-                return db._syncNodes
-                    .orderBy('isMaster')
-                    .reverse()
-                    .modify(existingNode => {
-                        if (existingNode.isMaster) {
-                            // Master have been inactive for too long
-                            // Take over mastership
-                            if (existingNode.lastHeartBeat < Date.now() - NODE_TIMEOUT) {
-                                existingNode.isMaster = 0;
-                            } else {
-                                mySyncNodeShouldBecomeMaster = 0;
-                            }
+                return db._syncNodes.orderBy('isMaster').reverse().modify(existingNode => {
+                    if (existingNode.isMaster) {
+                        // Master have been inactive for too long
+                        // Take over mastership
+                        if (existingNode.lastHeartBeat < Date.now() - NODE_TIMEOUT) {
+                            existingNode.isMaster = 0;
+                        } else {
+                            mySyncNodeShouldBecomeMaster = 0;
                         }
-                        if (existingNode.id === mySyncNode.node.id) {
-                            existingNode.isMaster = mySyncNodeShouldBecomeMaster;
-                        }
-                    });
+                    }
+                    if (existingNode.id === mySyncNode.node.id) {
+                        existingNode.isMaster = mySyncNodeShouldBecomeMaster;
+                    }
+                });
             })).then(() => {
                 Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
                 Observable.on('beforeunload', onBeforeUnload);
