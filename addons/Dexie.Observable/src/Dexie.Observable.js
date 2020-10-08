@@ -243,7 +243,7 @@ function Observable(db) {
             }
             // Add new sync node or if this is a reopening of the database after a close() call, update it.
             return db.transaction('rw', '_syncNodes', () => {
-                var currentMaster = db._syncNodes
+                return db._syncNodes
                     .where('isMaster').equals(1)
                     .first(currentMaster => {
                         if (!currentMaster) {
@@ -256,23 +256,18 @@ function Observable(db) {
                             currentMaster.isMaster = 0;
                             return db._syncNodes.put(currentMaster);
                         }
-                    });
-                Promise.all([currentMaster]);
-
-                // Add our node to DB and start subscribing to events
-                var currentNode = db._syncNodes.add(mySyncNode.node).then(function() {
-                    Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
-                    Observable.on('beforeunload', onBeforeUnload);
-                    Observable.on('suicideNurseCall', onSuicide);
-                    Observable.on('intercomm', onIntercomm);
-                });
-                Promise.all([currentNode]);
-
-                return Dexie.ignoreTransaction(function() {
-                    // Start polling for changes and do cleanups:
-                    pollHandle = setTimeout(poll, LOCAL_POLL);
-                    // Start heartbeat
-                    heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
+                    }).then(()=>{
+                        // Add our node to DB and start subscribing to events
+                        return db._syncNodes.add(mySyncNode.node).then(function() {
+                            Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
+                            Observable.on('beforeunload', onBeforeUnload);
+                            Observable.on('suicideNurseCall', onSuicide);
+                            Observable.on('intercomm', onIntercomm);
+                            // Start polling for changes and do cleanups:
+                            pollHandle = setTimeout(poll, LOCAL_POLL);
+                            // Start heartbeat
+                            heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
+                        });
                 });
             }).then(function () {
                 cleanup();
