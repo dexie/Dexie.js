@@ -127,6 +127,7 @@ export function updateTablesAndIndexes(
       if (contentUpgrade && version._cfg.version > oldVersion) {
         // Update db.core with new tables and indexes:
         generateMiddlewareStacks(db, idbUpgradeTrans);
+        trans._memoizedTables = {}; // Invalidate memoization as transaction shape may change between versions.
 
         anyContentUpgraderHasRun = true;
 
