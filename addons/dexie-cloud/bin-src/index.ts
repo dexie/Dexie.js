@@ -3,4 +3,4 @@ import { version } from "../package.json";
 
 program.version(version);
 
-console.log("Hello en3", version);
+console.log("Hello en5", version);
