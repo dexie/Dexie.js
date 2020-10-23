@@ -843,3 +843,21 @@ promisedTest("Virtual Index", async () => {
         ], null, 2), "equalsIgnoreCase() should work with virtual indexes");
     //equal(daves.length, 3, "There should be 3 davids in the result when using equalsIgnoreCase()");
 });
+
+promisedTest("WhereClause.equals(invalid key)", async () => {
+    await db.files.where("filename").equals(null).first().then(()=>{
+        ok(false, "db.files.where('filename').equals(null) must fail but it didnt!");
+    }).catch(error => {
+        ok(true, `db.files.where('filename').equals(null) failed as expected (with ${error})`);
+    });
+    await db.files.where("filename").equals(undefined).first().then(()=>{
+        ok(false, "db.files.where('filename').equals(undefined) must fail but it didnt!");
+    }).catch(error => {
+        ok(true, `db.files.where('filename').equals(undefined) failed as expected (with ${error})`);
+    });
+    await db.files.where("filename").equals(function(){}).first().then(()=>{
+        ok(false, "db.files.where('filename').equals(function(){}) must fail but it didnt!");
+    }).catch(error => {
+        ok(true, `db.files.where('filename').equals(function(){}) failed as expected (with ${error})`);
+    });
+});
