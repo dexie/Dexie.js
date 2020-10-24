@@ -1,9 +1,10 @@
 import { WhereClause } from './where-clause';
 import { Collection } from '../collection';
-import { STRING_EXPECTED } from '../../globals/constants';
+import { STRING_EXPECTED, INVALID_KEY_ARGUMENT } from '../../globals/constants';
 import { simpleCompare, simpleCompareReverse } from '../../functions/compare-functions';
 import { IndexableType } from '../../public';
 import { DBCoreKeyRange, DBCoreRangeType } from '../../public/types/dbcore';
+import { isValidIDBKey } from '../../functions/utils';
 
 export function fail(collectionOrWhereClause: Collection | WhereClause, err, T?) {
   var collection = collectionOrWhereClause instanceof WhereClause ?
@@ -129,4 +130,8 @@ export function rangeEqual (value: IndexableType) : DBCoreKeyRange {
         lower: value,
         upper: value
     };
+}
+
+export function failIfInvalidKey(collectionOrWhereClause: Collection | WhereClause, key: any) {
+    return !isValidIDBKey(key) && fail(collectionOrWhereClause, INVALID_KEY_ARGUMENT);
 }

@@ -860,4 +860,13 @@ promisedTest("WhereClause.equals(invalid key)", async () => {
     }).catch(error => {
         ok(true, `db.files.where('filename').equals(function(){}) failed as expected (with ${error})`);
     });
+
+    await db.files.where({
+        filename: undefined,
+        extension: undefined
+    }).first().then(()=>{
+        ok(false, "db.files.where({filename:undefined, extension: undefined}) must fail but it didnt!");
+    }).catch(error => {
+        ok(true, `db.files.where({filename:undefined, extension: undefined}) failed as expected (with ${error})`);
+    });
 });

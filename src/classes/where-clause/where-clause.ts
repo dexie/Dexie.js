@@ -2,9 +2,9 @@ import { WhereClause as IWhereClause } from "../../public/types/where-clause";
 import { Collection } from "../collection";
 import { Table } from "../table";
 import { IndexableType } from "../../public/types/indexable-type";
-import { emptyCollection, fail, addIgnoreCaseAlgorithm, createRange, rangeEqual } from './where-clause-helpers';
+import { emptyCollection, fail, addIgnoreCaseAlgorithm, createRange, rangeEqual, failIfInvalidKey } from './where-clause-helpers';
 import { INVALID_KEY_ARGUMENT, STRING_EXPECTED, maxString, minKey } from '../../globals/constants';
-import { getArrayOf, NO_CHAR_ARRAY } from '../../functions/utils';
+import { getArrayOf, NO_CHAR_ARRAY, isValidIDBKey } from '../../functions/utils';
 import { exceptions } from '../../errors';
 import { Dexie } from '../dexie';
 import { Collection as ICollection} from "../../public/types/collection";
@@ -55,8 +55,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   equals(value: IndexableType) {
-    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
-    return new this.Collection(this, () => rangeEqual(value)) as ICollection;
+    return failIfInvalidKey(this, value) || new this.Collection(this, () => rangeEqual(value)) as ICollection;
   }
 
   /** WhereClause.above()
@@ -65,8 +64,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   above(value: IndexableType) {
-    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
-    return new this.Collection(this, () => createRange(value, undefined, true));
+    return failIfInvalidKey(this, value) || new this.Collection(this, () => createRange(value, undefined, true));
   }
 
   /** WhereClause.aboveOrEqual()
@@ -75,8 +73,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   aboveOrEqual(value: IndexableType) {
-    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
-    return new this.Collection(this, () => createRange(value, undefined, false));
+    return failIfInvalidKey(this, value) || new this.Collection(this, () => createRange(value, undefined, false));
   }
 
   /** WhereClause.below()
@@ -85,8 +82,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   below(value: IndexableType) {
-    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
-    return new this.Collection(this, () => createRange(undefined, value, false, true));
+    return failIfInvalidKey(this, value) || new this.Collection(this, () => createRange(undefined, value, false, true));
   }
 
   /** WhereClause.belowOrEqual()
@@ -95,8 +91,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   belowOrEqual(value: IndexableType) {
-    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
-    return new this.Collection(this, () => createRange(undefined, value));
+    return failIfInvalidKey(this, value) || new this.Collection(this, () => createRange(undefined, value));
   }
 
   /** WhereClause.startsWith()

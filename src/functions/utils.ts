@@ -1,4 +1,6 @@
-﻿declare var global;
+﻿import type { IndexableType } from '../public/types/indexable-type';
+
+declare var global;
 export const keys = Object.keys;
 export const isArray = Array.isArray;
 const _global =
@@ -316,3 +318,14 @@ export function getArrayOf (arrayLike) {
 export const isAsyncFunction = typeof Symbol !== 'undefined'
     ? (fn: Function) => fn[Symbol.toStringTag] === 'AsyncFunction'
     : ()=>false;
+
+export function isValidIDBKey(key: any): key is IndexableType {
+  return (
+    /^string$|^number$/.test(typeof key) ||
+    (key &&
+      (isArray(key)
+        ? key.every(isValidIDBKey)
+        : /^Date$|^ArrayBuffer$/.test(toStringTag(key)) ||
+          ArrayBuffer.isView(key)))
+  );
+}
