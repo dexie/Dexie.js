@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "1.0.0-alpha.4",
+  "version": "1.0.0-alpha.6",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/dexie-cloud.js",
   "module": "dist/dexie-cloud.mjs",
@@ -9,7 +9,6 @@
   "engines": {
     "node": ">=8.2.1"
   },
-  "bin": "./dexie-cloud",
   "repository": {
     "type": "git",
     "url": "https://github.com/dfahlander/Dexie.js.git"
@@ -18,7 +17,6 @@
     "test": "just-build test && npm run test-unit",
     "test-unit": "karma start test/unit/karma.conf.js --single-run",
     "build": "just-build",
-    "build-cli": "just-build cli",
     "watch": "just-build --watch",
     "clean": "rm -rf tools/tmp dist esnext test/unit/bundle.*",
     "prepare": "just-build"
