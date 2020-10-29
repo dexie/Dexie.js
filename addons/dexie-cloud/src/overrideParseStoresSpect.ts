@@ -13,6 +13,6 @@ export function overrideParseStoresSpec(origFunc: Function, cloudSchema: DexieCl
         cloudSchema[tableName] = {generatedGlobalId: true};
       }
     });
-    return origFunc.call(this, stores, dbSchema);
+    return origFunc.call(this, storesClone, dbSchema);
   }
 }

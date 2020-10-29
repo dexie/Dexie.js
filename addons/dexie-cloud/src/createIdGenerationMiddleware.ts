@@ -77,11 +77,11 @@ function generateKey(prefix: string) {
   } else {
     time = now;
   }
-  timePart[0] = time / 0x10000000000;
-  timePart[1] = time / 0x100000000;
-  timePart[2] = time / 0x1000000;
-  timePart[3] = time / 0x10000;
-  timePart[4] = time / 0x100;
+  timePart[0] = time / 0x1_00_00_00_00_00;
+  timePart[1] = time / 0x1_00_00_00_00;
+  timePart[2] = time / 0x1_00_00_00;
+  timePart[3] = time / 0x1_00_00;
+  timePart[4] = time / 0x1_00;
   timePart[5] = time;
   const randomPart = new Uint8Array(a.buffer, 6);
   crypto.getRandomValues(randomPart);
@@ -108,7 +108,8 @@ export function createIdGenerationMiddleware(
         ...core,
         table: (tableName) => {
           const table = core.table(tableName);
-          if (!cloudSchema[tableName]?.generatedGlobalId) return table;
+          const cloudTableSchema = cloudSchema[tableName];
+          if (!cloudTableSchema?.generatedGlobalId) return table;
           return {
             ...table,
             mutate: (req) => {
@@ -127,6 +128,10 @@ export function createIdGenerationMiddleware(
                         keys[idx]
                       );
                     }
+                  } else if (typeof key !== 'string' || !key.startsWith(cloudTableSchema.idPrefix!)) {
+                    throw new Dexie.ConstraintError(
+                      `The ID "${key}" is not valid for table "${tableName}". ` +
+                      `The ID must be a string prefixed with "${cloudTableSchema.idPrefix}"`);
                   }
                 });
                 return table.mutate({

@@ -13,9 +13,10 @@
     "sourceMap": true,
     "rootDir": ".."
   },
-  "files": [
-    "../src/dexie-cloud-client.ts",
-    "./unit/index.ts",
-    "qunit.d.ts"
+  "include": [
+    "../src/",
+    "./unit/",
+    "./*.ts",
+    "./qunit.d.ts"
   ]
 }

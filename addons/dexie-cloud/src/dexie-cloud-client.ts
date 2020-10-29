@@ -1,18 +1,18 @@
 import Dexie from "dexie";
-import dexieObservable from "dexie-observable";
-import dexieSyncable from "dexie-syncable";
+//import dexieObservable from "dexie-observable";
+//import dexieSyncable from "dexie-syncable";
 import { createIdGenerationMiddleware } from './createIdGenerationMiddleware';
 import { DexieCloudOptions } from './DexieCloudOptions';
 import { DexieCloudSchema } from './DexieCloudSchema';
 import { dexieCloudSyncProtocol } from "./dexieCloudSyncProtocol";
 import { overrideParseStoresSpec } from './overrideParseStoresSpect';
 
-const DEXIE_CLOUD_PROTOCOL_NAME = "dexie.cloud";
+/*const DEXIE_CLOUD_PROTOCOL_NAME = "dexie.cloud";
 
 dexieSyncable.registerSyncProtocol(
   DEXIE_CLOUD_PROTOCOL_NAME,
   dexieCloudSyncProtocol
-);
+);*/
 
 //
 // Extend Dexie interface
@@ -39,18 +39,19 @@ declare module "dexie" {
   }
 }
 
-export function DexieCloud(db: Dexie) {
+export function dexieCloud(db: Dexie) {
   // Make it possible to only add dexieCloud addon by auto-
   // registering the observable and syncable:
-  if (!db.observable) dexieObservable(db);
-  if (!db.syncable) dexieSyncable(db);
+  //if (!db.observable) dexieObservable(db);
+  //if (!db.syncable) dexieSyncable(db);
   db.cloud = {
     version: "{version}",
     options: {databaseUrl: ""},
     schema: {},
     configure (options: DexieCloudOptions) {
       db.cloud.options = options;
-      return db.syncable.connect(DEXIE_CLOUD_PROTOCOL_NAME, options.databaseUrl, options);
+      //return db.syncable.connect(DEXIE_CLOUD_PROTOCOL_NAME, options.databaseUrl, options);
+      return Promise.resolve();
     }
   }
   db.Version.prototype["_parseStoresSpec"] = Dexie.override(
@@ -60,10 +61,10 @@ export function DexieCloud(db: Dexie) {
   db.use(createIdGenerationMiddleware(db.cloud.schema));
 }
 
-DexieCloud.version = "{version}";
+dexieCloud.version = "{version}";
 
-Dexie.Cloud = DexieCloud;
+Dexie.Cloud = dexieCloud;
 
-Dexie.addons.push(DexieCloud);
+Dexie.addons.push(dexieCloud);
 
-export default DexieCloud;
+export default dexieCloud;

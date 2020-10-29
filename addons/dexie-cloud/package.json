@@ -25,11 +25,7 @@
   },
   "just-build": {
     "default": [
-      "just-build release cli test"
-    ],
-    "cli": [
-      "cd bin-src",
-      "tsc --build [--watch 'Compilation complete.']"
+      "just-build release test"
     ],
     "release": [
       "# Build outputs",

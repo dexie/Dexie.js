@@ -14,6 +14,7 @@ export default {
     format: 'umd',
     globals: {
       dexie: "Dexie",
+      qunit: "QUnit",
       "dexie-observable": "Dexie.Observable",
       "dexie-syncable": "Dexie.Syncable",
       "dexie-cloud": "Dexie.Cloud"
