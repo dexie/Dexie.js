@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "1.0.0-alpha.3",
+  "version": "1.0.0-alpha.4",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/dexie-cloud.js",
   "module": "dist/dexie-cloud.mjs",
@@ -21,7 +21,7 @@
     "build-cli": "just-build cli",
     "watch": "just-build --watch",
     "clean": "rm -rf tools/tmp dist esnext test/unit/bundle.*",
-    "prepublish": "just-build"
+    "prepare": "just-build"
   },
   "just-build": {
     "default": [
