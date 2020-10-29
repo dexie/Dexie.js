@@ -1,7 +1,7 @@
 {
-  "name": "dexie-cloud",
-  "version": "1.0.0-alpha.2",
-  "description": "Dexie addon that connects to dexie.cloud",
+  "name": "dexie-cloud-addon",
+  "version": "1.0.0-alpha.3",
+  "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/dexie-cloud.js",
   "module": "dist/dexie-cloud.mjs",
   "esnext": "esnext/dexie-cloud.js",

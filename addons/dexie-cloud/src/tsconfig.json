@@ -12,7 +12,7 @@
     "sourceMap": true,
     "rootDir": "."
   },
-  "files": [
-    "dexie-cloud-client.ts"
+  "include": [
+    "*.ts"
   ]
 }
