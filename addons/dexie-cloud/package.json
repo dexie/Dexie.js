@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "1.0.0-alpha.6",
+  "version": "1.0.0-alpha.7",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/dexie-cloud.js",
   "module": "dist/dexie-cloud.mjs",
@@ -73,10 +73,8 @@
     "typescript": "^4.0.2"
   },
   "dependencies": {
-    "commander": "^6.1.0",
     "dexie": "^3.0.2",
     "dexie-observable": "^3.0.0-beta.9",
-    "dexie-syncable": "^3.0.0-beta.9",
-    "prompts": "^2.3.2"
+    "dexie-syncable": "^3.0.0-beta.9"
   }
 }
