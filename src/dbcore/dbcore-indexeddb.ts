@@ -205,6 +205,12 @@ export function createDBCore (
         };
   
         req.onsuccess = done;
+      }).then(res => {
+        // Add the mutated table to the mutatedTables set on the transaction.
+        // Used by subscribers to txcommit event and for Collection.prototype.subscribe().
+        if (!trans.mutatedParts) trans.mutatedParts = {};
+        trans.mutatedParts[tableName] = true;
+        return res;
       });
     }
     

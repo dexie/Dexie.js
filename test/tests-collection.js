@@ -1,6 +1,7 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, test, asyncTest, equal, ok} from 'QUnit';
 import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unittest-utils';
+import { deepEqual } from './tests-table';
 
 var db = new Dexie("TestDBCollection");
 db.version(1).stores({ users: "id,first,last,&username,*&email,*pets" });
@@ -619,4 +620,23 @@ asyncTest("Promise chain from within each() operation", 2, function () {
     }).catch(function(err) {
         ok(false, err.stack || err);
     }).finally(start);
+});
+
+class Signal {
+    promise = new Promise(resolve => this.resolve = resolve);
+}
+
+promisedTest("Reactive queries", async ()=>{
+    let result;
+    let signal = new Signal();
+    const subscription = db.users.subscribe(results => {
+        result = results;
+        signal.resolve();
+    });
+    await signal.promise;
+    equal(result.length, 2, "Should have got the 2 initial users on first subscribe callback");
+    signal = new Signal();
+    await db.users.add({ id: 3, first: "Foo", last: "Bar"});
+    await signal.promise;
+    equal(result.length, 3, "Subscriber should have got a new result with 3 users");
 });

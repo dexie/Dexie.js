@@ -20,13 +20,23 @@ export interface DexiePopulateEvent {
   fire(trans: Transaction): any;
 }
 
+export type MutatedParts = {[tableName: string]: true};
+
+export interface DexieOnMutateEvent {
+  subscribe(fn: (parts: MutatedParts) => any): void;
+  unsubscribe(fn: (parts: MutatedParts) => any): void;
+  fire(parts: MutatedParts): any;
+}
+
 export interface DbEvents extends DexieEventSet {
   (eventName: 'ready', subscriber: () => any, bSticky?: boolean): void;
   (eventName: 'populate', subscriber: (trans: Transaction) => any): void;
   (eventName: 'blocked', subscriber: (event: IDBVersionChangeEvent) => any): void;
   (eventName: 'versionchange', subscriber: (event: IDBVersionChangeEvent) => any): void;
+  (eventName: 'mutate', subscriber: (parts: MutatedParts)=>any): void;
   ready: DexieOnReadyEvent;
   populate: DexiePopulateEvent;
   blocked: DexieEvent;
-  versionchange: DexieVersionChangeEvent;        
+  versionchange: DexieVersionChangeEvent;
+  mutate: DexieOnMutateEvent;
 }
