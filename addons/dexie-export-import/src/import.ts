@@ -45,6 +45,12 @@ export async function importDB(exportedData: Blob | JsonStream<DexieExportJsonSt
   return db;
 }
 
+export async function peakImportFile(exportedData: Blob): Promise<Partial<DexieExportJsonStructure>> {
+  const CHUNK_SIZE = (DEFAULT_KILOBYTES_PER_CHUNK * 1024);
+  const stream = await loadUntilWeGotEnoughData(exportedData, CHUNK_SIZE);
+  return stream.result;
+}
+
 export async function importInto(db: Dexie, exportedData: Blob | JsonStream<DexieExportJsonStructure>, options?: ImportOptions): Promise<void> {
   options = options || {}; // All booleans defaults to false.
   const CHUNK_SIZE = options!.chunkSizeBytes || (DEFAULT_KILOBYTES_PER_CHUNK * 1024);

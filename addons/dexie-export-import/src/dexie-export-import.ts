@@ -1,9 +1,9 @@
 import Dexie from 'dexie';
 import { ExportOptions, exportDB } from './export';
-import { importDB, ImportOptions, importInto, StaticImportOptions } from './import';
+import { importDB, peakImportFile, ImportOptions, importInto, StaticImportOptions } from './import';
 
 export { exportDB, ExportOptions};
-export { importDB, importInto, ImportOptions};
+export { importDB, importInto, peakImportFile, ImportOptions};
 
 //
 // Extend Dexie interface (typescript-wise)
