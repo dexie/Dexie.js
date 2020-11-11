@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import { extractDbSchema } from './helpers';
-import { DexieExportJsonStructure, VERSION } from './json-structure';
+import { DexieExportJsonMeta, DexieExportJsonStructure, VERSION } from './json-structure';
 import { TSON } from './tson';
 import { JsonStream } from './json-stream';
 
@@ -45,10 +45,17 @@ export async function importDB(exportedData: Blob | JsonStream<DexieExportJsonSt
   return db;
 }
 
-export async function peakImportFile(exportedData: Blob): Promise<Partial<DexieExportJsonStructure>> {
-  const CHUNK_SIZE = (DEFAULT_KILOBYTES_PER_CHUNK * 1024);
-  const stream = await loadUntilWeGotEnoughData(exportedData, CHUNK_SIZE);
-  return stream.result;
+export async function peakImportFile(exportedData: Blob): Promise<DexieExportJsonMeta> {
+  const stream = JsonStream<DexieExportJsonStructure>(exportedData);
+  while (!stream.eof()) {
+    await stream.pullAsync(5 * 1024); // 5 k is normally enough for the headers. If not, it will just do another go.
+    if (stream.result.data && stream.result.data!.data) {
+      // @ts-ignore - TS won't allow us to delete a required property - but we are going to cast it.
+      delete stream.result.data.data; // Don't return half-baked data array.
+      break;
+    }
+  }
+  return stream.result as DexieExportJsonMeta;
 }
 
 export async function importInto(db: Dexie, exportedData: Blob | JsonStream<DexieExportJsonStructure>, options?: ImportOptions): Promise<void> {
