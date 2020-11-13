@@ -16,6 +16,8 @@ import { exceptions } from '../../errors';
 import { errnames } from '../../errors';
 import { getMaxKey } from '../../functions/quirks';
 import { vip } from './vip';
+import { globalEvents } from '../../globals/global-events';
+import { liveQuery, extendObservabilitySet } from '../live-query/live-query';
 
 /* (Dexie) is an instance of DexieConstructor, as defined in public/types/dexie-constructor.d.ts
 *  (new Dexie()) is an instance of Dexie, as defined in public/types/dexie.d.ts
@@ -168,6 +170,9 @@ props(Dexie, {
   override: override, // Deprecate?
   // Export our Events() function - can be handy as a toolkit
   Events: Events,
+  on: globalEvents,
+  liveQuery,
+  extendObservabilitySet,
   // Utilities
   getByKeyPath: getByKeyPath,
   setByKeyPath: setByKeyPath,

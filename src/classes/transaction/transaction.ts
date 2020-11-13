@@ -11,6 +11,7 @@ import { newScope } from '../../helpers/promise';
 import * as Debug from '../../helpers/debug';
 import { Table } from '../table';
 import { connections } from '../../globals/constants';
+import { globalEvents } from '../../globals/global-events';
 
 /** Transaction
  * 
@@ -128,11 +129,7 @@ export class Transaction implements ITransaction {
       this.active = false;
       this._resolve();
       if ('mutatedParts' in idbtrans) {
-        // Notify all open db instances of the same db name that a transaction has committed.
-        connections.forEach(c => c.name === this.db.name && c.on.mutate.fire(
-          // @ts-ignore - mutatedParts is an expando prop on IDBTransaction
-          idbtrans.mutatedParts
-        ));
+        globalEvents.txcommitted.fire(idbtrans["mutatedParts"]);
       }
     });
     return this;

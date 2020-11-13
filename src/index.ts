@@ -9,6 +9,7 @@ import { initDatabaseEnumerator } from './helpers/database-enumerator';
 // Generate all static properties such as Dexie.maxKey etc
 // (implement interface DexieConstructor):
 import './classes/dexie/dexie-static-props';
+import { liveQuery } from './classes/live-query/live-query';
 
 // Init Database Enumerator (for Dexie.getDatabaseNames())
 initDatabaseEnumerator((Dexie as any as DexieConstructor).dependencies.indexedDB);
@@ -22,5 +23,5 @@ DexiePromise.rejectionMapper = mapError;
 // Let the async stack filter focus on app code and filter away frames from dexie.min.js:
 Debug.setDebug(Debug.debug, dexieStackFrameFilter);
 
-export { Dexie }; // Comply with public/index.d.ts.
+export { Dexie, liveQuery }; // Comply with public/index.d.ts.
 export default Dexie;

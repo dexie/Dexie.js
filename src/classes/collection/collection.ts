@@ -13,6 +13,7 @@ import { ThenShortcut } from "../../public/types/then-shortcut";
 import { Transaction } from '../transaction';
 import { DBCoreCursor, DBCoreTransaction, DBCoreRangeType, DBCoreMutateResponse, DBCoreKeyRange } from '../../public/types/dbcore';
 import { Observer, Subscription } from '../../public/types/observable';
+import { liveQuery } from '../live-query/live-query';
 
 /** class Collection
  * 
@@ -97,76 +98,11 @@ export class Collection implements ICollection {
     onComplete?: () => void
   ): Subscription;
   subscribe(observer: Observer<any[]>): Subscription;
-  subscribe(
-    o: Observer<any[]> | ((value: any[]) => void),
-    onError?: (error: any) => void): Subscription
+  subscribe()
   {
-    // @ts-ignore - The typings of Dexie's static props are not set internally.
-    return Dexie.ignoreTransaction(()=>{
-      let onStart: undefined | ((s: Subscription)=>void);
-      let onNext: undefined | ((value: any[]) => void);
-      if (typeof o !== "function") {
-        onStart = o.start;
-        onError = o.error;
-        onNext = o.next;
-      } else {
-        onNext = o;
-      }
-      let closed = false;
-      // Break free the Collection from any additional operators and any bound transaction:
-      const clone = this.clone({
-        table: this.db.table(this._ctx.table.name)
-      });
-
-      const subscription: Subscription = {
-        get closed() { return closed; },
-        unsubscribe: () => {
-          closed = true;
-          this.db.on.mutate.unsubscribe(mutationListener);
-        }
-      };
-
-      onStart && onStart(subscription); // https://github.com/tc39/proposal-observable
-
-      let ver = 0,
-          lastVer = 0,
-          querying = false,
-          startedListening = false;
-
-      const mutationListener = parts => {
-        if (parts[this._ctx.table.name]) {
-          ++ver;
-          doQuery();
-        }
-      }
-      
-      const doQuery = () => {
-        if (querying || closed) return;
-        lastVer = ver;
-        querying = true;
-        clone.toArray().then(items => {
-          querying = false;
-          if (closed) return;
-          if (ver > lastVer) {
-            // A mutation has happened while we were querying. Redo query.
-            doQuery();
-          } else {
-            if (!startedListening) {
-              this.db.on('mutate', mutationListener);
-              startedListening = true;
-            }
-            onNext && onNext(items);
-          }
-        }, error => {
-          querying = false;
-          onError && onError(error);
-          subscription.unsubscribe();
-        });
-      };
-
-      doQuery();
-      return subscription;
-    });
+    const clone = this.clone();
+    const observable = liveQuery(()=>clone.toArray());
+    return observable.subscribe.apply(observable, arguments);
   }
 
   /** Collection.each()

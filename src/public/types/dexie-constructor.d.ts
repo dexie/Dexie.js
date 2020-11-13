@@ -7,6 +7,8 @@ import { DexieExceptionClasses, DexieErrors } from "./errors";
 import { PromiseExtendedConstructor } from "./promise-extended";
 import { DexieEventSet } from "./dexie-event-set";
 import { DexieDOMDependencies } from "./dexie-dom-dependencies";
+import { GlobalDexieEvents, ObservabilitySet } from "./db-events";
+import { Observable } from "./observable";
 
 export interface DexieOptions {
   addons?: Array<(db: Dexie) => void>,
@@ -31,6 +33,8 @@ export interface DexieConstructor extends DexieExceptionClasses {
 
   vip<U>(scopeFunction: () => U): U;
   ignoreTransaction<U>(fn: ()=> U) : U;
+  liveQuery<T>(fn: () => T | Promise<T>): Observable<T>;
+  extendObservabilitySet (target: ObservabilitySet, newSet: ObservabilitySet): ObservabilitySet;
   override<F> (origFunc:F, overridedFactory: (fn:any)=>any) : F; // ?
   getByKeyPath(obj: Object, keyPath: string): any;
   setByKeyPath(obj: Object, keyPath: string, value: any): void;
@@ -49,6 +53,7 @@ export interface DexieConstructor extends DexieExceptionClasses {
   //TableSchema: {}; // Deprecate!
   //IndexSpec: {new():IndexSpec}; //? Deprecate
   Events: (ctx?: any)=>DexieEventSet;
+  on: GlobalDexieEvents;
 
   errnames: DexieErrors;
 }

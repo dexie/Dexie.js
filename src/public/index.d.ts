@@ -22,6 +22,7 @@ declare var Dexie: DexieConstructor;
 import { Table } from './types/table';
 import { Collection } from './types/collection';
 import { PromiseExtended } from './types/promise-extended';
+import { Observable } from './types/observable';
 
 // Alias of Table and Collection in order to be able to refer them from module below...
 interface _Table<T, TKey> extends Table<T, TKey> {}
@@ -46,6 +47,7 @@ export { IndexableType } from './types/indexable-type';
  * have been using the default export until version 2.0.1.
 */
 export { Dexie };
+export function liveQuery<T>(querier: () => T | Promise<T>): Observable<T>;
 
 /** Exporting 'Dexie' as the default export.
  **/
