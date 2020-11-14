@@ -182,7 +182,11 @@ export const observabilityMiddleware: Middleware<DBCore> = {
         const tableClone: DBCoreTable = {
           ...table,
           mutate: (req) => {
-            const keys = req.type !== "deleteRange" && getEffectiveKeys(table.schema.primaryKey, req);
+            const keys =
+              req.type !== "deleteRange" &&
+              (req.type === "delete"
+                ? req.keys
+                : (req.keys = getEffectiveKeys(table.schema.primaryKey, req)));
             const trans = req.trans as DBCoreTransaction & {
               mutatedParts?: ObservabilitySet;
             };              
