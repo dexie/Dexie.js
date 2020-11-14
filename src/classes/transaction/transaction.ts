@@ -10,7 +10,6 @@ import { preventDefault } from '../../functions/event-wrappers';
 import { newScope } from '../../helpers/promise';
 import * as Debug from '../../helpers/debug';
 import { Table } from '../table';
-import { connections } from '../../globals/constants';
 import { globalEvents } from '../../globals/global-events';
 
 /** Transaction

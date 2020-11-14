@@ -12,8 +12,6 @@ import { hangsOnDeleteLargeKeyRange } from "../../globals/constants";
 import { ThenShortcut } from "../../public/types/then-shortcut";
 import { Transaction } from '../transaction';
 import { DBCoreCursor, DBCoreTransaction, DBCoreRangeType, DBCoreMutateResponse, DBCoreKeyRange } from '../../public/types/dbcore';
-import { Observer, Subscription } from '../../public/types/observable';
-import { liveQuery } from '../live-query/live-query';
 
 /** class Collection
  * 

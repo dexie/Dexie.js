@@ -16,7 +16,6 @@ import { debug } from '../../helpers/debug';
 import { DBCoreTable } from '../../public/types/dbcore';
 import { AnyRange } from '../../dbcore/keyrange';
 import { workaroundForUndefinedPrimKey } from '../../functions/workaround-undefined-primkey';
-import { Observer, Subscription } from '../../public/types/observable';
 
 /** class Table
  * 

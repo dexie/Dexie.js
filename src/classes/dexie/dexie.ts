@@ -125,7 +125,7 @@ export class Dexie implements IDexie {
     });
     this._state = state;
     this.name = name;
-    this.on = Events(this, "populate", "blocked", "versionchange", "mutate", { ready: [promisableChain, nop] }) as DbEvents;
+    this.on = Events(this, "populate", "blocked", "versionchange", { ready: [promisableChain, nop] }) as DbEvents;
     this.on.ready.subscribe = override(this.on.ready.subscribe, subscribe => {
       return (subscriber, bSticky) => {
         (Dexie as any as DexieConstructor).vip(() => {
