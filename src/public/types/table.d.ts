@@ -8,9 +8,8 @@ import { PromiseExtended } from "./promise-extended";
 import { Database } from "./database";
 import { IndexableType } from "./indexable-type";
 import { DBCoreTable } from "./dbcore";
-import { Observable } from "./observable";
 
-export interface Table<T=any, TKey=IndexableType> extends Observable<T[]> {
+export interface Table<T=any, TKey=IndexableType> {
   db: Database;
   name: string;
   schema: TableSchema;

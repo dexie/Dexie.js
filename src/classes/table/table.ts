@@ -68,18 +68,6 @@ export class Table implements ITable<any, IndexableType> {
     }
   }
 
-  subscribe(
-    onNext: (value: any[]) => void,
-    onError?: (error: any) => void,
-    onComplete?: () => void
-  ): Subscription;
-  subscribe(observer: Observer<any[]>): Subscription;
-  subscribe(): Subscription
-  {
-    const coll = this.toCollection();
-    return coll.subscribe.apply(coll, arguments);
-  }
-
   /** Table.get()
    * 
    * http://dexie.org/docs/Table/Table.get()

@@ -92,20 +92,6 @@ export class Collection implements ICollection {
     return this;
   }
 
-  subscribe(
-    onNext: (value: any[]) => void,
-    onError?: (error: any) => void,
-    onComplete?: () => void
-  ): Subscription;
-  subscribe(observer: Observer<any[]>): Subscription;
-  subscribe()
-  {
-    // Break away from any bound transaction (this._ctx.table._tx)
-    const clone = this.clone({table: this.db.table(this._ctx.table.name)});
-    const observable = liveQuery(()=>clone.toArray());
-    return observable.subscribe.apply(observable, arguments);
-  }
-
   /** Collection.each()
    * 
    * http://dexie.org/docs/Collection/Collection.each()

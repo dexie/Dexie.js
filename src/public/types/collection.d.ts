@@ -4,9 +4,8 @@ import { WhereClause } from "./where-clause";
 import { PromiseExtended } from "./promise-extended";
 import { Database } from "./database";
 import { IndexableType } from "./indexable-type";
-import { Observable } from "./observable";
 
-export interface Collection<T=any, TKey=IndexableType> extends Observable<T[]> {
+export interface Collection<T=any, TKey=IndexableType> {
   //db: Database;
   and(filter: (x: T) => boolean): Collection<T, TKey>;
   clone(props?: Object): Collection<T, TKey>;
