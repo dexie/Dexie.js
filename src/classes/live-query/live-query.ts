@@ -1,3 +1,4 @@
+import { getEffectiveKeys } from '../../dbcore/get-effective-keys';
 import { extend, isAsyncFunction, keys } from "../../functions/utils";
 import { globalEvents } from '../../globals/global-events';
 import {
@@ -22,20 +23,6 @@ import {
 import { Middleware } from "../../public/types/middleware";
 import { Observable as IObservable, Subscription } from "../../public/types/observable";
 import { Observable } from "../observable/observable";
-
-/*
-  TODO:
-    1. V: Deklarera Dexie.on = globalEvents.
-    2. V: Även i typings för DexieConstructor.
-       V: Även Dexie.liveQuery = liveQuery!
-       V: Även export {liveQuery} i es6 version av modulen.
-    3. V: Rätta kompileringsfel.
-    4. --> npm test. Funkar allt som tidigare fortfarnade?
-    5. Skapa nytt unit test. Funkar det som det ska? Även i native async?
-    6. Ta bort kod från Collection.subscribe och Table.subcsribe samt dess unit test.
-    7. Publicera.
-
-*/
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
   return new Observable<T>(({start, next, error}) => {
@@ -75,7 +62,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     let querying = false,
         startedListening = false;
 
-    function doNotify() {
+    function shouldNotify() {
       for (const db of keys(currentObs)) {
         const mutDb = accumMuts[db];
         if (mutDb) {
@@ -95,7 +82,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
 
     const mutationListener = (parts: ObservabilitySet) => {
       extendObservabilitySet(accumMuts, parts);
-      if (doNotify()) {
+      if (shouldNotify()) {
         doQuery();
       }
     };
@@ -110,7 +97,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         (result) => {
           querying = false;
           if (closed) return;
-          if (doNotify()) {
+          if (shouldNotify()) {
             // Mutations has happened while we were querying. Redo query.
             doQuery();
           } else {
@@ -201,9 +188,9 @@ export const observabilityMiddleware: Middleware<DBCore> = {
               const trans = req.trans as DBCoreTransaction & {
                 mutatedParts?: ObservabilitySet;
               };
-              const keys = "keys" in req && req.keys;
+              const keys = req.type !== "deleteRange" && getEffectiveKeys(table.schema.primaryKey, req);
               const mutatedParts: ObservabilitySet = {
-                [dbName]: {[tableName]: keys ? { keys } : true}
+                [dbName]: {[tableName]: keys && keys.every(k => k != null) ? { keys } : true}
               };
               if (!trans.mutatedParts) trans.mutatedParts = {};
               extendObservabilitySet(trans.mutatedParts, mutatedParts)

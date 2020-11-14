@@ -100,7 +100,8 @@ export class Collection implements ICollection {
   subscribe(observer: Observer<any[]>): Subscription;
   subscribe()
   {
-    const clone = this.clone();
+    // Break away from any bound transaction (this._ctx.table._tx)
+    const clone = this.clone({table: this.db.table(this._ctx.table.name)});
     const observable = liveQuery(()=>clone.toArray());
     return observable.subscribe.apply(observable, arguments);
   }
