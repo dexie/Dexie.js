@@ -182,13 +182,13 @@ export const observabilityMiddleware: Middleware<DBCore> = {
         const tableClone: DBCoreTable = {
           ...table,
           mutate: (req) => {
+            const keys = req.type !== "deleteRange" && getEffectiveKeys(table.schema.primaryKey, req);
+            const trans = req.trans as DBCoreTransaction & {
+              mutatedParts?: ObservabilitySet;
+            };              
             return table.mutate(req).then((res) => {
               // Add the mutated table and optionally keys to the mutatedTables set on the transaction.
               // Used by subscribers to txcommit event and for Collection.prototype.subscribe().
-              const trans = req.trans as DBCoreTransaction & {
-                mutatedParts?: ObservabilitySet;
-              };
-              const keys = req.type !== "deleteRange" && getEffectiveKeys(table.schema.primaryKey, req);
               const mutatedParts: ObservabilitySet = {
                 [dbName]: {[tableName]: keys && keys.every(k => k != null) ? { keys } : true}
               };
