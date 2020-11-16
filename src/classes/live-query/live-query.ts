@@ -88,12 +88,16 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     };
 
     const doQuery = () => {
-      debugger;
       if (querying || closed) return;
       accumMuts = {};
-      querying = true;
       const subscr: ObservabilitySet = {};
-      Promise.resolve(execute(subscr)).then(
+      const ret = execute(subscr);
+      if (!startedListening) {
+        globalEvents("txcommitted", mutationListener);
+        startedListening = true;
+      }
+      querying = true;
+      Promise.resolve(ret).then(
         (result) => {
           querying = false;
           if (closed) return;
@@ -102,10 +106,6 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
             doQuery();
           } else {
             accumMuts = {};
-            if (!startedListening) {
-              globalEvents("txcommitted", mutationListener);
-              startedListening = true;
-            }
             // Update what we are subscribing for based on this last run:
             currentObs = subscr;
             next && next(result);
