@@ -1,5 +1,5 @@
 import { getEffectiveKeys } from '../../dbcore/get-effective-keys';
-import { extend, isAsyncFunction, keys } from "../../functions/utils";
+import { deepClone, extend, isAsyncFunction, keys } from "../../functions/utils";
 import { globalEvents } from '../../globals/global-events';
 import {
   decrementExpectedAwaits,
@@ -71,7 +71,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
             const mutTable = mutDb[table];
             const obsTable = obsDb[table];
             if (mutTable === true || obsTable === true) return true;
-            return (obsTable.keys.some(key => mutTable.keys.some(mKey => {
+            return mutTable && (obsTable.keys.some(key => mutTable.keys.some(mKey => {
               try {return obsTable.cmp!(key, mKey) === 0;} catch (_) {return false;}
             })));
           }
@@ -135,17 +135,19 @@ export function extendObservabilitySet(
       // merge os1[dbName] with os2[dbName]
       keys(newTableSet).forEach((tableName) => {
         const targetPart = targetTableSet[tableName];
+        const newPart = newTableSet[tableName];
         if (targetPart && targetPart !== true && targetPart.keys) {
-          const newPart = newTableSet[tableName];
           if (newPart === true) {
             targetTableSet[tableName] = true;
           } else if (newPart.keys) {
             targetTableSet[tableName] = { keys: targetPart.keys.concat(newPart.keys) };
           }
+        } else {
+          targetTableSet[tableName] = deepClone(newPart);
         }
       });
     } else {
-      target[dbName] = newTableSet;
+      target[dbName] = deepClone(newTableSet);
     } 
   });
   return target;
@@ -197,7 +199,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                 [dbName]: {[tableName]: keys && keys.every(k => k != null) ? { keys } : true}
               };
               if (!trans.mutatedParts) trans.mutatedParts = {};
-              extendObservabilitySet(trans.mutatedParts, mutatedParts)
+              extendObservabilitySet(trans.mutatedParts, mutatedParts);
               return res;
             });
           },

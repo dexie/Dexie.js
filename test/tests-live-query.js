@@ -4,8 +4,9 @@ import {resetDatabase, supports, promisedTest} from './dexie-unittest-utils';
 import { deepEqual } from './tests-table';
 
 const db = new Dexie("TestLiveQuery");
-db.version(1).stores({
-    items: "id"
+db.version(2).stores({
+    items: "id",
+    foo: "++id"
 });
 
 db.on('populate', ()=> {
@@ -31,6 +32,35 @@ module("live-query", {
   }
 });
 
+promisedTest("txcommitted event", async ()=>{
+  let signal = new Signal();
+  let os = {};
+  function txCommitted(observabilitySet) {
+    Dexie.extendObservabilitySet(os, observabilitySet);
+    signal.resolve(observabilitySet);
+  }
+  await db.open();
+  Dexie.on('txcommitted', txCommitted);
+  await db.transaction('rw', db.items, db.foo, async ()=>{
+    await db.items.add({id: 4, name: "aiwo1"});
+    await db.items.add({id: 7, name: "kjlj"});
+    await db.foo.add({name: "jkll"});
+  });
+  while (!os.TestLiveQuery || !os.TestLiveQuery.items || os.TestLiveQuery.items.keys.indexOf(4) === -1) {
+    // When Dexie.Observable is active, we might see intermediate transactions taking place
+    // before our transaction.
+    signal = new Signal();
+    await signal.promise;
+  }
+  ok(!!os.TestLiveQuery, "Got changes in our table name TestLiveQuery");
+  const itemsChanges = os.TestLiveQuery.items;
+  ok(itemsChanges, "Got changes for items table");
+  deepEqual(itemsChanges.keys, [4, 7], "Item changes on concattenated keys");
+  const fooChanges = os.TestLiveQuery.foo;
+  ok(fooChanges, "Got changes for foo table");
+  Dexie.on('txcommitted').unsubscribe(txCommitted);
+});
+
 promisedTest("subscribe to range", async ()=> {
   let signal = new Signal();
   let subscription = liveQuery(()=>db.items.toArray()).subscribe(result => {
@@ -53,6 +83,8 @@ promisedTest("subscribe to range", async ()=> {
 promisedTest("subscribe to keys", async ()=>{
   let signal1 = new Signal(), signal2 = new Signal();
   let count1 = 0, count2 = 0;
+  const debugTxCommitted = set => console.debug("txcommitted", set);
+  Dexie.on('txcommitted', debugTxCommitted);
   let sub1 = liveQuery(()=>db.items.get(1)).subscribe(result => {
     ++count1;
     signal1.resolve(result);
@@ -73,6 +105,7 @@ promisedTest("subscribe to keys", async ()=>{
   signal1 = new Signal();
   signal2 = new Signal();
   await db.items.update(1, {name: "one"});
+  ok(true, "Could update item 1");
   res1 = await signal1.promise;
   equal(count1, 2, "First should have been called 2 times now");
   equal(count2, 1, "2nd callback should still only have been called once");
@@ -110,7 +143,7 @@ promisedTest("subscribe to keys", async ()=>{
 promisedTest("subscribe and error occur", async ()=> {
   let signal = new Signal();
   let subscription = liveQuery(
-    ()=>db.items.get(window) // window is not a valid key
+    ()=>db.items.get(NaN) // NaN is not a valid key
   ).subscribe({
     next: result => signal.resolve("success"),
     error: result => signal.resolve("error"),
