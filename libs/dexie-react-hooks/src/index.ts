@@ -1,19 +1,23 @@
 import {liveQuery} from "dexie";
 import {useSubscription} from "./use-subscription";
-import {useMemo} from "react";
+import {useMemo, useState} from "react";
 
 export function useLiveQuery<T>(querier: ()=>Promise<T> | T, dependencies?: any[]): T | undefined;
 export function useLiveQuery<T,TDefault> (querier: ()=>Promise<T> | T, dependencies: any[], defaultResult: TDefault) : T | TDefault;
 export function useLiveQuery<T,TDefault> (querier: ()=>Promise<T> | T, dependencies?: any[], defaultResult?: TDefault) : T | TDefault{
-  let currentValue: T | TDefault = defaultResult as (T | TDefault);
+  const [lastResult, setLastResult] = useState(defaultResult as T | TDefault);
   const subscription = useMemo(
     () => {
+      // Make it remember previus subscription's default value when
+      // resubscribing (á la useTransition())
+      let currentValue = lastResult;
       const observable = liveQuery(querier);
       return {
         getCurrentValue: () => currentValue,
         subscribe: (onNext, onError) => {
           const esSubscription = observable.subscribe(value => {
             currentValue = value;
+            setLastResult(value);
             onNext(value);
           }, onError);
           return esSubscription.unsubscribe.bind(esSubscription);
