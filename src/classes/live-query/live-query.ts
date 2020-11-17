@@ -1,6 +1,6 @@
-import { getEffectiveKeys } from '../../dbcore/get-effective-keys';
-import { deepClone, extend, isAsyncFunction, keys } from "../../functions/utils";
-import { globalEvents } from '../../globals/global-events';
+import { getEffectiveKeys } from "../../dbcore/get-effective-keys";
+import { deepClone, isAsyncFunction, keys } from "../../functions/utils";
+import { globalEvents } from "../../globals/global-events";
 import {
   decrementExpectedAwaits,
   incrementExpectedAwaits,
@@ -21,11 +21,14 @@ import {
   DBCoreTransaction,
 } from "../../public/types/dbcore";
 import { Middleware } from "../../public/types/middleware";
-import { Observable as IObservable, Subscription } from "../../public/types/observable";
+import {
+  Observable as IObservable,
+  Subscription,
+} from "../../public/types/observable";
 import { Observable } from "../observable/observable";
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
-  return new Observable<T>(({start, next, error}) => {
+  return new Observable<T>(({ start, next, error }) => {
     const scopeFuncIsAsync = isAsyncFunction(querier);
     function execute(subscr: ObservabilitySet) {
       if (scopeFuncIsAsync) {
@@ -37,7 +40,10 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
           usePSD(PSD.transless, exec)
         : exec();
       if (scopeFuncIsAsync) {
-        (rv as Promise<any>).then(decrementExpectedAwaits, decrementExpectedAwaits);
+        (rv as Promise<any>).then(
+          decrementExpectedAwaits,
+          decrementExpectedAwaits
+        );
       }
       return rv;
     }
@@ -60,7 +66,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     start && start(subscription); // https://github.com/tc39/proposal-observable
 
     let querying = false,
-        startedListening = false;
+      startedListening = false;
 
     function shouldNotify() {
       for (const db of keys(currentObs)) {
@@ -71,9 +77,21 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
             const mutTable = mutDb[table];
             const obsTable = obsDb[table];
             if (mutTable === true || obsTable === true) return true;
-            return mutTable && (obsTable.keys.some(key => mutTable.keys.some(mKey => {
-              try {return obsTable.cmp!(key, mKey) === 0;} catch (_) {return false;}
-            })));
+            if (
+              mutTable &&
+              mutTable.keys &&
+              obsTable.keys.some((key) =>
+                mutTable.keys.some((mKey) => {
+                  try {
+                    return obsTable.cmp!(key, mKey) === 0;
+                  } catch (_) {
+                    return false;
+                  }
+                })
+              )
+            ) {
+              return true;
+            }
           }
         }
       }
@@ -140,7 +158,9 @@ export function extendObservabilitySet(
           if (newPart === true) {
             targetTableSet[tableName] = true;
           } else if (newPart.keys) {
-            targetTableSet[tableName] = { keys: targetPart.keys.concat(newPart.keys) };
+            targetTableSet[tableName] = {
+              keys: targetPart.keys.concat(newPart.keys),
+            };
           }
         } else {
           targetTableSet[tableName] = deepClone(newPart);
@@ -148,7 +168,7 @@ export function extendObservabilitySet(
       });
     } else {
       target[dbName] = deepClone(newTableSet);
-    } 
+    }
   });
   return target;
 }
@@ -191,12 +211,15 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                 : (req.keys = getEffectiveKeys(table.schema.primaryKey, req)));
             const trans = req.trans as DBCoreTransaction & {
               mutatedParts?: ObservabilitySet;
-            };              
+            };
             return table.mutate(req).then((res) => {
               // Add the mutated table and optionally keys to the mutatedTables set on the transaction.
               // Used by subscribers to txcommit event and for Collection.prototype.subscribe().
               const mutatedParts: ObservabilitySet = {
-                [dbName]: {[tableName]: keys && keys.every(k => k != null) ? { keys } : true}
+                [dbName]: {
+                  [tableName]:
+                    keys && keys.every((k) => k != null) ? { keys } : true,
+                },
               };
               if (!trans.mutatedParts) trans.mutatedParts = {};
               extendObservabilitySet(trans.mutatedParts, mutatedParts);
@@ -221,8 +244,8 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                       { keys, cmp: core.cmp }
                     : // The query is based on a secondary index, or is range based -
                       // Lets subscribe to all changes on the table
-                      true
-                }
+                      true,
+                },
               };
               extendObservabilitySet(PSD.subscr, observabilitySet);
             }
