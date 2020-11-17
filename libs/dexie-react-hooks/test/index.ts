@@ -128,6 +128,9 @@ test("Clicking next button will update the currently viewed item", async ()=>{
 });
 
 test("Selecting invalid key trigger the error boundrary", async ()=>{
+  // Stop test from failing because we trigger an error!
+  QUnit["onUnhandledRejection"] = ()=>{};
+
   listChanged.reset();
   currentChanged.reset();
   // Add some data:
@@ -151,7 +154,7 @@ test("Selecting invalid key trigger the error boundrary", async ()=>{
     rootChanged.reset();
   }
   assert.ok(/Something went wrong/.test(div.innerText), "The ErrorBoundrary should be shown");
-
+  
   // Restore the gui from the error state:
   (div.querySelector("#btnFirst") as HTMLElement).click();
   (div.querySelector("#btnRetry") as HTMLElement).click();

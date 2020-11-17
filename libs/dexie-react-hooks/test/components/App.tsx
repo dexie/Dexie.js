@@ -20,7 +20,7 @@ export function App() {
     <div id="controls">
       <button id="btnFirst" onClick={()=>setCurrentId(1)}>First</button>
       <button id="btnNext" onClick={()=>setCurrentId(prevId => prevId + 1)}>Next</button>
-      <button id="btnInvalidKey" onClick={()=>setCurrentId({} as number)}>Select invalid key</button>
+      <button id="btnInvalidKey" onClick={()=>setCurrentId(NaN)}>Select invalid key</button>
     </div>    
   </ErrorBoundary>;
 }

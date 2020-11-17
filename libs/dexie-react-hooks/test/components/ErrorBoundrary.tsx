@@ -12,7 +12,7 @@ export class ErrorBoundary extends Component<{}, { error: any }> {
   }
 
   componentDidCatch(error, errorInfo) {
-    console.error(error, errorInfo);
+    //console.error(error, errorInfo);
   }
 
   render() {
