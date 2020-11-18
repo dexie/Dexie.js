@@ -1,9 +1,10 @@
 import Dexie from 'dexie';
 import { ExportOptions, exportDB } from './export';
-import { importDB, ImportOptions, importInto, StaticImportOptions } from './import';
+import { importDB, peakImportFile, ImportOptions, importInto, StaticImportOptions } from './import';
+import { DexieExportJsonMeta } from './json-structure';
 
 export { exportDB, ExportOptions};
-export { importDB, importInto, ImportOptions};
+export { importDB, importInto, peakImportFile, ImportOptions, DexieExportJsonMeta};
 
 //
 // Extend Dexie interface (typescript-wise)

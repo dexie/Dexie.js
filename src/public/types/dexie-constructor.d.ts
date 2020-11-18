@@ -16,6 +16,7 @@ export interface DexieOptions {
   indexedDB?: {open: Function},
   IDBKeyRange?: {bound: Function, lowerBound: Function, upperBound: Function},
   allowEmptyDB?: boolean;
+  modifyChunkSize?: number
 }
 
 export interface DexieConstructor extends DexieExceptionClasses {
