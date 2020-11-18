@@ -14,6 +14,8 @@ export class IdbPromiseIncompatibleError extends Error {
 export async function isIdbAndPromiseCompatible() {
     let db = new Dexie("idbPromiseCompatTest");
     db.version(1).stores({foo:'bar'});
+    await db.delete();
+    await db.open();
     return await db.transaction('r', db.foo, async ()=>{
         let x = await db.foo.count();
         let p = _resolve(0);

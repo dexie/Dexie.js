@@ -28,5 +28,25 @@ export interface DbEvents extends DexieEventSet {
   ready: DexieOnReadyEvent;
   populate: DexiePopulateEvent;
   blocked: DexieEvent;
-  versionchange: DexieVersionChangeEvent;        
+  versionchange: DexieVersionChangeEvent;
+}
+
+export type ObservabilitySet = {
+  [dbName: string]: {
+    [tableName: string]: true | {
+      cmp?: (a: any, b: any) => number,
+      keys: any[]
+    }
+  }
+};
+
+export interface DexieOnTxCommittedEvent {
+  subscribe(fn: (parts: ObservabilitySet) => any): void;
+  unsubscribe(fn: (parts: ObservabilitySet) => any): void;
+  fire(parts: ObservabilitySet): any;
+}
+
+export interface GlobalDexieEvents extends DexieEventSet {
+  (eventName: 'txcommitted', subscriber: (parts: ObservabilitySet)=>any): void;
+  txcommitted: DexieOnTxCommittedEvent;
 }
