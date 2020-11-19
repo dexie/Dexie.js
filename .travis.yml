@@ -14,6 +14,7 @@ env:
   - TF=addons/Dexie.Syncable/test/unit
   - TF=addons/Dexie.Syncable/test/integration
   - TF=addons/dexie-export-import/test
+  - TF=libs/dexie-react-hooks/test
   - TF=test/integrations/test-dexie-relationships
 branches:
   only:
