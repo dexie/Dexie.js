@@ -39,7 +39,7 @@
     "test": "npm run build && npm run test:typings && npm run test:unit && npm run test:integration",
     "test:unit": "karma start test/unit/karma.conf.js --single-run",
     "test:integration": "karma start test/integration/karma.conf.js --single-run",
-    "test:typings": "tsc -p test/typings/",
+    "test:typings": "just-build test-typings",
     "test:unit:debug": "karma start test/unit/karma.conf.js --log-level debug",
     "test:integration:debug": "karma start test/integrations/karma.conf.js --log-level debug"
   },
@@ -72,6 +72,9 @@
       "tsc --allowJs --moduleResolution node --lib es2015,dom -t es5 -m es2015 --outDir tools/tmp/es5/test --rootDir ../.. --sourceMap test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
       "rollup -c tools/build-configs/rollup.tests.config.js",
       "eslint test/unit --cache --ignore-pattern bundle.js"
+    ],
+    "test-typings": [
+      "tsc -p test/typings/"
     ]
   },
   "homepage": "http://dexie.org",
@@ -91,7 +94,6 @@
     "qunit": "^2.9.2",
     "rollup": "^0.55.5",
     "rollup-plugin-sourcemaps": "^0.4.1",
-    "typescript": "^2.8.3",
     "uglify-js": "^3.5.6"
   },
   "dependencies": {}
