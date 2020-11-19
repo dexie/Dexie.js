@@ -25,3 +25,4 @@ script:
   - cd $TF
   - pwd
   - bash ./travis.sh
+
