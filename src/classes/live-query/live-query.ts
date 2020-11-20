@@ -76,7 +76,14 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
           for (const table of keys(obsDb)) {
             const mutTable = mutDb[table];
             const obsTable = obsDb[table];
-            if (mutTable === true || obsTable === true) return true;
+            if (mutTable === true) {
+              if (obsTable) return true;
+              else continue;
+            }
+            if (obsTable === true) {
+              if (mutTable) return true;
+              else continue;
+            }
             if (
               mutTable &&
               mutTable.keys &&
