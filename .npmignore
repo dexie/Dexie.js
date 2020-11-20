@@ -1,6 +1,7 @@
 **/tmp/
 samples/
 addons/
+libs/
 *.njsproj
 .*
 *.log
