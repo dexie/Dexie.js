@@ -127,7 +127,7 @@ test("Clicking next button will update the currently viewed item", async ()=>{
   assert.equal(divCurrent.textContent, "Current itemID: 2Name: World", "We are now viewering item 2");
 });
 
-test("Selecting invalid key trigger the error boundrary", async ()=>{
+test("Selecting invalid key trigger the err-boundrary", async ()=>{
   // Stop test from failing because we trigger an error!
   QUnit["onUnhandledRejection"] = ()=>{};
 
