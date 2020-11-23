@@ -1,24 +1,29 @@
-# vue
+# Vue + Dexie Todo Example
 
-## Project setup
-```
-yarn install
-```
+This project was bootstrapped with [Vue CLI](https://cli.vuejs.org/). Its arrangement of components is designed to be similar to that of the components in the [React](../react) example. The code is organized into:
 
-### Compiles and hot-reloads for development
-```
-yarn serve
-```
+* `src/database.js`: contains all database logic in its exported `Database` class.
+* `src/App.vue`: the top-level Vue.js app instantiates a `Database` on its creation to handle database changes.
+* `src/components/*.vue`: the components to the to-do list; sends events up to the `App.vue` component on user interactions.
 
-### Compiles and minifies for production
-```
-yarn build
-```
+## Install dependencies
 
-### Lints and fixes files
+Before you can run the app in your browser, you will have to install its dependencies with:
+
 ```
-yarn lint
+npm install
 ```
 
-### Customize configuration
-See [Configuration Reference](https://cli.vuejs.org/config/).
+## Development server
+
+Run `npm run start` for a dev server. Navigate to `http://localhost:1123`. The app will automatically reload if you change any of the source files. You will also see any lint errors in the console.
+
+## Build
+
+Run `npm run build` to build the project. The build artifacts will be stored in the `build/` directory.
+
+## Further help
+
+* [Vue CLI guide](https://cli.vuejs.org)
+* [Vue.js Guide](https://v3.vuejs.org/guide/introduction.html) for core Vue 3 concepts
+* To get more help on Dexie check out the [Dexie Wiki](https://github.com/dfahlander/Dexie.js/wiki)
