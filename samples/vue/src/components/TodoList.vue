@@ -3,9 +3,9 @@
     <div
       class="select-order-group"
       role="group"
-      aria-label="Select order"
+      aria-label="Update order"
     >
-      <span class="select-order-header" aria-hidden="true">Select order</span>
+      <span class="select-order-header" aria-hidden="true">Update order</span>
       <!-- [TODO] Define sort events these buttons will emit when we add the
            database.js file -->
       <button
