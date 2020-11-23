@@ -9,16 +9,16 @@
       <!-- [TODO] Define sort events these buttons will emit when we add the
            database.js file -->
       <button
-        aria-label="newest first"
+        aria-label="oldest first"
         @click="sortTodos(forwardOrder)"
       >
-        🛸 Newest first
+        🦖 Oldest first
       </button>
       <button
-        aria-label="oldest first"
+        aria-label="newest first"
         @click="sortTodos(reverseOrder)"
       >
-        🦖 Oldest first
+        🛸 Newest first
       </button>
       <button
         aria-label="unfinished first"
@@ -34,8 +34,8 @@
         :todoID="todo.id"
         :text="todo.text"
         :done="todo.done"
-        @toggle="toggleTodo"
-        @delete="deleteTodo"
+        @toggle-todo="toggleTodo"
+        @delete-todo="deleteTodo"
       />
     </ul>
   </div>
@@ -57,13 +57,13 @@ export default {
   methods: {
     // toggleTodo emits an event to toggle a todo between finished and
     // unfinished.
-    toggleTodo(id, status) {
-      this.$emit('add-todo', { id: id, status: status });
+    toggleTodo(togglePayload) {
+      this.$emit('toggle-todo', togglePayload);
     },
 
     // deleteTodo emits an event to delete a todo of the given ID
-    deleteTodo(id) {
-      this.$emit('delete-todo', { id: id });
+    deleteTodo(deletePayload) {
+      this.$emit('delete-todo', deletePayload);
     },
 
     // sortTodo emits an event to sort the todo list by a given order.
