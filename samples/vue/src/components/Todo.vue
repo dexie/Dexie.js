@@ -26,12 +26,12 @@ export default {
     // toggleTodo emits an event to toggle this to-do between complete and
     // incomplete.
     toggleTodo() {
-      this.$emit('toggle', { id: this.todoID, done: !this.done });
+      this.$emit('toggle-todo', { id: this.todoID, done: !this.done });
     },
 
     // deleteTodo emits an event to delete this to-do.
     deleteTodo() {
-      this.$emit('delete', { id: this.todoID });
+      this.$emit('delete-todo', { id: this.todoID });
     }
   },
   computed: {

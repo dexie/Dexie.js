@@ -17,7 +17,7 @@ export default {
   methods: {
     // addTodo emits an event to add a todo to the todo list.
     addTodo() {
-      this.$emit('add-todo', { value: this.value });
+      this.$emit('add-todo', { text: this.value });
       this.value = '';
     }
   }
