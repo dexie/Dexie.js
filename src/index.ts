@@ -9,6 +9,7 @@ import { initDatabaseEnumerator } from './helpers/database-enumerator';
 // Generate all static properties such as Dexie.maxKey etc
 // (implement interface DexieConstructor):
 import './classes/dexie/dexie-static-props';
+import './classes/live-query/enable-broadcast';
 import { liveQuery } from './classes/live-query/live-query';
 
 // Init Database Enumerator (for Dexie.getDatabaseNames())
