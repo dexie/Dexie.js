@@ -1,5 +1,5 @@
-import { globalEvents } from '../../globals/global-events';
-import { ObservabilitySet } from "../../public/types/db-events";
+import { globalEvents } from '../globals/global-events';
+import { ObservabilitySet } from "../public/types/db-events";
 import { extendObservabilitySet } from './extend-observability-set';
 
 function fireLocally(updateParts: ObservabilitySet) {

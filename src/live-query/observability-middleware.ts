@@ -1,6 +1,6 @@
-import { getEffectiveKeys } from "../../dbcore/get-effective-keys";
-import { PSD } from "../../helpers/promise";
-import { ObservabilitySet } from "../../public/types/db-events";
+import { getEffectiveKeys } from "../dbcore/get-effective-keys";
+import { PSD } from "../helpers/promise";
+import { ObservabilitySet } from "../public/types/db-events";
 import {
   DBCore,
   DBCoreCountRequest,
@@ -11,8 +11,8 @@ import {
   DBCoreRangeType,
   DBCoreTable,
   DBCoreTransaction
-} from "../../public/types/dbcore";
-import { Middleware } from "../../public/types/middleware";
+} from "../public/types/dbcore";
+import { Middleware } from "../public/types/middleware";
 import { extendObservabilitySet } from "./extend-observability-set";
 
 

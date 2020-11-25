@@ -1,5 +1,5 @@
-import { deepClone, keys } from "../../functions/utils";
-import { ObservabilitySet } from "../../public/types/db-events";
+import { deepClone, keys } from "../functions/utils";
+import { ObservabilitySet } from "../public/types/db-events";
 
 
 export function extendObservabilitySet(

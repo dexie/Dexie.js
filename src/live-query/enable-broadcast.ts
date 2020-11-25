@@ -1,4 +1,4 @@
-import { globalEvents } from "../../globals/global-events";
+import { globalEvents } from "../globals/global-events";
 import { propagateLocally, propagatingLocally } from "./propagate-locally";
 
 if (typeof BroadcastChannel !== "undefined") {

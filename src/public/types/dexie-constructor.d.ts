@@ -24,7 +24,6 @@ export interface DexieConstructor extends DexieExceptionClasses {
   prototype: Dexie;
 
   addons: Array<(db: Dexie) => void>;
-  enablers: Array<(db: Dexie) => void>;
   version: number;
   semVer: string;
   currentTransaction: Transaction;

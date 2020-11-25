@@ -10,7 +10,7 @@ import { initDatabaseEnumerator } from './helpers/database-enumerator';
 // (implement interface DexieConstructor):
 import './classes/dexie/dexie-static-props';
 import './classes/live-query/enable-broadcast';
-import { liveQuery } from './classes/live-query/live-query';
+import { liveQuery } from './live-query/live-query';
 
 // Init Database Enumerator (for Dexie.getDatabaseNames())
 initDatabaseEnumerator((Dexie as any as DexieConstructor).dependencies.indexedDB);

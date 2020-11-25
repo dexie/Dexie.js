@@ -42,7 +42,7 @@ import { Middleware, DexieStacks } from '../../public/types/middleware';
 import { virtualIndexMiddleware } from '../../dbcore/virtual-index-middleware';
 import { hooksMiddleware } from '../../hooks/hooks-middleware';
 import { IndexableType } from '../../public';
-import { observabilityMiddleware } from '../live-query/observability-middleware';
+import { observabilityMiddleware } from '../../live-query/observability-middleware';
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -207,9 +207,6 @@ export class Dexie implements IDexie {
     this.use(virtualIndexMiddleware);
     this.use(hooksMiddleware);
     this.use(observabilityMiddleware);
-
-    // Call all enablers
-    (Dexie as any as DexieConstructor).enablers.forEach(enabler => enabler(this));
 
     // Call each addon:
     addons.forEach(addon => addon(this));

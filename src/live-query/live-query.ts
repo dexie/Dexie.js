@@ -1,18 +1,18 @@
-import { isAsyncFunction, keys } from "../../functions/utils";
-import { globalEvents } from "../../globals/global-events";
+import { isAsyncFunction, keys } from "../functions/utils";
+import { globalEvents } from "../globals/global-events";
 import {
   decrementExpectedAwaits,
   incrementExpectedAwaits,
   newScope,
   PSD,
   usePSD,
-} from "../../helpers/promise";
-import { ObservabilitySet } from "../../public/types/db-events";
+} from "../helpers/promise";
+import { ObservabilitySet } from "../public/types/db-events";
 import {
   Observable as IObservable,
   Subscription,
-} from "../../public/types/observable";
-import { Observable } from "../observable/observable";
+} from "../public/types/observable";
+import { Observable } from "../classes/observable/observable";
 import { extendObservabilitySet } from './extend-observability-set';
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
