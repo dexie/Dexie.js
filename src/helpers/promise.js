@@ -3,7 +3,7 @@
  * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/LICENSE-2.0
  */
 import {tryCatch, props, setProp, _global,
-    getPropertyDescriptor, getArrayOf, extend} from '../functions/utils';
+    getPropertyDescriptor, getArrayOf, extend, getProto} from '../functions/utils';
 import {nop, callBoth, mirror} from '../functions/chaining-functions';
 import {debug, prettyStack, getErrorWithStack} from './debug';
 import {exceptions} from '../errors';
@@ -46,12 +46,12 @@ const
         (()=>{
             let globalP = Promise.resolve();
             if (typeof crypto === 'undefined' || !crypto.subtle)
-                return [globalP, globalP.__proto__, globalP];
+                return [globalP, getProto(globalP), globalP];
             // Generate a native promise (as window.Promise may have been patched)
             const nativeP = crypto.subtle.digest("SHA-512", new Uint8Array([0]));
             return [
                 nativeP,
-                nativeP.__proto__,
+                getProto(nativeP),
                 globalP
             ];
         })(),
