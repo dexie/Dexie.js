@@ -18,7 +18,7 @@ export function extendObservabilitySet(
             targetTableSet[tableName] = true;
           } else if (newPart.keys) {
             const newTargetPart = (targetTableSet[tableName] = {
-              keys: targetPart.keys.concat(newPart.keys),
+              keys: (targetPart.keys || []).concat(newPart.keys),
             } as typeof targetPart);
             const targetIndexes = targetPart.indexes;
             const newIndexes = newPart.indexes;
