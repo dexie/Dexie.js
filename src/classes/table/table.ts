@@ -305,17 +305,29 @@ export class Table implements ITable<any, IndexableType> {
    * http://dexie.org/docs/Table/Table.update()
    * 
    **/
-  update(keyOrObject, modifications: { [keyPath: string]: any; }): PromiseExtended<number> {
-    if (typeof modifications !== 'object' || isArray(modifications))
-      throw new exceptions.InvalidArgument("Modifications must be an object.");
+  update(keyOrObject, modifications: { [keyPath: string]: any; } | ((obj: any, ctx:{value: any, primKey: IndexableType}) => void | boolean)): PromiseExtended<number> {
     if (typeof keyOrObject === 'object' && !isArray(keyOrObject)) {
-      // object to modify. Also modify given object with the modifications:
-      keys(modifications).forEach(keyPath => {
-        setByKeyPath(keyOrObject, keyPath, modifications[keyPath]);
-      });
       const key = getByKeyPath(keyOrObject, this.schema.primKey.keyPath);
       if (key === undefined) return rejection(new exceptions.InvalidArgument(
         "Given object does not contain its primary key"));
+      // object to modify. Also modify given object with the modifications:
+      // This part should be here for backward compatibility.
+      // If ever feeling too bad about mutating given object, please wait to a new major before removing it,
+      // and document the change thoroughly.
+      try {
+        if (typeof modifications !== "function") {
+          keys(modifications).forEach(keyPath => {
+            setByKeyPath(keyOrObject, keyPath, modifications[keyPath]);
+          });
+        } else {
+          // Now since we support function argument, we should have a similar behavior here as well
+          // (as long as we do this mutability stuff on the given object)
+          modifications(keyOrObject, {value: keyOrObject, primKey: key});
+        }
+      } catch {
+        // Maybe given object was frozen.
+        // This part is not essential. Just move on as nothing happened...
+      }
       return this.where(":id").equals(key).modify(modifications);
     } else {
       // key to modify
