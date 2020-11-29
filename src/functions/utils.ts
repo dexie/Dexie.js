@@ -198,21 +198,32 @@ const intrinsicTypeNames =
 const intrinsicTypes = intrinsicTypeNames.map(t=>_global[t]);
 const intrinsicTypeNameSet = arrayToObject(intrinsicTypeNames, x=>[x,true]);
 
+let map: null | Map<any,any> = null;
 export function deepClone<T>(any: T): T {
+    map = typeof Map !== 'undefined' && new Map();
+    const rv = innerDeepClone(any);
+    map = null;
+    return rv;
+}
+
+function innerDeepClone<T>(any: T): T {
     if (!any || typeof any !== 'object') return any;
-    var rv;
+    let rv = map && map.get(any); // Resolve circular references
+    if (rv) return rv;
     if (isArray(any)) {
         rv = [];
+        map && map.set(any, rv);
         for (var i = 0, l = any.length; i < l; ++i) {
-            rv.push(deepClone(any[i]));
+            rv.push(innerDeepClone(any[i]));
         }
     } else if (intrinsicTypes.indexOf(any.constructor) >= 0) {
         rv = any;
     } else {
         rv = any.constructor ? Object.create(any.constructor.prototype) : {};
+        map && map.set(any, rv);
         for (var prop in any) {
             if (hasOwn(any, prop)) {
-                rv[prop] = deepClone(any[prop]);
+                rv[prop] = innerDeepClone(any[prop]);
             }
         }
     }
