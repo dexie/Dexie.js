@@ -5,7 +5,7 @@ import { deepEqual } from './tests-table';
 
 const db = new Dexie("TestLiveQuery");
 db.version(2).stores({
-    items: "id",
+    items: "id, name",
     foo: "++id"
 });
 
@@ -45,19 +45,50 @@ promisedTest("txcommitted event", async ()=>{
     await db.items.add({id: 4, name: "aiwo1"});
     await db.items.add({id: 7, name: "kjlj"});
     await db.foo.add({name: "jkll"});
+    await db.items.update(1, {name: "A"});
   });
-  while (!os.TestLiveQuery || !os.TestLiveQuery.items || os.TestLiveQuery.items.keys.indexOf(4) === -1) {
+  while (!os.TestLiveQuery || !os.TestLiveQuery.items || !os.TestLiveQuery.items.keys.some(([id]) => id === 4)) {
     // When Dexie.Observable is active, we might see intermediate transactions taking place
     // before our transaction.
     signal = new Signal();
     await signal.promise;
   }
   ok(!!os.TestLiveQuery, "Got changes in our table name TestLiveQuery");
-  const itemsChanges = os.TestLiveQuery.items;
+  let itemsChanges = os.TestLiveQuery.items;
   ok(itemsChanges, "Got changes for items table");
-  deepEqual(itemsChanges.keys, [4, 7], "Item changes on concattenated keys");
-  const fooChanges = os.TestLiveQuery.foo;
+  deepEqual(itemsChanges.keys, [[4], [7], [1]], "Item changes on concattenated keys");
+  deepEqual(itemsChanges.indexes, {name: [["aiwo1"],["kjlj"],["A"]]}, "Index changes present");
+
+  // Foo changes (auto-incremented id)
+  let fooChanges = os.TestLiveQuery.foo;
   ok(fooChanges, "Got changes for foo table");
+
+  os = {};
+  let fooIds = await db.foo.toCollection().primaryKeys();
+  await db.transaction('rw', db.items, db.foo, async ()=>{
+    await db.items.update(4, {name: "aiwo2"});
+    await db.foo.where('id').between(0, 1000).delete();
+  });
+  while (!os.TestLiveQuery || !os.TestLiveQuery.items || !os.TestLiveQuery.items.keys.some(([id]) => id === 4)) {
+    // When Dexie.Observable is active, we might see intermediate transactions taking place
+    // before our transaction.
+    signal = new Signal();
+    await signal.promise;
+  }
+  itemsChanges = os.TestLiveQuery.items;
+  deepEqual(itemsChanges.keys, [[4]], "Item 4 was updated");
+  deepEqual(itemsChanges.indexes, {name: [["aiwo1"], ["aiwo2"]]});
+
+  fooChanges = os.TestLiveQuery.foo;
+  ok(!!fooChanges, "Foo table changed");
+  if (fooChanges.keys[0].length > 1) {
+    // Without addons:
+    deepEqual(fooChanges.keys, [[0, 1000]], "Got a range update of foo keys 0..1000");
+  } else {
+    // With hooks / addons or browser workarounds:
+    deepEqual(fooChanges, fooIds.map(id => [id]), "Got individual delete updates of foo keys ", fooIds.join(','));
+  }
+
   Dexie.on('txcommitted').unsubscribe(txCommitted);
 });
 

@@ -34,8 +34,11 @@ export interface DbEvents extends DexieEventSet {
 export type ObservabilitySet = {
   [dbName: string]: {
     [tableName: string]: true | {
-      cmp?: (a: any, b: any) => number,
-      keys: any[]
+      cmp?: (a: any, b: any) => number;
+      keys?: Array<[any] | [any, any]>;
+      indexes?: true | {
+        [index: string]: Array<[any] | [any, any]>
+      }
     }
   }
 };

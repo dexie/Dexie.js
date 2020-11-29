@@ -43,6 +43,7 @@ import { virtualIndexMiddleware } from '../../dbcore/virtual-index-middleware';
 import { hooksMiddleware } from '../../hooks/hooks-middleware';
 import { IndexableType } from '../../public';
 import { observabilityMiddleware } from '../../live-query/observability-middleware';
+import { cacheExistingValuesMiddleware } from '../../dbcore/cache-existing-values-middleware';
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -207,6 +208,7 @@ export class Dexie implements IDexie {
     this.use(virtualIndexMiddleware);
     this.use(hooksMiddleware);
     this.use(observabilityMiddleware);
+    this.use(cacheExistingValuesMiddleware);
 
     // Call each addon:
     addons.forEach(addon => addon(this));

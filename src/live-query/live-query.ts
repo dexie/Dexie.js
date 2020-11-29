@@ -13,7 +13,7 @@ import {
   Subscription,
 } from "../public/types/observable";
 import { Observable } from "../classes/observable/observable";
-import { extendObservabilitySet } from './extend-observability-set';
+import { extendObservabilitySet } from "./extend-observability-set";
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
   return new Observable<T>(({ start, next, error }) => {
@@ -72,18 +72,28 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
               if (mutTable) return true;
               else continue;
             }
+            if (!mutTable) continue;
+            const obsIndexes = obsTable.indexes,
+              mutIndexes = mutTable.indexes;
+            if (obsIndexes && mutIndexes) {
+              if (obsIndexes === true || mutIndexes === true) {
+                return true;
+              }
+              for (const idxName of keys(mutIndexes)) {
+                if (
+                  obsIndexes[idxName] &&
+                  hasOverlappingRanges(
+                    obsTable.cmp,
+                    obsIndexes[idxName],
+                    obsIndexes[idxName]
+                  )
+                ) {
+                  return true;
+                }
+              }
+            }
             if (
-              mutTable &&
-              mutTable.keys &&
-              obsTable.keys.some((key) =>
-                mutTable.keys.some((mKey) => {
-                  try {
-                    return obsTable.cmp!(key, mKey) === 0;
-                  } catch (_) {
-                    return false;
-                  }
-                })
-              )
+              hasOverlappingRanges(obsTable.cmp, obsTable.keys, mutTable.keys)
             ) {
               return true;
             }
@@ -91,6 +101,20 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         }
       }
       return false;
+    }
+
+    function hasOverlappingRanges(
+      cmp: (a: any, b: any) => number,
+      rangeSet1: Array<[any] | [any, any]>,
+      rangeSet2: Array<[any] | [any, any]>
+    ) {
+      return rangeSet1.some((range1) =>
+        rangeSet2.some(
+          (range2) =>
+            cmp(range2[0], range1[range1.length - 1]) <= 0 &&
+            cmp(range2[range2.length - 1], range1[0]) >= 0
+        )
+      );
     }
 
     const mutationListener = (parts: ObservabilitySet) => {

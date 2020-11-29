@@ -13,9 +13,10 @@ import { nop } from '../functions/chaining-functions';
 import { getObjectDiff, hasOwn, setByKeyPath } from '../functions/utils';
 import { PSD } from '../helpers/promise';
 //import { LockableTableMiddleware } from '../dbcore/lockable-table-middleware';
-import { getEffectiveKeys, getExistingValues } from '../dbcore/get-effective-keys';
+import { getEffectiveKeys } from '../dbcore/get-effective-keys';
 import { Middleware } from '../public/types/middleware';
 import { Transaction } from '../classes/transaction';
+import { getExistingValues } from '../dbcore/cache-existing-values-middleware';
 
 export const hooksMiddleware: Middleware<DBCore>  = {
   stack: "dbcore",
@@ -63,7 +64,7 @@ export const hooksMiddleware: Middleware<DBCore>  = {
             if (req.type !== 'delete') req.values = [...req.values];
             if (req.keys) req.keys = [...req.keys];
   
-            return getExistingValues(downTable, req, keys).then (existingValues => {
+            return getExistingValues(downCore.cmp, downTable, req, keys).then (existingValues => {
               const contexts = keys.map((key, i) => {
                 const existingValue = existingValues[i];
                 const ctx = { onerror: null, onsuccess: null };
