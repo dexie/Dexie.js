@@ -484,7 +484,7 @@ export class Collection implements ICollection {
 
       const coreTable = ctx.table.core;
       const {outbound, extractKey} = coreTable.schema.primaryKey;
-      const limit = this.db._options.modifyChunkSize || 2000;
+      const limit = this.db._options.modifyChunkSize || 200;
       const {cmp} = this.db.core;
       const totalFailures = [];
       let successCount = 0;
