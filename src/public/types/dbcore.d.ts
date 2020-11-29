@@ -67,6 +67,7 @@ export interface DBCoreDeleteRangeRequest {
 export interface DBCoreGetManyRequest {
   trans: DBCoreTransaction;
   keys: any[];
+  cache?: "immutable" | "clone"
 }
 
 export interface DBCoreGetRequest {

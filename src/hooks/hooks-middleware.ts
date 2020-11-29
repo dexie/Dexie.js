@@ -7,7 +7,7 @@ import {
   DBCorePutRequest,
   DBCoreDeleteRequest,
   DBCoreTransaction,
-  DBCoreKeyRange,
+  DBCoreKeyRange
 } from "../public/types/dbcore";
 import { nop } from '../functions/chaining-functions';
 import { getObjectDiff, hasOwn, setByKeyPath } from '../functions/utils';
@@ -16,7 +16,6 @@ import { PSD } from '../helpers/promise';
 import { getEffectiveKeys } from '../dbcore/get-effective-keys';
 import { Middleware } from '../public/types/middleware';
 import { Transaction } from '../classes/transaction';
-import { getExistingValues } from '../dbcore/cache-existing-values-middleware';
 
 export const hooksMiddleware: Middleware<DBCore>  = {
   stack: "dbcore",
@@ -59,12 +58,12 @@ export const hooksMiddleware: Middleware<DBCore>  = {
             if (!keys) throw new Error("Keys missing");
             // Clone Request and set keys arg
             req = req.type === 'add' || req.type === 'put' ?
-              {...req, keys, wantResults: true} : // Tell lower layer to deliver results. Hooks onsuccess needs it.
+              {...req, keys} :
               {...req};
             if (req.type !== 'delete') req.values = [...req.values];
             if (req.keys) req.keys = [...req.keys];
   
-            return getExistingValues(downCore.cmp, downTable, req, keys).then (existingValues => {
+            return getExistingValues(downTable, req, keys).then (existingValues => {
               const contexts = keys.map((key, i) => {
                 const existingValue = existingValues[i];
                 const ctx = { onerror: null, onsuccess: null };
@@ -150,3 +149,13 @@ export const hooksMiddleware: Middleware<DBCore>  = {
     },
   }) as DBCore
 };
+
+function getExistingValues(
+  table: DBCoreTable,
+  req: DBCoreAddRequest | DBCorePutRequest | DBCoreDeleteRequest,
+  effectiveKeys: any[]
+) {
+  return req.type === "add"
+    ? Promise.resolve(new Array<any>(req.values.length))
+    : table.getMany({ trans: req.trans, keys: effectiveKeys, cache: "immutable" });
+}
