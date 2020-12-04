@@ -2,9 +2,9 @@ import { deepClone } from "../functions/utils";
 import { DBCore } from "../public/types/dbcore";
 import { Middleware } from "../public/types/middleware";
 import Promise from "../helpers/promise";
+import { cmp } from '../functions/cmp';
 
 export function getFromTransactionCache(
-  cmp: (a: any, b: any) => number,
   keys: any[],
   cache: { keys: any[]; values: any[] } | undefined | null,
   clone?: boolean
@@ -42,7 +42,6 @@ export const cacheExistingValuesMiddleware: Middleware<DBCore> = {
               return table.getMany(req);
             }
             const cachedResult = getFromTransactionCache(
-              core.cmp,
               req.keys,
               req.trans["_cache"],
               req.cache === "clone"

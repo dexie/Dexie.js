@@ -1,6 +1,7 @@
 import { DexieEventSet } from "./dexie-event-set";
 import { DexieEvent } from "./dexie-event";
 import { Transaction } from "./transaction";
+import { SimpleRange } from "./simple-range";
 
 export interface DexieOnReadyEvent {
   subscribe(fn: () => any, bSticky: boolean): void;
@@ -34,10 +35,9 @@ export interface DbEvents extends DexieEventSet {
 export type ObservabilitySet = {
   [dbName: string]: {
     [tableName: string]: true | {
-      cmp?: (a: any, b: any) => number;
-      keys?: Array<[any] | [any, any]>;
+      keys?: SimpleRange[];
       indexes?: true | {
-        [index: string]: Array<[any] | [any, any]>
+        [index: string]: SimpleRange[]
       }
     }
   }

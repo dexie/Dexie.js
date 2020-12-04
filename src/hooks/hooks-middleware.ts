@@ -156,6 +156,6 @@ function getExistingValues(
   effectiveKeys: any[]
 ) {
   return req.type === "add"
-    ? Promise.resolve(new Array<any>(req.values.length))
+    ? Promise.resolve([])
     : table.getMany({ trans: req.trans, keys: effectiveKeys, cache: "immutable" });
 }

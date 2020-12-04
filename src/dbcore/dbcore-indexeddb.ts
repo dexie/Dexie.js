@@ -17,7 +17,6 @@ import { eventRejectHandler, preventDefault } from '../functions/event-wrappers'
 import { wrap } from '../helpers/promise';
 import { getMaxKey } from '../functions/quirks';
 import { getKeyExtractor } from './get-key-extractor';
-import { getEffectiveKeys } from './get-effective-keys';
 
 export function arrayify<T>(arrayLike: {length: number, [index: number]: T}): T[] {
   return [].slice.call(arrayLike);
