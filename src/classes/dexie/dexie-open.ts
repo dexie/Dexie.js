@@ -37,15 +37,13 @@ export function dexieOpen (db: Dexie) {
       // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
       
       // If no API, throw!
-      if (!indexedDB) throw new exceptions.MissingAPI(
-          "indexedDB API not found. If using IE10+, make sure to run your code on a server URL "+
-          "(not locally). If using old Safari versions, make sure to include indexedDB polyfill.");
+      if (!indexedDB) throw new exceptions.MissingAPI();
       const dbName = db.name;
       
       const req = state.autoSchema ?
         indexedDB.open(dbName) :
         indexedDB.open(dbName, Math.round(db.verno * 10));
-      if (!req) throw new exceptions.MissingAPI("IndexedDB API not available"); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
+      if (!req) throw new exceptions.MissingAPI(); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
       req.onerror = eventRejectHandler(reject);
       req.onblocked = wrap(db._fireOnBlocked);
       req.onupgradeneeded = wrap (e => {

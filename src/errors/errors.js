@@ -43,7 +43,8 @@ var defaultTexts = {
     VersionChanged: "Database version changed by other database connection",
     DatabaseClosed: "Database has been closed",
     Abort: "Transaction aborted",
-    TransactionInactive: "Transaction has already completed or failed"
+    TransactionInactive: "Transaction has already completed or failed",
+    MissingAPI: "IndexedDB API missing. Please visit https://tinyurl.com/y2uuvskb"
 };
 
 //

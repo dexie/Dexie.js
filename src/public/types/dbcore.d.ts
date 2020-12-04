@@ -147,8 +147,8 @@ export interface DBCoreIndex {
   readonly unique?: boolean;
   /** Whether index is multiEntry. */
   readonly multiEntry?: boolean;
-  /** Extract (using keyPath) a key from given value (object) */
-  readonly extractKey: (value: any) => any;
+  /** Extract (using keyPath) a key from given value (object). Null for outbound primary keys */
+  readonly extractKey: ((value: any) => any) | null;
 }
 
 export interface DBCore {

@@ -14,6 +14,8 @@ import {
 } from "../public/types/observable";
 import { Observable } from "../classes/observable/observable";
 import { extendObservabilitySet } from "./extend-observability-set";
+import { rangesOverlap } from './ranges-overlap';
+import { SimpleRange } from '../public/types/simple-range';
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
   return new Observable<T>(({ start, next, error }) => {
@@ -83,9 +85,8 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
                 if (
                   obsIndexes[idxName] &&
                   hasOverlappingRanges(
-                    obsTable.cmp,
                     obsIndexes[idxName],
-                    obsIndexes[idxName]
+                    mutIndexes[idxName]
                   )
                 ) {
                   return true;
@@ -93,7 +94,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
               }
             }
             if (
-              hasOverlappingRanges(obsTable.cmp, obsTable.keys, mutTable.keys)
+              hasOverlappingRanges(obsTable.keys, mutTable.keys)
             ) {
               return true;
             }
@@ -104,15 +105,12 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     }
 
     function hasOverlappingRanges(
-      cmp: (a: any, b: any) => number,
-      rangeSet1: Array<[any] | [any, any]>,
-      rangeSet2: Array<[any] | [any, any]>
+      rangeSet1: SimpleRange[],
+      rangeSet2: SimpleRange[]
     ) {
       return rangeSet1.some((range1) =>
         rangeSet2.some(
-          (range2) =>
-            cmp(range2[0], range1[range1.length - 1]) <= 0 &&
-            cmp(range2[range2.length - 1], range1[0]) >= 0
+          (range2) => rangesOverlap(range1, range2)
         )
       );
     }
