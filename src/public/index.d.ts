@@ -23,6 +23,7 @@ import { Table } from './types/table';
 import { Collection } from './types/collection';
 import { PromiseExtended } from './types/promise-extended';
 import { Observable } from './types/observable';
+import { RangeBtree, RangeSetConstructor } from './types/rangeset';
 
 // Alias of Table and Collection in order to be able to refer them from module below...
 interface _Table<T, TKey> extends Table<T, TKey> {}
@@ -48,7 +49,12 @@ export { IndexableType } from './types/indexable-type';
 */
 export { Dexie };
 export function liveQuery<T>(querier: () => T | Promise<T>): Observable<T>;
-
+export function mergeRanges(target: RangeBtree, newSet: RangeBtree): void;
+export function rangesOverlap(
+  rangeSet1: RangeBtree,
+  rangeSet2: RangeBtree
+): boolean;
+declare var RangeSet: RangeSetConstructor;
 /** Exporting 'Dexie' as the default export.
  **/
 export default Dexie;

@@ -13,12 +13,12 @@ if (typeof Promise !== 'undefined' && !_global.Promise){
 }
 export { _global }
 
-export function extend(obj, extension) {
-    if (typeof extension !== 'object') return obj;
+export function extend<T extends object,X extends object>(obj: T, extension: X): T & X  {
+    if (typeof extension !== 'object') return obj as T & X;
     keys(extension).forEach(function (key) {
         obj[key] = extension[key];
     });
-    return obj;
+    return obj as T & X;
 }
 
 export const getProto = Object.getPrototypeOf;
@@ -219,7 +219,8 @@ function innerDeepClone<T>(any: T): T {
     } else if (intrinsicTypes.indexOf(any.constructor) >= 0) {
         rv = any;
     } else {
-        rv = any.constructor ? Object.create(any.constructor.prototype) : {};
+        const proto = getProto(any);
+        rv = proto === Object.prototype ? {} : Object.create(proto);
         circularRefs && circularRefs.set(any, rv);
         for (var prop in any) {
             if (hasOwn(any, prop)) {
@@ -285,8 +286,10 @@ export const getValueOf = (val:any, type: string) =>
 }
 
 // If first argument is iterable or array-like, return it as an array
-export const iteratorSymbol = typeof Symbol !== 'undefined' && Symbol.iterator;
-export const getIteratorOf = iteratorSymbol ? function(x) {
+export const iteratorSymbol = typeof Symbol !== 'undefined' ?
+    Symbol.iterator :
+    '@@iterator';
+export const getIteratorOf = typeof iteratorSymbol === "symbol" ? function(x) {
     var i;
     return x != null && (i = x[iteratorSymbol]) && i.apply(x);
 } : function () { return null; };

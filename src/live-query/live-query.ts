@@ -14,8 +14,7 @@ import {
 } from "../public/types/observable";
 import { Observable } from "../classes/observable/observable";
 import { extendObservabilitySet } from "./extend-observability-set";
-import { rangesOverlap } from './ranges-overlap';
-import { SimpleRange } from '../public/types/simple-range';
+import { rangesOverlap } from "../helpers/rangeset";
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
   return new Observable<T>(({ start, next, error }) => {
@@ -59,6 +58,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       startedListening = false;
 
     function shouldNotify() {
+      debugger;
       for (const db of keys(currentObs)) {
         const mutDb = accumMuts[db];
         if (mutDb) {
@@ -84,35 +84,19 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
               for (const idxName of keys(mutIndexes)) {
                 if (
                   obsIndexes[idxName] &&
-                  hasOverlappingRanges(
-                    obsIndexes[idxName],
-                    mutIndexes[idxName]
-                  )
+                  rangesOverlap(obsIndexes[idxName], mutIndexes[idxName])
                 ) {
                   return true;
                 }
               }
             }
-            if (
-              hasOverlappingRanges(obsTable.keys, mutTable.keys)
-            ) {
+            if (rangesOverlap(obsTable.keys, mutTable.keys)) {
               return true;
             }
           }
         }
       }
       return false;
-    }
-
-    function hasOverlappingRanges(
-      rangeSet1: SimpleRange[],
-      rangeSet2: SimpleRange[]
-    ) {
-      return rangeSet1.some((range1) =>
-        rangeSet2.some(
-          (range2) => rangesOverlap(range1, range2)
-        )
-      );
     }
 
     const mutationListener = (parts: ObservabilitySet) => {
