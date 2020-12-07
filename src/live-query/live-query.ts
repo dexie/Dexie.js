@@ -58,7 +58,6 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       startedListening = false;
 
     function shouldNotify() {
-      debugger;
       for (const db of keys(currentObs)) {
         const mutDb = accumMuts[db];
         if (mutDb) {
