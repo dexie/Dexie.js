@@ -99,7 +99,7 @@ promisedTest("txcommitted event", async ()=>{
     deepEqual(fooChanges.keys, rangeSet([[0, 1000]]), "Got a range update of foo keys 0..1000");
   } else {
     // With hooks / addons or browser workarounds:
-    deepEqual(fooChanges, rangeSet(fooIds.map(id => [id])), "Got individual delete updates of foo keys ", fooIds.join(','));
+    deepEqual(fooChanges.keys, rangeSet(fooIds.map(id => [id])), "Got individual delete updates of foo keys ", fooIds.join(','));
   }
 
   Dexie.on('txcommitted').unsubscribe(txCommitted);
