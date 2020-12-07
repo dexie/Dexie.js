@@ -20,5 +20,6 @@ DexiePromise.rejectionMapper = mapError;
 // Let the async stack filter focus on app code and filter away frames from dexie.min.js:
 Debug.setDebug(Debug.debug, dexieStackFrameFilter);
 
+export { RangeSet, mergeRanges, rangesOverlap } from "./helpers/rangeset";
 export { Dexie, liveQuery }; // Comply with public/index.d.ts.
 export default Dexie;

@@ -218,13 +218,13 @@ props(Dexie, {
   // https://github.com/dfahlander/Dexie.js/issues/186
   // typescript compiler tsc in mode ts-->es5 & commonJS, will expect require() to return
   // x.default. Workaround: Set Dexie.default = Dexie.
-  default: Dexie,
+  // default: Dexie, // Commented because solved in index-umd.ts instead.
   // Make it possible to import {Dexie} (non-default import)
   // Reason 1: May switch to that in future.
   // Reason 2: We declare it both default and named exported in d.ts to make it possible
   // to let addons extend the Dexie interface with Typescript 2.1 (works only when explicitely
   // exporting the symbol, not just default exporting)
-  Dexie: Dexie
+  // Dexie: Dexie // Commented because solved in index-umd.ts instead.
 });
 
 Dexie.maxKey = getMaxKey(Dexie.dependencies.IDBKeyRange);

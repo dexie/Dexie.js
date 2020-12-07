@@ -1,7 +1,8 @@
 import { getFromTransactionCache } from "../dbcore/cache-existing-values-middleware";
-import { cmp } from '../functions/cmp';
+import { cmp } from "../functions/cmp";
 import { isArray } from "../functions/utils";
 import { PSD } from "../helpers/promise";
+import { RangeSet } from "../helpers/rangeset";
 import { ObservabilitySet } from "../public/types/db-events";
 import {
   DBCore,
@@ -17,7 +18,7 @@ import {
   DBCoreTransaction,
 } from "../public/types/dbcore";
 import { Middleware } from "../public/types/middleware";
-import { SimpleRange } from '../public/types/simple-range';
+import { RangeBtree } from "../public/types/rangeset";
 import { extendObservabilitySet } from "./extend-observability-set";
 
 export const observabilityMiddleware: Middleware<DBCore> = {
@@ -66,7 +67,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                 if (type !== "delete") keys = res.results;
                 // individual keys (add put or delete)
                 changeSpec = {
-                  keys: keys.map((key) => [key]),
+                  keys: new RangeSet().addKeys(keys),
                 };
                 // Only get oldObjs if they have been cached recently
                 // (This applies to Collection.modify() only, but also if updating/deleting hooks have subscribers)
@@ -80,7 +81,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
               } else if (keys) {
                 // deleteRange. keys is a DBCoreKeyRange objects. Transform it to [from,to]-style range.
                 changeSpec = {
-                  keys: [[keys.lower, keys.upper]],
+                  keys: new RangeSet(keys.lower, keys.upper),
                   indexes: true, // As we can't know deleted index ranges, mark index-based subscriptions must trigger.
                 };
               }
@@ -92,18 +93,20 @@ export const observabilityMiddleware: Middleware<DBCore> = {
         };
 
         const getKey = (req: DBCoreGetRequest) =>
-          ({ keys: [[req.key]] } as ObservabilitySet[string][string]);
+          ({ keys: new RangeSet(req.key) } as ObservabilitySet[string][string]);
         const getKeys = (req: DBCoreGetManyRequest) =>
           ({
-            keys: req.keys.map((key) => [key]),
+            keys: new RangeSet().addKeys(req.keys),
           } as ObservabilitySet[string][string]);
         const getRange = ({
           query: { index, range },
         }: DBCoreQueryRequest | DBCoreCountRequest | DBCoreOpenCursorRequest) =>
           (index.isPrimaryKey
-            ? { keys: [[range.lower, range.upper]] }
+            ? { keys: new RangeSet(range.lower, range.upper) }
             : {
-                indexes: { [index.name]: [[range.lower, range.upper]] },
+                indexes: {
+                  [index.name]: new RangeSet(range.lower, range.upper),
+                },
               }) as ObservabilitySet[string][string];
 
         const readSubscribers: [
@@ -151,10 +154,12 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                       outbound
                         ? true // If outbound, we can't use extractKey to map what keys to observe
                         : {
-                          keys: (res as DBCoreQueryResponse).result.map(
-                            extractKey
-                          ),
-                        }
+                            keys: new RangeSet().addKeys(
+                              (res as DBCoreQueryResponse).result.map(
+                                extractKey
+                              )
+                            ),
+                          }
                     );
                   } else if (method === "openCursor") {
                     const cursor: DBCoreCursor | null = res;
@@ -163,8 +168,9 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                       Object.create(cursor, {
                         value: {
                           get: () => {
+                            //subscr.
                             extendTableObservation(subscr, {
-                              keys: [[cursor.key]],
+                              keys: new RangeSet(cursor.key),
                             });
                             return cursor.value;
                           },
@@ -190,31 +196,24 @@ function getAffectedIndexes(
   oldObjs: any[] | undefined,
   newObjs: any[] | undefined
 ) {
-  const result: { [indexName: string]: SimpleRange[] } = {};
+  const result: { [indexName: string]: RangeSet } = {};
   schema.indexes.forEach((ix) => {
     function extractKey(val: any) {
-      const key = val != null ? ix.extractKey(val) : null;
-      if (key == null) return null;
-      try {
-        cmp(key, 0);
-        return key;
-      } catch {
-        return null;
-      }
+      return val != null ? ix.extractKey(val) : null;
     }
     if (ix.isPrimaryKey) return;
     (oldObjs || newObjs).forEach((_, i) => {
       const oldObj = oldObjs && oldObjs[i];
       const oldKey = extractKey(oldObj);
       const newKey = newObjs && extractKey(newObjs[i]);
-      const resultArray = result[ix.name] || (result[ix.name] = []);
+      const resultSet = result[ix.name] || (result[ix.name] = new RangeSet());
       if (oldKey != null) {
-        resultArray.push([oldKey]);
+        resultSet.addKey(oldKey);
         if (newKey != null && cmp(oldKey, newKey) !== 0) {
-          resultArray.push([newKey]);
+          resultSet.addKey(newKey);
         }
       } else if (newKey != null) {
-        resultArray.push([newKey]);
+        resultSet.addKey(newKey);
       }
     });
   });
