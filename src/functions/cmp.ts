@@ -9,7 +9,7 @@ export function cmp(a: IndexableType, b: IndexableType): number {
   if (!indexedDB) throw new exceptions.MissingAPI();
   _cmp = (a, b) => {
     try {
-      return indexedDB.cmp(a, b);
+      return a == null || b == null ? NaN : indexedDB.cmp(a, b);
     } catch {
       return NaN;
     }
