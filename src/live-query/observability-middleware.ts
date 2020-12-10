@@ -10,6 +10,8 @@ import {
   DBCoreCursor,
   DBCoreGetManyRequest,
   DBCoreGetRequest,
+  DBCoreIndex,
+  DBCoreKeyRange,
   DBCoreOpenCursorRequest,
   DBCoreQueryRequest,
   DBCoreQueryResponse,
@@ -18,7 +20,6 @@ import {
   DBCoreTransaction,
 } from "../public/types/dbcore";
 import { Middleware } from "../public/types/middleware";
-import { RangeBtree } from "../public/types/rangeset";
 import { extendObservabilitySet } from "./extend-observability-set";
 
 export const observabilityMiddleware: Middleware<DBCore> = {
@@ -32,16 +33,17 @@ export const observabilityMiddleware: Middleware<DBCore> = {
       table: (tableName) => {
         const table = core.table(tableName);
         const { schema } = table;
-        const {
-          primaryKey: { extractKey, outbound },
-        } = schema;
+        const { primaryKey } = schema;
+        const { extractKey, outbound } = primaryKey;
         const extendTableObservation = (
           target: ObservabilitySet,
           tableChanges: ObservabilitySet[string][string]
-        ) =>
+        ) => {
           extendObservabilitySet(target, {
             [dbName]: { [tableName]: tableChanges },
           });
+          return target[dbName][tableName];
+        };
 
         const tableClone: DBCoreTable = {
           ...table,
@@ -92,35 +94,36 @@ export const observabilityMiddleware: Middleware<DBCore> = {
           },
         };
 
-        const getKey = (req: DBCoreGetRequest) =>
-          ({ keys: new RangeSet(req.key) } as ObservabilitySet[string][string]);
-        const getKeys = (req: DBCoreGetManyRequest) =>
-          ({
-            keys: new RangeSet().addKeys(req.keys),
-          } as ObservabilitySet[string][string]);
+        const getKey = (req: DBCoreGetRequest) => [
+          primaryKey,
+          new RangeSet(req.key),
+        ];
+        const getKeys = (req: DBCoreGetManyRequest) => [
+          primaryKey,
+          new RangeSet().addKeys(req.keys),
+        ];
         const getRange = ({
           query: { index, range },
-        }: DBCoreQueryRequest | DBCoreCountRequest | DBCoreOpenCursorRequest) =>
-          (index.isPrimaryKey
-            ? { keys: new RangeSet(range.lower, range.upper) }
-            : {
-                indexes: {
-                  [index.name]: new RangeSet(range.lower, range.upper),
-                },
-              }) as ObservabilitySet[string][string];
+        }:
+          | DBCoreQueryRequest
+          | DBCoreCountRequest
+          | DBCoreOpenCursorRequest) => [
+          index,
+          new RangeSet(range.lower, range.upper),
+        ];
 
         const readSubscribers: [
           Exclude<keyof DBCoreTable, "name" | "schema" | "mutate">,
-          (req: any) => ObservabilitySet[string][string]
+          (req: any) => [DBCoreIndex, RangeSet]
         ][] = [
-          ["get", getKey],
-          ["getMany", getKeys],
-          ["count", getRange],
-          ["query", getRange],
-          ["openCursor", getRange],
+          ["get", getKey as (req: any) => [DBCoreIndex, RangeSet]],
+          ["getMany", getKeys as (req: any) => [DBCoreIndex, RangeSet]],
+          ["count", getRange as (req: any) => [DBCoreIndex, RangeSet]],
+          ["query", getRange as (req: any) => [DBCoreIndex, RangeSet]],
+          ["openCursor", getRange as (req: any) => [DBCoreIndex, RangeSet]],
         ];
 
-        readSubscribers.forEach(([method, getObservedRanges]) => {
+        readSubscribers.forEach(([method, getQueriedRanges]) => {
           tableClone[method] = function (
             req:
               | DBCoreGetRequest
@@ -135,52 +138,97 @@ export const observabilityMiddleware: Middleware<DBCore> = {
               // (The query is executed within a "liveQuery" zone)
               // Check whether the query applies to a certain set of ranges:
               // Track what we should be observing:
-
-              const observedRanges = getObservedRanges(req) as Exclude<
-                ObservabilitySet[string][string],
-                true // Exclude true from the type since neither getKey(), getKeys() nor getRange() returns that!
-              >;
-              extendTableObservation(subscr, observedRanges);
-
-              return table[method].apply(this, arguments).then((res) => {
-                if (
-                  (req as DBCoreQueryRequest | DBCoreOpenCursorRequest)
-                    .values && // Caller want's values, not just keys
-                  !observedRanges.keys // only indexes were tracked. Keys must always be tracked too!
-                ) {
-                  if (method === "query") {
-                    extendTableObservation(
-                      subscr,
-                      outbound
-                        ? true // If outbound, we can't use extractKey to map what keys to observe
-                        : {
-                            keys: new RangeSet().addKeys(
-                              (res as DBCoreQueryResponse).result.map(
-                                extractKey
-                              )
-                            ),
+              const [queriedIndex, queriedRanges] = getQueriedRanges(req);
+              const observationPart = extendTableObservation(subscr, {
+                keys: new RangeSet(),
+                indexes: {
+                  [queriedIndex.name || ""]: queriedRanges,
+                },
+              }) as
+                | true
+                | {
+                    keys: RangeSet;
+                    indexes: true | { [indexName: string]: RangeSet };
+                  };
+              if (observationPart !== true) {
+                // Still idea to track changes ...
+                // If observationPart would have been true, another query has been put making it impossible
+                // to track detailed changes.
+                if (method === "get" || method === "getMany") {
+                  // If getting specific keys, we should not only record the observed rangeset
+                  // but also the observed "keys" for the same reason as we record the results
+                  // of "query" and "openCursor" - in case a property of a retrieved object is
+                  // changed without the primary key being changed, we must wake up and re-
+                  // launch the query.
+                  observationPart.keys.add(queriedRanges);
+                } else {
+                  return table[method].apply(this, arguments).then((res) => {
+                    if (
+                      (req as DBCoreQueryRequest | DBCoreOpenCursorRequest)
+                        .values // Caller want's values, not just keys
+                    ) {
+                      if (method === "query") {
+                        if (outbound) {
+                          // If keys are outbound, we can't use extractKey to map what keys to observe.
+                          // On the other hand, if the query was put on the keys was based on keys query,
+                          // we can reuse that since it will cover the entire range of possible keys
+                          if (queriedIndex.isPrimaryKey) {
+                            observationPart.keys.add(queriedRanges);
+                          } else {
+                            // We've queried an index (like 'dateTime') on an outbound table
+                            // and retrieve a list of objects
+                            // from who we cannot know their primary keys.
+                            // There's no way to detect whether a mutation like
+                            // db.myOutboundTable.update(id, {name: "Foo"}) would affect us since
+                            // the "dateTime" index wouldn't be notified.
+                            // So we really need to mark this
+                            // entire table 'true' which means any mutation on it will re-launch our
+                            // query.
+                            extendTableObservation(subscr, true);
                           }
-                    );
-                  } else if (method === "openCursor") {
-                    const cursor: DBCoreCursor | null = res;
-                    return (
-                      cursor &&
-                      Object.create(cursor, {
-                        value: {
-                          get: () => {
-                            //subscr.
-                            extendTableObservation(subscr, {
-                              keys: new RangeSet(cursor.key),
-                            });
-                            return cursor.value;
-                          },
-                        },
-                      })
-                    );
-                  }
+                        } else {
+                          // We have inbound keys which makes it possible to know the primary keys
+                          // of all returned items.
+                          // Even though we're already observing the queried index- or key-range,
+                          // we must also get notified when something mutates that could affect
+                          // what would be returned in the results.
+                          // That's why we are observing each individual key of the result.
+                          // Use case:
+                          //  Query: db.friends.where('age').between(20, 30)
+                          //  Mutation: db.friends.update(id, {fooProp: "Foo"});
+                          // Age index doesn't change but the query has to be re-launched to get
+                          // the new version of the objects with the changed property on one of them.
+                          observationPart.keys.addKeys(
+                            (res as DBCoreQueryResponse).result.map(extractKey)
+                          );
+                        }
+                      } else if (method === "openCursor") {
+                        // Caller requests a cursor.
+                        // For the same reason as when method==="query", we only need to observe
+                        // those keys whose values are possibly used or rendered - which could
+                        // only happen on keys where they get the cursor's value.
+                        // For example if they put a query anyOf(), equalsIgnoreCase() etc,
+                        // that may use a cursor to be fulfilled, the cursor will not access
+                        // the value getter on every record the cursor lands on - only the ones
+                        // that match the algorithm-based query.
+                        const cursor: DBCoreCursor | null = res;
+                        return (
+                          cursor &&
+                          Object.create(cursor, {
+                            value: {
+                              get: () => {
+                                observationPart.keys.addKey(cursor.key);
+                                return cursor.value;
+                              },
+                            },
+                          })
+                        );
+                      }
+                    }
+                    return res;
+                  });
                 }
-                return res;
-              });
+              }
             }
             return table[method].apply(this, arguments);
           };
@@ -197,25 +245,22 @@ function getAffectedIndexes(
   newObjs: any[] | undefined
 ) {
   const result: { [indexName: string]: RangeSet } = {};
-  schema.indexes.forEach((ix) => {
-    function extractKey(val: any) {
-      return val != null ? ix.extractKey(val) : null;
+  function addAffectedIndex(ix: DBCoreIndex) {
+    function extractKey(obj: any) {
+      return obj != null ? ix.extractKey(obj) : null;
     }
-    if (ix.isPrimaryKey) return;
+    const ixName = ix.name || "";
     (oldObjs || newObjs).forEach((_, i) => {
-      const oldObj = oldObjs && oldObjs[i];
-      const oldKey = extractKey(oldObj);
+      const oldKey = oldObjs && extractKey(oldObjs[i]);
       const newKey = newObjs && extractKey(newObjs[i]);
-      const resultSet = result[ix.name] || (result[ix.name] = new RangeSet());
-      if (oldKey != null) {
-        resultSet.addKey(oldKey);
-        if (newKey != null && cmp(oldKey, newKey) !== 0) {
-          resultSet.addKey(newKey);
-        }
-      } else if (newKey != null) {
-        resultSet.addKey(newKey);
+      const resultSet = result[ixName] || (result[ixName] = new RangeSet());
+      if (cmp(oldKey, newKey) !== 0) {
+        oldKey && resultSet.addKey(oldKey);
+        newKey && resultSet.addKey(newKey);
       }
     });
-  });
+  }
+  addAffectedIndex(schema.primaryKey);
+  schema.indexes.forEach(addAffectedIndex);
   return result;
 }

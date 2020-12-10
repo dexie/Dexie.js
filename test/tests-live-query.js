@@ -1,7 +1,27 @@
 import Dexie, {liveQuery, rangesOverlap, RangeSet} from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
 import {resetDatabase, supports, promisedTest} from './dexie-unittest-utils';
-import { deepEqual } from './tests-table';
+import sortedJSON from "sorted-json";
+
+const db = new Dexie("TestLiveQuery");
+db.version(2).stores({
+    items: "id, name",
+    foo: "++id",
+    outbound: "++,name"
+});
+
+db.on('populate', ()=> {
+  db.items.bulkAdd([
+      {id: 1},
+      {id: 2},
+      {id: 3}
+  ]);
+  db.outbound.bulkAdd([
+    {num: 1, name: "A"},
+    {num: 2, name: "B"},
+    {num: 3, name: "C"}
+  ], [1, 2, 3]);
+});
 
 function rangeSet(ranges) {
   const set = new RangeSet();
@@ -15,19 +35,23 @@ function hasKey(set, key) {
   return rangesOverlap(set, new RangeSet(key))
 }
 
-const db = new Dexie("TestLiveQuery");
-db.version(2).stores({
-    items: "id, name",
-    foo: "++id"
-});
+function hasAllKeys(set, keys) {
+  keys.every(key => hasKey(set, key));
+}
 
-db.on('populate', ()=> {
-  db.items.bulkAdd([
-      {id: 1},
-      {id: 2},
-      {id: 3}
-  ]);
-});
+function objectify(map) {
+  const rv = {};
+  map.forEach((value, name) => {
+    rv[name] = value;
+  });
+  return rv;
+}
+
+export function deepEqual(actual, expected, description) {
+  actual = sortedJSON.sortify(actual, {sortArray: false});
+  expected = sortedJSON.sortify(expected, {sortArray: false});
+  equal(JSON.stringify(actual, null, 2), JSON.stringify(expected, null, 2), description);
+}
 
 class Signal {
   promise = new Promise(resolve => this.resolve = resolve);
@@ -70,7 +94,7 @@ promisedTest("txcommitted event", async ()=>{
   let itemsChanges = os.TestLiveQuery.items;
   ok(itemsChanges, "Got changes for items table");
   deepEqual(itemsChanges.keys, rangeSet([[4], [7], [1]]), "Item changes on concattenated keys");
-  deepEqual(itemsChanges.indexes, {name: rangeSet([["aiwo1"],["kjlj"],["A"]])}, "Index changes present");
+  deepEqual(itemsChanges.indexes, {"": rangeSet([[4],[7]]),name: rangeSet([["aiwo1"],["kjlj"],["A"]])}, "Index changes present");
 
   // Foo changes (auto-incremented id)
   let fooChanges = os.TestLiveQuery.foo;
@@ -89,8 +113,9 @@ promisedTest("txcommitted event", async ()=>{
     await signal.promise;
   }
   itemsChanges = os.TestLiveQuery.items;
-  deepEqual(itemsChanges.keys, rangeSet([[4]]), "Item 4 was updated");
-  deepEqual(itemsChanges.indexes, {name: rangeSet([["aiwo1"], ["aiwo2"]])});
+  ok(hasKey(itemsChanges.keys, 4), "Item 4 was updated");
+  ok(hasKey(itemsChanges.indexes.name, "aiwo1"), "Old value of name index were triggered");
+  ok(hasKey(itemsChanges.indexes.name, "aiwo2"), "New value of name index were triggered");
 
   fooChanges = os.TestLiveQuery.foo;
   ok(!!fooChanges, "Foo table changed");
@@ -198,4 +223,163 @@ promisedTest("subscribe and error occur", async ()=> {
   equal(result, "error", "The observable's error callback should have been called");
   ok(subscription.closed, "Subscription should have been closed after error has occurred");
   subscription.unsubscribe();
+});
+
+/* Use cases to cover:
+
+  Queries
+    get
+    getMany
+    query
+    queryKeys
+    openCursor
+    openKeyCursor
+    count
+    queryOutbound
+    queryOutboundByPKey
+    openCursorOutbound
+
+  Mutations
+    add
+    addAuto
+    update
+    delete
+    deleteRange
+ */
+
+let abbaKey = 0;
+const mutsAndExpects = [
+  // add
+  [
+    ()=>db.items.add({id: -1, name: "A"}),
+    {
+      get: [{id: 1}, {id: -1, name: "A"}],
+      query: [{id: -1, name: "A"}],
+      queryKeys: [-1],
+      openCursor: [],
+      openKeyCursor: ["A"],
+      count: 1
+    }
+  ],
+  // addAuto
+  [
+    ()=>db.outbound.add({name: "Abba"}).then(id=>abbaKey = id),
+    {
+      queryOutbound: [{name: "A", num: 1}, {name: "Abba"}]
+    }
+  ], [
+    ()=>db.outbound.bulkAdd([{name: "Benny"}, {name: "C"}], [-1, 0]),
+    {
+      queryOutboundByPKey: [{name: "Benny"}, {name: "C"}, {name: "A", num: 1}, {name: "B", num: 2}],
+      openCursorOutbound: ["B", "C", "C"]
+    },
+    ["queryOutbound"] // Limitation in outbound.toArray(): Don't know what keys to observe
+  ],
+  // update
+  [
+    ()=>db.outbound.update(abbaKey, {name: "Ceacar"}),
+    {
+      queryOutbound: [{name: "A", num: 1}]
+    },
+    ["openCursorOutbound"] // Why is this query triggered? Shouldn't be! BUGBUG!
+  ],
+  // add again
+  [
+    ()=>db.items.bulkAdd([{id: 4, name: "Abbot"},{id: 5, name: "Assot"},{id: 6, name: "Ambros"}]).then(lastId => {}),
+    {
+      query: [{id: -1, name: "A"}, {id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}, {id: 5, name: "Assot"}],
+      queryKeys: [-1, 4, 6, 5],
+      openCursor: [{id: 5, name: "Assot"}], // offset 3
+      openKeyCursor: ["A", "Abbot", "Ambros", "Assot"],
+      count: 4
+    }
+  ],
+  // delete:
+  [
+    ()=>db.transaction('rw', db.items, db.outbound, ()=>{
+      db.items.delete(-1);
+      db.outbound.delete(abbaKey);
+    }),
+    {
+      get: [{id: 1}, null],
+      query: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}, {id: 5, name: "Assot"}],
+      queryKeys: [4, 6, 5],
+      openCursor: [], // offset 3
+      openKeyCursor: ["Abbot", "Ambros", "Assot"],
+      count: 3
+    }, [
+      "openCursorOutbound", // Why?
+      "queryOutbound", // Limitation in outbound.toArray(): Don't know what keys to observe
+      "queryOutboundByPKey", // - " -
+      "getMany", // Why is this???!!!
+    ]
+  ],
+  // deleteRange: TODO this
+]
+
+promisedTest("Full use case matrix", async ()=>{
+  const queries = {
+    get: () => Promise.all(db.items.get(1), db.items.get(-1)),
+    getMany: () => db.items.bulkGet([1,2,3]),
+    query: () => db.items.where('name').startsWith("A").toArray(),
+    queryKeys: () => db.items.where('name').startsWith("A").primaryKeys(),
+    openCursor: () => db.items.where('name').startsWith("A").offset(3).toArray(),
+    openKeyCursor: () => db.items.where('name').startsWith("A").keys(),
+    count: () => db.items.where('name').startsWith("A").count(),
+    queryOutbound: () => db.outbound.where('name').startsWith("A").toArray(),
+    queryOutboundByPKey: () => db.outbound.where(':id').between(-1, 2, true, true).toArray(),
+    openCursorOutbound: () => db.outbound.where('name').anyOf("B", "C", "D").keys(),
+  };
+  const expectedInitialResults = {
+    get: [{id: 1}, undefined],
+    getMany: [{id: 1}, {id: 2}, {id: 3}],
+    query: [],
+    queryKeys: [],
+    openCursor: [],
+    openKeyCursor: [],
+    count: 0,
+    queryOutbound: [{num: 1, name: "A"}],
+    queryOutboundByPKey: [{num: 1, name: "A"}, {num: 2, name: "B"}],
+    openCursorOutbound: ["B", "C"]
+  }
+  let flyingNow = 0;
+  let signal = new Signal();
+  const actualResults = objectify(new Map(Object.keys(queries).map(name => [name, undefined])));
+  const observables = new Map(Object.keys(queries).map(name => [
+    name,
+    liveQuery(async () => {
+      ++flyingNow;
+      try {
+        const res = await queries[name]();
+        actualResults[name] = res;
+        return res;
+      } finally {
+        if (--flyingNow === 0) signal.resolve();
+      }
+    })
+  ]));
+
+  const subscriptions = Object.keys(queries).map(name => observables.get(name).subscribe({
+    next: res => {},
+    error: error => ok(false, ''+error)
+  }));
+  try {
+    await signal.promise;
+    deepEqual(actualResults, expectedInitialResults, "Initial results as expected");
+    let prevActual = Dexie.deepClone(actualResults);
+    for (const [mut, expects, allowedExtra] of mutsAndExpects) {
+      actualResults = {};
+      signal = new Signal();
+      mut();
+      await signal.promise;
+      const expected = Dexie.deepClone(expects);
+      if (allowedExtra) allowedExtra.forEach(key => {
+        expected[key] = prevActual[key]
+      });
+      deepEqual(actualResults, expected, `${mut.toString()} ==> ${JSON.stringify(expects, null, 2)}`);
+      Object.assign(prevActual, actualResults);
+    }
+  } finally {
+    subscriptions.forEach(s => s.unsubscribe());
+  }
 });
