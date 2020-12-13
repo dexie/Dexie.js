@@ -304,7 +304,7 @@ const mutsAndExpects = [
       //openCursor: [], // offset 3 - allow offset queries in indexes not to change if things are changed outside result.
       openKeyCursor: ["Abbot", "Ambros", "Assot"],
       count: 3
-    }
+    },["openCursor"] // If hooks is listened to (integration tests), oldVal will be available and offset-queries will be correcly triggered for deleted index keys before the offset.
   ],
   // deleteRange: TODO this
 ]
