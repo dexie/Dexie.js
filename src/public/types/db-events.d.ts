@@ -33,14 +33,9 @@ export interface DbEvents extends DexieEventSet {
 }
 
 export type ObservabilitySet = {
-  [dbName: string]: {
-    [tableName: string]: true | {
-      keys?: RangeBtree;
-      indexes?: true | {
-        [index: string]: RangeBtree;
-      }
-    }
-  }
+  // `idb:${dbName}/${tableName}/changedRowContents` - keys.
+  // `idb:${dbName}/${tableName}/changedIndexes/${indexName}` - indexes
+  [part: string]: RangeBtree;
 };
 
 export interface DexieOnTxCommittedEvent {
