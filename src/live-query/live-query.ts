@@ -58,44 +58,10 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       startedListening = false;
 
     function shouldNotify() {
-      for (const db of keys(currentObs)) {
-        const mutDb = accumMuts[db];
-        if (mutDb) {
-          const obsDb = currentObs[db];
-          for (const table of keys(obsDb)) {
-            const mutTable = mutDb[table];
-            const obsTable = obsDb[table];
-            if (mutTable === true) {
-              if (obsTable) return true;
-              else continue;
-            }
-            if (obsTable === true) {
-              if (mutTable) return true;
-              else continue;
-            }
-            if (!mutTable) continue;
-            const obsIndexes = obsTable.indexes,
-              mutIndexes = mutTable.indexes;
-            if (obsIndexes && mutIndexes) {
-              if (obsIndexes === true || mutIndexes === true) {
-                return true;
-              }
-              for (const idxName of keys(mutIndexes)) {
-                if (
-                  obsIndexes[idxName] &&
-                  rangesOverlap(obsIndexes[idxName], mutIndexes[idxName])
-                ) {
-                  return true;
-                }
-              }
-            }
-            if (rangesOverlap(obsTable.keys, mutTable.keys)) {
-              return true;
-            }
-          }
-        }
-      }
-      return false;
+      return keys(currentObs).some(
+        (key) =>
+          accumMuts[key] && rangesOverlap(accumMuts[key], currentObs[key])
+      );
     }
 
     const mutationListener = (parts: ObservabilitySet) => {
