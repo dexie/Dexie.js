@@ -1,9 +1,6 @@
-import { domDeps } from "../classes/dexie/dexie-dom-dependencies";
 import { getFromTransactionCache } from "../dbcore/cache-existing-values-middleware";
 import { cmp } from "../functions/cmp";
-import { getMaxKey } from "../functions/quirks";
-import { isArray } from "../functions/utils";
-import { minKey } from "../globals/constants";
+import { isArray, keys } from "../functions/utils";
 import { PSD } from "../helpers/promise";
 import { RangeSet } from "../helpers/rangeset";
 import { ObservabilitySet } from "../public/types/db-events";
@@ -22,70 +19,13 @@ import {
   DBCoreTransaction,
 } from "../public/types/dbcore";
 import { Middleware } from "../public/types/middleware";
-import { RangeBtreeNode } from "../public/types/rangeset";
-
-// part in ObservabilitySet is a URL like path including dbName, tableName and index
-//
-//`idb://${dbName}/${tableName}/` // MUT: Updated property: record the key. SUB: If values requested, record keys.
-//`idb://${dbName}/${tableName}/:dels` // MUT: put or delete without having oldVal: record FULL_RANGE here.
-//`idb://${dbName}/${tableName}/${indexName | ''}`;
-// MUT: add: value of new idx
-//      put: record both oldIdx & newIdx (or should we only record idxes if they change?)
-//           if not have old: record FULL_RANGE in :dels and record the newIdx here. (for count!)
-//      del: value of old idx
-//           if not have old: record FULL_RANGE in :dels.
-// SUB:
-//    count on secondary index:
-//      ":dels" (FULL) + the index: queried range.
-//    count on primary key:
-//      "": queried range
-//    primaryKeys on 2ndary index:
-//      index: queried range + "" - all returned keys.
-//    primaryKeys on primary key range:
-//      "": queried range only.
-//    query values on 2ndary index:
-//      index: queried range + "" - all returned keys.
-//    query values on primary key range with possible limit:
-//      "": sub range: [from, lastKey] or just all returned keys.
-//    query outbound values on secondary index range:
-//      request keys also! and record them in "".
-//    query outbound values on primaryKey range:
-//      "" - queried range!
-//    openCursor values on secondary index (inbound and outbound):
-//      index: queried range + "" - all keys of accessed cursor.key or cursor.value.
-//    openCursor values on primary key
-//      "" - all keys of accessed cursor.key or cursor.value.
-
-// Testing query values or values:
-//db.friends.where('age').between(20, 30).toArray(); // SUB: {age: 20-30, "": 10, 11, 13}
-//db.friends.where('age').between(20, 30).primaryKeys(); // SUB: {age: 20-30, "": 10, 11, 13}
-//db.friends.delete(7); // MUT: {"": 7, ":dels": FULL} --> ingen update. 7 not in "".
-//db.friends.delete(11); // MUT: {"": 11, ":dels": FULL} --> update because of match in "" (11).
-//db.friends.add({ name: 'Foo', age: 19 }); //MUT: {"": 14, name: "Foo", age: 19} -->
-//                                               age not in range, keys not in range --> no update.
-//db.friends.add({ name: 'Foo2', age: 25 }); //MUT: {"": 15, name: "Foo2", age: 25} -->
-//                                               age in range, keys not in range --> update!
-//db.friends.update(14, { name: '_Foo' }); // MUT: {"": 14, name: "Foo","_Foo", age: 19} -->
-//                                               age not in range, keys not in range --> no update.
-//db.friends.update(15, { name: '_Foo2' }); // MUT: {"": 15, name: "Foo2","_Foo2", age: 25} -->
-//                                               age in range, keys in range --> update!
-
-// Testing count():
-//db.friends.where('age').between(20, 30).count(); // SUB: {age: 20-30, ":dels": FULL}
-//db.friends.delete(7); // MUT: {"": 7, ":dels": FULL} --> update! ":dels" match. (false positive but OK!)
-//db.friends.delete(11); // MUT: {"": 11, ":dels": FULL} --> update! ":dels" match. Correct!
-//db.friends.add({ name: 'Foo', age: 19 }); //MUT: {"": 14, name: "Foo", age: 19} -->
-//                                               age not in range, no ":dels" --> no update (CORRECT!)
-//db.friends.add({ name: 'Foo2', age: 25 }); //MUT: {"": 15, name: "Foo2", age: 25} -->
-//                                               age in range, no ":dels" --> update! (CORRECT!)
-
-export const FULL_RANGE = new RangeSet(minKey, getMaxKey(domDeps.IDBKeyRange));
 
 export const observabilityMiddleware: Middleware<DBCore> = {
   stack: "dbcore",
   level: 0,
   create: (core) => {
     const dbName = core.schema.name;
+    const FULL_RANGE = new RangeSet(core.MIN_KEY, core.MAX_KEY);
 
     return {
       ...core,
@@ -94,21 +34,6 @@ export const observabilityMiddleware: Middleware<DBCore> = {
         const { schema } = table;
         const { primaryKey } = schema;
         const { extractKey, outbound } = primaryKey;
-        /*const extendTableObservation = (
-          target: ObservabilitySet,
-          index: string,
-          ranges: RangeBtree
-        ) => {
-          const part = `idb://${dbName}/${tableName}/${index}`;
-          const os: ObservabilitySet = {};
-          os[part] = ranges;
-          extendObservabilitySet(target, os);
-          return target[part];
-        };
-        const addKeys = (target: ObservabilitySet, keys: any[]) => {
-          extendTableObservation(target, "", new RangeSet().addKeys(keys));
-        };*/
-
         const tableClone: DBCoreTable = {
           ...table,
           mutate: (req) => {
@@ -169,15 +94,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
           },
         };
 
-        const getKey = (req: DBCoreGetRequest) => [
-          primaryKey,
-          new RangeSet(req.key),
-        ];
-        const getKeys = (req: DBCoreGetManyRequest) => [
-          primaryKey,
-          new RangeSet().addKeys(req.keys),
-        ];
-        const getRange = ({
+        const getRange: (req: any) => [DBCoreIndex, RangeSet] = ({
           query: { index, range },
         }:
           | DBCoreQueryRequest
@@ -187,18 +104,18 @@ export const observabilityMiddleware: Middleware<DBCore> = {
           new RangeSet(range.lower, range.upper),
         ];
 
-        const readSubscribers: [
-          Exclude<keyof DBCoreTable, "name" | "schema" | "mutate">,
+        const readSubscribers: {[method in
+          Exclude<keyof DBCoreTable, "name" | "schema" | "mutate">]: 
           (req: any) => [DBCoreIndex, RangeSet]
-        ][] = [
-          ["get", getKey as (req: any) => [DBCoreIndex, RangeSet]],
-          ["getMany", getKeys as (req: any) => [DBCoreIndex, RangeSet]],
-          ["count", getRange as (req: any) => [DBCoreIndex, RangeSet]],
-          ["query", getRange as (req: any) => [DBCoreIndex, RangeSet]],
-          ["openCursor", getRange as (req: any) => [DBCoreIndex, RangeSet]],
-        ];
+        } = {
+          get: (req) => [primaryKey, new RangeSet(req.key)],
+          getMany: (req) => [primaryKey, new RangeSet().addKeys(req.keys)],
+          count: getRange,
+          query: getRange,
+          openCursor: getRange,
+        }
 
-        readSubscribers.forEach(([method, getQueriedRanges]) => {
+        keys(readSubscribers).forEach(method => {
           tableClone[method] = function (
             req:
               | DBCoreGetRequest
@@ -219,7 +136,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                   (subscr[part] = new RangeSet())) as RangeSet;
               };
               const pkRangeSet = getRangeSet("");
-              const [queriedIndex, queriedRanges] = getQueriedRanges(req);
+              const [queriedIndex, queriedRanges] = readSubscribers[method](req);
               // A generic rule here: queried ranges should always be subscribed to.
               getRangeSet(queriedIndex.name || "").add(queriedRanges);
               if (!queriedIndex.isPrimaryKey) {
