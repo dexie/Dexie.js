@@ -17,7 +17,7 @@ import { extendObservabilitySet } from "./extend-observability-set";
 import { rangesOverlap } from "../helpers/rangeset";
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
-  return new Observable<T>(({ start, next, error }) => {
+  return new Observable<T>((observer) => {
     const scopeFuncIsAsync = isAsyncFunction(querier);
     function execute(subscr: ObservabilitySet) {
       if (scopeFuncIsAsync) {
@@ -52,7 +52,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       },
     };
 
-    start && start(subscription); // https://github.com/tc39/proposal-observable
+    observer.start && observer.start(subscription); // https://github.com/tc39/proposal-observable
 
     let querying = false,
       startedListening = false;
@@ -92,12 +92,12 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
             accumMuts = {};
             // Update what we are subscribing for based on this last run:
             currentObs = subscr;
-            next && next(result);
+            observer.next && observer.next(result);
           }
         },
         (err) => {
           querying = false;
-          error && error(err);
+          observer.error && observer.error(err);
           subscription.unsubscribe();
         }
       );

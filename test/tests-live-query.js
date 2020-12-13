@@ -2,6 +2,8 @@ import Dexie, {liveQuery, rangesOverlap, RangeSet} from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
 import {resetDatabase, supports, promisedTest} from './dexie-unittest-utils';
 import sortedJSON from "sorted-json";
+import {from} from "rxjs";
+import {map} from "rxjs/operators";
 
 const db = new Dexie("TestLiveQuery");
 db.version(2).stores({
@@ -381,4 +383,22 @@ promisedTest("Full use case matrix", async ()=>{
   } finally {
     subscriptions.forEach(s => s.unsubscribe());
   }
+});
+
+promisedTest("RxJS compability", async ()=>{
+  let signal = new Signal();
+  const o = from(liveQuery(
+    ()=>db.items.toArray()
+  )).pipe(
+   map(items => items.map(item => item.id)) 
+  );
+
+  const s = o.subscribe(results => signal.resolve(results));
+  const result = await signal.promise;
+  deepEqual(result, [1, 2, 3], "We should have get a mapped result");
+  signal = new Signal();
+  db.items.add({id: 4});
+  const res2 = await signal.promise;
+  deepEqual(res2, [1, 2, 3, 4], "We should have get an updated mapped result");
+  s.unsubscribe();
 });

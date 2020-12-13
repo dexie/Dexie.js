@@ -102,6 +102,7 @@
     "rollup-plugin-commonjs": "^8.4.1",
     "rollup-plugin-node-resolve": "^3.4.0",
     "rollup-plugin-sourcemaps": "^0.4.1",
+    "rxjs": "^6.6.3",
     "serve-static": "^1.14.1",
     "sorted-json": "^0.2.6",
     "tslib": "^1.11.2",
