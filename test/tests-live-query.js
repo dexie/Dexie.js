@@ -301,10 +301,15 @@ const mutsAndExpects = [
       get: [{id: 1}, null],
       query: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}, {id: 5, name: "Assot"}],
       queryKeys: [4, 6, 5],
-      //openCursor: [], // offset 3 - allow offset queries in indexes not to change if things are changed outside result.
       openKeyCursor: ["Abbot", "Ambros", "Assot"],
       count: 3
-    },["openCursor"] // If hooks is listened to (integration tests), oldVal will be available and offset-queries will be correcly triggered for deleted index keys before the offset.
+    },
+    // Allowed extras:
+    // If hooks is listened to we'll get an even more correct update of the openCursor query
+    // since oldVal will be available and offset-queries will be correcly triggered for deleted index keys before the offset.
+    {
+      openCursor: [] 
+    }
   ],
   // deleteRange: TODO this
 ]
@@ -365,8 +370,10 @@ promisedTest("Full use case matrix", async ()=>{
       mut();
       await signal.promise;
       const expected = Dexie.deepClone(expects);
-      if (allowedExtra) allowedExtra.forEach(key => {
-        expected[key] = prevActual[key]
+      if (allowedExtra) Array.isArray(allowedExtra) ? allowedExtra.forEach(key => {
+        if (actualResults[key]) expected[key] = prevActual[key];
+      }) : Object.keys(allowedExtra).forEach(key => {
+        if (actualResults[key]) expected[key] = allowedExtra[key];
       });
       deepEqual(actualResults, expected, `${mut.toString()} ==> ${JSON.stringify(expects, null, 2)}`);
       Object.assign(prevActual, actualResults);
