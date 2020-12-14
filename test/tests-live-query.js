@@ -283,6 +283,41 @@ const mutsAndExpects = [
       queryOutbound: [{name: "A", num: 1}]
     }
   ],
+  [
+    // Testing that keys-only queries don't get bothered
+    ()=>db.items.update(-1, {foo: "bar"}),
+    {
+      get: [{id: 1}, {id: -1, name: "A", foo: "bar"}],
+      query: [{id: -1, name: "A", foo: "bar"}],
+      //queryKeys: [-1], should not have to be updated!
+      //openKeyCursor: ["A"] should not have to be updated!
+    }
+  ],
+  [
+    // Update an index property (name) should trigger
+    // listeners to that index:
+    ()=>db.items.update(-1, {foo: undefined, name: "B"}),
+    {
+      get: [{id: 1}, {id: -1, name: "B"}],
+      query: [],
+      queryKeys: [],
+      openCursor: [],
+      openKeyCursor: [],
+      count: 0
+    }
+  ],
+  [
+    // Restoring and re-checking.
+    ()=>db.items.update(-1, {name: "A"}),
+    {
+      get: [{id: 1}, {id: -1, name: "A"}],
+      query: [{id: -1, name: "A"}],
+      queryKeys: [-1],
+      openCursor: [],
+      openKeyCursor: ["A"],
+      count: 1
+    }
+  ],
   // add again
   [
     ()=>db.items.bulkAdd([{id: 4, name: "Abbot"},{id: 5, name: "Assot"},{id: 6, name: "Ambros"}]).then(lastId => {}),
