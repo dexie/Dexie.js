@@ -31,7 +31,7 @@ import { exceptions } from '../../errors';
 import { lowerVersionFirst } from '../version/schema-helpers';
 import { dexieOpen } from './dexie-open';
 import { wrap } from '../../helpers/promise';
-import { databaseEnumerator } from '../../helpers/database-enumerator';
+import { _onDatabaseDeleted } from '../../helpers/database-enumerator';
 import { eventRejectHandler } from '../../functions/event-wrappers';
 import { extractTransactionArgs, enterTransactionScope } from './transaction-helpers';
 import { TransactionMode } from '../../public/types/transaction-mode';
@@ -300,7 +300,7 @@ export class Dexie implements IDexie {
         this.close();
         var req = this._deps.indexedDB.deleteDatabase(this.name);
         req.onsuccess = wrap(() => {
-          databaseEnumerator.remove(this.name);
+          _onDatabaseDeleted(this._deps, this.name);
           resolve();
         });
         req.onerror = eventRejectHandler(reject);

@@ -3,7 +3,7 @@ import {module, test, equal, ok} from 'QUnit';
 import {resetDatabase, spawnedTest, promisedTest} from './dexie-unittest-utils';
 import {isIdbAndPromiseCompatible} from './is-idb-and-promise-compatible';
 
-const idbAndPromiseCompatible = isIdbAndPromiseCompatible();
+let idbAndPromiseCompatible;
 
 const hasNativeAsyncFunctions = false;
 try {
@@ -17,6 +17,11 @@ db.version(1).stores({
 
 module("asyncawait", {
     setup: function (assert) {
+        // Execute this promise when needed:
+        if (idbAndPromiseCompatible === undefined) {
+            // Initialize this promise.
+            idbAndPromiseCompatible = isIdbAndPromiseCompatible();
+        }
         let done = assert.async();
         resetDatabase(db).catch(function (e) {
             ok(false, "Error resetting database: " + e.stack);
