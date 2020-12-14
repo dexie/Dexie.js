@@ -46,7 +46,7 @@ export function _onDatabaseCreated(
 ) {
   !hasDatabasesNative(indexedDB) &&
     name !== DBNAMES_DB &&
-    getDbNamesTable(indexedDB, IDBKeyRange).delete(name).catch(nop);
+    getDbNamesTable(indexedDB, IDBKeyRange).put({name}).catch(nop);
 }
 
 export function _onDatabaseDeleted(
