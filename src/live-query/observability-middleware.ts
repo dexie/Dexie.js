@@ -74,15 +74,16 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                 if (!oldObjs && type !== "add") {
                   // delete or put and we don't know old values.
                   // Indicate this in the ":dels" part, for the sake of count() queries only!
-                  getRangeSet(":dels").add(FULL_RANGE);
+                  getRangeSet(":dels").addKeys(keys);
                 } else {
                   trackAffectedIndexes(getRangeSet, schema, oldObjs, newObjs);
                 }
               } else if (keys) {
                 // As we can't know deleted index ranges, mark index-based subscriptions must trigger.
-                getRangeSet(":dels").add(FULL_RANGE);
+                const range = { from: keys.lower, to: keys.upper };
+                getRangeSet(":dels").add(range);
                 // deleteRange. keys is a DBCoreKeyRange objects. Transform it to [from,to]-style range.
-                pkRangeSet.add({ from: keys.lower, to: keys.upper });
+                pkRangeSet.add(range);
               } else {
                 // Too many requests to record the details without slowing down write performance.
                 // Let's just record a generic large range
@@ -136,6 +137,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                   (subscr[part] = new RangeSet())) as RangeSet;
               };
               const pkRangeSet = getRangeSet("");
+              const delsRangeSet = getRangeSet(":dels");
               const [queriedIndex, queriedRanges] = readSubscribers[method](req);
               // A generic rule here: queried ranges should always be subscribed to.
               getRangeSet(queriedIndex.name || "").add(queriedRanges);
@@ -154,7 +156,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                   // Those mutation could change the count.
                   // Solution: Dedicated ":dels" url represends a subscription to all mutations without oldObjs
                   // (specially triggered in the mutators put(), delete() and deleteRange() when they don't know oldObject)
-                  getRangeSet(":dels").add(FULL_RANGE);
+                  delsRangeSet.add(FULL_RANGE);
                 } else {
                   // openCursor() or query()
 
@@ -185,36 +187,49 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                       }
                       // query() inbound values, keys or outbound keys. Secondary indexes only since
                       // for primary keys we would only add results within the already registered range.
-                      pkRangeSet.addKeys(
-                        (req as DBCoreQueryRequest).values
-                          ? (res as DBCoreQueryResponse).result.map(extractKey)
-                          : (res as DBCoreQueryResponse).result
-                      );
+                      const pKeys = (req as DBCoreQueryRequest).values
+                        ? (res as DBCoreQueryResponse).result.map(extractKey)
+                        : (res as DBCoreQueryResponse).result;
+                      if ((req as DBCoreQueryRequest).values) {
+                        // Subscribe to any mutation made on the returned keys,
+                        // so that we detect both deletions and updated properties.
+                        pkRangeSet.addKeys(pKeys);
+                      } else {
+                        // Subscribe only to mutations on the returned keys
+                        // in case the mutator was unable to know oldObjs.
+                        // If it has oldObj, the mutator won't put anything in ":dels" because
+                        // it can more fine-grained put the exact removed and added index value in the correct
+                        // index range that we subscribe to in the queried range sets.
+                        // We don't load values so a change on a property outside our index will not
+                        // require us to re-execute the query.
+                        delsRangeSet.addKeys(pKeys);
+                      }
                     } else if (method === "openCursor") {
                       // Caller requests a cursor.
                       // For the same reason as when method==="query", we only need to observe
                       // those keys whose values are possibly used or rendered - which could
                       // only happen on keys where they get the cursor's key, primaryKey or value.
                       const cursor: DBCoreCursor | null = res;
+                      const wantValues = (req as DBCoreOpenCursorRequest).values;
                       return (
                         cursor &&
                         Object.create(cursor, {
                           key: {
                             get() {
-                              pkRangeSet.addKey(cursor.primaryKey);
+                              delsRangeSet.addKey(cursor.primaryKey);
                               return cursor.key;
                             },
                           },
                           primaryKey: {
                             get() {
                               const pkey = cursor.primaryKey;
-                              pkRangeSet.addKey(pkey);
+                              delsRangeSet.addKey(pkey);
                               return pkey;
                             },
                           },
                           value: {
                             get() {
-                              pkRangeSet.addKey(cursor.primaryKey);
+                              wantValues && pkRangeSet.addKey(cursor.primaryKey);
                               return cursor.value;
                             },
                           },
