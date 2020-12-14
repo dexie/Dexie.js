@@ -348,6 +348,36 @@ const mutsAndExpects = [
       openCursor: [] 
     }
   ],
+  // Special case for more fine grained keys observation of put (not knowing oldObjs
+  [
+    ()=>db.items.put({id: 5, name: "Azlan"}),
+    {
+      query: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}, {id: 5, name: "Azlan"}],
+      openKeyCursor: ["Abbot", "Ambros", "Azlan"],
+    }, {
+      // Things that optionally can be matched in result (if no hooks specified):
+      queryKeys: [4, 6, 5], 
+      count: 3,
+      openCursor: []
+    }
+  ],
+  [
+    ()=>db.items.put({id: 5}),
+    {
+      query: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}],
+      queryKeys: [4, 6],
+      openKeyCursor: ["Abbot", "Ambros"],
+      count: 2
+    }
+  ],
+  [
+    ()=>db.items.delete(5),
+    {
+    },
+    {
+      count: 2
+    }
+  ]
   // deleteRange: TODO this
 ]
 
