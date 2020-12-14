@@ -1,58 +1,59 @@
-import Promise from './promise';
-import { Dexie } from '../classes/dexie/dexie';
-import { Table } from '../public/types/table';
-import { nop } from '../functions/chaining-functions';
-import { PromiseExtended } from '../public/types/promise-extended';
-import { DBNAMES_DB } from '../globals/constants';
+import { Dexie } from "../classes/dexie/dexie";
+import { Table } from "../public/types/table";
+import { DBNAMES_DB } from "../globals/constants";
+import { DexieDOMDependencies } from "../public/types/dexie-dom-dependencies";
+import { nop } from "../functions/chaining-functions";
 
-export let databaseEnumerator: DatabaseEnumerator;
+type IDBKeyNamesVar = typeof IDBKeyRange;
 
-export interface DatabaseEnumerator {
-  getDatabaseNames (): PromiseExtended<string[]>;
-  add (name: string): undefined | PromiseExtended;
-  remove (name: string): undefined | PromiseExtended;
-}
-
-export function DatabaseEnumerator (indexedDB: IDBFactory & {databases?: ()=>Promise<{name: string}[]>}) : DatabaseEnumerator {
-  const hasDatabasesNative = indexedDB && typeof indexedDB.databases === 'function';
-  let dbNamesTable: Table<{name: string}, string>;
-
-  if (!hasDatabasesNative) {
-    const db = new Dexie (DBNAMES_DB, {addons: []});
-    db.version(1).stores({dbnames: 'name'});
-    dbNamesTable = db.table<{name: string}, string>('dbnames');
+function getDbNamesTable(indexedDB: IDBFactory, IDBKeyRange: IDBKeyNamesVar) {
+  let dbNamesDB = indexedDB["_dbNamesDB"];
+  if (!dbNamesDB) {
+    dbNamesDB = indexedDB["_dbNamesDB"] = new Dexie(DBNAMES_DB, {
+      addons: [],
+      indexedDB,
+      IDBKeyRange,
+    });
+    dbNamesDB.version(1).stores({ dbnames: "name" });
   }
-
-  return {
-    getDatabaseNames () {
-      return hasDatabasesNative
-        ?
-          // Use Promise.resolve() to wrap the native promise into a Dexie promise,
-          // to keep PSD zone.
-          Promise.resolve(indexedDB.databases()).then(infos => infos
-            // Select name prop of infos:
-            .map(info => info.name)
-            // Filter out DBNAMES_DB as previous Dexie or browser version would not have included it in the result.
-            .filter(name => name !== DBNAMES_DB)
-          )
-        :
-          // Use dexie's manually maintained list of database names:
-          dbNamesTable.toCollection().primaryKeys();
-    },
-
-    add (name: string) : PromiseExtended<any> | undefined {
-      return !hasDatabasesNative && name !== DBNAMES_DB && dbNamesTable.put({name}).catch(nop);
-    },
-
-    remove (name: string) : PromiseExtended<any> | undefined {
-      return !hasDatabasesNative && name !== DBNAMES_DB && dbNamesTable.delete(name).catch(nop);
-    }
-  };
+  return dbNamesDB.table("dbnames") as Table<{ name: string }, string>;
 }
 
-export function initDatabaseEnumerator(indexedDB: IDBFactory) {
-  try {
-    databaseEnumerator = DatabaseEnumerator(indexedDB);
-  } catch (e) {}
+function hasDatabasesNative(
+  indexedDB: IDBFactory & { databases?: () => Promise<{ name: string }[]> }
+): indexedDB is IDBFactory & { databases: () => Promise<{ name: string }[]> } {
+  return indexedDB && typeof indexedDB.databases === "function";
 }
 
+export function getDatabaseNames({
+  indexedDB,
+  IDBKeyRange,
+}: DexieDOMDependencies) {
+  return hasDatabasesNative(indexedDB)
+    ? Promise.resolve(indexedDB.databases()).then((infos) =>
+        infos
+          // Select name prop of infos:
+          .map((info) => info.name)
+          // Filter out DBNAMES_DB as previous Dexie or browser version would not have included it in the result.
+          .filter((name) => name !== DBNAMES_DB)
+      )
+    : getDbNamesTable(indexedDB, IDBKeyRange).toCollection().primaryKeys();
+}
+
+export function _onDatabaseCreated(
+  { indexedDB, IDBKeyRange }: DexieDOMDependencies,
+  name: string
+) {
+  !hasDatabasesNative(indexedDB) &&
+    name !== DBNAMES_DB &&
+    getDbNamesTable(indexedDB, IDBKeyRange).put({name}).catch(nop);
+}
+
+export function _onDatabaseDeleted(
+  { indexedDB, IDBKeyRange }: DexieDOMDependencies,
+  name: string
+) {
+  !hasDatabasesNative(indexedDB) &&
+    name !== DBNAMES_DB &&
+    getDbNamesTable(indexedDB, IDBKeyRange).delete(name).catch(nop);
+}

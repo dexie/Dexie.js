@@ -2,7 +2,7 @@ import { Dexie as _Dexie } from './dexie';
 import { props, derive, extend, override, getByKeyPath, setByKeyPath, delByKeyPath, shallowClone, deepClone, getObjectDiff, asap, _global } from '../../functions/utils';
 import { fullNameExceptions } from '../../errors';
 import { DexieConstructor } from '../../public/types/dexie-constructor';
-import { DatabaseEnumerator, databaseEnumerator } from '../../helpers/database-enumerator';
+import { getDatabaseNames } from '../../helpers/database-enumerator';
 import { PSD } from '../../helpers/promise';
 import { usePSD } from '../../helpers/promise';
 import { newScope } from '../../helpers/promise';
@@ -65,9 +65,11 @@ props(Dexie, {
   // Static method for retrieving a list of all existing databases at current host.
   //
   getDatabaseNames(cb) {
-    return databaseEnumerator ?
-      databaseEnumerator.getDatabaseNames().then(cb) :
-      Promise.resolve([]);
+    try {
+      return getDatabaseNames(Dexie.dependencies).then(cb);
+    } catch {
+      return rejection(new exceptions.MissingAPI());
+    }
   },
 
   /** @deprecated */

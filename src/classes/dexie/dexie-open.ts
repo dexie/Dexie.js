@@ -7,7 +7,7 @@ import Promise, { wrap } from '../../helpers/promise';
 import { connections } from '../../globals/constants';
 import { runUpgraders, readGlobalSchema, adjustToExistingIndexNames, verifyInstalledSchema } from '../version/schema-helpers';
 import { safariMultiStoreFix } from '../../functions/quirks';
-import { databaseEnumerator } from '../../helpers/database-enumerator';
+import { _onDatabaseCreated } from '../../helpers/database-enumerator';
 import { vip } from './vip';
 import { promisableChain, nop } from '../../functions/chaining-functions';
 import { generateMiddlewareStacks } from './generate-middleware-stacks';
@@ -100,7 +100,7 @@ export function dexieOpen (db: Dexie) {
               db.on("versionchange").fire(ev);
           });
           
-          databaseEnumerator.add(dbName);
+          _onDatabaseCreated(db._deps, dbName);
 
           resolve();
 
