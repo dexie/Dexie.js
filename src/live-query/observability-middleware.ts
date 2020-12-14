@@ -48,6 +48,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                 (mutatedParts[part] = new RangeSet())) as RangeSet;
             };
             const pkRangeSet = getRangeSet("");
+            const delsRangeSet = getRangeSet(":dels");
 
             const { type } = req;
             let [keys, newObjs] =
@@ -74,21 +75,21 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                 if (!oldObjs && type !== "add") {
                   // delete or put and we don't know old values.
                   // Indicate this in the ":dels" part, for the sake of count() queries only!
-                  getRangeSet(":dels").addKeys(keys);
+                  delsRangeSet.addKeys(keys);
                 } else {
                   trackAffectedIndexes(getRangeSet, schema, oldObjs, newObjs);
                 }
               } else if (keys) {
                 // As we can't know deleted index ranges, mark index-based subscriptions must trigger.
                 const range = { from: keys.lower, to: keys.upper };
-                getRangeSet(":dels").add(range);
+                delsRangeSet.add(range);
                 // deleteRange. keys is a DBCoreKeyRange objects. Transform it to [from,to]-style range.
                 pkRangeSet.add(range);
               } else {
                 // Too many requests to record the details without slowing down write performance.
                 // Let's just record a generic large range
                 pkRangeSet.add(FULL_RANGE);
-                getRangeSet(":dels").add(FULL_RANGE);
+                delsRangeSet.add(FULL_RANGE);
               }
               return res;
             });
