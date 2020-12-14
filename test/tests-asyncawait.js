@@ -18,7 +18,10 @@ db.version(1).stores({
 module("asyncawait", {
     setup: function (assert) {
         // Execute this promise when needed:
-        if (idbAndPromiseCompatible) idbAndPromiseCompatible = isIdbAndPromiseCompatible();
+        if (idbAndPromiseCompatible === undefined) {
+            // Initialize this promise.
+            idbAndPromiseCompatible = isIdbAndPromiseCompatible();
+        }
         let done = assert.async();
         resetDatabase(db).catch(function (e) {
             ok(false, "Error resetting database: " + e.stack);
