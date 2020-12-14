@@ -234,7 +234,7 @@ promisedTest("subscribe and error occur", async ()=> {
     getMany
     query
     queryKeys
-    openCursor
+    itemsStartsWithAOffset3
     openKeyCursor
     count
     queryOutbound
@@ -255,42 +255,47 @@ const mutsAndExpects = [
   [
     ()=>db.items.add({id: -1, name: "A"}),
     {
-      get: [{id: 1}, {id: -1, name: "A"}],
-      query: [{id: -1, name: "A"}],
-      queryKeys: [-1],
-      openCursor: [],
-      openKeyCursor: ["A"],
-      count: 1
+      itemsToArray: [{id: -1,name:"A"}, {id: 1}, {id: 2}, {id: 3}],
+      itemsGet1And2: [{id: 1}, {id: -1, name: "A"}],
+      itemsStartsWithA: [{id: -1, name: "A"}],
+      itemsStartsWithAPrimKeys: [-1],
+      itemsStartsWithAOffset3: [],
+      itemsStartsWithAKeys: ["A"],
+      itemsStartsWithACount: 1
     }
   ],
   // addAuto
   [
     ()=>db.outbound.add({name: "Abba"}).then(id=>abbaKey = id),
     {
-      queryOutbound: [{name: "A", num: 1}, {name: "Abba"}]
+      outboundToArray: [{num:1,name:"A"},{num:2,name:"B"},{num:3,name:"C"},{name:"Abba"}],
+      outboundStartsWithA: [{name: "A", num: 1}, {name: "Abba"}]
     }
   ], [
     ()=>db.outbound.bulkAdd([{name: "Benny"}, {name: "C"}], [-1, 0]),
     {
-      queryOutboundByPKey: [{name: "Benny"}, {name: "C"}, {name: "A", num: 1}, {name: "B", num: 2}],
-      openCursorOutbound: ["B", "C", "C"]
+      outboundToArray: [{name:"Benny"},{name: "C"},{num:1,name:"A"},{num:2,name:"B"},{num:3,name:"C"},{name:"Abba"}],
+      outboundIdBtwnMinus1And2: [{name: "Benny"}, {name: "C"}, {name: "A", num: 1}, {name: "B", num: 2}],
+      outboundAnyOf_BCD_keys: ["B", "C", "C"]
     }
   ],
   // update
   [
     ()=>db.outbound.update(abbaKey, {name: "Zlatan"}),
     {
-      queryOutbound: [{name: "A", num: 1}]
+      outboundToArray: [{name:"Benny"},{name: "C"},{num:1,name:"A"},{num:2,name:"B"},{num:3,name:"C"},{name:"Zlatan"}],
+      outboundStartsWithA: [{name: "A", num: 1}]
     }
   ],
   [
     // Testing that keys-only queries don't get bothered
     ()=>db.items.update(-1, {foo: "bar"}),
     {
-      get: [{id: 1}, {id: -1, name: "A", foo: "bar"}],
-      query: [{id: -1, name: "A", foo: "bar"}],
-      //queryKeys: [-1], should not have to be updated!
-      //openKeyCursor: ["A"] should not have to be updated!
+      itemsToArray: [{id: -1,name:"A", foo: "bar"}, {id: 1}, {id: 2}, {id: 3}],
+      itemsGet1And2: [{id: 1}, {id: -1, name: "A", foo: "bar"}],
+      itemsStartsWithA: [{id: -1, name: "A", foo: "bar"}],
+      //itemsStartsWithAPrimKeys: [-1], should not have to be updated!
+      //itemsStartsWithAKeys: ["A"] should not have to be updated!
     }
   ],
   [
@@ -298,35 +303,38 @@ const mutsAndExpects = [
     // listeners to that index:
     ()=>db.items.update(-1, {foo: undefined, name: "B"}),
     {
-      get: [{id: 1}, {id: -1, name: "B"}],
-      query: [],
-      queryKeys: [],
-      openCursor: [],
-      openKeyCursor: [],
-      count: 0
+      itemsToArray: [{id: -1, name: "B"}, {id: 1}, {id: 2}, {id: 3}],
+      itemsGet1And2: [{id: 1}, {id: -1, name: "B"}],
+      itemsStartsWithA: [],
+      itemsStartsWithAPrimKeys: [],
+      itemsStartsWithAOffset3: [],
+      itemsStartsWithAKeys: [],
+      itemsStartsWithACount: 0
     }
   ],
   [
     // Restoring and re-checking.
     ()=>db.items.update(-1, {name: "A"}),
     {
-      get: [{id: 1}, {id: -1, name: "A"}],
-      query: [{id: -1, name: "A"}],
-      queryKeys: [-1],
-      openCursor: [],
-      openKeyCursor: ["A"],
-      count: 1
+      itemsToArray: [{id: -1, name: "A"}, {id: 1}, {id: 2}, {id: 3}],
+      itemsGet1And2: [{id: 1}, {id: -1, name: "A"}],
+      itemsStartsWithA: [{id: -1, name: "A"}],
+      itemsStartsWithAPrimKeys: [-1],
+      itemsStartsWithAOffset3: [],
+      itemsStartsWithAKeys: ["A"],
+      itemsStartsWithACount: 1
     }
   ],
   // add again
   [
     ()=>db.items.bulkAdd([{id: 4, name: "Abbot"},{id: 5, name: "Assot"},{id: 6, name: "Ambros"}]).then(lastId => {}),
     {
-      query: [{id: -1, name: "A"}, {id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}, {id: 5, name: "Assot"}],
-      queryKeys: [-1, 4, 6, 5],
-      openCursor: [{id: 5, name: "Assot"}], // offset 3
-      openKeyCursor: ["A", "Abbot", "Ambros", "Assot"],
-      count: 4
+      itemsToArray: [{id:-1,name:"A"},{id:1},{id:2},{id:3},{id:4,name:"Abbot"},{id:5,name:"Assot"},{id:6,name:"Ambros"}],
+      itemsStartsWithA: [{id: -1, name: "A"}, {id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}, {id: 5, name: "Assot"}],
+      itemsStartsWithAPrimKeys: [-1, 4, 6, 5],
+      itemsStartsWithAOffset3: [{id: 5, name: "Assot"}], // offset 3
+      itemsStartsWithAKeys: ["A", "Abbot", "Ambros", "Assot"],
+      itemsStartsWithACount: 4
     }
   ],
   // delete:
@@ -335,47 +343,65 @@ const mutsAndExpects = [
       db.items.delete(-1);
     }),
     {
-      get: [{id: 1}, null],
-      query: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}, {id: 5, name: "Assot"}],
-      queryKeys: [4, 6, 5],
-      openKeyCursor: ["Abbot", "Ambros", "Assot"],
-      count: 3
+      itemsToArray: [{id:1},{id:2},{id:3},{id:4,name:"Abbot"},{id:5,name:"Assot"},{id:6,name:"Ambros"}],
+      itemsGet1And2: [{id: 1}, null],
+      itemsStartsWithA: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}, {id: 5, name: "Assot"}],
+      itemsStartsWithAPrimKeys: [4, 6, 5],
+      itemsStartsWithAKeys: ["Abbot", "Ambros", "Assot"],
+      itemsStartsWithACount: 3
     },
     // Allowed extras:
-    // If hooks is listened to we'll get an even more correct update of the openCursor query
+    // If hooks is listened to we'll get an even more correct update of the itemsStartsWithAOffset3 query
     // since oldVal will be available and offset-queries will be correcly triggered for deleted index keys before the offset.
     {
-      openCursor: [] 
+      itemsStartsWithAOffset3: [] 
     }
   ],
   // Special case for more fine grained keys observation of put (not knowing oldObjs
   [
     ()=>db.items.put({id: 5, name: "Azlan"}),
     {
-      query: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}, {id: 5, name: "Azlan"}],
-      openKeyCursor: ["Abbot", "Ambros", "Azlan"],
+      itemsToArray: [{id:1},{id:2},{id:3},{id:4,name:"Abbot"},{id:5,name:"Azlan"},{id:6,name:"Ambros"}],
+      itemsStartsWithA: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}, {id: 5, name: "Azlan"}],
+      itemsStartsWithAKeys: ["Abbot", "Ambros", "Azlan"],
     }, {
       // Things that optionally can be matched in result (if no hooks specified):
-      queryKeys: [4, 6, 5], 
-      count: 3,
-      openCursor: []
+      itemsStartsWithAPrimKeys: [4, 6, 5], 
+      itemsStartsWithACount: 3,
+      itemsStartsWithAOffset3: []
     }
   ],
   [
-    ()=>db.items.put({id: 5}),
+    ()=>db.transaction('rw', db.items, db.outbound, ()=>{
+      db.items.bulkPut([{id: 5}]);
+    }),
     {
-      query: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}],
-      queryKeys: [4, 6],
-      openKeyCursor: ["Abbot", "Ambros"],
-      count: 2
+      itemsToArray: [{id:1},{id:2},{id:3},{id:4,name:"Abbot"},{id:5},{id:6,name:"Ambros"}],
+      itemsStartsWithA: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}],
+      itemsStartsWithAPrimKeys: [4, 6],
+      itemsStartsWithAKeys: ["Abbot", "Ambros"],
+      itemsStartsWithACount: 2
+    }, {
+      itemsStartsWithAOffset3: [] // This is
     }
   ],
   [
-    ()=>db.items.delete(5),
+    ()=>db.transaction('rw', db.items, db.outbound, ()=>{
+      db.items.delete(5);
+      db.outbound.bulkDelete([abbaKey,-1,0]);
+    }),
     {
+      itemsToArray: [{id:1},{id:2},{id:3},{id:4,name:"Abbot"},{id:6,name:"Ambros"}],
+      // (allOutbound was:
+      //  [{name:"Benny"},{name: "C"},{num:1,name:"A"},{num:2,name:"B"},{num:3,name:"C"},{name:"Zlatan"}])
+      // )
+      outboundToArray: [{num:1,name:"A"},{num:2,name:"B"},{num:3,name:"C"}],
+      //outboundStartsWithA: [{num:1,name:"A"}],
+      outboundIdBtwnMinus1And2: [{num:1,name:"A"},{num:2,name:"B"}],
+      outboundAnyOf_BCD_keys: ["B", "C"]
     },
     {
-      count: 2
+      itemsStartsWithACount: 2
     }
   ]
   // deleteRange: TODO this
@@ -383,28 +409,38 @@ const mutsAndExpects = [
 
 promisedTest("Full use case matrix", async ()=>{
   const queries = {
-    get: () => Promise.all(db.items.get(1), db.items.get(-1)),
-    getMany: () => db.items.bulkGet([1,2,3]),
-    query: () => db.items.where('name').startsWith("A").toArray(),
-    queryKeys: () => db.items.where('name').startsWith("A").primaryKeys(),
-    openCursor: () => db.items.where('name').startsWith("A").offset(3).toArray(),
-    openKeyCursor: () => db.items.where('name').startsWith("A").keys(),
-    count: () => db.items.where('name').startsWith("A").count(),
-    queryOutbound: () => db.outbound.where('name').startsWith("A").toArray(),
-    queryOutboundByPKey: () => db.outbound.where(':id').between(-1, 2, true, true).toArray(),
-    openCursorOutbound: () => db.outbound.where('name').anyOf("B", "C", "D").keys(),
+    itemsToArray: () => db.items.toArray(),
+    itemsGet1And2: () => Promise.all(db.items.get(1), db.items.get(-1)),
+    itemsBulkGet123: () => db.items.bulkGet([1,2,3]),
+    itemsStartsWithA: () => db.items.where('name').startsWith("A").toArray(),
+    itemsStartsWithAPrimKeys: () => db.items.where('name').startsWith("A").primaryKeys(),
+    itemsStartsWithAOffset3: () => db.items.where('name').startsWith("A").offset(3).toArray(),
+    itemsStartsWithAKeys: () => db.items.where('name').startsWith("A").keys(),
+    itemsStartsWithACount: () => db.items.where('name').startsWith("A").count(),
+    
+    outboundToArray: () => db.outbound.toArray(),
+    outboundStartsWithA: () => db.outbound.where('name').startsWith("A").toArray(),
+    outboundIdBtwnMinus1And2: () => db.outbound.where(':id').between(-1, 2, true, true).toArray(),
+    outboundAnyOf_BCD_keys: () => db.outbound.where('name').anyOf("B", "C", "D").keys(),
   };
   const expectedInitialResults = {
-    get: [{id: 1}, undefined],
-    getMany: [{id: 1}, {id: 2}, {id: 3}],
-    query: [],
-    queryKeys: [],
-    openCursor: [],
-    openKeyCursor: [],
-    count: 0,
-    queryOutbound: [{num: 1, name: "A"}],
-    queryOutboundByPKey: [{num: 1, name: "A"}, {num: 2, name: "B"}],
-    openCursorOutbound: ["B", "C"]
+    itemsToArray: [{id: 1}, {id: 2}, {id: 3}],
+    itemsGet1And2: [{id: 1}, undefined],
+    itemsBulkGet123: [{id: 1}, {id: 2}, {id: 3}],
+    itemsStartsWithA: [],
+    itemsStartsWithAPrimKeys: [],
+    itemsStartsWithAOffset3: [],
+    itemsStartsWithAKeys: [],
+    itemsStartsWithACount: 0,
+
+    outboundToArray: [
+      {num: 1, name: "A"},
+      {num: 2, name: "B"},
+      {num: 3, name: "C"}
+    ],
+    outboundStartsWithA: [{num: 1, name: "A"}],
+    outboundIdBtwnMinus1And2: [{num: 1, name: "A"}, {num: 2, name: "B"}],
+    outboundAnyOf_BCD_keys: ["B", "C"]
   }
   let flyingNow = 0;
   let signal = new Signal();
