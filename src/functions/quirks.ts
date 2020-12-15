@@ -9,11 +9,13 @@ export function getNativeGetDatabaseNamesFn(indexedDB) {
   return fn && fn.bind(indexedDB);
 }
 
-export function getMaxKey (IdbKeyRange: typeof IDBKeyRange) {
+export let getMaxKey = (IdbKeyRange: typeof IDBKeyRange) => {
   try {
     IdbKeyRange.only([[]]);
+    getMaxKey = () => [[]];
     return [[]];
   } catch (e) {
+    getMaxKey = () => maxString;
     return maxString;
   }
 }
