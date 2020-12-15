@@ -154,8 +154,8 @@ promisedTest("subscribe to range", async ()=> {
 promisedTest("subscribe to keys", async ()=>{
   let signal1 = new Signal(), signal2 = new Signal();
   let count1 = 0, count2 = 0;
-  const debugTxCommitted = set => console.debug("txcommitted", set);
-  Dexie.on('txcommitted', debugTxCommitted);
+  //const debugTxCommitted = set => console.debug("txcommitted", set);
+  //Dexie.on('txcommitted', debugTxCommitted);
   let sub1 = liveQuery(()=>db.items.get(1)).subscribe(result => {
     ++count1;
     signal1.resolve(result);
@@ -250,7 +250,8 @@ promisedTest("subscribe and error occur", async ()=> {
  */
 
 let abbaKey = 0;
-const mutsAndExpects = [
+let fruitCount = 0; // A bug in Safari <= 13.1 makes it unable to count on the name index (adds 1 extra)
+const mutsAndExpects = () => [
   // add
   [
     ()=>db.items.add({id: -1, name: "A"}),
@@ -261,7 +262,7 @@ const mutsAndExpects = [
       itemsStartsWithAPrimKeys: [-1],
       itemsStartsWithAOffset3: [],
       itemsStartsWithAKeys: ["A"],
-      itemsStartsWithACount: 1
+      itemsStartsWithACount: fruitCount + 1
     }
   ],
   // addAuto
@@ -309,7 +310,7 @@ const mutsAndExpects = [
       itemsStartsWithAPrimKeys: [],
       itemsStartsWithAOffset3: [],
       itemsStartsWithAKeys: [],
-      itemsStartsWithACount: 0
+      itemsStartsWithACount: fruitCount
     }
   ],
   [
@@ -322,7 +323,7 @@ const mutsAndExpects = [
       itemsStartsWithAPrimKeys: [-1],
       itemsStartsWithAOffset3: [],
       itemsStartsWithAKeys: ["A"],
-      itemsStartsWithACount: 1
+      itemsStartsWithACount: fruitCount + 1
     }
   ],
   // add again
@@ -334,7 +335,7 @@ const mutsAndExpects = [
       itemsStartsWithAPrimKeys: [-1, 4, 6, 5],
       itemsStartsWithAOffset3: [{id: 5, name: "Assot"}], // offset 3
       itemsStartsWithAKeys: ["A", "Abbot", "Ambros", "Assot"],
-      itemsStartsWithACount: 4
+      itemsStartsWithACount: fruitCount + 4
     }
   ],
   // delete:
@@ -348,7 +349,7 @@ const mutsAndExpects = [
       itemsStartsWithA: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}, {id: 5, name: "Assot"}],
       itemsStartsWithAPrimKeys: [4, 6, 5],
       itemsStartsWithAKeys: ["Abbot", "Ambros", "Assot"],
-      itemsStartsWithACount: 3
+      itemsStartsWithACount: fruitCount + 3
     },
     // Allowed extras:
     // If hooks is listened to we'll get an even more correct update of the itemsStartsWithAOffset3 query
@@ -367,7 +368,7 @@ const mutsAndExpects = [
     }, {
       // Things that optionally can be matched in result (if no hooks specified):
       itemsStartsWithAPrimKeys: [4, 6, 5], 
-      itemsStartsWithACount: 3,
+      itemsStartsWithACount: fruitCount + 3,
       itemsStartsWithAOffset3: []
     }
   ],
@@ -380,7 +381,7 @@ const mutsAndExpects = [
       itemsStartsWithA: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}],
       itemsStartsWithAPrimKeys: [4, 6],
       itemsStartsWithAKeys: ["Abbot", "Ambros"],
-      itemsStartsWithACount: 2
+      itemsStartsWithACount: fruitCount + 2
     }, {
       itemsStartsWithAOffset3: [] // This is
     }
@@ -401,13 +402,17 @@ const mutsAndExpects = [
       outboundAnyOf_BCD_keys: ["B", "C"]
     },
     {
-      itemsStartsWithACount: 2
+      itemsStartsWithACount: fruitCount + 2
     }
   ]
   // deleteRange: TODO this
 ]
 
 promisedTest("Full use case matrix", async ()=>{
+  // A bug in Safari <= 13.1 makes it unable to count on the name index (adds 1 extra)
+  fruitCount = await db.items.where('name').startsWith('A').count();
+  if (fruitCount > 0) console.log("fruitCount: " + fruitCount);
+  
   const queries = {
     itemsToArray: () => db.items.toArray(),
     itemsGet1And2: () => Promise.all(db.items.get(1), db.items.get(-1)),
@@ -431,7 +436,7 @@ promisedTest("Full use case matrix", async ()=>{
     itemsStartsWithAPrimKeys: [],
     itemsStartsWithAOffset3: [],
     itemsStartsWithAKeys: [],
-    itemsStartsWithACount: 0,
+    itemsStartsWithACount: fruitCount,
 
     outboundToArray: [
       {num: 1, name: "A"},
@@ -467,7 +472,7 @@ promisedTest("Full use case matrix", async ()=>{
     await signal.promise;
     deepEqual(actualResults, expectedInitialResults, "Initial results as expected");
     let prevActual = Dexie.deepClone(actualResults);
-    for (const [mut, expects, allowedExtra] of mutsAndExpects) {
+    for (const [mut, expects, allowedExtra] of mutsAndExpects()) {
       actualResults = {};
       signal = new Signal();
       mut();
