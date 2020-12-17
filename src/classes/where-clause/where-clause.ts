@@ -55,6 +55,7 @@ export class WhereClause implements IWhereClause {
    * 
    **/
   equals(value: IndexableType) {
+    if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
     return new this.Collection(this, () => rangeEqual(value)) as ICollection;
   }
 

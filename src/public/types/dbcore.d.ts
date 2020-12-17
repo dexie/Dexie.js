@@ -31,7 +31,7 @@ export interface DBCoreMutateResponse {
   numFailures: number,
   failures: {[operationNumber: number]: Error};
   lastResult: any;
-  results?: any[]; // Present on AddRequest and PutRequest if request.wantResults is truthy.
+  results?: any[]; // Present on AddRequest and PutRequest.
 }
 
 export interface DBCoreAddRequest {
@@ -39,6 +39,7 @@ export interface DBCoreAddRequest {
   trans: DBCoreTransaction;
   values: any[];
   keys?: any[];
+  /** @deprecated Will always get results since 3.1.0-alpha.5 */
   wantResults?: boolean;
 }
 
@@ -47,6 +48,7 @@ export interface DBCorePutRequest {
   trans: DBCoreTransaction;
   values: any[];
   keys?: any[];
+  /** @deprecated Will always get results since 3.1.0-alpha.5 */
   wantResults?: boolean;
 }
 
@@ -65,6 +67,7 @@ export interface DBCoreDeleteRangeRequest {
 export interface DBCoreGetManyRequest {
   trans: DBCoreTransaction;
   keys: any[];
+  cache?: "immutable" | "clone"
 }
 
 export interface DBCoreGetRequest {
@@ -144,8 +147,8 @@ export interface DBCoreIndex {
   readonly unique?: boolean;
   /** Whether index is multiEntry. */
   readonly multiEntry?: boolean;
-  /** Extract (using keyPath) a key from given value (object) */
-  readonly extractKey: (value: any) => any;
+  /** Extract (using keyPath) a key from given value (object). Null for outbound primary keys */
+  readonly extractKey: ((value: any) => any) | null;
 }
 
 export interface DBCore {

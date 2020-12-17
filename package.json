@@ -1,6 +1,6 @@
 {
   "name": "dexie",
-  "version": "3.0.2",
+  "version": "3.1.0-alpha.5",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "module": "dist/dexie.mjs",
@@ -52,6 +52,7 @@
       "cd src",
       "tsc [--watch 'Watching for file changes']",
       "rollup -c ../tools/build-configs/rollup.config.js",
+      "rollup -c ../tools/build-configs/rollup.umd.config.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.mjs",
       "dts-bundle-generator --umd-module-name Dexie -o ../dist/dexie.d.ts public/index.d.ts",
@@ -101,8 +102,10 @@
     "rollup-plugin-commonjs": "^8.4.1",
     "rollup-plugin-node-resolve": "^3.4.0",
     "rollup-plugin-sourcemaps": "^0.4.1",
+    "rxjs": "^6.6.3",
     "serve-static": "^1.14.1",
     "terser": "^5.3.1",
+    "sorted-json": "^0.2.6",
     "tslib": "^1.11.2",
     "typescript": "^3.8.3",
     "uglify-js": "^3.9.2"

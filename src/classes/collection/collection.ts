@@ -484,7 +484,7 @@ export class Collection implements ICollection {
 
       const coreTable = ctx.table.core;
       const {outbound, extractKey} = coreTable.schema.primaryKey;
-      const limit = 'testmode' in Dexie ? 1 : 2000;
+      const limit = this.db._options.modifyChunkSize || 200;
       const {cmp} = this.db.core;
       const totalFailures = [];
       let successCount = 0;
@@ -500,7 +500,14 @@ export class Collection implements ICollection {
 
         const nextChunk = (offset: number) => {
           const count = Math.min(limit, keys.length - offset);
-          return coreTable.getMany({trans, keys: keys.slice(offset, offset + count)}).then(values => {
+          return coreTable.getMany({
+            trans,
+            keys: keys.slice(offset, offset + count),
+            cache: "immutable" // Optimize for 2 things:
+            // 1) observability-middleware can track changes better.
+            // 2) hooks middleware don't have to query the existing values again when tracking changes.
+            // We can use "immutable" because we promise to not touch the values we retrieve here!
+          }).then(values => {
             const addValues = [];
             const putValues = [];
             const putKeys = outbound ? [] : null;
@@ -536,7 +543,7 @@ export class Collection implements ICollection {
                   }
                   applyMutateResult(addValues.length, res);
                 })
-            ).then(res=>putValues.length > 0 &&
+            ).then(()=>putValues.length > 0 &&
                 coreTable.mutate({trans, type: 'put', keys: putKeys, values: putValues})
                   .then(res=>applyMutateResult(putValues.length, res))
             ).then(()=>deleteKeys.length > 0 &&

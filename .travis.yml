@@ -1,8 +1,8 @@
 language: node_js
 addons:
-  firefox: "66.0"
+  firefox: "82.0"
 node_js:
-  - "8"
+  - "12"
 matrix:
   fast_finish: true
 services:
@@ -14,9 +14,16 @@ env:
   - TF=addons/Dexie.Syncable/test/unit
   - TF=addons/Dexie.Syncable/test/integration
   - TF=addons/dexie-export-import/test
+  - TF=libs/dexie-react-hooks/test
   - TF=test/integrations/test-dexie-relationships
+branches:
+  only:
+  - master
+  - master-2
+  - master-1
 script:
   - npm run build
   - cd $TF
   - pwd
   - bash ./travis.sh
+

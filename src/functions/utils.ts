@@ -13,12 +13,12 @@ if (typeof Promise !== 'undefined' && !_global.Promise){
 }
 export { _global }
 
-export function extend(obj, extension) {
-    if (typeof extension !== 'object') return obj;
+export function extend<T extends object,X extends object>(obj: T, extension: X): T & X  {
+    if (typeof extension !== 'object') return obj as T & X;
     keys(extension).forEach(function (key) {
         obj[key] = extension[key];
     });
-    return obj;
+    return obj as T & X;
 }
 
 export const getProto = Object.getPrototypeOf;
@@ -198,21 +198,33 @@ const intrinsicTypeNames =
 const intrinsicTypes = intrinsicTypeNames.map(t=>_global[t]);
 const intrinsicTypeNameSet = arrayToObject(intrinsicTypeNames, x=>[x,true]);
 
+let circularRefs: null | WeakMap<any,any> = null;
 export function deepClone<T>(any: T): T {
+    circularRefs = typeof WeakMap !== 'undefined' && new WeakMap();
+    const rv = innerDeepClone(any);
+    circularRefs = null;
+    return rv;
+}
+
+function innerDeepClone<T>(any: T): T {
     if (!any || typeof any !== 'object') return any;
-    var rv;
+    let rv = circularRefs && circularRefs.get(any); // Resolve circular references
+    if (rv) return rv;
     if (isArray(any)) {
         rv = [];
+        circularRefs && circularRefs.set(any, rv);
         for (var i = 0, l = any.length; i < l; ++i) {
-            rv.push(deepClone(any[i]));
+            rv.push(innerDeepClone(any[i]));
         }
     } else if (intrinsicTypes.indexOf(any.constructor) >= 0) {
         rv = any;
     } else {
-        rv = any.constructor ? Object.create(any.constructor.prototype) : {};
+        const proto = getProto(any);
+        rv = proto === Object.prototype ? {} : Object.create(proto);
+        circularRefs && circularRefs.set(any, rv);
         for (var prop in any) {
             if (hasOwn(any, prop)) {
-                rv[prop] = deepClone(any[prop]);
+                rv[prop] = innerDeepClone(any[prop]);
             }
         }
     }
@@ -247,7 +259,7 @@ export const getValueOf = (val:any, type: string) =>
                 const bpTypeName = toStringTag(bp);
 
                 if (apTypeName === bpTypeName) {
-                    if (intrinsicTypeNameSet[apTypeName]) {
+                    if (intrinsicTypeNameSet[apTypeName] || isArray(ap)) {
                         // This is an intrinsic type. Don't go deep diffing it.
                         // Instead compare its value in best-effort:
                         // (Can compare real values of Date, ArrayBuffers and views)
@@ -274,8 +286,10 @@ export const getValueOf = (val:any, type: string) =>
 }
 
 // If first argument is iterable or array-like, return it as an array
-export const iteratorSymbol = typeof Symbol !== 'undefined' && Symbol.iterator;
-export const getIteratorOf = iteratorSymbol ? function(x) {
+export const iteratorSymbol = typeof Symbol !== 'undefined' ?
+    Symbol.iterator :
+    '@@iterator';
+export const getIteratorOf = typeof iteratorSymbol === "symbol" ? function(x) {
     var i;
     return x != null && (i = x[iteratorSymbol]) && i.apply(x);
 } : function () { return null; };

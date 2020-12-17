@@ -3,7 +3,7 @@
  * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/LICENSE-2.0
  */
 import {tryCatch, props, setProp, _global,
-    getPropertyDescriptor, getArrayOf, extend} from '../functions/utils';
+    getPropertyDescriptor, getArrayOf, extend, getProto} from '../functions/utils';
 import {nop, callBoth, mirror} from '../functions/chaining-functions';
 import {debug, prettyStack, getErrorWithStack} from './debug';
 import {exceptions} from '../errors';
@@ -46,12 +46,12 @@ const
         (()=>{
             let globalP = Promise.resolve();
             if (typeof crypto === 'undefined' || !crypto.subtle)
-                return [globalP, globalP.__proto__, globalP];
+                return [globalP, getProto(globalP), globalP];
             // Generate a native promise (as window.Promise may have been patched)
             const nativeP = crypto.subtle.digest("SHA-512", new Uint8Array([0]));
             return [
                 nativeP,
-                nativeP.__proto__,
+                getProto(nativeP),
                 globalP
             ];
         })(),
@@ -178,11 +178,11 @@ const thenProp = {
 
         function then (onFulfilled, onRejected) {
             var possibleAwait = !psd.global && (psd !== PSD || microTaskId !== totalEchoes);
-            if (possibleAwait) decrementExpectedAwaits();
+            const cleanup = possibleAwait && !decrementExpectedAwaits();
             var rv = new DexiePromise((resolve, reject) => {
                 propagateToListener(this, new Listener(
-                    nativeAwaitCompatibleWrap(onFulfilled, psd, possibleAwait),
-                    nativeAwaitCompatibleWrap(onRejected, psd, possibleAwait),
+                    nativeAwaitCompatibleWrap(onFulfilled, psd, possibleAwait, cleanup),
+                    nativeAwaitCompatibleWrap(onRejected, psd, possibleAwait, cleanup),
                     resolve,
                     reject,
                     psd));
@@ -321,7 +321,7 @@ props (DexiePromise, {
         set: value => PSD = value
     },
 
-    //totalEchoes: {get: ()=>totalEchoes},
+    totalEchoes: {get: ()=>totalEchoes},
 
     //task: {get: ()=>task},
     
@@ -714,10 +714,11 @@ export function incrementExpectedAwaits() {
 // Function to call when 'then' calls back on a native promise where onAwaitExpected() had been called.
 // Also call this when a native await calls then method on a promise. In that case, don't supply
 // sourceTaskId because we already know it refers to current task.
-export function decrementExpectedAwaits(sourceTaskId) {
-    if (!task.awaits || (sourceTaskId && sourceTaskId !== task.id)) return;
+export function decrementExpectedAwaits() {
+    if (!task.awaits) return false;
     if (--task.awaits === 0) task.id = 0;
     task.echoes = task.awaits * ZONE_ECHO_LIMIT; // Will reset echoes to 0 if awaits is 0.
+    return true;
 }
 
 if ((''+nativePromiseThen).indexOf('[native code]') === -1) {
@@ -834,7 +835,7 @@ function enqueueNativeMicroTask (job) {
     nativePromiseThen.call(resolvedNativePromise, job);
 }
 
-function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
+function nativeAwaitCompatibleWrap(fn, zone, possibleAwait, cleanup) {
     return typeof fn !== 'function' ? fn : function () {
         var outerZone = PSD;
         if (possibleAwait) incrementExpectedAwaits();
@@ -843,6 +844,7 @@ function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
             return fn.apply(this, arguments);
         } finally {
             switchToZone(outerZone, false);
+            if (cleanup) enqueueNativeMicroTask(decrementExpectedAwaits);
         }
     };
 }
@@ -850,8 +852,8 @@ function nativeAwaitCompatibleWrap(fn, zone, possibleAwait) {
 function getPatchedPromiseThen (origThen, zone) {
     return function (onResolved, onRejected) {
         return origThen.call(this,
-            nativeAwaitCompatibleWrap(onResolved, zone, false),
-            nativeAwaitCompatibleWrap(onRejected, zone, false));
+            nativeAwaitCompatibleWrap(onResolved, zone),
+            nativeAwaitCompatibleWrap(onRejected, zone));
     };
 }
 

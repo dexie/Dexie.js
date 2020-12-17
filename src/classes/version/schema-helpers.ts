@@ -1,6 +1,6 @@
 import { Dexie } from '../dexie';
 import { DbSchema } from '../../public/types/db-schema';
-import { setProp, keys, slice, _global, isArray, shallowClone, isAsyncFunction, defineProperty } from '../../functions/utils';
+import { setProp, keys, slice, _global, isArray, shallowClone, isAsyncFunction, defineProperty, getPropertyDescriptor } from '../../functions/utils';
 import { Transaction } from '../transaction';
 import { Version } from './version';
 import Promise, { PSD, newScope, NativePromise, decrementExpectedAwaits, incrementExpectedAwaits } from '../../helpers/promise';
@@ -17,7 +17,9 @@ export function setApiOnPlace(db: Dexie, objs: Object[], tableNames: string[], d
   tableNames.forEach(tableName => {
     const schema = dbschema[tableName];
     objs.forEach(obj => {
-      if (!(tableName in obj)) {
+      const propDesc = getPropertyDescriptor(obj, tableName);
+      if (!propDesc || ("value" in propDesc && propDesc.value === undefined)) {
+        // Either the prop is not declared, or it is initialized to undefined.
         if (obj === db.Transaction.prototype || obj instanceof db.Transaction) {
           // obj is a Transaction prototype (or prototype of a subclass to Transaction)
           // Make the API a getter that returns this.table(tableName)
@@ -125,6 +127,7 @@ export function updateTablesAndIndexes(
       if (contentUpgrade && version._cfg.version > oldVersion) {
         // Update db.core with new tables and indexes:
         generateMiddlewareStacks(db, idbUpgradeTrans);
+        trans._memoizedTables = {}; // Invalidate memoization as transaction shape may change between versions.
 
         anyContentUpgraderHasRun = true;
 
@@ -226,10 +229,17 @@ export function getSchemaDiff(oldSchema: DbSchema, newSchema: DbSchema): SchemaD
         add: [],
         change: []
       };
-      if (oldDef.primKey.src !== newDef.primKey.src &&
-          !isIEOrEdge // IE and non-chromium Edge has a bug reading spec of primary key
-         ) 
-      { 
+      if (
+          (
+             // compare keyPaths no matter if string or string[]
+             // compare falsy keypaths same no matter if they are null or empty string.
+            ''+(oldDef.primKey.keyPath||'')
+          ) !== (
+            ''+(newDef.primKey.keyPath||'')
+          ) ||
+            // Compare the autoIncrement flag also
+          (oldDef.primKey.auto !== newDef.primKey.auto && !isIEOrEdge)) // IE has bug reading autoIncrement prop.
+      {
         // Primary key has changed. Remove and re-add table.
         change.recreate = true;
         diff.change.push(change);

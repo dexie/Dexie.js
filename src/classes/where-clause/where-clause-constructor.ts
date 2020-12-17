@@ -28,7 +28,7 @@ export function createWhereClauseConstructor(db: Dexie) {
         or: orCollection
       };
       const indexedDB = db._deps.indexedDB;
-      if (!indexedDB) throw new exceptions.MissingAPI("indexedDB API missing");
+      if (!indexedDB) throw new exceptions.MissingAPI();
       this._cmp = this._ascending = indexedDB.cmp.bind(indexedDB);
       this._descending = (a, b) => indexedDB.cmp(b, a);
       this._max = (a, b) => indexedDB.cmp(a,b) > 0 ? a : b;

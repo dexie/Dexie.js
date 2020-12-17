@@ -793,3 +793,36 @@ promisedTest("Issue #959 - Should migrate successfully with an explicit unique m
         equal(result2.name, "Bar", "The expected friends was returned");
     }
 );
+
+
+promisedTest(
+  "Issue 1145 - Regression: SchemaError during version upgrade",
+  async () => {
+    const DBNAME = "issue1145";
+    await Dexie.delete(DBNAME);
+    const db = new Dexie(DBNAME);
+    db.version(1).stores({ Y: "id" });
+    await db.open();
+    await db.close();
+    db.version(2).upgrade((trans) => {
+      ok(true, "Starting version 2 upgrade.");
+      return trans.Y.count();
+    });
+    db.version(3).stores({
+      Y: "id,X",
+    });
+    db.version(4).upgrade((trans) => {
+      ok(true, "Starting version 4 upgrade.");
+      return trans.Y.where("X").equals("value").toArray();
+    });
+
+    try {
+      await db.open();
+      ok(true, "Open successful");
+    } catch (e) {
+      ok(false, "Open Failed:: " + e);
+    } finally {
+      await db.delete();
+    }
+  }
+);

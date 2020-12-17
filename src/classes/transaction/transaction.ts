@@ -10,6 +10,7 @@ import { preventDefault } from '../../functions/event-wrappers';
 import { newScope } from '../../helpers/promise';
 import * as Debug from '../../helpers/debug';
 import { Table } from '../table';
+import { globalEvents } from '../../globals/global-events';
 
 /** Transaction
  * 
@@ -126,6 +127,9 @@ export class Transaction implements ITransaction {
     idbtrans.oncomplete = wrap(() => {
       this.active = false;
       this._resolve();
+      if ('mutatedParts' in idbtrans) {
+        globalEvents.txcommitted.fire(idbtrans["mutatedParts"]);
+      }
     });
     return this;
   }

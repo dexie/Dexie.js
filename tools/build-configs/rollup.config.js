@@ -14,21 +14,10 @@ const ERRORS_TO_IGNORE = [
 export default {
   input: path.resolve(__dirname, '../../tools/tmp/src/index.js'),
   output: [{
-    file: path.resolve(__dirname, '../../dist/dexie.js'),
-    format: 'umd',
-    name: 'Dexie',
-    globals: {}, // For tests, use "QUnit". For addons, use "Dexie"
-    sourcemap: true,
-    banner: readFileSync(path.resolve(__dirname, 'banner.txt'))+""
-      .replace(/{version}/g, version)
-      .replace(/{date}/g, new Date().toDateString()),
-  },{
     file: path.resolve(__dirname, '../../dist/dexie.mjs'),
     format: 'es',
     sourcemap: true,
-    banner: readFileSync(path.resolve(__dirname, 'banner.txt'))+""
-      .replace(/{version}/g, version)
-      .replace(/{date}/g, new Date().toDateString()),
+    banner: readFileSync(path.resolve(__dirname, 'banner.txt')),
   }],
   plugins: [
     sourcemaps(),

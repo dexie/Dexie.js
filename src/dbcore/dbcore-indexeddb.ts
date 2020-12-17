@@ -17,7 +17,6 @@ import { eventRejectHandler, preventDefault } from '../functions/event-wrappers'
 import { wrap } from '../helpers/promise';
 import { getMaxKey } from '../functions/quirks';
 import { getKeyExtractor } from './get-key-extractor';
-import { getEffectiveKeys } from './get-effective-keys';
 
 export function arrayify<T>(arrayLike: {length: number, [index: number]: T}): T[] {
   return [].slice.call(arrayLike);
@@ -116,7 +115,7 @@ export function createDBCore (
   function createDbCoreTable(tableSchema: DBCoreTableSchema): DBCoreTable {
     const tableName = tableSchema.name;
 
-    function mutate ({trans, type, keys, values, range, wantResults}) {
+    function mutate ({trans, type, keys, values, range}) {
       return new Promise<DBCoreMutateResponse>((resolve, reject) => {
         resolve = wrap(resolve);
         const store = (trans as IDBTransaction).objectStore(tableName);
@@ -133,32 +132,25 @@ export function createDBCore (
           // No items to write. Don't even bother!
           return resolve({numFailures: 0, failures: {}, results: [], lastResult: undefined});
 
-        const results = wantResults && [...(keys ?
-          keys : // keys already resolved in an earlier middleware. Don't re-resolve them.
-          getEffectiveKeys(tableSchema.primaryKey, {type, keys, values}))];
+        let req: IDBRequest;
+        const reqs: IDBRequest[] = [];
           
-        let req: IDBRequest & { _reqno?};
         const failures: {[operationNumber: number]: Error} = [];
         let numFailures = 0;
         const errorHandler = 
           event => {
             ++numFailures;
             preventDefault(event);
-            if (results) results[(event.target as any)._reqno] = undefined;
-            failures[(event.target as any)._reqno] = event.target.error;
           };
-        const setResult = ({target}) => {
-          results[target._reqno] = target.result;
-        }
   
         if (type === 'deleteRange') {
           // Here the argument is the range
           if (range.type === DBCoreRangeType.Never)
-            return resolve({numFailures, failures, results, lastResult: undefined}); // Deleting the Never range shoulnt do anything.
+            return resolve({numFailures, failures, results: [], lastResult: undefined}); // Deleting the Never range shoulnt do anything.
           if (range.type === DBCoreRangeType.Any)
-            req = store.clear(); // Deleting the Any range is equivalent to store.clear()
+            reqs.push(req = store.clear()); // Deleting the Any range is equivalent to store.clear()
           else
-            req = store.delete(makeIDBKeyRange(range));
+            reqs.push(req = store.delete(makeIDBKeyRange(range)));
         } else {
           // No matter add, put or delete - find out arrays of first and second arguments to it.
           const [args1, args2] = isAddOrPut ?
@@ -169,32 +161,25 @@ export function createDBCore (
 
           if (isAddOrPut) {
             for (let i=0; i<length; ++i) {
-              req = (args2 && args2[i] !== undefined ?
+              reqs.push(req = (args2 && args2[i] !== undefined ?
                 store[type](args1[i], args2[i]) :
-                store[type](args1[i])) as IDBRequest;
-              req._reqno = i;
-              if (results && results[i] === undefined) {
-                // Key is not set explicitely and is autoIncremented.
-                // Have to listen for onsuccess and set the resulting key.
-                req.onsuccess = setResult;
-              }
+                store[type](args1[i])) as IDBRequest);
               req.onerror = errorHandler;
             }
           } else {
             for (let i=0; i<length; ++i) {
-              req = store[type](args1[i]) as IDBRequest;
-              req._reqno = i;
+              reqs.push(req = store[type](args1[i]) as IDBRequest);
               req.onerror = errorHandler;
             }
           }
         }
         const done = event => {
           const lastResult = event.target.result;
-          if (results) results[length-1] = lastResult;
+          reqs.forEach((req, i) => req.error != null && (failures[i] = req.error));
           resolve({
             numFailures,
             failures,
-            results,
+            results: type === "delete" ? keys : reqs.map(req => req.result),
             lastResult
           });
         };

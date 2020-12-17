@@ -41,7 +41,7 @@ module("table", {
 });
 
 promisedTest("Issue #841 - put() ignores date changes", async ()=> {
-    db.folks.hook("updating", (mods) => {
+    const updateAssertions = (mods) => {
         equal(mods.first, first2, `first value should be ${first2} but is ${mods.first}`)
         
         equal(!!mods.date, true, "date should be included in modifications");
@@ -49,7 +49,8 @@ promisedTest("Issue #841 - put() ignores date changes", async ()=> {
         if (mods.date) {
             equal(mods.date.getTime(), date2.getTime(), `date should be ${date2} but is ${mods.date}`)
         }
-    });
+    };
+    db.folks.hook("updating", updateAssertions);
 
     const date1 = new Date("2019-05-03");
     const date2 = new Date("2020-01-01");
@@ -73,6 +74,53 @@ promisedTest("Issue #841 - put() ignores date changes", async ()=> {
     obj = await db.folks.get(id);
     equal(obj.first, first2, `first should have been successfully updated to '${first2}'`);
     equal(obj.date.getTime(), date2.getTime(), "Date should have been successfully updated to be date2");
+
+    db.folks.hook("updating").unsubscribe(updateAssertions);
+});
+
+promisedTest("Issue #966 - put() with dotted field in update hook", async () => {
+    const updateAssertions = (mods) => {
+        equal(mods["nested.field"], "value", "mods.nested.field should contain 'value'");
+        equal(mods.nested, undefined, "mods.nested field should be empty");
+        return {...mods};
+    };
+    db.folks.hook("updating", updateAssertions);
+
+    const id = await db.folks.add({first: "first", last: "last"});
+    await db.folks.put({first: "first", last: "last", "nested.field": "value"}, id);
+
+    let obj = await db.folks.get(id);
+    equal(obj["nested.field"], "value", "obj.nested.field should have been successfully updated to 'value'");
+    equal(obj.nested, undefined, "obj.nested field should have remained undefined");
+
+    db.folks.hook("updating").unsubscribe(updateAssertions);
+});
+
+promisedTest("Verify #1130 doesn't break contract of hook('updating')", async ()=>{
+    const updateHook = (mods) => {
+        return {"address.postalCode": 111};
+    };
+    try {
+      const id = await db.folks.add({
+        first: "Foo",
+        last: "Bar",
+        address: {
+            city: "Stockholm",
+            street: "Folkungagatan"
+        }
+      });
+      db.folks.hook("updating", updateHook);
+      await db.folks.update(id, {
+          "address.streetNo": 23
+      });
+      let foo = await db.folks.get(id);
+      equal(foo.address.city, "Stockholm", "Correct city Stockholm");
+      equal(foo.address.street, "Folkungagatan", "Correct street Folkungagatan");
+      equal(foo.address.streetNo, 23, "Correct streetNo: 23");
+      equal(foo.address.postalCode, 111, "Hooks should have added postal code");
+    } finally {
+      db.folks.hook("updating").unsubscribe(updateHook);
+    }
 });
 
 asyncTest("get", 4, function () {

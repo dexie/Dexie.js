@@ -242,33 +242,38 @@ function Observable(db) {
                 });
             }
             // Add new sync node or if this is a reopening of the database after a close() call, update it.
-            return db.transaction('rw', '_syncNodes', () => {
-                return db._syncNodes
-                    .where('isMaster').equals(1)
-                    .first(currentMaster => {
-                        if (!currentMaster) {
-                            // There's no master. We must be the master
-                            mySyncNode.node.isMaster = 1;
-                        } else if (currentMaster.lastHeartBeat < Date.now() - NODE_TIMEOUT) {
-                            // Master have been inactive for too long
-                            // Take over mastership
-                            mySyncNode.node.isMaster = 1;
-                            currentMaster.isMaster = 0;
-                            return db._syncNodes.put(currentMaster);
+            return db._syncNodes.put(mySyncNode.node).then(Dexie.ignoreTransaction(() => {
+                // By default, this node will become master unless we discover an existing, up-to-date master
+                var mySyncNodeShouldBecomeMaster = 1;
+                return db._syncNodes.orderBy('isMaster').reverse().modify(existingNode => {
+                    if (existingNode.isMaster) {
+                        if (existingNode.lastHeartBeat < Date.now() - NODE_TIMEOUT) {
+                            // Existing master record is out-of-date; demote it
+                            existingNode.isMaster = 0;
+                        } else {
+                            // An existing up-to-date master record exists, so it will remain master
+                            mySyncNodeShouldBecomeMaster = 0;
                         }
-                    }).then(()=>{
-                        // Add our node to DB and start subscribing to events
-                        return db._syncNodes.add(mySyncNode.node).then(function() {
-                            Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
-                            Observable.on('beforeunload', onBeforeUnload);
-                            Observable.on('suicideNurseCall', onSuicide);
-                            Observable.on('intercomm', onIntercomm);
-                            // Start polling for changes and do cleanups:
-                            pollHandle = setTimeout(poll, LOCAL_POLL);
-                            // Start heartbeat
-                            heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
-                        });
+                    }
+
+                    // The local node reference may be unassigned at any point by a database close() operation
+                    if (!mySyncNode.node) return;
+
+                    // Assign the local node state
+                    // This is guaranteed to apply *after* any existing master records have been inspected, due to the orderBy clause
+                    if (existingNode.id === mySyncNode.node.id) {
+                        existingNode.isMaster = mySyncNode.node.isMaster = mySyncNodeShouldBecomeMaster;
+                    }
                 });
+            })).then(() => {
+                Observable.on('latestRevisionIncremented', onLatestRevisionIncremented); // Wakeup when a new revision is available.
+                Observable.on('beforeunload', onBeforeUnload);
+                Observable.on('suicideNurseCall', onSuicide);
+                Observable.on('intercomm', onIntercomm);
+                // Start polling for changes and do cleanups:
+                pollHandle = setTimeout(poll, LOCAL_POLL);
+                // Start heartbeat
+                heartbeatHandle = setTimeout(heartbeat, HEARTBEAT_INTERVAL);
             }).then(function () {
                 cleanup();
             });
