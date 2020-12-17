@@ -2,6 +2,7 @@ import { DexieEventSet } from "./dexie-event-set";
 import { DexieEvent } from "./dexie-event";
 import { Transaction } from "./transaction";
 import { RangeBtree } from "./rangeset";
+import { DBCoreMutateRequest } from "./dbcore";
 
 export interface DexieOnReadyEvent {
   subscribe(fn: () => any, bSticky: boolean): void;
@@ -37,6 +38,10 @@ export type ObservabilitySet = {
   // `idb:${dbName}/${tableName}/changedIndexes/${indexName}` - indexes
   [part: string]: RangeBtree;
 };
+
+export type TxCommittedData = {
+  [part: string]: true | DBCoreMutateRequest[];
+}
 
 export interface DexieOnTxCommittedEvent {
   subscribe(fn: (parts: ObservabilitySet) => any): void;
