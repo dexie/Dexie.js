@@ -9,7 +9,8 @@ const db = new Dexie("TestLiveQuery");
 db.version(2).stores({
     items: "id, name",
     foo: "++id",
-    outbound: "++,name"
+    outbound: "++,name",
+    friends: "++id, name, age"
 });
 
 db.on('populate', ()=> {
@@ -250,6 +251,7 @@ promisedTest("subscribe and error occur", async ()=> {
  */
 
 let abbaKey = 0;
+let lastFriendId = 0;
 let fruitCount = 0; // A bug in Safari <= 13.1 makes it unable to count on the name index (adds 1 extra)
 const mutsAndExpects = () => [
   // add
@@ -404,6 +406,12 @@ const mutsAndExpects = () => [
     {
       itemsStartsWithACount: fruitCount + 2
     }
+  ],
+  [
+    ()=>db.friends.add({name: "Foo", age: 20}).then(id => lastFriendId = id),
+    {
+      friendsOver18: [{get id(){return lastFriendId}, name: "Foo", age: 20}]
+    }
   ]
   // deleteRange: TODO this
 ]
@@ -434,6 +442,8 @@ promisedTest("Full use case matrix", async ()=>{
     outboundStartsWithA: () => db.outbound.where('name').startsWith("A").toArray(),
     outboundIdBtwnMinus1And2: () => db.outbound.where(':id').between(-1, 2, true, true).toArray(),
     outboundAnyOf_BCD_keys: () => db.outbound.where('name').anyOf("B", "C", "D").keys(),
+
+    friendsOver18: () => db.friends.where('age').above(18).toArray()
   };
   const expectedInitialResults = {
     itemsToArray: [{id: 1}, {id: 2}, {id: 3}],
@@ -452,7 +462,9 @@ promisedTest("Full use case matrix", async ()=>{
     ],
     outboundStartsWithA: [{num: 1, name: "A"}],
     outboundIdBtwnMinus1And2: [{num: 1, name: "A"}, {num: 2, name: "B"}],
-    outboundAnyOf_BCD_keys: ["B", "C"]
+    outboundAnyOf_BCD_keys: ["B", "C"],
+
+    friendsOver18: [],
   }
   let flyingNow = 0;
   let signal = new Signal();
