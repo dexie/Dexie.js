@@ -259,7 +259,7 @@ export const getValueOf = (val:any, type: string) =>
                 const bpTypeName = toStringTag(bp);
 
                 if (apTypeName === bpTypeName) {
-                    if (intrinsicTypeNameSet[apTypeName]) {
+                    if (intrinsicTypeNameSet[apTypeName] || isArray(ap)) {
                         // This is an intrinsic type. Don't go deep diffing it.
                         // Instead compare its value in best-effort:
                         // (Can compare real values of Date, ArrayBuffers and views)

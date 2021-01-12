@@ -3,7 +3,7 @@
  */
 import Dexie from 'dexie';
 import {module, stop, start, test, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, supports, spawnedTest} from './dexie-unittest-utils';
+import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
 let Promise = Dexie.Promise,
     all = Promise.all,
@@ -764,5 +764,36 @@ spawnedTest("deleting using Collection.delete()", function*(){
     }], ()=>db.transaction('rw', db.tables, function* (){
         yield db.table1.add({id:1}); // create
         yield db.table1.where('id').between(0,2).delete(); // delete
+    }));
+});
+
+promisedTest("issue #1195 Update with array as value adds number objects", async ()=>{
+    await expect([{
+        op: "create",
+        key: 1,
+        value: {id:1}
+    },{
+        op: "update",
+        key: 1,
+        obj: {id:1},
+        mods: {authors: [{foo: "bar"}]},
+        updatedObj: {id:1, authors: [{foo: "bar"}]},
+    },{
+        op: "update",
+        key: 1,
+        obj: {id:1, authors: [{foo: "bar"}]},
+        mods: {authors: []},
+        updatedObj: {id:1, authors: []},
+    },{
+        op: "update",
+        key: 1,
+        obj: {id:1, authors: []},
+        mods: {authors: [{name: "foo"}, {name: "bar"}]},
+        updatedObj: {id:1, authors: [{name: "foo"}, {name: "bar"}]},
+    }], ()=>db.transaction('rw', db.table1, async ()=>{
+        await db.table1.add({id:1});
+        await db.table1.put({id:1, authors: [{foo: "bar"}]});
+        await db.table1.put({id:1, authors: []});
+        await db.table1.put({id:1, authors: [{name: "foo"}, {name: "bar"}]});
     }));
 });

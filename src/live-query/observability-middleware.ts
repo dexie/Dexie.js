@@ -103,7 +103,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
           | DBCoreCountRequest
           | DBCoreOpenCursorRequest) => [
           index,
-          new RangeSet(range.lower, range.upper),
+          new RangeSet(range.lower ?? core.MIN_KEY, range.upper ?? core.MAX_KEY),
         ];
 
         const readSubscribers: {[method in
