@@ -137,7 +137,8 @@ export interface ModifyError extends DexieError {
  * http://dexie.org/docs/DexieErrors/Dexie.BulkError
  */
 export interface BulkError extends DexieError {
-  failures: {[operationNumber: number]: Error};
+  failures: Error[];
+  failuresByPos: {[operationNumber: number]: Error};
 }
 
 export interface DexieErrorConstructor {
