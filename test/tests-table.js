@@ -945,8 +945,13 @@ promisedTest("bulkError by pos", async () => {
     ]);
     ok(false, "Should not succeed");
   } catch (bulkError) {
-    equal(bulkError.failures.length === 1, "Got one failure");
+    ok(bulkError instanceof Dexie.BulkError, "Got BulkError");
+    equal(bulkError.failures.length, 1, "Got one failure");
+    ok(bulkError.failures[0] instanceof Error, "failures[0] instanceof Error");
+    ok(bulkError.failures[1] === undefined, "failures[1] is undefined");
     equal(Object.keys(bulkError.failuresByPos).length, 1, "Got one key in failuresByPos");
     equal(Object.keys(bulkError.failuresByPos)[0], 1, "Failure in position 1");
+    ok(bulkError.failuresByPos[0] === undefined, "failuresByPos[0] is undefined");
+    ok(bulkError.failuresByPos[1] instanceof Error, "failuresByPos[1] instanceof Error");
   }
 });
