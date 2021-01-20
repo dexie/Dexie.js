@@ -935,3 +935,23 @@ promisedTest("bulkGet()", async () => {
     ok(u3 && u3.first === 'Foo100', "Third should be Foo100");
     ok(u4 === undefined, "Forth should be undefined");
 });
+
+promisedTest("bulkError by pos", async () => {
+  try {
+    const ids = await db.users.bulkAdd([
+      { first: "foo1", last: "bar1", username: "foobar" },
+      { first: "foo2", last: "bar2", username: "foobar" }, // should fail because username is unique idx
+      { first: "foo3", last: "bar3", username: "foobar3" },
+    ]);
+    ok(false, "Should not succeed");
+  } catch (bulkError) {
+    ok(bulkError instanceof Dexie.BulkError, "Got BulkError");
+    equal(bulkError.failures.length, 1, "Got one failure");
+    ok(!!bulkError.failures[0], "failures[0] is one Error");
+    ok(bulkError.failures[1] === undefined, "failures[1] is undefined");
+    equal(Object.keys(bulkError.failuresByPos).length, 1, "Got one key in failuresByPos");
+    equal(Object.keys(bulkError.failuresByPos)[0], 1, "Failure in position 1");
+    ok(bulkError.failuresByPos[0] === undefined, "failuresByPos[0] is undefined");
+    ok(!!bulkError.failuresByPos[1], "failuresByPos[1] is one Error");
+  }
+});

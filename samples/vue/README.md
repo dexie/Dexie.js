@@ -16,7 +16,7 @@ npm install
 
 ## Development server
 
-Run `npm run start` for a dev server. Navigate to `http://localhost:1123`. The app will automatically reload if you change any of the source files. You will also see any lint errors in the console.
+Run `npm run serve` for a dev server. Navigate to `http://localhost:1123`. The app will automatically reload if you change any of the source files. You will also see any lint errors in the console.
 
 ## Build
 
