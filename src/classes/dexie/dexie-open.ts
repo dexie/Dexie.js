@@ -100,6 +100,10 @@ export function dexieOpen (db: Dexie) {
               db.on("versionchange").fire(ev);
           });
           
+          idbdb.onclose = wrap(ev => {
+              db.on("close").fire(ev);
+          });
+
           _onDatabaseCreated(db._deps, dbName);
 
           resolve();
