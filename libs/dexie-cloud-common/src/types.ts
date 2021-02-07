@@ -73,4 +73,4 @@ export interface WhitelistRequest {
   delete?: boolean;
 }
 
-export type WhitelistResponse = number;
+export type WhitelistResponse = number | string[];
