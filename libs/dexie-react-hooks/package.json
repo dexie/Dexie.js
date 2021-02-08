@@ -1,6 +1,6 @@
 {
   "name": "dexie-react-hooks",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "React hooks for reactive data fetching using Dexie.js",
   "main": "dist/dexie-react-hooks.js",
   "module": "dist/dexie-react-hooks.mjs",
@@ -12,7 +12,8 @@
   "just-build": {
     "default": [
       "just-build dexie",
-      "rollup -c rollup.config.js"
+      "rollup -c rollup.config.js",
+      "tsc --emitDeclarationOnly"
     ],
     "run-tests": [
       "karma start test/karma.conf.js --single-run"
