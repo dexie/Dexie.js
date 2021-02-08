@@ -3,6 +3,7 @@
   "version": "1.0.3",
   "description": "React hooks for reactive data fetching using Dexie.js",
   "main": "dist/dexie-react-hooks.js",
+  "module": "dist/dexie-react-hooks.mjs",
   "typings": "dist/index.d.ts",
   "scripts": {
     "test": "just-build build-tests && just-build run-tests",
