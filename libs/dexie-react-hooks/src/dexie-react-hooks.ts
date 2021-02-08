@@ -8,7 +8,7 @@ export function useLiveQuery<T,TDefault> (querier: ()=>Promise<T> | T, dependen
   const [lastResult, setLastResult] = useState(defaultResult as T | TDefault);
   const subscription = useMemo(
     () => {
-      // Make it remember previus subscription's default value when
+      // Make it remember previous subscription's default value when
       // resubscribing (á la useTransition())
       let currentValue = lastResult;
       const observable = liveQuery(querier);
