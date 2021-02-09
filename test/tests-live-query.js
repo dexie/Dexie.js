@@ -252,6 +252,7 @@ promisedTest("subscribe and error occur", async ()=> {
 
 let abbaKey = 0;
 let lastFriendId = 0;
+let barbarFriendId = 0;
 let fruitCount = 0; // A bug in Safari <= 13.1 makes it unable to count on the name index (adds 1 extra)
 const mutsAndExpects = () => [
   // add
@@ -411,6 +412,15 @@ const mutsAndExpects = () => [
     ()=>db.friends.add({name: "Foo", age: 20}).then(id => lastFriendId = id),
     {
       friendsOver18: [{get id(){return lastFriendId}, name: "Foo", age: 20}]
+    }
+  ],
+  [
+    ()=>db.friends.put({name: "Barbar", age: 21}).then(id => barbarFriendId = id),
+    {
+      friendsOver18: [
+        {get id(){return lastFriendId}, name: "Foo", age: 20},
+        {get id(){return barbarFriendId}, name: "Barbar", age: 21}
+      ]
     }
   ]
   // deleteRange: TODO this
