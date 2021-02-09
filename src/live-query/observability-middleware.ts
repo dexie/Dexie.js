@@ -76,7 +76,9 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                   // delete or put and we don't know old values.
                   // Indicate this in the ":dels" part, for the sake of count() queries only!
                   delsRangeSet.addKeys(keys);
-                } else {
+                }
+                if (type === "put" || type === "add") {
+                  // No matter if knowning oldObjs or not, track the indices if it's a put or add.
                   trackAffectedIndexes(getRangeSet, schema, oldObjs, newObjs);
                 }
               } else if (keys) {
