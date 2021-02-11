@@ -90,9 +90,11 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                 pkRangeSet.add(range);
               } else {
                 // Too many requests to record the details without slowing down write performance.
-                // Let's just record a generic large range
+                // Let's just record a generic large range on primary key, the virtual :dels index and
+                // all secondary indices:
                 pkRangeSet.add(FULL_RANGE);
                 delsRangeSet.add(FULL_RANGE);
+                schema.indexes.forEach(idx => getRangeSet(idx.name).add(FULL_RANGE));
               }
               return res;
             });
