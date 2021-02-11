@@ -5,6 +5,7 @@ export interface OTPTokenRequest {
   grant_type: "otp";
   public_key?: string; // If a refresh token is requested. Clients own the keypair and sign refresh_token requests using it.
   email: string;
+  scopes: string[]; // TODO use CLIENT_SCOPE type.
   otp_id?: string;
   otp?: string;
 }
@@ -14,9 +15,9 @@ export interface ClientCredentialsTokenRequest {
   client_id: string;
   client_secret: string;
   public_key?: string; // If a refresh token is requested. The web client calling the server-client should own corresponding private key.
+  scopes: string[]; // TODO: Move TOKEN_SCOPE type to this lib and use it instead.
   claims?: {
     sub: string;
-    scopes: string[]; // TODO: Move TOKEN_SCOPE type to this lib and use it instead.
     email?: string;
     email_verified?: string;
     [customClaim: string]: any;
@@ -27,6 +28,7 @@ export interface ClientCredentialsTokenRequest {
 
 export interface RefreshTokenRequest {
   grant_type: "refresh_token";
+  scopes: string[]; // TODO use CLIENT_SCOPE type.
   public_key?: string; // Optional. Makes it possible to renew keypair. Given signature must still be generated using the old keypair.
   refresh_token: string;
   time_stamp: number;
@@ -36,6 +38,7 @@ export interface RefreshTokenRequest {
 
 export interface DemoTokenRequest {
   grant_type: "demo";
+  scopes: ["ACCESS_DB"];
   demo_user: string; // Email of a demo user that must have been added using the dexie cloud CLI.
 }
 
@@ -74,3 +77,12 @@ export interface WhitelistRequest {
 }
 
 export type WhitelistResponse = number | string[];
+
+export type ClientsResponse = DXCClient[];
+
+export interface DXCClient {
+  id: string;
+  email: string;
+  emailVerified: boolean;
+  scopes: string[]; // TODO: Use the CLIENT_SCOPE[] type.
+}
