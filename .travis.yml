@@ -1,6 +1,6 @@
 language: node_js
 addons:
-  firefox: "82.0"
+  firefox: "85.0"
 node_js:
   - "12"
 matrix:
