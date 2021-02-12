@@ -46,6 +46,10 @@ export interface TokenFinalResponse {
   type: "tokens";
   accessToken: string;
   refreshToken?: string;
+  alerts?: {
+    type: "warning" | "info",
+    message: string;
+  }[];
 }
 
 export interface TokenOtpSentResponse {
