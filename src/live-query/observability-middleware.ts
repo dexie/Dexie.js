@@ -272,11 +272,8 @@ function trackAffectedIndexes(
       const newKey = newObjs && extractKey(newObjs[i]);
       if (cmp(oldKey, newKey) !== 0) {
         // The index has changed. Add both old and new value of the index.
-        // NOTE! If the argument passed to rangeSet.addKey() is null, NaN
-        // or other IDB-invalid key, rangeSet.addKey() will be a noop as
-        // it will test for invalidity before adding it.
-        rangeSet.addKey(oldKey); 
-        rangeSet.addKey(newKey);
+        if (oldKey != null) rangeSet.addKey(oldKey); // If oldKey is invalid key, addKey() will be a noop.
+        if (newKey != null) rangeSet.addKey(newKey); // If newKey is invalid key, addKey() will be a noop.
       }
     });
   }
