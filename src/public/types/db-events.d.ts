@@ -21,15 +21,23 @@ export interface DexiePopulateEvent {
   fire(trans: Transaction): any;
 }
 
+export interface DexieCloseEvent {
+  subscribe(fn: (event: Event) => any): void;
+  unsubscribe(fn: (event: Event) => any): void;
+  fire(event: Event): any;
+}
+
 export interface DbEvents extends DexieEventSet {
   (eventName: 'ready', subscriber: () => any, bSticky?: boolean): void;
   (eventName: 'populate', subscriber: (trans: Transaction) => any): void;
   (eventName: 'blocked', subscriber: (event: IDBVersionChangeEvent) => any): void;
   (eventName: 'versionchange', subscriber: (event: IDBVersionChangeEvent) => any): void;
+  (eventName: 'close', subscriber: (event: Event) => any): void;
   ready: DexieOnReadyEvent;
   populate: DexiePopulateEvent;
   blocked: DexieEvent;
   versionchange: DexieVersionChangeEvent;
+  close: DexieCloseEvent;
 }
 
 export type ObservabilitySet = {
@@ -45,6 +53,6 @@ export interface DexieOnTxCommittedEvent {
 }
 
 export interface GlobalDexieEvents extends DexieEventSet {
-  (eventName: 'txcommitted', subscriber: (parts: ObservabilitySet)=>any): void;
+  (eventName: 'txcommitted', subscriber: (parts: ObservabilitySet) => any): void;
   txcommitted: DexieOnTxCommittedEvent;
 }

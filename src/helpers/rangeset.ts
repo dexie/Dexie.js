@@ -49,7 +49,14 @@ props(RangeSet.prototype, {
 });
 
 function addRange(target: RangeBtree, from: IndexableType, to: IndexableType) {
-  if (cmp(from, to) > 0) throw RangeError();
+  const diff = cmp(from, to);
+  // cmp() returns NaN if one of the args are IDB-invalid keys.
+  // Avoid storing invalid keys in rangeset:
+  if (isNaN(diff)) return;
+
+  // Caller is trying to add a range where from is greater than to:
+  if (diff > 0) throw RangeError();
+  
   if (isEmptyRange(target)) return extend(target, { from, to, d: 1 });
   const left = target.l;
   const right = target.r;

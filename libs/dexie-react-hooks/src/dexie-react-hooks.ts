@@ -1,12 +1,12 @@
 import {liveQuery} from "dexie";
 import {useSubscription} from "./use-subscription";
-import {useMemo, useState} from "react";
+import React from "react";
 
 export function useLiveQuery<T>(querier: ()=>Promise<T> | T, dependencies?: any[]): T | undefined;
 export function useLiveQuery<T,TDefault> (querier: ()=>Promise<T> | T, dependencies: any[], defaultResult: TDefault) : T | TDefault;
 export function useLiveQuery<T,TDefault> (querier: ()=>Promise<T> | T, dependencies?: any[], defaultResult?: TDefault) : T | TDefault{
-  const [lastResult, setLastResult] = useState(defaultResult as T | TDefault);
-  const subscription = useMemo(
+  const [lastResult, setLastResult] = React.useState(defaultResult as T | TDefault);
+  const subscription = React.useMemo(
     () => {
       // Make it remember previus subscription's default value when
       // resubscribing (á la useTransition())
