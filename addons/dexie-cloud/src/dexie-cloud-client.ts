@@ -65,6 +65,6 @@ dexieCloud.version = "{version}";
 
 Dexie.Cloud = dexieCloud;
 
-Dexie.addons.push(dexieCloud);
+//Dexie.addons.push(dexieCloud);
 
 export default dexieCloud;
