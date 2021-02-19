@@ -1,4 +1,4 @@
-import Dexie, {liveQuery, rangesOverlap, RangeSet} from 'dexie';
+import Dexie, {liveQuery} from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
 import {resetDatabase, supports, promisedTest, isIE} from './dexie-unittest-utils';
 import sortedJSON from "sorted-json";
@@ -25,22 +25,6 @@ db.on('populate', ()=> {
     {num: 3, name: "C"}
   ], [1, 2, 3]);
 });
-
-function rangeSet(ranges) {
-  const set = new RangeSet();
-  for (const range of ranges) {
-    set.add({from: range[0], to: range[range.length-1]});
-  }
-  return set;
-}
-
-function hasKey(set, key) {
-  return rangesOverlap(set, new RangeSet(key))
-}
-
-function hasAllKeys(set, keys) {
-  keys.every(key => hasKey(set, key));
-}
 
 function objectify(map) {
   const rv = {};
