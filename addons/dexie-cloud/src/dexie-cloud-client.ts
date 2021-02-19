@@ -1,18 +1,18 @@
 import Dexie from "dexie";
-//import dexieObservable from "dexie-observable";
-//import dexieSyncable from "dexie-syncable";
+import dexieObservable from "dexie-observable";
+import dexieSyncable from "dexie-syncable";
 import { createIdGenerationMiddleware } from './createIdGenerationMiddleware';
 import { DexieCloudOptions } from './DexieCloudOptions';
 import { DexieCloudSchema } from './DexieCloudSchema';
 import { dexieCloudSyncProtocol } from "./dexieCloudSyncProtocol";
 import { overrideParseStoresSpec } from './overrideParseStoresSpect';
 
-/*const DEXIE_CLOUD_PROTOCOL_NAME = "dexie.cloud";
+const DEXIE_CLOUD_PROTOCOL_NAME = "dexiecloud";
 
 dexieSyncable.registerSyncProtocol(
   DEXIE_CLOUD_PROTOCOL_NAME,
   dexieCloudSyncProtocol
-);*/
+);
 
 //
 // Extend Dexie interface
@@ -50,8 +50,8 @@ export function dexieCloud(db: Dexie) {
     schema: {},
     configure (options: DexieCloudOptions) {
       db.cloud.options = options;
-      //return db.syncable.connect(DEXIE_CLOUD_PROTOCOL_NAME, options.databaseUrl, options);
-      return Promise.resolve();
+      return db.syncable.connect(DEXIE_CLOUD_PROTOCOL_NAME, options.databaseUrl, options);
+      //return Promise.resolve();
     }
   }
   db.Version.prototype["_parseStoresSpec"] = Dexie.override(
