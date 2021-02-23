@@ -1,7 +1,7 @@
 import Dexie from "dexie";
 import dexieObservable from "dexie-observable";
 import dexieSyncable from "dexie-syncable";
-import { createIdGenerationMiddleware } from './createIdGenerationMiddleware';
+import { createIdGenerationMiddleware } from './middlewares/createIdGenerationMiddleware';
 import { DexieCloudOptions } from './DexieCloudOptions';
 import { DexieCloudSchema } from './DexieCloudSchema';
 import { dexieCloudSyncProtocol } from "./dexieCloudSyncProtocol";
@@ -59,6 +59,8 @@ export function dexieCloud(db: Dexie) {
     origFunc => overrideParseStoresSpec(origFunc, db.cloud.schema));
 
   db.use(createIdGenerationMiddleware(db.cloud.schema));
+  dexieObservable(db);
+  dexieSyncable(db);
 }
 
 dexieCloud.version = "{version}";

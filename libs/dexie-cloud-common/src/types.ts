@@ -45,7 +45,9 @@ export interface DemoTokenRequest {
 export interface TokenFinalResponse {
   type: "tokens";
   accessToken: string;
+  accessTokenExpiration: number;
   refreshToken?: string;
+  refreshTokenExpiration?: number;
   alerts?: {
     type: "warning" | "info",
     message: string;

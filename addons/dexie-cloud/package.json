@@ -74,6 +74,7 @@
   },
   "dependencies": {
     "dexie": "^3.0.2",
+    "dexie-cloud-common": "^1.0.2",
     "dexie-observable": "^3.0.0-beta.9",
     "dexie-syncable": "^3.0.0-beta.9"
   }

@@ -1,63 +1,84 @@
 import { IDatabaseChange } from "dexie-observable/api";
-import { ISyncProtocol } from "dexie-syncable/api";
+import {
+  ApplyRemoteChangesFunction,
+  IPersistedContext,
+  ISyncProtocol,
+  ReactiveContinuation,
+} from "dexie-syncable/api";
+import { authenticate } from './authenticate';
 import { TSON } from "./TSON";
 
 // Constants:
 var RECONNECT_DELAY = 5000; // Reconnect delay in case of errors such as network down.
 
 export const dexieCloudSyncProtocol: ISyncProtocol = {
-  sync(
-    context,
-    url,
-    options,
-    baseRevision,
-    syncedRevision,
-    changes,
-    partial,
-    applyRemoteChanges,
-    onChangesAccepted,
-    onSuccess,
-    onError
+  async sync(
+    context: IPersistedContext,
+    url: string,
+    options: { databaseUrl: string; requireAuth?: boolean },
+    baseRevision: any,
+    syncedRevision: any,
+    changes: IDatabaseChange[],
+    partial: boolean,
+    applyRemoteChanges: ApplyRemoteChangesFunction,
+    onChangesAccepted: () => void,
+    onSuccess: (continuation: ReactiveContinuation) => void,
+    onError: (error: any, again: number) => void
   ) {
     // The following vars are needed because we must know which callback to ack when server sends it's ack to us.
     let requestId = 0;
     const acceptCallbacks = new Map<number, () => void>();
+    const wsUrl = new URL(url);
+    wsUrl.protocol = wsUrl.protocol === "https" ? "wss" : "ws";
+    const token: string = options.requireAuth
+      ? await authenticate(url, context)
+      : null;
+    const query = `?clientIdentity=${encodeURIComponent(
+      context.clientIdentity
+    )}${token ? `&token=${encodeURIComponent(token)}` : ``}`;
 
     // Connect the WebSocket to given url:
     // Initiate this socket connection by sending our clientIdentity. If we dont have a clientIdentity yet,
     // server will call back with a new client identity that we should use in future WebSocket connections.
     const ws = new WebSocket(
-      url +
+      wsUrl.toString() +
         `?token=${encodeURIComponent(
-          options.token
+          token
         )}&clientIdentity=${encodeURIComponent(context.clientIdentity || "")}`
     );
     ws.binaryType = "arraybuffer";
 
-    // Send our changes if we have any:
-    if (changes.length > 0) {
-      sendChanges(changes, baseRevision, partial, onChangesAccepted);
-    }
-
     // When WebSocket opens, send our changes to the server.
     ws.onopen = (event) => {
+      console.log("onopen");
+      // Send our changes if we have any:
+      if (changes.length > 0) {
+        console.log("sending changes");
+        sendChanges(changes, baseRevision, partial, onChangesAccepted);
+      }
       // Subscribe to server changes:
+      console.log("subscribing");
       ws.send(
         JSON.stringify({
           type: "subscribe",
           syncedRevision: syncedRevision,
         })
       );
+      /*setInterval(()=>{
+        ws.send(JSON.stringify({type: "test"}));
+      }, 1000);*/
     };
 
     // If network down or other error, tell the framework to reconnect again in some time:
     ws.onerror = function (event) {
+      console.log("onerror");
       ws.close();
       onError((event as ErrorEvent).message, RECONNECT_DELAY);
     };
 
     // If socket is closed (network disconnected), inform framework and make it reconnect
     ws.onclose = function (event) {
+      console.log("onclose");
       onError("Socket closed: " + event.reason, RECONNECT_DELAY);
     };
 
@@ -71,6 +92,7 @@ export const dexieCloudSyncProtocol: ISyncProtocol = {
     let incomingBinaryChunks: any[] = [];
     // When message arrive from the server, deal with the message accordingly:
     ws.onmessage = function (event) {
+      console.log("onmessage");
       try {
         // Assume we have a server that should send JSON messages of the following format:
         // {
@@ -85,7 +107,10 @@ export const dexieCloudSyncProtocol: ISyncProtocol = {
         if (typeof event.data !== "string") {
           incomingBinaryChunks.push(event.data);
         } else {
-          const requestFromServer = TSON.parse(event.data, incomingBinaryChunks);
+          const requestFromServer = TSON.parse(
+            event.data,
+            incomingBinaryChunks
+          );
           incomingBinaryChunks = [];
           if (requestFromServer.type === "changes") {
             applyRemoteChanges(
@@ -93,9 +118,11 @@ export const dexieCloudSyncProtocol: ISyncProtocol = {
               requestFromServer.currentRevision,
               requestFromServer.partial
             );
-            
+
             if (isFirstRound && !requestFromServer.partial) {
               // Since this is the first sync round and server sais we've got all changes - now is the time to call onsuccess()
+              console.log("Calling onSuccess with continuation react.");
+              debugger;
               onSuccess({
                 // Specify a react function that will react on additional client changes
                 react: function (
@@ -104,10 +131,17 @@ export const dexieCloudSyncProtocol: ISyncProtocol = {
                   partial,
                   onChangesAccepted
                 ) {
-                  sendChanges(changes, baseRevision, partial, onChangesAccepted);
+                  console.log("Got changes", changes);
+                  sendChanges(
+                    changes,
+                    baseRevision,
+                    partial,
+                    onChangesAccepted
+                  );
                 },
                 // Specify a disconnect function that will close our socket so that we dont continue to monitor changes.
                 disconnect: function () {
+                  console.log("Framework wants to disconnect");
                   ws.close();
                 },
               });
@@ -156,13 +190,16 @@ export const dexieCloudSyncProtocol: ISyncProtocol = {
       //  In real world, you would have to pre-process the changes array to fit the server specification.
       //  However, this example shows how to deal with the WebSocket to fullfill the API.
       const outgoingBinaryChunks = [];
-      const tson = TSON.stringify({
-        type: "changes",
-        changes,
-        partial,
-        baseRevision,
-        requestId
-      }, outgoingBinaryChunks);
+      const tson = TSON.stringify(
+        {
+          type: "changes",
+          changes,
+          partial,
+          baseRevision,
+          requestId,
+        },
+        outgoingBinaryChunks
+      );
       for (const chunk of outgoingBinaryChunks) ws.send(chunk);
       ws.send(tson);
     }
