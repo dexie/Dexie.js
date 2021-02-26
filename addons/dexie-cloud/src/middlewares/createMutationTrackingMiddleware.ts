@@ -10,13 +10,21 @@ import Dexie, {
 } from "dexie";
 import { DBOperation } from "../types/DBOperation";
 import { TXExpandos } from "../types/TXExpandos";
-import { guardedTable } from "./helpers/guardedTable";
-import { randomString } from "./helpers/randomString";
+import { guardedTable } from "../middleware-helpers/guardedTable";
+import { randomString } from "../helpers/randomString";
 
-export function createSyncMiddleware(): Middleware<DBCore> {
+/** Tracks all mutations in the same transaction as the mutations - 
+ * so it is guaranteed that no mutation goes untracked - and if transaction
+ * aborts, the mutations won't be tracked.
+ * 
+ * The sync job will use the tracked mutations as the source of truth when pushing
+ * changes to server and cleanup the tracked mutations once the server has
+ * ackowledged that it got them.
+ */
+export function createMutationTrackingMiddleware(): Middleware<DBCore> {
   return {
     stack: "dbcore",
-    name: "SyncMiddleware",
+    name: "MutationTrackingMiddleware",
     level: 1,
     create: (core) => {
       const ordinaryTables = core.schema.tables.filter(
@@ -102,7 +110,7 @@ export function createSyncMiddleware(): Middleware<DBCore> {
                     }
                   : req.type === "add"
                   ? {
-                      type: "add",
+                      type: "insert",
                       keys,
                       txid,
                     }

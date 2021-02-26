@@ -1,5 +1,5 @@
 import { DBCoreTable, DBCoreTransaction } from "dexie";
-import { allSettled } from "./allSettled";
+import { allSettled } from "../helpers/allSettled";
 
 let counter = 0;
 

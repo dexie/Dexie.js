@@ -94,9 +94,9 @@ export async function sync(db: Dexie) {
 }
 
 async function syncWithServer(
-  changeSet: Array<{ table: string; muts: DBOperation[] }>,
+  changeSet: DBOperationsSet,
   db: Dexie
-) {
+): Promise<DBOperationsSet> {
   //
   // Reduce changes to only contain updated fields and no duplicates
   //
@@ -105,7 +105,9 @@ async function syncWithServer(
   //
   // Push changes to server using fetch
   //
-  return [] as DBOperationsSet;
+  throw new Error(`Not implemented!`);
+  const serverChanges = [] as DBOperationsSet;
+  return serverChanges;
 }
 
 async function listClientChanges(
@@ -115,18 +117,20 @@ async function listClientChanges(
 ): Promise<{ table: string; muts: DBOperation[] }[]> {
   const lastRevisions = new Map<string, number>();
   for (const { table, muts } of since) {
-    const lastRev = muts.length > 0 ? muts[muts.length - 1].rev : 0;
+    const lastRev = muts.length > 0 ? muts[muts.length - 1].rev! : 0;
     lastRevisions.set(table, lastRev);
   }
   const allMutsOnTables = await Promise.all(
     mutationTables.map(async (mutationTable) => {
       const lastRevision = lastRevisions.get(mutationTable.name);
-      const muts = lastRevision
+      
+      const muts: DBOperation[] = lastRevision
         ? await mutationTable.where("rev").above(lastRevision).toArray()
         : await mutationTable.toArray();
+
       const objTable = db.table(getTableFromMutationTable(mutationTable.name));
       for (const mut of muts) {
-        if (mut.type !== "delete") {
+        if (mut.type === "insert" || mut.type === "upsert") {
           mut.values = await objTable.bulkGet(mut.keys);
         }
       }
@@ -144,3 +148,7 @@ export async function applyServerChanges(
   serverChangeSet: DBOperationsSet,
   db: Dexie
 ) {}
+
+export function reduceChangeSet(changeSet: DBOperationsSet): DBOperationsSet {
+  throw new Error(`Not implemented`);
+}

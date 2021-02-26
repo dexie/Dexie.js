@@ -1,3 +1,3 @@
-import { randomString } from "../middlewares/helpers/randomString";
+import { randomString } from "../helpers/randomString";
 
 export const myId = randomString(16);

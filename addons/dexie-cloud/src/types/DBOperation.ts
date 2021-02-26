@@ -1,10 +1,10 @@
 import { DBCoreKeyRange } from "dexie";
 
-export type DBOperation = DBAddOperation | DBUpsertOperation | DBUpdateOperation | DBDeleteOperation;
+export type DBOperation = DBInsertOperation | DBUpsertOperation | DBUpdateOperation | DBDeleteOperation;
 
-export interface DBAddOperation {
+export interface DBInsertOperation {
   rev?: number;
-  type: "add";
+  type: "insert";
   keys: any[];
   txid: string;
   values?: any[];
