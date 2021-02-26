@@ -5,7 +5,7 @@ import {
   ISyncProtocol,
   ReactiveContinuation,
 } from "dexie-syncable/api";
-import { authenticate } from './authenticate';
+import { authenticate } from './authentication/authenticate';
 import { TSON } from "./TSON";
 
 // Constants:

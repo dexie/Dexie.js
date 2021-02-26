@@ -105,6 +105,8 @@ async function syncWithServer(
   //
   // Push changes to server using fetch
   //
+  const {databaseUrl} = db.cloud.options;
+  const res = fetch(`${databaseUrl}/sync`, {})
   throw new Error(`Not implemented!`);
   const serverChanges = [] as DBOperationsSet;
   return serverChanges;
