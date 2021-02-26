@@ -83,7 +83,7 @@ if (typeof BroadcastChannel !== "undefined") {
   if (swContainer) {
     // We're a browser window and want to propagate message from the SW:
     swContainer.addEventListener('message', propagateMessageLocally);
-  } else if ("clients" in self) {
+  } else if (!self.document) {
     // We're the SW and want to propagate messages from our clients
     self.addEventListener('message', propagateMessageLocally);
   }

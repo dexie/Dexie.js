@@ -5,12 +5,15 @@ export function overrideParseStoresSpec(origFunc: Function, cloudSchema: DexieCl
   return function(stores: {[tableName: string]: string}, dbSchema: DbSchema) {
     const storesClone = {
       ...stores,
-      _cloud: 'id'
+      $sync: ''
     };
     Object.keys(stores).forEach(tableName => {
       if (/^\@/.test(stores[tableName])) {
         storesClone[tableName] = stores[tableName].substr(1);
         cloudSchema[tableName] = {generatedGlobalId: true};
+      }
+      if (!/^\$/.test(tableName)) {
+        storesClone[`$${tableName}_mutations`] = '++rev';
       }
     });
     return origFunc.call(this, storesClone, dbSchema);
