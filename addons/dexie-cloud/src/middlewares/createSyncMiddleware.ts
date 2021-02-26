@@ -8,7 +8,7 @@ import Dexie, {
   DBCoreTransaction,
   DBCoreTable,
 } from "dexie";
-import { startSyncingClientChanges } from "../sync/old_startSyncingClientChanges";
+import { DBOperation } from "../types/DBOperation";
 import { TXExpandos } from "../types/TXExpandos";
 import { guardedTable } from "./helpers/guardedTable";
 import { randomString } from "./helpers/randomString";
@@ -44,17 +44,6 @@ export function createSyncMiddleware(): Middleware<DBCore> {
             TXExpandos;
           if (req.mode === "readwrite") {
             tx.txid = randomString(16);
-            tx.mutReqs = {};
-            req.tables.forEach(tableName => tx.mutReqs[tableName] = {
-              muts: [],
-              firstRev: 0
-            });
-            tx.addEventListener(
-              "complete",
-              function (this: IDBTransaction & TXExpandos) {
-                startSyncingClientChanges(this, req.tables, mutTableMap, core, ordinaryTables);
-              }
-            );
           }
           return tx;
         },
@@ -94,9 +83,8 @@ export function createSyncMiddleware(): Middleware<DBCore> {
             req: DBCoreDeleteRequest | DBCoreAddRequest | DBCorePutRequest
           ): Promise<DBCoreMutateResponse> {
             const trans = req.trans as DBCoreTransaction & TXExpandos;
-            const { txid, mutReqs } = trans;
+            const { txid } = trans;
             const { type } = req;
-            if (req.type !== "delete") req.values = Dexie.deepClone(req.values);
 
             return table.mutate(req).then((res) => {
               const keys = (type === "delete"
@@ -104,42 +92,38 @@ export function createSyncMiddleware(): Middleware<DBCore> {
                 : res.results!
               ).filter((_, idx) => !res.failures[idx]);
 
-              const mut =
+              const mut: DBOperation =
                 req.type === "delete"
                   ? {
-                      type,
+                      type: "delete",
                       keys,
                       criteria: req.criteria,
                       txid,
                     }
                   : req.type === "add"
                   ? {
-                      type,
+                      type: "add",
                       keys,
                       txid,
                     }
-                  : {
-                      type,
+                  : req.changeSpec
+                  ? {
+                      type: "update",
                       keys,
                       txid,
                       criteria: req.criteria,
                       changeSpec: req.changeSpec,
+                    }
+                  : {
+                      type: "upsert",
+                      keys,
+                      txid,
                     };
               return keys.length > 0
                 ? mutsTable
                     .mutate({ type: "add", trans, values: [mut] }) // Log entry
-                    .then(res => {
-                      // Successful mutation - record the mutation request with resolved keys in trans.mutReqs:
-                      const txMem = mutReqs[tableName];
-                      txMem.muts.push({
-                        ...req,
-                        keys, // Make sure generated keys result are contained.
-                      });
-                      if (!txMem.firstRev) txMem.firstRev = res.lastResult; // So we can query earlier non-synced revs
-                      // Return original response
-                      return res;
-                    })
-                : res;
+                    .then(() => res) // Return original response
+                : res; 
             });
           }
         },

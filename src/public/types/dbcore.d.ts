@@ -49,8 +49,8 @@ export interface DBCorePutRequest {
   values: any[];
   keys?: any[];
   criteria?: {
-    index?: string;
-    range?: DBCoreKeyRange;
+    index: string | null;
+    range: DBCoreKeyRange;
   } | false;
   changeSpec?: {[keyPath: string]: any} | false;
   /** @deprecated Will always get results since 3.1.0-alpha.5 */
@@ -62,8 +62,8 @@ export interface DBCoreDeleteRequest {
   trans: DBCoreTransaction;
   keys: any[];
   criteria?: {
-    index?: string;
-    range?: DBCoreKeyRange;
+    index: string | null;
+    range: DBCoreKeyRange;
   } | false;
 }
 

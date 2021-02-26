@@ -5,10 +5,10 @@ import { getMutationTable } from "../helpers/getMutationTable";
 import { getSyncableTables } from "../helpers/getSyncableTables";
 import { getTableFromMutationTable } from "../helpers/getTableFromMutationTable";
 import { IS_SERVICE_WORKER } from "../helpers/IS_SERVICE_WORKER";
-import { ChangeSet } from "../types/ChangeSet";
-import { Mut } from "../types/Mut";
+import { DBOperationsSet } from "../types/DBOperationsSet";
+import { DBOperation } from "../types/DBOperation";
 import { numUnsyncedMutations } from "./numUnsyncedMutations";
-import { performGuardedJob } from './performGuardedJob';
+import { performGuardedJob } from "./performGuardedJob";
 
 const isPushing = new WeakSet<Dexie>();
 const CURRENT_SYNC_WORKER = "currentPushWorker";
@@ -49,11 +49,11 @@ export async function sync(db: Dexie) {
   //
   // List changes to sync
   //
-  let clientChangeSet: ChangeSet = await db.transaction(
+  let clientChangeSet: DBOperationsSet = await db.transaction(
     "r",
     mutationTables,
     async () => {
-      return await listAllMutations(mutationTables, db);
+      return await listClientChanges(mutationTables, db);
     }
   );
 
@@ -71,12 +71,11 @@ export async function sync(db: Dexie) {
   // Now when server has persisted the changes, we may delete the changes
   //
   do {
+    const previousChangeSet = clientChangeSet;
     clientChangeSet = await db.transaction("rw", mutationTables, async () => {
-      const newMutsOnTables = await listAllMutations(
-        mutationTables,
-        db,
-        clientChangeSet
-      );
+      const newMutsOnTables = await listClientChanges(mutationTables, db, {
+        since: previousChangeSet,
+      });
 
       // Clear out the mutations we've already sent to server.
       // Not the ones that has happened while we were syncing
@@ -95,38 +94,35 @@ export async function sync(db: Dexie) {
 }
 
 async function syncWithServer(
-  muts: Array<{ table: string; muts: Mut[] }>,
+  changeSet: Array<{ table: string; muts: DBOperation[] }>,
   db: Dexie
 ) {
   //
   // Reduce changes to only contain updated fields and no duplicates
   //
+  const changes = reduceChangeSet(changeSet);
 
   //
   // Push changes to server using fetch
   //
-  return [] as ChangeSet;
+  return [] as DBOperationsSet;
 }
 
-async function listAllMutations(
+async function listClientChanges(
   mutationTables: Table[],
   db: Dexie,
-  since?: Array<{ table: string; muts: Mut[] }>
-): Promise<{ table: string; muts: Mut[] }[]> {
+  { since = [] as DBOperationsSet } = {}
+): Promise<{ table: string; muts: DBOperation[] }[]> {
   const lastRevisions = new Map<string, number>();
-  if (since) {
-    for (const { table, muts } of since) {
-      const lastRev = muts.length > 0 ? muts[muts.length - 1].rev : 0;
-      lastRevisions.set(table, lastRev);
-    }
+  for (const { table, muts } of since) {
+    const lastRev = muts.length > 0 ? muts[muts.length - 1].rev : 0;
+    lastRevisions.set(table, lastRev);
   }
   const allMutsOnTables = await Promise.all(
     mutationTables.map(async (mutationTable) => {
-      const muts = since
-        ? await mutationTable
-            .where("rev")
-            .above(lastRevisions.get(mutationTable.name))
-            .toArray()
+      const lastRevision = lastRevisions.get(mutationTable.name);
+      const muts = lastRevision
+        ? await mutationTable.where("rev").above(lastRevision).toArray()
         : await mutationTable.toArray();
       const objTable = db.table(getTableFromMutationTable(mutationTable.name));
       for (const mut of muts) {
@@ -145,6 +141,6 @@ async function listAllMutations(
 }
 
 export async function applyServerChanges(
-  serverChangeSet: ChangeSet,
+  serverChangeSet: DBOperationsSet,
   db: Dexie
 ) {}
