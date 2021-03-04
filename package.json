@@ -55,7 +55,7 @@
       "rollup -c ../tools/build-configs/rollup.umd.config.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.mjs",
-      "dts-bundle-generator --inline-declare-externals --umd-module-name Dexie -o ../dist/dexie.d.ts public/index.d.ts",
+      "dts-bundle-generator --inline-declare-externals -o ../dist/dexie.d.ts public/index.d.ts",
       "node ../tools/prepend.js ../dist/dexie.d.ts ../tools/build-configs/banner.txt",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.d.ts"
     ],
