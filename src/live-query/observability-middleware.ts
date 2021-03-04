@@ -64,6 +64,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
               // Add the mutated table and optionally keys to the mutatedTables set on the transaction.
               // Used by subscribers to txcommit event and for Collection.prototype.subscribe().
               if (isArray(keys)) {
+                // keys is an array - delete, add or put of less than 50 rows.
                 if (type !== "delete") keys = res.results;
                 // individual keys (add put or delete)
                 pkRangeSet.addKeys(keys);
@@ -76,7 +77,9 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                   // delete or put and we don't know old values.
                   // Indicate this in the ":dels" part, for the sake of count() queries only!
                   delsRangeSet.addKeys(keys);
-                } else {
+                }
+                if (oldObjs || newObjs) {
+                  // No matter if knowning oldObjs or not, track the indices if it's a put, add or delete.
                   trackAffectedIndexes(getRangeSet, schema, oldObjs, newObjs);
                 }
               } else if (keys) {
@@ -87,9 +90,11 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                 pkRangeSet.add(range);
               } else {
                 // Too many requests to record the details without slowing down write performance.
-                // Let's just record a generic large range
+                // Let's just record a generic large range on primary key, the virtual :dels index and
+                // all secondary indices:
                 pkRangeSet.add(FULL_RANGE);
                 delsRangeSet.add(FULL_RANGE);
+                schema.indexes.forEach(idx => getRangeSet(idx.name).add(FULL_RANGE));
               }
               return res;
             });
@@ -262,12 +267,19 @@ function trackAffectedIndexes(
     function extractKey(obj: any) {
       return obj != null ? ix.extractKey(obj) : null;
     }
+    const addKeyOrKeys = (key: any) => ix.multiEntry && isArray(key)
+      // multiEntry and the old property was an array - add each array entry to the rangeSet:
+      ? key.forEach(key => rangeSet.addKey(key))
+      // Not multiEntry or the old property was not an array - add each array entry to the rangeSet:
+      : rangeSet.addKey(key);
+
     (oldObjs || newObjs).forEach((_, i) => {
       const oldKey = oldObjs && extractKey(oldObjs[i]);
       const newKey = newObjs && extractKey(newObjs[i]);
       if (cmp(oldKey, newKey) !== 0) {
-        oldKey && rangeSet.addKey(oldKey);
-        newKey && rangeSet.addKey(newKey);
+        // The index has changed. Add both old and new value of the index.
+        if (oldKey != null) addKeyOrKeys(oldKey); // If oldKey is invalid key, addKey() will be a noop.
+        if (newKey != null) addKeyOrKeys(newKey); // If newKey is invalid key, addKey() will be a noop.
       }
     });
   }

@@ -1,6 +1,6 @@
 {
   "name": "dexie-react-hooks",
-  "version": "1.0.2",
+  "version": "1.0.6",
   "description": "React hooks for reactive data fetching using Dexie.js",
   "main": "dist/dexie-react-hooks.js",
   "typings": "dist/index.d.ts",
@@ -11,7 +11,8 @@
   "just-build": {
     "default": [
       "just-build dexie",
-      "webpack"
+      "rollup -c rollup.config.js",
+      "tsc --emitDeclarationOnly"
     ],
     "run-tests": [
       "karma start test/karma.conf.js --single-run"
@@ -52,17 +53,21 @@
     "dexie": ">=3.1.0-alpha.1"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^17.1.0",
+    "@rollup/plugin-node-resolve": "^11.1.1",
+    "@rollup/plugin-typescript": "^8.1.1",
     "@types/qunit": "^2.9.6",
     "@types/react": "^16.9.56",
     "@types/react-dom": "^16.9.9",
+    "dexie": "file:../..",
     "just-build": "^0.9.19",
     "qunit": "^2.12.0",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
+    "rollup": "^2.38.5",
     "ts-loader": "^8.0.11",
     "webpack": "^5.4.0",
-    "webpack-cli": "^4.2.0",
-    "dexie": "file:../.."
+    "webpack-cli": "^4.2.0"
   },
   "dependencies": {}
 }

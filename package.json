@@ -1,6 +1,6 @@
 {
   "name": "dexie",
-  "version": "3.1.0-alpha.6",
+  "version": "3.1.0-alpha.8",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "module": "dist/dexie.mjs",
@@ -85,7 +85,7 @@
   "engines": {
     "node": ">=6.0"
   },
-  "homepage": "http://dexie.org",
+  "homepage": "https://dexie.org",
   "devDependencies": {
     "dts-bundle-generator": "^1.6.1",
     "just-build": "^0.9.19",
