@@ -55,7 +55,7 @@
       "rollup -c ../tools/build-configs/rollup.umd.config.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.mjs",
-      "dts-bundle-generator --umd-module-name Dexie -o ../dist/dexie.d.ts public/index.d.ts",
+      "dts-bundle-generator --inline-declare-externals --umd-module-name Dexie -o ../dist/dexie.d.ts public/index.d.ts",
       "node ../tools/prepend.js ../dist/dexie.d.ts ../tools/build-configs/banner.txt",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.d.ts"
     ],
@@ -87,7 +87,7 @@
   },
   "homepage": "https://dexie.org",
   "devDependencies": {
-    "dts-bundle-generator": "^1.6.1",
+    "dts-bundle-generator": "^5.7.0",
     "just-build": "^0.9.19",
     "karma": "^5.1.1",
     "karma-browserstack-launcher": "^1.5.2",
@@ -102,12 +102,11 @@
     "rollup-plugin-commonjs": "^8.4.1",
     "rollup-plugin-node-resolve": "^3.4.0",
     "rollup-plugin-sourcemaps": "^0.4.1",
-    "rxjs": "^6.6.3",
+    "rxjs": "^6.6.6",
     "serve-static": "^1.14.1",
     "sorted-json": "^0.2.6",
     "tslib": "^1.11.2",
     "typescript": "^3.8.3",
     "uglify-js": "^3.9.2"
-  },
-  "dependencies": {}
+  }
 }
