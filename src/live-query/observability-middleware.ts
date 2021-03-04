@@ -267,13 +267,19 @@ function trackAffectedIndexes(
     function extractKey(obj: any) {
       return obj != null ? ix.extractKey(obj) : null;
     }
+    const addKeyOrKeys = (key: any) => ix.multiEntry && isArray(key)
+      // multiEntry and the old property was an array - add each array entry to the rangeSet:
+      ? key.forEach(key => rangeSet.addKey(key))
+      // Not multiEntry or the old property was not an array - add each array entry to the rangeSet:
+      : rangeSet.addKey(key);
+
     (oldObjs || newObjs).forEach((_, i) => {
       const oldKey = oldObjs && extractKey(oldObjs[i]);
       const newKey = newObjs && extractKey(newObjs[i]);
       if (cmp(oldKey, newKey) !== 0) {
         // The index has changed. Add both old and new value of the index.
-        if (oldKey != null) rangeSet.addKey(oldKey); // If oldKey is invalid key, addKey() will be a noop.
-        if (newKey != null) rangeSet.addKey(newKey); // If newKey is invalid key, addKey() will be a noop.
+        if (oldKey != null) addKeyOrKeys(oldKey); // If oldKey is invalid key, addKey() will be a noop.
+        if (newKey != null) addKeyOrKeys(newKey); // If newKey is invalid key, addKey() will be a noop.
       }
     });
   }
