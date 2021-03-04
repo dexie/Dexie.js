@@ -28,7 +28,8 @@ export function dexieOpen (db: Dexie) {
   // Function pointers to call when the core opening process completes.
   let resolveDbReady = state.dbReadyResolve,
       // upgradeTransaction to abort on failure.
-      upgradeTransaction: (IDBTransaction | null) = null;
+      upgradeTransaction: (IDBTransaction | null) = null,
+      wasCreated = false;
   
   return Promise.race([state.openCanceller, new Promise((resolve, reject) => {
       // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
@@ -63,6 +64,7 @@ export function dexieOpen (db: Dexie) {
           } else {
               upgradeTransaction.onerror = eventRejectHandler(reject);
               var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
+              wasCreated = oldVer < 1;
               db.idbdb = req.result;
               runUpgraders(db, oldVer / 10, upgradeTransaction, reject);
           }
@@ -104,7 +106,7 @@ export function dexieOpen (db: Dexie) {
               db.on("close").fire(ev);
           });
 
-          _onDatabaseCreated(db._deps, dbName);
+          if (wasCreated) _onDatabaseCreated(db._deps, dbName);
 
           resolve();
 

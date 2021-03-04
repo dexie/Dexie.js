@@ -10,7 +10,8 @@ db.version(2).stores({
     items: "id, name",
     foo: "++id",
     outbound: "++,name",
-    friends: "++id, name, age"
+    friends: "++id, name, age",
+    multiEntry: "id, *tags"
 });
 
 db.on('populate', ()=> {
@@ -461,6 +462,25 @@ const mutsAndExpects = () => [
     {
       friendsOver18: [...bulkFriends.filter(f => f.age === 20)]
     }
+  ],
+  // multiEntry
+  [
+    () => db.multiEntry.add({id: 1, tags: ["fooTag", "Apa"]}),
+    {
+      multiEntry1: [1],
+      multiEntry2: [1]
+    }
+  ],
+  [
+    () => db.multiEntry.bulkPut([
+      {id: 1, tags: []},
+      {id: 2, tags: ["Apa", "x", "y"]},
+      {id: 3, tags: ["barTag", "fooTag"]}
+    ]),
+    {
+      multiEntry1: [2],
+      multiEntry2: [3]
+    }
   ]
 ]
 
@@ -492,7 +512,10 @@ promisedTest("Full use case matrix", async ()=>{
     outboundAnyOf_BCD_keys: () => db.outbound.where('name').anyOf("B", "C", "D").keys(),
     outbound_above_z49: () => db.outbound.where('name').above("z49").toArray(),
 
-    friendsOver18: () => db.friends.where('age').above(18).toArray()
+    friendsOver18: () => db.friends.where('age').above(18).toArray(),
+
+    multiEntry1: () => db.multiEntry.where('tags').startsWith('A').primaryKeys(),
+    multiEntry2: () => db.multiEntry.where({tags: "fooTag"}).primaryKeys()
   };
   const expectedInitialResults = {
     itemsToArray: [{id: 1}, {id: 2}, {id: 3}],
@@ -515,6 +538,9 @@ promisedTest("Full use case matrix", async ()=>{
     outbound_above_z49: [],
 
     friendsOver18: [],
+
+    multiEntry1: [],
+    multiEntry2: []
   }
   let flyingNow = 0;
   let signal = new Signal();
