@@ -23,7 +23,7 @@ export default {
   }],
   plugins: [
     sourcemaps(),
-    nodeResolve({module: true, jsnext: true, browser: true, ignoreGlobal: false}),
+    nodeResolve({browser: true, ignoreGlobal: false}),
     cleanup()
   ],
   onwarn ({loc, frame, code, message}) {
