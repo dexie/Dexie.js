@@ -105,8 +105,8 @@
     "rxjs": "^6.6.6",
     "serve-static": "^1.14.1",
     "sorted-json": "^0.2.6",
-    "tslib": "^1.11.2",
-    "typescript": "^3.8.3",
+    "tslib": "^2.1.0",
+    "typescript": "^4.2.2",
     "uglify-js": "^3.9.2"
   }
 }

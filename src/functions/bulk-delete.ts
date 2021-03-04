@@ -12,7 +12,7 @@ export function bulkDelete(
 {
   // If hasDeleteHook, keysOrTuples must be an array of tuples: [[key1, value2],[key2,value2],...],
   // else keysOrTuples must be just an array of keys: [key1, key2, ...].
-  return new Promise((resolve, reject)=>{
+  return new Promise<void>((resolve, reject)=>{
       const len = keysOrTuples.length;
       const lastItem = len - 1;
       if (len === 0) return resolve();
