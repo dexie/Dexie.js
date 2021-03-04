@@ -7,12 +7,13 @@ const ERRORS_TO_IGNORE = [
 ];
 
 export default {
-  entry: 'tools/tmp/es5/addons/Dexie.Syncable/test/unit/unit-tests-all.js',
-  dest: 'test/unit/bundle.js',
-  format: 'umd',
-  sourceMap: true,
-  moduleName: 'dexieSyncableTests',
-  globals: {dexie: "Dexie", "dexie-observable": "Dexie.Observable", QUnit: "QUnit"},
+  input: 'tools/tmp/es5/addons/Dexie.Syncable/test/unit/unit-tests-all.js',
+  output: [{
+    file: 'test/unit/bundle.js',
+    format: 'umd',
+    name: 'dexieSyncableTests',
+    globals: {dexie: "Dexie", "dexie-observable": "Dexie.Observable", QUnit: "QUnit"},
+  }],
   external: ['dexie', 'dexie-observable', 'QUnit'],
   plugins: [
     sourcemaps(),

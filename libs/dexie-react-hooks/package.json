@@ -49,25 +49,22 @@
   "homepage": "https://github.com/dfahlander/Dexie.js#readme",
   "peerDependencies": {
     "@types/react": ">=16",
-    "react": ">=16",
-    "dexie": ">=3.1.0-alpha.1"
+    "dexie": ">=3.1.0-alpha.1",
+    "react": ">=16"
   },
   "devDependencies": {
     "@rollup/plugin-commonjs": "^17.1.0",
     "@rollup/plugin-node-resolve": "^11.1.1",
     "@rollup/plugin-typescript": "^8.1.1",
     "@types/qunit": "^2.9.6",
-    "@types/react": "^16.9.56",
-    "@types/react-dom": "^16.9.9",
+    "@types/react": "^17.0.0",
+    "@types/react-dom": "^17.0.0",
     "dexie": "file:../..",
     "just-build": "^0.9.19",
     "qunit": "^2.12.0",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
-    "rollup": "^2.38.5",
-    "ts-loader": "^8.0.11",
-    "webpack": "^5.4.0",
-    "webpack-cli": "^4.2.0"
-  },
-  "dependencies": {}
+    "ts-loader": "^8.0.17",
+    "webpack-cli": "^4.5.0"
+  }
 }
