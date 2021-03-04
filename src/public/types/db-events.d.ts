@@ -2,11 +2,12 @@ import { DexieEventSet } from "./dexie-event-set";
 import { DexieEvent } from "./dexie-event";
 import { Transaction } from "./transaction";
 import { RangeBtree } from "./rangeset";
+import { Dexie } from "./dexie";
 
 export interface DexieOnReadyEvent {
-  subscribe(fn: () => any, bSticky: boolean): void;
-  unsubscribe(fn: () => any): void;
-  fire(): any;
+  subscribe(fn: (vipDb: Dexie) => any, bSticky: boolean): void;
+  unsubscribe(fn: (vipDb: Dexie) => any): void;
+  fire(vipDb: Dexie): any;
 }
 
 export interface DexieVersionChangeEvent {
@@ -28,7 +29,7 @@ export interface DexieCloseEvent {
 }
 
 export interface DbEvents extends DexieEventSet {
-  (eventName: 'ready', subscriber: () => any, bSticky?: boolean): void;
+  (eventName: 'ready', subscriber: (vipDb: Dexie) => any, bSticky?: boolean): void;
   (eventName: 'populate', subscriber: (trans: Transaction) => any): void;
   (eventName: 'blocked', subscriber: (event: IDBVersionChangeEvent) => any): void;
   (eventName: 'versionchange', subscriber: (event: IDBVersionChangeEvent) => any): void;
