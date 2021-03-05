@@ -11,11 +11,11 @@
     "forceConsistentCasingInFileNames": true,
     "outDir": "../tools/tmp/",
     "sourceMap": true,
-    "rootDir": ".."
+    "rootDir": "..",
+    "allowJs": true
   },
   "files": [
     "../src/index.ts",
-    "index.ts",
-    "qunit.d.ts"
+    "index.js"
   ]
 }
