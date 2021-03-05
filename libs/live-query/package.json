@@ -1,0 +1,28 @@
+{
+  "name": "live-query",
+  "version": "1.0.0",
+  "description": "Observe IndexedDB by turning Promise-returning functions into Observables.",
+  "main": "dist/live-query.js",
+  "scripts": {
+    "test": "echo This package is tested in Dexie.js test suite"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dfahlander/Dexie.js.git"
+  },
+  "keywords": [
+    "observables",
+    "reactive",
+    "indexeddb"
+  ],
+  "author": "david@dexie.org",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/dfahlander/Dexie.js/issues"
+  },
+  "homepage": "https://github.com/dfahlander/Dexie.js#readme",
+  "dependencies": {
+    "dexie": ">=3.2.0-alpha.1",
+    "rxjs": "^6.0.0"
+  }
+}
