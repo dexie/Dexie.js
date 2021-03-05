@@ -19,10 +19,6 @@ export default {
     name: 'DexieReactHooks',
     sourcemap: true,
     exports: 'named'
-  },{
-    file: 'dist/dexie-react-hooks.mjs',
-    format: 'es',
-    sourcemap: true
   }],
   external: ['dexie', 'react', 'react-dom'],
   plugins: [

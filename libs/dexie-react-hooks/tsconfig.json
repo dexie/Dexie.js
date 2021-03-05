@@ -10,9 +10,10 @@
     "strictNullChecks": true,
     "declaration": true,
     "declarationMap": true,
-    "allowSyntheticDefaultImports": true,
+    "allowSyntheticDefaultImports": false,
     "outDir": "dist",
-    "rootDir": "src"
+    "rootDir": "src",
+    "skipLibCheck": true
   },
   "include": ["src"]
 }
