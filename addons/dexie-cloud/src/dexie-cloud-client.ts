@@ -85,7 +85,7 @@ export function dexieCloud(db: Dexie) {
       return currentUserEmitter.value;
     },
     currentUserObservable: currentUserEmitter,
-    loginStateObservable: null, // fixthis!
+    loginStateObservable: new Subject<LoginState>(), // fixthis!
     configure(options: DexieCloudOptions) {
       db.cloud.options = options;
       //return db.syncable.connect(DEXIE_CLOUD_PROTOCOL_NAME, options.databaseUrl, options);
