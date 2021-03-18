@@ -1,6 +1,9 @@
+import { TokenFinalResponse } from 'dexie-cloud-common';
+
 export interface DexieCloudOptions {
   databaseUrl: string;
   requireAuth?: boolean;
   serviceWorker?: boolean;
-  fetchToken?: (email?: string) => Promise<any>;
+  customLoginGui?: boolean;
+  fetchTokens?: (tokenParams: any) => Promise<TokenFinalResponse>;
 }

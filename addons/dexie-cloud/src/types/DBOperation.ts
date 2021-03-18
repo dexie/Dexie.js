@@ -1,28 +1,29 @@
 import { DBCoreKeyRange } from "dexie";
 
-export type DBOperation = DBInsertOperation | DBUpsertOperation | DBUpdateOperation | DBDeleteOperation;
+export type DBOperation =
+  | DBInsertOperation
+  | DBUpsertOperation
+  | DBUpdateOperation
+  | DBDeleteOperation;
 
-export interface DBInsertOperation {
+export interface DBOperationCommon {
   rev?: number;
+  keys: any[]; // Needed also in delete and update operations when criteria is specificied: for server->client rollback operation
+  txid: string;
+  userId?: string;
+}
+export interface DBInsertOperation extends DBOperationCommon {
   type: "insert";
-  keys: any[];
-  txid: string;
   values?: any[];
 }
 
-export interface DBUpsertOperation {
-  rev?: number;
+export interface DBUpsertOperation extends DBOperationCommon {
   type: "upsert";
-  keys: any[];
-  txid: string;
   values?: any[];
 }
 
-export interface DBUpdateOperation {
-  rev?: number;
+export interface DBUpdateOperation extends DBOperationCommon {
   type: "update";
-  keys: any[]; // Needed also when criteria is specificied: for server->client rollback operation 
-  txid: string;
   criteria?:
     | {
         index: string | null;
@@ -32,11 +33,8 @@ export interface DBUpdateOperation {
   changeSpec: { [keyPath: string]: any };
 }
 
-export interface DBDeleteOperation {
-  rev?: number;
+export interface DBDeleteOperation extends DBOperationCommon {
   type: "delete";
-  keys: any[]; // Needed also when criteria is specificied: for server->client rollback operation 
-  txid: string;
   criteria?:
     | {
         index: string | null;
@@ -44,4 +42,3 @@ export interface DBDeleteOperation {
       }
     | false;
 }
-

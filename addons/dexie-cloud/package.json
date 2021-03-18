@@ -7,7 +7,7 @@
   "esnext": "esnext/dexie-cloud.js",
   "typings": "dist/dexie-cloud.d.ts",
   "engines": {
-    "node": ">=8.2.1"
+    "node": ">=14"
   },
   "repository": {
     "type": "git",
@@ -56,27 +56,26 @@
   "author": "david.fahlander@gmail.com",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@types/node": "^14.6.3",
-    "dreambase-library": "^1.0.4",
-    "just-build": "^0.9.19",
-    "karma": "^5.2.1",
-    "karma-browserstack-launcher": "^1.6.0",
-    "karma-chrome-launcher": "^3.1.0",
-    "karma-firefox-launcher": "^1.3.0",
-    "karma-qunit": "^4.1.1",
-    "rollup": "^2.26.9",
-    "rollup-plugin-alias": "^2.2.0",
-    "rollup-plugin-commonjs": "^10.1.0",
-    "rollup-plugin-node-resolve": "^5.2.0",
-    "rollup-plugin-sourcemaps": "^0.6.2",
-    "tslib": "^2.0.1",
-    "typescript": "^4.0.2"
+    "@types/node": "*",
+    "dreambase-library": "*",
+    "just-build": "*",
+    "karma": "*",
+    "karma-browserstack-launcher": "*",
+    "karma-chrome-launcher": "*",
+    "karma-firefox-launcher": "*",
+    "karma-qunit": "*",
+    "preact": "*",
+    "rollup": "*",
+    "rollup-plugin-alias": "*",
+    "rollup-plugin-commonjs": "*",
+    "rollup-plugin-node-resolve": "*",
+    "rollup-plugin-sourcemaps": "*",
+    "tslib": "*",
+    "typescript": "*"
   },
   "dependencies": {
-    "dexie": "^3.0.2",
-    "dexie-cloud-common": "^1.0.2",
-    "dexie-observable": "^3.0.0-beta.9",
-    "dexie-syncable": "^3.0.0-beta.9",
-    "rxjs": "^6.6.3"
+    "dexie": "*",
+    "dexie-cloud-common": "*",
+    "rxjs": "*"
   }
 }

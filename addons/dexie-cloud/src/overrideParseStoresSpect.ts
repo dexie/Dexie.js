@@ -5,7 +5,10 @@ export function overrideParseStoresSpec(origFunc: Function, cloudSchema: DexieCl
   return function(stores: {[tableName: string]: string}, dbSchema: DbSchema) {
     const storesClone = {
       ...stores,
-      $sync: ''
+      $jobs: '',
+      $logins: 'claims.sub, lastLogin',
+      $syncState: 'id'
+      // $pendingChangesFromServer: '++' // Wait a while with this. The thought is: if server has loads of changes, we might want to add them all at once in single transaction.
     };
     Object.keys(stores).forEach(tableName => {
       if (/^\@/.test(stores[tableName])) {

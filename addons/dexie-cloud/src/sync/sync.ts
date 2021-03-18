@@ -1,5 +1,4 @@
-import { table } from "console";
-import Dexie, { Table } from "dexie";
+import { Table } from "dexie";
 import { MINUTES } from "../helpers/date-constants";
 import { getMutationTable } from "../helpers/getMutationTable";
 import { getSyncableTables } from "../helpers/getSyncableTables";
@@ -9,30 +8,31 @@ import { DBOperationsSet } from "../types/DBOperationsSet";
 import { DBOperation } from "../types/DBOperation";
 import { numUnsyncedMutations } from "./numUnsyncedMutations";
 import { performGuardedJob } from "./performGuardedJob";
+import { SyncableDB } from '../SyncableDB';
 
-const isPushing = new WeakSet<Dexie>();
+const isSyncing = new WeakSet<SyncableDB>();
 const CURRENT_SYNC_WORKER = "currentPushWorker";
 
-export async function syncIfNeeded(db: Dexie) {
-  if (isPushing.has(db)) return; // Still working.
+export async function syncIfNeeded(db: SyncableDB) {
+  if (isSyncing.has(db)) return; // Still working.
   if (!numUnsyncedMutations.get(db)) return; // undefined or 0 = nothing to sync.
   if (typeof navigator !== "undefined" && !navigator.onLine) return;
   if (typeof document !== "undefined" && document.visibilityState !== "visible")
     return;
 
-  isPushing.add(db);
+  isSyncing.add(db);
   try {
     if (db.cloud.options.serviceWorker) {
       await sync(db);
     } else {
       // We use a flow that is better suited for the case when multiple workers want to
       // do the same thing.
-      await performGuardedJob(db, CURRENT_SYNC_WORKER, () => sync(db));
+      await performGuardedJob(db, CURRENT_SYNC_WORKER, "$jobs", () => sync(db));
     }
-    isPushing.delete(db);
+    isSyncing.delete(db);
     await syncIfNeeded(db);
   } catch (error) {
-    isPushing.delete(db);
+    isSyncing.delete(db);
     console.error(`Failed to sync client changes`, error);
     // I don't think we should setTimout or so here.
     // Unless server tells us to in some response.
@@ -41,7 +41,7 @@ export async function syncIfNeeded(db: Dexie) {
   }
 }
 
-export async function sync(db: Dexie) {
+export async function sync(db: SyncableDB) {
   const mutationTables = getSyncableTables(
     db.tables.map((tbl) => tbl.name)
   ).map((tbl) => db.table(getMutationTable(tbl)));
@@ -52,9 +52,7 @@ export async function sync(db: Dexie) {
   let clientChangeSet: DBOperationsSet = await db.transaction(
     "r",
     mutationTables,
-    async () => {
-      return await listClientChanges(mutationTables, db);
-    }
+    () => listClientChanges(mutationTables, db)
   );
 
   //
@@ -95,7 +93,7 @@ export async function sync(db: Dexie) {
 
 async function syncWithServer(
   changeSet: DBOperationsSet,
-  db: Dexie
+  db: SyncableDB
 ): Promise<DBOperationsSet> {
   //
   // Reduce changes to only contain updated fields and no duplicates
@@ -106,6 +104,8 @@ async function syncWithServer(
   // Push changes to server using fetch
   //
   const {databaseUrl} = db.cloud.options;
+
+  
   const res = fetch(`${databaseUrl}/sync`, {})
   throw new Error(`Not implemented!`);
   const serverChanges = [] as DBOperationsSet;
@@ -114,9 +114,9 @@ async function syncWithServer(
 
 async function listClientChanges(
   mutationTables: Table[],
-  db: Dexie,
+  db: SyncableDB,
   { since = [] as DBOperationsSet } = {}
-): Promise<{ table: string; muts: DBOperation[] }[]> {
+): Promise<DBOperationsSet> {
   const lastRevisions = new Map<string, number>();
   for (const { table, muts } of since) {
     const lastRev = muts.length > 0 ? muts[muts.length - 1].rev! : 0;
@@ -142,13 +142,14 @@ async function listClientChanges(
       };
     })
   );
+
   // Filter out those tables that doesn't have any mutations:
   return allMutsOnTables.filter(({ muts }) => muts.length > 0);
 }
 
 export async function applyServerChanges(
   serverChangeSet: DBOperationsSet,
-  db: Dexie
+  db: SyncableDB
 ) {}
 
 export function reduceChangeSet(changeSet: DBOperationsSet): DBOperationsSet {

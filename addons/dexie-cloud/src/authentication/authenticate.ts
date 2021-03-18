@@ -1,25 +1,60 @@
-import { IPersistedContext } from "dexie-syncable/api";
-import type { OTPTokenRequest, TokenFinalResponse, TokenOtpSentResponse } from "dexie-cloud-common";
+import type {
+  TokenFinalResponse,
+} from "dexie-cloud-common";
+import { UserLogin } from "../types/UserLogin";
+import { AuthPersistedContext } from "./AuthPersistedContext";
+import { otpFetchTokenCallback } from './otpFetchTokenCallback';
 
-export async function authenticate(url: string, context: IPersistedContext) {
-  if (context.accessToken && context.accessTokenExpiration > Date.now()) {
-    return context.accessToken;
+export interface AuthenticationDialog {
+  prompt(msg: string): string | null | Promise<string | null>;
+  alert(msg: string): any;
+}
+
+export const dummyAuthDialog: AuthenticationDialog = {
+  prompt,
+  alert,
+};
+
+export type FetchTokenCallback = (tokenParams: {
+  public_key: string;
+  hints?: { userId?: string; email?: string };
+}) => Promise<TokenFinalResponse>;
+
+export async function authenticate(
+  url: string,
+  context: UserLogin,
+  dlg: AuthenticationDialog,
+  fetchToken: undefined | FetchTokenCallback
+): Promise<UserLogin> {
+  if (
+    context.accessToken &&
+    context.accessTokenExpiration!.getTime() > Date.now()
+  ) {
+    return context;
   } else if (
     context.refreshToken &&
-    context.refreshTokenExpiration > Date.now()
+    (!context.refreshTokenExpiration ||
+      context.refreshTokenExpiration.getTime() > Date.now())
   ) {
     return await refreshAccessToken(url, context);
   } else {
-    return await otpAuthenticate(url, context);
+    return await userAuthenticate(url, context, dlg, fetchToken || otpFetchTokenCallback(dlg, url));
   }
 }
 
-async function refreshAccessToken(url: string, context: IPersistedContext) {
-  console.error("Refresh not implemented");
-  return await otpAuthenticate(url, context);
+async function refreshAccessToken(
+  url: string,
+  context: UserLogin
+): Promise<AuthPersistedContext> {
+  throw new Error("Refresh token not implemented");
 }
 
-async function otpAuthenticate(url: string, context: IPersistedContext) {
+async function userAuthenticate(
+  url: string,
+  context: UserLogin,
+  dlg: AuthenticationDialog,
+  fetchToken: FetchTokenCallback
+) {
   const { privateKey, publicKey } = await crypto.subtle.generateKey(
     {
       name: "RSASSA-PKCS1-v1_5",
@@ -30,56 +65,41 @@ async function otpAuthenticate(url: string, context: IPersistedContext) {
     false, // Non-exportable...
     ["sign", "verify"]
   );
-  context.privateKey = privateKey; //...but storable!
-
-  const email = prompt("Email"); // TODO: Fixthis!
-  if (!email) throw new Error(`Invalid email was given`);
+  context.nonExportablePrivateKey = privateKey; //...but storable!
   const publicKeySPKI = await crypto.subtle.exportKey("spki", publicKey);
   const publicKeyPEM = spkiToPEM(publicKeySPKI);
   context.publicKey = publicKey;
 
-  const otpRequest: OTPTokenRequest = {
-    email,
-    grant_type: "otp",
-    scopes: ["ACCESS_DB"],
+  const response2 = await fetchToken({
     public_key: publicKeyPEM,
-  };
-  const res1 = await fetch(`${url}/token`, {
-    body: JSON.stringify(otpRequest),
-    method: "post",
-    headers: { "Content-Type": "application/json",
-    mode: "cors"
-  },
+    hints: {
+      email: context.email || undefined,
+      userId: context.userId || undefined,
+    },
   });
-  if (res1.status !== 200) throw new Error(`Status ${res1.status} from ${url}/token`);
-  const response: TokenOtpSentResponse = await res1.json();
-  if (response.type !== "otp-sent") throw new Error(`Unexpected response from ${url}/token`);
-  const otp = prompt("OTP"); // TODO: Fixthis!
-  if (!otp) throw new Error("Invalid OTP");
-  otpRequest.otp = otp;
-  otpRequest.otp_id = response.otp_id;
-  
-  const res2 = await fetch(`${url}/token`, {
-    body: JSON.stringify(otpRequest),
-    method: "post",
-    headers: {"Content-Type": "application/json"},
-    mode: "cors"
-  });
-  if (res2.status !== 200) throw new Error(`OTP2: Status ${res2.status} from ${url}/token`);
-  const response2: TokenFinalResponse = await res2.json();
-  if (response2.type !== "tokens") throw new Error(`Unexpected response type from token endpoint: ${response2.type}`);
-  
+
+  if (response2.type !== "tokens")
+    throw new Error(
+      `Unexpected response type from token endpoint: ${response2.type}`
+    );
+
   context.accessToken = response2.accessToken;
-  context.accessTokenExpiration = response2.accessTokenExpiration;
+  context.accessTokenExpiration = new Date(response2.accessTokenExpiration);
   context.refreshToken = response2.refreshToken;
-  context.refreshTokenExpiration = response2.refreshTokenExpiration;
-  await context.save();
+  if (response2.refreshTokenExpiration) {
+    context.refreshTokenExpiration = new Date(response2.refreshTokenExpiration);
+  }
+  context.userId = response2.claims.sub;
+  context.email = response2.claims.email;
+  context.name = response2.claims.name;
+  context.lastLogin = new Date();
+
   if (response2.alerts) {
     for (const a of response2.alerts) {
-      alert(`${a.type}: ${a.message}`);
+      dlg.alert(`${a.type}: ${a.message}`);
     }
   }
-  return context.accessToken;
+  return context;
 }
 
 function spkiToPEM(keydata) {

@@ -12,16 +12,25 @@ import { DBOperation } from "../types/DBOperation";
 import { TXExpandos } from "../types/TXExpandos";
 import { guardedTable } from "../middleware-helpers/guardedTable";
 import { randomString } from "../helpers/randomString";
+import { UserLogin } from "../types/UserLogin";
+import { BehaviorSubject } from "rxjs";
+import { outstandingTransactions } from "./outstandingTransaction";
 
-/** Tracks all mutations in the same transaction as the mutations - 
+export interface MutationTrackingMiddlewareArgs {
+  currentUserObservable: BehaviorSubject<UserLogin>;
+}
+
+/** Tracks all mutations in the same transaction as the mutations -
  * so it is guaranteed that no mutation goes untracked - and if transaction
  * aborts, the mutations won't be tracked.
- * 
+ *
  * The sync job will use the tracked mutations as the source of truth when pushing
  * changes to server and cleanup the tracked mutations once the server has
  * ackowledged that it got them.
  */
-export function createMutationTrackingMiddleware(): Middleware<DBCore> {
+export function createMutationTrackingMiddleware({
+  currentUserObservable,
+}: MutationTrackingMiddlewareArgs): Middleware<DBCore> {
   return {
     stack: "dbcore",
     name: "MutationTrackingMiddleware",
@@ -50,8 +59,25 @@ export function createMutationTrackingMiddleware(): Middleware<DBCore> {
           const tx = core.transaction(req) as DBCoreTransaction &
             IDBTransaction &
             TXExpandos;
+
           if (req.mode === "readwrite") {
+            // Give each transaction a globally unique id.
             tx.txid = randomString(16);
+            // Introduce the concept of current user that lasts through the entire transaction.
+            // This is important because the tracked mutations must be connected to the user.
+            tx.currentUser = currentUserObservable.value;
+            outstandingTransactions.value.add(tx);
+            outstandingTransactions.next(outstandingTransactions.value);
+            const removeTransaction = () => {
+              tx.removeEventListener("complete", removeTransaction);
+              tx.removeEventListener("error", removeTransaction);
+              tx.removeEventListener("abort", removeTransaction);
+              outstandingTransactions.value.delete(tx);
+              outstandingTransactions.next(outstandingTransactions.value);
+            };
+            tx.addEventListener("complete", removeTransaction);
+            tx.addEventListener("error", removeTransaction);
+            tx.addEventListener("abort", removeTransaction);
           }
           return tx;
         },
@@ -91,7 +117,10 @@ export function createMutationTrackingMiddleware(): Middleware<DBCore> {
             req: DBCoreDeleteRequest | DBCoreAddRequest | DBCorePutRequest
           ): Promise<DBCoreMutateResponse> {
             const trans = req.trans as DBCoreTransaction & TXExpandos;
-            const { txid } = trans;
+            const {
+              txid,
+              currentUser: { userId },
+            } = trans;
             const { type } = req;
 
             return table.mutate(req).then((res) => {
@@ -107,12 +136,14 @@ export function createMutationTrackingMiddleware(): Middleware<DBCore> {
                       keys,
                       criteria: req.criteria,
                       txid,
+                      userId,
                     }
                   : req.type === "add"
                   ? {
                       type: "insert",
                       keys,
                       txid,
+                      userId,
                     }
                   : req.changeSpec
                   ? {
@@ -121,17 +152,19 @@ export function createMutationTrackingMiddleware(): Middleware<DBCore> {
                       txid,
                       criteria: req.criteria,
                       changeSpec: req.changeSpec,
+                      userId,
                     }
                   : {
                       type: "upsert",
                       keys,
                       txid,
+                      userId,
                     };
               return keys.length > 0
                 ? mutsTable
                     .mutate({ type: "add", trans, values: [mut] }) // Log entry
                     .then(() => res) // Return original response
-                : res; 
+                : res;
             });
           }
         },

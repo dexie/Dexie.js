@@ -13,9 +13,7 @@ export default {
     file: 'dist/dexie-cloud.js',
     format: 'umd',
     globals: {
-      dexie: "Dexie",
-      "dexie-observable": "Dexie.Observable",
-      "dexie-syncable": "Dexie.Syncable"
+      dexie: "Dexie"
     },
     name: 'DexieCloud',
     sourcemap: true,
