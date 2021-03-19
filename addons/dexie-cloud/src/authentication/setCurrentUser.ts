@@ -68,14 +68,14 @@ export async function setCurrentUser(db: SyncableDB, user: AuthPersistedContext)
   });
 
   // TANKAR!!!!
-  // * Service workern kommer inte ha tillgång till currentUserObservable om den inte istället härrör från ett liveQuery.
-  // * Samma med andra windows.
-  // * Så kanske göra om den till att häröra från liveQuery som läser $logins.orderBy('lastLogin').last().
-  // * Då bara vara medveten om:
-  //    * En sån observable börjar hämta data vid första subscribe
-  //    * Vi har inget "inital value" men kan emulera det till att vara ANONYMOUS_USER
-  //    * Om requireAuth är true, så borde db.on(ready) hålla databasen stängd för alla utom denna observable.
-  //    * Om inte så behöver den inte blocka.
+  // V: Service workern kommer inte ha tillgång till currentUserObservable om den inte istället härrör från ett liveQuery.
+  // V: Samma med andra windows.
+  // V: Så kanske göra om den till att häröra från liveQuery som läser $logins.orderBy('lastLogin').last().
+  // V: Då bara vara medveten om:
+  //    V: En sån observable börjar hämta data vid första subscribe
+  //    V: Vi har inget "inital value" men kan emulera det till att vara ANONYMOUS_USER
+  //    V: Om requireAuth är true, så borde db.on(ready) hålla databasen stängd för alla utom denna observable.
+  //    V: Om inte så behöver den inte blocka.
 
   // Andra tankar:
   //    * Man kan inte byta användare när man är offline. Skulle gå att flytta realms till undanstuff-tabell vid user-change.

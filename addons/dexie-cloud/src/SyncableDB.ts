@@ -1,7 +1,7 @@
 import Dexie, { Table } from "dexie";
 import { GuardedJob } from './types/GuardedJob';
 import { UserLogin } from './types/UserLogin';
-import { DBOperationsSet } from "./types/DBOperationsSet";
+import { DBOperationsSet } from "./types/move-to-dexie-cloud-common/DBOperationsSet";
 import { SyncState } from './types/SyncState';
 
 export interface SyncableDB extends Dexie {

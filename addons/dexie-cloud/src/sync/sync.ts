@@ -3,43 +3,35 @@ import { MINUTES } from "../helpers/date-constants";
 import { getMutationTable } from "../helpers/getMutationTable";
 import { getSyncableTables } from "../helpers/getSyncableTables";
 import { getTableFromMutationTable } from "../helpers/getTableFromMutationTable";
-import { IS_SERVICE_WORKER } from "../helpers/IS_SERVICE_WORKER";
-import { DBOperationsSet } from "../types/DBOperationsSet";
-import { DBOperation } from "../types/DBOperation";
-import { numUnsyncedMutations } from "./numUnsyncedMutations";
-import { performGuardedJob } from "./performGuardedJob";
+import { DBOperationsSet } from "../types/move-to-dexie-cloud-common/DBOperationsSet";
+import { DBOperation } from "../types/move-to-dexie-cloud-common/DBOperation";
 import { SyncableDB } from '../SyncableDB';
+import { SyncResponse } from "../types/move-to-dexie-cloud-common/SyncResponse";
+import { SyncState } from "../types/SyncState";
 
-const isSyncing = new WeakSet<SyncableDB>();
-const CURRENT_SYNC_WORKER = "currentPushWorker";
+export const isSyncing = new WeakSet<SyncableDB>();
+export const CURRENT_SYNC_WORKER = "currentSyncWorker";
 
-export async function syncIfNeeded(db: SyncableDB) {
-  if (isSyncing.has(db)) return; // Still working.
-  if (!numUnsyncedMutations.get(db)) return; // undefined or 0 = nothing to sync.
-  if (typeof navigator !== "undefined" && !navigator.onLine) return;
-  if (typeof document !== "undefined" && document.visibilityState !== "visible")
-    return;
+/*
+  TODO:
+    1. Rätta flödet och gör det persistent mellan transaktioner
+       -> do..while snurran efter applyServerChanges() verkar onödig.
+          Bättre att applyServerChanges gör detta i samma transaktion.
+    2. Sync-requestet ska autenticera sig med nuvarande användare.
+       MEN:
+        Vissa medskickade operationer kan vara gjorda av annan användare.
+        Därför: Om några av client-changes är andra användare, så måste de användarnas
+        tokens följa med som extra parameter till fetch-requestet.
+        Servern skall då validera och genomföra dessa operationer baserat på alternativt token.
+        Kanske kan vi skita i det flödet just nu och hindra att det uppstår istället.
+        Hur? Jo, genom:
+          1. Användare är ANONYMOUS
+          2. Data laddas ned.
+          3. Data modifieras.
+          4. Användare loggar in.
+          5. Sync: Några inledande requests är ANONYMOUS men autenticeras som användaren.
 
-  isSyncing.add(db);
-  try {
-    if (db.cloud.options.serviceWorker) {
-      await sync(db);
-    } else {
-      // We use a flow that is better suited for the case when multiple workers want to
-      // do the same thing.
-      await performGuardedJob(db, CURRENT_SYNC_WORKER, "$jobs", () => sync(db));
-    }
-    isSyncing.delete(db);
-    await syncIfNeeded(db);
-  } catch (error) {
-    isSyncing.delete(db);
-    console.error(`Failed to sync client changes`, error);
-    // I don't think we should setTimout or so here.
-    // Unless server tells us to in some response.
-    // Then we could follow that advice but not by waiting here but by registering
-    // Something that triggers an event listened to in startPushWorker()
-  }
-}
+*/
 
 export async function sync(db: SyncableDB) {
   const mutationTables = getSyncableTables(
@@ -49,21 +41,26 @@ export async function sync(db: SyncableDB) {
   //
   // List changes to sync
   //
-  let clientChangeSet: DBOperationsSet = await db.transaction(
+  const $syncState = db.table("$syncState");
+  const [clientChangeSet, syncState] = await db.transaction(
     "r",
-    mutationTables,
-    () => listClientChanges(mutationTables, db)
+    [...mutationTables, $syncState],
+    async () => {
+      const clientChanges = await listClientChanges(mutationTables, db);
+      const syncState = await $syncState.get("syncState");
+      return [clientChanges, syncState];
+    }
   );
 
   //
   // Push changes to server
   //
-  const serverChangeSet = await syncWithServer(clientChangeSet, db);
+  const res = await syncWithServer(clientChangeSet, syncState, db);
 
   //
   // apply server changes
   //
-  await applyServerChanges(serverChangeSet, db);
+  await applyServerChanges(res, db);
 
   //
   // Now when server has persisted the changes, we may delete the changes
@@ -93,8 +90,9 @@ export async function sync(db: SyncableDB) {
 
 async function syncWithServer(
   changeSet: DBOperationsSet,
+  syncState: SyncState | undefined,
   db: SyncableDB
-): Promise<DBOperationsSet> {
+): Promise<SyncResponse> {
   //
   // Reduce changes to only contain updated fields and no duplicates
   //
@@ -105,7 +103,6 @@ async function syncWithServer(
   //
   const {databaseUrl} = db.cloud.options;
 
-  
   const res = fetch(`${databaseUrl}/sync`, {})
   throw new Error(`Not implemented!`);
   const serverChanges = [] as DBOperationsSet;
@@ -148,7 +145,7 @@ async function listClientChanges(
 }
 
 export async function applyServerChanges(
-  serverChangeSet: DBOperationsSet,
+  syncResponse: SyncResponse,
   db: SyncableDB
 ) {}
 

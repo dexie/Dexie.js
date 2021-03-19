@@ -8,7 +8,7 @@ import Dexie, {
   DBCoreTransaction,
   DBCoreTable,
 } from "dexie";
-import { DBOperation } from "../types/DBOperation";
+import { DBOperation } from "../types/move-to-dexie-cloud-common/DBOperation";
 import { TXExpandos } from "../types/TXExpandos";
 import { guardedTable } from "../middleware-helpers/guardedTable";
 import { randomString } from "../helpers/randomString";
