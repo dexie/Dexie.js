@@ -55,12 +55,12 @@ export function createMutationTrackingMiddleware({
 
       return {
         ...core,
-        transaction: (req) => {
-          const tx = core.transaction(req) as DBCoreTransaction &
+        transaction: (tables, mode) => {
+          const tx = core.transaction(tables, mode) as DBCoreTransaction &
             IDBTransaction &
             TXExpandos;
 
-          if (req.mode === "readwrite") {
+          if (mode === "readwrite") {
             // Give each transaction a globally unique id.
             tx.txid = randomString(16);
             // Introduce the concept of current user that lasts through the entire transaction.
