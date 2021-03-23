@@ -114,10 +114,10 @@ export class Transaction implements ITransaction {
     assert(this._completion._state === null); // Completion Promise must still be pending.
 
     idbtrans = this.idbtrans = idbtrans ||
-      (this.db.core ? this.db.core.transaction({
-        mode: this.mode as "readonly" | "readwrite",
-        tables: this.storeNames
-      }) : idbdb.transaction(this.storeNames, this.mode)) as IDBTransaction;
+      (this.db.core 
+        ? this.db.core.transaction(this.storeNames, this.mode as 'readwrite' | 'readonly')
+        : idbdb.transaction(this.storeNames, this.mode)
+      ) as IDBTransaction;
 
     idbtrans.onerror = wrap(ev => {
       preventDefault(ev);// Prohibit default bubbling to window.error

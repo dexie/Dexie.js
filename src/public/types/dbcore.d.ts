@@ -20,11 +20,6 @@ export interface DBCoreTransaction {
   abort(): void;
 }
 
-export interface DBCoreTransactionRequest {
-  tables: string[];
-  mode: 'readonly' | 'readwrite';
-}
-
 export type DBCoreMutateRequest = DBCoreAddRequest | DBCorePutRequest | DBCoreDeleteRequest | DBCoreDeleteRangeRequest;
 
 export interface DBCoreMutateResponse {
@@ -159,11 +154,10 @@ export interface DBCoreIndex {
   /** Extract (using keyPath) a key from given value (object). Null for outbound primary keys */
   readonly extractKey: ((value: any) => any) | null;
 }
-
 export interface DBCore {
   stack: "dbcore";
   // Transaction and Object Store
-  transaction(req: DBCoreTransactionRequest): DBCoreTransaction;
+  transaction(stores: string[], mode: 'readonly' | 'readwrite'): DBCoreTransaction;
 
   // Utility methods
   cmp(a: any, b: any) : number;
