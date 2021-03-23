@@ -6,6 +6,7 @@ import { Transaction } from '../transaction';
 import { removeTablesApi, setApiOnPlace, parseIndexSyntax } from './schema-helpers';
 import { exceptions } from '../../errors';
 import { createTableSchema } from '../../helpers/table-schema';
+import { nop, promisableChain } from '../../functions/chaining-functions';
 
 /** class Version
  * 
@@ -61,7 +62,7 @@ export class Version implements IVersion {
   }
 
   upgrade(upgradeFunction: (trans: Transaction) => PromiseLike<any> | void): Version {
-    this._cfg.contentUpgrade = upgradeFunction;
+    this._cfg.contentUpgrade = promisableChain(this._cfg.contentUpgrade || nop, upgradeFunction);
     return this;
   }
 }
