@@ -91,31 +91,26 @@ export function updateTablesAndIndexes(
 
   const versToRun = versions.filter(v => v._cfg.version >= oldVersion);
   versToRun.forEach(version => {
-    const oldSchema = globalSchema;
-    const newSchema = version._cfg.dbschema;
-    let diff: SchemaDiff;
     queue.push(() => {
+      const oldSchema = globalSchema;
+      const newSchema = version._cfg.dbschema;
       adjustToExistingIndexNames(db, oldSchema, idbUpgradeTrans);
       adjustToExistingIndexNames(db, newSchema, idbUpgradeTrans);
-      globalSchema = db._dbSchema = newSchema;
-      diff = getSchemaDiff(oldSchema, newSchema);
-    });
 
-    // Add tables           
-    queue.push(() => {
+      globalSchema = db._dbSchema = newSchema;
+
+      const diff = getSchemaDiff(oldSchema, newSchema);
+      // Add tables           
       diff.add.forEach(tuple => {
         createTable(idbUpgradeTrans, tuple[0], tuple[1].primKey, tuple[1].indexes);
       });
-    });
-
-    // Change tables indexes (except applying a unique constraint)
-    queue.push(() => {
+      // Change tables
       diff.change.forEach(change => {
         if (change.recreate) {
           throw new exceptions.Upgrade("Not yet support for changing primary key");
         } else {
           const store = idbUpgradeTrans.objectStore(change.name);
-          // Add indexes (but don't yet apply uniqueness)
+          // Add indexes
           change.add.forEach(idx => addIndex(store, idx));
           // Update indexes
           change.change.forEach(idx => {
@@ -126,13 +121,10 @@ export function updateTablesAndIndexes(
           change.del.forEach(idxName => store.deleteIndex(idxName));
         }
       });
-    });
 
+      const contentUpgrade = version._cfg.contentUpgrade;
 
-    // Apply content upgrader(s)
-    const contentUpgrade = version._cfg.contentUpgrade;
-    if (contentUpgrade && version._cfg.version > oldVersion) {
-      queue.push(() => {
+      if (contentUpgrade && version._cfg.version > oldVersion) {
         // Update db.core with new tables and indexes:
         generateMiddlewareStacks(db, idbUpgradeTrans);
         trans._memoizedTables = {}; // Invalidate memoization as transaction shape may change between versions.
@@ -140,7 +132,7 @@ export function updateTablesAndIndexes(
         anyContentUpgraderHasRun = true;
 
         // Add to-be-deleted tables to contentUpgrade transaction
-        const upgradeSchema = shallowClone(newSchema);
+        let upgradeSchema = shallowClone(newSchema);
         diff.del.forEach(table => {
           upgradeSchema[table] = oldSchema[table];
         });
@@ -173,23 +165,8 @@ export function updateTablesAndIndexes(
         });
         return (returnValue && typeof returnValue.then === 'function' ?
           Promise.resolve(returnValue) : promiseFollowed.then(()=>returnValue));
-      });
-    }
-
-    // Apply added uniqueness. Do this after upgrader has run so that upgrader may remove duplicates
-    // before applying the filter.
-    queue.push(() => {
-      diff.change.forEach(change => {
-        if (change.uniques.length > 0) {
-          const store = idbUpgradeTrans.objectStore(change.name);
-          change.uniques.forEach(idx => {
-            store.deleteIndex(idx.name);
-            addIndex(store, idx);
-          });
-        }
-      });
+      }
     });
-
     queue.push(idbtrans => {
       if (!anyContentUpgraderHasRun || !hasIEDeleteObjectStoreBug) { // Dont delete old tables if ieBug is present and a content upgrader has run. Let tables be left in DB so far. This needs to be taken care of.
         const newSchema = version._cfg.dbschema;
@@ -222,19 +199,17 @@ export interface SchemaDiff {
 
 export interface TableSchemaDiff {
   name: string,
-  def: TableSchema,
   recreate: boolean,
   del: string[],
   add: IndexSpec[],
-  change: IndexSpec[],
-  uniques: IndexSpec[]
+  change: IndexSpec[]
 }
 
 export function getSchemaDiff(oldSchema: DbSchema, newSchema: DbSchema): SchemaDiff {
   const diff: SchemaDiff = {
     del: [], // Array of table names
     add: [], // Array of [tableName, newDefinition]
-    change: [], // Array of {name: tableName, recreate: newDefinition, del: delIndexNames, add: newIndexDefs, change: changedIndexDefs}
+    change: [] // Array of {name: tableName, recreate: newDefinition, del: delIndexNames, add: newIndexDefs, change: changedIndexDefs}
   };
   let table: string;
   for (table in oldSchema) {
@@ -246,14 +221,13 @@ export function getSchemaDiff(oldSchema: DbSchema, newSchema: DbSchema): SchemaD
     if (!oldDef) {
       diff.add.push([table, newDef]);
     } else {
-      const change: TableSchemaDiff = {
+      const change = {
         name: table,
         def: newDef,
         recreate: false,
         del: [],
         add: [],
-        change: [],
-        uniques: []
+        change: []
       };
       if (
           (
@@ -278,14 +252,12 @@ export function getSchemaDiff(oldSchema: DbSchema, newSchema: DbSchema): SchemaD
           if (!newIndexes[idxName]) change.del.push(idxName);
         }
         for (idxName in newIndexes) {
-          const oldIdx = oldIndexes[idxName];
-          const newIdx = newIndexes[idxName];
-          const newIdxNotUnique = {...newIdx, unique: false};
-          if (!oldIdx) change.add.push(newIdxNotUnique);
-          else if (oldIdx.multi !== newIdx.multi) change.change.push(newIdxNotUnique);
-          if (newIdx.unique && !oldIdx.unique) change.uniques.push(newIdx); // Treat going over to uniqueness
+          const oldIdx = oldIndexes[idxName],
+            newIdx = newIndexes[idxName];
+          if (!oldIdx) change.add.push(newIdx);
+          else if (oldIdx.src !== newIdx.src) change.change.push(newIdx);
         }
-        if (change.del.length > 0 || change.add.length > 0 || change.change.length > 0 || change.uniques.length > 0) {
+        if (change.del.length > 0 || change.add.length > 0 || change.change.length > 0) {
           diff.change.push(change);
         }
       }
