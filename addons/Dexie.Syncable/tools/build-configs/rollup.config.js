@@ -5,18 +5,20 @@ import path from 'path';
 const version = require(path.resolve(__dirname, '../../package.json')).version;
 
 export default {
-  entry: 'tools/tmp/es5/addons/Dexie.Syncable/src/Dexie.Syncable.js',
-  targets: [{
-    dest: 'dist/dexie-syncable.js',
+  input: 'tools/tmp/es5/addons/Dexie.Syncable/src/Dexie.Syncable.js',
+  output: [{
+    file: 'dist/dexie-syncable.js',
     format: 'umd',
+    banner: readFileSync(path.resolve(__dirname, 'banner.txt')),
+    globals: {dexie: "Dexie", "dexie-observable": "Dexie.Observable"},
+    name: "Dexie.Syncable",
   },{
-    dest: 'dist/dexie-syncable.es.js',
-    format: 'es'
+    file: 'dist/dexie-syncable.es.js',
+    format: 'es',
+    banner: readFileSync(path.resolve(__dirname, 'banner.txt')),
+    globals: {dexie: "Dexie", "dexie-observable": "Dexie.Observable"},
+    name: "Dexie.Syncable",
   }],
-  sourceMap: true,
-  banner: readFileSync(path.resolve(__dirname, 'banner.txt')),
-  moduleName: 'Dexie.Syncable',
-  globals: {dexie: "Dexie", "dexie-observable": "Dexie.Observable"},
   external: ['dexie', 'dexie-observable'],
   plugins: [ sourcemaps() ]
 };

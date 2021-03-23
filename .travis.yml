@@ -1,4 +1,5 @@
 language: node_js
+before_install: if [[ `npm -v` != 7* ]]; then npm i -g npm@7; fi
 addons:
   firefox: "85.0"
 node_js:
