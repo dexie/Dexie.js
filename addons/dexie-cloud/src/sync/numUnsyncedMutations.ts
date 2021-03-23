@@ -5,7 +5,7 @@ import { combineLatest, from } from "rxjs";
 import { distinctUntilChanged, filter, map } from "rxjs/operators";
 
 export function getNumUnsyncedMutationsObservable(db: Dexie) {
-  const syncableTables = getSyncableTables(db.tables.map((t) => t.name));
+  const syncableTables = getSyncableTables(db);
   const mutationTables = syncableTables.map((table) =>
     db.table(getMutationTable(table))
   );

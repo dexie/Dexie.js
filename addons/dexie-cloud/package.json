@@ -57,7 +57,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@types/node": "*",
-    "dreambase-library": "*",
+    "dreambase-library": "^1.0.5",
     "just-build": "*",
     "karma": "*",
     "karma-browserstack-launcher": "*",

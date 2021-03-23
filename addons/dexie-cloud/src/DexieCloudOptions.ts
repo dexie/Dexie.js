@@ -5,5 +5,6 @@ export interface DexieCloudOptions {
   requireAuth?: boolean;
   serviceWorker?: boolean;
   customLoginGui?: boolean;
+  nonSyncedTables?: string[];
   fetchTokens?: (tokenParams: any) => Promise<TokenFinalResponse>;
 }

@@ -1,4 +1,5 @@
+import { SyncableDB } from "../SyncableDB";
 
-export function getSyncableTables(tables: string[]) {
-  return tables.filter(tbl => !/^\$/.test(tbl));
+export function getSyncableTables(db: SyncableDB) {
+  return Object.keys(db.cloud.schema).filter(tableName => db.cloud.schema[tableName].sync);
 }

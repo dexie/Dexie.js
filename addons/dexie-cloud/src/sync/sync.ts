@@ -5,9 +5,11 @@ import { getSyncableTables } from "../helpers/getSyncableTables";
 import { getTableFromMutationTable } from "../helpers/getTableFromMutationTable";
 import { DBOperationsSet } from "../types/move-to-dexie-cloud-common/DBOperationsSet";
 import { DBOperation } from "../types/move-to-dexie-cloud-common/DBOperation";
-import { SyncableDB } from '../SyncableDB';
+import { SyncableDB } from "../SyncableDB";
 import { SyncResponse } from "../types/move-to-dexie-cloud-common/SyncResponse";
 import { SyncState } from "../types/SyncState";
+import { loadAccessToken } from "../authentication/authenticate";
+import { BISON } from "../BISON";
 
 export const isSyncing = new WeakSet<SyncableDB>();
 export const CURRENT_SYNC_WORKER = "currentSyncWorker";
@@ -34,9 +36,9 @@ export const CURRENT_SYNC_WORKER = "currentSyncWorker";
 */
 
 export async function sync(db: SyncableDB) {
-  const mutationTables = getSyncableTables(
-    db.tables.map((tbl) => tbl.name)
-  ).map((tbl) => db.table(getMutationTable(tbl)));
+  const mutationTables = getSyncableTables(db).map((tbl) =>
+    db.table(getMutationTable(tbl))
+  );
 
   //
   // List changes to sync
@@ -65,7 +67,7 @@ export async function sync(db: SyncableDB) {
   //
   // Now when server has persisted the changes, we may delete the changes
   //
-  do {
+  /*do {
     const previousChangeSet = clientChangeSet;
     clientChangeSet = await db.transaction("rw", mutationTables, async () => {
       const newMutsOnTables = await listClientChanges(mutationTables, db, {
@@ -85,7 +87,7 @@ export async function sync(db: SyncableDB) {
       );
       return newMutsOnTables;
     });
-  } while (clientChangeSet.length > 0);
+  } while (clientChangeSet.length > 0);*/
 }
 
 async function syncWithServer(
@@ -101,9 +103,36 @@ async function syncWithServer(
   //
   // Push changes to server using fetch
   //
-  const {databaseUrl} = db.cloud.options;
+  const {
+    options: { databaseUrl },
+    schema,
+  } = db.cloud;
+  const syncableTables = db.tables
+    .map((t) => t.name)
+    .filter((tableName) => !/^\$/.test(tableName));
 
-  const res = fetch(`${databaseUrl}/sync`, {})
+  const headers: HeadersInit = {
+    Accept: "application/x-bison",
+    "Content-Type": "application/x-bison",
+  };
+  const accessToken = await loadAccessToken(db);
+  if (accessToken) {
+    headers.Authorization = `Bearer ${accessToken}`;
+  }
+
+  const res = await fetch(`${databaseUrl}/sync`, {
+    headers,
+    body: BISON.toBinary({
+      schema: {
+        tables: syncableTables,
+      },
+      lastPull: syncState && {
+        serverRevision: syncState.serverRevision,
+        realms: syncState.realms,
+      },
+      changes,
+    }),
+  });
   throw new Error(`Not implemented!`);
   const serverChanges = [] as DBOperationsSet;
   return serverChanges;
@@ -122,7 +151,7 @@ async function listClientChanges(
   const allMutsOnTables = await Promise.all(
     mutationTables.map(async (mutationTable) => {
       const lastRevision = lastRevisions.get(mutationTable.name);
-      
+
       const muts: DBOperation[] = lastRevision
         ? await mutationTable.where("rev").above(lastRevision).toArray()
         : await mutationTable.toArray();

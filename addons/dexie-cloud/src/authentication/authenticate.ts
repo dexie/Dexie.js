@@ -1,9 +1,8 @@
-import type {
-  TokenFinalResponse,
-} from "dexie-cloud-common";
+import type { TokenFinalResponse } from "dexie-cloud-common";
+import { SyncableDB } from "../SyncableDB";
 import { UserLogin } from "../types/UserLogin";
 import { AuthPersistedContext } from "./AuthPersistedContext";
-import { otpFetchTokenCallback } from './otpFetchTokenCallback';
+import { otpFetchTokenCallback } from "./otpFetchTokenCallback";
 
 export interface AuthenticationDialog {
   prompt(msg: string): string | null | Promise<string | null>;
@@ -19,6 +18,39 @@ export type FetchTokenCallback = (tokenParams: {
   public_key: string;
   hints?: { userId?: string; email?: string };
 }) => Promise<TokenFinalResponse>;
+
+export async function loadAccessToken(
+  db: SyncableDB
+): Promise<string | undefined> {
+  const {
+    accessToken,
+    accessTokenExpiration,
+    refreshToken,
+    refreshTokenExpiration,
+    claims,
+  } = db.cloud.currentUser.value;
+  if (!accessToken) return;
+  const expTime = accessTokenExpiration?.getTime() ?? Infinity;
+  if (expTime > Date.now()) {
+    return accessToken;
+  }
+  if (!refreshToken) {
+    throw new Error(`Refresh token missing`);
+  }
+  const refreshExpTime = refreshTokenExpiration?.getTime() ?? Infinity;
+  if (refreshExpTime <= Date.now()) {
+      throw new Error(`Refresh token has expired`);
+  }
+  const refreshedLogin = await refreshAccessToken(
+    db.cloud.options.databaseUrl,
+    db.cloud.currentUser.value
+  );
+  await db.table("$logins").update(claims.sub, {
+    accessToken: refreshedLogin.accessToken,
+    accessTokenExpiration: refreshedLogin.accessTokenExpiration,
+  });
+  return refreshedLogin.accessToken;
+}
 
 export async function authenticate(
   url: string,
@@ -38,14 +70,19 @@ export async function authenticate(
   ) {
     return await refreshAccessToken(url, context);
   } else {
-    return await userAuthenticate(url, context, dlg, fetchToken || otpFetchTokenCallback(dlg, url));
+    return await userAuthenticate(
+      url,
+      context,
+      dlg,
+      fetchToken || otpFetchTokenCallback(dlg, url)
+    );
   }
 }
 
 async function refreshAccessToken(
   url: string,
-  context: UserLogin
-): Promise<AuthPersistedContext> {
+  login: UserLogin
+): Promise<UserLogin> {
   throw new Error("Refresh token not implemented");
 }
 
