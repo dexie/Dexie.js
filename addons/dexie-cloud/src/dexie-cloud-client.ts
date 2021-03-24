@@ -5,7 +5,7 @@ import { createIdGenerationMiddleware } from "./middlewares/createIdGenerationMi
 import { DexieCloudOptions } from "./DexieCloudOptions";
 import { DexieCloudSchema } from "./DexieCloudSchema";
 //import { dexieCloudSyncProtocol } from "./dexieCloudSyncProtocol";
-import { overrideParseStoresSpec } from "./overrideParseStoresSpect";
+import { overrideParseStoresSpec } from "./overrideParseStoresSpec";
 import { SyncableDB } from "./SyncableDB";
 import { UserLogin } from "./types/UserLogin";
 import { ANONYMOUS_USER } from "./authentication/ANONYMOUS_USER";
