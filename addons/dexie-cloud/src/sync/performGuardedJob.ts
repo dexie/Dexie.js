@@ -1,14 +1,14 @@
 import { Table } from "dexie";
 import { MINUTES, SECONDS } from "../helpers/date-constants";
-import { SyncableDB } from "../SyncableDB";
-import { GuardedJob } from "../types/GuardedJob";
+import { DexieCloudDB } from "../db/DexieCloudDB";
+import { GuardedJob } from "../db/entities/GuardedJob";
 import { myId } from "./myId";
 
 const GUARDED_JOB_HEARTBEAT = 1 * SECONDS;
 const GUARDED_JOB_TIMEOUT = 1 * MINUTES;
 
 export async function performGuardedJob(
-  db: SyncableDB,
+  db: DexieCloudDB,
   jobName: string,
   jobsTableName: string,
   job: () => Promise<void>

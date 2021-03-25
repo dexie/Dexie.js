@@ -1,4 +1,4 @@
-import { UserLogin } from '../types/UserLogin';
+import { UserLogin } from '../db/entities/UserLogin';
 
 export const ANONYMOUS_USER: UserLogin = {
   userId: "anonymous",

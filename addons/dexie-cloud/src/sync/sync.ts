@@ -5,13 +5,13 @@ import { getSyncableTables } from "../helpers/getSyncableTables";
 import { getTableFromMutationTable } from "../helpers/getTableFromMutationTable";
 import { DBOperationsSet } from "../types/move-to-dexie-cloud-common/DBOperationsSet";
 import { DBOperation } from "../types/move-to-dexie-cloud-common/DBOperation";
-import { SyncableDB } from "../SyncableDB";
+import { DexieCloudDB } from "../db/DexieCloudDB";
 import { SyncResponse } from "../types/move-to-dexie-cloud-common/SyncResponse";
-import { SyncState } from "../types/SyncState";
+import { PersistedSyncState } from "../db/entities/PersistedSyncState";
 import { loadAccessToken } from "../authentication/authenticate";
 import { BISON } from "../BISON";
 
-export const isSyncing = new WeakSet<SyncableDB>();
+export const isSyncing = new WeakSet<DexieCloudDB>();
 export const CURRENT_SYNC_WORKER = "currentSyncWorker";
 
 /*
@@ -35,7 +35,7 @@ export const CURRENT_SYNC_WORKER = "currentSyncWorker";
 
 */
 
-export async function sync(db: SyncableDB) {
+export async function sync(db: DexieCloudDB) {
   const mutationTables = getSyncableTables(db).map((tbl) =>
     db.table(getMutationTable(tbl))
   );
@@ -92,8 +92,8 @@ export async function sync(db: SyncableDB) {
 
 async function syncWithServer(
   changeSet: DBOperationsSet,
-  syncState: SyncState | undefined,
-  db: SyncableDB
+  syncState: PersistedSyncState | undefined,
+  db: DexieCloudDB
 ): Promise<SyncResponse> {
   //
   // Reduce changes to only contain updated fields and no duplicates
@@ -140,7 +140,7 @@ async function syncWithServer(
 
 async function listClientChanges(
   mutationTables: Table[],
-  db: SyncableDB,
+  db: DexieCloudDB,
   { since = [] as DBOperationsSet } = {}
 ): Promise<DBOperationsSet> {
   const lastRevisions = new Map<string, number>();
@@ -175,7 +175,7 @@ async function listClientChanges(
 
 export async function applyServerChanges(
   syncResponse: SyncResponse,
-  db: SyncableDB
+  db: DexieCloudDB
 ) {}
 
 export function reduceChangeSet(changeSet: DBOperationsSet): DBOperationsSet {

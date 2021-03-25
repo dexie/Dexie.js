@@ -2,7 +2,7 @@ import Dexie, { liveQuery } from "dexie";
 import { combineLatest } from "rxjs";
 import { filter, map } from "rxjs/operators";
 import { IS_SERVICE_WORKER } from "../helpers/IS_SERVICE_WORKER";
-import { SyncState } from "../types/SyncState";
+import { PersistedSyncState } from "../db/entities/PersistedSyncState";
 import { getNumUnsyncedMutationsObservable } from "./numUnsyncedMutations";
 import { syncIfNeeded } from "./syncIfNeeded";
 
@@ -13,7 +13,7 @@ export async function startSyncWorker(db: Dexie) {
   const numUnsyncedMuts = getNumUnsyncedMutationsObservable(db);
   const syncStateObservable = liveQuery(
     () =>
-      db.table("$syncState").get("syncState") as Promise<SyncState | undefined>
+      db.table("$syncState").get("syncState") as Promise<PersistedSyncState | undefined>
   );
   const syncNeeded = combineLatest([
     syncStateObservable,

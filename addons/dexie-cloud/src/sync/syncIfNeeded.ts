@@ -1,9 +1,9 @@
 import { IS_SERVICE_WORKER } from "../helpers/IS_SERVICE_WORKER";
 import { performGuardedJob } from "./performGuardedJob";
-import { SyncableDB } from '../SyncableDB';
+import { DexieCloudDB } from '../db/DexieCloudDB';
 import { isSyncing, sync, CURRENT_SYNC_WORKER } from "./sync";
 
-export async function syncIfNeeded(db: SyncableDB) {
+export async function syncIfNeeded(db: DexieCloudDB) {
   if (isSyncing.has(db))
     return; // Still working.
   if (typeof navigator !== "undefined" && !navigator.onLine)

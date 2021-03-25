@@ -1,9 +1,9 @@
-import { SyncableDB } from "../SyncableDB";
+import { DexieCloudDB } from "../db/DexieCloudDB";
 import { authenticate, dummyAuthDialog } from "./authenticate";
 import { AuthPersistedContext } from "./AuthPersistedContext";
 import { setCurrentUser } from "./setCurrentUser";
 
-export async function login(db: SyncableDB) {
+export async function login(db: DexieCloudDB) {
   if (db.cloud.currentUser.isLoggedIn) return;
   const context = new AuthPersistedContext(db, {
     claims: {},

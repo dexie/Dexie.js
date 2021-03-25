@@ -5,8 +5,8 @@ import { authenticate, dummyAuthDialog } from "./authenticate";
 import { AuthPersistedContext } from "./AuthPersistedContext";
 import { makeArray } from "../helpers/makeArray";
 import { outstandingTransactions } from "../middlewares/outstandingTransaction";
-import { SyncableDB } from "../SyncableDB";
-import { UserLogin } from "../types/UserLogin";
+import { DexieCloudDB } from "../db/DexieCloudDB";
+import { UserLogin } from "../db/entities/UserLogin";
 import { getNumUnsyncedMutationsObservable } from "../sync/numUnsyncedMutations";
 
 /** This function changes or sets the current user as requested.
@@ -20,7 +20,7 @@ import { getNumUnsyncedMutationsObservable } from "../sync/numUnsyncedMutations"
  * @param db 
  * @param newUser 
  */
-export async function setCurrentUser(db: SyncableDB, user: AuthPersistedContext) {
+export async function setCurrentUser(db: DexieCloudDB, user: AuthPersistedContext) {
   const currentUserObservable = db.cloud.currentUserObservable;
   if (!currentUserObservable)
     throw new Error(`Given Dexie instance doesn't have the dexie-cloud addon.`);

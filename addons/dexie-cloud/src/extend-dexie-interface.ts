@@ -2,8 +2,9 @@ import Dexie from "dexie";
 import { DexieCloudOptions } from './DexieCloudOptions';
 import { DexieCloudSchema } from './DexieCloudSchema';
 import { LoginState } from './types/LoginState';
-import { UserLogin } from './types/UserLogin';
+import { UserLogin } from './db/entities/UserLogin';
 import * as Rx from "rxjs";
+import { PersistedSyncState } from "./db/entities/PersistedSyncState";
 import { SyncState } from "./types/SyncState";
 
 //
@@ -17,6 +18,7 @@ declare module "dexie" {
       schema: DexieCloudSchema;
       currentUserId: string;
       currentUser: Rx.BehaviorSubject<UserLogin>;
+      syncState: Rx.BehaviorSubject<SyncState>;
       loginState: Rx.BehaviorSubject<LoginState>;
       /**
        * Connect to given URL

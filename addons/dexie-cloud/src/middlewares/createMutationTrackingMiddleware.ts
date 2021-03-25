@@ -12,7 +12,7 @@ import { DBOperation } from "../types/move-to-dexie-cloud-common/DBOperation";
 import { TXExpandos } from "../types/TXExpandos";
 import { guardedTable } from "../middleware-helpers/guardedTable";
 import { randomString } from "../helpers/randomString";
-import { UserLogin } from "../types/UserLogin";
+import { UserLogin } from "../db/entities/UserLogin";
 import { BehaviorSubject } from "rxjs";
 import { outstandingTransactions } from "./outstandingTransaction";
 

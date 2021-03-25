@@ -1,6 +1,6 @@
 import type { TokenFinalResponse } from "dexie-cloud-common";
-import { SyncableDB } from "../SyncableDB";
-import { UserLogin } from "../types/UserLogin";
+import { DexieCloudDB } from "../db/DexieCloudDB";
+import { UserLogin } from "../db/entities/UserLogin";
 import { AuthPersistedContext } from "./AuthPersistedContext";
 import { otpFetchTokenCallback } from "./otpFetchTokenCallback";
 
@@ -20,7 +20,7 @@ export type FetchTokenCallback = (tokenParams: {
 }) => Promise<TokenFinalResponse>;
 
 export async function loadAccessToken(
-  db: SyncableDB
+  db: DexieCloudDB
 ): Promise<string | undefined> {
   const {
     accessToken,

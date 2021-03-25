@@ -1,7 +1,5 @@
+export type SyncStatePhase = "initial" | "not-in-sync" | "pushing" | "pulling" | "in-sync";
 export interface SyncState {
-  id: "syncState";
-  serverRevision: any;
-  realms: string[];
-  initiallySynced: boolean;
-  tableAliases: {[tableName: string]: string};
+  phase: SyncStatePhase;
+  progress?: number; // 0..100
 }

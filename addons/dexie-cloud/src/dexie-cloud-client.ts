@@ -6,40 +6,43 @@ import { DexieCloudOptions } from "./DexieCloudOptions";
 import { DexieCloudSchema } from "./DexieCloudSchema";
 //import { dexieCloudSyncProtocol } from "./dexieCloudSyncProtocol";
 import { overrideParseStoresSpec } from "./overrideParseStoresSpec";
-import { SyncableDB } from "./SyncableDB";
-import { UserLogin } from "./types/UserLogin";
+import { DexieCloudDB } from "./db/DexieCloudDB";
+import { UserLogin } from "./db/entities/UserLogin";
 import { ANONYMOUS_USER } from "./authentication/ANONYMOUS_USER";
 import { login } from "./authentication/login";
 import { OTPTokenRequest, TokenFinalResponse, TokenOtpSentResponse, TokenResponse } from 'dexie-cloud-common';
 import { LoginState } from './types/LoginState';
+import { SyncState } from "./types/SyncState";
 
-export function dexieCloud(db: Dexie) {
+export function dexieCloud(dexie: Dexie) {
   //
   //
   //
   const currentUserEmitter = new BehaviorSubject(ANONYMOUS_USER);
   let currentUserSubscription: Subscription | null = null;
-  db.on(
+  dexie.on(
     "ready",
-    async (db: SyncableDB) => {
+    async (dexie: Dexie) => {
+      const db = DexieCloudDB(dexie);
+
+      // Manage CurrentUser observable:
       if (currentUserSubscription) currentUserSubscription.unsubscribe();
       currentUserSubscription = liveQuery(() =>
-        (db.table("$logins") as Table<UserLogin>)
+        db.$logins
           .toArray()
           .then((logins) => logins.find((l) => l.isLoggedIn) || ANONYMOUS_USER)
       ).subscribe(currentUserEmitter);
     },
     true // true = sticky
   );
-  db.on("close", () => {
+  
+  dexie.on("close", () => {
     currentUserSubscription && currentUserSubscription.unsubscribe();
     currentUserSubscription = null;
     currentUserEmitter.next(ANONYMOUS_USER);
   });
 
-  //db.
-
-  db.cloud = {
+  dexie.cloud = {
     version: "{version}",
     options: { databaseUrl: "" },
     schema: {},
@@ -47,20 +50,19 @@ export function dexieCloud(db: Dexie) {
       return currentUserEmitter.value.userId || ANONYMOUS_USER.userId!;
     },
     currentUser: currentUserEmitter,
+    syncState: new BehaviorSubject<SyncState>({phase: "initial"}),
     loginState: new BehaviorSubject<LoginState>({type: "silent"}), // fixthis! Or remove this observable?
     configure(options: DexieCloudOptions) {
-      db.cloud.options = options;
-      //return db.syncable.connect(DEXIE_CLOUD_PROTOCOL_NAME, options.databaseUrl, options);
-      //return Promise.resolve();
+      dexie.cloud.options = options;
     },
   };
 
-  db.Version.prototype["_parseStoresSpec"] = Dexie.override(
-    db.Version.prototype["_parseStoresSpec"],
-    (origFunc) => overrideParseStoresSpec(origFunc, db.cloud.options, db.cloud.schema)
+  dexie.Version.prototype["_parseStoresSpec"] = Dexie.override(
+    dexie.Version.prototype["_parseStoresSpec"],
+    (origFunc) => overrideParseStoresSpec(origFunc, dexie.cloud.options, dexie.cloud.schema)
   );
 
-  db.use(createIdGenerationMiddleware(db.cloud.schema));
+  dexie.use(createIdGenerationMiddleware(dexie.cloud.schema));
 }
 
 dexieCloud.version = "{version}";
