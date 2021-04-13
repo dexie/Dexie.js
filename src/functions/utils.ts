@@ -115,39 +115,39 @@ export function tryCatch(fn: (...args: any[])=>void, onerror, args?) : void {
     }
 }
 
-export function getByKeyPath(obj, keyPath) {
+export function getByKeyPath(obj, keyPath, replacementChar = '.') {
     // http://www.w3.org/TR/IndexedDB/#steps-for-extracting-a-key-from-a-value-using-a-key-path
     if (hasOwn(obj, keyPath)) return obj[keyPath]; // This line is moved from last to first for optimization purpose.
     if (!keyPath) return obj;
     if (typeof keyPath !== 'string') {
         var rv = [];
         for (var i = 0, l = keyPath.length; i < l; ++i) {
-            var val = getByKeyPath(obj, keyPath[i]);
+            var val = getByKeyPath(obj, keyPath[i], replacementChar);
             rv.push(val);
         }
         return rv;
     }
-    var period = keyPath.indexOf('.');
+    var period = keyPath.indexOf(replacementChar);
     if (period !== -1) {
         var innerObj = obj[keyPath.substr(0, period)];
-        return innerObj === undefined ? undefined : getByKeyPath(innerObj, keyPath.substr(period + 1));
+        return innerObj === undefined ? undefined : getByKeyPath(innerObj, keyPath.substr(period + replacementChar.length), replacementChar);
     }
     return undefined;
 }
 
-export function setByKeyPath(obj, keyPath, value) {
+export function setByKeyPath(obj, keyPath, value, replacementChar = '.') {
     if (!obj || keyPath === undefined) return;
     if ('isFrozen' in Object && Object.isFrozen(obj)) return;
     if (typeof keyPath !== 'string' && 'length' in keyPath) {
         assert(typeof value !== 'string' && 'length' in value);
         for (var i = 0, l = keyPath.length; i < l; ++i) {
-            setByKeyPath(obj, keyPath[i], value[i]);
+            setByKeyPath(obj, keyPath[i], value[i], replacementChar);
         }
     } else {
-        var period = keyPath.indexOf('.');
+        var period = keyPath.indexOf(replacementChar);
         if (period !== -1) {
             var currentKeyPath = keyPath.substr(0, period);
-            var remainingKeyPath = keyPath.substr(period + 1);
+            var remainingKeyPath = keyPath.substr(period + replacementChar.length);
             if (remainingKeyPath === "")
                 if (value === undefined) {
                     if (isArray(obj) && !isNaN(parseInt(currentKeyPath))) obj.splice(currentKeyPath, 1);
@@ -156,7 +156,7 @@ export function setByKeyPath(obj, keyPath, value) {
             else {
                 var innerObj = obj[currentKeyPath];
                 if (!innerObj) innerObj = (obj[currentKeyPath] = {});
-                setByKeyPath(innerObj, remainingKeyPath, value);
+                setByKeyPath(innerObj, remainingKeyPath, value, replacementChar);
             }
         } else {
             if (value === undefined) {
@@ -241,16 +241,24 @@ export const getValueOf = (val:any, type: string) =>
     type === "ArrayBuffer" ? ''+new Uint8Array(val) :
     type === "Date" ? val.getTime() :
     ArrayBuffer.isView(val) ? ''+new Uint8Array(val.buffer) :
+    typeof val === 'object' ? JSON.stringify(val, function (k,v) { 
+      if (k !== '' && typeof v === 'object') {
+        return getValueOf(v, toStringTag(v));
+      } else {
+        return v;
+      }
+    }) :
     val;
 
  export function getObjectDiff(a, b, rv?, prfx?) {
     // Compares objects a and b and produces a diff object.
+    const REPLACEMENT_CHAR = '~~';
     rv = rv || {};
     prfx = prfx || '';
     keys(a).forEach(prop => {
-        if (!hasOwn(b, prop))
-            rv[prfx+prop] = undefined; // Property removed
-        else {
+        if (!hasOwn(b, prop)) {
+            setByKeyPath(rv, prfx + prop, undefined, REPLACEMENT_CHAR); // Property removed
+        } else {
             var ap = a[prop],
                 bp = b[prop];
             if (typeof ap === 'object' && typeof bp === 'object' && ap && bp)
@@ -264,22 +272,23 @@ export const getValueOf = (val:any, type: string) =>
                         // Instead compare its value in best-effort:
                         // (Can compare real values of Date, ArrayBuffers and views)
                         if (getValueOf(ap, apTypeName) !== getValueOf(bp, bpTypeName)) {
-                            rv[prfx + prop] = b[prop]; // Date / ArrayBuffer etc is of different value
+                            setByKeyPath(rv, prfx + prop, b[prop], REPLACEMENT_CHAR); // Date / ArrayBuffer etc is of different value
                         }
                     } else {
                         // This is not an intrinsic object. Compare the it deeply:
-                        getObjectDiff(ap, bp, rv, prfx + prop + ".");
+                        getObjectDiff(ap, bp, rv, prfx + prop + REPLACEMENT_CHAR);
                     }
                 } else {
-                    rv[prfx + prop] = b[prop];// Property changed to other type
+                    setByKeyPath(rv, prfx + prop, b[prop], REPLACEMENT_CHAR); // Property changed to other type
                 }                
-            } else if (ap !== bp)
-                rv[prfx + prop] = b[prop];// Primitive value changed
+            } else if (ap !== bp) {
+                setByKeyPath(rv, prfx + prop, b[prop], REPLACEMENT_CHAR); // Primitive value changed
+            }
         }
     });
     keys(b).forEach(prop => {
         if (!hasOwn(a, prop)) {
-            rv[prfx+prop] = b[prop]; // Property added
+            setByKeyPath(rv, prfx + prop, b[prop], REPLACEMENT_CHAR); // Property added
         }
     });
     return rv;
