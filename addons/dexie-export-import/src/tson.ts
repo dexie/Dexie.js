@@ -71,7 +71,7 @@ TSON.finalize = async (items?: any[]) => {
           const typeSpec = TSON.types[typeName];
           if (typeSpec && typeSpec.finalize) {
             const b = Dexie.getByKeyPath(item, arrayType ? "$." + keyPath : keyPath);
-            typeSpec.finalize(b, allChunks.slice(b.start, b.end));
+            typeSpec.finalize(b, allChunks.slice(b.data?.start, b.data?.end));
           }
         }
       }
