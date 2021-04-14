@@ -4,10 +4,11 @@ import Dexie, {
   DBCoreAddRequest,
   DBCorePutRequest,
   DBCoreDeleteRequest,
-  DBCoreIndex
+  DBCoreIndex,
 } from "dexie";
 import { DexieCloudSchema } from "../DexieCloudSchema";
 import { b64LexEncode } from "dreambase-library/dist/common/b64lex";
+import { DexieCloudServerState } from "../DexieCloudServerState";
 
 export function getEffectiveKeys(
   primaryKey: DBCoreIndex,
@@ -31,7 +32,7 @@ function applyToUpperBitFix(orig: string, bits: number) {
 
 const consonants = /b|c|d|f|g|h|j|k|l|m|n|p|q|r|s|t|v|x|y|z/i;
 
-function generateTablePrefix(tableName: string, allPrefixes: Set<string>) {
+export function generateTablePrefix(tableName: string, allPrefixes: Set<string>) {
   let rv = "";
   for (let i = 0, l = tableName.length; i < l && rv.length < 3; ++i) {
     if (consonants.test(tableName[i])) rv += tableName[i].toLowerCase();
@@ -90,35 +91,29 @@ function generateKey(prefix: string) {
 }
 
 export function createIdGenerationMiddleware(
-  cloudSchema: DexieCloudSchema
+  getCloudSchema: () => DexieCloudSchema | null
 ): Middleware<DBCore> {
   return {
     stack: "dbcore",
     name: "idGenerationMiddleware",
     create: (core) => {
-      const allPrefixes = new Set<string>();
-      core.schema.tables.forEach((table) => {
-        const cloudTableSchema =
-          cloudSchema[table.name] || (cloudSchema[table.name] = {});
-        const tablePrefix = generateTablePrefix(table.name, allPrefixes);
-        allPrefixes.add(tablePrefix);
-        cloudTableSchema.idPrefix = tablePrefix;
-      });
       return {
         ...core,
-        table: (tableName) => {
+        table: (tableName) => {          
           const table = core.table(tableName);
-          const cloudTableSchema = cloudSchema[tableName];
-          if (!cloudTableSchema?.generatedGlobalId) return table;
           return {
             ...table,
             mutate: (req) => {
-              if (req.type === "add" || req.type === "put") {
+              const cloudTableSchema = getCloudSchema()?.[tableName];
+              if (
+                cloudTableSchema?.generatedGlobalId &&
+                (req.type === "add" || req.type === "put")
+              ) {
                 let valueClones: null | object[] = null;
                 const keys = getEffectiveKeys(table.schema.primaryKey, req);
                 keys.forEach((key, idx) => {
                   if (key === undefined) {
-                    keys[idx] = generateKey(cloudSchema[tableName].idPrefix!);
+                    keys[idx] = generateKey(cloudTableSchema.idPrefix!);
                     if (!table.schema.primaryKey.outbound) {
                       if (!valueClones) valueClones = req.values.slice();
                       valueClones[idx] = Dexie.deepClone(valueClones[idx]);
@@ -128,10 +123,14 @@ export function createIdGenerationMiddleware(
                         keys[idx]
                       );
                     }
-                  } else if (typeof key !== 'string' || !key.startsWith(cloudTableSchema.idPrefix!)) {
+                  } else if (
+                    typeof key !== "string" ||
+                    !key.startsWith(cloudTableSchema.idPrefix!)
+                  ) {
                     throw new Dexie.ConstraintError(
                       `The ID "${key}" is not valid for table "${tableName}". ` +
-                      `The ID must be a string prefixed with "${cloudTableSchema.idPrefix}"`);
+                        `The ID must be a string prefixed with "${cloudTableSchema.idPrefix}"`
+                    );
                   }
                 });
                 return table.mutate({

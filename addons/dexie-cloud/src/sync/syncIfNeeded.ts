@@ -13,7 +13,7 @@ export async function syncIfNeeded(db: DexieCloudDB) {
 
   isSyncing.add(db);
   try {
-    if (db.cloud.options.serviceWorker) {
+    if (db.cloud.options?.usingServiceWorker) {
       if (IS_SERVICE_WORKER) {
         await sync(db);
       }

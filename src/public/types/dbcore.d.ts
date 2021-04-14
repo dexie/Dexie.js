@@ -46,8 +46,9 @@ export interface DBCorePutRequest {
   criteria?: {
     index: string | null;
     range: DBCoreKeyRange;
-  } | false;
-  changeSpec?: {[keyPath: string]: any} | false;
+  };
+  changeSpec?: {[keyPath: string]: any}; // Common changeSpec for each key
+  changeSpecs?: {[keyPath: string]: any}[]; // changeSpec per key. 
   /** @deprecated Will always get results since 3.1.0-alpha.5 */
   wantResults?: boolean;
 }
@@ -59,7 +60,7 @@ export interface DBCoreDeleteRequest {
   criteria?: {
     index: string | null;
     range: DBCoreKeyRange;
-  } | false;
+  };
 }
 
 export interface DBCoreDeleteRangeRequest {

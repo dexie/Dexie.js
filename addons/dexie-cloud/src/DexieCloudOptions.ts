@@ -1,10 +1,11 @@
+import Dexie, { Collection, Table } from 'dexie';
 import { TokenFinalResponse } from 'dexie-cloud-common';
 
 export interface DexieCloudOptions {
   databaseUrl: string;
   requireAuth?: boolean;
-  serviceWorker?: boolean;
+  usingServiceWorker?: boolean;
   customLoginGui?: boolean;
-  nonSyncedTables?: string[];
+  syncedTables?: string[];
   fetchTokens?: (tokenParams: any) => Promise<TokenFinalResponse>;
 }

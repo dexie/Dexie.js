@@ -1,0 +1,38 @@
+import { Table } from "dexie";
+import { getTableFromMutationTable } from "../helpers/getTableFromMutationTable";
+import { DBOperationsSet } from "../types/move-to-dexie-cloud-common/DBOperationsSet";
+import { DBOperation } from "../types/move-to-dexie-cloud-common/DBOperation";
+import { DexieCloudDB } from "../db/DexieCloudDB";
+
+export async function listClientChanges(
+  mutationTables: Table[],
+  db: DexieCloudDB,
+  { since = {} as {[table: string]: number}, limit = Infinity } = {}): Promise<DBOperationsSet> {
+  const allMutsOnTables = await Promise.all(
+    mutationTables.map(async (mutationTable) => {
+      const lastRevision = since[mutationTable.name];
+
+      let query = lastRevision
+        ? mutationTable.where("rev").above(lastRevision)
+        : mutationTable;
+
+      if (limit < Infinity) query = query.limit(limit);
+      
+      const muts: DBOperation[] = await query.toArray();
+
+      const objTable = db.table(getTableFromMutationTable(mutationTable.name));
+      for (const mut of muts) {
+        if (mut.type === "insert" || mut.type === "upsert") {
+          mut.values = await objTable.bulkGet(mut.keys);
+        }
+      }
+      return {
+        table: mutationTable.name,
+        muts,
+      };
+    })
+  );
+
+  // Filter out those tables that doesn't have any mutations:
+  return allMutsOnTables.filter(({ muts }) => muts.length > 0);
+}

@@ -1,6 +1,14 @@
 export interface PersistedSyncState {
-  id: "syncState";
-  serverRevision: any;
-  realms: string[];
-  initiallySynced: boolean;
+  serverRevision?: any;
+  baseRevisions?: {
+    [table: string]: {
+      prevServerRev?: any;
+      clientRev: number;
+      newServerRev?: any;
+    }
+  };
+  realms?: string[];
+  initiallySynced?: boolean;
+  remoteDbId?: string;
+  syncedTables: string[];
 }

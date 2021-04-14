@@ -7,6 +7,7 @@ import Dexie, {
   DBCoreMutateResponse,
   DBCoreTransaction,
   DBCoreTable,
+  DBCoreRangeType,
 } from "dexie";
 import { DBOperation } from "../types/move-to-dexie-cloud-common/DBOperation";
 import { TXExpandos } from "../types/TXExpandos";
@@ -15,9 +16,13 @@ import { randomString } from "../helpers/randomString";
 import { UserLogin } from "../db/entities/UserLogin";
 import { BehaviorSubject } from "rxjs";
 import { outstandingTransactions } from "./outstandingTransaction";
+import { throwVersionIncrementNeeded } from "../helpers/throwVersionIncrementNeeded";
+import { DexieCloudOptions } from "../DexieCloudOptions";
+import { DexieCloudDB } from "../db/DexieCloudDB";
 
 export interface MutationTrackingMiddlewareArgs {
   currentUserObservable: BehaviorSubject<UserLogin>;
+  db: DexieCloudDB;
 }
 
 /** Tracks all mutations in the same transaction as the mutations -
@@ -30,6 +35,7 @@ export interface MutationTrackingMiddlewareArgs {
  */
 export function createMutationTrackingMiddleware({
   currentUserObservable,
+  db,
 }: MutationTrackingMiddlewareArgs): Middleware<DBCore> {
   return {
     stack: "dbcore",
@@ -48,9 +54,7 @@ export function createMutationTrackingMiddleware({
           ])
         );
       } catch {
-        throw new Dexie.SchemaError(
-          `Version increment needed to allow dexie-cloud change tracking`
-        );
+        throwVersionIncrementNeeded();
       }
 
       return {
@@ -78,6 +82,11 @@ export function createMutationTrackingMiddleware({
             tx.addEventListener("complete", removeTransaction);
             tx.addEventListener("error", removeTransaction);
             tx.addEventListener("abort", removeTransaction);
+
+            // Copy "disableChangeTracking" flag from Dexie transaction to DBCore transaction:
+            if (Dexie.currentTransaction["disableChangeTracking"]) {
+              tx.disableChangeTracking = true;
+            }
           }
           return tx;
         },
@@ -91,7 +100,13 @@ export function createMutationTrackingMiddleware({
             mutate: (req) => {
               const trans = req.trans as DBCoreTransaction & TXExpandos;
               if (!trans.txid) return table.mutate(req); // Upgrade transactions not guarded by us.
-              const { txid } = trans;
+              if (trans.disableChangeTracking) return table.mutate(req);
+              if (!trans.currentUser?.isLoggedIn) {
+                // Unauthorized user should not log mutations.
+                // Instead, after login all local data should be logged at once.
+                return table.mutate(req);
+              }
+
               return req.type === "deleteRange"
                 ? table
                     // Query the actual keys (needed for server sending correct rollback to us)
@@ -124,15 +139,25 @@ export function createMutationTrackingMiddleware({
             const { type } = req;
 
             return table.mutate(req).then((res) => {
-              const keys = (type === "delete"
+              const {numFailures: hasFailures, failures} = res;
+              let keys = (type === "delete"
                 ? req.keys!
                 : res.results!
-              ).filter((_, idx) => !res.failures[idx]);
+              );
+              let values = 'values' in req ? req.values : [];
+              let changeSpecs = 'changeSpecs' in req ? req.changeSpecs! : [];
+              if (hasFailures) {
+                keys = keys.filter((_, idx) => !failures[idx]);
+                values = values.filter((_, idx) => !failures[idx]);
+                changeSpecs = changeSpecs.filter((_, idx) => !failures[idx]);
+              }
+              const ts = Date.now();
 
               const mut: DBOperation =
                 req.type === "delete"
                   ? {
                       type: "delete",
+                      ts,
                       keys,
                       criteria: req.criteria,
                       txid,
@@ -141,22 +166,38 @@ export function createMutationTrackingMiddleware({
                   : req.type === "add"
                   ? {
                       type: "insert",
+                      ts,
                       keys,
                       txid,
                       userId,
+                      values,
                     }
-                  : req.changeSpec
+                  : req.criteria && req.changeSpec
                   ? {
-                      type: "update",
+                      // Common changeSpec for all keys
+                      type: "modify",
+                      ts,
                       keys,
-                      txid,
                       criteria: req.criteria,
                       changeSpec: req.changeSpec,
+                      txid,
+                      userId,
+                    }
+                  : req.changeSpecs
+                  ? {
+                      // One changeSpec per key
+                      type: "update",
+                      ts,
+                      keys,
+                      changeSpecs,
+                      txid,
                       userId,
                     }
                   : {
                       type: "upsert",
+                      ts,
                       keys,
+                      values,
                       txid,
                       userId,
                     };

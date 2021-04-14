@@ -1,6 +1,6 @@
 import { combineLatest, Observable } from "rxjs";
 import { filter } from "rxjs/operators";
-import { ANONYMOUS_USER } from "./ANONYMOUS_USER";
+import { UNAUTHORIZED_USER } from "./UNAUTHORIZED_USER";
 import { authenticate, dummyAuthDialog } from "./authenticate";
 import { AuthPersistedContext } from "./AuthPersistedContext";
 import { makeArray } from "../helpers/makeArray";

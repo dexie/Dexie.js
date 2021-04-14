@@ -18,8 +18,7 @@
     "test-unit": "karma start test/unit/karma.conf.js --single-run",
     "build": "just-build",
     "watch": "just-build --watch",
-    "clean": "rm -rf tools/tmp dist esnext test/unit/bundle.*",
-    "prepare": "just-build"
+    "clean": "rm -rf tools/tmp dist esnext test/unit/bundle.*"
   },
   "just-build": {
     "default": [
@@ -57,7 +56,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@types/node": "*",
-    "dreambase-library": "^1.0.5",
+    "dreambase-library": "^1.0.6",
     "just-build": "*",
     "karma": "*",
     "karma-browserstack-launcher": "*",

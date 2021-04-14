@@ -6,7 +6,9 @@ import { PersistedSyncState } from "./entities/PersistedSyncState";
 import { Realm } from "./entities/Realm";
 import { Member } from "./entities/Member";
 import { Role } from "./entities/Role";
-import { Schema } from "./entities/Schema";
+import { UNAUTHORIZED_USER } from "../authentication/UNAUTHORIZED_USER";
+import { DexieCloudOptions } from "../DexieCloudOptions";
+import { DexieCloudSchema } from "../DexieCloudSchema";
 
 /*export interface DexieCloudDB extends Dexie {
   table(name: string): Table<any, any>;
@@ -17,38 +19,75 @@ import { Schema } from "./entities/Schema";
 }
 */
 
-export interface DexieCloudDB {
+export interface DexieCloudDBBase {
+  readonly name: Dexie["name"];
+  close: Dexie["close"],
   transaction: Dexie["transaction"],
   table: Dexie["table"],
+  readonly tables: Dexie["tables"],
   cloud: Dexie["cloud"],
   $jobs: Table<GuardedJob, string>;
   $logins: Table<UserLogin, string>;
-  $syncState: Table<PersistedSyncState, "syncState">;
-  $schema: Table<Schema, "schema">;
+  $syncState: Table<PersistedSyncState | DexieCloudSchema | DexieCloudOptions, "syncState" | "options" | "schema">;
 
   realms: Table<Realm, string>;
   members: Table<Member, string>;
   roles: Table<Role, [string, string]>;
 }
 
+export interface DexieCloudDB extends DexieCloudDBBase {
+  getCurrentUser(): Promise<UserLogin>;
+  getSchema(): Promise<DexieCloudSchema | undefined>;
+  getOptions(): Promise<DexieCloudOptions | undefined>;
+  getPersistedSyncState(): Promise<PersistedSyncState | undefined>;
+}
+
 const wm = new WeakMap<Dexie, DexieCloudDB>();
+
+export const DEXIE_CLOUD_SCHEMA = {
+  realms: "@realmId",
+  members: "@id",
+  roles: "[realmId+name]",
+  $jobs: '',
+  $syncState: '',
+  $logins: 'claims.sub, lastLogin',
+};
 
 export function DexieCloudDB(dx: Dexie): DexieCloudDB {
   let db = wm.get(dx);
   if (!db) {
-    db = {
+    const _db: DexieCloudDBBase = {
+      get name() { return dx.name; },
+      close() { return dx.close(); },
       transaction: dx.transaction.bind(dx),
       table: dx.table.bind(dx),
+      get tables () { return dx.tables; },
       cloud: dx.cloud,
       $jobs: dx.table("$jobs"),
-      $logins: dx.table("$logins"),
       $syncState: dx.table("$syncState"),
-      $schema: dx.table("$schema"),
+      $logins: dx.table("$logins"),
   
       realms: dx.table("realms"),
       members: dx.table("members"),
       roles: dx.table("roles"),
     };
+    db = {
+      ..._db,
+      getCurrentUser() {
+        return _db.$logins
+          .toArray()
+          .then((logins) => logins.find((l) => l.isLoggedIn) || UNAUTHORIZED_USER);
+      },
+      getPersistedSyncState() {
+        return _db.$syncState.get("syncState") as Promise<PersistedSyncState | undefined>;
+      },
+      getSchema() {
+        return _db.$syncState.get("schema") as Promise<DexieCloudSchema | undefined>;
+      },
+      getOptions() {
+        return _db.$syncState.get("options") as Promise<DexieCloudOptions | undefined>;
+      }
+    }
     wm.set(dx, db);
   }
   return db;

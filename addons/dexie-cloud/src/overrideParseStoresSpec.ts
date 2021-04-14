@@ -1,34 +1,34 @@
-import { DbSchema } from 'dexie';
-import { DexieCloudOptions } from './DexieCloudOptions';
-import { DexieCloudSchema } from './DexieCloudSchema';
+import Dexie, { DbSchema } from 'dexie';
+import { DEXIE_CLOUD_SCHEMA } from './db/DexieCloudDB';
+import { generateTablePrefix } from './middlewares/createIdGenerationMiddleware';
 
-export function overrideParseStoresSpec(origFunc: Function, cloudOptions: DexieCloudOptions, cloudSchema: DexieCloudSchema) {
+export function overrideParseStoresSpec(origFunc: Function, dexie: Dexie) {
   return function(stores: {[tableName: string]: string}, dbSchema: DbSchema) {
     const storesClone = {
+      ...DEXIE_CLOUD_SCHEMA,
       ...stores,
-      $jobs: '',
-      $logins: 'claims.sub, lastLogin',
-      $syncState: 'id'
-      // $pendingChangesFromServer: '++' // Wait a while with this. The thought is: if server has loads of changes, we might want to add them all at once in single transaction.
     };
-    Object.keys(stores).forEach(tableName => {
-      const schemaSrc = stores[tableName];
+    const cloudSchema = dexie.cloud.schema || (dexie.cloud.schema = {});
+    const allPrefixes = new Set<string>();
+    Object.keys(storesClone).forEach(tableName => {
+      const schemaSrc = storesClone[tableName];
+      const cloudTableSchema = cloudSchema[tableName] || (cloudSchema[tableName] = {});
       if (schemaSrc != null) {
-        const cloudTableSchema = cloudSchema[tableName] || (cloudSchema[tableName] = {});
-        if (cloudSchema)
         if (/^\@/.test(schemaSrc)) {
           storesClone[tableName] = stores[tableName].substr(1);
           cloudTableSchema.generatedGlobalId = true;
+          cloudTableSchema.idPrefix = generateTablePrefix(tableName, allPrefixes);
+          allPrefixes.add(cloudTableSchema.idPrefix);
         }
         if (!/^\$/.test(tableName)) {
-          cloudTableSchema.sync = true;
           storesClone[`$${tableName}_mutations`] = '++rev';
         }
-        if (cloudOptions.nonSyncedTables?.includes(tableName)) {
-          cloudTableSchema.sync = false;
+        if (cloudTableSchema.deleted) {
+          cloudTableSchema.deleted = false;
         }
       } else {
-        delete cloudSchema[tableName];
+        cloudTableSchema.deleted = true;
+        storesClone[`$${tableName}_mutations`] = null;
       }
     });
     const rv = origFunc.call(this, storesClone, dbSchema);

@@ -1,8 +1,10 @@
-import { Table } from "dexie";
+import { liveQuery, Table } from "dexie";
 import { MINUTES, SECONDS } from "../helpers/date-constants";
 import { DexieCloudDB } from "../db/DexieCloudDB";
 import { GuardedJob } from "../db/entities/GuardedJob";
 import { myId } from "./myId";
+import { from } from "rxjs";
+import { filter } from "rxjs/operators";
 
 const GUARDED_JOB_HEARTBEAT = 1 * SECONDS;
 const GUARDED_JOB_TIMEOUT = 1 * MINUTES;
@@ -11,14 +13,15 @@ export async function performGuardedJob(
   db: DexieCloudDB,
   jobName: string,
   jobsTableName: string,
-  job: () => Promise<void>
-) {
+  job: () => Promise<void>,
+  {awaitRemoteJob}: {awaitRemoteJob?: boolean} = {}
+): Promise<void> {
   // Start working.
   //
   // Check if someone else is working on this already.
   //
   const jobsTable = db.table(jobsTableName) as Table<GuardedJob, string>;
-  const weTookTheJob = await db.transaction("rw!", jobsTableName, async () => {
+  const jobOwnerId = await db.transaction("rw!", jobsTableName, async () => {
     const currentWork = await jobsTable.get(jobName);
     if (!currentWork) {
       // No one else is working. Let's record that we are.
@@ -30,7 +33,7 @@ export async function performGuardedJob(
         },
         jobName
       );
-      return true;
+      return myId;
     } else if (
       currentWork.heartbeat.getTime() <
       Date.now() - GUARDED_JOB_TIMEOUT
@@ -54,11 +57,18 @@ export async function performGuardedJob(
         },
         jobName
       );
-      return true;
+      return myId;
     }
-    return false;
+    return currentWork.nodeId;
   });
-  if (!weTookTheJob) {
+  if (jobOwnerId !== myId) {
+    // Someone else took the job.
+    if (awaitRemoteJob) {
+      const jobDoneObservable = from(
+        liveQuery(() => jobsTable.get(jobName))
+      ).pipe(filter((job) => !job));
+      await jobDoneObservable.toPromise();
+    }
     return;
   }
   // Start our heart beat during the sync.
@@ -73,8 +83,8 @@ export async function performGuardedJob(
   } finally {
     // Stop heartbeat
     clearInterval(heartbeat);
-    // Remove the currentPushWorker state:
-    await db.transaction("rw", jobsTableName, async () => {
+    // Remove the persisted job state:
+    await db.transaction("rw!", jobsTableName, async () => {
       const currentWork = await jobsTable.get(jobName);
       if (currentWork && currentWork.nodeId === myId) {
         jobsTable.delete(jobName);
