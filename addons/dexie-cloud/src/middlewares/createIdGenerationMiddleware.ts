@@ -9,6 +9,11 @@ import Dexie, {
 import { DexieCloudSchema } from "../DexieCloudSchema";
 import { b64LexEncode } from "dreambase-library/dist/common/b64lex";
 import { DexieCloudServerState } from "../DexieCloudServerState";
+import { toStringTag } from "../types/move-to-dexie-cloud-common/validation/toStringTag";
+import { isValidSyncableID } from "../types/move-to-dexie-cloud-common/validation/isValidSyncableID";
+import { DexieCloudOptions } from "../DexieCloudOptions";
+import { getSyncableTables } from "../helpers/getSyncableTables";
+import { DexieCloudDB } from "../db/DexieCloudDB";
 
 export function getEffectiveKeys(
   primaryKey: DBCoreIndex,
@@ -32,7 +37,10 @@ function applyToUpperBitFix(orig: string, bits: number) {
 
 const consonants = /b|c|d|f|g|h|j|k|l|m|n|p|q|r|s|t|v|x|y|z/i;
 
-export function generateTablePrefix(tableName: string, allPrefixes: Set<string>) {
+export function generateTablePrefix(
+  tableName: string,
+  allPrefixes: Set<string>
+) {
   let rv = "";
   for (let i = 0, l = tableName.length; i < l && rv.length < 3; ++i) {
     if (consonants.test(tableName[i])) rv += tableName[i].toLowerCase();
@@ -91,53 +99,65 @@ function generateKey(prefix: string) {
 }
 
 export function createIdGenerationMiddleware(
-  getCloudSchema: () => DexieCloudSchema | null
+  db: DexieCloudDB
 ): Middleware<DBCore> {
+  const isSyncable = new Set(getSyncableTables(db).map(tbl => tbl.name));
   return {
     stack: "dbcore",
     name: "idGenerationMiddleware",
+    level: 0,
     create: (core) => {
       return {
         ...core,
-        table: (tableName) => {          
+        table: (tableName) => {
           const table = core.table(tableName);
           return {
             ...table,
             mutate: (req) => {
-              const cloudTableSchema = getCloudSchema()?.[tableName];
-              if (
-                cloudTableSchema?.generatedGlobalId &&
-                (req.type === "add" || req.type === "put")
-              ) {
-                let valueClones: null | object[] = null;
-                const keys = getEffectiveKeys(table.schema.primaryKey, req);
-                keys.forEach((key, idx) => {
-                  if (key === undefined) {
-                    keys[idx] = generateKey(cloudTableSchema.idPrefix!);
-                    if (!table.schema.primaryKey.outbound) {
-                      if (!valueClones) valueClones = req.values.slice();
-                      valueClones[idx] = Dexie.deepClone(valueClones[idx]);
-                      Dexie.setByKeyPath(
-                        valueClones[idx],
-                        table.schema.primaryKey.keyPath as any, // TODO: fix typings in dexie-constructor.d.ts!
-                        keys[idx]
+              const cloudTableSchema = db.cloud.schema?.[tableName];
+              if (req.type === "add" || req.type === "put") {
+                if (!cloudTableSchema?.generatedGlobalId) {
+                  if (isSyncable.has(tableName)) {
+                    // Just make sure primary key is of a supported type:
+                    const keys = getEffectiveKeys(table.schema.primaryKey, req);
+                    keys.forEach((key, idx) => {
+                      if (!isValidSyncableID(key)) {
+                        throw new Dexie.ConstraintError(`Invalid primary key ${key} for table ${tableName}. Tables marked for sync must have primary keys of type strings or Uint8Arrays.`);
+                      }
+                    });                  
+                  }
+                } else {
+                  let valueClones: null | object[] = null;
+                  const keys = getEffectiveKeys(table.schema.primaryKey, req);
+                  keys.forEach((key, idx) => {
+                    if (key === undefined) {
+                      keys[idx] = generateKey(cloudTableSchema.idPrefix!);
+                      if (!table.schema.primaryKey.outbound) {
+                        if (!valueClones) valueClones = req.values.slice();
+                        valueClones[idx] = Dexie.deepClone(valueClones[idx]);
+                        Dexie.setByKeyPath(
+                          valueClones[idx],
+                          table.schema.primaryKey.keyPath as any, // TODO: fix typings in dexie-constructor.d.ts!
+                          keys[idx]
+                        );
+                      }
+                    } else if (
+                      typeof key !== "string" ||
+                      !key.startsWith(cloudTableSchema.idPrefix!)
+                    ) {
+                      throw new Dexie.ConstraintError(
+                        `The ID "${key}" is not valid for table "${tableName}". ` +
+                          `Primary '@' keys requires the key to be prefixed with "${cloudTableSchema.idPrefix}.\n"` +
+                          `If you want to generate IDs programmatically, remove '@' from the schema to get rid of this constraint. Dexie Cloud supports custom IDs as long as they are random and globally unique.`
                       );
                     }
-                  } else if (
-                    typeof key !== "string" ||
-                    !key.startsWith(cloudTableSchema.idPrefix!)
-                  ) {
-                    throw new Dexie.ConstraintError(
-                      `The ID "${key}" is not valid for table "${tableName}". ` +
-                        `The ID must be a string prefixed with "${cloudTableSchema.idPrefix}"`
-                    );
-                  }
-                });
-                return table.mutate({
-                  ...req,
-                  keys,
-                  values: valueClones || req.values,
-                });
+                  });
+                  return table.mutate({
+                    ...req,
+                    keys,
+                    values: valueClones || req.values,
+                  });
+                }
               }
               return table.mutate(req);
             },

@@ -9,6 +9,7 @@ import { Role } from "./entities/Role";
 import { UNAUTHORIZED_USER } from "../authentication/UNAUTHORIZED_USER";
 import { DexieCloudOptions } from "../DexieCloudOptions";
 import { DexieCloudSchema } from "../DexieCloudSchema";
+import { BehaviorSubject } from "rxjs";
 
 /*export interface DexieCloudDB extends Dexie {
   table(name: string): Table<any, any>;
@@ -33,6 +34,9 @@ export interface DexieCloudDBBase {
   realms: Table<Realm, string>;
   members: Table<Member, string>;
   roles: Table<Role, [string, string]>;
+
+  readonly localSyncEvent: BehaviorSubject<any>;
+  readonly dx: Dexie;
 }
 
 export interface DexieCloudDB extends DexieCloudDBBase {
@@ -56,6 +60,7 @@ export const DEXIE_CLOUD_SCHEMA = {
 export function DexieCloudDB(dx: Dexie): DexieCloudDB {
   let db = wm.get(dx);
   if (!db) {
+    const localSyncEvent = new BehaviorSubject({});
     const _db: DexieCloudDBBase = {
       get name() { return dx.name; },
       close() { return dx.close(); },
@@ -70,6 +75,9 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
       realms: dx.table("realms"),
       members: dx.table("members"),
       roles: dx.table("roles"),
+
+      localSyncEvent,
+      dx
     };
     db = {
       ..._db,

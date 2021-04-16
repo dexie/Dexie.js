@@ -19,6 +19,7 @@ import { outstandingTransactions } from "./outstandingTransaction";
 import { throwVersionIncrementNeeded } from "../helpers/throwVersionIncrementNeeded";
 import { DexieCloudOptions } from "../DexieCloudOptions";
 import { DexieCloudDB } from "../db/DexieCloudDB";
+import { registerSyncEvent } from "../sync/registerSyncEvent";
 
 export interface MutationTrackingMiddlewareArgs {
   currentUserObservable: BehaviorSubject<UserLogin>;
@@ -73,13 +74,23 @@ export function createMutationTrackingMiddleware({
             outstandingTransactions.value.add(tx);
             outstandingTransactions.next(outstandingTransactions.value);
             const removeTransaction = () => {
-              tx.removeEventListener("complete", removeTransaction);
+              tx.removeEventListener("complete", txComplete);
               tx.removeEventListener("error", removeTransaction);
               tx.removeEventListener("abort", removeTransaction);
               outstandingTransactions.value.delete(tx);
               outstandingTransactions.next(outstandingTransactions.value);
             };
-            tx.addEventListener("complete", removeTransaction);
+            const txComplete = () => {
+              if (tx.mutationsAdded) {
+                if (db.cloud.options?.usingServiceWorker) {
+                  registerSyncEvent(db);
+                } else {
+                  db.localSyncEvent.next({});
+                }
+              }
+              removeTransaction();
+            }
+            tx.addEventListener("complete", txComplete);
             tx.addEventListener("error", removeTransaction);
             tx.addEventListener("abort", removeTransaction);
 
@@ -91,8 +102,26 @@ export function createMutationTrackingMiddleware({
           return tx;
         },
         table: (tableName) => {
-          if (/^\$/.test(tableName)) return core.table(tableName);
           const table = core.table(tableName);
+          if (/^\$/.test(tableName)) {
+            if (tableName.endsWith('_mutations')) {
+              // In case application code adds items to ..._mutations tables,
+              // make sure to set the mutationsAdded flag on transaction.
+              // This is also done in mutateAndLog() as that function talks to a
+              // lower level DBCore and wouldn't be catched by this code.
+              return {
+                ...table,
+                mutate: req => {
+                  if (req.type === "add" || req.type === "put") {
+                    (req.trans as DBCoreTransaction & TXExpandos).mutationsAdded = true;
+                  }
+                  return table.mutate(req);
+                }
+              }
+            } else {
+              return table;
+            }
+          }
           const { schema } = table;
           const mutsTable = mutTableMap.get(tableName)!;
           return guardedTable({
@@ -132,6 +161,7 @@ export function createMutationTrackingMiddleware({
             req: DBCoreDeleteRequest | DBCoreAddRequest | DBCorePutRequest
           ): Promise<DBCoreMutateResponse> {
             const trans = req.trans as DBCoreTransaction & TXExpandos;
+            trans.mutationsAdded = true;
             const {
               txid,
               currentUser: { userId },

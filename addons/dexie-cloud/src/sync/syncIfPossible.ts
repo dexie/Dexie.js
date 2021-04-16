@@ -1,9 +1,9 @@
 import { IS_SERVICE_WORKER } from "../helpers/IS_SERVICE_WORKER";
 import { performGuardedJob } from "./performGuardedJob";
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { isSyncing, sync, CURRENT_SYNC_WORKER } from "./sync";
+import { isSyncing, sync, CURRENT_SYNC_WORKER, SyncOptions } from "./sync";
 
-export async function syncIfNeeded(db: DexieCloudDB) {
+export async function syncIfPossible(db: DexieCloudDB, options?: SyncOptions) {
   if (isSyncing.has(db))
     return; // Still working.
   if (typeof navigator !== "undefined" && !navigator.onLine)
@@ -15,7 +15,7 @@ export async function syncIfNeeded(db: DexieCloudDB) {
   try {
     if (db.cloud.options?.usingServiceWorker) {
       if (IS_SERVICE_WORKER) {
-        await sync(db);
+        await sync(db, options);
       }
     } else {
       // We use a flow that is better suited for the case when multiple workers want to
@@ -23,7 +23,7 @@ export async function syncIfNeeded(db: DexieCloudDB) {
       await performGuardedJob(db, CURRENT_SYNC_WORKER, "$jobs", () => sync(db));
     }
     isSyncing.delete(db);
-    await syncIfNeeded(db);
+    await syncIfPossible(db, options);
   } catch (error) {
     isSyncing.delete(db);
     console.error(`Failed to sync client changes`, error);

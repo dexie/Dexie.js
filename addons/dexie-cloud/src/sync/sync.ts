@@ -13,6 +13,7 @@ import { applyOperations } from "../types/move-to-dexie-cloud-common/change-proc
 import { subtractChanges } from "../types/move-to-dexie-cloud-common/change-processing/subtractChanges";
 import { toDBOperationSet } from "../types/move-to-dexie-cloud-common/change-processing/toDBOperationSet";
 import { bulkUpdate } from "../helpers/bulkUpdate";
+import { throwIfCancelled } from "../helpers/CancelToken";
 
 export const isSyncing = new WeakSet<DexieCloudDB>();
 export const CURRENT_SYNC_WORKER = "currentSyncWorker";
@@ -40,9 +41,14 @@ export const CURRENT_SYNC_WORKER = "currentSyncWorker";
 
 */
 
+export interface SyncOptions {
+  isInitialSync?: boolean;
+  cancelToken?: { cancelled: boolean };
+}
+
 export async function sync(
   db: DexieCloudDB,
-  { isInitialSync } = { isInitialSync: false }
+  { isInitialSync, cancelToken }: SyncOptions = { isInitialSync: false }
 ) {
   if (!db.cloud.options?.databaseUrl)
     throw new Error(
@@ -50,7 +56,7 @@ export async function sync(
     );
   const { options, schema } = db.cloud;
   const { databaseUrl } = options;
-  const currentUser = db.cloud.currentUser.value; // Keep same value across entire sync flow:
+  const currentUser = await db.getCurrentUser(); // Keep same value across entire sync flow:
   const mutationTables = currentUser.isLoggedIn
     ? getSyncableTables(db).map((tbl) => db.table(getMutationTable(tbl.name)))
     : [];
@@ -66,6 +72,7 @@ export async function sync(
     !isInitialSync && currentUser.isLoggedIn
       ? getTablesToSyncify(db, persistedSyncState)
       : [];
+  throwIfCancelled(cancelToken);
   const doSyncify = tablesToSyncify.length > 0;
 
   if (doSyncify) {
@@ -74,6 +81,7 @@ export async function sync(
       tx["disableAccessControl"] = true; // TODO: Take care of this flag in access control middleware!
       await modifyLocalObjectsWithNewUserId(tablesToSyncify, currentUser);
     });
+    throwIfCancelled(cancelToken);
   }
   //
   // List changes to sync
@@ -84,11 +92,14 @@ export async function sync(
     async () => {
       const syncState = await db.getPersistedSyncState();
       let clientChanges = await listClientChanges(mutationTables, db);
+      throwIfCancelled(cancelToken);
       if (doSyncify) {
         const syncificationInserts = await listSyncifiedChanges(
           tablesToSyncify,
-          currentUser
+          currentUser,
+          schema!
         );
+        throwIfCancelled(cancelToken);
         clientChanges = clientChanges.concat(syncificationInserts);
         return [clientChanges, syncState];
       }
@@ -101,6 +112,7 @@ export async function sync(
   //
   // Push changes to server
   //
+  throwIfCancelled(cancelToken);
   const res = await syncWithServer(
     clientChangeSet,
     syncState,
@@ -117,14 +129,20 @@ export async function sync(
     tx["disableAccessControl"] = true; // TODO: Take care of this flag in access control middleware!
 
     // List mutations that happened during our exchange with the server:
-    const addedClientChanges = await listClientChanges(mutationTables, db, { since: latestRevisions });
+    const addedClientChanges = await listClientChanges(mutationTables, db, {
+      since: latestRevisions,
+    });
 
     //
     // Delete changes now as server has return success
     // (but keep changes that haven't reached server yet)
     //
     for (const table of mutationTables) {
-      if (!addedClientChanges.some(ch => ch.table === table.name && ch.muts.length > 0)) {
+      if (
+        !addedClientChanges.some(
+          (ch) => ch.table === table.name && ch.muts.length > 0
+        )
+      ) {
         // No added mutations for this table during the time we sent changes
         // to the server.
         // It is therefore safe to clear all changes (which is faster than
@@ -176,7 +194,10 @@ export async function sync(
       }
     }
 
-    const filteredChanges = filterServerChangesThroughAddedClientChanges(res.changes, addedClientChanges);
+    const filteredChanges = filterServerChangesThroughAddedClientChanges(
+      res.changes,
+      addedClientChanges
+    );
 
     //
     // apply server changes
@@ -205,7 +226,7 @@ export async function applyServerChanges(
   changes: DBOperationsSet,
   db: DexieCloudDB
 ) {
-  for (const {table: tableName, muts} of changes) {
+  for (const { table: tableName, muts } of changes) {
     const table = db.table(tableName);
     for (const mut of muts) {
       switch (mut.type) {
@@ -217,7 +238,6 @@ export async function applyServerChanges(
           break;
         case "modify":
           if (mut.keys.length === 1) {
-            // Would've been nice with a bulkUpdate method...
             await table.update(mut.keys[0], mut.changeSpec);
           } else {
             await table.where(":id").anyOf(mut.keys).modify(mut.changeSpec);
@@ -234,9 +254,12 @@ export async function applyServerChanges(
   }
 }
 
-//export function 
+//export function
 
-function filterServerChangesThroughAddedClientChanges(serverChanges: DBOperationsSet, addedClientChanges: DBOperationsSet): DBOperationsSet {
+function filterServerChangesThroughAddedClientChanges(
+  serverChanges: DBOperationsSet,
+  addedClientChanges: DBOperationsSet
+): DBOperationsSet {
   const changes: DBKeyMutationSet = {};
   applyOperations(changes, serverChanges);
   const localPostChanges: DBKeyMutationSet = {};

@@ -21,14 +21,16 @@ import {
 } from "dexie-cloud-common";
 import { LoginState } from "./types/LoginState";
 import { SyncState } from "./types/SyncState";
-import { verifySchema } from "./to_remove_verifySchema";
+import { verifySchema } from "./verifySchema";
 import { throwVersionIncrementNeeded } from "./helpers/throwVersionIncrementNeeded";
 import { performInitialSync } from "./performInitialSync";
-import { startSyncWorker } from "./sync/startSyncWorker";
-import { dexieCloudGlobalDB } from "./dexieCloudGlobalDB";
+import { LocalSyncWorker } from "./sync/LocalSyncWorker";
 import { dbOnClosed } from "./helpers/dbOnClosed";
 import { IS_SERVICE_WORKER } from "./helpers/IS_SERVICE_WORKER";
 import { authenticate } from "./authentication/authenticate";
+import { createMutationTrackingMiddleware } from "./middlewares/createMutationTrackingMiddleware";
+import { updateSchemaFromOptions } from "./updateSchemaFromOptions";
+import { registerPeriodicSyncEvent, registerSyncEvent } from "./sync/registerSyncEvent";
 
 export function dexieCloud(dexie: Dexie) {
   //
@@ -36,7 +38,9 @@ export function dexieCloud(dexie: Dexie) {
   //
   const currentUserEmitter = new BehaviorSubject(UNAUTHORIZED_USER);
   let currentUserSubscription: Subscription | null = null;
-  let syncWorker: { stop: () => void } | null = null;
+
+  // local sync worker - used when there's no service worker.
+  let localSyncWorker: { start: () => void, stop: () => void } | null = null;
   dexie.on(
     "ready",
     async (dexie: Dexie) => {
@@ -47,42 +51,49 @@ export function dexieCloud(dexie: Dexie) {
         throwVersionIncrementNeeded();
       }
 
-      const initiallySynced = await db.transaction("rw", db.$syncState, async () => {
-        const { options, schema } = db.cloud;
-        const [
-          persistedOptions,
-          persistedSchema,
-          persistedSyncState,
-        ] = await Promise.all([
-          db.getOptions(),
-          db.getSchema(),
-          db.getPersistedSyncState(),
-        ]);
-        if (!options) {
-          // Options not specified programatically (use case for SW!)
-          // Take persisted options:
-          db.cloud.options = persistedOptions || null;
-        } else if (
-          !persistedOptions ||
-          JSON.stringify(persistedOptions) !== JSON.stringify(options)
-        ) {
-          // Update persisted options:
-          await db.$syncState.put(options, "options");
+      const initiallySynced = await db.transaction(
+        "rw",
+        db.$syncState,
+        async () => {
+          const { options, schema } = db.cloud;
+          const [
+            persistedOptions,
+            persistedSchema,
+            persistedSyncState,
+          ] = await Promise.all([
+            db.getOptions(),
+            db.getSchema(),
+            db.getPersistedSyncState(),
+          ]);
+          if (!options) {
+            // Options not specified programatically (use case for SW!)
+            // Take persisted options:
+            db.cloud.options = persistedOptions || null;
+          } else if (
+            !persistedOptions ||
+            JSON.stringify(persistedOptions) !== JSON.stringify(options)
+          ) {
+            // Update persisted options:
+            await db.$syncState.put(options, "options");
+          }
+          updateSchemaFromOptions(schema, db.cloud.options);
+          updateSchemaFromOptions(persistedSchema, db.cloud.options);
+          if (!schema) {
+            // Database opened dynamically (use case for SW!)
+            // Take persisted schema:
+            db.cloud.schema = persistedSchema || null;
+          } else if (
+            !persistedSchema ||
+            JSON.stringify(persistedSchema) !== JSON.stringify(schema)
+          ) {
+            // Update persisted schema
+            await db.$syncState.put(schema, "schema");
+          }
+          return persistedSyncState?.initiallySynced;
         }
-        if (!schema) {
-          // Database opened dynamically (use case for SW!)
-          // Take persisted schema:
-          db.cloud.schema = persistedSchema || null;
-        } else if (
-          !persistedSchema ||
-          JSON.stringify(persistedSchema) !== JSON.stringify(schema)
-        ) {
-          // Update persisted schema
-          await db.$syncState.put(schema, "schema");
-        }
-        return persistedSyncState?.initiallySynced;
-      });
-      //await verifySchema(db); // TODO: Can we remove this?!
+      );
+
+      verifySchema(db);
 
       if (db.cloud.options?.databaseUrl && !initiallySynced) {
         await performInitialSync(db);
@@ -95,29 +106,16 @@ export function dexieCloud(dexie: Dexie) {
         //await authenticate(db.cloud.options.databaseUrl, db.cloud.currentUser.value, )
       }
 
-      if (!dexie.dynamicallyOpened() && !IS_SERVICE_WORKER) {
-        // Communicate to serviceWorker to take care of sync if options.serviceWorker is set.
-        await dexieCloudGlobalDB.transaction(
-          "rw",
-          dexieCloudGlobalDB.swManagedDBs,
-          async () => {
-            if (db.cloud.options?.usingServiceWorker) {
-              if (!(await dexieCloudGlobalDB.swManagedDBs.get(dexie.name))) {
-                // Communicate to service worker that it has a new DB to manage:
-                await dexieCloudGlobalDB.swManagedDBs.add({ db: dexie.name });
-              }
-            } else {
-              if (await dexieCloudGlobalDB.swManagedDBs.get(dexie.name)) {
-                // Communicate to service worker that it no longer need to manage this DB:
-                await dexieCloudGlobalDB.swManagedDBs.delete(dexie.name);
-              }
-            }
-          }
-        );
+      if (localSyncWorker) localSyncWorker.stop();
+      localSyncWorker = null;
+      if (db.cloud.options?.usingServiceWorker && ("serviceWorker" in navigator)) {
+        registerSyncEvent(db);
+        registerPeriodicSyncEvent(db);
+      } else {
+        // There's no SW. Start SyncWorker instead.
+        localSyncWorker = LocalSyncWorker(db);
+        localSyncWorker.start();
       }
-
-      if (syncWorker) syncWorker.stop();
-      syncWorker = await startSyncWorker(db); // Will be a noop if options.serviceWorker and we're not the SW.
 
       // Manage CurrentUser observable:
       if (currentUserSubscription) currentUserSubscription.unsubscribe();
@@ -131,8 +129,8 @@ export function dexieCloud(dexie: Dexie) {
   dbOnClosed(dexie, () => {
     currentUserSubscription && currentUserSubscription.unsubscribe();
     currentUserSubscription = null;
-    syncWorker && syncWorker.stop();
-    syncWorker = null;
+    localSyncWorker && localSyncWorker.stop();
+    localSyncWorker = null;
     currentUserEmitter.next(UNAUTHORIZED_USER);
   });
 
@@ -149,6 +147,7 @@ export function dexieCloud(dexie: Dexie) {
     loginState: new BehaviorSubject<LoginState>({ type: "silent" }), // fixthis! Or remove this observable?
     configure(options: DexieCloudOptions) {
       dexie.cloud.options = options;
+      updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
     },
   };
 
@@ -158,11 +157,12 @@ export function dexieCloud(dexie: Dexie) {
   );
 
   dexie.use(
-    createIdGenerationMiddleware(
-      () => dexie.cloud.schema,
-      () => dexie.cloud.serverState
-    )
+    createMutationTrackingMiddleware({
+      currentUserObservable: dexie.cloud.currentUser,
+      db: DexieCloudDB(dexie),
+    })
   );
+  dexie.use(createIdGenerationMiddleware(DexieCloudDB(dexie)));
 }
 
 dexieCloud.version = "{version}";

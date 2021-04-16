@@ -22,12 +22,14 @@ export function overrideParseStoresSpec(origFunc: Function, dexie: Dexie) {
         }
         if (!/^\$/.test(tableName)) {
           storesClone[`$${tableName}_mutations`] = '++rev';
+          cloudTableSchema.synced = true;
         }
         if (cloudTableSchema.deleted) {
           cloudTableSchema.deleted = false;
         }
       } else {
         cloudTableSchema.deleted = true;
+        cloudTableSchema.synced = false;
         storesClone[`$${tableName}_mutations`] = null;
       }
     });

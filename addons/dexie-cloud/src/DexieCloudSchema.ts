@@ -3,5 +3,6 @@ export type DexieCloudSchema = {
     generatedGlobalId?: boolean;
     idPrefix?: string;
     deleted?: boolean;
+    synced?: boolean;
   };
 };
