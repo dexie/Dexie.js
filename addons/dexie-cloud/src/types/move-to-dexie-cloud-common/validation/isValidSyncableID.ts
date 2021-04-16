@@ -21,5 +21,5 @@ export function isValidSyncableID(id: any) {
 }
 
 export function isValidAtID(id: any, idPrefix?: string): id is string {
-  return !idPrefix || typeof id === "string" && id.startsWith(idPrefix);
+  return !idPrefix || (typeof id === "string" && id.startsWith(idPrefix));
 }
