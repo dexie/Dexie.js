@@ -21,12 +21,6 @@ if (typeof BroadcastChannel !== "undefined") {
   };
 } else if (typeof self !== "undefined" && typeof navigator !== "undefined") {
   // DOM verified - when typeof self !== "undefined", we are a window or worker. Not a Node process.
-
-  // Once wait for service worker registration and keep a lazy reference to it.
-  const swHolder: {registration?: ServiceWorkerRegistration} = {};
-  const swContainer = self.document && navigator.serviceWorker; // self.document is to verify we're not the SW ourself
-  if (swContainer) swContainer.ready.then(registration => swHolder.registration = registration);
-
   //
   // Propagate local changes to remote tabs/windows via storage event and service worker
   // via messages. We have this code here because of https://bugs.webkit.org/show_bug.cgi?id=161472.
@@ -44,25 +38,6 @@ if (typeof BroadcastChannel !== "undefined") {
             })
           );
         }
-        if (self.document) {
-          // We're a browser window...
-          if (swHolder.registration) {
-            // ...and there's a service worker ready. Propagate to service worker:
-            swHolder.registration.active.postMessage({
-              type: "dexie-txcommitted",
-              changedParts,
-            });
-          }
-        } else if (typeof self["clients"] === "object") {
-          // We're a service worker. Propagate to our browser clients.
-          [...self["clients"].matchAll({ includeUncontrolled: true })].forEach(
-            (client) =>
-              client.postMessage({
-                type: "dexie-txcommitted",
-                changedParts,
-              })
-          );
-        }
       }
     } catch {}
   });
@@ -76,21 +51,4 @@ if (typeof BroadcastChannel !== "undefined") {
       if (data) propagateLocally(data.changedParts);
     }
   });
-
-  //
-  // Propagate messages from service worker
-  //
-  if (swContainer) {
-    // We're a browser window and want to propagate message from the SW:
-    swContainer.addEventListener('message', propagateMessageLocally);
-  } else if (!self.document) {
-    // We're the SW and want to propagate messages from our clients
-    self.addEventListener('message', propagateMessageLocally);
-  }
-}
-
-function propagateMessageLocally({data}: MessageEvent) {
-  if (data && data.type === "dexie-txcommitted") {
-    propagateLocally(data.changedParts);
-  }
 }
