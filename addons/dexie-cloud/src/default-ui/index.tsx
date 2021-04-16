@@ -19,7 +19,7 @@ export default class LoginGui extends Component<Props, LoginState> {
   }
 
   componentDidMount() {
-    this.subscription = from(this.props.db.cloud.loginStateObservable).subscribe({
+    this.subscription = from(this.props.db.cloud.loginState).subscribe({
       next: (state) => this.setState(state),
       error: (error) =>
         this.setState({ type: "error", message: error?.message || error }),

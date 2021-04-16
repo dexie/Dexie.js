@@ -19,14 +19,10 @@ db.version(1).stores({
 
 
 promisedTest("basic-test", async ()=>{
-  await new Dexie("argur", {addons: []}).delete();
-  await db.cloud.configure({
+  await Dexie.delete(db.name);
+  db.cloud.configure({
     databaseUrl: "http://localhost:3000/z8qgl998z",
     requireAuth: true
-  }).then(x => {
-    console.log("db.cloud configure succeeded");
-  }).catch(error => {
-    console.log("db.cloud.configure failed");
   });
   console.log("Waiting for open to resolve");
   await db.open();

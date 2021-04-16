@@ -42,7 +42,7 @@ export async function loadAccessToken(
       throw new Error(`Refresh token has expired`);
   }
   const refreshedLogin = await refreshAccessToken(
-    db.cloud.options.databaseUrl,
+    db.cloud.options!.databaseUrl,
     db.cloud.currentUser.value
   );
   await db.table("$logins").update(claims.sub, {

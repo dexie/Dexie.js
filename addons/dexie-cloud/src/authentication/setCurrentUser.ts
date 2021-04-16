@@ -21,18 +21,18 @@ import { getNumUnsyncedMutationsObservable } from "../sync/numUnsyncedMutations"
  * @param newUser 
  */
 export async function setCurrentUser(db: DexieCloudDB, user: AuthPersistedContext) {
-  const currentUserObservable = db.cloud.currentUserObservable;
+  const currentUserObservable = db.cloud.currentUser;
   if (!currentUserObservable)
     throw new Error(`Given Dexie instance doesn't have the dexie-cloud addon.`);
-  if (user.userId === db.cloud.currentUser.userId) return; // Already this user.
+  if (user.userId === db.cloud.currentUserId) return; // Already this user.
 
   // Yes, I know, we're calling authenticate() again (if you were following login.ts and came here.)
   // But this function can also be called from db.ready!
   const authenticationPromise = authenticate(
-    db.cloud.options.databaseUrl,
+    db.cloud.options!.databaseUrl,
     user,
     dummyAuthDialog, // TODO: Fixthis!
-    db.cloud.options.fetchTokens
+    db.cloud.options!.fetchTokens
   ); 
 
   // Wait til all readwrite transactions have ended and there is nothing more to sync
@@ -44,7 +44,7 @@ export async function setCurrentUser(db: DexieCloudDB, user: AuthPersistedContex
   const safeToChangeUser = outstandingTxAndUnsyncedChangesCombo.pipe(
     filter(
       ([txSet, numOps]) =>
-        makeArray(txSet.values()).every((tx) => tx.db !== db.backendDB()) &&
+        makeArray(txSet.values()).every((tx) => tx.db !== db.dx.backendDB()) &&
         numOps === 0
     )
   );
