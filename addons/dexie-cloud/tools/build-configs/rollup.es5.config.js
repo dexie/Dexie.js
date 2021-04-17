@@ -3,27 +3,28 @@ import sourcemaps from 'rollup-plugin-sourcemaps';
 import commonjs from 'rollup-plugin-commonjs';
 import nodeResolve from 'rollup-plugin-node-resolve';
 
-const ERRORS_TO_IGNORE = [
-  "THIS_IS_UNDEFINED",
-];
+const ERRORS_TO_IGNORE = ['THIS_IS_UNDEFINED'];
 
 export default {
-  input: 'tools/tmp/es5/dexie-cloud.js',
-  output: [{
-    file: 'dist/dexie-cloud.js',
-    format: 'umd',
-    globals: {
-      dexie: "Dexie"
+  input: 'tools/tmp/es5/dexie-cloud-addon.js',
+  output: [
+    {
+      file: 'dist/umd/dexie-cloud-addon.js',
+      format: 'umd',
+      globals: {
+        dexie: 'Dexie'
+      },
+      name: 'DexieCloud',
+      sourcemap: true,
+      exports: 'named'
     },
-    name: 'DexieCloud',
-    sourcemap: true,
-    exports: 'named'
-  },{
-    file: 'dist/dexie-cloud.mjs',
-    format: 'es',
-    sourcemap: true
-  }],
-  external: ['dexie', 'dexie-observable', 'dexie-syncable'],
+    {
+      file: 'dist/module-es5/dexie-cloud-addon.js',
+      format: 'es',
+      sourcemap: true
+    }
+  ],
+  external: ['dexie'],
   plugins: [
     sourcemaps(),
     nodeResolve({
@@ -32,13 +33,13 @@ export default {
     }),
     commonjs()
   ],
-  onwarn ({loc, frame, code, message}) {
+  onwarn({ loc, frame, code, message }) {
     if (ERRORS_TO_IGNORE.includes(code)) return;
-    if ( loc ) {
-      console.warn( `${loc.file} (${loc.line}:${loc.column}) ${message}` );
-      if ( frame ) console.warn( frame );
+    if (loc) {
+      console.warn(`${loc.file} (${loc.line}:${loc.column}) ${message}`);
+      if (frame) console.warn(frame);
     } else {
       console.warn(`${code} ${message}`);
-    }    
+    }
   }
 };

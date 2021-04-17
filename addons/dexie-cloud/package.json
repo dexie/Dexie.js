@@ -2,10 +2,13 @@
   "name": "dexie-cloud-addon",
   "version": "1.0.0-alpha.7",
   "description": "Dexie addon that syncs with to Dexie Cloud",
-  "main": "dist/dexie-cloud.js",
-  "module": "dist/dexie-cloud.mjs",
-  "esnext": "esnext/dexie-cloud.js",
-  "typings": "dist/dexie-cloud.d.ts",
+  "main": "dist/umd/dexie-cloud-addon.min.js",
+  "module": "dist/module-es5/dexie-cloud-addon.min.js",
+  "exports": {
+    ".": "./dist/modern/dexie-cloud-addon.min.js",
+    "./service-worker": "./dist/modern/service-worker.min.js"
+  },
+  "types": "dist/types/dexie-cloud-client.d.ts",
   "engines": {
     "node": ">=14"
   },
@@ -16,9 +19,10 @@
   "scripts": {
     "test": "just-build test && npm run test-unit",
     "test-unit": "karma start test/unit/karma.conf.js --single-run",
-    "build": "just-build",
+    "build": "just-build && bash ./copydts.sh",
     "watch": "just-build --watch",
-    "clean": "rm -rf tools/tmp dist esnext test/unit/bundle.*"
+    "clean": "rm -rf tools/tmp dist test/unit/bundle.*",
+    "copydts": "bash ./copydts.sh"
   },
   "just-build": {
     "default": [
@@ -27,22 +31,43 @@
     "release": [
       "# Build outputs",
       "just-build src",
+      "just-build dexie-cloud service-worker",
       "# Minify the default ES5 UMD module",
-      "cd dist",
-      "uglifyjs dexie-cloud.js -m -c negate_iife=0 -o dexie-cloud.min.js --source-map",
-      "cd ..",
-      "terser --compress --mangle --source-map -o esnext/dexie-cloud.min.js -- esnext/dexie-cloud.js",
-      "terser --compress --mangle --source-map -o dist/dexie-cloud.min.js -- dist/dexie-cloud.mjs"
+      "cd dist/umd",
+      "# Minify ES5 UMD bundle",
+      "uglifyjs dexie-cloud-addon.js -m -c negate_iife=0 -o dexie-cloud-addon.min.js --source-map",
+      "cd ../..",
+      "#dts-bundle-generator --external-imports=dexie --project src/tsconfig.json -o dist/dexie-cloud-addon.d.ts tools/tmp/modern/dexie-cloud-client.d.ts",
+      "# Minify modern bundle",
+      "terser --comments false --compress --mangle --source-map -o dist/modern/dexie-cloud-addon.min.js -- dist/modern/dexie-cloud-addon.js",
+      "# Minify module bundle",
+      "terser --comments false --compress --mangle --source-map -o dist/module-es5/dexie-cloud-addon.min.js -- dist/module-es5/dexie-cloud-addon.js",
+      "# Minify modern service-worker",
+      "terser --comments false --compress --mangle --source-map -o dist/modern/service-worker.min.js -- dist/modern/service-worker.js",
+      "# Minify umd service-worker",
+      "terser --comments false --compress --mangle --source-map -o dist/umd/service-worker.min.js -- dist/umd/service-worker.js"
     ],
     "src": [
-      "tsc -p src -t esnext --outDir tools/tmp/esnext [--watch 'Compilation complete.']",
-      "rollup -c tools/build-configs/rollup.esnext.config.js",
-      "tsc --allowJs -m es2015 -t es5 --sourceMap --outDir tools/tmp/es5 esnext/dexie-cloud.js",
+      "# Build the entire typescript source into modern JS",
+      "tsc -p src -t esnext --outDir tools/tmp/modern [--watch 'Compilation complete.']"
+    ],
+    "dexie-cloud": [
+      "# Create a modern bundle in dist/modern",
+      "rollup -c tools/build-configs/rollup.modern.config.js",
+      "# Transpile the modern dexie-cloud bundle into ES5 JS",
+      "tsc --allowJs -m es2015 -t es5 --sourceMap --outDir tools/tmp/es5 dist/modern/dexie-cloud-addon.js",
+      "# Create ES5 bundles: One UMD and one MJS",
       "rollup -c tools/build-configs/rollup.es5.config.js",
       "# Copy dexie-cloud-client.d.ts to dist",
-      "node -e \"fs.writeFileSync('dist/dexie-cloud.d.ts', fs.readFileSync('tools/tmp/esnext/dexie-cloud-client.d.ts'))\"",
+      "#node -e \"fs.writeFileSync('dist/dexie-cloud-addon.d.ts', fs.readFileSync('tools/tmp/modern/dexie-cloud-client.d.ts'))\"",
       "# Replace {version} and {date} in output files",
-      "node tools/replaceVersionAndDate.js dist/dexie-cloud.d.ts dist/dexie-cloud.js dist/dexie-cloud.mjs esnext/dexie-cloud.js"
+      "node tools/replaceVersionAndDate.js dist/umd/dexie-cloud-addon.js dist/module-es5/dexie-cloud-addon.js dist/modern/dexie-cloud-addon.js"
+    ],
+    "service-worker": [
+      "# Create a modern bundle in dist/modern",
+      "rollup -c tools/build-configs/rollup.sw.modern.config.js",
+      "# Replace {version} and {date} in output files",
+      "node tools/replaceVersionAndDate.js dist/umd/service-worker.js dist/modern/service-worker.js"
     ],
     "test": [
       "just-build test-unit"

@@ -10,14 +10,22 @@ const ERRORS_TO_IGNORE = [
 ];
 
 export default {
-  input: 'tools/tmp/esnext/dexie-cloud-client.js',
+  input: 'tools/tmp/modern/service-worker.js',
   output: [{
-    file: 'esnext/dexie-cloud.js',
+    file: 'dist/modern/service-worker.js',
     format: 'es',
-    banner: readFileSync(path.resolve(__dirname, 'banner.txt'), "utf-8"),
     sourcemap: true
+  },{
+    file: 'dist/umd/service-worker.js',
+    format: 'umd',
+    globals: {
+      dexie: 'Dexie'
+    },
+    name: 'DexieCloudSW',
+    sourcemap: true,
+    exports: 'named'
   }],
-  external: ['dexie', 'dexie-observable', 'dexie-syncable'],
+  external: ['dexie'],
   plugins: [
     sourcemaps(),
     nodeResolve({
