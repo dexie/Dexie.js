@@ -76,6 +76,11 @@ export function dexieCloud(dexie: Dexie) {
             // Update persisted options:
             await db.$syncState.put(options, "options");
           }
+          if (db.cloud.options?.usingServiceWorker && !(("serviceWorker" in navigator) ) {
+            // Configured to use service worker, but this browser doesn't support it.
+            // Act as if usingServiceWorker is configured falsy:
+            db.cloud.options.usingServiceWorker = false;
+          }
           updateSchemaFromOptions(schema, db.cloud.options);
           updateSchemaFromOptions(persistedSchema, db.cloud.options);
           if (!schema) {
@@ -108,9 +113,9 @@ export function dexieCloud(dexie: Dexie) {
 
       if (localSyncWorker) localSyncWorker.stop();
       localSyncWorker = null;
-      if (db.cloud.options?.usingServiceWorker && ("serviceWorker" in navigator)) {
-        registerSyncEvent(db);
-        registerPeriodicSyncEvent(db);
+      if (db.cloud.options?.usingServiceWorker) {
+        registerSyncEvent(db).catch(()=>{});
+        registerPeriodicSyncEvent(db).catch(()=>{});
       } else {
         // There's no SW. Start SyncWorker instead.
         localSyncWorker = LocalSyncWorker(db);

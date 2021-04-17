@@ -2,6 +2,7 @@ import Dexie from "dexie";
 import { DexieCloudDB } from "./db/DexieCloudDB";
 import dexieCloud from "./dexie-cloud-client";
 import { syncIfPossible } from "./sync/syncIfPossible";
+import { SWMessageEvent } from "./types/SWMessageEvent";
 import { SyncEvent } from "./types/SWSyncEvent";
 
 // In case the SW lives for a while, let it reuse already opened connections:
@@ -53,6 +54,14 @@ self.addEventListener("periodicsync", (event: SyncEvent) => {
   console.debug('SW "periodicsync" Event', event.tag);
   const dbName = getDbNameFromTag(event.tag);
   if (dbName) {
+    event.waitUntil(syncDB(dbName));
+  }
+});
+
+self.addEventListener("message", (event: SWMessageEvent) => {
+  console.debug('SW "message" Event', event.data);
+  if (event.data.type === "dexie-cloud-sync") {
+    const { dbName } = event.data;
     event.waitUntil(syncDB(dbName));
   }
 });
