@@ -1,29 +1,47 @@
-import { IS_SERVICE_WORKER } from "../helpers/IS_SERVICE_WORKER";
-import { performGuardedJob } from "./performGuardedJob";
+import { IS_SERVICE_WORKER } from '../helpers/IS_SERVICE_WORKER';
+import { performGuardedJob } from './performGuardedJob';
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { isSyncing, sync, CURRENT_SYNC_WORKER, SyncOptions } from "./sync";
+import { isSyncing, sync, CURRENT_SYNC_WORKER, SyncOptions } from './sync';
+import { DexieCloudOptions } from '../DexieCloudOptions';
+import { DexieCloudSchema } from '../DexieCloudSchema';
 
-export async function syncIfPossible(db: DexieCloudDB, options?: SyncOptions) {
-  if (isSyncing.has(db))
-    return; // Still working.
-  if (typeof navigator !== "undefined" && !navigator.onLine)
-    return; // We're not online
-  if (typeof document !== "undefined" && document.visibilityState !== "visible")
+export async function syncIfPossible(
+  db: DexieCloudDB,
+  cloudOptions: DexieCloudOptions,
+  cloudSchema: DexieCloudSchema,
+  options?: SyncOptions
+) {
+  if (isSyncing.has(db)) {
+    // Still working. Existing work will make sure to complete its job
+    // and after that, check if new mutations have arrived, and if so complete
+    // those as well. So if isSyncing.has(db) is true, we can rely that nothing at
+    // all will be needed to perform at this time.
+    // Exceptions: If onling sync throws an exception, it's caller will take care of
+    // the retry procedure - we shouldn't do that also (would be redundant).
+    return;
+  }
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    // We're not online.
+    // If LocalSyncWorker is used, a retry will automatically happen when we become
+    // online.
+    return;
+  }
+  if (typeof document !== 'undefined' && document.visibilityState !== 'visible')
     return; // We're a window but not visible
 
   isSyncing.add(db);
   try {
     if (db.cloud.options?.usingServiceWorker) {
       if (IS_SERVICE_WORKER) {
-        await sync(db, options);
+        await sync(db, cloudOptions, cloudSchema, options);
       }
     } else {
       // We use a flow that is better suited for the case when multiple workers want to
       // do the same thing.
-      await performGuardedJob(db, CURRENT_SYNC_WORKER, "$jobs", () => sync(db));
+      await performGuardedJob(db, CURRENT_SYNC_WORKER, '$jobs', () => sync(db, cloudOptions, cloudSchema));
     }
     isSyncing.delete(db);
-    await syncIfPossible(db, options);
+    await syncIfPossible(db, cloudOptions, cloudSchema, options);
   } catch (error) {
     isSyncing.delete(db);
     console.error(`Failed to sync client changes`, error);

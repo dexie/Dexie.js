@@ -14,6 +14,8 @@ import { subtractChanges } from "../types/move-to-dexie-cloud-common/change-proc
 import { toDBOperationSet } from "../types/move-to-dexie-cloud-common/change-processing/toDBOperationSet";
 import { bulkUpdate } from "../helpers/bulkUpdate";
 import { throwIfCancelled } from "../helpers/CancelToken";
+import { DexieCloudSchema } from "../DexieCloudSchema";
+import { DexieCloudOptions } from "../DexieCloudOptions";
 
 export const isSyncing = new WeakSet<DexieCloudDB>();
 export const CURRENT_SYNC_WORKER = "currentSyncWorker";
@@ -48,13 +50,14 @@ export interface SyncOptions {
 
 export async function sync(
   db: DexieCloudDB,
+  options: DexieCloudOptions,
+  schema: DexieCloudSchema,
   { isInitialSync, cancelToken }: SyncOptions = { isInitialSync: false }
 ) {
   if (!db.cloud.options?.databaseUrl)
     throw new Error(
       `Internal error: sync must not be called when no databaseUrl is configured`
     );
-  const { options, schema } = db.cloud;
   const { databaseUrl } = options;
   const currentUser = await db.getCurrentUser(); // Keep same value across entire sync flow:
   const mutationTables = currentUser.isLoggedIn
@@ -127,6 +130,16 @@ export async function sync(
   await db.transaction("rw", db.tables, async (tx) => {
     tx["disableChangeTracking"] = true;
     tx["disableAccessControl"] = true; // TODO: Take care of this flag in access control middleware!
+
+    // Update db.cloud.schema from server response.
+    // Local schema MAY include a subset of tables, so do not force all tables into local schema.
+    for (const tableName of Object.keys(schema)) {
+      if (res.schema[tableName]) {
+        // Write directly into configured schema. This code can only be executed alone.
+        schema[tableName] = res.schema[tableName];
+      }
+    }
+    await db.$syncState.put(schema, "schema");
 
     // List mutations that happened during our exchange with the server:
     const addedClientChanges = await listClientChanges(mutationTables, db, {

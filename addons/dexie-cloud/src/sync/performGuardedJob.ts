@@ -66,7 +66,7 @@ export async function performGuardedJob(
     if (awaitRemoteJob) {
       const jobDoneObservable = from(
         liveQuery(() => jobsTable.get(jobName))
-      ).pipe(filter((job) => !job));
+      ).pipe(filter((job) => !job)); // Wait til job is not there anymore.
       await jobDoneObservable.toPromise();
     }
     return;

@@ -21,6 +21,15 @@ async function syncDB(dbName: string) {
     db = DexieCloudDB(dexie);
     dexie.on('versionchange', stopManagingDB);
     managedDBs.set(dbName, db);
+    await db.dx.open(); // Makes sure db.cloud.options and db.cloud.schema are read from db,
+  }
+  if (!db.cloud.options?.databaseUrl) {
+    console.error(`Dexie Cloud: No databaseUrl configured`);
+    return; // Nothing to sync.
+  }
+  if (!db.cloud.schema) {
+    console.error(`Dexie Cloud: No schema persisted`);
+    return; // Nothing to sync.
   }
 
   function stopManagingDB() {
@@ -32,7 +41,7 @@ async function syncDB(dbName: string) {
 
   try {
     console.debug('Dexie Cloud SW: Syncing');
-    await syncIfPossible(db);
+    await syncIfPossible(db, db.cloud.options, db.cloud.schema);
     console.debug('Dexie Cloud SW: Done Syncing');
   } catch (e) {
     console.error(`Dexie Cloud SW Error`, e);
@@ -70,9 +79,9 @@ self.addEventListener('message', (event: SWMessageEvent) => {
     // But lesser timeout and more number of times.
     const syncAndRetry = (num = 1) => {
       return syncDB(dbName).catch(async (e) => {
-        if (num === 5) throw e;
-        await sleep(120_000); // 2 minutes
-        syncAndRetry (num + 1);
+        if (num === 3) throw e;
+        await sleep(60_000); // 1 minute
+        syncAndRetry(num + 1);
       });
     };
     if ('waitUntil' in event) {
@@ -84,5 +93,5 @@ self.addEventListener('message', (event: SWMessageEvent) => {
 });
 
 function sleep(ms: number) {
-  return new Promise(resolve => setTimeout(resolve, ms));
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }

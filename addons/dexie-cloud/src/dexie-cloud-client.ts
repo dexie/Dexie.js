@@ -76,7 +76,7 @@ export function dexieCloud(dexie: Dexie) {
             // Update persisted options:
             await db.$syncState.put(options, "options");
           }
-          if (db.cloud.options?.usingServiceWorker && !(("serviceWorker" in navigator) ) {
+          if (db.cloud.options?.usingServiceWorker && !(("serviceWorker" in navigator) )) {
             // Configured to use service worker, but this browser doesn't support it.
             // Act as if usingServiceWorker is configured falsy:
             db.cloud.options.usingServiceWorker = false;
@@ -101,7 +101,7 @@ export function dexieCloud(dexie: Dexie) {
       verifySchema(db);
 
       if (db.cloud.options?.databaseUrl && !initiallySynced) {
-        await performInitialSync(db);
+        await performInitialSync(db, db.cloud.options, db.cloud.schema!);
       }
 
       // HERE: If requireAuth, do athentication now.
@@ -113,12 +113,12 @@ export function dexieCloud(dexie: Dexie) {
 
       if (localSyncWorker) localSyncWorker.stop();
       localSyncWorker = null;
-      if (db.cloud.options?.usingServiceWorker) {
+      if (db.cloud.options?.usingServiceWorker && db.cloud.options.databaseUrl) {
         registerSyncEvent(db).catch(()=>{});
         registerPeriodicSyncEvent(db).catch(()=>{});
-      } else {
+      } else if (db.cloud.options?.databaseUrl && db.cloud.schema) {
         // There's no SW. Start SyncWorker instead.
-        localSyncWorker = LocalSyncWorker(db);
+        localSyncWorker = LocalSyncWorker(db, db.cloud.options, db.cloud.schema!);
         localSyncWorker.start();
       }
 
