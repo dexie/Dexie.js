@@ -16,6 +16,8 @@ export async function registerSyncEvent(db: DexieCloudDB) {
         type: 'dexie-cloud-sync',
         dbName: db.name
       });
+    } else {
+      console.error(`Dexie Cloud: There's no active service worker. Can this ever happen??`);
     }
     return;
   } catch (e) {

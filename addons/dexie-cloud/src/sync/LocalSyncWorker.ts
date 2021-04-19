@@ -1,6 +1,7 @@
 import { Subscription } from "rxjs";
 import { syncIfPossible } from "./syncIfPossible";
 import { DexieCloudDB } from "../db/DexieCloudDB";
+import { MINUTES } from "../helpers/date-constants";
 
 export function LocalSyncWorker(db: DexieCloudDB) {
   let syncNeededSubscription: Subscription | null = null;
@@ -10,47 +11,42 @@ export function LocalSyncWorker(db: DexieCloudDB) {
   //let periodicSyncHandler: ((event: Event) => void) | null = null;
   let cancelToken = { cancelled: false };
 
+  function syncAndRetry(retryNum=1) {
+    syncIfPossible(db, { cancelToken }).catch((e) => {
+      if (cancelToken.cancelled) {
+        stop();
+      } else if (retryNum < 3) {
+        // Mimic service worker sync event: retry 3 times
+        // * first retry after 5 minutes
+        // * second retry 15 minutes later
+        setTimeout(()=>syncAndRetry(retryNum + 1), [0, 5, 15][retryNum] * MINUTES)
+      }
+    })
+  }
+
   const start = () => {
     // Sync eagerly whenever a change has happened (+ initially when there's no syncState yet)
     // This initial subscribe will also trigger an sync also now.
-    syncNeededSubscription = db.localSyncEvent.subscribe(() =>
-      syncIfPossible(db, { cancelToken }).catch((e) => {
-        if (cancelToken.cancelled) stop();
-      })
-    );
+    syncNeededSubscription = db.localSyncEvent.subscribe(() => {
+      syncAndRetry();
+    });
+
     onlineHandler = () => {
       // Trigger a sync when system comes online
-      syncIfPossible(db, { cancelToken }).catch((e) => {
-        if (cancelToken.cancelled) stop();
-      });
+      syncAndRetry();
     };
+
     visibilityHandler = () => {
       // Trigger a sync when tab becomes visible
       if (document.visibilityState === "visible") {
-        syncIfPossible(db, { cancelToken }).catch((e) => {
-          if (cancelToken.cancelled) stop();
-        });
+        syncAndRetry();
       }
     };
-    /*syncHandler = (event: SyncEvent) => {
-      // Trigger a background sync when system comes online and app/site is closed.
-      if (event.tag === "dexie-cloud") {
-        event.waitUntil(syncIfPossible(db));
-      }
-    }
-    periodicSyncHandler = (event: SyncEvent) => {
-      if (event.tag == "dexie-cloud") {
-        event.waitUntil(syncIfPossible(db));
-      }
-    };*/
 
     // If browser or worker:
     if (typeof self !== "undefined") {
       // Sync whenever client goes online:
       self.addEventListener("online", onlineHandler);
-
-      // Sync whenever service worker gets a periodicsync event:
-      //self.addEventListener("periodicsync", periodicSyncHandler);
     }
     if (typeof document !== "undefined") {
       document.addEventListener("visibilitychange", visibilityHandler);
@@ -69,8 +65,6 @@ export function LocalSyncWorker(db: DexieCloudDB) {
         document.removeEventListener("visibilitychange", visibilityHandler!);
       }
     }
-    /*if (periodicSyncHandler)
-        self.removeEventListener("periodicsync", periodicSyncHandler);*/
     if (syncNeededSubscription) syncNeededSubscription.unsubscribe();
   };
 

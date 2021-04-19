@@ -27,6 +27,7 @@ export async function syncIfPossible(db: DexieCloudDB, options?: SyncOptions) {
   } catch (error) {
     isSyncing.delete(db);
     console.error(`Failed to sync client changes`, error);
+    throw error; // Make sure we rethrow error so that sync event is retried.
     // I don't think we should setTimout or so here.
     // Unless server tells us to in some response.
     // Then we could follow that advice but not by waiting here but by registering
