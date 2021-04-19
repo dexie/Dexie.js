@@ -78,7 +78,7 @@ export async function performGuardedJob(
         await jobDoneObservable.toPromise();
         return false;
       } catch (err) {
-        if (err.name !== "TimeoutError") throw err;
+        if (err.name !== 'TimeoutError') throw err;
         // Timeout stopped us! Try aquire the lock now.
         return await aquireLock();
       }
@@ -94,7 +94,12 @@ export async function performGuardedJob(
     // Start our heart beat during the job.
     // Use setInterval to make sure we are updating heartbeat even during long-lived fetch calls.
     const heartbeat = setInterval(
-      () => jobsTable.update(jobName, { heartbeat: new Date() }),
+      () =>
+        jobsTable.update(
+          jobName,
+          (job: GuardedJob) =>
+            job.nodeId === myId && (job.heartbeat = new Date())
+        ),
       GUARDED_JOB_HEARTBEAT
     );
 
