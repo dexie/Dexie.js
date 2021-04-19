@@ -6,11 +6,13 @@ import { loadAccessToken } from '../authentication/authenticate';
 import { BISON } from '../BISON';
 import { DexieCloudSchema } from '../DexieCloudSchema';
 import { getSyncableTables } from '../helpers/getSyncableTables';
+import { BaseRevisionMapEntry } from '../db/entities/BaseRevisionMapEntry';
 //import {BisonWebStreamReader} from "dreambase-library/dist/typeson-simplified/BisonWebStreamReader";
 
 export async function syncWithServer(
   changeSet: DBOperationsSet,
   syncState: PersistedSyncState | undefined,
+  baseRevs: BaseRevisionMapEntry[],
   db: DexieCloudDB,
   databaseUrl: string,
   schema: DexieCloudSchema | null
@@ -41,7 +43,8 @@ export async function syncWithServer(
         serverRevision: syncState.serverRevision,
         realms: syncState.realms
       },
-      baseRevisions: syncState?.baseRevisions || [],
+      baseRevs,
+      //baseRevisions: syncState?.baseRevisions || [],
       changes
     })
   });

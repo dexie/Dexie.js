@@ -10,6 +10,7 @@ import { UNAUTHORIZED_USER } from "../authentication/UNAUTHORIZED_USER";
 import { DexieCloudOptions } from "../DexieCloudOptions";
 import { DexieCloudSchema } from "../DexieCloudSchema";
 import { BehaviorSubject } from "rxjs";
+import { BaseRevisionMapEntry } from "./entities/BaseRevisionMapEntry";
 
 /*export interface DexieCloudDB extends Dexie {
   table(name: string): Table<any, any>;
@@ -30,6 +31,7 @@ export interface DexieCloudDBBase {
   $jobs: Table<GuardedJob, string>;
   $logins: Table<UserLogin, string>;
   $syncState: Table<PersistedSyncState | DexieCloudSchema | DexieCloudOptions, "syncState" | "options" | "schema">;
+  $baseRevs: Table<BaseRevisionMapEntry, [string, number]>;
 
   realms: Table<Realm, string>;
   members: Table<Member, string>;
@@ -54,6 +56,7 @@ export const DEXIE_CLOUD_SCHEMA = {
   roles: "[realmId+name]",
   $jobs: '',
   $syncState: '',
+  $baseRevs: '[tableName+clientRev]',
   $logins: 'claims.sub, lastLogin',
 };
 
@@ -70,6 +73,7 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
       cloud: dx.cloud,
       $jobs: dx.table("$jobs"),
       $syncState: dx.table("$syncState"),
+      $baseRevs: dx.table("$baseRevs"),
       $logins: dx.table("$logins"),
   
       realms: dx.table("realms"),

@@ -1,24 +1,26 @@
-import { getMutationTable } from "../helpers/getMutationTable";
-import { getSyncableTables } from "../helpers/getSyncableTables";
-import { DBOperationsSet } from "../types/move-to-dexie-cloud-common/DBOperationsSet";
-import { DexieCloudDB } from "../db/DexieCloudDB";
-import { listSyncifiedChanges } from "./listSyncifiedChanges";
-import { getTablesToSyncify } from "./getTablesToSyncify";
-import { listClientChanges } from "./listClientChanges";
-import { syncWithServer } from "./syncWithServer";
-import Dexie from "dexie";
-import { modifyLocalObjectsWithNewUserId } from "./modifyLocalObjectsWithNewUserId";
-import { DBKeyMutationSet } from "../types/move-to-dexie-cloud-common/change-processing/DBKeyMutationSet";
-import { applyOperations } from "../types/move-to-dexie-cloud-common/change-processing/applyOperations";
-import { subtractChanges } from "../types/move-to-dexie-cloud-common/change-processing/subtractChanges";
-import { toDBOperationSet } from "../types/move-to-dexie-cloud-common/change-processing/toDBOperationSet";
-import { bulkUpdate } from "../helpers/bulkUpdate";
-import { throwIfCancelled } from "../helpers/CancelToken";
-import { DexieCloudSchema } from "../DexieCloudSchema";
-import { DexieCloudOptions } from "../DexieCloudOptions";
+import { getMutationTable } from '../helpers/getMutationTable';
+import { getSyncableTables } from '../helpers/getSyncableTables';
+import { DBOperationsSet } from '../types/move-to-dexie-cloud-common/DBOperationsSet';
+import { DexieCloudDB } from '../db/DexieCloudDB';
+import { listSyncifiedChanges } from './listSyncifiedChanges';
+import { getTablesToSyncify } from './getTablesToSyncify';
+import { listClientChanges } from './listClientChanges';
+import { syncWithServer } from './syncWithServer';
+import Dexie from 'dexie';
+import { modifyLocalObjectsWithNewUserId } from './modifyLocalObjectsWithNewUserId';
+import { DBKeyMutationSet } from '../types/move-to-dexie-cloud-common/change-processing/DBKeyMutationSet';
+import { applyOperations } from '../types/move-to-dexie-cloud-common/change-processing/applyOperations';
+import { subtractChanges } from '../types/move-to-dexie-cloud-common/change-processing/subtractChanges';
+import { toDBOperationSet } from '../types/move-to-dexie-cloud-common/change-processing/toDBOperationSet';
+import { bulkUpdate } from '../helpers/bulkUpdate';
+import { throwIfCancelled } from '../helpers/CancelToken';
+import { DexieCloudSchema } from '../DexieCloudSchema';
+import { DexieCloudOptions } from '../DexieCloudOptions';
+import { BaseRevisionMapEntry } from '../db/entities/BaseRevisionMapEntry';
+import { getTableFromMutationTable } from '../helpers/getTableFromMutationTable';
 
 export const isSyncing = new WeakSet<DexieCloudDB>();
-export const CURRENT_SYNC_WORKER = "currentSyncWorker";
+export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 
 /*
   TODO:
@@ -79,9 +81,9 @@ export async function sync(
   const doSyncify = tablesToSyncify.length > 0;
 
   if (doSyncify) {
-    await db.transaction("rw", tablesToSyncify, async (tx) => {
-      tx["disableChangeTracking"] = true;
-      tx["disableAccessControl"] = true; // TODO: Take care of this flag in access control middleware!
+    await db.transaction('rw', tablesToSyncify, async (tx) => {
+      tx['disableChangeTracking'] = true;
+      tx['disableAccessControl'] = true; // TODO: Take care of this flag in access control middleware!
       await modifyLocalObjectsWithNewUserId(tablesToSyncify, currentUser);
     });
     throwIfCancelled(cancelToken);
@@ -89,11 +91,12 @@ export async function sync(
   //
   // List changes to sync
   //
-  const [clientChangeSet, syncState] = await db.transaction(
-    "r",
+  const [clientChangeSet, syncState, baseRevs] = await db.transaction(
+    'r',
     db.tables,
     async () => {
       const syncState = await db.getPersistedSyncState();
+      const baseRevs = await db.$baseRevs.toArray();
       let clientChanges = await listClientChanges(mutationTables, db);
       throwIfCancelled(cancelToken);
       if (doSyncify) {
@@ -104,13 +107,16 @@ export async function sync(
         );
         throwIfCancelled(cancelToken);
         clientChanges = clientChanges.concat(syncificationInserts);
-        return [clientChanges, syncState];
+        return [clientChanges, syncState, baseRevs];
       }
-      return [clientChanges, syncState];
+      return [clientChanges, syncState, baseRevs];
     }
   );
 
-  let latestRevisions = getLatestRevisionsPerTable(clientChangeSet);
+  const latestRevisions = getLatestRevisionsPerTable(
+    clientChangeSet,
+    syncState?.latestRevisions
+  );
 
   //
   // Push changes to server
@@ -119,6 +125,7 @@ export async function sync(
   const res = await syncWithServer(
     clientChangeSet,
     syncState,
+    baseRevs,
     db,
     databaseUrl,
     schema
@@ -127,9 +134,9 @@ export async function sync(
   //
   // Apply changes locally and clear old change entries:
   //
-  await db.transaction("rw", db.tables, async (tx) => {
-    tx["disableChangeTracking"] = true;
-    tx["disableAccessControl"] = true; // TODO: Take care of this flag in access control middleware!
+  await db.transaction('rw', db.tables, async (tx) => {
+    tx['disableChangeTracking'] = true;
+    tx['disableAccessControl'] = true; // TODO: Take care of this flag in access control middleware!
 
     // Update db.cloud.schema from server response.
     // Local schema MAY include a subset of tables, so do not force all tables into local schema.
@@ -139,40 +146,72 @@ export async function sync(
         schema[tableName] = res.schema[tableName];
       }
     }
-    await db.$syncState.put(schema, "schema");
+    await db.$syncState.put(schema, 'schema');
 
     // List mutations that happened during our exchange with the server:
     const addedClientChanges = await listClientChanges(mutationTables, db, {
-      since: latestRevisions,
+      since: latestRevisions
     });
 
     //
     // Delete changes now as server has return success
     // (but keep changes that haven't reached server yet)
     //
-    for (const table of mutationTables) {
+    for (const mutTable of mutationTables) {
+      const tableName = getTableFromMutationTable(mutTable.name);
       if (
         !addedClientChanges.some(
-          (ch) => ch.table === table.name && ch.muts.length > 0
+          (ch) => ch.table === tableName && ch.muts.length > 0
         )
       ) {
         // No added mutations for this table during the time we sent changes
         // to the server.
         // It is therefore safe to clear all changes (which is faster than
         // deleting a range)
-        await table.clear();
-      } else if (latestRevisions[table.name]) {
-        await table
-          .where("rev")
-          .belowOrEqual(latestRevisions[table.name])
-          .delete();
+        await Promise.all([
+          mutTable.clear(),
+          db.$baseRevs.where({ tableName }).delete()
+        ]);
+      } else if (latestRevisions[mutTable.name]) {
+        const latestRev = latestRevisions[mutTable.name];
+        //await mutTable.where('rev').belowOrEqual(latestRev).reverse().offset(1).delete();
+        await Promise.all([
+          mutTable.where('rev').belowOrEqual(latestRev).delete(),
+          db.$baseRevs
+            .where(':id')
+            .between([tableName, -Infinity], [tableName, latestRev], true, true)
+            .reverse()
+            .offset(1) // Keep one entry (the one pointing out exising ones)
+            .delete()
+        ]);
       } else {
         // In this case, the mutation table only contains added items after sending empty changeset to server.
         // We should not clear out anything now.
       }
-      // Update latestRevisions object according to additional changes:
-      getLatestRevisionsPerTable(addedClientChanges, latestRevisions);
     }
+
+    // Update latestRevisions object according to additional changes:
+    getLatestRevisionsPerTable(addedClientChanges, latestRevisions);
+
+    // Update/add new entries into baseRevs map.
+    // * On tables without mutations since last serverRevision,
+    //   this will update existing entry.
+    // * On tables where mutations have been recorded since last
+    //   serverRevision, this will create a new entry.
+    // The purpose of this operation is to mark a start revision (per table)
+    // so that all client-mutations that come after this, will be mapped to current
+    // server revision.
+    await db.$baseRevs.bulkPut(
+      Object.keys(schema).map((tableName) => {
+        const lastClientRevOnPreviousServerRev =
+          latestRevisions[tableName] || 0;
+        return {
+          tableName,
+          clientRev: lastClientRevOnPreviousServerRev + 1,
+          serverRev: res.serverRevision
+        };
+      })
+    );
 
     //
     // Update syncState
@@ -181,6 +220,7 @@ export async function sync(
     const newSyncState = syncState || {
       syncedTables: [],
       initiallySynced: true,
+      latestRevisions
     };
     if (doSyncify) {
       newSyncState.syncedTables = getSyncableTables(db).map((tbl) => tbl.name);
@@ -202,7 +242,7 @@ export async function sync(
         baseRevisions[table.name] = {
           prevServerRev: null,
           clientRev,
-          newServerRev: res.serverRevision,
+          newServerRev: res.serverRevision
         };
       }
     }
@@ -220,8 +260,15 @@ export async function sync(
     //
     // Update syncState
     //
-    db.$syncState.put(newSyncState, "syncState");
+    db.$syncState.put(newSyncState, 'syncState');
   });
+}
+
+function getLatestRevisionsFromBaseRevs(baseRevs: BaseRevisionMapEntry[]) {
+  const result: { [table: string]: number } = {};
+  for (const { tableName, clientRev } of baseRevs) {
+  }
+  return result;
 }
 
 function getLatestRevisionsPerTable(
@@ -243,23 +290,23 @@ export async function applyServerChanges(
     const table = db.table(tableName);
     for (const mut of muts) {
       switch (mut.type) {
-        case "insert":
+        case 'insert':
           await table.bulkAdd(mut.values, mut.keys);
           break;
-        case "upsert":
+        case 'upsert':
           await table.bulkPut(mut.values, mut.keys);
           break;
-        case "modify":
+        case 'modify':
           if (mut.keys.length === 1) {
             await table.update(mut.keys[0], mut.changeSpec);
           } else {
-            await table.where(":id").anyOf(mut.keys).modify(mut.changeSpec);
+            await table.where(':id').anyOf(mut.keys).modify(mut.changeSpec);
           }
           break;
-        case "update":
+        case 'update':
           await bulkUpdate(table, mut.keys, mut.changeSpecs);
           break;
-        case "delete":
+        case 'delete':
           await table.bulkDelete(mut.keys);
           break;
       }

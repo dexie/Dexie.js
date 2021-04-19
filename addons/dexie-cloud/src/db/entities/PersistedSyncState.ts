@@ -1,11 +1,14 @@
 export interface PersistedSyncState {
   serverRevision?: any;
-  baseRevisions?: {
+  /*baseRevisions?: {
     [table: string]: {
       prevServerRev?: any;
       clientRev: number;
       newServerRev?: any;
     }
+  };*/
+  latestRevisions: {
+    [tableName: string]: number
   };
   realms?: string[];
   initiallySynced?: boolean;

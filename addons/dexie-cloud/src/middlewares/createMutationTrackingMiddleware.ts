@@ -81,7 +81,7 @@ export function createMutationTrackingMiddleware({
               outstandingTransactions.next(outstandingTransactions.value);
             };
             const txComplete = () => {
-              if (tx.mutationsAdded) {
+              if (tx.mutationsAdded && db.cloud.options?.databaseUrl) {
                 if (db.cloud.options?.usingServiceWorker) {
                   registerSyncEvent(db);
                 } else {
