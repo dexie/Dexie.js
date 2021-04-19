@@ -297,8 +297,6 @@ export async function applyServerChanges(
   }
 }
 
-//export function
-
 function filterServerChangesThroughAddedClientChanges(
   serverChanges: DBOperationsSet,
   addedClientChanges: DBOperationsSet
