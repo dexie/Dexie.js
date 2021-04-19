@@ -1,12 +1,5 @@
 export interface PersistedSyncState {
   serverRevision?: any;
-  /*baseRevisions?: {
-    [table: string]: {
-      prevServerRev?: any;
-      clientRev: number;
-      newServerRev?: any;
-    }
-  };*/
   latestRevisions: {
     [tableName: string]: number
   };

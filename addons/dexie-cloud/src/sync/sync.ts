@@ -62,9 +62,11 @@ export async function sync(
     );
   const { databaseUrl } = options;
   const currentUser = await db.getCurrentUser(); // Keep same value across entire sync flow:
-  const mutationTables = currentUser.isLoggedIn
-    ? getSyncableTables(db).map((tbl) => db.table(getMutationTable(tbl.name)))
-    : [];
+  const tablesToSync = currentUser.isLoggedIn ? getSyncableTables(db) : [];
+
+  const mutationTables = tablesToSync.map((tbl) =>
+    db.table(getMutationTable(tbl.name))
+  );
 
   // If this is not the initial sync,
   // go through tables that were previously not synced but should now be according to
@@ -173,15 +175,20 @@ export async function sync(
           db.$baseRevs.where({ tableName }).delete()
         ]);
       } else if (latestRevisions[mutTable.name]) {
-        const latestRev = latestRevisions[mutTable.name];
+        const latestRev = latestRevisions[mutTable.name] || 0;
         //await mutTable.where('rev').belowOrEqual(latestRev).reverse().offset(1).delete();
         await Promise.all([
           mutTable.where('rev').belowOrEqual(latestRev).delete(),
           db.$baseRevs
             .where(':id')
-            .between([tableName, -Infinity], [tableName, latestRev], true, true)
+            .between(
+              [tableName, -Infinity],
+              [tableName, latestRev + 1],
+              true,
+              true
+            )
             .reverse()
-            .offset(1) // Keep one entry (the one pointing out exising ones)
+            .offset(1) // Keep one entry (the one mapping muts that came during fetch --> previous server revision)
             .delete()
         ]);
       } else {
@@ -219,33 +226,16 @@ export async function sync(
     const syncState = await db.getPersistedSyncState();
     const newSyncState = syncState || {
       syncedTables: [],
-      initiallySynced: true,
-      latestRevisions
+      latestRevisions: {}
     };
-    if (doSyncify) {
-      newSyncState.syncedTables = getSyncableTables(db).map((tbl) => tbl.name);
-    }
+    newSyncState.syncedTables = tablesToSync
+      .map((tbl) => tbl.name)
+      .concat(tablesToSyncify.map((tbl) => tbl.name));
+    newSyncState.latestRevisions = latestRevisions;
+    newSyncState.remoteDbId = res.dbId;
     newSyncState.initiallySynced = true;
     newSyncState.realms = res.realms;
-    newSyncState.remoteDbId = res.dbId;
     newSyncState.serverRevision = res.serverRevision;
-
-    const baseRevisions = syncState?.baseRevisions ?? {};
-    for (const table of getSyncableTables(db)) {
-      const revEntry = baseRevisions[table.name];
-      const clientRev = latestRevisions[table.name] || 0;
-      if (revEntry) {
-        revEntry.clientRev = clientRev;
-        revEntry.prevServerRev = revEntry.newServerRev;
-        revEntry.newServerRev = res.serverRevision;
-      } else {
-        baseRevisions[table.name] = {
-          prevServerRev: null,
-          clientRev,
-          newServerRev: res.serverRevision
-        };
-      }
-    }
 
     const filteredChanges = filterServerChangesThroughAddedClientChanges(
       res.changes,
@@ -262,13 +252,6 @@ export async function sync(
     //
     db.$syncState.put(newSyncState, 'syncState');
   });
-}
-
-function getLatestRevisionsFromBaseRevs(baseRevs: BaseRevisionMapEntry[]) {
-  const result: { [table: string]: number } = {};
-  for (const { tableName, clientRev } of baseRevs) {
-  }
-  return result;
 }
 
 function getLatestRevisionsPerTable(
