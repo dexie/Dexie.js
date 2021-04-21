@@ -393,3 +393,14 @@ asyncTest("Issue #1112", async ()=>{
         start();
     }
 });
+
+asyncTest("Issue #1280 - Don't perform deep-clone workaround when adding non-POJO to auto-incrementing table", async () => {
+    try {
+        await db.bars.add({ id: undefined, text: "hello1" });
+        ok(false, "Expected add() to fail since id is undefined");
+    } catch (error) {
+        ok(true);
+    } finally {
+        start();
+    }
+});
