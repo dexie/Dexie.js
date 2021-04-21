@@ -5,6 +5,7 @@
   "main": "dist/dexie.js",
   "module": "dist/dexie.mjs",
   "jsnext:main": "dist/dexie.mjs",
+  "exports": "./dist/modern/dexie.mjs",
   "typings": "dist/dexie.d.ts",
   "jspm": {
     "format": "cjs",
@@ -51,10 +52,13 @@
       "# Build dist/dexie.js, dist/dexie.mjs and dist/dexie.d.ts",
       "cd src",
       "tsc [--watch 'Watching for file changes']",
+      "tsc --target es2018 --outdir ../tools/tmp/modern/src/",
       "rollup -c ../tools/build-configs/rollup.config.js",
       "rollup -c ../tools/build-configs/rollup.umd.config.js",
+      "rollup -c ../tools/build-configs/rollup.modern.config.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.mjs",
+      "node ../tools/replaceVersionAndDate.js ../dist/modern/dexie.mjs",
       "dts-bundle-generator --inline-declare-externals --umd-module-name Dexie -o ../dist/dexie.d.ts public/index.d.ts",
       "node ../tools/prepend.js ../dist/dexie.d.ts ../tools/build-configs/banner.txt",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.d.ts"
@@ -65,7 +69,10 @@
       "node tools/replaceVersionAndDate.js dist/dexie.d.ts",
       "# Minify the default ES5 UMD module",
       "cd dist",
-      "uglifyjs dexie.js -m -c negate_iife=0 -o dexie.min.js --source-map"
+      "uglifyjs dexie.js -m -c negate_iife=0 -o dexie.min.js --source-map",
+      "# Minify modern bundle",
+      "cd modern",
+      "terser --comments false --compress --mangle --module --source-map -o dexie.min.mjs -- dexie.mjs"
     ],
     "dev": [
       "# Build ES5 module and the tests",
