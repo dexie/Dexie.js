@@ -39,11 +39,11 @@
       "cd ../..",
       "#dts-bundle-generator --external-imports=dexie --project src/tsconfig.json -o dist/dexie-cloud-addon.d.ts tools/tmp/modern/dexie-cloud-client.d.ts",
       "# Minify modern bundle",
-      "terser --comments false --compress --mangle --source-map -o dist/modern/dexie-cloud-addon.min.js -- dist/modern/dexie-cloud-addon.js",
+      "terser --comments false --compress --mangle --module --source-map -o dist/modern/dexie-cloud-addon.min.js -- dist/modern/dexie-cloud-addon.js",
       "# Minify module bundle",
-      "terser --comments false --compress --mangle --source-map -o dist/module-es5/dexie-cloud-addon.min.js -- dist/module-es5/dexie-cloud-addon.js",
+      "terser --comments false --compress --mangle --module --source-map -o dist/module-es5/dexie-cloud-addon.min.js -- dist/module-es5/dexie-cloud-addon.js",
       "# Minify modern service-worker",
-      "terser --comments false --compress --mangle --source-map -o dist/modern/service-worker.min.js -- dist/modern/service-worker.js",
+      "terser --comments false --compress --mangle --module --source-map -o dist/modern/service-worker.min.js -- dist/modern/service-worker.js",
       "# Minify umd service-worker",
       "terser --comments false --compress --mangle --source-map -o dist/umd/service-worker.min.js -- dist/umd/service-worker.js"
     ],
@@ -55,7 +55,7 @@
       "# Create a modern bundle in dist/modern",
       "rollup -c tools/build-configs/rollup.modern.config.js",
       "# Transpile the modern dexie-cloud bundle into ES5 JS",
-      "tsc --allowJs -m es2015 -t es5 --sourceMap --outDir tools/tmp/es5 dist/modern/dexie-cloud-addon.js",
+      "tsc --allowJs -m es2015 -t es5 --sourceMap --importHelpers true --outDir tools/tmp/es5 dist/modern/dexie-cloud-addon.js",
       "# Create ES5 bundles: One UMD and one MJS",
       "rollup -c tools/build-configs/rollup.es5.config.js",
       "# Copy dexie-cloud-client.d.ts to dist",
@@ -80,7 +80,10 @@
   "author": "david.fahlander@gmail.com",
   "license": "Apache-2.0",
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^18.0.0",
+    "@rollup/plugin-node-resolve": "^11.2.1",
     "@types/node": "*",
+    "dexie-cloud-common": "^1.0.6",
     "dreambase-library": "^1.0.6",
     "just-build": "*",
     "karma": "*",
@@ -89,17 +92,17 @@
     "karma-firefox-launcher": "*",
     "karma-qunit": "*",
     "preact": "*",
-    "rollup": "*",
+    "rollup": "^2.45.2",
     "rollup-plugin-alias": "*",
     "rollup-plugin-commonjs": "*",
     "rollup-plugin-node-resolve": "*",
     "rollup-plugin-sourcemaps": "*",
     "tslib": "*",
-    "typescript": "*"
+    "typescript": "*",
+    "universal-imports": "^1.0.3"
   },
   "dependencies": {
     "dexie": "*",
-    "dexie-cloud-common": "*",
     "rxjs": "*"
   }
 }

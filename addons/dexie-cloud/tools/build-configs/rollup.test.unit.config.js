@@ -1,7 +1,7 @@
 // @ts-check
 import sourcemaps from 'rollup-plugin-sourcemaps';
-import commonjs from 'rollup-plugin-commonjs';
-import nodeResolve from 'rollup-plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs';
+import nodeResolve from '@rollup/plugin-node-resolve';
 
 const ERRORS_TO_IGNORE = [
   "THIS_IS_UNDEFINED",
@@ -23,7 +23,7 @@ export default {
     sourcemap: true,
     exports: 'named'
   }],
-  external: ['dexie', 'dexie-observable', 'dexie-syncable', "dexie-cloud", "qunit"],
+  external: ['dexie', 'dexie-observable', 'dexie-syncable', "dexie-cloud", "qunit", "rxjs"],
   plugins: [
     sourcemaps(),
     nodeResolve({browser: true}),

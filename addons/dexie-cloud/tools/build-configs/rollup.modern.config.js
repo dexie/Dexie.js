@@ -1,7 +1,7 @@
 // @ts-check
 import sourcemaps from 'rollup-plugin-sourcemaps';
-import commonjs from 'rollup-plugin-commonjs';
-import nodeResolve from 'rollup-plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs';
+import nodeResolve from '@rollup/plugin-node-resolve';
 import {readFileSync} from 'fs';
 import path from 'path';
 
@@ -17,7 +17,7 @@ export default {
     banner: readFileSync(path.resolve(__dirname, 'banner.txt'), "utf-8"),
     sourcemap: true
   }],
-  external: ['dexie'],
+  external: ['dexie', 'rxjs'],
   plugins: [
     sourcemaps(),
     nodeResolve({
