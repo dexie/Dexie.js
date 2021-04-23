@@ -19,8 +19,8 @@ module.exports = {
         // Leaving out Chrome, since local tests have hopefully already run on it.
         // Chrome will be tested in the pre_npm_publish anyway.
         'bs_firefox_latest_supported', 
-        // Internet Explorer - an old beast. Enforces legacy compatibility for every PR!
-        'bs_ie11',
+        // Internet Explorer - an old beast. Enforces legacy compatibility for every PR.
+        'bs_ie11', // This is causing a lot of trouble.
         // Safari. Enforces native Safari support for every PR!
         'bs_safari_latest_supported'
     ],
