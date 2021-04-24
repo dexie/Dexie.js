@@ -8,7 +8,7 @@ import { exceptions } from '../../errors';
 import { createTableSchema } from '../../helpers/table-schema';
 
 /** class Version
- * 
+ *
  * http://dexie.org/docs/Version/Version
  */
 export class Version implements IVersion {
@@ -36,7 +36,7 @@ export class Version implements IVersion {
     });
   }
 
-  stores(stores: { [key: string]: string; }): IVersion {
+  stores(stores: { [key: string]: string | null; }): IVersion {
     const db = this.db;
     this._cfg.storesSource = this._cfg.storesSource ?
       extend(this._cfg.storesSource, stores) :
