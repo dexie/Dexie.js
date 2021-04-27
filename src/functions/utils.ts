@@ -29,7 +29,7 @@ export function hasOwn(obj, prop) {
 
 export function props (proto, extension) {
     if (typeof extension === 'function') extension = extension(getProto(proto));
-    keys(extension).forEach(key => {
+    (typeof Reflect === "undefined" ? keys : Reflect.ownKeys)(extension).forEach(key => {
         setProp(proto, key, extension[key]);
     });
 }

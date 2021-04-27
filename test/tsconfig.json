@@ -10,9 +10,10 @@
     "moduleResolution": "node",
     "lib": ["es2015", "dom"],
     "forceConsistentCasingInFileNames": true,
-    "outDir": "../tools/tmp/test/",
+    "outDir": "../tools/tmp/",
     "sourceMap": true,
-    "rootDir": "."
+    "rootDir": "..",
+    "downlevelIteration": true
   },
   "files": [
     "tests-all.js"
