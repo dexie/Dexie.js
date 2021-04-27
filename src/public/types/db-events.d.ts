@@ -1,7 +1,7 @@
 import { DexieEventSet } from "./dexie-event-set";
 import { DexieEvent } from "./dexie-event";
 import { Transaction } from "./transaction";
-import { RangeBtree } from "./rangeset";
+import { IntervalTree } from "./rangeset";
 
 export interface DexieOnReadyEvent {
   subscribe(fn: () => any, bSticky: boolean): void;
@@ -43,7 +43,7 @@ export interface DbEvents extends DexieEventSet {
 export type ObservabilitySet = {
   // `idb:${dbName}/${tableName}/changedRowContents` - keys.
   // `idb:${dbName}/${tableName}/changedIndexes/${indexName}` - indexes
-  [part: string]: RangeBtree;
+  [part: string]: IntervalTree;
 };
 
 export interface DexieOnTxCommittedEvent {
