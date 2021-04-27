@@ -1,11 +1,11 @@
 import { IndexableType } from "./indexable-type";
 
-export type RangeBtree = RangeBtreeNode | EmptyRange;
-export interface RangeBtreeNode {
+export type IntervalTree = IntervalTreeNode | EmptyRange;
+export interface IntervalTreeNode {
   from: IndexableType; // lower bound
   to: IndexableType; // upper bound
-  l: RangeBtreeNode | null; // left
-  r: RangeBtreeNode | null; // right
+  l: IntervalTreeNode | null; // left
+  r: IntervalTreeNode | null; // right
   d: number; // depth
 }
 export interface EmptyRange {
@@ -13,16 +13,16 @@ export interface EmptyRange {
 }
 
 export interface RangeSetPrototype {
-  add(rangeSet: RangeBtree | {from: IndexableType, to: IndexableType}): RangeSet;
+  add(rangeSet: IntervalTree | {from: IndexableType, to: IndexableType}): RangeSet;
   addKey(key: IndexableType): RangeSet;
   addKeys(keys: IndexableType[]): RangeSet;
-  [Symbol.iterator](): Iterator<RangeBtreeNode, undefined, IndexableType | undefined>;
+  [Symbol.iterator](): Iterator<IntervalTreeNode, undefined, IndexableType | undefined>;
 }
 
-export type RangeSet = RangeSetPrototype & RangeBtree;
+export type RangeSet = RangeSetPrototype & IntervalTree;
 
 export interface RangeSetConstructor {
-  (tree: RangeBtree): RangeSet;
+  (tree: IntervalTree): RangeSet;
   new (): RangeSet;
   new (from: IndexableType, to?: IndexableType): RangeSet;
 }
