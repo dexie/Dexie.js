@@ -86,6 +86,7 @@ function addRange(target: RangeBtree, from: IndexableType, to: IndexableType) {
     target.r = null; // Cut off for now. Re-add later.
     target.d = target.l ? target.l.d + 1 : 1;
   }
+  const rightWasCutOff = !target.r;
   // Re-add left?
   if (left && !target.l) {
     //Ranges to the left may be swallowed. Cut it of and re-add all.
@@ -93,7 +94,7 @@ function addRange(target: RangeBtree, from: IndexableType, to: IndexableType) {
     mergeRanges(target, left);
   }
   // Re-add right?
-  if (right && !target.r) {
+  if (right && rightWasCutOff) {
     //Ranges to the right may be swallowed. Cut it of and re-add all.
     //Could probably be done more efficiently!
     mergeRanges(target, right);
