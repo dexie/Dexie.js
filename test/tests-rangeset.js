@@ -103,10 +103,33 @@ test("stress", () => {
   console.log("depth", set.d);
 });
 
+function printTree(nodes, pad=-1) {
+  /*function branchLength(node, lr, num=0) {
+    return node[lr] ? branchLength(node[lr], lr, num + 1) : num;
+  }
+  const treeWidth = 1 + branchLength(set, "l") + branchLength(set, "r");*/
+  if (pad === -1) pad = 4 * Math.pow(2, nodes[0].d);
+  const toPad = pad - ((nodes.length - 1) * 4);
+  console.log(nodes.map(node => (node
+    ? `[${node.from}-${node.to}]`
+    : node === ""
+    ? ""
+    : " (null) "
+  ).padStart(8, " ") ).join('').padStart(toPad, " "));
+  const children = nodes.map (node => node ? [node.l, node.r] : ["",""]).flat();
+  if (children.some(child => child)) {
+    printTree(children, pad);
+  }
+}
+
 const issue1268_triggering_input = [
-  { from: 63, to: 71 },  // 0
-  { from: 99, to: 102 }, // 1
-  { from: 90, to: 92 },  // 2
+  { from: 63, to: 71 },  // 0. Tree: [63-71]
+  { from: 99, to: 102 }, // 1. Tree: [63-71]
+                         //      (null)  [99-102]
+  { from: 90, to: 92 },  // 2. Tree: [99-102]
+                         //       [63-71]  (null)
+                         //    [90-92] [90-92]
+                         // WOW: Here both left and right leafs are the same node!
   { from: 92, to: 95 },  // 3
   { from: 4, to: 10 },   // 4
   { from: 51, to: 51 },  // 5
@@ -126,9 +149,15 @@ test("issue1268", () => {
   const set = new RangeSet();
   issue1268_triggering_input.forEach((range, idx) => {
     try {
+      if (idx === 11) debugger;
+      console.log(`Adding [${range.from}-${range.to}]`);
       set.add(range);
       if (!verifySet(set)) {
-        ok(false, "set not ok at idx " + idx);
+        ok(false, "set not ok at idx " + idx + " depth: " + set.d);
+      } else {
+        console.log("Printing tree on idx " + idx);
+        if (idx === 2) debugger;
+        printTree([set]);
       }
     } catch (e) {
       console.log("crashed on idx", idx);
