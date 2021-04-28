@@ -200,14 +200,39 @@ function rebalance(target: IntervalTreeNode) {
   const diff = (target.r?.d || 0) - (target.l?.d || 0);
   const r = diff > 1 ? "r" : diff < -1 ? "l" : "";
   if (r) {
-    // Rotate
+
+    // Rotate (https://en.wikipedia.org/wiki/Tree_rotation)
+    //
+    // 
+    //                    [OLDROOT]
+    //       [OLDROOT.L]            [NEWROOT]
+    //                        [NEWROOT.L] [NEWROOT.R]
+    //
+    // Is going to become:
+    //
+    // 
+    //                    [NEWROOT]
+    //        [OLDROOT]             [NEWROOT.R]
+    // [OLDROOT.L] [NEWROOT.L]  
+
+    // * clone now has the props of OLDROOT
+    // Plan:
+    // * target must be given the props of NEWROOT
+    // * target[l] must point to a new OLDROOT
+    // * target[r] must point to NEWROOT.R
+    // * OLDROOT[r] must point to NEWROOT.L
     const l = r === "r" ? "l" : "r";
     extend(target, clone[r]);
-    extend(clone[r], clone);
-    clone[r]![r] = target[l];
-    target[l] = clone[r];
-    clone[r]!.d = computeDepth(clone[r]!);
+    // * Make a new oldRoot (clone the clone)
+    const oldRoot = {...clone};
+    // * Point it's right side to NEWROOT.L
+    oldRoot[r] = target[l];
+    // * Point the NEWROOT.l to OLDROOT
+    target[l] = oldRoot;
+    // Recompute depth
+    oldRoot.d = computeDepth(oldRoot);
   }
+  // Recompute depth
   target.d = computeDepth(target);
 }
 
