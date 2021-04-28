@@ -537,6 +537,10 @@ spawnedTest("bulkAdd-catch sub transaction", function*(){
 });
 
 spawnedTest("Issue #1280 - add() with auto-incrementing ID and CryptoKey", function* () {
+    if (!self?.crypto?.subtle) {
+        ok(true, "This browser doesnt have WebCrypto");
+        return;
+    }
     var generatedKey = yield self.crypto.subtle.generateKey(
         {
             name: "RSA-OAEP",
