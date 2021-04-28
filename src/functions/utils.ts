@@ -191,7 +191,7 @@ export function flatten<T> (a: (T | T[])[]) : T[] {
 
 //https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm
 const intrinsicTypeNames =
-    "Boolean,String,Date,RegExp,Blob,File,FileList,ArrayBuffer,DataView,Uint8ClampedArray,ImageData,Map,Set"
+    "Boolean,String,Date,RegExp,Blob,File,FileList,ArrayBuffer,DataView,Uint8ClampedArray,ImageData,Map,Set,CryptoKey"
     .split(',').concat(
         flatten([8,16,32,64].map(num=>["Int","Uint","Float"].map(t=>t+num+"Array")))
     ).filter(t=>_global[t]);
