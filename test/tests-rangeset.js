@@ -1,6 +1,5 @@
 import {test, module, stop, start, asyncTest, equal, ok} from 'QUnit';
 import {RangeSet, mergeRanges, rangesOverlap} from "../src/helpers/rangeset";
-import { deepEqual } from './tests-table';
 
 module("rangeset");
 
@@ -85,22 +84,22 @@ function isSequencial(set) {
 
 test("stress", () => {
   const set = new RangeSet();
-  console.log("depth", set.d);
+  //console.log("depth", set.d);
   for (let i=1; i<=600; ++i) {
     set.addKey(i);
   }
   ok(isSequencial(set), "set is sequencial");
-  console.log("the set 1", [...set]);
-  console.log("depth", set.d);
+  //console.log("the set 1", [...set]);
+  //console.log("depth", set.d);
   equal([...set].length, 600, "Set should contain individual ranges");
   ok(isSequencial(set), "set is sequencial");
   //debugger;
   set.add({from: 280, to: 321});
-  console.log("the set 2", JSON.parse(JSON.stringify([...set])));
+  //console.log("the set 2", JSON.parse(JSON.stringify([...set])));
   ok(isSequencial(set), "set is sequencial");
-  console.log("depth", set.d);
+  //console.log("depth", set.d);
   equal([...set].length, 559, "Set should have less ranges");
-  console.log("depth", set.d);
+  //console.log("depth", set.d);
 });
 
 function printTree(nodes, pad=-1) {
@@ -149,15 +148,15 @@ test("issue1268", () => {
   const set = new RangeSet();
   issue1268_triggering_input.forEach((range, idx) => {
     try {
-      if (idx === 11) debugger;
-      console.log(`Adding [${range.from}-${range.to}]`);
+      //if (idx === 11) debugger;
+      //console.log(`Adding [${range.from}-${range.to}]`);
       set.add(range);
       if (!verifySet(set)) {
         ok(false, "set not ok at idx " + idx + " depth: " + set.d);
       } else {
-        console.log("Printing tree on idx " + idx);
-        if (idx === 2) debugger;
-        printTree([set]);
+        //console.log("Printing tree on idx " + idx);
+        //if (idx === 2) debugger;
+        //printTree([set]);
       }
     } catch (e) {
       console.log("crashed on idx", idx);
@@ -168,7 +167,7 @@ test("issue1268", () => {
 });
 
 function verifySet(set) {
-  let i = 20;
+  let i = issue1268_triggering_input.length + 2;
   for (const node of set) {
     if (--i === 0) return false;
   }
