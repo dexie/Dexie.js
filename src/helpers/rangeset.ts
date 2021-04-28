@@ -196,7 +196,6 @@ export function getRangeSetIterator(
 }
 
 function rebalance(target: IntervalTreeNode) {
-  const clone = { ...target };
   const diff = (target.r?.d || 0) - (target.l?.d || 0);
   const r = diff > 1 ? "r" : diff < -1 ? "l" : "";
   if (r) {
@@ -221,18 +220,19 @@ function rebalance(target: IntervalTreeNode) {
     // * target[l] must point to a new OLDROOT
     // * target[r] must point to NEWROOT.R
     // * OLDROOT[r] must point to NEWROOT.L
-    const l = r === "r" ? "l" : "r";
-    extend(target, clone[r]);
-    // * Make a new oldRoot (clone the clone)
-    const oldRoot = {...clone};
-    // * Point it's right side to NEWROOT.L
-    oldRoot[r] = target[l];
-    // * Point the NEWROOT.l to OLDROOT
-    target[l] = oldRoot;
-    // Recompute depth
-    oldRoot.d = computeDepth(oldRoot);
+    const l = r === "r" ? "l" : "r"; // Support both left/right rotation
+    const rootClone = { ...target };
+    // We're gonna copy props from target's right node into target so that target will
+    // have same range as old target[r] (instead of changing pointers, we copy values.
+    // that way we do not need to adjust pointers in parents).
+    const oldRootRight = target[r]; 
+    target.from = oldRootRight.from;
+    target.to = oldRootRight.to;
+    target[r] = oldRootRight[r];
+    rootClone[r] = oldRootRight[l];
+    target[l] = rootClone;
+    rootClone.d = computeDepth(rootClone);
   }
-  // Recompute depth
   target.d = computeDepth(target);
 }
 
