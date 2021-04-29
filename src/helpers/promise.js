@@ -656,13 +656,7 @@ export function newScope (fn, props, a1, a2) {
     var globalEnv = globalPSD.env;
     psd.env = patchGlobalPromise ? {
         Promise: DexiePromise, // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
-        PromiseProp: {value: DexiePromise, configurable: true, writable: true},
-        all: DexiePromise.all,
-        race: DexiePromise.race,
-        allSettled: DexiePromise.allSettled,
-        any: DexiePromise.any,
-        resolve: DexiePromise.resolve,
-        reject: DexiePromise.reject,
+        PromiseProp: {value: DexiePromise, configurable: true, writable: true}
     } : {};
     if (props) extend(psd, props);
     
@@ -762,15 +756,6 @@ function switchToZone (targetZone, bEnteringZone) {
 
             // Set this Promise to window.Promise so that transiled async functions will work on Firefox, Safari and IE, as well as with Zonejs and angular.
             Object.defineProperty(_global, 'Promise', targetEnv.PromiseProp);
-
-            // Support Promise.all() etc to work indexedDB-safe also when people are including es6-promise as a module (they might
-            // not be accessing global.Promise but a local reference to it)
-            GlobalPromise.all = targetEnv.all;
-            GlobalPromise.race = targetEnv.race;
-            GlobalPromise.resolve = targetEnv.resolve;
-            GlobalPromise.reject = targetEnv.reject;
-            if (targetEnv.allSettled) GlobalPromise.allSettled = targetEnv.allSettled;
-            if (targetEnv.any) GlobalPromise.any = targetEnv.any;
         }
     }
 }
@@ -779,13 +764,7 @@ function snapShot () {
     var GlobalPromise = _global.Promise;
     return patchGlobalPromise ? {
         Promise: GlobalPromise,
-        PromiseProp: Object.getOwnPropertyDescriptor(_global, "Promise"),
-        all: GlobalPromise.all,
-        race: GlobalPromise.race,
-        allSettled: GlobalPromise.allSettled,
-        any: GlobalPromise.any,
-        resolve: GlobalPromise.resolve,
-        reject: GlobalPromise.reject,
+        PromiseProp: Object.getOwnPropertyDescriptor(_global, "Promise")
     } : {};
 }
 
