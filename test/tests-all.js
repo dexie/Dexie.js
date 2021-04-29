@@ -16,4 +16,5 @@ import "./tests-crud-hooks";
 import "./tests-blobs";
 import "./tests-binarykeys";
 import "./tests-live-query";
+import "./tests-rangeset";
 //import "./tests-performance.js"; Not required. Should make other performance tests separately instead.
