@@ -3,7 +3,7 @@ import { syncIfPossible } from './syncIfPossible';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { MINUTES } from '../helpers/date-constants';
 import { DexieCloudOptions } from '../DexieCloudOptions';
-import { DexieCloudSchema } from '../DexieCloudSchema';
+import { DexieCloudSchema } from 'dexie-cloud-common';
 
 export function LocalSyncWorker(
   db: DexieCloudDB,

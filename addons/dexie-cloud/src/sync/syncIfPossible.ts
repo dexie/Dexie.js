@@ -3,7 +3,7 @@ import { performGuardedJob } from './performGuardedJob';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { isSyncing, sync, CURRENT_SYNC_WORKER, SyncOptions } from './sync';
 import { DexieCloudOptions } from '../DexieCloudOptions';
-import { DexieCloudSchema } from '../DexieCloudSchema';
+import { DexieCloudSchema } from 'dexie-cloud-common';
 
 export async function syncIfPossible(
   db: DexieCloudDB,

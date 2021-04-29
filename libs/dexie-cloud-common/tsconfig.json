@@ -7,6 +7,7 @@
     "outDir": "dist",
     "rootDir": "src",
     "strict": true,
+    "noImplicitAny": false,
     "declaration": true,
     "declarationMap": true,
     "allowSyntheticDefaultImports": true

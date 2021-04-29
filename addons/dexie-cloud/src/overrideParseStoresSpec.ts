@@ -15,7 +15,7 @@ export function overrideParseStoresSpec(origFunc: Function, dexie: Dexie) {
       const cloudTableSchema = cloudSchema[tableName] || (cloudSchema[tableName] = {});
       if (schemaSrc != null) {
         if (/^\@/.test(schemaSrc)) {
-          storesClone[tableName] = stores[tableName].substr(1);
+          storesClone[tableName] = storesClone[tableName].substr(1);
           cloudTableSchema.generatedGlobalId = true;
           cloudTableSchema.idPrefix = generateTablePrefix(tableName, allPrefixes);
           allPrefixes.add(cloudTableSchema.idPrefix);

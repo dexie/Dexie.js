@@ -1,6 +1,5 @@
 import { getMutationTable } from '../helpers/getMutationTable';
 import { getSyncableTables } from '../helpers/getSyncableTables';
-import { DBOperationsSet } from '../types/move-to-dexie-cloud-common/DBOperationsSet';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { listSyncifiedChanges } from './listSyncifiedChanges';
 import { getTablesToSyncify } from './getTablesToSyncify';
@@ -8,16 +7,12 @@ import { listClientChanges } from './listClientChanges';
 import { syncWithServer } from './syncWithServer';
 import Dexie from 'dexie';
 import { modifyLocalObjectsWithNewUserId } from './modifyLocalObjectsWithNewUserId';
-import { DBKeyMutationSet } from '../types/move-to-dexie-cloud-common/change-processing/DBKeyMutationSet';
-import { applyOperations } from '../types/move-to-dexie-cloud-common/change-processing/applyOperations';
-import { subtractChanges } from '../types/move-to-dexie-cloud-common/change-processing/subtractChanges';
-import { toDBOperationSet } from '../types/move-to-dexie-cloud-common/change-processing/toDBOperationSet';
 import { bulkUpdate } from '../helpers/bulkUpdate';
 import { throwIfCancelled } from '../helpers/CancelToken';
-import { DexieCloudSchema } from '../DexieCloudSchema';
 import { DexieCloudOptions } from '../DexieCloudOptions';
 import { BaseRevisionMapEntry } from '../db/entities/BaseRevisionMapEntry';
 import { getTableFromMutationTable } from '../helpers/getTableFromMutationTable';
+import { applyOperations, DBKeyMutationSet, DBOperationsSet, DexieCloudSchema, subtractChanges, toDBOperationSet } from 'dexie-cloud-common';
 
 export const isSyncing = new WeakSet<DexieCloudDB>();
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';

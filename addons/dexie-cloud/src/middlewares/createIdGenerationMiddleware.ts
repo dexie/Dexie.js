@@ -6,14 +6,18 @@ import Dexie, {
   DBCoreDeleteRequest,
   DBCoreIndex,
 } from "dexie";
-import { DexieCloudSchema } from "../DexieCloudSchema";
 import { b64LexEncode } from "dreambase-library/dist/common/b64lex";
 import { DexieCloudServerState } from "../DexieCloudServerState";
-import { toStringTag } from "../types/move-to-dexie-cloud-common/validation/toStringTag";
-import { isValidSyncableID } from "../types/move-to-dexie-cloud-common/validation/isValidSyncableID";
 import { DexieCloudOptions } from "../DexieCloudOptions";
 import { getSyncableTables } from "../helpers/getSyncableTables";
 import { DexieCloudDB } from "../db/DexieCloudDB";
+import { isValidSyncableID } from "dexie-cloud-common";
+
+const { toString } = {};
+export function toStringTag(o: Object) {
+  return toString.call(o).slice(8, -1);
+}
+
 
 export function getEffectiveKeys(
   primaryKey: DBCoreIndex,

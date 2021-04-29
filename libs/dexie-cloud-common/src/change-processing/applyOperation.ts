@@ -1,8 +1,8 @@
-import { DBKeyMutation } from "./DBKeyMutation";
-import { DBKeyMutationSet } from "./DBKeyMutationSet";
-import { DBOperationsSet } from "../DBOperationsSet";
-import { DBOperation } from "../DBOperation";
-import Dexie from "dexie";
+import { DBKeyMutation } from "./DBKeyMutation.js";
+import { DBKeyMutationSet } from "./DBKeyMutationSet.js";
+import { DBOperationsSet } from "../DBOperationsSet.js";
+import { DBOperation } from "../DBOperation.js";
+import { setByKeyPath } from "../utils.js";
 
 export function applyOperation(
   target: DBKeyMutationSet,
@@ -35,7 +35,7 @@ export function applyOperation(
             case "ups":
               // Adjust the existing upsert with additional updates
               for (const [propPath, value] of Object.entries(changeSpec)) {
-                Dexie.setByKeyPath(entry.val, propPath, value);
+                setByKeyPath(entry.val, propPath, value);
               }
               break;
             case "del":

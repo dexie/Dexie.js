@@ -1,15 +1,18 @@
 {
   "name": "dexie-cloud-common",
-  "version": "1.0.3",
+  "version": "1.0.6",
   "description": "Library for shared code between dexie-cloud-addon, dexie-cloud (CLI) and dexie-cloud-server",
   "type": "module",
   "module": "dist/index.js",
-  "typings": "dist/index.d.ts",
+  "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
     "prepare": "tsc",
     "tsver": "tsc --version"
   },
   "author": "David Fahlander",
-  "license": "Apache-2.0"
+  "license": "Apache-2.0",
+  "dependencies": {
+    "universal-imports": "^1.0.1"
+  }
 }

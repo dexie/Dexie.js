@@ -1,5 +1,5 @@
+import { DexieCloudSchema } from "dexie-cloud-common";
 import { DexieCloudOptions } from "./DexieCloudOptions";
-import { DexieCloudSchema } from "./DexieCloudSchema";
 
 export function updateSchemaFromOptions(schema?: DexieCloudSchema | null, options?: DexieCloudOptions | null) {
   if (schema && options) {

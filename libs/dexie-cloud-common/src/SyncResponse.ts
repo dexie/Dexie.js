@@ -1,5 +1,5 @@
-import { DexieCloudSchema } from "../../DexieCloudSchema";
-import { DBOperationsSet } from "./DBOperationsSet";
+import { DBOperationsSet } from "./DBOperationsSet.js";
+import { DexieCloudSchema } from "./DexieCloudSchema.js";
 
 export interface SyncResponse {
   serverRevision: any;

@@ -1,16 +1,10 @@
-import { DBOperationsSet } from "../types/move-to-dexie-cloud-common/DBOperationsSet";
-import { DBInsertOperation } from "../types/move-to-dexie-cloud-common/DBOperation";
 import { DexieCloudDB } from "../db/DexieCloudDB";
 import { PersistedSyncState } from "../db/entities/PersistedSyncState";
 import { UserLogin } from "../db/entities/UserLogin";
 import { randomString } from "../helpers/randomString";
 import { EntityCommon } from "../db/entities/EntityCommon";
 import { Table } from "dexie";
-import {
-  isValidAtID,
-  isValidSyncableID,
-} from "../types/move-to-dexie-cloud-common/validation/isValidSyncableID";
-import { DexieCloudSchema } from "../DexieCloudSchema";
+import { DBInsertOperation, DBOperationsSet, DexieCloudSchema, isValidAtID, isValidSyncableID } from "dexie-cloud-common";
 
 export async function listSyncifiedChanges(
   tablesToSyncify: Table<EntityCommon>[],

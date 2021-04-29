@@ -1,4 +1,18 @@
-import { DBCoreKeyRange } from "dexie";
+const enum DBCoreRangeType {
+  Equal = 1,
+  Range = 2,
+  Any = 3,
+  Never = 4
+}
+
+interface DBCoreKeyRange {
+  readonly type: DBCoreRangeType | number;
+  readonly lower: any;
+  readonly lowerOpen?: boolean;
+  readonly upper: any;
+  readonly upperOpen?: boolean;
+  //includes (key: Key) : boolean; Despite IDBKeyRange api - it's no good to have this as a method. Benefit from using a more functional approach.
+}
 
 export type DBOperation =
   | DBInsertOperation

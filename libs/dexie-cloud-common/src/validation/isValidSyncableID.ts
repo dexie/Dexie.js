@@ -1,4 +1,4 @@
-import { toStringTag } from "./toStringTag";
+import { toStringTag } from "./toStringTag.js";
 
 const validIDTypes = {
   Uint8Array,

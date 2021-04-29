@@ -1,6 +1,6 @@
 import { DBCoreMutateRequest } from "dexie";
+import { DexieCloudSchema } from "dexie-cloud-common";
 import { UserLogin } from '../db/entities/UserLogin';
-import { DexieCloudSchema } from "../DexieCloudSchema";
 
 export interface TXExpandos {
   txid: string;

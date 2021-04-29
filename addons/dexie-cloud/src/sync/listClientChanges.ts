@@ -1,8 +1,7 @@
 import { Table } from "dexie";
 import { getTableFromMutationTable } from "../helpers/getTableFromMutationTable";
-import { DBOperationsSet } from "../types/move-to-dexie-cloud-common/DBOperationsSet";
-import { DBOperation } from "../types/move-to-dexie-cloud-common/DBOperation";
 import { DexieCloudDB } from "../db/DexieCloudDB";
+import { DBOperation, DBOperationsSet } from "dexie-cloud-common";
 
 export async function listClientChanges(
   mutationTables: Table[],

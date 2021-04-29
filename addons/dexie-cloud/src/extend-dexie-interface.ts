@@ -1,6 +1,6 @@
 import Dexie from "dexie";
 import { DexieCloudOptions } from './DexieCloudOptions';
-import { DexieCloudSchema } from './DexieCloudSchema';
+import { DexieCloudSchema } from 'dexie-cloud-common/dist';
 import { LoginState } from './types/LoginState';
 import { UserLogin } from './db/entities/UserLogin';
 import * as Rx from "rxjs";

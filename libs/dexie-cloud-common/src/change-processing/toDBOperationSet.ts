@@ -1,8 +1,8 @@
-import { randomString } from "../../../helpers/randomString";
-import { DBDeleteOperation, DBOperation, DBUpdateOperation, DBUpsertOperation } from "../DBOperation";
-import { DBOperationsSet } from "../DBOperationsSet";
-import { DBKeyMutation } from "./DBKeyMutation";
-import { DBKeyMutationSet } from "./DBKeyMutationSet";
+import { DBDeleteOperation, DBOperation, DBUpdateOperation, DBUpsertOperation } from "../DBOperation.js";
+import { DBOperationsSet } from "../DBOperationsSet.js";
+import { randomString } from "../utils.js";
+import { DBKeyMutation } from "./DBKeyMutation.js";
+import { DBKeyMutationSet } from "./DBKeyMutationSet.js";
 
 /** Convert a DBKeyMutationSet (which is an internal format capable of looking up changes per ID)
  * ...into a DBOperationsSet (which is more optimal for performing DB operations into DB (bulkAdd() etc))

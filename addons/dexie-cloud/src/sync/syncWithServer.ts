@@ -1,12 +1,11 @@
-import { DBOperationsSet } from '../types/move-to-dexie-cloud-common/DBOperationsSet';
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { SyncResponse } from '../types/move-to-dexie-cloud-common/SyncResponse';
 import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import { loadAccessToken } from '../authentication/authenticate';
 import { BISON } from '../BISON';
-import { DexieCloudSchema } from '../DexieCloudSchema';
 import { getSyncableTables } from '../helpers/getSyncableTables';
 import { BaseRevisionMapEntry } from '../db/entities/BaseRevisionMapEntry';
+import { HttpError } from '../errors/HttpError';
+import { DBOperationsSet, DexieCloudSchema, SyncResponse } from 'dexie-cloud-common';
 //import {BisonWebStreamReader} from "dreambase-library/dist/typeson-simplified/BisonWebStreamReader";
 
 export async function syncWithServer(
@@ -34,7 +33,9 @@ export async function syncWithServer(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
+  debugger;
   const res = await fetch(`${databaseUrl}/sync`, {
+    method: "post",
     headers,
     body: BISON.toBinary({
       dbID: syncState?.remoteDbId,
@@ -48,6 +49,10 @@ export async function syncWithServer(
       changes
     })
   });
+
+  if (!res.ok) {
+    throw new HttpError(res);
+  }
 
   switch (res.headers.get('Content-Type')) {
     case 'x-bison':

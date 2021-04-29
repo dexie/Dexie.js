@@ -6,7 +6,6 @@ import {
   generateTablePrefix,
 } from "./middlewares/createIdGenerationMiddleware";
 import { DexieCloudOptions } from "./DexieCloudOptions";
-import { DexieCloudSchema } from "./DexieCloudSchema";
 //import { dexieCloudSyncProtocol } from "./dexieCloudSyncProtocol";
 import { overrideParseStoresSpec } from "./overrideParseStoresSpec";
 import { DexieCloudDB } from "./db/DexieCloudDB";

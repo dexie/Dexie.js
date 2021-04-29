@@ -1,5 +1,5 @@
-import Dexie from "dexie";
-import { DBKeyMutationSet } from "./DBKeyMutationSet";
+import { setByKeyPath } from "../utils.js";
+import { DBKeyMutationSet } from "./DBKeyMutationSet.js";
 
 export function subtractChanges(
   target: DBKeyMutationSet,
@@ -34,7 +34,7 @@ export function subtractChanges(
               case "ups":
                 // Adjust the server upsert with locally updated values.
                 for (const [propPath, value] of Object.entries(mut.mod)) {
-                  Dexie.setByKeyPath(targetMut.val, propPath, value);
+                  setByKeyPath(targetMut.val, propPath, value);
                 }
                 break;
               case "del":

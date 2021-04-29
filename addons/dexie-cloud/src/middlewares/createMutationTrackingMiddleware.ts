@@ -9,7 +9,6 @@ import Dexie, {
   DBCoreTable,
   DBCoreRangeType,
 } from "dexie";
-import { DBOperation } from "../types/move-to-dexie-cloud-common/DBOperation";
 import { TXExpandos } from "../types/TXExpandos";
 import { guardedTable } from "../middleware-helpers/guardedTable";
 import { randomString } from "../helpers/randomString";
@@ -20,6 +19,7 @@ import { throwVersionIncrementNeeded } from "../helpers/throwVersionIncrementNee
 import { DexieCloudOptions } from "../DexieCloudOptions";
 import { DexieCloudDB } from "../db/DexieCloudDB";
 import { registerSyncEvent } from "../sync/registerSyncEvent";
+import { DBOperation } from "dexie-cloud-common";
 
 export interface MutationTrackingMiddlewareArgs {
   currentUserObservable: BehaviorSubject<UserLogin>;
@@ -95,7 +95,7 @@ export function createMutationTrackingMiddleware({
             tx.addEventListener("abort", removeTransaction);
 
             // Copy "disableChangeTracking" flag from Dexie transaction to DBCore transaction:
-            if (Dexie.currentTransaction["disableChangeTracking"]) {
+            if (Dexie.currentTransaction?.["disableChangeTracking"]) {
               tx.disableChangeTracking = true;
             }
           }
