@@ -17,7 +17,8 @@ export default {
     file: 'dist/umd/service-worker.js',
     format: 'umd',
     globals: {
-      dexie: 'Dexie'
+      dexie: 'Dexie',
+      rxjs: 'rxjs'
     },
     name: 'DexieCloudSW',
     sourcemap: true,

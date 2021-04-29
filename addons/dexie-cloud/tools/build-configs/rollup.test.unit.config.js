@@ -15,8 +15,7 @@ export default {
     globals: {
       dexie: "Dexie",
       qunit: "QUnit",
-      "dexie-observable": "Dexie.Observable",
-      "dexie-syncable": "Dexie.Syncable",
+      rxjs: "rxjs",
       "dexie-cloud": "Dexie.Cloud"
     },
     name: 'DexieCloudTests',

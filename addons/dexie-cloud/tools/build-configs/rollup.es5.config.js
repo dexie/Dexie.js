@@ -12,7 +12,8 @@ export default {
       file: 'dist/umd/dexie-cloud-addon.js',
       format: 'umd',
       globals: {
-        dexie: 'Dexie'
+        dexie: 'Dexie',
+        rxjs: 'rxjs'
       },
       name: 'DexieCloud',
       sourcemap: true,
