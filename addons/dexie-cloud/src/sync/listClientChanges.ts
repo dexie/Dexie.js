@@ -20,11 +20,11 @@ export async function listClientChanges(
       const muts: DBOperation[] = await query.toArray();
 
       const objTable = db.table(getTableFromMutationTable(mutationTable.name));
-      for (const mut of muts) {
+      /*for (const mut of muts) {
         if (mut.type === "insert" || mut.type === "upsert") {
           mut.values = await objTable.bulkGet(mut.keys);
         }
-      }
+      }*/
       return {
         table: mutationTable.name,
         muts,
