@@ -1,4 +1,6 @@
 export * from "./types.js";
+export * from "./BaseRevisionMapEntry.js"
+export * from "./SyncRequest.js"
 export * from "./SyncResponse.js"
 export * from "./utils.js"
 export * from "./DexieCloudSchema.js"

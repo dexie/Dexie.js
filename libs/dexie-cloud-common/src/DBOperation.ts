@@ -5,13 +5,16 @@ const enum DBCoreRangeType {
   Never = 4
 }
 
+/** This interface must be identical to the interface with same name in dexie.
+ * If DBCore ever gets moved out from dexie we could let it be referenced.
+ * We could also be dependent on dexie but it would be a pitty just for this reason.
+*/
 interface DBCoreKeyRange {
   readonly type: DBCoreRangeType | number;
   readonly lower: any;
   readonly lowerOpen?: boolean;
   readonly upper: any;
   readonly upperOpen?: boolean;
-  //includes (key: Key) : boolean; Despite IDBKeyRange api - it's no good to have this as a method. Benefit from using a more functional approach.
 }
 
 export type DBOperation =
@@ -23,7 +26,7 @@ export type DBOperation =
 
 export interface DBOperationCommon {
   rev?: number;
-  ts?: number;
+  ts?: number; // timestamp
   keys: any[]; // Needed also in delete and update operations when criteria is specificied: for server->client rollback operation
   txid?: string;
   userId?: string;
