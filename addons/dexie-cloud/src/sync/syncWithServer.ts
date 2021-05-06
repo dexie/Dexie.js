@@ -9,18 +9,13 @@ import { DBOperationsSet, DexieCloudSchema, SyncResponse } from 'dexie-cloud-com
 //import {BisonWebStreamReader} from "dreambase-library/dist/typeson-simplified/BisonWebStreamReader";
 
 export async function syncWithServer(
-  changeSet: DBOperationsSet,
+  changes: DBOperationsSet,
   syncState: PersistedSyncState | undefined,
   baseRevs: BaseRevisionMapEntry[],
   db: DexieCloudDB,
   databaseUrl: string,
   schema: DexieCloudSchema | null
 ): Promise<SyncResponse> {
-  //
-  // Reduce changes to only contain updated fields and no duplicates
-  //
-  const changes = reduceChangeSet(changeSet);
-
   //
   // Push changes to server using fetch
   //
@@ -61,13 +56,4 @@ export async function syncWithServer(
     default:
       throw new Error(`Unsupported content type from server`);
   }
-}
-
-export function reduceChangeSet(changeSet: DBOperationsSet): DBOperationsSet {
-  return changeSet; // TODO: Implement:
-  // 1. Go through tables
-  // 2. Go through mutations
-  // 3. Convert to DBKeyMutation using applyOperation() until a modify operation happens.
-  // 4. When modify operation happen, convert existing changes back to DBOperationSet from DBKeyMutationSet
-  //    Send that DBOperation. Then send the modify operation. This procedure to be done per table ( or per set of involved tables in the transaction )
 }
