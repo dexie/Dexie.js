@@ -45,8 +45,8 @@ export function generateTablePrefix(
   tableName: string,
   allPrefixes: Set<string>
 ) {
-  let rv = "";
-  for (let i = 0, l = tableName.length; i < l && rv.length < 3; ++i) {
+  let rv = tableName[0].toLocaleLowerCase(); // "users" = "usr", "friends" = "frn", "realms" = "rlm", etc.
+  for (let i = 1, l = tableName.length; i < l && rv.length < 3; ++i) {
     if (consonants.test(tableName[i])) rv += tableName[i].toLowerCase();
   }
   while (allPrefixes.has(rv)) {
@@ -75,7 +75,18 @@ export function generateTablePrefix(
 }
 
 let time = 0;
-function generateKey(prefix: string) {
+/**
+ * 
+ * @param prefix A unique 3-letter short-name of the table.
+ * @param shardKey 3 last letters from another ID if colocation is requested. Verified on server on inserts - guarantees unique IDs across shards.
+ *  The shardKey part of the key represent the shardId where it was first created. An object with this
+ *  primary key can later on be moved to another shard without being altered. The reason for having
+ *  the origin shardKey as part of the key, is that the server will not need to check uniqueness constraint
+ *  across all shards on every insert. Updates / moves across shards are already controlled by the server
+ *  in the sense that the objects needs to be there already - we only need this part for inserts.
+ * @returns 
+ */
+function generateKey(prefix: string, shardKey?: string) {
   const a = new Uint8Array(18);
   const timePart = new Uint8Array(a.buffer, 0, 6);
   const now = Date.now(); // Will fit into 6 bytes until year 10 895.
@@ -90,7 +101,7 @@ function generateKey(prefix: string) {
   } else {
     time = now;
   }
-  timePart[0] = time / 0x1_00_00_00_00_00;
+  timePart[0] = time / 0x1_00_00_00_00_00; // Normal division (no bitwise operator) --> works with >= 32 bits.
   timePart[1] = time / 0x1_00_00_00_00;
   timePart[2] = time / 0x1_00_00_00;
   timePart[3] = time / 0x1_00_00;
@@ -99,7 +110,7 @@ function generateKey(prefix: string) {
   const randomPart = new Uint8Array(a.buffer, 6);
   crypto.getRandomValues(randomPart);
   const id = new Uint8Array(a.buffer);
-  return prefix + b64LexEncode(id);
+  return prefix + b64LexEncode(id) + (shardKey || "");
 }
 
 export function createIdGenerationMiddleware(
@@ -126,7 +137,7 @@ export function createIdGenerationMiddleware(
                     const keys = getEffectiveKeys(table.schema.primaryKey, req);
                     keys.forEach((key, idx) => {
                       if (!isValidSyncableID(key)) {
-                        throw new Dexie.ConstraintError(`Invalid primary key ${key} for table ${tableName}. Tables marked for sync must have primary keys of type strings or Uint8Arrays.`);
+                        throw new Dexie.ConstraintError(`Invalid primary key ${key} for table ${tableName}. Tables marked for sync must have primary keys of type string or Array of string (and optional numbers)`);
                       }
                     });                  
                   }
@@ -135,7 +146,9 @@ export function createIdGenerationMiddleware(
                   const keys = getEffectiveKeys(table.schema.primaryKey, req);
                   keys.forEach((key, idx) => {
                     if (key === undefined) {
-                      keys[idx] = generateKey(cloudTableSchema.idPrefix!);
+                      const colocatedId = req.values[idx].realmId || db.cloud.currentUserId;
+                      const shardKey = colocatedId.substr(colocatedId.length - 3);
+                      keys[idx] = generateKey(cloudTableSchema.idPrefix!, shardKey);
                       if (!table.schema.primaryKey.outbound) {
                         if (!valueClones) valueClones = req.values.slice();
                         valueClones[idx] = Dexie.deepClone(valueClones[idx]);
