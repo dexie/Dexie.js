@@ -12,6 +12,7 @@ export function applyOperation(
   const tbl = target[table] || (target[table] = {});
   switch (op.type) {
     case "insert":
+      // TODO: Don't treat insert and upsert the same?
     case "upsert":
       op.keys.forEach((key, idx) => {
         tbl[key] = {
@@ -23,7 +24,9 @@ export function applyOperation(
     case "update":
     case "modify": {
       op.keys.forEach((key, idx) => {
-        const changeSpec = op.type === "update" ? op.changeSpecs[idx]: op.changeSpec;
+        const changeSpec = op.type === "update"
+          ? op.changeSpecs[idx]
+          : op.changeSpec;
         const entry = tbl[key];
         if (!entry) {
           tbl[key] = {
