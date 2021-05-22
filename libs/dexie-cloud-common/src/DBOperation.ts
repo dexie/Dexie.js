@@ -26,10 +26,10 @@ export type DBOperation =
 
 export interface DBOperationCommon {
   rev?: number;
-  ts?: number; // timestamp
+  ts?: number | null; // timestamp
   keys: any[]; // Needed also in delete and update operations when criteria is specificied: for server->client rollback operation
-  txid?: string;
-  userId?: string;
+  txid?: string | null;
+  userId?: string | null;
 }
 export interface DBInsertOperation extends DBOperationCommon {
   type: "insert";
