@@ -1,4 +1,5 @@
 import { Bison } from "dreambase-library/dist/typeson-simplified/Bison";
+import undefinedDef from 'dreambase-library/dist/typeson-simplified/types/undefined.js';
 
 // Since server revisions are stored in bigints, we need to handle clients without
 // bigint support to not fail when serverRevision is passed over to client.
@@ -26,7 +27,9 @@ export class FakeBigInt {
   }
 }
 
-export const BISON = Bison(hasBigIntSupport ? {} : {
+export const BISON = Bison({
+  ...undefinedDef
+}, hasBigIntSupport ? {} : {
   bigint: {
     test: (val: any) => val instanceof FakeBigInt,
     replace: (fakeBigInt: any) => {
