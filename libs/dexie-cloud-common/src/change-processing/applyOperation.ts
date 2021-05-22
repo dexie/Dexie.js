@@ -46,7 +46,7 @@ export function applyOperation(
               break;
             case "upd":
               // Adjust existing update with additional updates
-              Object.assign(entry.mod, changeSpec);
+              Object.assign(entry.mod, changeSpec); // May work for deep props as well - new keys is added later, right? Does the prop order persist along TSON and all? But it will not be 100% when combined with some server code (seach for "address.city": "Stockholm" comment)
               break;
           }
         }
