@@ -4,6 +4,7 @@
   "description": "Library for shared code between dexie-cloud-addon, dexie-cloud (CLI) and dexie-cloud-server",
   "type": "module",
   "module": "dist/index.js",
+  "exports": "./dist/index.js",
   "types": "dist/index.d.ts",
   "scripts": {
     "build": "tsc",
