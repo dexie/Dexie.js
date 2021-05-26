@@ -21,7 +21,7 @@ db.version(1).stores({
 promisedTest("basic-test", async ()=>{
   await Dexie.delete(db.name);
   db.cloud.configure({
-    databaseUrl: "http://localhost:3000/zvwarmd5f",
+    databaseUrl: "http://localhost:3000/z34u30d3r",
     requireAuth: true
   });
   console.log("Waiting for open to resolve");
