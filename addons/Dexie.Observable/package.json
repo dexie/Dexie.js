@@ -83,7 +83,7 @@
   },
   "devDependencies": {
     "dexie": "^3.0.2",
-    "eslint": "^5.16.0",
+    "eslint": "^7.27.0",
     "just-build": "^0.9.19",
     "qunit": "^2.9.2",
     "uglify-js": "^3.5.6"
