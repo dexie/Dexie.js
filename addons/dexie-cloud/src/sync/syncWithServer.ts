@@ -1,11 +1,15 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import { loadAccessToken } from '../authentication/authenticate';
-import { BISON } from '../BISON';
+import { BISON, TSON } from '../BISON';
 import { getSyncableTables } from '../helpers/getSyncableTables';
 import { BaseRevisionMapEntry } from '../db/entities/BaseRevisionMapEntry';
 import { HttpError } from '../errors/HttpError';
-import { DBOperationsSet, DexieCloudSchema, SyncResponse } from 'dexie-cloud-common';
+import {
+  DBOperationsSet,
+  DexieCloudSchema,
+  SyncResponse
+} from 'dexie-cloud-common';
 //import {BisonWebStreamReader} from "dreambase-library/dist/typeson-simplified/BisonWebStreamReader";
 
 export async function syncWithServer(
@@ -20,7 +24,7 @@ export async function syncWithServer(
   // Push changes to server using fetch
   //
   const headers: HeadersInit = {
-    Accept: 'application/x-bison, application/x-bison-stream',
+    Accept: 'application/json, application/x-bison, application/x-bison-stream',
     'Content-Type': 'application/x-bison'
   };
   const accessToken = await loadAccessToken(db);
@@ -28,9 +32,8 @@ export async function syncWithServer(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  debugger;
   const res = await fetch(`${databaseUrl}/sync`, {
-    method: "post",
+    method: 'post',
     headers,
     body: BISON.toBinary({
       dbID: syncState?.remoteDbId,
@@ -49,11 +52,12 @@ export async function syncWithServer(
     throw new HttpError(res);
   }
 
-  switch (res.headers.get('Content-Type')) {
-    case 'x-bison':
+  switch (res.headers.get('content-type')) {
+    case 'application/x-bison':
       return BISON.fromBinary(await res.blob());
-    case 'x-bison-stream': //return BisonWebStreamReader(BISON, res);
+    case 'application/x-bison-stream': //return BisonWebStreamReader(BISON, res);
     default:
-      throw new Error(`Unsupported content type from server`);
+    case 'application/json':
+      return TSON.parse(await res.text());
   }
 }
