@@ -1,4 +1,5 @@
 import type { TokenFinalResponse } from "dexie-cloud-common";
+import { b64encode } from "dreambase-library/dist/common/base64";
 import { DexieCloudDB } from "../db/DexieCloudDB";
 import { UserLogin } from "../db/entities/UserLogin";
 import { AuthPersistedContext } from "./AuthPersistedContext";
@@ -139,25 +140,14 @@ async function userAuthenticate(
   return context;
 }
 
-function spkiToPEM(keydata) {
-  var keydataS = arrayBufferToString(keydata);
-  var keydataB64 = window.btoa(keydataS);
-  var keydataB64Pem = formatAsPem(keydataB64);
+function spkiToPEM(keydata: ArrayBuffer) {
+  const keydataB64 = b64encode(keydata);
+  const keydataB64Pem = formatAsPem(keydataB64);
   return keydataB64Pem;
 }
 
-function arrayBufferToString(buffer) {
-  var binary = "";
-  var bytes = new Uint8Array(buffer);
-  var len = bytes.byteLength;
-  for (var i = 0; i < len; i++) {
-    binary += String.fromCharCode(bytes[i]);
-  }
-  return binary;
-}
-
-function formatAsPem(str) {
-  var finalString = "-----BEGIN PUBLIC KEY-----\n";
+function formatAsPem(str: string) {
+  let finalString = "-----BEGIN PUBLIC KEY-----\n";
 
   while (str.length > 0) {
     finalString += str.substring(0, 64) + "\n";
