@@ -41,7 +41,6 @@ export async function syncIfPossible(
       await performGuardedJob(db, CURRENT_SYNC_WORKER, '$jobs', () => sync(db, cloudOptions, cloudSchema));
     }
     isSyncing.delete(db);
-    await syncIfPossible(db, cloudOptions, cloudSchema, options);
   } catch (error) {
     isSyncing.delete(db);
     console.error(`Failed to sync client changes`, error);

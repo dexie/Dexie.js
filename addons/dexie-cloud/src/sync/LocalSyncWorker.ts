@@ -50,7 +50,7 @@ export function LocalSyncWorker(
     visibilityHandler = () => {
       // Trigger a sync when tab becomes visible
       if (document.visibilityState === 'visible') {
-        syncAndRetry();
+        //syncAndRetry();
       }
     };
 

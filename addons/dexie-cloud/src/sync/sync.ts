@@ -50,7 +50,7 @@ export async function sync(
   options: DexieCloudOptions,
   schema: DexieCloudSchema,
   { isInitialSync, cancelToken }: SyncOptions = { isInitialSync: false }
-) {
+): Promise<void> {
   if (!db.cloud.options?.databaseUrl)
     throw new Error(
       `Internal error: sync must not be called when no databaseUrl is configured`
@@ -131,7 +131,7 @@ export async function sync(
   //
   // Apply changes locally and clear old change entries:
   //
-  await db.transaction('rw', db.tables, async (tx) => {
+  const done = await db.transaction('rw', db.tables, async (tx) => {
     tx['disableChangeTracking'] = true;
     tx['disableAccessControl'] = true; // TODO: Take care of this flag in access control middleware!
 
@@ -246,7 +246,10 @@ export async function sync(
     // Update syncState
     //
     db.$syncState.put(newSyncState, 'syncState');
+
+    return addedClientChanges.length === 0;
   });
+  if (!done) return await sync(db, options, schema, { isInitialSync, cancelToken});
 }
 
 function getLatestRevisionsPerTable(
