@@ -84,7 +84,7 @@
     "@rollup/plugin-node-resolve": "^11.2.1",
     "@types/node": "*",
     "dexie-cloud-common": "^1.0.7",
-    "dreambase-library": "^1.0.7",
+    "dreambase-library": "^1.0.8",
     "just-build": "*",
     "karma": "*",
     "karma-browserstack-launcher": "*",
