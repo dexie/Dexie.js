@@ -12,5 +12,8 @@ export interface DexieCloudOptions {
   syncedTables?: string[];
   unsyncedTables?: string[];
   periodicSync?: PeriodicSyncOptions;
-  fetchTokens?: (tokenParams: any) => Promise<TokenFinalResponse>;
+  fetchTokens?: (tokenParams: {
+    public_key: string;
+    hints?: { userId?: string; email?: string };
+  }) => Promise<TokenFinalResponse>;
 }

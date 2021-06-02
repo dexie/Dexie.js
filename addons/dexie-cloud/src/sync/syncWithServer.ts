@@ -57,7 +57,10 @@ export async function syncWithServer(
       return BISON.fromBinary(await res.blob());
     case 'application/x-bison-stream': //return BisonWebStreamReader(BISON, res);
     default:
-    case 'application/json':
-      return TSON.parse(await res.text());
+    case 'application/json': {
+      const text = await res.text();
+      const syncRes = TSON.parse(text);
+      return syncRes;
+    }
   }
 }

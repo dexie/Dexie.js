@@ -22,6 +22,11 @@ declare module "dexie" {
       currentUser: Rx.BehaviorSubject<UserLogin>;
       syncState: Rx.BehaviorSubject<SyncState>;
       loginState: Rx.BehaviorSubject<LoginState>;
+      /** Login using Dexie Cloud OTP or Demo user.
+       * 
+       * @param email Email to authenticate
+       */
+      login(email?: string): Promise<void>;
       /**
        * Connect to given URL
        */

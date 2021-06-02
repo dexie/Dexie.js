@@ -12,7 +12,14 @@ import { throwIfCancelled } from '../helpers/CancelToken';
 import { DexieCloudOptions } from '../DexieCloudOptions';
 import { BaseRevisionMapEntry } from '../db/entities/BaseRevisionMapEntry';
 import { getTableFromMutationTable } from '../helpers/getTableFromMutationTable';
-import { applyOperations, DBKeyMutationSet, DBOperationsSet, DexieCloudSchema, subtractChanges, toDBOperationSet } from 'dexie-cloud-common';
+import {
+  applyOperations,
+  DBKeyMutationSet,
+  DBOperationsSet,
+  DexieCloudSchema,
+  subtractChanges,
+  toDBOperationSet
+} from 'dexie-cloud-common';
 
 export const isSyncing = new WeakSet<DexieCloudDB>();
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
@@ -249,7 +256,8 @@ export async function sync(
 
     return addedClientChanges.length === 0;
   });
-  if (!done) return await sync(db, options, schema, { isInitialSync, cancelToken});
+  if (!done)
+    return await sync(db, options, schema, { isInitialSync, cancelToken });
 }
 
 function getLatestRevisionsPerTable(
@@ -269,13 +277,28 @@ export async function applyServerChanges(
 ) {
   for (const { table: tableName, muts } of changes) {
     const table = db.table(tableName);
+    const {primaryKey} = table.core.schema;
     for (const mut of muts) {
       switch (mut.type) {
         case 'insert':
-          await table.bulkAdd(mut.values, mut.keys);
+          if (primaryKey.outbound) {
+            await table.bulkAdd(mut.values, mut.keys);
+          } else {
+            mut.keys.forEach((key, i) => {
+              Dexie.setByKeyPath(mut.values[i], primaryKey.keyPath as any, key);
+            });
+            await table.bulkAdd(mut.values);            
+          }
           break;
         case 'upsert':
-          await table.bulkPut(mut.values, mut.keys);
+          if (primaryKey.outbound) {
+            await table.bulkPut(mut.values, mut.keys);
+          } else {
+            mut.keys.forEach((key, i) => {
+              Dexie.setByKeyPath(mut.values[i], primaryKey.keyPath as any, key);
+            });
+            await table.bulkPut(mut.values);
+          }
           break;
         case 'modify':
           if (mut.keys.length === 1) {

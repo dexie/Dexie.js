@@ -149,6 +149,10 @@ export function dexieCloud(dexie: Dexie) {
     currentUser: currentUserEmitter,
     syncState: new BehaviorSubject<SyncState>({ phase: "initial" }),
     loginState: new BehaviorSubject<LoginState>({ type: "silent" }), // fixthis! Or remove this observable?
+    async login(email) {
+      const db = DexieCloudDB(dexie);
+      await login(db, { email });
+    },
     configure(options: DexieCloudOptions) {
       dexie.cloud.options = options;
       updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
