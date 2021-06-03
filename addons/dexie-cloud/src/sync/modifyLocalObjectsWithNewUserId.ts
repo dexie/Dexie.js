@@ -7,12 +7,14 @@ import { Realm } from "../db/entities/Realm";
 
 export async function modifyLocalObjectsWithNewUserId(
   syncifiedTables: Table<EntityCommon>[],
-  currentUser: UserLogin) {
+  currentUser: UserLogin,
+  alreadySyncedRealms?: string[]) {
+  const ignoredRealms = new Set(alreadySyncedRealms || []);
   for (const table of syncifiedTables) {
     if (table.name === "members") {
       // members
       await table.toCollection().modify((member: Member) => {
-        if (member.userId === UNAUTHORIZED_USER.userId) {
+        if (!ignoredRealms.has(member.realmId) && member.userId === UNAUTHORIZED_USER.userId) {
           member.userId = currentUser.userId;
         }
       });
@@ -22,17 +24,19 @@ export async function modifyLocalObjectsWithNewUserId(
     } else if (table.name === "realms") {
       // realms
       await table.toCollection().modify((realm: Realm) => {
-        if (!realm.owner || realm.owner === UNAUTHORIZED_USER.userId) {
+        if (!ignoredRealms.has(realm.realmId) && !realm.owner || realm.owner === UNAUTHORIZED_USER.userId) {
           realm.owner = currentUser.userId;
         }
       });
     } else {
       // application entities
       await table.toCollection().modify((obj) => {
-        if (!obj.owner || obj.owner === UNAUTHORIZED_USER.userId)
-          obj.owner = currentUser.userId;
-        if (!obj.realmId || obj.realmId === UNAUTHORIZED_USER.userId) {
-          obj.realmId = currentUser.userId;
+        if (!obj.realmId || !ignoredRealms.has(obj.realmId)) {
+          if (!obj.owner || obj.owner === UNAUTHORIZED_USER.userId)
+            obj.owner = currentUser.userId;
+          if (!obj.realmId || obj.realmId === UNAUTHORIZED_USER.userId) {
+            obj.realmId = currentUser.userId;
+          }
         }
       });
     }

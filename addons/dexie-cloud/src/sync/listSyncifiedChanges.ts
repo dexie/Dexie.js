@@ -9,10 +9,12 @@ import { DBInsertOperation, DBOperationsSet, DexieCloudSchema, isValidAtID, isVa
 export async function listSyncifiedChanges(
   tablesToSyncify: Table<EntityCommon>[],
   currentUser: UserLogin,
-  schema: DexieCloudSchema
+  schema: DexieCloudSchema,
+  alreadySyncedRealms?: string[]
 ): Promise<DBOperationsSet> {
   if (currentUser.isLoggedIn) {
     if (tablesToSyncify.length > 0) {
+      const ignoredRealms = new Set(alreadySyncedRealms || []);
       const inserts = await Promise.all(
         tablesToSyncify.map(async (table) => {
           const { extractKey } = table.core.schema.primaryKey;
@@ -21,25 +23,32 @@ export async function listSyncifiedChanges(
           const dexieCloudTableSchema = schema[table.name];
           const query = dexieCloudTableSchema?.generatedGlobalId
             ? table.filter(
-                (item) => isValidSyncableID(extractKey(item))
+                (item) => !ignoredRealms.has(item.realmId || "") && isValidSyncableID(extractKey(item))
               )
             : table.filter(
-                (item) => isValidAtID(extractKey(item), dexieCloudTableSchema?.idPrefix)
+                (item) => !ignoredRealms.has(item.realmId || "") && isValidAtID(extractKey(item), dexieCloudTableSchema?.idPrefix)
               );
           const unsyncedObjects = await query.toArray();
-          const mut: DBInsertOperation = {
-            type: "insert",
-            values: unsyncedObjects,
-            keys: unsyncedObjects.map(extractKey),
-            userId: currentUser.userId,
-          };
-          return {
-            table: table.name,
-            muts: [mut],
-          };
+          if (unsyncedObjects.length > 0) {
+            const mut: DBInsertOperation = {
+              type: "insert",
+              values: unsyncedObjects,
+              keys: unsyncedObjects.map(extractKey),
+              userId: currentUser.userId,
+            };
+            return {
+              table: table.name,
+              muts: [mut],
+            };
+          } else {
+            return {
+              table: table.name,
+              muts: []
+            }
+          }
         })
       );
-      return inserts;
+      return inserts.filter(op => op.muts.length > 0);
     }
   }
   return [];

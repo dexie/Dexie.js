@@ -85,13 +85,12 @@ export async function sync(
   const doSyncify = tablesToSyncify.length > 0;
 
   if (doSyncify) {
-    
     await db.transaction('rw', tablesToSyncify, async (tx) => {
       // @ts-ignore
       tx.idbtrans.disableChangeTracking = true;
       // @ts-ignore
       tx.idbtrans.disableAccessControl = true; // TODO: Take care of this flag in access control middleware!
-      await modifyLocalObjectsWithNewUserId(tablesToSyncify, currentUser);
+      await modifyLocalObjectsWithNewUserId(tablesToSyncify, currentUser, persistedSyncState?.realms);
     });
     throwIfCancelled(cancelToken);
   }
@@ -110,7 +109,8 @@ export async function sync(
         const syncificationInserts = await listSyncifiedChanges(
           tablesToSyncify,
           currentUser,
-          schema!
+          schema!,
+          persistedSyncState?.realms
         );
         throwIfCancelled(cancelToken);
         clientChanges = clientChanges.concat(syncificationInserts);
