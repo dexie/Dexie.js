@@ -130,7 +130,7 @@ async function userAuthenticate(
   context.userId = response2.claims.sub;
   context.email = response2.claims.email;
   context.name = response2.claims.name;
-  context.lastLogin = new Date();
+  context.claims = response2.claims;
 
   if (response2.alerts) {
     for (const a of response2.alerts) {

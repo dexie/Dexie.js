@@ -81,10 +81,13 @@ export function createMutationTrackingMiddleware({
               outstandingTransactions.next(outstandingTransactions.value);
             };
             const txComplete = () => {
+              console.debug(`transaction complete: (${JSON.stringify(tables)}, ${JSON.stringify(mode)}, ${db.cloud.options?.databaseUrl}, ${tx.mutationsAdded})`)
               if (tx.mutationsAdded && db.cloud.options?.databaseUrl) {
                 if (db.cloud.options?.usingServiceWorker) {
+                  console.debug("registering sync event");
                   registerSyncEvent(db);
                 } else {
+                  console.debug("notifying local sync worker", db.localSyncEvent["id"]);
                   db.localSyncEvent.next({});
                 }
               }
@@ -93,11 +96,6 @@ export function createMutationTrackingMiddleware({
             tx.addEventListener("complete", txComplete);
             tx.addEventListener("error", removeTransaction);
             tx.addEventListener("abort", removeTransaction);
-
-            // Copy "disableChangeTracking" flag from Dexie transaction to DBCore transaction:
-            if (Dexie.currentTransaction?.["disableChangeTracking"]) {
-              tx.disableChangeTracking = true;
-            }
           }
           return tx;
         },
@@ -113,9 +111,27 @@ export function createMutationTrackingMiddleware({
                 ...table,
                 mutate: req => {
                   if (req.type === "add" || req.type === "put") {
+                    console.debug("Adding to mutations table", tableName);
                     (req.trans as DBCoreTransaction & TXExpandos).mutationsAdded = true;
                   }
                   return table.mutate(req);
+                }
+              }
+            } else if (tableName === "$logins") {
+              console.debug("$logins table");
+              return {
+                ...table,
+                mutate: req => {
+                  console.debug("Mutating $logins table", req);
+                  return table.mutate(req).then(res => {
+                    console.debug("Mutating $logins");
+                    (req.trans as DBCoreTransaction & TXExpandos).mutationsAdded = true;
+                    console.debug("$logins mutated");
+                    return res;
+                  }).catch(err => {
+                    console.debug("Failed mutation $logins", err);
+                    return Promise.reject(err);
+                  });
                 }
               }
             } else {

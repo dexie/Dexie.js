@@ -28,34 +28,12 @@ export async function setCurrentUser(db: DexieCloudDB, user: AuthPersistedContex
 
   // Yes, I know, we're calling authenticate() again (if you were following login.ts and came here.)
   // But this function can also be called from db.ready!
-  const authenticationPromise = authenticate(
+  await authenticate(
     db.cloud.options!.databaseUrl,
     user,
     dummyAuthDialog, // TODO: Fixthis!
     db.cloud.options!.fetchTokens
-  ); 
-
-  // Wait til all readwrite transactions have ended and there is nothing more to sync
-  const outstandingTxAndUnsyncedChangesCombo = combineLatest([
-    outstandingTransactions,
-    getNumUnsyncedMutationsObservable(db),
-  ]);
-
-  const safeToChangeUser = outstandingTxAndUnsyncedChangesCombo.pipe(
-    filter(
-      ([txSet, numOps]) =>
-        makeArray(txSet.values()).every((tx) => tx.db !== db.dx.backendDB()) &&
-        numOps === 0
-    )
   );
-
-  // While authentication is happending,
-  // also wait for local database silence:
-  //   * No outstanding write-transactions in our db while at the same
-  //     time, nothing unsynced in the database for the previous user
-  // * Authentication to succeed
-  // *
-  await Promise.all([authenticationPromise, safeToChangeUser.toPromise()]);
   const $logins = db.table('$logins');
   await db.transaction('rw', "$logins", async tx => {
     const existingLogins = await $logins.toArray();
@@ -64,7 +42,21 @@ export async function setCurrentUser(db: DexieCloudDB, user: AuthPersistedContex
       return $logins.put(login);
     }));
     user.isLoggedIn = true;
+    user.lastLogin = new Date();
     await user.save();
+    console.debug("Saved new user", user.email);
+  });
+  await new Promise(resolve=>{
+    if (db.cloud.currentUserId === user.userId) {
+      resolve(null);
+    } else {
+      const subscription = db.cloud.currentUser.subscribe(currentUser=>{
+        if (currentUser.userId === user.userId) {
+          subscription.unsubscribe();
+          resolve(null);
+        }
+      });
+    }
   });
 
   // TANKAR!!!!

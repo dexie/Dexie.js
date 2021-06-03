@@ -85,9 +85,12 @@ export async function sync(
   const doSyncify = tablesToSyncify.length > 0;
 
   if (doSyncify) {
+    
     await db.transaction('rw', tablesToSyncify, async (tx) => {
-      tx['disableChangeTracking'] = true;
-      tx['disableAccessControl'] = true; // TODO: Take care of this flag in access control middleware!
+      // @ts-ignore
+      tx.idbtrans.disableChangeTracking = true;
+      // @ts-ignore
+      tx.idbtrans.disableAccessControl = true; // TODO: Take care of this flag in access control middleware!
       await modifyLocalObjectsWithNewUserId(tablesToSyncify, currentUser);
     });
     throwIfCancelled(cancelToken);
@@ -139,8 +142,10 @@ export async function sync(
   // Apply changes locally and clear old change entries:
   //
   const done = await db.transaction('rw', db.tables, async (tx) => {
-    tx['disableChangeTracking'] = true;
-    tx['disableAccessControl'] = true; // TODO: Take care of this flag in access control middleware!
+    // @ts-ignore
+    tx.idbtrans.disableChangeTracking = true;
+    // @ts-ignore
+    tx.idbtrans.disableAccessControl = true; // TODO: Take care of this flag in access control middleware!
 
     // Update db.cloud.schema from server response.
     // Local schema MAY include a subset of tables, so do not force all tables into local schema.
@@ -275,6 +280,7 @@ export async function applyServerChanges(
   changes: DBOperationsSet,
   db: DexieCloudDB
 ) {
+  console.debug("Applying server changes", changes, Dexie.currentTransaction);
   for (const { table: tableName, muts } of changes) {
     const table = db.table(tableName);
     const {primaryKey} = table.core.schema;

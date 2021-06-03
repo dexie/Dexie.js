@@ -51,7 +51,7 @@ export interface DexieCloudDB extends DexieCloudDBBase {
   getPersistedSyncState(): Promise<PersistedSyncState | undefined>;
 }
 
-const wm = new WeakMap<Dexie, DexieCloudDB>();
+const wm = new WeakMap<object, DexieCloudDB>();
 
 export const DEXIE_CLOUD_SCHEMA = {
   realms: '@realmId',
@@ -63,10 +63,12 @@ export const DEXIE_CLOUD_SCHEMA = {
   $logins: 'claims.sub, lastLogin'
 };
 
+let static_counter = 0;
 export function DexieCloudDB(dx: Dexie): DexieCloudDB {
-  let db = wm.get(dx);
+  let db = wm.get(dx.cloud);
   if (!db) {
     const localSyncEvent = new BehaviorSubject({});
+    localSyncEvent["id"] = ++static_counter;
     db = {
       get name() {
         return dx.name;
@@ -136,7 +138,7 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
     };
 
     Object.assign(db, helperMethods);
-    wm.set(dx, db);
+    wm.set(dx.cloud, db);
   }
   return db;
 }

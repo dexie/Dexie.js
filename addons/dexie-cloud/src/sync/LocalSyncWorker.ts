@@ -38,9 +38,12 @@ export function LocalSyncWorker(
   const start = () => {
     // Sync eagerly whenever a change has happened (+ initially when there's no syncState yet)
     // This initial subscribe will also trigger an sync also now.
+    console.error("Starting LocalSyncWorker", db.localSyncEvent["id"])
     syncNeededSubscription = db.localSyncEvent.subscribe(() => {
-      syncAndRetry();
+      console.debug("POCKY!")
+      try {syncAndRetry();} catch(err) {console.error("Whathe f....")}
     });
+    //setTimeout(()=>db.localSyncEvent.next({}), 5000);
 
     onlineHandler = () => {
       // Trigger a sync when system comes online
@@ -65,6 +68,7 @@ export function LocalSyncWorker(
   };
 
   const stop = () => {
+    console.error("Stopping LocalSyncWorker")
     cancelToken.cancelled = true;
     if (typeof self !== 'undefined') {
       if (onlineHandler) {
