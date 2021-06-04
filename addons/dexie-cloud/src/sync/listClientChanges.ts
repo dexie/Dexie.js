@@ -9,7 +9,8 @@ export async function listClientChanges(
   { since = {} as {[table: string]: number}, limit = Infinity } = {}): Promise<DBOperationsSet> {
   const allMutsOnTables = await Promise.all(
     mutationTables.map(async (mutationTable) => {
-      const lastRevision = since[mutationTable.name];
+      const tableName = getTableFromMutationTable(mutationTable.name);
+      const lastRevision = since[tableName];
 
       let query = lastRevision
         ? mutationTable.where("rev").above(lastRevision)
@@ -19,14 +20,14 @@ export async function listClientChanges(
       
       const muts: DBOperation[] = await query.toArray();
 
-      const objTable = db.table(getTableFromMutationTable(mutationTable.name));
+      //const objTable = db.table(tableName);
       /*for (const mut of muts) {
         if (mut.type === "insert" || mut.type === "upsert") {
           mut.values = await objTable.bulkGet(mut.keys);
         }
       }*/
       return {
-        table: mutationTable.name,
+        table: tableName,
         muts,
       };
     })

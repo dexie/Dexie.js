@@ -40,6 +40,7 @@ export async function syncIfPossible(
       if (IS_SERVICE_WORKER) {
         console.debug("Will sync: (We are service worker)", options);
         await sync(db, cloudOptions, cloudSchema, options);
+        console.debug("Done sync");
       }
     } else {
       // We use a flow that is better suited for the case when multiple workers want to

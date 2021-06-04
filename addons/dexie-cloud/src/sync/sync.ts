@@ -85,6 +85,7 @@ export async function sync(
   const doSyncify = tablesToSyncify.length > 0;
 
   if (doSyncify) {
+    console.debug("sync doSyncify is true");
     await db.transaction('rw', tablesToSyncify, async (tx) => {
       // @ts-ignore
       tx.idbtrans.disableChangeTracking = true;
@@ -97,6 +98,7 @@ export async function sync(
   //
   // List changes to sync
   //
+  console.debug("sync: Listing client changes");
   const [clientChangeSet, syncState, baseRevs] = await db.transaction(
     'r',
     db.tables,
@@ -137,7 +139,8 @@ export async function sync(
     databaseUrl,
     schema
   );
-
+  console.debug("Sync response", res);
+ 
   //
   // Apply changes locally and clear old change entries:
   //
@@ -261,8 +264,10 @@ export async function sync(
 
     return addedClientChanges.length === 0;
   });
-  if (!done)
+  if (!done) {
+    console.debug("Not done. Go for it again!");
     return await sync(db, options, schema, { isInitialSync, cancelToken });
+  }  
 }
 
 function getLatestRevisionsPerTable(
@@ -270,7 +275,7 @@ function getLatestRevisionsPerTable(
   lastRevisions = {} as { [table: string]: number }
 ) {
   for (const { table, muts } of clientChangeSet) {
-    const lastRev = muts.length > 0 ? muts[muts.length - 1].rev! : 0;
+    const lastRev = muts.length > 0 ? muts[muts.length - 1].rev || 0 : 0;
     lastRevisions[table] = lastRev;
   }
   return lastRevisions;

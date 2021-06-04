@@ -83,7 +83,7 @@
     "@rollup/plugin-commonjs": "^18.0.0",
     "@rollup/plugin-node-resolve": "^11.2.1",
     "@types/node": "*",
-    "dexie-cloud-common": "^1.0.7",
+    "dexie-cloud-common": "^1.0.9",
     "dreambase-library": "^1.0.8",
     "just-build": "*",
     "karma": "*",

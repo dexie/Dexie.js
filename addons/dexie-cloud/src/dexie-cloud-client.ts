@@ -30,6 +30,7 @@ import { authenticate } from "./authentication/authenticate";
 import { createMutationTrackingMiddleware } from "./middlewares/createMutationTrackingMiddleware";
 import { updateSchemaFromOptions } from "./updateSchemaFromOptions";
 import { registerPeriodicSyncEvent, registerSyncEvent } from "./sync/registerSyncEvent";
+import { createImplicitPropSetterMiddleware } from "./middlewares/createImplicitPropSetterMiddleware";
 
 export function dexieCloud(dexie: Dexie) {
   //
@@ -170,6 +171,7 @@ export function dexieCloud(dexie: Dexie) {
       db: DexieCloudDB(dexie),
     })
   );
+  dexie.use(createImplicitPropSetterMiddleware(DexieCloudDB(dexie)));
   dexie.use(createIdGenerationMiddleware(DexieCloudDB(dexie)));
 }
 

@@ -7,4 +7,5 @@ export interface SyncResponse {
   realms: string[];
   schema: DexieCloudSchema,
   changes: DBOperationsSet;
+  rejections: { name: string; message: string; txid: string }[];
 }

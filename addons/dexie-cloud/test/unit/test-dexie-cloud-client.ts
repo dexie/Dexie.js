@@ -16,9 +16,9 @@ module('dexie-cloud-client');
 Dexie.addons = []; // Prohibit dexie-observable and dexie-syncable from registering themselves.
 
 const db = new Dexie('argur', { addons: [dexieCloud] });
-db.version(1).stores({
+db.version(2).stores({
   friends: '@id, name',
-  products: '@id, title'
+  products: '@id, title, realmId'
 });
 
 /*db.open().then(async ()=>{
@@ -50,5 +50,15 @@ promisedTest('basic-test', async () => {
   console.log('Before login', db.cloud.currentUserId, db.cloud.currentUser);
   await db.cloud.login('foo@demo.local');
   console.log('Done login', db.cloud.currentUserId, db.cloud.currentUser);
-
+  await new Promise(resolve => setTimeout(resolve, 2000));
+  console.log("Deleting friend");
+  await db.table('friends').delete(id);
+  await new Promise(resolve => setTimeout(resolve, 1500));
+  await db.table('products').add({title: "My private new fantastic product that wont be accepted by server", realmId: "rlm-public"});
+  console.log("Products before", await db.table('products').toArray());
+  await db.table('products').where({realmId: db.cloud.currentUserId}).delete();
+  console.log("Products after", await db.table('products').toArray());
+  await new Promise(resolve => setTimeout(resolve, 4000));
+  console.log("Products", await db.table('products').toArray());
+  console.log("Friends", await db.table('friends').toArray());
 });

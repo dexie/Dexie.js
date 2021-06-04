@@ -8,6 +8,7 @@ import { HttpError } from '../errors/HttpError';
 import {
   DBOperationsSet,
   DexieCloudSchema,
+  SyncRequest,
   SyncResponse
 } from 'dexie-cloud-common';
 //import {BisonWebStreamReader} from "dreambase-library/dist/typeson-simplified/BisonWebStreamReader";
@@ -32,20 +33,22 @@ export async function syncWithServer(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
+  const syncRequest: SyncRequest = {
+    dbID: syncState?.remoteDbId,
+    schema: schema || {},
+    lastPull: syncState ? {
+      serverRevision: syncState.serverRevision!,
+      realms: syncState.realms!
+    } : undefined,
+    baseRevs,
+    //baseRevisions: syncState?.baseRevisions || [],
+    changes
+  };
+  console.debug("Sync request", syncRequest);
   const res = await fetch(`${databaseUrl}/sync`, {
     method: 'post',
     headers,
-    body: BISON.toBinary({
-      dbID: syncState?.remoteDbId,
-      schema,
-      lastPull: syncState && {
-        serverRevision: syncState.serverRevision,
-        realms: syncState.realms
-      },
-      baseRevs,
-      //baseRevisions: syncState?.baseRevisions || [],
-      changes
-    })
+    body: BISON.toBinary(syncRequest)
   });
 
   if (!res.ok) {

@@ -1,33 +1,29 @@
 import Dexie, {
   DBCore,
-  Middleware,
   DBCoreAddRequest,
-  DBCorePutRequest,
   DBCoreDeleteRequest,
   DBCoreIndex,
-} from "dexie";
-import { b64LexEncode } from "dreambase-library/dist/common/b64lex";
-import { DexieCloudServerState } from "../DexieCloudServerState";
-import { DexieCloudOptions } from "../DexieCloudOptions";
-import { getSyncableTables } from "../helpers/getSyncableTables";
-import { DexieCloudDB } from "../db/DexieCloudDB";
-import { isValidSyncableID } from "dexie-cloud-common";
+  DBCorePutRequest,
+  Middleware
+} from 'dexie';
+import { isValidSyncableID } from 'dexie-cloud-common';
+import { b64LexEncode } from 'dreambase-library/dist/common/b64lex';
+import { DexieCloudDB } from '../db/DexieCloudDB';
 
 const { toString } = {};
 export function toStringTag(o: Object) {
   return toString.call(o).slice(8, -1);
 }
 
-
 export function getEffectiveKeys(
   primaryKey: DBCoreIndex,
   req:
-    | (Pick<DBCoreAddRequest | DBCorePutRequest, "type" | "values"> & {
+    | (Pick<DBCoreAddRequest | DBCorePutRequest, 'type' | 'values'> & {
         keys?: any[];
       })
-    | Pick<DBCoreDeleteRequest, "keys" | "type">
+    | Pick<DBCoreDeleteRequest, 'keys' | 'type'>
 ) {
-  if (req.type === "delete") return req.keys;
+  if (req.type === 'delete') return req.keys;
   return req.keys?.slice() || req.values.map(primaryKey.extractKey!);
 }
 
@@ -55,7 +51,7 @@ export function generateTablePrefix(
       if (rv.length > 3) rv = rv.substr(0, 3);
       else continue;
     } else if (rv.length < 3) {
-      rv = rv + "2";
+      rv = rv + '2';
       continue;
     }
     let bitFix = 1;
@@ -76,7 +72,7 @@ export function generateTablePrefix(
 
 let time = 0;
 /**
- * 
+ *
  * @param prefix A unique 3-letter short-name of the table.
  * @param shardKey 3 last letters from another ID if colocation is requested. Verified on server on inserts - guarantees unique IDs across shards.
  *  The shardKey part of the key represent the shardId where it was first created. An object with this
@@ -84,7 +80,7 @@ let time = 0;
  *  the origin shardKey as part of the key, is that the server will not need to check uniqueness constraint
  *  across all shards on every insert. Updates / moves across shards are already controlled by the server
  *  in the sense that the objects needs to be there already - we only need this part for inserts.
- * @returns 
+ * @returns
  */
 function generateKey(prefix: string, shardKey?: string) {
   const a = new Uint8Array(18);
@@ -110,17 +106,16 @@ function generateKey(prefix: string, shardKey?: string) {
   const randomPart = new Uint8Array(a.buffer, 6);
   crypto.getRandomValues(randomPart);
   const id = new Uint8Array(a.buffer);
-  return prefix + b64LexEncode(id) + (shardKey || "");
+  return prefix + b64LexEncode(id) + (shardKey || '');
 }
 
 export function createIdGenerationMiddleware(
   db: DexieCloudDB
 ): Middleware<DBCore> {
-  const isSyncable = new Set(getSyncableTables(db).map(tbl => tbl.name));
   return {
-    stack: "dbcore",
-    name: "idGenerationMiddleware",
-    level: 0,
+    stack: 'dbcore',
+    name: 'idGenerationMiddleware',
+    level: 1,
     create: (core) => {
       return {
         ...core,
@@ -130,25 +125,33 @@ export function createIdGenerationMiddleware(
             ...table,
             mutate: (req) => {
               const cloudTableSchema = db.cloud.schema?.[tableName];
-              if (req.type === "add" || req.type === "put") {
+              if (req.type === 'add' || req.type === 'put') {
                 if (!cloudTableSchema?.generatedGlobalId) {
-                  if (isSyncable.has(tableName)) {
+                  if (cloudTableSchema?.synced) {
                     // Just make sure primary key is of a supported type:
                     const keys = getEffectiveKeys(table.schema.primaryKey, req);
                     keys.forEach((key, idx) => {
                       if (!isValidSyncableID(key)) {
-                        throw new Dexie.ConstraintError(`Invalid primary key ${key} for table ${tableName}. Tables marked for sync must have primary keys of type string or Array of string (and optional numbers)`);
+                        throw new Dexie.ConstraintError(
+                          `Invalid primary key ${key} for table ${tableName}. Tables marked for sync must have primary keys of type string or Array of string (and optional numbers)`
+                        );
                       }
-                    });                  
+                    });
                   }
                 } else {
                   let valueClones: null | object[] = null;
                   const keys = getEffectiveKeys(table.schema.primaryKey, req);
                   keys.forEach((key, idx) => {
                     if (key === undefined) {
-                      const colocatedId = req.values[idx].realmId || db.cloud.currentUserId;
-                      const shardKey = colocatedId.substr(colocatedId.length - 3);
-                      keys[idx] = generateKey(cloudTableSchema.idPrefix!, shardKey);
+                      const colocatedId =
+                        req.values[idx].realmId || db.cloud.currentUserId;
+                      const shardKey = colocatedId.substr(
+                        colocatedId.length - 3
+                      );
+                      keys[idx] = generateKey(
+                        cloudTableSchema.idPrefix!,
+                        shardKey
+                      );
                       if (!table.schema.primaryKey.outbound) {
                         if (!valueClones) valueClones = req.values.slice();
                         valueClones[idx] = Dexie.deepClone(valueClones[idx]);
@@ -159,7 +162,7 @@ export function createIdGenerationMiddleware(
                         );
                       }
                     } else if (
-                      typeof key !== "string" ||
+                      typeof key !== 'string' ||
                       !key.startsWith(cloudTableSchema.idPrefix!)
                     ) {
                       throw new Dexie.ConstraintError(
@@ -172,15 +175,15 @@ export function createIdGenerationMiddleware(
                   return table.mutate({
                     ...req,
                     keys,
-                    values: valueClones || req.values,
+                    values: valueClones || req.values
                   });
                 }
               }
               return table.mutate(req);
-            },
+            }
           };
-        },
+        }
       };
-    },
+    }
   };
 }

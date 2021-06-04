@@ -1,25 +1,24 @@
-import Dexie, {
+import {
   DBCore,
-  Middleware,
   DBCoreAddRequest,
-  DBCorePutRequest,
   DBCoreDeleteRequest,
   DBCoreMutateResponse,
-  DBCoreTransaction,
+  DBCorePutRequest,
   DBCoreTable,
-  DBCoreRangeType,
-} from "dexie";
-import { TXExpandos } from "../types/TXExpandos";
-import { guardedTable } from "../middleware-helpers/guardedTable";
-import { randomString } from "../helpers/randomString";
-import { UserLogin } from "../db/entities/UserLogin";
-import { BehaviorSubject } from "rxjs";
-import { outstandingTransactions } from "./outstandingTransaction";
-import { throwVersionIncrementNeeded } from "../helpers/throwVersionIncrementNeeded";
-import { DexieCloudOptions } from "../DexieCloudOptions";
-import { DexieCloudDB } from "../db/DexieCloudDB";
-import { registerSyncEvent } from "../sync/registerSyncEvent";
-import { DBOperation } from "dexie-cloud-common";
+  DBCoreTransaction,
+  Middleware
+} from 'dexie';
+import { DBOperation } from 'dexie-cloud-common';
+import { BehaviorSubject } from 'rxjs';
+import { DexieCloudDB } from '../db/DexieCloudDB';
+import { UserLogin } from '../db/entities/UserLogin';
+import { getMutationTable } from '../helpers/getMutationTable';
+import { randomString } from '../helpers/randomString';
+import { throwVersionIncrementNeeded } from '../helpers/throwVersionIncrementNeeded';
+import { guardedTable } from '../middleware-helpers/guardedTable';
+import { registerSyncEvent } from '../sync/registerSyncEvent';
+import { TXExpandos } from '../types/TXExpandos';
+import { outstandingTransactions } from './outstandingTransaction';
 
 export interface MutationTrackingMiddlewareArgs {
   currentUserObservable: BehaviorSubject<UserLogin>;
@@ -36,11 +35,11 @@ export interface MutationTrackingMiddlewareArgs {
  */
 export function createMutationTrackingMiddleware({
   currentUserObservable,
-  db,
+  db
 }: MutationTrackingMiddlewareArgs): Middleware<DBCore> {
   return {
-    stack: "dbcore",
-    name: "MutationTrackingMiddleware",
+    stack: 'dbcore',
+    name: 'MutationTrackingMiddleware',
     level: 1,
     create: (core) => {
       const ordinaryTables = core.schema.tables.filter(
@@ -51,7 +50,7 @@ export function createMutationTrackingMiddleware({
         mutTableMap = new Map(
           ordinaryTables.map((tbl) => [
             tbl.name,
-            core.table(`$${tbl.name}_mutations`),
+            core.table(`$${tbl.name}_mutations`)
           ])
         );
       } catch {
@@ -61,11 +60,22 @@ export function createMutationTrackingMiddleware({
       return {
         ...core,
         transaction: (tables, mode) => {
-          const tx = core.transaction(tables, mode) as DBCoreTransaction &
-            IDBTransaction &
-            TXExpandos;
+          let tx: DBCoreTransaction & IDBTransaction & TXExpandos;
+          if (mode === 'readwrite') {
+            const mutationTables = tables
+              .filter((tbl) => db.cloud.schema?.[tbl]?.synced)
+              .map((tbl) => getMutationTable(tbl));
+            tx = core.transaction(
+              [...tables, ...mutationTables],
+              mode
+            ) as DBCoreTransaction & IDBTransaction & TXExpandos;
+          } else {
+            tx = core.transaction(tables, mode) as DBCoreTransaction &
+              IDBTransaction &
+              TXExpandos;
+          }
 
-          if (mode === "readwrite") {
+          if (mode === 'readwrite') {
             // Give each transaction a globally unique id.
             tx.txid = randomString(16);
             // Introduce the concept of current user that lasts through the entire transaction.
@@ -74,28 +84,30 @@ export function createMutationTrackingMiddleware({
             outstandingTransactions.value.add(tx);
             outstandingTransactions.next(outstandingTransactions.value);
             const removeTransaction = () => {
-              tx.removeEventListener("complete", txComplete);
-              tx.removeEventListener("error", removeTransaction);
-              tx.removeEventListener("abort", removeTransaction);
+              tx.removeEventListener('complete', txComplete);
+              tx.removeEventListener('error', removeTransaction);
+              tx.removeEventListener('abort', removeTransaction);
               outstandingTransactions.value.delete(tx);
               outstandingTransactions.next(outstandingTransactions.value);
             };
             const txComplete = () => {
-              console.debug(`transaction complete: (${JSON.stringify(tables)}, ${JSON.stringify(mode)}, ${db.cloud.options?.databaseUrl}, ${tx.mutationsAdded})`)
               if (tx.mutationsAdded && db.cloud.options?.databaseUrl) {
                 if (db.cloud.options?.usingServiceWorker) {
-                  console.debug("registering sync event");
+                  console.debug('registering sync event');
                   registerSyncEvent(db);
                 } else {
-                  console.debug("notifying local sync worker", db.localSyncEvent["id"]);
+                  console.debug(
+                    'notifying local sync worker',
+                    db.localSyncEvent['id']
+                  );
                   db.localSyncEvent.next({});
                 }
               }
               removeTransaction();
-            }
-            tx.addEventListener("complete", txComplete);
-            tx.addEventListener("error", removeTransaction);
-            tx.addEventListener("abort", removeTransaction);
+            };
+            tx.addEventListener('complete', txComplete);
+            tx.addEventListener('error', removeTransaction);
+            tx.addEventListener('abort', removeTransaction);
           }
           return tx;
         },
@@ -109,31 +121,36 @@ export function createMutationTrackingMiddleware({
               // lower level DBCore and wouldn't be catched by this code.
               return {
                 ...table,
-                mutate: req => {
-                  if (req.type === "add" || req.type === "put") {
-                    console.debug("Adding to mutations table", tableName);
-                    (req.trans as DBCoreTransaction & TXExpandos).mutationsAdded = true;
+                mutate: (req) => {
+                  if (req.type === 'add' || req.type === 'put') {
+                    (
+                      req.trans as DBCoreTransaction & TXExpandos
+                    ).mutationsAdded = true;
                   }
                   return table.mutate(req);
                 }
-              }
-            } else if (tableName === "$logins") {
-              console.debug("$logins table");
+              };
+            } else if (tableName === '$logins') {
               return {
                 ...table,
-                mutate: req => {
-                  console.debug("Mutating $logins table", req);
-                  return table.mutate(req).then(res => {
-                    console.debug("Mutating $logins");
-                    (req.trans as DBCoreTransaction & TXExpandos).mutationsAdded = true;
-                    console.debug("$logins mutated");
-                    return res;
-                  }).catch(err => {
-                    console.debug("Failed mutation $logins", err);
-                    return Promise.reject(err);
-                  });
+                mutate: (req) => {
+                  console.debug('Mutating $logins table', req);
+                  return table
+                    .mutate(req)
+                    .then((res) => {
+                      console.debug('Mutating $logins');
+                      (
+                        req.trans as DBCoreTransaction & TXExpandos
+                      ).mutationsAdded = true;
+                      console.debug('$logins mutated');
+                      return res;
+                    })
+                    .catch((err) => {
+                      console.debug('Failed mutation $logins', err);
+                      return Promise.reject(err);
+                    });
                 }
-              }
+              };
             } else {
               return table;
             }
@@ -152,25 +169,25 @@ export function createMutationTrackingMiddleware({
                 return table.mutate(req);
               }
 
-              return req.type === "deleteRange"
+              return req.type === 'deleteRange'
                 ? table
                     // Query the actual keys (needed for server sending correct rollback to us)
                     .query({
                       query: { range: req.range, index: schema.primaryKey },
                       trans: req.trans,
-                      values: false,
+                      values: false
                     })
                     // Do a delete request instead, but keep the criteria info for the server to execute
                     .then((res) => {
                       return mutateAndLog({
-                        type: "delete",
+                        type: 'delete',
                         keys: res.result,
                         trans: req.trans,
-                        criteria: { index: null, range: req.range },
+                        criteria: { index: null, range: req.range }
                       });
                     })
                 : mutateAndLog(req);
-            },
+            }
           });
 
           function mutateAndLog(
@@ -180,16 +197,13 @@ export function createMutationTrackingMiddleware({
             trans.mutationsAdded = true;
             const {
               txid,
-              currentUser: { userId },
+              currentUser: { userId }
             } = trans;
             const { type } = req;
 
             return table.mutate(req).then((res) => {
-              const {numFailures: hasFailures, failures} = res;
-              let keys = (type === "delete"
-                ? req.keys!
-                : res.results!
-              );
+              const { numFailures: hasFailures, failures } = res;
+              let keys = type === 'delete' ? req.keys! : res.results!;
               let values = 'values' in req ? req.values : [];
               let changeSpecs = 'changeSpecs' in req ? req.changeSpecs! : [];
               if (hasFailures) {
@@ -200,62 +214,62 @@ export function createMutationTrackingMiddleware({
               const ts = Date.now();
 
               const mut: DBOperation =
-                req.type === "delete"
+                req.type === 'delete'
                   ? {
-                      type: "delete",
+                      type: 'delete',
                       ts,
                       keys,
                       criteria: req.criteria,
                       txid,
-                      userId,
+                      userId
                     }
-                  : req.type === "add"
+                  : req.type === 'add'
                   ? {
-                      type: "insert",
+                      type: 'insert',
                       ts,
                       keys,
                       txid,
                       userId,
-                      values,
+                      values
                     }
                   : req.criteria && req.changeSpec
                   ? {
                       // Common changeSpec for all keys
-                      type: "modify",
+                      type: 'modify',
                       ts,
                       keys,
                       criteria: req.criteria,
                       changeSpec: req.changeSpec,
                       txid,
-                      userId,
+                      userId
                     }
                   : req.changeSpecs
                   ? {
                       // One changeSpec per key
-                      type: "update",
+                      type: 'update',
                       ts,
                       keys,
                       changeSpecs,
                       txid,
-                      userId,
+                      userId
                     }
                   : {
-                      type: "upsert",
+                      type: 'upsert',
                       ts,
                       keys,
                       values,
                       txid,
-                      userId,
+                      userId
                     };
               return keys.length > 0
                 ? mutsTable
-                    .mutate({ type: "add", trans, values: [mut] }) // Log entry
+                    .mutate({ type: 'add', trans, values: [mut] }) // Log entry
                     .then(() => res) // Return original response
                 : res;
             });
           }
-        },
+        }
       };
-    },
+    }
   };
 }

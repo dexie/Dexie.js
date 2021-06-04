@@ -1,0 +1,112 @@
+{
+  "dbID": "ziud0envo",
+  "schema": {
+    "realms": { "synced": true, "idPrefix": "rlm", "generatedGlobalId": true },
+    "members": { "synced": true, "idPrefix": "mmb", "generatedGlobalId": true },
+    "roles": { "synced": true },
+    "friends": { "synced": true, "idPrefix": "frn", "generatedGlobalId": true },
+    "products": {
+      "synced": true,
+      "idPrefix": "prd",
+      "generatedGlobalId": true
+    },
+    "$$jobs": {},
+    "$$syncState": {},
+    "$$baseRevs": {},
+    "$$logins": {}
+  },
+  "lastPull": {
+    "serverRevision": { "$t": "bigint", "v": "28" },
+    "realms": ["rlm-public", "foo"]
+  },
+  "baseRevs": [
+    {
+      "tableName": "$baseRevs",
+      "clientRev": 1,
+      "serverRev": { "$t": "bigint", "v": "28" }
+    },
+    {
+      "tableName": "$jobs",
+      "clientRev": 1,
+      "serverRev": { "$t": "bigint", "v": "28" }
+    },
+    {
+      "tableName": "$logins",
+      "clientRev": 1,
+      "serverRev": { "$t": "bigint", "v": "28" }
+    },
+    {
+      "tableName": "$syncState",
+      "clientRev": 1,
+      "serverRev": { "$t": "bigint", "v": "28" }
+    },
+    {
+      "tableName": "friends",
+      "clientRev": 1,
+      "serverRev": { "$t": "bigint", "v": "27" }
+    },
+    {
+      "tableName": "friends",
+      "clientRev": 2,
+      "serverRev": { "$t": "bigint", "v": "28" }
+    },
+    {
+      "tableName": "members",
+      "clientRev": 1,
+      "serverRev": { "$t": "bigint", "v": "28" }
+    },
+    {
+      "tableName": "products",
+      "clientRev": 1,
+      "serverRev": { "$t": "bigint", "v": "27" }
+    },
+    {
+      "tableName": "products",
+      "clientRev": 2,
+      "serverRev": { "$t": "bigint", "v": "28" }
+    },
+    {
+      "tableName": "realms",
+      "clientRev": 1,
+      "serverRev": { "$t": "bigint", "v": "28" }
+    },
+    {
+      "tableName": "roles",
+      "clientRev": 1,
+      "serverRev": { "$t": "bigint", "v": "28" }
+    }
+  ],
+  "changes": [
+    {
+      "table": "friends",
+      "muts": [
+        {
+          "type": "delete",
+          "ts": 1622794266418,
+          "keys": ["frn0NcM4qmuJxcHFVVPe98f1TZfzed"],
+          "txid": "qJgk+/BVQfyBREVGZX/LAQ==",
+          "userId": "foo",
+          "rev": 1
+        }
+      ]
+    },
+    {
+      "table": "products",
+      "muts": [
+        {
+          "type": "insert",
+          "ts": 1622794266954,
+          "keys": ["prd0NcM4ra6ZOtKTTXGIwcKIOLKfoo"],
+          "txid": "f9Ftw9n03pvWDdPjOLSRQw==",
+          "userId": "foo",
+          "values": [
+            {
+              "title": "My private new fantastic product that wont be accepted by server"
+            }
+          ],
+          "rev": 1
+        }
+      ]
+    }
+  ]
+}

@@ -9,6 +9,7 @@ export async function performInitialSync(
   cloudOptions: DexieCloudOptions,
   cloudSchema: DexieCloudSchema
 ) {
+  console.debug("Performing initial sync");
   await performGuardedJob(
     db,
     'initialSync',
@@ -23,4 +24,5 @@ export async function performInitialSync(
     },
     { awaitRemoteJob: true } // Don't return until the job is done!
   );
+  console.debug("Done initial sync");
 }
