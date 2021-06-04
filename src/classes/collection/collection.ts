@@ -533,10 +533,12 @@ export class Collection implements ICollection {
                 }
               }
             }
-            const criteria = isPlainKeyRange(ctx) && ctx.limit === Infinity && {
-              index: ctx.index,
-              range: ctx.range
-            }
+            const criteria = isPlainKeyRange(ctx) &&
+              ctx.limit === Infinity &&
+              (typeof changes !== 'function' || changes === deleteCallback) && {
+                index: ctx.index,
+                range: ctx.range
+              };
 
             return Promise.resolve(addValues.length > 0 &&
               coreTable.mutate({trans, type: 'add', values: addValues})
@@ -614,8 +616,8 @@ export class Collection implements ICollection {
       });
     }
 
-    return this.modify((value, ctx) => ctx.value = null);
+    return this.modify(deleteCallback);
   }
 }
 
-
+const deleteCallback = (value, ctx) => ctx.value = null;
