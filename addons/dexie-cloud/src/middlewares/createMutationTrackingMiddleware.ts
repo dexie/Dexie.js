@@ -261,7 +261,7 @@ export function createMutationTrackingMiddleware({
                       txid,
                       userId
                     };
-              return keys.length > 0
+              return keys.length > 0 || ('criteria' in req && req.criteria)
                 ? mutsTable
                     .mutate({ type: 'add', trans, values: [mut] }) // Log entry
                     .then(() => res) // Return original response

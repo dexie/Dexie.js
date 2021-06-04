@@ -533,7 +533,11 @@ export class Collection implements ICollection {
                 }
               }
             }
-            
+            const criteria = isPlainKeyRange(ctx) && ctx.limit === Infinity && {
+              index: ctx.index,
+              range: ctx.range
+            }
+
             return Promise.resolve(addValues.length > 0 &&
               coreTable.mutate({trans, type: 'add', values: addValues})
                 .then(res => {
@@ -543,28 +547,22 @@ export class Collection implements ICollection {
                   }
                   applyMutateResult(addValues.length, res);
                 })
-            ).then(()=>putValues.length > 0 &&
+            ).then(()=>(putValues.length > 0 || criteria) &&
                 coreTable.mutate({
                   trans,
                   type: 'put',
                   keys: putKeys,
                   values: putValues,
-                  criteria: isPlainKeyRange(ctx) && ctx.limit < Infinity && {
-                    index: ctx.index,
-                    range: ctx.range
-                  },
+                  criteria,
                   changeSpec: typeof changes !== 'function'
                     && changes
                 }).then(res=>applyMutateResult(putValues.length, res))
-            ).then(()=>deleteKeys.length > 0 &&
+            ).then(()=>(deleteKeys.length > 0 || criteria) &&
                 coreTable.mutate({
                   trans,
                   type: 'delete',
                   keys: deleteKeys,
-                  criteria: isPlainKeyRange(ctx) && ctx.limit < Infinity && {
-                    index: ctx.index,
-                    range: ctx.range
-                  }
+                  criteria
                 }).then(res=>applyMutateResult(deleteKeys.length, res))
             ).then(()=>{
               return keys.length > offset + count && nextChunk(offset + limit);
