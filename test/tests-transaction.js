@@ -976,3 +976,17 @@ promisedTest("db.transaction() should not wait for non-awaited new top-level tra
 
     equal(log.join(','), "outer-transaction-done,inner-transaction-done", "outer-transaction-done should have happened before inner-transaction-done");
 });
+
+asyncTest("abort will rollback previous writes", function() {
+    db.transaction('rw', db.users, function() {
+        db.users.add({ username: "james", color: "red" });
+        Dexie.currentTransaction.abort();
+    }).catch(function() {
+        ok(true, "transaction done");
+    }).then(function() {
+        return db.users.get('james')
+    }).then(function(user) {
+        ok(user == null, "should not written if transaction aborted");
+    })
+    .finally(start);
+});
