@@ -536,6 +536,36 @@ spawnedTest("bulkAdd-catch sub transaction", function*(){
     equal(yield db.users.where('username').startsWith('aper').count(), 0, "0 users! Good, means that inner transaction did not commit");
 });
 
+spawnedTest("Issue #1280 - add() with auto-incrementing ID and CryptoKey", function* () {
+    if (!self?.crypto?.subtle) {
+        ok(true, "This browser doesnt have WebCrypto");
+        return;
+    }
+    var generatedKey = yield self.crypto.subtle.generateKey(
+        {
+            name: "RSA-OAEP",
+            modulusLength: 4096,
+            publicExponent: new Uint8Array([1, 0, 1]),
+            hash: "SHA-256",
+        },
+        true,
+        ["encrypt", "decrypt"],
+    );
+
+    var db = new Dexie("MyDatabaseToStoreCryptoKeys");
+    db.version(1).stores({
+        keys: "++id",
+    });
+    var objToAdd = { key: generatedKey.privateKey };
+    ok(generatedKey.privateKey instanceof CryptoKey, "The CryptoKey object was not generated correctly");
+
+    var id = yield db.keys.add(objToAdd);
+    ok(id != null, "Got unexpectedly nullish id");
+
+    var storedObj = yield db.keys.get(id);
+    ok(storedObj.key instanceof CryptoKey, "The CryptoKey object was destroyed in storage");
+});
+
 spawnedTest("bulkPut", function*(){
     var highestKey = yield db.users.add({username: "fsdkljfd", email: ["fjkljslk"]});
     ok(true, "Highest key was: " + highestKey);

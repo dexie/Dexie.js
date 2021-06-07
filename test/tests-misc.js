@@ -393,3 +393,14 @@ asyncTest("Issue #1112", async ()=>{
         start();
     }
 });
+
+asyncTest("Issue #1280 - Don't perform deep-clone workaround when adding non-POJO to auto-incrementing table", async () => {
+    try {
+        await db.bars.add({ text: "hello1", fooProp: function(){} });
+        ok(false, "Expected add() to fail since IDB would fail with DOMError if trying to store a function.");
+    } catch (error) {
+        ok(true);
+    } finally {
+        start();
+    }
+});
