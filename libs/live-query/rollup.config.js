@@ -9,13 +9,13 @@ const ERRORS_TO_IGNORE = [
 export default {
   input: './src/index.ts',
   output: [{
-    file: 'dist/live-query.js',
+    file: 'dist/dexie-live-query.js',
     format: 'umd',
     globals: {dexie: "Dexie", rxjs: "Rx"},
     name: 'liveQuery',
     sourcemap: true
   },{
-    file: 'dist/live-query.mjs',
+    file: 'dist/dexie-live-query.mjs',
     format: 'es',
     sourcemap: true
   }],

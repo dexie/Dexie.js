@@ -20,10 +20,10 @@ module.exports = function (config) {
     files: karmaCommon.files.concat([
       'node_modules/rxjs/bundles/rxjs.umd.js',
       'dist/dexie.js',
-      'libs/live-query/dist/live-query.js',
-      'libs/live-query/test/bundle.js',
-      { pattern: 'libs/live-query/test/*.map', watched: false, included: false },
-      { pattern: 'libs/live-query/dist/*.map', watched: false, included: false }
+      'libs/dexie-live-query/dist/dexie-live-query.js',
+      'libs/dexie-live-query/test/bundle.js',
+      { pattern: 'libs/dexie-live-query/test/*.map', watched: false, included: false },
+      { pattern: 'libs/dexie-live-query/dist/*.map', watched: false, included: false }
     ])
   });
 

@@ -1,9 +1,9 @@
 {
-  "name": "live-query",
+  "name": "dexie-live-query",
   "version": "1.0.0",
   "description": "Observe IndexedDB by turning Promise-returning functions into Observables.",
-  "main": "dist/live-query.js",
-  "module": "dist/live-query.mjs",
+  "main": "dist/dexie-live-query.js",
+  "module": "dist/dexie-live-query.mjs",
   "scripts": {
     "build": "just-build",
     "test": "echo This package is tested in Dexie.js test suite"
