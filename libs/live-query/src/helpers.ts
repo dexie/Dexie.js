@@ -1,4 +1,4 @@
-import { ObservabilitySet, RangeBtree, mergeRanges } from "dexie";
+import { ObservabilitySet, IntervalTree, mergeRanges } from "dexie";
 
 export const isAsyncFunction = typeof Symbol !== 'undefined'
     ? (fn: Function) => fn[Symbol.toStringTag] === 'AsyncFunction'
@@ -9,7 +9,7 @@ export function extendObservabilitySet(
   newSet: ObservabilitySet
 ): ObservabilitySet {
   Object.keys(newSet).forEach(part => {
-    const rangeSet: RangeBtree = target[part] || (target[part] = {d: 0});
+    const rangeSet: IntervalTree = target[part] || (target[part] = {d: 0});
     mergeRanges(rangeSet, newSet[part]);
   });
   return target;
