@@ -1,48 +1,56 @@
-import Dexie, { liveQuery, Subscription, Table } from "dexie";
-import "./extend-dexie-interface";
-import { BehaviorSubject, from, Observable, Subject } from "rxjs";
+import Dexie, { liveQuery, Subscription, Table } from 'dexie';
+import './extend-dexie-interface';
+import { BehaviorSubject, from, Observable, Subject } from 'rxjs';
 import {
   createIdGenerationMiddleware,
-  generateTablePrefix,
-} from "./middlewares/createIdGenerationMiddleware";
-import { DexieCloudOptions } from "./DexieCloudOptions";
+  generateTablePrefix
+} from './middlewares/createIdGenerationMiddleware';
+import { DexieCloudOptions } from './DexieCloudOptions';
 //import { dexieCloudSyncProtocol } from "./dexieCloudSyncProtocol";
-import { overrideParseStoresSpec } from "./overrideParseStoresSpec";
-import { DexieCloudDB } from "./db/DexieCloudDB";
-import { UserLogin } from "./db/entities/UserLogin";
-import { UNAUTHORIZED_USER } from "./authentication/UNAUTHORIZED_USER";
-import { login } from "./authentication/login";
+import { overrideParseStoresSpec } from './overrideParseStoresSpec';
+import { DexieCloudDB } from './db/DexieCloudDB';
+import { UserLogin } from './db/entities/UserLogin';
+import { UNAUTHORIZED_USER } from './authentication/UNAUTHORIZED_USER';
+import { login } from './authentication/login';
 import {
   OTPTokenRequest,
   TokenFinalResponse,
   TokenOtpSentResponse,
-  TokenResponse,
-} from "dexie-cloud-common";
-import { LoginState } from "./types/LoginState";
-import { SyncState } from "./types/SyncState";
-import { verifySchema } from "./verifySchema";
-import { throwVersionIncrementNeeded } from "./helpers/throwVersionIncrementNeeded";
-import { performInitialSync } from "./performInitialSync";
-import { LocalSyncWorker } from "./sync/LocalSyncWorker";
-import { dbOnClosed } from "./helpers/dbOnClosed";
-import { IS_SERVICE_WORKER } from "./helpers/IS_SERVICE_WORKER";
-import { authenticate } from "./authentication/authenticate";
-import { createMutationTrackingMiddleware } from "./middlewares/createMutationTrackingMiddleware";
-import { updateSchemaFromOptions } from "./updateSchemaFromOptions";
-import { registerPeriodicSyncEvent, registerSyncEvent } from "./sync/registerSyncEvent";
-import { createImplicitPropSetterMiddleware } from "./middlewares/createImplicitPropSetterMiddleware";
+  TokenResponse
+} from 'dexie-cloud-common';
+import { LoginState } from './types/LoginState';
+import { SyncState } from './types/SyncState';
+import { verifySchema } from './verifySchema';
+import { throwVersionIncrementNeeded } from './helpers/throwVersionIncrementNeeded';
+import { performInitialSync } from './performInitialSync';
+import { LocalSyncWorker } from './sync/LocalSyncWorker';
+import { dbOnClosed } from './helpers/dbOnClosed';
+import { IS_SERVICE_WORKER } from './helpers/IS_SERVICE_WORKER';
+import { authenticate } from './authentication/authenticate';
+import { createMutationTrackingMiddleware } from './middlewares/createMutationTrackingMiddleware';
+import { updateSchemaFromOptions } from './updateSchemaFromOptions';
+import {
+  registerPeriodicSyncEvent,
+  registerSyncEvent
+} from './sync/registerSyncEvent';
+import { createImplicitPropSetterMiddleware } from './middlewares/createImplicitPropSetterMiddleware';
+import { sync } from './sync/sync';
+import { filter } from 'rxjs/operators';
+import { triggerSync } from './sync/triggerSync';
+import { DexieCloudSyncOptions } from './extend-dexie-interface';
+import { isSyncNeeded } from './sync/isSyncNeeded';
 
 export function dexieCloud(dexie: Dexie) {
   //
   //
   //
   const currentUserEmitter = new BehaviorSubject(UNAUTHORIZED_USER);
-  let currentUserSubscription: Subscription | null = null;
+  const subscriptions: Subscription[] = [];
 
   // local sync worker - used when there's no service worker.
-  let localSyncWorker: { start: () => void, stop: () => void } | null = null;
+  let localSyncWorker: { start: () => void; stop: () => void } | null = null;
   dexie.on(
-    "ready",
+    'ready',
     async (dexie: Dexie) => {
       const db = DexieCloudDB(dexie);
       //verifyConfig(db.cloud.options); Not needed (yet at least!)
@@ -52,19 +60,16 @@ export function dexieCloud(dexie: Dexie) {
       }
 
       const initiallySynced = await db.transaction(
-        "rw",
+        'rw',
         db.$syncState,
         async () => {
           const { options, schema } = db.cloud;
-          const [
-            persistedOptions,
-            persistedSchema,
-            persistedSyncState,
-          ] = await Promise.all([
-            db.getOptions(),
-            db.getSchema(),
-            db.getPersistedSyncState(),
-          ]);
+          const [persistedOptions, persistedSchema, persistedSyncState] =
+            await Promise.all([
+              db.getOptions(),
+              db.getSchema(),
+              db.getPersistedSyncState()
+            ]);
           if (!options) {
             // Options not specified programatically (use case for SW!)
             // Take persisted options:
@@ -74,9 +79,12 @@ export function dexieCloud(dexie: Dexie) {
             JSON.stringify(persistedOptions) !== JSON.stringify(options)
           ) {
             // Update persisted options:
-            await db.$syncState.put(options, "options");
+            await db.$syncState.put(options, 'options');
           }
-          if (db.cloud.options?.usingServiceWorker && !(("serviceWorker" in navigator) )) {
+          if (
+            db.cloud.options?.usingServiceWorker &&
+            !('serviceWorker' in navigator)
+          ) {
             // Configured to use service worker, but this browser doesn't support it.
             // Act as if usingServiceWorker is configured falsy:
             db.cloud.options.usingServiceWorker = false;
@@ -92,7 +100,7 @@ export function dexieCloud(dexie: Dexie) {
             JSON.stringify(persistedSchema) !== JSON.stringify(schema)
           ) {
             // Update persisted schema
-            await db.$syncState.put(schema, "schema");
+            await db.$syncState.put(schema, 'schema');
           }
           return persistedSyncState?.initiallySynced;
         }
@@ -113,34 +121,42 @@ export function dexieCloud(dexie: Dexie) {
 
       if (localSyncWorker) localSyncWorker.stop();
       localSyncWorker = null;
-      if (db.cloud.options?.usingServiceWorker && db.cloud.options.databaseUrl) {
-        registerSyncEvent(db).catch(()=>{});
-        registerPeriodicSyncEvent(db).catch(()=>{});
+      if (
+        db.cloud.options?.usingServiceWorker &&
+        db.cloud.options.databaseUrl
+      ) {
+        registerSyncEvent(db).catch(() => {});
+        registerPeriodicSyncEvent(db).catch(() => {});
+        subscriptions.push(
+          db.syncStateChangedEvent.subscribe(dexie.cloud.syncState)
+        );
       } else if (db.cloud.options?.databaseUrl && db.cloud.schema) {
         // There's no SW. Start SyncWorker instead.
-        localSyncWorker = LocalSyncWorker(db, db.cloud.options, db.cloud.schema!);
+        localSyncWorker = LocalSyncWorker(
+          db,
+          db.cloud.options,
+          db.cloud.schema!
+        );
         localSyncWorker.start();
       }
 
       // Manage CurrentUser observable:
-      if (currentUserSubscription) currentUserSubscription.unsubscribe();
-      currentUserSubscription = liveQuery(() => db.getCurrentUser()).subscribe(
-        currentUserEmitter
+      subscriptions.push(
+        liveQuery(() => db.getCurrentUser()).subscribe(currentUserEmitter)
       );
     },
     true // true = sticky
   );
 
   dbOnClosed(dexie, () => {
-    currentUserSubscription && currentUserSubscription.unsubscribe();
-    currentUserSubscription = null;
+    subscriptions.forEach((subscription) => subscription.unsubscribe());
     localSyncWorker && localSyncWorker.stop();
     localSyncWorker = null;
     currentUserEmitter.next(UNAUTHORIZED_USER);
   });
 
   dexie.cloud = {
-    version: "{version}",
+    version: '{version}',
     options: null,
     schema: null,
     serverState: null,
@@ -148,8 +164,8 @@ export function dexieCloud(dexie: Dexie) {
       return currentUserEmitter.value.userId || UNAUTHORIZED_USER.userId!;
     },
     currentUser: currentUserEmitter,
-    syncState: new BehaviorSubject<SyncState>({ phase: "initial" }),
-    loginState: new BehaviorSubject<LoginState>({ type: "silent" }), // fixthis! Or remove this observable?
+    syncState: new BehaviorSubject<SyncState>({ phase: 'initial' }),
+    loginState: new BehaviorSubject<LoginState>({ type: 'silent' }), // fixthis! Or remove this observable?
     async login(email) {
       const db = DexieCloudDB(dexie);
       await login(db, { email });
@@ -158,24 +174,36 @@ export function dexieCloud(dexie: Dexie) {
       dexie.cloud.options = options;
       updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
     },
+    async sync({ wait }: DexieCloudSyncOptions = { wait: true }) {
+      const db = DexieCloudDB(dexie);
+      const syncNeeded = await isSyncNeeded(db);
+      if (syncNeeded) {
+        triggerSync(db);
+        if (wait) {
+          await from(liveQuery(() => isSyncNeeded(db)))
+            .pipe(filter((isNeeded) => !isNeeded))
+            .toPromise();
+        }
+      }
+    }
   };
 
-  dexie.Version.prototype["_parseStoresSpec"] = Dexie.override(
-    dexie.Version.prototype["_parseStoresSpec"],
+  dexie.Version.prototype['_parseStoresSpec'] = Dexie.override(
+    dexie.Version.prototype['_parseStoresSpec'],
     (origFunc) => overrideParseStoresSpec(origFunc, dexie)
   );
 
   dexie.use(
     createMutationTrackingMiddleware({
       currentUserObservable: dexie.cloud.currentUser,
-      db: DexieCloudDB(dexie),
+      db: DexieCloudDB(dexie)
     })
   );
   dexie.use(createImplicitPropSetterMiddleware(DexieCloudDB(dexie)));
   dexie.use(createIdGenerationMiddleware(DexieCloudDB(dexie)));
 }
 
-dexieCloud.version = "{version}";
+dexieCloud.version = '{version}';
 
 Dexie.Cloud = dexieCloud;
 

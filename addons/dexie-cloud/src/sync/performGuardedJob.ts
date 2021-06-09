@@ -13,7 +13,7 @@ export async function performGuardedJob(
   db: DexieCloudDB,
   jobName: string,
   jobsTableName: string,
-  job: () => Promise<void>,
+  job: () => Promise<any>,
   { awaitRemoteJob }: { awaitRemoteJob?: boolean } = {}
 ): Promise<void> {
   // Start working.

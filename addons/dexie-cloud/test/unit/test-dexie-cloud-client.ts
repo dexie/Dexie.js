@@ -13,7 +13,7 @@ import Dexie from 'dexie';
 import dexieCloud from '../../src/dexie-cloud-client';
 
 module('dexie-cloud-client');
-Dexie.addons = []; // Prohibit dexie-observable and dexie-syncable from registering themselves.
+const DATABASE_URL = 'http://localhost:3000/ziud0envo';
 
 const db = new Dexie('argur', { addons: [dexieCloud] });
 db.version(2).stores({
@@ -29,8 +29,8 @@ db.version(2).stores({
 promisedTest('basic-test', async () => {
   await Dexie.delete(db.name);
   db.cloud.configure({
-    databaseUrl: 'http://localhost:3000/ziud0envo',
-    requireAuth: true
+    databaseUrl: DATABASE_URL,
+    requireAuth: false
   });
   console.log('Waiting for open to resolve');
   await db.open();
@@ -62,3 +62,80 @@ promisedTest('basic-test', async () => {
   console.log("Products", await db.table('products').toArray());
   console.log("Friends", await db.table('friends').toArray());
 });
+
+promisedTest('add-realm', async ()=> {
+  const db = new Dexie('argur2', { addons: [dexieCloud] });
+  await Dexie.delete(db.name);
+  db.version(1).stores({
+    todoLists: '@id, title',
+    todoItems: '@id, title, todoListId',
+
+    // Access Control tables
+    realms: "@realmId",
+    members: "@id", // Optionally, index things also, like "realmId" or "email".
+    roles: "[realmId+name]",    
+  });
+  db.cloud.configure({
+    databaseUrl: DATABASE_URL,
+    requireAuth: false
+  });
+
+  await db.open();
+  console.log('Before login', db.cloud.currentUserId, db.cloud.currentUser);
+  await db.cloud.login('foo@demo.local');
+  console.log('Done login', db.cloud.currentUserId, db.cloud.currentUser);
+  await db.cloud.sync();
+  console.log("In sync now");
+
+  // Add a realm
+  const realmId = await db.transaction('rw', 'realms', 'members', 'todoLists', 'todoItems', async ()=>{
+    const realmId = await db.table("realms").add({
+      name: "My new realm"
+    });
+    await db.table('members').bulkAdd([{
+      realmId,
+      userId: db.cloud.currentUserId
+    },{
+      realmId,
+      email: "david@dexie.org",
+      name: "David"
+    }]);
+    const todoListId = await db.table("todoLists").add({
+      title: "My todo list",
+      realmId,
+    });
+    const todoItems = await db.table("todoItems").bulkAdd([{
+      realmId,
+      todoListId,
+      title: "Make Dexie Cloud work"
+    }]);
+    return realmId;
+  });
+
+  console.log("Before syncing new realm and todo list");
+  await db.cloud.sync();
+  console.log("After syncing new realm and todo list. Now cleaning up all:");
+  await db.transaction('rw', 'realms', 'members', 'todoLists', 'todoItems', async ()=>{
+    db.table('todoItems').where({realmId}).delete();
+    db.table('todoLists').where({realmId}).delete();
+    db.table('members').where({realmId}).delete();
+    db.table('realms').where({realmId}).delete();
+  });
+  console.log("Before syncing the realm removal");
+  await db.cloud.sync();
+  console.log("After syncing the realm removal");
+});
+
+/*promisedTest('require-auth', async () => {
+  await Dexie.delete(db.name);
+  db.cloud.configure({
+    databaseUrl: DATABASE_URL,
+    requireAuth: true
+  });
+  console.log('Waiting for open to resolve');
+  await db.open();
+  console.log('open resolved. Listing friends:');
+  const friends = await db.table('friends').toArray();
+  console.log('Got friends', friends);
+});
+*/

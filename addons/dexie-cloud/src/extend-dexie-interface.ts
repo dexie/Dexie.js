@@ -8,6 +8,9 @@ import { PersistedSyncState } from "./db/entities/PersistedSyncState";
 import { SyncState } from "./types/SyncState";
 import { DexieCloudServerState } from "./DexieCloudServerState";
 
+export interface DexieCloudSyncOptions {
+  wait: boolean
+}
 //
 // Extend Dexie interface
 //
@@ -30,7 +33,11 @@ declare module "dexie" {
       /**
        * Connect to given URL
        */
-      configure(options: DexieCloudOptions): void;
+      configure(options: DexieCloudOptions ): void;
+      /** Wait until a full sync is done.
+       * 
+       */
+      sync(options?: DexieCloudSyncOptions): Promise<void>;
     };
   }
 

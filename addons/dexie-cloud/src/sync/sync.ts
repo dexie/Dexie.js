@@ -50,14 +50,15 @@ export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 export interface SyncOptions {
   isInitialSync?: boolean;
   cancelToken?: { cancelled: boolean };
+  justCheckIfNeeded?: boolean;
 }
 
 export async function sync(
   db: DexieCloudDB,
   options: DexieCloudOptions,
   schema: DexieCloudSchema,
-  { isInitialSync, cancelToken }: SyncOptions = { isInitialSync: false }
-): Promise<void> {
+  { isInitialSync, cancelToken, justCheckIfNeeded }: SyncOptions = { isInitialSync: false }
+): Promise<boolean> {
   if (!db.cloud.options?.databaseUrl)
     throw new Error(
       `Internal error: sync must not be called when no databaseUrl is configured`
@@ -85,6 +86,7 @@ export async function sync(
   const doSyncify = tablesToSyncify.length > 0;
 
   if (doSyncify) {
+    if (justCheckIfNeeded) return true;
     console.debug("sync doSyncify is true");
     await db.transaction('rw', tablesToSyncify, async (tx) => {
       // @ts-ignore
@@ -98,7 +100,6 @@ export async function sync(
   //
   // List changes to sync
   //
-  console.debug("sync: Listing client changes");
   const [clientChangeSet, syncState, baseRevs] = await db.transaction(
     'r',
     db.tables,
@@ -121,6 +122,10 @@ export async function sync(
       return [clientChanges, syncState, baseRevs];
     }
   );
+
+  if (justCheckIfNeeded) {
+    return clientChangeSet.some(set => set.muts.some(mut => mut.keys.length > 0));
+  }
 
   const latestRevisions = getLatestRevisionsPerTable(
     clientChangeSet,
@@ -267,7 +272,8 @@ export async function sync(
   if (!done) {
     console.debug("Not done. Go for it again!");
     return await sync(db, options, schema, { isInitialSync, cancelToken });
-  }  
+  }
+  return false; // Not needed anymore
 }
 
 function getLatestRevisionsPerTable(

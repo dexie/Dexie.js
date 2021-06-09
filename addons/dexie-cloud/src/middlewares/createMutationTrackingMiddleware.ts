@@ -96,10 +96,6 @@ export function createMutationTrackingMiddleware({
                   console.debug('registering sync event');
                   registerSyncEvent(db);
                 } else {
-                  console.debug(
-                    'notifying local sync worker',
-                    db.localSyncEvent['id']
-                  );
                   db.localSyncEvent.next({});
                 }
               }

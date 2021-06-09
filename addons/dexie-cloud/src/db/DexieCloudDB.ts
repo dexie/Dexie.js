@@ -10,6 +10,8 @@ import { DexieCloudOptions } from '../DexieCloudOptions';
 import { BehaviorSubject } from 'rxjs';
 import { BaseRevisionMapEntry } from './entities/BaseRevisionMapEntry';
 import { DexieCloudSchema } from "dexie-cloud-common";
+import { BroadcastedLocalEvent } from '../helpers/BroadcastedLocalEvent';
+import { SyncState } from '../types/SyncState';
 
 /*export interface DexieCloudDB extends Dexie {
   table(name: string): Table<any, any>;
@@ -41,6 +43,7 @@ export interface DexieCloudDBBase {
   readonly roles: Table<Role, [string, string]>;
 
   readonly localSyncEvent: BehaviorSubject<any>;
+  readonly syncStateChangedEvent: BroadcastedLocalEvent<SyncState>;
   readonly dx: Dexie;
 }
 
@@ -68,6 +71,7 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
   let db = wm.get(dx.cloud);
   if (!db) {
     const localSyncEvent = new BehaviorSubject({});
+    const syncStateChangedEvent = new BroadcastedLocalEvent<SyncState>(`syncstatechanged-${dx.name}`);
     localSyncEvent["id"] = ++static_counter;
     db = {
       get name() {
@@ -109,6 +113,7 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
       },
 
       localSyncEvent,
+      syncStateChangedEvent,
       dx
     } as DexieCloudDB;
 

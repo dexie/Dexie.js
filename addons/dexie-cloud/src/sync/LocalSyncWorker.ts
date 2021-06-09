@@ -40,7 +40,6 @@ export function LocalSyncWorker(
     // This initial subscribe will also trigger an sync also now.
     console.error("Starting LocalSyncWorker", db.localSyncEvent["id"])
     syncNeededSubscription = db.localSyncEvent.subscribe(() => {
-      console.debug("POCKY!")
       try {syncAndRetry();} catch(err) {console.error("Whathe f....")}
     });
     //setTimeout(()=>db.localSyncEvent.next({}), 5000);
