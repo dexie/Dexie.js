@@ -35,7 +35,7 @@ import {
 } from './sync/registerSyncEvent';
 import { createImplicitPropSetterMiddleware } from './middlewares/createImplicitPropSetterMiddleware';
 import { sync } from './sync/sync';
-import { filter } from 'rxjs/operators';
+import { filter, map, take } from 'rxjs/operators';
 import { triggerSync } from './sync/triggerSync';
 import { DexieCloudSyncOptions } from './extend-dexie-interface';
 import { isSyncNeeded } from './sync/isSyncNeeded';
@@ -168,6 +168,7 @@ export function dexieCloud(dexie: Dexie) {
     loginState: new BehaviorSubject<LoginState>({ type: 'silent' }), // fixthis! Or remove this observable?
     async login(email) {
       const db = DexieCloudDB(dexie);
+      await db.cloud.sync();
       await login(db, { email });
     },
     configure(options: DexieCloudOptions) {
@@ -180,9 +181,14 @@ export function dexieCloud(dexie: Dexie) {
       if (syncNeeded) {
         triggerSync(db);
         if (wait) {
+          console.debug("db.cloud.login() is waiting for sync completion...");
           await from(liveQuery(() => isSyncNeeded(db)))
-            .pipe(filter((isNeeded) => !isNeeded))
+            .pipe(
+              filter((isNeeded) => !isNeeded),
+              take(1),
+              )
             .toPromise();
+          console.debug("Done waiting for sync completion because we have nothing to push anymore");
         }
       }
     }

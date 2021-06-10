@@ -11,7 +11,6 @@ export async function syncIfPossible(
   cloudSchema: DexieCloudSchema,
   options?: SyncOptions
 ) {
-  console.debug("syncIfPossible", options);
   if (isSyncing.has(db)) {
     // Still working. Existing work will make sure to complete its job
     // and after that, check if new mutations have arrived, and if so complete
@@ -19,14 +18,12 @@ export async function syncIfPossible(
     // all will be needed to perform at this time.
     // Exceptions: If onling sync throws an exception, it's caller will take care of
     // the retry procedure - we shouldn't do that also (would be redundant).
-    console.debug("syncIfPossible already ongoing", options);
     return;
   }
   if (typeof navigator !== 'undefined' && !navigator.onLine) {
     // We're not online.
     // If LocalSyncWorker is used, a retry will automatically happen when we become
     // online.
-    console.debug("syncIfPossible: not online", options);
     return;
   }
   /*if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
@@ -38,14 +35,11 @@ export async function syncIfPossible(
   try {
     if (db.cloud.options?.usingServiceWorker) {
       if (IS_SERVICE_WORKER) {
-        console.debug("Will sync: (We are service worker)", options);
         await sync(db, cloudOptions, cloudSchema, options);
-        console.debug("Done sync");
       }
     } else {
       // We use a flow that is better suited for the case when multiple workers want to
       // do the same thing.
-      console.debug("Will sync: (We are LocalSyncWorker)", cloudOptions);
       await performGuardedJob(db, CURRENT_SYNC_WORKER, '$jobs', () => sync(db, cloudOptions, cloudSchema));
     }
     isSyncing.delete(db);

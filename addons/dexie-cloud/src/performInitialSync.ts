@@ -19,7 +19,7 @@ export async function performInitialSync(
       // Do check again (now within a transaction) that we really do not have a sync state:
       const syncState = await db.getPersistedSyncState();
       if (!syncState?.initiallySynced) {
-        await sync(db, cloudOptions, cloudSchema);
+        await sync(db, cloudOptions, cloudSchema, {isInitialSync: true});
       }
     },
     { awaitRemoteJob: true } // Don't return until the job is done!

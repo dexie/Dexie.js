@@ -67,12 +67,12 @@ promisedTest('add-realm', async ()=> {
   const db = new Dexie('argur2', { addons: [dexieCloud] });
   await Dexie.delete(db.name);
   db.version(1).stores({
-    todoLists: '@id, title',
-    todoItems: '@id, title, todoListId',
+    todoLists: '@id, realmId, title',
+    todoItems: '@id, realmId, title, todoListId',
 
     // Access Control tables
     realms: "@realmId",
-    members: "@id", // Optionally, index things also, like "realmId" or "email".
+    members: "@id, realmId", // Optionally, index things also, like "realmId" or "email".
     roles: "[realmId+name]",    
   });
   db.cloud.configure({
@@ -81,11 +81,24 @@ promisedTest('add-realm', async ()=> {
   });
 
   await db.open();
+  console.log('DB opened...', db.cloud.currentUserId, db.cloud.currentUser);
+  await new Promise(resolve => setTimeout(resolve, 500));
   console.log('Before login', db.cloud.currentUserId, db.cloud.currentUser);
   await db.cloud.login('foo@demo.local');
   console.log('Done login', db.cloud.currentUserId, db.cloud.currentUser);
   await db.cloud.sync();
   console.log("In sync now");
+
+  //const allMyRealms = await db.table("realms").toCollection().primaryKeys();
+  /*console.log("Cleaning up EVERYTHING!");
+  await db.transaction('rw', 'todoLists', 'todoItems', 'members', 'realms', ()=>{
+    db.table('todoLists').where('realmId').notEqual('rlm-public').delete();
+    db.table('todoItems').where('realmId').notEqual('rlm-public').delete();
+    db.table('members').where('realmId').notEqual('rlm-public').delete();
+    db.table('realms').where('realmId').notEqual('rlm-public').delete();
+  });*/
+
+  await db.cloud.sync();
 
   // Add a realm
   const realmId = await db.transaction('rw', 'realms', 'members', 'todoLists', 'todoItems', async ()=>{
@@ -98,7 +111,7 @@ promisedTest('add-realm', async ()=> {
     },{
       realmId,
       email: "david@dexie.org",
-      name: "David"
+      name: "David (dexie)"
     }]);
     const todoListId = await db.table("todoLists").add({
       title: "My todo list",
@@ -114,7 +127,21 @@ promisedTest('add-realm', async ()=> {
 
   console.log("Before syncing new realm and todo list");
   await db.cloud.sync();
-  console.log("After syncing new realm and todo list. Now cleaning up all:");
+  console.log("After syncing new realm and todo list.");
+  console.log("Now adding another member for invite");
+  await Promise.all([db.table("members").add({
+    realmId,
+    email: "david.fahlander@gmail.com",
+    name: "David (gmail)"
+  }),
+  db.table("members").add({
+    realmId,
+    userId: "gkjlgfdfg" // Should fail
+  })]);
+  await db.cloud.sync();
+  console.log("Added two transactions where the second should have failed by now");
+
+  console.log("Now cleaning up all:");
   await db.transaction('rw', 'realms', 'members', 'todoLists', 'todoItems', async ()=>{
     db.table('todoItems').where({realmId}).delete();
     db.table('todoLists').where({realmId}).delete();

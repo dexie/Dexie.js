@@ -26,7 +26,7 @@ export async function syncWithServer(
   //
   const headers: HeadersInit = {
     Accept: 'application/json, application/x-bison, application/x-bison-stream',
-    'Content-Type': 'application/x-bison'
+    'Content-Type': 'application/tson'
   };
   const accessToken = await loadAccessToken(db);
   if (accessToken) {
@@ -48,7 +48,7 @@ export async function syncWithServer(
   const res = await fetch(`${databaseUrl}/sync`, {
     method: 'post',
     headers,
-    body: BISON.toBinary(syncRequest)
+    body: TSON.stringify(syncRequest)
   });
 
   if (!res.ok) {
