@@ -1,6 +1,7 @@
 import { Dexie } from '../dexie';
 import { DbSchema } from '../../public/types/db-schema';
-import { setProp, keys, slice, _global, isArray, shallowClone, isAsyncFunction, defineProperty, getPropertyDescriptor } from '../../functions/utils';
+import { _global } from "../../globals/global";
+import { setProp, keys, slice, isArray, shallowClone, isAsyncFunction, defineProperty, getPropertyDescriptor } from '../../functions/utils';
 import { Transaction } from '../transaction';
 import { Version } from './version';
 import Promise, { PSD, newScope, NativePromise, decrementExpectedAwaits, incrementExpectedAwaits } from '../../helpers/promise';

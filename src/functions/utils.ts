@@ -1,10 +1,6 @@
-﻿declare var global;
+﻿import { _global } from "../globals/global";
 export const keys = Object.keys;
 export const isArray = Array.isArray;
-const _global =
-    typeof self !== 'undefined' ? self :
-    typeof window !== 'undefined' ? window :
-    global;
 if (typeof Promise !== 'undefined' && !_global.Promise){
     // In jsdom, this it can be the case that Promise is not put on the global object.
     // If so, we need to patch the global object for the rest of the code to work as expected.
@@ -196,7 +192,7 @@ const intrinsicTypeNames =
         flatten([8,16,32,64].map(num=>["Int","Uint","Float"].map(t=>t+num+"Array")))
     ).filter(t=>_global[t]);
 const intrinsicTypes = intrinsicTypeNames.map(t=>_global[t]);
-const intrinsicTypeNameSet = arrayToObject(intrinsicTypeNames, x=>[x,true]);
+export const intrinsicTypeNameSet = arrayToObject(intrinsicTypeNames, x=>[x,true]);
 
 let circularRefs: null | WeakMap<any,any> = null;
 export function deepClone<T>(any: T): T {
@@ -234,55 +230,6 @@ function innerDeepClone<T>(any: T): T {
 const {toString} = {};
 export function toStringTag(o: Object) {
     return toString.call(o).slice(8, -1);
-}
-
-export const getValueOf = (val:any, type: string) => 
-    type === "Array" ? ''+val.map(v => getValueOf(v, toStringTag(v))) :
-    type === "ArrayBuffer" ? ''+new Uint8Array(val) :
-    type === "Date" ? val.getTime() :
-    ArrayBuffer.isView(val) ? ''+new Uint8Array(val.buffer) :
-    val;
-
- export function getObjectDiff(a, b, rv?, prfx?) {
-    // Compares objects a and b and produces a diff object.
-    rv = rv || {};
-    prfx = prfx || '';
-    keys(a).forEach(prop => {
-        if (!hasOwn(b, prop))
-            rv[prfx+prop] = undefined; // Property removed
-        else {
-            var ap = a[prop],
-                bp = b[prop];
-            if (typeof ap === 'object' && typeof bp === 'object' && ap && bp)
-            {
-                const apTypeName = toStringTag(ap);
-                const bpTypeName = toStringTag(bp);
-
-                if (apTypeName === bpTypeName) {
-                    if (intrinsicTypeNameSet[apTypeName] || isArray(ap)) {
-                        // This is an intrinsic type. Don't go deep diffing it.
-                        // Instead compare its value in best-effort:
-                        // (Can compare real values of Date, ArrayBuffers and views)
-                        if (getValueOf(ap, apTypeName) !== getValueOf(bp, bpTypeName)) {
-                            rv[prfx + prop] = b[prop]; // Date / ArrayBuffer etc is of different value
-                        }
-                    } else {
-                        // This is not an intrinsic object. Compare the it deeply:
-                        getObjectDiff(ap, bp, rv, prfx + prop + ".");
-                    }
-                } else {
-                    rv[prfx + prop] = b[prop];// Property changed to other type
-                }                
-            } else if (ap !== bp)
-                rv[prfx + prop] = b[prop];// Primitive value changed
-        }
-    });
-    keys(b).forEach(prop => {
-        if (!hasOwn(a, prop)) {
-            rv[prfx+prop] = b[prop]; // Property added
-        }
-    });
-    return rv;
 }
 
 // If first argument is iterable or array-like, return it as an array
