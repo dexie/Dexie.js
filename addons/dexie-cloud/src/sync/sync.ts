@@ -229,7 +229,7 @@ export async function sync(
     // so that all client-mutations that come after this, will be mapped to current
     // server revision.
     await db.$baseRevs.bulkPut(
-      Object.keys(schema).map((tableName) => {
+      Object.keys(schema).filter(table => schema[table].synced).map((tableName) => {
         const lastClientRevOnPreviousServerRev =
           latestRevisions[tableName] || 0;
         return {
