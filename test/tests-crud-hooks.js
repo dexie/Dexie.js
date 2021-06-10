@@ -797,3 +797,55 @@ promisedTest("issue #1195 Update with array as value adds number objects", async
         await db.table1.put({id:1, authors: [{name: "foo"}, {name: "bar"}]});
     }));
 });
+
+promisedTest("issue #1270 Modification object in updating hook not correct when changing array", async ()=>{
+    // Test sub-array
+    await expect([{
+        op: "create",
+        key: 1,
+        value: {id:1, authors: [{name: "foo"}]}
+    },{
+        op: "update",
+        key: 1,
+        obj: {id:1, authors: [{name: "foo"}]},
+        mods: {authors: [{name: "bar"}]},
+        updatedObj: {id:1, authors: [{name: "bar"}]},
+    }], ()=>db.transaction('rw', db.table1, async ()=>{
+        await db.table1.add({id:1, authors: [{name: "foo"}]});
+        await db.table1.put({id:1, authors: [{name: "bar"}]});
+    }));
+
+    // Test sub-object
+    await expect([{
+        op: "create",
+        key: 1,
+        value: {id:1, author: {name: "foo"}}
+    },{
+        op: "update",
+        key: 1,
+        obj: {id:1, author: {name: "foo"}},
+        mods: {"author.name": "bar"},
+        updatedObj: {id:1, author: {name: "bar"}},
+    }], ()=>db.transaction('rw', db.table1, async ()=>{
+        await db.table1.add({id:1, author: {name: "foo"}});
+        await db.table1.put({id:1, author: {name: "bar"}});
+    }));
+
+    // Test Arraybuffer in sub-array
+    const buffer1 = new Uint8Array(8).fill(1)
+    const buffer2 = new Uint8Array(8).fill(2)
+    await expect([{
+        op: "create",
+        key: 1,
+        value: {id:1, author: {buf: buffer1}}
+    },{
+        op: "update",
+        key: 1,
+        obj: {id:1, author: {buf: buffer1}},
+        mods: {"author.buf": buffer2},
+        updatedObj: {id:1, author: {buf: buffer2}},
+    }], ()=>db.transaction('rw', db.table1, async ()=>{
+        await db.table1.add({id:1, author: {buf: buffer1}});
+        await db.table1.put({id:1, author: {buf: buffer2}});
+    }));
+});
