@@ -37,13 +37,17 @@ function applyToUpperBitFix(orig: string, bits: number) {
 
 const consonants = /b|c|d|f|g|h|j|k|l|m|n|p|q|r|s|t|v|x|y|z/i;
 
+function isUpperCase(ch: string) {
+  return ch >= 'A' && ch <= 'Z';
+}
+
 export function generateTablePrefix(
   tableName: string,
   allPrefixes: Set<string>
 ) {
   let rv = tableName[0].toLocaleLowerCase(); // "users" = "usr", "friends" = "frn", "realms" = "rlm", etc.
   for (let i = 1, l = tableName.length; i < l && rv.length < 3; ++i) {
-    if (consonants.test(tableName[i])) rv += tableName[i].toLowerCase();
+    if (consonants.test(tableName[i]) || isUpperCase(tableName[i])) rv += tableName[i].toLowerCase();
   }
   while (allPrefixes.has(rv)) {
     if (/\d/g.test(rv)) {
