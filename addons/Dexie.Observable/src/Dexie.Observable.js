@@ -519,7 +519,7 @@ try {
 //
 // Map window events to static events in Dexie.Observable:
 //
-if (global.addEventListener) {
+if (global?.addEventListener) {
     global.addEventListener("storage", Observable._onStorage);
     global.addEventListener("beforeunload", Observable._onBeforeUnload);
 }

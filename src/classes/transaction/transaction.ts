@@ -237,8 +237,11 @@ export class Transaction implements ITransaction {
    * http://dexie.org/docs/Transaction/Transaction.abort()
    */
   abort() {
-    this.active && this._reject(new exceptions.Abort());
-    this.active = false;
+    if (this.active) {
+      this.active = false;
+      if (this.idbtrans) this.idbtrans.abort();
+      this._reject(new exceptions.Abort());
+    }
   }
 
   /** Transaction.table()

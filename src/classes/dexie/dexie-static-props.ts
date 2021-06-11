@@ -1,5 +1,7 @@
 import { Dexie as _Dexie } from './dexie';
-import { props, derive, extend, override, getByKeyPath, setByKeyPath, delByKeyPath, shallowClone, deepClone, getObjectDiff, asap, _global } from '../../functions/utils';
+import { _global } from '../../globals/global';
+import { props, derive, extend, override, getByKeyPath, setByKeyPath, delByKeyPath, shallowClone, deepClone, asap } from '../../functions/utils';
+import { getObjectDiff } from "../../functions/get-object-diff";
 import { fullNameExceptions } from '../../errors';
 import { DexieConstructor } from '../../public/types/dexie-constructor';
 import { getDatabaseNames } from '../../helpers/database-enumerator';

@@ -6,6 +6,7 @@ var db = new Dexie("TestDBTable");
 db.version(1).stores({
     users: "++id,first,last,&username,*&email,*pets",
     folks: "++,first,last",
+    items: "id",
     schema: "" // Test issue #1039
 });
 
@@ -94,6 +95,13 @@ promisedTest("Issue #966 - put() with dotted field in update hook", async () => 
     equal(obj.nested, undefined, "obj.nested field should have remained undefined");
 
     db.folks.hook("updating").unsubscribe(updateAssertions);
+});
+
+promisedTest("update array property", async () => {
+    const id = await db.items.put({id: 1, foo: [{bar: 123}]});
+    await db.items.update(1, {foo: [{bar: 222}]});
+    const obj = await db.items.get(1);
+    equal(JSON.stringify(obj.foo), JSON.stringify([{bar: 222}]), "foo har been updated to the new array");
 });
 
 promisedTest("Verify #1130 doesn't break contract of hook('updating')", async ()=>{
