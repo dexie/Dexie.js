@@ -9,7 +9,7 @@ import { UNAUTHORIZED_USER } from '../authentication/UNAUTHORIZED_USER';
 import { DexieCloudOptions } from '../DexieCloudOptions';
 import { BehaviorSubject } from 'rxjs';
 import { BaseRevisionMapEntry } from './entities/BaseRevisionMapEntry';
-import { DexieCloudSchema } from "dexie-cloud-common";
+import { DBRealm, DBRealmMember, DBRealmRole, DexieCloudSchema } from "dexie-cloud-common";
 import { BroadcastedLocalEvent } from '../helpers/BroadcastedLocalEvent';
 import { SyncState } from '../types/SyncState';
 
@@ -38,9 +38,9 @@ export interface DexieCloudDBBase {
   readonly $syncState: SyncStateTable;
   readonly $baseRevs: Table<BaseRevisionMapEntry, [string, number]>;
 
-  readonly realms: Table<Realm, string>;
-  readonly members: Table<Member, string>;
-  readonly roles: Table<Role, [string, string]>;
+  readonly realms: Table<DBRealm, string>;
+  readonly members: Table<DBRealmMember, string>;
+  readonly roles: Table<DBRealmRole, [string, string]>;
 
   readonly localSyncEvent: BehaviorSubject<any>;
   readonly syncStateChangedEvent: BroadcastedLocalEvent<SyncState>;
@@ -103,13 +103,13 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
       },
 
       get realms() {
-        return dx.table('realms') as Table<Realm, string>;
+        return dx.realms;
       },
       get members() {
-        return dx.table('members') as Table<Member, string>;
+        return dx.members;
       },
       get roles() {
-        return dx.table('roles') as Table<Role, [string, string]>;
+        return dx.roles;
       },
 
       localSyncEvent,

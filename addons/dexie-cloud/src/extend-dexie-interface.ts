@@ -1,12 +1,14 @@
 import Dexie from "dexie";
 import { DexieCloudOptions } from './DexieCloudOptions';
-import { DexieCloudSchema } from 'dexie-cloud-common/dist';
+import { DBRealm, DBRealmMember, DBRealmRole, DexieCloudSchema } from 'dexie-cloud-common';
 import { LoginState } from './types/LoginState';
 import { UserLogin } from './db/entities/UserLogin';
 import * as Rx from "rxjs";
 import { PersistedSyncState } from "./db/entities/PersistedSyncState";
 import { SyncState } from "./types/SyncState";
 import { DexieCloudServerState } from "./DexieCloudServerState";
+import { Member } from "./db/entities/Member";
+import { Role } from "./db/entities/Role";
 
 export interface DexieCloudSyncOptions {
   wait: boolean
@@ -29,7 +31,7 @@ declare module "dexie" {
        * 
        * @param email Email to authenticate
        */
-      login(email?: string): Promise<void>;
+      login(hint?: {email?: string, userId?: string, grant_type?: "demo" | "otp"}): Promise<void>;
       /**
        * Connect to given URL
        */
@@ -39,6 +41,10 @@ declare module "dexie" {
        */
       sync(options?: DexieCloudSyncOptions): Promise<void>;
     };
+
+    realms: Table<Partial<DBRealm>, string>;
+    members: Table<Partial<DBRealmMember>, string>;
+    roles: Table<DBRealmRole, [string, string]>;
   }
 
   interface DexieConstructor {

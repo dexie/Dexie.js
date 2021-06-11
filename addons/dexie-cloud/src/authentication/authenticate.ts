@@ -11,13 +11,13 @@ export interface AuthenticationDialog {
 }
 
 export const dummyAuthDialog: AuthenticationDialog = {
-  prompt,
-  alert,
+  prompt: async msg => prompt(msg),
+  alert: async msg => alert(msg),
 };
 
 export type FetchTokenCallback = (tokenParams: {
   public_key: string;
-  hints?: { userId?: string; email?: string };
+  hints?: { userId?: string; email?: string; grant_type?: string };
 }) => Promise<TokenFinalResponse>;
 
 export async function loadAccessToken(
@@ -57,7 +57,8 @@ export async function authenticate(
   url: string,
   context: UserLogin,
   dlg: AuthenticationDialog,
-  fetchToken: undefined | FetchTokenCallback
+  fetchToken: undefined | FetchTokenCallback,
+  hints?: {userId?: string; email?: string; grant_type?: string}
 ): Promise<UserLogin> {
   if (
     context.accessToken &&
@@ -75,7 +76,8 @@ export async function authenticate(
       url,
       context,
       dlg,
-      fetchToken || otpFetchTokenCallback(dlg, url)
+      fetchToken || otpFetchTokenCallback(dlg, url),
+      hints
     );
   }
 }
@@ -91,7 +93,8 @@ async function userAuthenticate(
   url: string,
   context: UserLogin,
   dlg: AuthenticationDialog,
-  fetchToken: FetchTokenCallback
+  fetchToken: FetchTokenCallback,
+  hints?: {userId?: string; email?: string; grant_type?: string}
 ) {
   const { privateKey, publicKey } = await crypto.subtle.generateKey(
     {
@@ -110,10 +113,7 @@ async function userAuthenticate(
 
   const response2 = await fetchToken({
     public_key: publicKeyPEM,
-    hints: {
-      email: context.email || undefined,
-      userId: context.userId || undefined,
-    },
+    hints,
   });
 
   if (response2.type !== "tokens")

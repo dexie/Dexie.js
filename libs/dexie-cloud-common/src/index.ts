@@ -13,3 +13,8 @@ export * from "./change-processing/DBKeyMutation.js"
 export * from "./change-processing/DBKeyMutationSet.js"
 export * from "./change-processing/subtractChanges.js"
 export * from "./change-processing/toDBOperationSet.js"
+export * from "./DBPermissionSet.js";
+export * from "./entities/DBRealm.js";
+export * from "./entities/DBRealmMember.js";
+export * from "./entities/DBRealmRole.js";
+export * from "./entities/DBSyncedObject.js";

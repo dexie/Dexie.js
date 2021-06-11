@@ -48,7 +48,7 @@ promisedTest('basic-test', async () => {
   ok(true, `Num friends: ${numFriends}`);
 
   console.log('Before login', db.cloud.currentUserId, db.cloud.currentUser);
-  await db.cloud.login('foo@demo.local');
+  await db.cloud.login({grant_type: "demo", userId: 'foo@demo.local'});
   console.log('Done login', db.cloud.currentUserId, db.cloud.currentUser);
   await new Promise(resolve => setTimeout(resolve, 2000));
   console.log("Deleting friend");
@@ -84,7 +84,7 @@ promisedTest('add-realm', async ()=> {
   console.log('DB opened...', db.cloud.currentUserId, db.cloud.currentUser);
   await new Promise(resolve => setTimeout(resolve, 500));
   console.log('Before login', db.cloud.currentUserId, db.cloud.currentUser);
-  await db.cloud.login('foo@demo.local');
+  await db.cloud.login({grant_type: "demo", userId: 'foo@demo.local'});
   console.log('Done login', db.cloud.currentUserId, db.cloud.currentUser);
   await db.cloud.sync();
   console.log("In sync now");
@@ -102,16 +102,20 @@ promisedTest('add-realm', async ()=> {
 
   // Add a realm
   const realmId = await db.transaction('rw', 'realms', 'members', 'todoLists', 'todoItems', async ()=>{
-    const realmId = await db.table("realms").add({
+    const realmId = await db.realms.add({
       name: "My new realm"
     });
-    await db.table('members').bulkAdd([{
+    await db.members.bulkAdd([{
       realmId,
       userId: db.cloud.currentUserId
     },{
       realmId,
       email: "david@dexie.org",
-      name: "David (dexie)"
+      name: "David (dexie)",
+      invite: true,
+      permissions: {
+        manage: "*"
+      }
     }]);
     const todoListId = await db.table("todoLists").add({
       title: "My todo list",
@@ -132,7 +136,10 @@ promisedTest('add-realm', async ()=> {
   await Promise.all([db.table("members").add({
     realmId,
     email: "david.fahlander@gmail.com",
-    name: "David (gmail)"
+    name: "David (gmail)",
+    permissions: {
+      manage: "*"
+    }    
   }),
   db.table("members").add({
     realmId,
