@@ -8,8 +8,9 @@ export interface SyncRequest {
   lastPull?: {
     serverRevision: any;
     realms: string[];
+    inviteRealms: string[];
   };
   baseRevs: BaseRevisionMapEntry[];
-  //baseRevisions: syncState?.baseRevisions || [],
   changes: DBOperationsSet;
+  //invites: {[inviteId: string]: "accept" | "reject"}
 }

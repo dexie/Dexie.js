@@ -7,7 +7,12 @@ export interface DBRealmMember extends DBSyncedObject {
   email?: string;
   name?: string;
   invite?: boolean;
-  invited?: Date;
+  invitedDate?: Date; // Set by system in in processInvites
+  invitedBy?: { // Set by system in in processInvites
+    name: string;
+    email: string;
+    userId: string;
+  }
   accepted?: Date;
   rejected?: Date;
   roles?: string[];
