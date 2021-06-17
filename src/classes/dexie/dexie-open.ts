@@ -12,6 +12,7 @@ import { vip } from './vip';
 import { promisableChain, nop } from '../../functions/chaining-functions';
 import { generateMiddlewareStacks } from './generate-middleware-stacks';
 import { slice } from '../../functions/utils';
+import safari14Workaround from 'safari-14-idb-fix';
 
 export function dexieOpen (db: Dexie) {
   const state = db._state;
@@ -31,7 +32,8 @@ export function dexieOpen (db: Dexie) {
       upgradeTransaction: (IDBTransaction | null) = null,
       wasCreated = false;
   
-  return Promise.race([state.openCanceller, new Promise((resolve, reject) => {
+  // safari14Workaround = Workaround by jakearchibald for new nasty bug in safari 14.
+  return Promise.race([state.openCanceller, safari14Workaround().then(() => new Promise((resolve, reject) => {
       // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
       // IE fails when deleting objectStore after reading from it.
       // A future version of Dexie.js will stopover an intermediate version to workaround this.
@@ -111,7 +113,7 @@ export function dexieOpen (db: Dexie) {
           resolve();
 
       }, reject);
-  })]).then(() => {
+  }))]).then(() => {
       // Before finally resolving the dbReadyPromise and this promise,
       // call and await all on('ready') subscribers:
       // Dexie.vip() makes subscribers able to use the database while being opened.
