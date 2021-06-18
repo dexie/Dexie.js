@@ -20,12 +20,13 @@ export async function syncIfPossible(
     // the retry procedure - we shouldn't do that also (would be redundant).
     return;
   }
-  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+  // Skipping check for navigator.onLine - turns out to be false in Opera even when online.
+  /*if (typeof navigator !== 'undefined' && !navigator.onLine) {
     // We're not online.
     // If LocalSyncWorker is used, a retry will automatically happen when we become
     // online.
     return;
-  }
+  }*/
   /*if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
     console.debug("syncIfPossible: not visible", options);
     return; // We're a window but not visible
