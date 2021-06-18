@@ -246,7 +246,9 @@ export async function sync(
     const syncState = await db.getPersistedSyncState();
     const newSyncState = syncState || {
       syncedTables: [],
-      latestRevisions: {}
+      latestRevisions: {},
+      realms: [],
+      inviteRealms: []
     };
     newSyncState.syncedTables = tablesToSync
       .map((tbl) => tbl.name)
@@ -255,6 +257,7 @@ export async function sync(
     newSyncState.remoteDbId = res.dbId;
     newSyncState.initiallySynced = true;
     newSyncState.realms = res.realms;
+    newSyncState.inviteRealms = res.inviteRealms;
     newSyncState.serverRevision = res.serverRevision;
 
     const filteredChanges = filterServerChangesThroughAddedClientChanges(

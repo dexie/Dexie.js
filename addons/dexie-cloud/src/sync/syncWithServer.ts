@@ -38,7 +38,8 @@ export async function syncWithServer(
     schema: schema || {},
     lastPull: syncState ? {
       serverRevision: syncState.serverRevision!,
-      realms: syncState.realms!
+      realms: syncState.realms,
+      inviteRealms: syncState.inviteRealms
     } : undefined,
     baseRevs,
     //baseRevisions: syncState?.baseRevisions || [],

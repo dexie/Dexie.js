@@ -1,4 +1,4 @@
-import Dexie from "dexie";
+import Dexie, { Table } from "dexie";
 import { DexieCloudOptions } from './DexieCloudOptions';
 import { DBRealm, DBRealmMember, DBRealmRole, DexieCloudSchema } from 'dexie-cloud-common';
 import { LoginState } from './types/LoginState';
@@ -9,10 +9,14 @@ import { SyncState } from "./types/SyncState";
 import { DexieCloudServerState } from "./DexieCloudServerState";
 import { Member } from "./db/entities/Member";
 import { Role } from "./db/entities/Role";
+import { EntityCommon } from "./db/entities/EntityCommon";
 
 export interface DexieCloudSyncOptions {
   wait: boolean
 }
+
+export type DexieCloudTable<T = any> = Table<T & EntityCommon, string>;
+
 //
 // Extend Dexie interface
 //

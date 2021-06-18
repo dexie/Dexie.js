@@ -40,6 +40,8 @@ import { triggerSync } from './sync/triggerSync';
 import { DexieCloudSyncOptions } from './extend-dexie-interface';
 import { isSyncNeeded } from './sync/isSyncNeeded';
 
+export { DexieCloudTable } from './extend-dexie-interface';
+
 export function dexieCloud(dexie: Dexie) {
   //
   //
@@ -181,14 +183,16 @@ export function dexieCloud(dexie: Dexie) {
       if (syncNeeded) {
         triggerSync(db);
         if (wait) {
-          console.debug("db.cloud.login() is waiting for sync completion...");
+          console.debug('db.cloud.login() is waiting for sync completion...');
           await from(liveQuery(() => isSyncNeeded(db)))
             .pipe(
               filter((isNeeded) => !isNeeded),
-              take(1),
-              )
+              take(1)
+            )
             .toPromise();
-          console.debug("Done waiting for sync completion because we have nothing to push anymore");
+          console.debug(
+            'Done waiting for sync completion because we have nothing to push anymore'
+          );
         }
       }
     }

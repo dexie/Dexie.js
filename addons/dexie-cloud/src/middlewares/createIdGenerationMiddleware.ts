@@ -128,6 +128,11 @@ export function createIdGenerationMiddleware(
           return {
             ...table,
             mutate: (req) => {
+              // @ts-ignore
+              if (req.trans.disableChangeTracking) {
+                // Disable ID policy checks and ID generation
+                return table.mutate(req);
+              }
               const cloudTableSchema = db.cloud.schema?.[tableName];
               if (req.type === 'add' || req.type === 'put') {
                 if (!cloudTableSchema?.generatedGlobalId) {

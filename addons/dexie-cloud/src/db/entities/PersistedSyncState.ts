@@ -3,7 +3,8 @@ export interface PersistedSyncState {
   latestRevisions: {
     [tableName: string]: number
   };
-  realms?: string[];
+  realms: string[];
+  inviteRealms: string[];
   initiallySynced?: boolean;
   remoteDbId?: string;
   syncedTables: string[];

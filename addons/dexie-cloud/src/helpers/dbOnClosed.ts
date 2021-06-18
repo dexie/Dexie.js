@@ -5,8 +5,8 @@ import Dexie from "dexie";
 export function dbOnClosed(db: Dexie, handler: () => void) {
   db.on.close.subscribe(handler);
   const origClose = db.close;
-  db.close = () => {
-    origClose();
+  db.close = function () {
+    origClose.call(this);
     handler();
   };
   return () => {
