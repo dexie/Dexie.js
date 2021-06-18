@@ -22,7 +22,8 @@ export function otpFetchTokenCallback(
       otpRequest = {
         demo_user,
         grant_type: 'demo',
-        scopes: ['ACCESS_DB']
+        scopes: ['ACCESS_DB'],
+        public_key
       };
     } else {
       const email = hints?.email || (await dlg.prompt('Email')); // TODO: Fixthis!
