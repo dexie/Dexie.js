@@ -1,6 +1,5 @@
 import { DBOperationsSet } from './DBOperationsSet.js';
 import { DexieCloudSchema } from './DexieCloudSchema.js';
-import { DBInvite } from './entities/DBInvite.js';
 
 export interface SyncResponse {
   serverRevision: any;
