@@ -20,6 +20,7 @@ export function LocalSyncWorker(
   function syncAndRetry(retryNum = 1) {
     syncIfPossible(db, cloudOptions, cloudSchema, { cancelToken }).catch(
       (e) => {
+        console.error('error in syncIfPossible()', e);
         if (cancelToken.cancelled) {
           stop();
         } else if (retryNum < 3) {
