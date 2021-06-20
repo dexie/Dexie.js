@@ -1,4 +1,4 @@
-import { Observable, Subject } from 'rxjs';
+import { Observable, Subject, Subscriber, Subscription } from 'rxjs';
 import { authenticate } from './authentication/authenticate';
 import { TSON } from './BISON';
 import { DexieCloudDB } from './db/DexieCloudDB';
@@ -15,15 +15,56 @@ interface RevisionMessage {
   type: 'rev';
   value: bigint;
 }
-export class WSConnection extends Subject<bigint> {
+
+export class WSRevObservable extends Observable<bigint> {
+  constructor(databaseUrl: string, token: string) {
+    super(subscriber => new WSRevConnection(databaseUrl, token, subscriber))
+  }
+}
+export class WSRevConnection extends Subscription {
   ws: WebSocket | null;
   lastServerActivity: Date;
   lastUserActivity: Date;
   lastPing: Date;
   databaseUrl: string;
   token: string;
+  closed: boolean;
+  subscriber: Subscriber<bigint>;
 
   private pinger: any;
+
+  constructor(databaseUrl: string, token: string, subscriber: Subscriber<bigint>) {
+    super(()=>this.teardown());
+    this.databaseUrl = databaseUrl;
+    this.token = token;
+    this.subscriber = subscriber;
+    this.connect();
+    window.addEventListener('mousemove', this.onUserActive);
+    window.addEventListener('keydown', this.onUserActive);
+  }
+
+  private teardown() {
+    this.disconnect();
+    window.removeEventListener('mousemove', this.onUserActive);
+    window.removeEventListener('keydown', this.onUserActive);
+  }
+
+  private disconnect() {
+    if (this.pinger) {
+      clearInterval(this.pinger);
+      this.pinger = null;
+    }
+    if (
+      this.ws &&
+      this.ws.readyState !== WebSocket.CLOSED &&
+      this.ws.readyState !== WebSocket.CLOSING
+    ) {
+      try {
+        this.ws?.close();
+      } catch {}
+    }
+    this.ws = null;
+  }
 
   isUserActive() {
     return (
@@ -47,65 +88,23 @@ export class WSConnection extends Subject<bigint> {
     }
   };
 
-  private close() {
-    if (
-      this.ws &&
-      this.ws.readyState !== WebSocket.CLOSED &&
-      this.ws.readyState !== WebSocket.CLOSING
-    ) {
-      try {
-        this.ws?.close();
-      } catch {}
-    }
-    this.ws = null;
-  }
-
-  private teardown() {
-    this.close();
-    window.removeEventListener('mousemove', this.onUserActive);
-    window.removeEventListener('keydown', this.onUserActive);
-    clearInterval(this.pinger);
-  }
-
-  complete() {
-    this.teardown();
-    super.complete();
-  }
-
   reconnect() {
+    this.disconnect();
+    this.connect();
+  }
+
+  connect() {
+    if (this.ws) {
+      throw new Error(`Called connect() when a connection is already open`);
+    }
     if (!this.databaseUrl)
       throw new Error(`Cannot reconnect without a database URL`);
-    this.connect(this.databaseUrl, this.token);
-    return new Promise((resolve, reject) => {
-      function onOpen() {
-        this.ws?.removeEventListener('open', onOpen);
-        this.ws?.removeEventListener('error', onError);
-        resolve(null);
-      }
-      function onError(ev: ErrorEvent) {
-        this.ws?.removeEventListener('open', onOpen);
-        this.ws?.removeEventListener('error', onError);
-        reject(ev.error);
-      }
-      this.ws!.addEventListener('open', onOpen);
-      this.ws!.addEventListener('error', reject);
-    });
-  }
-
-  connect(databaseUrl: string, token: string) {
-    if (!databaseUrl) throw new Error(`Cannot connect without a database URL`);
-    this.teardown();
-    if (this.isStopped) {
+    if (this.closed) {
       return;
     }
-    this.databaseUrl = databaseUrl;
-    this.token = token;
     this.lastServerActivity = new Date();
-
-    window.addEventListener('mousemove', this.onUserActive);
-    window.addEventListener('keydown', this.onUserActive);
     this.pinger = setInterval(async () => {
-      if (this.isStopped) {
+      if (this.closed) {
         this.teardown();
         return;
       }
@@ -114,7 +113,7 @@ export class WSConnection extends Subject<bigint> {
           try {
             this.ws.send(TSON.stringify({ type: 'ping' } as PingMessage));
             setTimeout(() => {
-              if (this.isStopped) {
+              if (this.closed) {
                 this.teardown();
                 return;
               }
@@ -126,7 +125,7 @@ export class WSConnection extends Subject<bigint> {
                 if (this.isUserActive()) {
                   this.reconnect();
                 } else {
-                  this.close();
+                  this.disconnect();
                 }
               }
             }, SERVER_PING_TIMEOUT);
@@ -138,15 +137,15 @@ export class WSConnection extends Subject<bigint> {
         }
       } else {
         // User not active
-        this.close();
+        this.disconnect();
       }
     }, CLIENT_PING_INTERVAL);
 
     // The following vars are needed because we must know which callback to ack when server sends it's ack to us.
-    const wsUrl = new URL(databaseUrl);
+    const wsUrl = new URL(this.databaseUrl);
     wsUrl.protocol = wsUrl.protocol === 'https' ? 'wss' : 'ws';
     const searchParams = new URLSearchParams();
-    if (token) searchParams.set('token', token);
+    if (this.token) searchParams.set('token', this.token);
 
     // Connect the WebSocket to given url:
     console.debug('ws create');
@@ -161,13 +160,13 @@ export class WSConnection extends Subject<bigint> {
     // If network down or other error, tell the framework to reconnect again in some time:
     ws.onerror = (event: ErrorEvent) => {
       console.log('onerror');
-      this.error(event.error);
-      this.close();
+      this.subscriber.error(event.error);
+      this.disconnect();
     };
 
     ws.onclose = (event: Event) => {
       console.log('onclose');
-      this.close();
+      this.disconnect();
     };
 
     ws.onmessage = (event: MessageEvent) => {
@@ -189,12 +188,12 @@ export class WSConnection extends Subject<bigint> {
           case 'ping':
             break;
           case 'rev':
-            this.next(msg.value);
+            this.subscriber.next(msg.value);
             break;
         }
       } catch (e) {
-        this.error(e);
-        this.close();
+        this.subscriber.error(e);
+        this.disconnect();
       }
     };
   }
