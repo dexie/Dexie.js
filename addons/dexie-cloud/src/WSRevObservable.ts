@@ -7,34 +7,49 @@ const USER_INACTIVITY_TIMEOUT = 60000;
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;
 
-export type WSConnectionMsg = PingMessage | RevisionMessage;
+export type WSConnectionMsg = PingMessage | RevisionChangedMessage | RealmsChangedMessage;
 interface PingMessage {
   type: 'ping';
 }
-interface RevisionMessage {
+export interface RevisionChangedMessage {
   type: 'rev';
-  value: bigint;
+  rev: bigint;
 }
 
-export class WSRevObservable extends Observable<bigint> {
-  constructor(databaseUrl: string, token: string) {
-    super(subscriber => new WSRevConnection(databaseUrl, token, subscriber))
+export interface RealmsChangedMessage {
+  type: 'realms';
+  realms: string[];
+}
+
+export class WSObservable extends Observable<WSConnectionMsg> {
+  constructor(
+    databaseUrl: string,
+    token?: string
+  ) {
+    super(
+      (subscriber) =>
+        new WSConnection(databaseUrl, token, subscriber)
+    );
   }
 }
-export class WSRevConnection extends Subscription {
+
+export class WSConnection extends Subscription {
   ws: WebSocket | null;
   lastServerActivity: Date;
   lastUserActivity: Date;
   lastPing: Date;
   databaseUrl: string;
-  token: string;
-  closed: boolean;
-  subscriber: Subscriber<bigint>;
+  token: string | undefined;
+  subscriber: Subscriber<WSConnectionMsg>;
 
   private pinger: any;
 
-  constructor(databaseUrl: string, token: string, subscriber: Subscriber<bigint>) {
-    super(()=>this.teardown());
+  constructor(
+    databaseUrl: string,
+    token: string | undefined,
+    subscriber: Subscriber<WSConnectionMsg>
+  ) {
+    super(() => this.teardown());
     this.databaseUrl = databaseUrl;
     this.token = token;
     this.subscriber = subscriber;
@@ -90,15 +105,15 @@ export class WSRevConnection extends Subscription {
 
   reconnect() {
     this.disconnect();
-    this.connect();
+    return this.connect();
   }
 
-  connect() {
+  async connect() {
     if (this.ws) {
       throw new Error(`Called connect() when a connection is already open`);
     }
     if (!this.databaseUrl)
-      throw new Error(`Cannot reconnect without a database URL`);
+      throw new Error(`Cannot connect without a database URL`);
     if (this.closed) {
       return;
     }
@@ -145,24 +160,14 @@ export class WSRevConnection extends Subscription {
     const wsUrl = new URL(this.databaseUrl);
     wsUrl.protocol = wsUrl.protocol === 'https' ? 'wss' : 'ws';
     const searchParams = new URLSearchParams();
-    if (this.token) searchParams.set('token', this.token);
+    const token = this.token;
+    if (this.subscriber.closed) return;
+    if (token) searchParams.set('token', token);
 
     // Connect the WebSocket to given url:
     console.debug('ws create');
     const ws = (this.ws = new WebSocket(`${wsUrl}/revision?${searchParams}`));
     //ws.binaryType = "arraybuffer"; // For future when subscribing to actual changes.
-
-    /*
-    ws.onopen = (event) => {
-      console.debug("ws onopen");
-    };*/
-
-    // If network down or other error, tell the framework to reconnect again in some time:
-    ws.onerror = (event: ErrorEvent) => {
-      console.log('onerror');
-      this.subscriber.error(event.error);
-      this.disconnect();
-    };
 
     ws.onclose = (event: Event) => {
       console.log('onclose');
@@ -173,28 +178,27 @@ export class WSRevConnection extends Subscription {
       console.log('onmessage', event.data);
       this.lastServerActivity = new Date();
       try {
-        // Assume we have a server that should send JSON messages of the following format:
-        // {
-        //     type: "clientIdentity", "changes", "ack" or "error"
-        //     clientIdentity: unique value for our database client node to persist in the context. (Only applicable if type="clientIdentity")
-        //     message: Error message (Only applicable if type="error")
-        //     requestId: ID of change request that is acked by the server (Only applicable if type="ack" or "error")
-        //     changes: changes from server (Only applicable if type="changes")
-        //     lastRevision: last revision of changes sent (applicable if type="changes")
-        //     partial: true if server has additionalChanges to send. False if these changes were the last known. (applicable if type="changes")
-        // }
         const msg = TSON.parse(event.data) as WSConnectionMsg;
-        switch (msg.type) {
-          case 'ping':
-            break;
-          case 'rev':
-            this.subscriber.next(msg.value);
-            break;
+        if (msg.type !== "ping") {
+          this.subscriber.next(msg);
         }
       } catch (e) {
         this.subscriber.error(e);
         this.disconnect();
       }
     };
+
+    await new Promise((resolve, reject) => {
+      ws.onopen = (event) => {
+        console.debug('ws onopen');
+        resolve(null);
+      };
+      ws.onerror = (event: ErrorEvent) => {
+        console.log('onerror');
+        this.subscriber.error(event.error);
+        this.disconnect();
+        reject(event.error);
+      };
+    });
   }
 }

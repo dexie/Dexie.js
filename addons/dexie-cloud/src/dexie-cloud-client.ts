@@ -26,7 +26,7 @@ import { performInitialSync } from './performInitialSync';
 import { LocalSyncWorker } from './sync/LocalSyncWorker';
 import { dbOnClosed } from './helpers/dbOnClosed';
 import { IS_SERVICE_WORKER } from './helpers/IS_SERVICE_WORKER';
-import { authenticate } from './authentication/authenticate';
+import { authenticate, loadAccessToken } from './authentication/authenticate';
 import { createMutationTrackingMiddleware } from './middlewares/createMutationTrackingMiddleware';
 import { updateSchemaFromOptions } from './updateSchemaFromOptions';
 import {
@@ -39,6 +39,7 @@ import { filter, map, take } from 'rxjs/operators';
 import { triggerSync } from './sync/triggerSync';
 import { DexieCloudSyncOptions } from './extend-dexie-interface';
 import { isSyncNeeded } from './sync/isSyncNeeded';
+import { connectWebSocket } from './sync/connectWebSocket';
 
 export { DexieCloudTable } from './extend-dexie-interface';
 
@@ -114,11 +115,16 @@ export function dexieCloud(dexie: Dexie) {
         await performInitialSync(db, db.cloud.options, db.cloud.schema!);
       }
 
+      // Manage CurrentUser observable:
+      subscriptions.push(
+        liveQuery(() => db.getCurrentUser()).subscribe(currentUserEmitter)
+      );
+
       // HERE: If requireAuth, do athentication now.
       if (db.cloud.options?.requireAuth) {
         // TODO: Do authentication here. BUT! Wait with this part for now!
         // First, make sure all other sync flows are complete!
-        //await authenticate(db.cloud.options.databaseUrl, db.cloud.currentUser.value, )
+        await login(db);
       }
 
       if (localSyncWorker) localSyncWorker.stop();
@@ -142,10 +148,14 @@ export function dexieCloud(dexie: Dexie) {
         localSyncWorker.start();
       }
 
-      // Manage CurrentUser observable:
-      subscriptions.push(
-        liveQuery(() => db.getCurrentUser()).subscribe(currentUserEmitter)
-      );
+      // Connect WebSocket only if we're a browser window
+      if (
+        typeof window !== 'undefined' &&
+        !IS_SERVICE_WORKER &&
+        db.cloud.options?.databaseUrl
+      ) {
+        subscriptions.push(connectWebSocket(db));
+      }
     },
     true // true = sticky
   );
@@ -177,14 +187,48 @@ export function dexieCloud(dexie: Dexie) {
       dexie.cloud.options = options;
       updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
     },
-    async sync({ wait }: DexieCloudSyncOptions = { wait: true }) {
+    async sync(
+      { wait, force }: DexieCloudSyncOptions = { wait: true, force: false }
+    ) {
+      if (wait === undefined) wait = true;
       const db = DexieCloudDB(dexie);
-      const syncNeeded = await isSyncNeeded(db);
-      if (syncNeeded) {
+      if (force) {
+        const syncState = await db.getPersistedSyncState();
+        triggerSync(db);
+        if (wait) {
+          const newSyncState = await from(
+            liveQuery(() => db.getPersistedSyncState())
+          )
+            .pipe(
+              filter(
+                (newSyncState) =>
+                  newSyncState?.timestamp != null &&
+                  (!syncState || newSyncState.timestamp > syncState.timestamp!)
+              ),
+              take(1)
+            )
+            .toPromise();
+          if (newSyncState?.error) {
+            throw new Error(`Sync error: ` + newSyncState.error);
+          }
+        }
+      } else if (await isSyncNeeded(db)) {
+        const syncState = await db.getPersistedSyncState();
         triggerSync(db);
         if (wait) {
           console.debug('db.cloud.login() is waiting for sync completion...');
-          await from(liveQuery(() => isSyncNeeded(db)))
+          await from(
+            liveQuery(async () => {
+              const syncNeeded = await isSyncNeeded(db);
+              const newSyncState = await db.getPersistedSyncState();
+              if (
+                newSyncState?.timestamp !== syncState?.timestamp &&
+                newSyncState?.error
+              )
+                throw new Error(`Sync error: ` + newSyncState.error);
+              return syncNeeded;
+            })
+          )
             .pipe(
               filter((isNeeded) => !isNeeded),
               take(1)

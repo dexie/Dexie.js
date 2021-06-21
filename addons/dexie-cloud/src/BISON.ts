@@ -22,11 +22,15 @@ import { TypeDefSet } from 'dreambase-library/dist/typeson-simplified/TypeDefSet
 export const hasBigIntSupport = typeof BigInt !== 'undefined';
 
 export class FakeBigInt {
-  b64: string;
-  neg: boolean;
-  constructor({ b64, neg }: { b64: string; neg?: boolean }) {
-    this.b64 = b64;
-    if (neg) this.neg = true;
+  v: string;
+  static compare(a: bigint | FakeBigInt, b:bigint | FakeBigInt) {
+    if (typeof a === "bigint") return a < b ? -1 : a > b ? 1 : 0;
+    if (typeof b === "bigint") throw new TypeError("Can't compare real bigint with FakeBigInt");
+    // Here, we can only compare in best effort.
+    return Number(a) < Number(b) ? -1 : Number(a) > Number(b) ? 1 : 0;
+  }
+  constructor(value: string) {
+    this.v = value;
   }
 }
 
@@ -44,13 +48,11 @@ const defs: TypeDefSet = {
             };
           },
           revive: ({
-            neg,
-            b64
+            v,
           }: {
             $t: 'bigint';
-            neg?: boolean;
-            b64: string;
-          }) => new FakeBigInt({ neg, b64 }) as any as bigint
+            v?: string;
+          }) => new FakeBigInt(v) as any as bigint
         }
       })
 };

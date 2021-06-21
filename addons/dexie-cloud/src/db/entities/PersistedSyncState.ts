@@ -8,4 +8,6 @@ export interface PersistedSyncState {
   initiallySynced?: boolean;
   remoteDbId?: string;
   syncedTables: string[];
+  timestamp?: Date;
+  error?: string;
 }

@@ -82,6 +82,8 @@ export async function performGuardedJob(
           throw err;
         }
         // Timeout stopped us! Try aquire the lock now.
+        // It will likely succeed this time unless
+        // another client took it.
         return await aquireLock();
       }
     }

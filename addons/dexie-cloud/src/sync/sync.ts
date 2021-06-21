@@ -53,14 +53,33 @@ export interface SyncOptions {
   justCheckIfNeeded?: boolean;
 }
 
-export async function sync(
+export function sync(
   db: DexieCloudDB,
   options: DexieCloudOptions,
   schema: DexieCloudSchema,
-  { isInitialSync, cancelToken, justCheckIfNeeded }: SyncOptions = { isInitialSync: false }
+  syncOptions: SyncOptions = {
+    isInitialSync: false
+  }
+): Promise<boolean> {
+  return _sync.apply(this, arguments).catch(async (error: any) => {
+    // Make sure that no matter whether sync() explodes or not,
+    // always update the timestamp. Also store the error.
+    await db.$syncState.update('syncState', {
+      timestamp: new Date(),
+      error: '' + error
+    });
+    return Promise.reject(error);
+  });
+}
+
+async function _sync(
+  db: DexieCloudDB,
+  options: DexieCloudOptions,
+  schema: DexieCloudSchema,
+  { isInitialSync, cancelToken, justCheckIfNeeded }: SyncOptions
 ): Promise<boolean> {
   if (!justCheckIfNeeded) {
-    console.debug("SYNC STARTED", {isInitialSync});
+    console.debug('SYNC STARTED', { isInitialSync });
   }
   if (!db.cloud.options?.databaseUrl)
     throw new Error(
@@ -90,13 +109,17 @@ export async function sync(
 
   if (doSyncify) {
     if (justCheckIfNeeded) return true;
-    console.debug("sync doSyncify is true");
+    console.debug('sync doSyncify is true');
     await db.transaction('rw', tablesToSyncify, async (tx) => {
       // @ts-ignore
       tx.idbtrans.disableChangeTracking = true;
       // @ts-ignore
       tx.idbtrans.disableAccessControl = true; // TODO: Take care of this flag in access control middleware!
-      await modifyLocalObjectsWithNewUserId(tablesToSyncify, currentUser, persistedSyncState?.realms);
+      await modifyLocalObjectsWithNewUserId(
+        tablesToSyncify,
+        currentUser,
+        persistedSyncState?.realms
+      );
     });
     throwIfCancelled(cancelToken);
   }
@@ -127,8 +150,10 @@ export async function sync(
   );
 
   if (justCheckIfNeeded) {
-    const syncIsNeeded = clientChangeSet.some(set => set.muts.some(mut => mut.keys.length > 0));
-    console.debug("Sync is needed:", syncIsNeeded);
+    const syncIsNeeded = clientChangeSet.some((set) =>
+      set.muts.some((mut) => mut.keys.length > 0)
+    );
+    console.debug('Sync is needed:', syncIsNeeded);
     return syncIsNeeded;
   }
 
@@ -149,8 +174,8 @@ export async function sync(
     databaseUrl,
     schema
   );
-  console.debug("Sync response", res);
- 
+  console.debug('Sync response', res);
+
   //
   // Apply changes locally and clear old change entries:
   //
@@ -229,15 +254,17 @@ export async function sync(
     // so that all client-mutations that come after this, will be mapped to current
     // server revision.
     await db.$baseRevs.bulkPut(
-      Object.keys(schema).filter(table => schema[table].synced).map((tableName) => {
-        const lastClientRevOnPreviousServerRev =
-          latestRevisions[tableName] || 0;
-        return {
-          tableName,
-          clientRev: lastClientRevOnPreviousServerRev + 1,
-          serverRev: res.serverRevision
-        };
-      })
+      Object.keys(schema)
+        .filter((table) => schema[table].synced)
+        .map((tableName) => {
+          const lastClientRevOnPreviousServerRev =
+            latestRevisions[tableName] || 0;
+          return {
+            tableName,
+            clientRev: lastClientRevOnPreviousServerRev + 1,
+            serverRev: res.serverRevision
+          };
+        })
     );
 
     //
@@ -259,6 +286,8 @@ export async function sync(
     newSyncState.realms = res.realms;
     newSyncState.inviteRealms = res.inviteRealms;
     newSyncState.serverRevision = res.serverRevision;
+    newSyncState.timestamp = new Date();
+    delete newSyncState.error;
 
     const filteredChanges = filterServerChangesThroughAddedClientChanges(
       res.changes,
@@ -278,10 +307,10 @@ export async function sync(
     return addedClientChanges.length === 0;
   });
   if (!done) {
-    console.debug("MORE SYNC NEEDED. Go for it again!");
+    console.debug('MORE SYNC NEEDED. Go for it again!');
     return await sync(db, options, schema, { isInitialSync, cancelToken });
   }
-  console.debug("SYNC DONE", {isInitialSync});
+  console.debug('SYNC DONE', { isInitialSync });
   return false; // Not needed anymore
 }
 
@@ -300,10 +329,10 @@ export async function applyServerChanges(
   changes: DBOperationsSet,
   db: DexieCloudDB
 ) {
-  console.debug("Applying server changes", changes, Dexie.currentTransaction);
+  console.debug('Applying server changes', changes, Dexie.currentTransaction);
   for (const { table: tableName, muts } of changes) {
     const table = db.table(tableName);
-    const {primaryKey} = table.core.schema;
+    const { primaryKey } = table.core.schema;
     for (const mut of muts) {
       switch (mut.type) {
         case 'insert':
@@ -313,7 +342,7 @@ export async function applyServerChanges(
             mut.keys.forEach((key, i) => {
               Dexie.setByKeyPath(mut.values[i], primaryKey.keyPath as any, key);
             });
-            await table.bulkAdd(mut.values);            
+            await table.bulkAdd(mut.values);
           }
           break;
         case 'upsert':
