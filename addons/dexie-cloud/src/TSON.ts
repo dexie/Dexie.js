@@ -51,7 +51,7 @@ const defs: TypeDefSet = {
             v,
           }: {
             $t: 'bigint';
-            v?: string;
+            v: string;
           }) => new FakeBigInt(v) as any as bigint
         }
       })

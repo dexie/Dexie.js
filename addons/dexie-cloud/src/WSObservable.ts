@@ -1,6 +1,6 @@
 import { Observable, Subject, Subscriber, Subscription } from 'rxjs';
 import { authenticate } from './authentication/authenticate';
-import { TSON } from './BISON';
+import { TSON } from './TSON';
 import { DexieCloudDB } from './db/DexieCloudDB';
 
 const USER_INACTIVITY_TIMEOUT = 60000;

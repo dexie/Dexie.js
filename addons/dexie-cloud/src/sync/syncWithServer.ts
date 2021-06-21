@@ -1,7 +1,7 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import { loadAccessToken } from '../authentication/authenticate';
-import { BISON, TSON } from '../BISON';
+import { BISON, TSON } from '../TSON';
 import { getSyncableTables } from '../helpers/getSyncableTables';
 import { BaseRevisionMapEntry } from '../db/entities/BaseRevisionMapEntry';
 import { HttpError } from '../errors/HttpError';

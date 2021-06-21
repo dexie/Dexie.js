@@ -1,7 +1,7 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { WSObservable } from '../WSRevObservable';
+import { WSObservable } from '../WSObservable';
 import { authenticate, loadAccessToken } from '../authentication/authenticate';
-import { FakeBigInt } from '../BISON';
+import { FakeBigInt } from '../TSON';
 import { triggerSync } from './triggerSync';
 import { switchMap } from 'rxjs/operators';
 
