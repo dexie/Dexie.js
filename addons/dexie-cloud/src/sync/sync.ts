@@ -57,9 +57,7 @@ export function sync(
   db: DexieCloudDB,
   options: DexieCloudOptions,
   schema: DexieCloudSchema,
-  syncOptions: SyncOptions = {
-    isInitialSync: false
-  }
+  syncOptions?: SyncOptions
 ): Promise<boolean> {
   return _sync.apply(this, arguments).catch(async (error: any) => {
     // Make sure that no matter whether sync() explodes or not,
@@ -76,7 +74,9 @@ async function _sync(
   db: DexieCloudDB,
   options: DexieCloudOptions,
   schema: DexieCloudSchema,
-  { isInitialSync, cancelToken, justCheckIfNeeded }: SyncOptions
+  { isInitialSync, cancelToken, justCheckIfNeeded }: SyncOptions = {
+    isInitialSync: false
+  }
 ): Promise<boolean> {
   if (!justCheckIfNeeded) {
     console.debug('SYNC STARTED', { isInitialSync });
