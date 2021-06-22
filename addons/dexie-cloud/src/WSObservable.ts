@@ -1,24 +1,37 @@
 import { Observable, Subject, Subscriber, Subscription } from 'rxjs';
 import { authenticate } from './authentication/authenticate';
-import { TSON } from './TSON';
 import { DexieCloudDB } from './db/DexieCloudDB';
 
 const USER_INACTIVITY_TIMEOUT = 60000;
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;
 
-export type WSConnectionMsg = PingMessage | RevisionChangedMessage | RealmsChangedMessage;
+export type WSConnectionMsg = RevisionChangedMessage | RealmAddedMessage | RealmRemovedMessage;
 interface PingMessage {
   type: 'ping';
 }
-export interface RevisionChangedMessage {
-  type: 'rev';
-  rev: bigint;
+
+interface PongMessage {
+  type: 'pong';
 }
 
-export interface RealmsChangedMessage {
-  type: 'realms';
-  realms: string[];
+interface ErrorMessage {
+  type: 'error';
+  error: string;
+}
+export interface RevisionChangedMessage {
+  type: 'rev';
+  rev: string;
+}
+
+export interface RealmAddedMessage {
+  type: 'realm-added';
+  realm: string;
+}
+
+export interface RealmRemovedMessage {
+  type: 'realm-removed';
+  realm: string;
 }
 
 export class WSObservable extends Observable<WSConnectionMsg> {
@@ -126,7 +139,7 @@ export class WSConnection extends Subscription {
       if (this.isUserActive()) {
         if (this.ws) {
           try {
-            this.ws.send(TSON.stringify({ type: 'ping' } as PingMessage));
+            this.ws.send(JSON.stringify({ type: 'ping' } as PingMessage));
             setTimeout(() => {
               if (this.closed) {
                 this.teardown();
@@ -178,8 +191,11 @@ export class WSConnection extends Subscription {
       console.log('onmessage', event.data);
       this.lastServerActivity = new Date();
       try {
-        const msg = TSON.parse(event.data) as WSConnectionMsg;
-        if (msg.type !== "ping") {
+        const msg = JSON.parse(event.data) as WSConnectionMsg | PongMessage | ErrorMessage;
+        if (msg.type === "error") {
+          throw new Error(`WebSocket Error ${msg.error}`);
+        }
+        if (msg.type !== "pong") {
           this.subscriber.next(msg);
         }
       } catch (e) {
