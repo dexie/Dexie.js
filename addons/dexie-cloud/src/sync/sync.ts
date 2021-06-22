@@ -18,8 +18,10 @@ import {
   DBOperationsSet,
   DexieCloudSchema,
   subtractChanges,
+  SyncResponse,
   toDBOperationSet
 } from 'dexie-cloud-common';
+import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 
 export const isSyncing = new WeakSet<DexieCloudDB>();
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
@@ -267,10 +269,16 @@ async function _sync(
         })
     );
 
+    const syncState = await db.getPersistedSyncState();
+
+    //
+    // Delete objects from removed realms
+    //
+    await deleteObjectsFromRemovedRealms(db, res, syncState);
+
     //
     // Update syncState
     //
-    const syncState = await db.getPersistedSyncState();
     const newSyncState = syncState || {
       syncedTables: [],
       latestRevisions: {},
@@ -312,6 +320,42 @@ async function _sync(
   }
   console.debug('SYNC DONE', { isInitialSync });
   return false; // Not needed anymore
+}
+
+async function deleteObjectsFromRemovedRealms(
+  db: DexieCloudDB,
+  res: SyncResponse,
+  prevState: PersistedSyncState | undefined
+) {
+  const deletedRealms: string[] = [];
+  const previousRealmSet = prevState
+    ? prevState.realms.concat(prevState.inviteRealms)
+    : [];
+  const updatedRealmSet = new Set([...res.realms, ...res.inviteRealms]);
+  for (const realmId of previousRealmSet) {
+    if (!updatedRealmSet.has(realmId)) deletedRealms.push(realmId);
+  }
+  if (deletedRealms.length > 0) {
+    const deletedRealmSet = new Set(deletedRealms);
+    const tables = getSyncableTables(db);
+    for (const table of tables) {
+      if (
+        table.schema.indexes.some(
+          (idx) =>
+            idx.keyPath === 'realmId' ||
+            (Array.isArray(idx.keyPath) && idx.keyPath[0] === 'realmId')
+        )
+      ) {
+        // There's an index to use:
+        await table.where('realmId').anyOf(deletedRealms).delete();
+      } else {
+        // No index to use:
+        await table
+          .filter((obj) => !!obj?.realmId && deletedRealmSet.has(obj.realmId))
+          .delete();
+      }
+    }
+  }
 }
 
 function getLatestRevisionsPerTable(
