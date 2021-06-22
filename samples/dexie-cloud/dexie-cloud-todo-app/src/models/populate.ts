@@ -1,7 +1,7 @@
 import { db } from "./db";
 
 export async function populate() {
-  const todoListId = await db.todoLists.add({
+  /*const todoListId = await db.todoLists.add({
     title: "To Do Today"
   });
   await db.todoItems.bulkAdd([
@@ -17,5 +17,5 @@ export async function populate() {
       todoListId,
       title: "Have some sleep"
     }
-  ]);
+  ]);*/
 }
