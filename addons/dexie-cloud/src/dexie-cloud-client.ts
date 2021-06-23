@@ -13,6 +13,7 @@ import { UserLogin } from './db/entities/UserLogin';
 import { UNAUTHORIZED_USER } from './authentication/UNAUTHORIZED_USER';
 import { login } from './authentication/login';
 import {
+  getDbNameFromDbUrl,
   OTPTokenRequest,
   TokenFinalResponse,
   TokenOtpSentResponse,
@@ -44,6 +45,7 @@ import { connectWebSocket } from './sync/connectWebSocket';
 export { DexieCloudTable } from './extend-dexie-interface';
 
 export function dexieCloud(dexie: Dexie) {
+  const origIdbName = dexie.name;
   //
   //
   //
@@ -102,17 +104,38 @@ export function dexieCloud(dexie: Dexie) {
             !persistedSchema ||
             JSON.stringify(persistedSchema) !== JSON.stringify(schema)
           ) {
-            // Update persisted schema
-            await db.$syncState.put(schema, 'schema');
+            // Update persisted schema (but don't overwrite table prefixes)
+            const newPersistedSchema = persistedSchema || {};
+            for (const [table, tblSchema] of Object.entries(schema)) {
+              const newTblSchema = newPersistedSchema[table];
+              if (!newTblSchema) {
+                newPersistedSchema[table] = {...tblSchema};
+              } else {
+                newTblSchema.markedForSync = tblSchema.markedForSync;
+                tblSchema.deleted = newTblSchema.deleted;
+                newTblSchema.generatedGlobalId = tblSchema.generatedGlobalId;
+              }
+            }
+            await db.$syncState.put(newPersistedSchema, 'schema');
+
+            // Make sure persisted table prefixes are being used instead of computed ones:
+            // Let's assign all props as the newPersistedSchems should be what we should be working with.
+            Object.assign(schema, newPersistedSchema);
           }
           return persistedSyncState?.initiallySynced;
         }
       );
 
+      if (initiallySynced) {
+        // @ts-ignore
+        db.setInitiallySynced(true);
+      }
+
       verifySchema(db);
 
       if (db.cloud.options?.databaseUrl && !initiallySynced) {
         await performInitialSync(db, db.cloud.options, db.cloud.schema!);
+        db.setInitiallySynced(true);
       }
 
       // Manage CurrentUser observable:
@@ -185,6 +208,10 @@ export function dexieCloud(dexie: Dexie) {
     },
     configure(options: DexieCloudOptions) {
       dexie.cloud.options = options;
+      if (options.databaseUrl) {
+        // @ts-ignore
+        dexie.name = `${origIdbName}-${getDbNameFromDbUrl(options.databaseUrl)}`;
+      }
       updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
     },
     async sync(

@@ -1,12 +1,17 @@
 import { Observable, Subject, Subscriber, Subscription } from 'rxjs';
-import { authenticate } from './authentication/authenticate';
+import { authenticate, loadAccessToken } from './authentication/authenticate';
+import { TokenExpiredError } from './authentication/TokenExpiredError';
 import { DexieCloudDB } from './db/DexieCloudDB';
 
-const USER_INACTIVITY_TIMEOUT = 60000;
+const USER_INACTIVITY_TIMEOUT = 30000; // 300_000;
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;
+const FAIL_RETRY_WAIT_TIME = 60000;
 
-export type WSConnectionMsg = RevisionChangedMessage | RealmAddedMessage | RealmRemovedMessage;
+export type WSConnectionMsg =
+  | RevisionChangedMessage
+  | RealmAddedMessage
+  | RealmRemovedMessage;
 interface PingMessage {
   type: 'ping';
 }
@@ -35,16 +40,12 @@ export interface RealmRemovedMessage {
 }
 
 export class WSObservable extends Observable<WSConnectionMsg> {
-  constructor(
-    databaseUrl: string,
-    token?: string
-  ) {
-    super(
-      (subscriber) =>
-        new WSConnection(databaseUrl, token, subscriber)
-    );
+  constructor(databaseUrl: string, rev: string, token?: string, tokenExpiration?: Date) {
+    super((subscriber) => new WSConnection(databaseUrl, rev, token, tokenExpiration, subscriber));
   }
 }
+
+let counter = 0;
 
 export class WSConnection extends Subscription {
   ws: WebSocket | null;
@@ -52,29 +53,41 @@ export class WSConnection extends Subscription {
   lastUserActivity: Date;
   lastPing: Date;
   databaseUrl: string;
+  rev: string;
   token: string | undefined;
+  tokenExpiration: Date | undefined;
   subscriber: Subscriber<WSConnectionMsg>;
+  pauseUntil?: Date;
+  id = ++counter;
 
   private pinger: any;
 
   constructor(
     databaseUrl: string,
+    rev: string,
     token: string | undefined,
+    tokenExpiration: Date | undefined,
     subscriber: Subscriber<WSConnectionMsg>
   ) {
     super(() => this.teardown());
+    console.debug('New WebSocket Connection', this.id, token);
     this.databaseUrl = databaseUrl;
+    this.rev = rev;
     this.token = token;
+    this.tokenExpiration = tokenExpiration;
     this.subscriber = subscriber;
     this.connect();
     window.addEventListener('mousemove', this.onUserActive);
     window.addEventListener('keydown', this.onUserActive);
+    window.addEventListener('wheel', this.onUserActive);
   }
 
   private teardown() {
+    console.debug('Teardown WebSocket Connection', this.id);
     this.disconnect();
     window.removeEventListener('mousemove', this.onUserActive);
     window.removeEventListener('keydown', this.onUserActive);
+    window.removeEventListener('wheel', this.onUserActive);
   }
 
   private disconnect() {
@@ -82,13 +95,9 @@ export class WSConnection extends Subscription {
       clearInterval(this.pinger);
       this.pinger = null;
     }
-    if (
-      this.ws &&
-      this.ws.readyState !== WebSocket.CLOSED &&
-      this.ws.readyState !== WebSocket.CLOSING
-    ) {
+    if (this.ws) {
       try {
-        this.ws?.close();
+        this.ws.close();
       } catch {}
     }
     this.ws = null;
@@ -118,16 +127,21 @@ export class WSConnection extends Subscription {
 
   reconnect() {
     this.disconnect();
-    return this.connect();
+    this.connect();
   }
 
   async connect() {
+    if (this.pauseUntil && this.pauseUntil > new Date()) return;
     if (this.ws) {
       throw new Error(`Called connect() when a connection is already open`);
     }
     if (!this.databaseUrl)
       throw new Error(`Cannot connect without a database URL`);
     if (this.closed) {
+      return;
+    }
+    if (this.tokenExpiration && this.tokenExpiration < new Date()) {
+      this.subscriber.error(new TokenExpiredError()); // Will be handled in connectWebSocket.ts.
       return;
     }
     this.lastServerActivity = new Date();
@@ -141,7 +155,7 @@ export class WSConnection extends Subscription {
           try {
             this.ws.send(JSON.stringify({ type: 'ping' } as PingMessage));
             setTimeout(() => {
-              if (this.closed) {
+              if (this.closed || !this.pinger) {
                 this.teardown();
                 return;
               }
@@ -173,9 +187,11 @@ export class WSConnection extends Subscription {
     const wsUrl = new URL(this.databaseUrl);
     wsUrl.protocol = wsUrl.protocol === 'https' ? 'wss' : 'ws';
     const searchParams = new URLSearchParams();
-    const token = this.token;
     if (this.subscriber.closed) return;
-    if (token) searchParams.set('token', token);
+    searchParams.set('rev', this.rev);
+    if (this.token) {
+      searchParams.set('token', this.token);
+    }
 
     // Connect the WebSocket to given url:
     console.debug('ws create');
@@ -191,30 +207,40 @@ export class WSConnection extends Subscription {
       console.log('onmessage', event.data);
       this.lastServerActivity = new Date();
       try {
-        const msg = JSON.parse(event.data) as WSConnectionMsg | PongMessage | ErrorMessage;
-        if (msg.type === "error") {
+        const msg = JSON.parse(event.data) as
+          | WSConnectionMsg
+          | PongMessage
+          | ErrorMessage;
+        if (msg.type === 'error') {
           throw new Error(`WebSocket Error ${msg.error}`);
         }
-        if (msg.type !== "pong") {
+        if (msg.type === "rev") {
+          this.rev = msg.rev; // No meaning but seems reasonable.
+        }
+        if (msg.type !== 'pong') {
           this.subscriber.next(msg);
         }
       } catch (e) {
-        this.subscriber.error(e);
         this.disconnect();
+        this.pauseUntil = new Date(Date.now() + FAIL_RETRY_WAIT_TIME);
       }
     };
 
-    await new Promise((resolve, reject) => {
-      ws.onopen = (event) => {
-        console.debug('ws onopen');
-        resolve(null);
-      };
-      ws.onerror = (event: ErrorEvent) => {
-        console.log('onerror');
-        this.subscriber.error(event.error);
-        this.disconnect();
-        reject(event.error);
-      };
-    });
+    try {
+      await new Promise((resolve, reject) => {
+        ws.onopen = (event) => {
+          console.debug('ws onopen');
+          resolve(null);
+        };
+        ws.onerror = (event: ErrorEvent) => {
+          const error = event.error || new Error('WebSocket Error');
+          console.warn('WebSocket error', error);
+          this.disconnect();
+          reject(error);
+        };
+      });
+    } catch (error) {
+      this.pauseUntil = new Date(Date.now() + FAIL_RETRY_WAIT_TIME);
+    }
   }
 }

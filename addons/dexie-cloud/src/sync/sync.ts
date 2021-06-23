@@ -257,7 +257,7 @@ async function _sync(
     // server revision.
     await db.$baseRevs.bulkPut(
       Object.keys(schema)
-        .filter((table) => schema[table].synced)
+        .filter((table) => schema[table].markedForSync)
         .map((tableName) => {
           const lastClientRevOnPreviousServerRev =
             latestRevisions[tableName] || 0;

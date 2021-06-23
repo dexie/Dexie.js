@@ -29,6 +29,9 @@ export class FakeBigInt {
     // Here, we can only compare in best effort.
     return Number(a) < Number(b) ? -1 : Number(a) > Number(b) ? 1 : 0;
   }
+  toString() {
+    return this.v;
+  }
   constructor(value: string) {
     this.v = value;
   }

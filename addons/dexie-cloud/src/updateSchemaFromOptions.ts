@@ -6,7 +6,7 @@ export function updateSchemaFromOptions(schema?: DexieCloudSchema | null, option
     if (options.unsyncedTables) {
       for (const tableName of options.unsyncedTables) {
         if (schema[tableName]) {
-          schema[tableName].synced = false;
+          schema[tableName].markedForSync = false;
         }
       }
     }

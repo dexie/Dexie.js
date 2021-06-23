@@ -19,7 +19,7 @@ export function createImplicitPropSetterMiddleware(
             mutate: (req) => {
               const trans = req.trans as DBCoreTransaction & TXExpandos;
               if (
-                db.cloud.schema?.[tableName]?.synced &&
+                db.cloud.schema?.[tableName]?.markedForSync &&
                 trans.currentUser?.isLoggedIn
               ) {
                 if (req.type === 'add' || req.type === 'put') {

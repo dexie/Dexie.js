@@ -3,6 +3,7 @@ import Dexie, {
   DBCoreAddRequest,
   DBCoreDeleteRequest,
   DBCoreIndex,
+  DBCoreMutateRequest,
   DBCorePutRequest,
   Middleware
 } from 'dexie';
@@ -47,7 +48,8 @@ export function generateTablePrefix(
 ) {
   let rv = tableName[0].toLocaleLowerCase(); // "users" = "usr", "friends" = "frn", "realms" = "rlm", etc.
   for (let i = 1, l = tableName.length; i < l && rv.length < 3; ++i) {
-    if (consonants.test(tableName[i]) || isUpperCase(tableName[i])) rv += tableName[i].toLowerCase();
+    if (consonants.test(tableName[i]) || isUpperCase(tableName[i]))
+      rv += tableName[i].toLowerCase();
   }
   while (allPrefixes.has(rv)) {
     if (/\d/g.test(rv)) {
@@ -125,6 +127,45 @@ export function createIdGenerationMiddleware(
         ...core,
         table: (tableName) => {
           const table = core.table(tableName);
+
+          function generateOrVerifyAtKeys(req: DBCoreAddRequest | DBCorePutRequest, idPrefix: string) {
+            let valueClones: null | object[] = null;
+            const keys = getEffectiveKeys(table.schema.primaryKey, req);
+            keys.forEach((key, idx) => {
+              if (key === undefined) {
+                // Generate the key
+                const colocatedId =
+                  req.values[idx].realmId || db.cloud.currentUserId;
+                const shardKey = colocatedId.substr(colocatedId.length - 3);
+                keys[idx] = generateKey(idPrefix, shardKey);
+                if (!table.schema.primaryKey.outbound) {
+                  if (!valueClones) valueClones = req.values.slice();
+                  valueClones[idx] = Dexie.deepClone(valueClones[idx]);
+                  Dexie.setByKeyPath(
+                    valueClones[idx],
+                    table.schema.primaryKey.keyPath as any, // TODO: fix typings in dexie-constructor.d.ts!
+                    keys[idx]
+                  );
+                }
+              } else if (
+                typeof key !== 'string' ||
+                !key.startsWith(idPrefix)
+              ) {
+                // Key was specified by caller. Verify it complies with id prefix.
+                throw new Dexie.ConstraintError(
+                  `The ID "${key}" is not valid for table "${tableName}". ` +
+                    `Primary '@' keys requires the key to be prefixed with "${idPrefix}.\n"` +
+                    `If you want to generate IDs programmatically, remove '@' from the schema to get rid of this constraint. Dexie Cloud supports custom IDs as long as they are random and globally unique.`
+                );
+              }
+            });
+            return table.mutate({
+              ...req,
+              keys,
+              values: valueClones || req.values
+            });
+          }
+
           return {
             ...table,
             mutate: (req) => {
@@ -133,59 +174,38 @@ export function createIdGenerationMiddleware(
                 // Disable ID policy checks and ID generation
                 return table.mutate(req);
               }
-              const cloudTableSchema = db.cloud.schema?.[tableName];
               if (req.type === 'add' || req.type === 'put') {
+                const cloudTableSchema = db.cloud.schema?.[tableName];
                 if (!cloudTableSchema?.generatedGlobalId) {
-                  if (cloudTableSchema?.synced) {
+                  if (cloudTableSchema?.markedForSync) {
                     // Just make sure primary key is of a supported type:
                     const keys = getEffectiveKeys(table.schema.primaryKey, req);
                     keys.forEach((key, idx) => {
                       if (!isValidSyncableID(key)) {
+                        const type = Array.isArray(key) ? key.map(toStringTag).join(',') : toStringTag(key);
                         throw new Dexie.ConstraintError(
-                          `Invalid primary key ${key} for table ${tableName}. Tables marked for sync must have primary keys of type string or Array of string (and optional numbers)`
+                          `Invalid primary key type ${type} for table ${tableName}. Tables marked for sync has primary keys of type string or Array of string (and optional numbers)`
                         );
                       }
                     });
                   }
                 } else {
-                  let valueClones: null | object[] = null;
-                  const keys = getEffectiveKeys(table.schema.primaryKey, req);
-                  keys.forEach((key, idx) => {
-                    if (key === undefined) {
-                      const colocatedId =
-                        req.values[idx].realmId || db.cloud.currentUserId;
-                      const shardKey = colocatedId.substr(
-                        colocatedId.length - 3
-                      );
-                      keys[idx] = generateKey(
-                        cloudTableSchema.idPrefix!,
-                        shardKey
-                      );
-                      if (!table.schema.primaryKey.outbound) {
-                        if (!valueClones) valueClones = req.values.slice();
-                        valueClones[idx] = Dexie.deepClone(valueClones[idx]);
-                        Dexie.setByKeyPath(
-                          valueClones[idx],
-                          table.schema.primaryKey.keyPath as any, // TODO: fix typings in dexie-constructor.d.ts!
-                          keys[idx]
-                        );
+                  if (db.cloud.options?.databaseUrl && !db.initiallySynced) {
+                    // A database URL is configured but no initial sync has been performed.
+                    const keys = getEffectiveKeys(table.schema.primaryKey, req);
+                    // Check if the operation would yield any INSERT. If so, complain! We never want wrong ID prefixes stored.
+                    return table.getMany({keys, trans: req.trans, cache: "immutable"}).then(results => {
+                      if (results.length < keys.length) {
+                        // At least one of the given objects would be created. Complain since
+                        // the generated ID would be based on a locally computed ID prefix only - we wouldn't
+                        // know if the server would give the same ID prefix until an initial sync has been
+                        // performed.
+                        throw new Error(`Unable to create new objects without an initial sync having been performed.`);
                       }
-                    } else if (
-                      typeof key !== 'string' ||
-                      !key.startsWith(cloudTableSchema.idPrefix!)
-                    ) {
-                      throw new Dexie.ConstraintError(
-                        `The ID "${key}" is not valid for table "${tableName}". ` +
-                          `Primary '@' keys requires the key to be prefixed with "${cloudTableSchema.idPrefix}.\n"` +
-                          `If you want to generate IDs programmatically, remove '@' from the schema to get rid of this constraint. Dexie Cloud supports custom IDs as long as they are random and globally unique.`
-                      );
-                    }
-                  });
-                  return table.mutate({
-                    ...req,
-                    keys,
-                    values: valueClones || req.values
-                  });
+                      return table.mutate(req);
+                    });
+                  }
+                  return generateOrVerifyAtKeys(req, cloudTableSchema.idPrefix!);
                 }
               }
               return table.mutate(req);

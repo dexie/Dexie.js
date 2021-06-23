@@ -63,7 +63,7 @@ export function createMutationTrackingMiddleware({
           let tx: DBCoreTransaction & IDBTransaction & TXExpandos;
           if (mode === 'readwrite') {
             const mutationTables = tables
-              .filter((tbl) => db.cloud.schema?.[tbl]?.synced)
+              .filter((tbl) => db.cloud.schema?.[tbl]?.markedForSync)
               .map((tbl) => getMutationTable(tbl));
             tx = core.transaction(
               [...tables, ...mutationTables],

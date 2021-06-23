@@ -18,3 +18,4 @@ export * from "./entities/DBRealm.js";
 export * from "./entities/DBRealmMember.js";
 export * from "./entities/DBRealmRole.js";
 export * from "./entities/DBSyncedObject.js";
+export * from "./getDbNameFromDbUrl.js";

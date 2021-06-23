@@ -549,7 +549,7 @@ export class Collection implements ICollection {
                   }
                   applyMutateResult(addValues.length, res);
                 })
-            ).then(()=>(putValues.length > 0 || criteria) &&
+            ).then(()=>(putValues.length > 0 || (criteria && typeof changes === 'object')) &&
                 coreTable.mutate({
                   trans,
                   type: 'put',
@@ -559,7 +559,7 @@ export class Collection implements ICollection {
                   changeSpec: typeof changes !== 'function'
                     && changes
                 }).then(res=>applyMutateResult(putValues.length, res))
-            ).then(()=>(deleteKeys.length > 0 || criteria) &&
+            ).then(()=>(deleteKeys.length > 0 || (criteria && changes === deleteCallback)) &&
                 coreTable.mutate({
                   trans,
                   type: 'delete',

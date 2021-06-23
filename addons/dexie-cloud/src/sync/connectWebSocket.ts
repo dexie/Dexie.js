@@ -1,9 +1,10 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { WSObservable } from '../WSObservable';
-import { authenticate, loadAccessToken } from '../authentication/authenticate';
 import { FakeBigInt } from '../TSON';
 import { triggerSync } from './triggerSync';
 import { filter, switchMap } from 'rxjs/operators';
+import { loadAccessToken, refreshAccessToken } from '../authentication/authenticate';
+import { TokenExpiredError } from '../authentication/TokenExpiredError';
 
 export function connectWebSocket(db: DexieCloudDB) {
   if (!db.cloud.options?.databaseUrl) {
@@ -17,9 +18,17 @@ export function connectWebSocket(db: DexieCloudDB) {
         !userLogin.accessTokenExpiration || // If no expiraction on access token - OK.
         userLogin.accessTokenExpiration > new Date()
     ), // If not expired - OK.
+    switchMap(async (userLogin) => {
+      const syncState = await db.getPersistedSyncState();
+      return {
+        token: userLogin.accessToken,
+        tokenExpiration: userLogin.accessTokenExpiration,
+        rev: '' + (syncState?.serverRevision || '')
+      };
+    }),
     switchMap(
-      (userLogin) =>
-        new WSObservable(db.cloud.options!.databaseUrl, userLogin.accessToken)
+      ({ rev, token, tokenExpiration }) =>
+        new WSObservable(db.cloud.options!.databaseUrl, rev, token, tokenExpiration)
     )
   );
   const subscription = observable.subscribe(async (msg) => {
@@ -50,6 +59,23 @@ export function connectWebSocket(db: DexieCloudDB) {
           triggerSync(db);
         }
         break;
+    }
+  }, async error => {
+    if (error instanceof TokenExpiredError) {
+      console.debug("WebSocket observable: Token expired. Refreshing token...");
+      const user = db.cloud.currentUser.value;
+      const refreshedLogin = await refreshAccessToken(
+        db.cloud.options!.databaseUrl,
+        user
+      );
+      // The following update will trigger db.cloud.currentUser observable to emit a new value
+      // and reconnect the websocket.
+      await db.table("$logins").update(user.userId, {
+        accessToken: refreshedLogin.accessToken,
+        accessTokenExpiration: refreshedLogin.accessTokenExpiration,
+      });
+    } else {
+      console.error("WebSocket observable:", error);
     }
   });
   return subscription;

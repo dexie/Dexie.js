@@ -16,6 +16,17 @@ export default {
     format: 'es',
     banner: readFileSync(path.resolve(__dirname, 'banner.txt'), "utf-8"),
     sourcemap: true
+  }, {
+    file: 'dist/umd-modern/dexie-cloud-addon.js',
+    format: 'umd',
+    globals: {
+      dexie: 'Dexie',
+      rxjs: 'rxjs'
+    },
+    name: 'DexieCloud',
+    banner: readFileSync(path.resolve(__dirname, 'banner.txt'), "utf-8"),
+    sourcemap: true,
+    exports: 'named'
   }],
   external: ['dexie', 'rxjs'],
   plugins: [

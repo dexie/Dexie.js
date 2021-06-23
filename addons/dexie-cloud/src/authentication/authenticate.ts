@@ -82,7 +82,7 @@ export async function authenticate(
   }
 }
 
-async function refreshAccessToken(
+export async function refreshAccessToken(
   url: string,
   login: UserLogin
 ): Promise<UserLogin> {

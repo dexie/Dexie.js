@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-common",
-  "version": "1.0.12",
+  "version": "1.0.14",
   "description": "Library for shared code between dexie-cloud-addon, dexie-cloud (CLI) and dexie-cloud-server",
   "type": "module",
   "module": "dist/index.js",

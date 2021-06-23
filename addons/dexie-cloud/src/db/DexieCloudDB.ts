@@ -45,6 +45,7 @@ export interface DexieCloudDBBase {
   readonly localSyncEvent: BehaviorSubject<any>;
   readonly syncStateChangedEvent: BroadcastedLocalEvent<SyncState>;
   readonly dx: Dexie;
+  readonly initiallySynced: boolean;
 }
 
 export interface DexieCloudDB extends DexieCloudDBBase {
@@ -52,6 +53,7 @@ export interface DexieCloudDB extends DexieCloudDBBase {
   getSchema(): Promise<DexieCloudSchema | undefined>;
   getOptions(): Promise<DexieCloudOptions | undefined>;
   getPersistedSyncState(): Promise<PersistedSyncState | undefined>;
+  setInitiallySynced(initiallySynced: boolean): void;
 }
 
 const wm = new WeakMap<object, DexieCloudDB>();
@@ -73,6 +75,7 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
     const localSyncEvent = new BehaviorSubject({});
     const syncStateChangedEvent = new BroadcastedLocalEvent<SyncState>(`syncstatechanged-${dx.name}`);
     localSyncEvent["id"] = ++static_counter;
+    let initiallySynced = false;
     db = {
       get name() {
         return dx.name;
@@ -111,10 +114,12 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
       get roles() {
         return dx.roles;
       },
-
+      get initiallySynced() {
+        return initiallySynced;
+      },
       localSyncEvent,
       syncStateChangedEvent,
-      dx
+      dx,
     } as DexieCloudDB;
 
     const helperMethods: Partial<DexieCloudDB> = {
@@ -139,6 +144,9 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
         return db!.$syncState.get('options') as Promise<
           DexieCloudOptions | undefined
         >;
+      },
+      setInitiallySynced(value) {
+        initiallySynced = value;
       }
     };
 
