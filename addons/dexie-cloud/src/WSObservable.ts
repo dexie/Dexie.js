@@ -3,7 +3,7 @@ import { authenticate, loadAccessToken } from './authentication/authenticate';
 import { TokenExpiredError } from './authentication/TokenExpiredError';
 import { DexieCloudDB } from './db/DexieCloudDB';
 
-const USER_INACTIVITY_TIMEOUT = 30000; // 300_000;
+const USER_INACTIVITY_TIMEOUT = 300_000; // 300_000;
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;
 const FAIL_RETRY_WAIT_TIME = 60000;
