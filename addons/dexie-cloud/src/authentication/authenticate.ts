@@ -91,13 +91,29 @@ export async function refreshAccessToken(
 ): Promise<UserLogin> {
   if (!login.refreshToken)
     throw new Error(`Cannot refresh token - refresh token is missing.`);
+  if (!login.nonExportablePrivateKey)
+    throw new Error(
+      `login.nonExportablePrivateKey is missing - cannot sign refresh token without a private key.`
+    );
+
+  const time_stamp = Date.now();
+  const signing_algorithm = 'RSASSA-PKCS1-v1_5';
+  const textEncoder = new TextEncoder();
+  const data = textEncoder.encode(login.refreshToken + time_stamp);
+  const binarySignature = await crypto.subtle.sign(
+    signing_algorithm,
+    login.nonExportablePrivateKey,
+    data
+  );
+  const signature = b64encode(binarySignature);
+
   const tokenRequest: RefreshTokenRequest = {
     grant_type: 'refresh_token',
     refresh_token: login.refreshToken,
     scopes: ['ACCESS_DB'],
-    signature: '',
-    signing_algorithm: 'RSA256',
-    time_stamp: Date.now()
+    signature,
+    signing_algorithm,
+    time_stamp
   };
   const res = await fetch(`${url}/token`, {
     body: JSON.stringify(tokenRequest),
