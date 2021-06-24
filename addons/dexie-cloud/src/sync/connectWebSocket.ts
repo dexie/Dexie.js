@@ -2,7 +2,7 @@ import { DexieCloudDB } from '../db/DexieCloudDB';
 import { WSObservable } from '../WSObservable';
 import { FakeBigInt } from '../TSON';
 import { triggerSync } from './triggerSync';
-import { filter, switchMap } from 'rxjs/operators';
+import { filter, mergeMap, switchMap } from 'rxjs/operators';
 import { loadAccessToken, refreshAccessToken } from '../authentication/authenticate';
 import { TokenExpiredError } from '../authentication/TokenExpiredError';
 
@@ -18,7 +18,7 @@ export function connectWebSocket(db: DexieCloudDB) {
         !userLogin.accessTokenExpiration || // If no expiraction on access token - OK.
         userLogin.accessTokenExpiration > new Date()
     ), // If not expired - OK.
-    switchMap(async (userLogin) => {
+    mergeMap(async (userLogin) => {
       const syncState = await db.getPersistedSyncState();
       return {
         token: userLogin.accessToken,

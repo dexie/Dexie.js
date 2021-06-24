@@ -40,8 +40,16 @@ export interface RealmRemovedMessage {
 }
 
 export class WSObservable extends Observable<WSConnectionMsg> {
-  constructor(databaseUrl: string, rev: string, token?: string, tokenExpiration?: Date) {
-    super((subscriber) => new WSConnection(databaseUrl, rev, token, tokenExpiration, subscriber));
+  constructor(
+    databaseUrl: string,
+    rev: string,
+    token?: string,
+    tokenExpiration?: Date
+  ) {
+    super(
+      (subscriber) =>
+        new WSConnection(databaseUrl, rev, token, tokenExpiration, subscriber)
+    );
   }
 }
 
@@ -131,6 +139,7 @@ export class WSConnection extends Subscription {
   }
 
   async connect() {
+    this.lastServerActivity = new Date();
     if (this.pauseUntil && this.pauseUntil > new Date()) return;
     if (this.ws) {
       throw new Error(`Called connect() when a connection is already open`);
@@ -144,7 +153,6 @@ export class WSConnection extends Subscription {
       this.subscriber.error(new TokenExpiredError()); // Will be handled in connectWebSocket.ts.
       return;
     }
-    this.lastServerActivity = new Date();
     this.pinger = setInterval(async () => {
       if (this.closed) {
         this.teardown();
@@ -155,7 +163,8 @@ export class WSConnection extends Subscription {
           try {
             this.ws.send(JSON.stringify({ type: 'ping' } as PingMessage));
             setTimeout(() => {
-              if (this.closed || !this.pinger) {
+              if (!this.pinger) return;
+              if (this.closed) {
                 this.teardown();
                 return;
               }
@@ -214,7 +223,7 @@ export class WSConnection extends Subscription {
         if (msg.type === 'error') {
           throw new Error(`WebSocket Error ${msg.error}`);
         }
-        if (msg.type === "rev") {
+        if (msg.type === 'rev') {
           this.rev = msg.rev; // No meaning but seems reasonable.
         }
         if (msg.type !== 'pong') {
