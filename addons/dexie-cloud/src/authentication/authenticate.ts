@@ -1,9 +1,12 @@
-import type { TokenFinalResponse } from "dexie-cloud-common";
-import { b64encode } from "dreambase-library/dist/common/base64";
-import { DexieCloudDB } from "../db/DexieCloudDB";
-import { UserLogin } from "../db/entities/UserLogin";
-import { AuthPersistedContext } from "./AuthPersistedContext";
-import { otpFetchTokenCallback } from "./otpFetchTokenCallback";
+import type {
+  RefreshTokenRequest,
+  TokenFinalResponse
+} from 'dexie-cloud-common';
+import { b64encode } from 'dreambase-library/dist/common/base64';
+import { DexieCloudDB } from '../db/DexieCloudDB';
+import { UserLogin } from '../db/entities/UserLogin';
+import { AuthPersistedContext } from './AuthPersistedContext';
+import { otpFetchTokenCallback } from './otpFetchTokenCallback';
 
 export interface AuthenticationDialog {
   prompt(msg: string): string | null | Promise<string | null>;
@@ -11,8 +14,8 @@ export interface AuthenticationDialog {
 }
 
 export const dummyAuthDialog: AuthenticationDialog = {
-  prompt: async msg => prompt(msg),
-  alert: async msg => alert(msg),
+  prompt: async (msg) => prompt(msg),
+  alert: async (msg) => alert(msg)
 };
 
 export type FetchTokenCallback = (tokenParams: {
@@ -28,7 +31,7 @@ export async function loadAccessToken(
     accessTokenExpiration,
     refreshToken,
     refreshTokenExpiration,
-    claims,
+    claims
   } = db.cloud.currentUser.value;
   if (!accessToken) return;
   const expTime = accessTokenExpiration?.getTime() ?? Infinity;
@@ -40,15 +43,15 @@ export async function loadAccessToken(
   }
   const refreshExpTime = refreshTokenExpiration?.getTime() ?? Infinity;
   if (refreshExpTime <= Date.now()) {
-      throw new Error(`Refresh token has expired`);
+    throw new Error(`Refresh token has expired`);
   }
   const refreshedLogin = await refreshAccessToken(
     db.cloud.options!.databaseUrl,
     db.cloud.currentUser.value
   );
-  await db.table("$logins").update(claims.sub, {
+  await db.table('$logins').update(claims.sub, {
     accessToken: refreshedLogin.accessToken,
-    accessTokenExpiration: refreshedLogin.accessTokenExpiration,
+    accessTokenExpiration: refreshedLogin.accessTokenExpiration
   });
   return refreshedLogin.accessToken;
 }
@@ -58,7 +61,7 @@ export async function authenticate(
   context: UserLogin,
   dlg: AuthenticationDialog,
   fetchToken: undefined | FetchTokenCallback,
-  hints?: {userId?: string; email?: string; grant_type?: string}
+  hints?: { userId?: string; email?: string; grant_type?: string }
 ): Promise<UserLogin> {
   if (
     context.accessToken &&
@@ -86,7 +89,30 @@ export async function refreshAccessToken(
   url: string,
   login: UserLogin
 ): Promise<UserLogin> {
-  throw new Error("Refresh token not implemented");
+  if (!login.refreshToken)
+    throw new Error(`Cannot refresh token - refresh token is missing.`);
+  const tokenRequest: RefreshTokenRequest = {
+    grant_type: 'refresh_token',
+    refresh_token: login.refreshToken,
+    scopes: ['ACCESS_DB'],
+    signature: '',
+    signing_algorithm: 'RSA256',
+    time_stamp: Date.now()
+  };
+  const res = await fetch(`${url}/token`, {
+    body: JSON.stringify(tokenRequest),
+    method: 'post',
+    headers: { 'Content-Type': 'application/json' },
+    mode: 'cors'
+  });
+  if (res.status !== 200)
+    throw new Error(`RefreshToken: Status ${res.status} from ${url}/token`);
+  const response: TokenFinalResponse = await res.json();
+  login.accessToken = response.accessToken;
+  login.accessTokenExpiration = response.accessTokenExpiration
+    ? new Date(response.accessTokenExpiration)
+    : undefined;
+  return login;
 }
 
 async function userAuthenticate(
@@ -94,29 +120,29 @@ async function userAuthenticate(
   context: UserLogin,
   dlg: AuthenticationDialog,
   fetchToken: FetchTokenCallback,
-  hints?: {userId?: string; email?: string; grant_type?: string}
+  hints?: { userId?: string; email?: string; grant_type?: string }
 ) {
   const { privateKey, publicKey } = await crypto.subtle.generateKey(
     {
-      name: "RSASSA-PKCS1-v1_5",
+      name: 'RSASSA-PKCS1-v1_5',
       modulusLength: 2048,
       publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
-      hash: { name: "SHA-256" },
+      hash: { name: 'SHA-256' }
     },
     false, // Non-exportable...
-    ["sign", "verify"]
+    ['sign', 'verify']
   );
   context.nonExportablePrivateKey = privateKey; //...but storable!
-  const publicKeySPKI = await crypto.subtle.exportKey("spki", publicKey);
+  const publicKeySPKI = await crypto.subtle.exportKey('spki', publicKey);
   const publicKeyPEM = spkiToPEM(publicKeySPKI);
   context.publicKey = publicKey;
 
   const response2 = await fetchToken({
     public_key: publicKeyPEM,
-    hints,
+    hints
   });
 
-  if (response2.type !== "tokens")
+  if (response2.type !== 'tokens')
     throw new Error(
       `Unexpected response type from token endpoint: ${response2.type}`
     );
@@ -147,14 +173,14 @@ function spkiToPEM(keydata: ArrayBuffer) {
 }
 
 function formatAsPem(str: string) {
-  let finalString = "-----BEGIN PUBLIC KEY-----\n";
+  let finalString = '-----BEGIN PUBLIC KEY-----\n';
 
   while (str.length > 0) {
-    finalString += str.substring(0, 64) + "\n";
+    finalString += str.substring(0, 64) + '\n';
     str = str.substring(64);
   }
 
-  finalString = finalString + "-----END PUBLIC KEY-----";
+  finalString = finalString + '-----END PUBLIC KEY-----';
 
   return finalString;
 }

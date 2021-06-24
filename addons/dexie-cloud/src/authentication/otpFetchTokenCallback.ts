@@ -12,14 +12,14 @@ export function otpFetchTokenCallback(
   url: string
 ): FetchTokenCallback {
   return async function otpAuthenticate({ public_key, hints }) {
-    let otpRequest: TokenRequest;
+    let tokenRequest: TokenRequest;
     if (hints?.grant_type === 'demo') {
       const demo_user =
         hints?.userId ||
         hints?.email ||
         (await dlg.prompt('Enter userId of a demo user')); // TODO: Fixthis!
       if (!demo_user) throw new Error(`No demo userId provided`);
-      otpRequest = {
+      tokenRequest = {
         demo_user,
         grant_type: 'demo',
         scopes: ['ACCESS_DB'],
@@ -29,7 +29,7 @@ export function otpFetchTokenCallback(
       const email = hints?.email || (await dlg.prompt('Email')); // TODO: Fixthis!
       if (!email) throw new Error(`No email was given`);
 
-      otpRequest = {
+      tokenRequest = {
         email,
         grant_type: 'otp',
         scopes: ['ACCESS_DB'],
@@ -37,7 +37,7 @@ export function otpFetchTokenCallback(
       };
     }
     const res1 = await fetch(`${url}/token`, {
-      body: JSON.stringify(otpRequest),
+      body: JSON.stringify(tokenRequest),
       method: 'post',
       headers: { 'Content-Type': 'application/json', mode: 'cors' }
     });
@@ -47,16 +47,16 @@ export function otpFetchTokenCallback(
     if (response.type === 'tokens') {
       // Demo user request can get a "tokens" response right away
       return response;
-    } else if (otpRequest.grant_type === 'otp') {
+    } else if (tokenRequest.grant_type === 'otp') {
       if (response.type !== 'otp-sent')
         throw new Error(`Unexpected response from ${url}/token`);
       const otp = await dlg.prompt('OTP'); // TODO: Fixthis!
       if (!otp) throw new Error('Invalid OTP');
-      otpRequest.otp = otp;
-      otpRequest.otp_id = response.otp_id;
+      tokenRequest.otp = otp;
+      tokenRequest.otp_id = response.otp_id;
 
       const res2 = await fetch(`${url}/token`, {
-        body: JSON.stringify(otpRequest),
+        body: JSON.stringify(tokenRequest),
         method: 'post',
         headers: { 'Content-Type': 'application/json' },
         mode: 'cors'
