@@ -1,10 +1,22 @@
-# Getting Started with Create React App
+# Dexie Cloud ToDo app
 
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
 ## Available Scripts
 
 In the project directory, you can run:
+
+### `npx dexie-cloud create`
+
+Create a new database in the cloud to sync your app against.
+The command will request OTP authentication and then create a database for you. It will also create two local files: dexie-cloud.json and dexie-cloud.key.
+
+See https://dexie.org/cloud/
+
+### `./configure-app.sh`
+
+Configure this app to use your created database.
+This command will create the file .env.local and configure it against the DB URL in dexie-cloud.json.
 
 ### `yarn start`
 
