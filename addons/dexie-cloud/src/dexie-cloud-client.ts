@@ -127,7 +127,6 @@ export function dexieCloud(dexie: Dexie) {
       );
 
       if (initiallySynced) {
-        // @ts-ignore
         db.setInitiallySynced(true);
       }
 
