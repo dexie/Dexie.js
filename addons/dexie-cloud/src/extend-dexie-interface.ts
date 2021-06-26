@@ -37,6 +37,7 @@ declare module 'dexie' {
       currentUser: Rx.BehaviorSubject<UserLogin>;
       syncState: Rx.BehaviorSubject<SyncState>;
       loginState: Rx.BehaviorSubject<LoginState>;
+      usingServiceWorker?: boolean;
       /** Login using Dexie Cloud OTP or Demo user.
        *
        * @param email Email to authenticate

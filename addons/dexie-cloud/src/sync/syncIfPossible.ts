@@ -34,7 +34,7 @@ export async function syncIfPossible(
 
   isSyncing.add(db);
   try {
-    if (db.cloud.options?.usingServiceWorker) {
+    if (db.cloud.usingServiceWorker) {
       if (IS_SERVICE_WORKER) {
         await sync(db, cloudOptions, cloudSchema, options);
       }

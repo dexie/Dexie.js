@@ -63,7 +63,10 @@ export function dexieCloud(dexie: Dexie) {
       if (!db.tables.every((table) => table.core)) {
         throwVersionIncrementNeeded();
       }
-
+      const swRegistrations =
+        'serviceWorker' in navigator
+          ? await navigator.serviceWorker.getRegistrations()
+          : [];
       const initiallySynced = await db.transaction(
         'rw',
         db.$syncState,
@@ -87,12 +90,28 @@ export function dexieCloud(dexie: Dexie) {
             await db.$syncState.put(options, 'options');
           }
           if (
-            db.cloud.options?.usingServiceWorker &&
-            !('serviceWorker' in navigator)
+            db.cloud.options?.tryUseServiceWorker &&
+            'serviceWorker' in navigator &&
+            swRegistrations.length > 0
           ) {
-            // Configured to use service worker, but this browser doesn't support it.
-            // Act as if usingServiceWorker is configured falsy:
-            db.cloud.options.usingServiceWorker = false;
+            // * Configured for using service worker if available.
+            // * Browser supports service workers
+            // * There are at least one service worker registration
+            console.debug('Dexie Cloud Addon: Using service worker');
+            db.cloud.usingServiceWorker = true;
+          } else {
+            // Not configured for using service worker or no service worker
+            // registration exists. Don't rely on service worker to do any job.
+            // Use LocalSyncWorker instead.
+            if (db.cloud.options?.tryUseServiceWorker && !IS_SERVICE_WORKER) {
+              console.debug(
+                'dexie-cloud-addon: Not using service worker.',
+                swRegistrations.length === 0
+                  ? 'No SW registrations found.'
+                  : 'navigator.serviceWorker not present'
+              );
+            }
+            db.cloud.usingServiceWorker = false;
           }
           updateSchemaFromOptions(schema, db.cloud.options);
           updateSchemaFromOptions(persistedSchema, db.cloud.options);
@@ -109,7 +128,7 @@ export function dexieCloud(dexie: Dexie) {
             for (const [table, tblSchema] of Object.entries(schema)) {
               const newTblSchema = newPersistedSchema[table];
               if (!newTblSchema) {
-                newPersistedSchema[table] = {...tblSchema};
+                newPersistedSchema[table] = { ...tblSchema };
               } else {
                 newTblSchema.markedForSync = tblSchema.markedForSync;
                 tblSchema.deleted = newTblSchema.deleted;
@@ -151,10 +170,7 @@ export function dexieCloud(dexie: Dexie) {
 
       if (localSyncWorker) localSyncWorker.stop();
       localSyncWorker = null;
-      if (
-        db.cloud.options?.usingServiceWorker &&
-        db.cloud.options.databaseUrl
-      ) {
+      if (db.cloud.usingServiceWorker && db.cloud.options?.databaseUrl) {
         registerSyncEvent(db).catch(() => {});
         registerPeriodicSyncEvent(db).catch(() => {});
         subscriptions.push(
@@ -209,7 +225,9 @@ export function dexieCloud(dexie: Dexie) {
       dexie.cloud.options = options;
       if (options.databaseUrl) {
         // @ts-ignore
-        dexie.name = `${origIdbName}-${getDbNameFromDbUrl(options.databaseUrl)}`;
+        dexie.name = `${origIdbName}-${getDbNameFromDbUrl(
+          options.databaseUrl
+        )}`;
       }
       updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
     },

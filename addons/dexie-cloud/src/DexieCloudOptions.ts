@@ -7,7 +7,7 @@ export interface PeriodicSyncOptions {
 export interface DexieCloudOptions {
   databaseUrl: string;
   requireAuth?: boolean;
-  usingServiceWorker?: boolean;
+  tryUseServiceWorker?: boolean;
   customLoginGui?: boolean;
   syncedTables?: string[];
   unsyncedTables?: string[];

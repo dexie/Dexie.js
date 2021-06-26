@@ -92,7 +92,7 @@ export function createMutationTrackingMiddleware({
             };
             const txComplete = () => {
               if (tx.mutationsAdded && db.cloud.options?.databaseUrl) {
-                if (db.cloud.options?.usingServiceWorker) {
+                if (db.cloud.usingServiceWorker) {
                   console.debug('registering sync event');
                   registerSyncEvent(db);
                 } else {

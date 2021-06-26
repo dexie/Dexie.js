@@ -203,17 +203,17 @@ export class WSConnection extends Subscription {
     }
 
     // Connect the WebSocket to given url:
-    console.debug('ws create');
+    console.debug('dexie-cloud WebSocket create');
     const ws = (this.ws = new WebSocket(`${wsUrl}/revision?${searchParams}`));
     //ws.binaryType = "arraybuffer"; // For future when subscribing to actual changes.
 
     ws.onclose = (event: Event) => {
-      console.log('onclose');
+      console.debug('dexie-cloud WebSocket ');
       this.disconnect();
     };
 
     ws.onmessage = (event: MessageEvent) => {
-      console.log('onmessage', event.data);
+      console.debug('dexie-cloud WebSocket onmessage', event.data);
       this.lastServerActivity = new Date();
       try {
         const msg = JSON.parse(event.data) as
@@ -221,7 +221,7 @@ export class WSConnection extends Subscription {
           | PongMessage
           | ErrorMessage;
         if (msg.type === 'error') {
-          throw new Error(`WebSocket Error ${msg.error}`);
+          throw new Error(`dexie-cloud WebSocket Error ${msg.error}`);
         }
         if (msg.type === 'rev') {
           this.rev = msg.rev; // No meaning but seems reasonable.
@@ -238,12 +238,12 @@ export class WSConnection extends Subscription {
     try {
       await new Promise((resolve, reject) => {
         ws.onopen = (event) => {
-          console.debug('ws onopen');
+          console.debug('dexie-cloud WebSocket onopen');
           resolve(null);
         };
         ws.onerror = (event: ErrorEvent) => {
           const error = event.error || new Error('WebSocket Error');
-          console.warn('WebSocket error', error);
+          console.debug('dexie-cloud WebSocket error', error);
           this.disconnect();
           reject(error);
         };
