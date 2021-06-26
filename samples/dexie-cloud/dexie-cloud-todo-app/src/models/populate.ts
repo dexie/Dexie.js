@@ -1,4 +1,4 @@
-import { db } from "./db";
+//import { db } from "./db";
 
 export async function populate() {
   /*const todoListId = await db.todoLists.add({
