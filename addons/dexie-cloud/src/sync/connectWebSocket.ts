@@ -61,7 +61,7 @@ export function connectWebSocket(db: DexieCloudDB) {
         break;
     }
   }, async error => {
-    if (error instanceof TokenExpiredError) {
+    if (error?.name === "TokenExpiredError") {
       console.debug("WebSocket observable: Token expired. Refreshing token...");
       const user = db.cloud.currentUser.value;
       const refreshedLogin = await refreshAccessToken(
