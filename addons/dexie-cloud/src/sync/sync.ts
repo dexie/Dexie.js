@@ -19,7 +19,7 @@ import {
   DexieCloudSchema,
   subtractChanges,
   SyncResponse,
-  toDBOperationSet
+  toDBOperationSet,
 } from 'dexie-cloud-common';
 import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 
@@ -61,15 +61,25 @@ export function sync(
   schema: DexieCloudSchema,
   syncOptions?: SyncOptions
 ): Promise<boolean> {
-  return _sync.apply(this, arguments).catch(async (error: any) => {
-    // Make sure that no matter whether sync() explodes or not,
-    // always update the timestamp. Also store the error.
-    await db.$syncState.update('syncState', {
-      timestamp: new Date(),
-      error: '' + error
+  return _sync
+    .apply(this, arguments)
+    .then(() => {
+      db.syncStateChangedEvent.next({
+        phase: 'in-sync',
+      });
+    })
+    .catch(async (error: any) => {
+      // Make sure that no matter whether sync() explodes or not,
+      // always update the timestamp. Also store the error.
+      await db.$syncState.update('syncState', {
+        timestamp: new Date(),
+        error: '' + error,
+      });
+      db.syncStateChangedEvent.next({
+        phase: navigator.onLine ? 'error' : 'offline',
+      });
+      return Promise.reject(error);
     });
-    return Promise.reject(error);
-  });
 }
 
 async function _sync(
@@ -77,7 +87,7 @@ async function _sync(
   options: DexieCloudOptions,
   schema: DexieCloudSchema,
   { isInitialSync, cancelToken, justCheckIfNeeded }: SyncOptions = {
-    isInitialSync: false
+    isInitialSync: false,
   }
 ): Promise<boolean> {
   if (!justCheckIfNeeded) {
@@ -199,7 +209,7 @@ async function _sync(
 
     // List mutations that happened during our exchange with the server:
     const addedClientChanges = await listClientChanges(mutationTables, db, {
-      since: latestRevisions
+      since: latestRevisions,
     });
 
     //
@@ -219,7 +229,7 @@ async function _sync(
         // deleting a range)
         await Promise.all([
           mutTable.clear(),
-          db.$baseRevs.where({ tableName }).delete()
+          db.$baseRevs.where({ tableName }).delete(),
         ]);
       } else if (latestRevisions[mutTable.name]) {
         const latestRev = latestRevisions[mutTable.name] || 0;
@@ -236,7 +246,7 @@ async function _sync(
             )
             .reverse()
             .offset(1) // Keep one entry (the one mapping muts that came during fetch --> previous server revision)
-            .delete()
+            .delete(),
         ]);
       } else {
         // In this case, the mutation table only contains added items after sending empty changeset to server.
@@ -264,7 +274,7 @@ async function _sync(
           return {
             tableName,
             clientRev: lastClientRevOnPreviousServerRev + 1,
-            serverRev: res.serverRevision
+            serverRev: res.serverRevision,
           };
         })
     );
@@ -283,7 +293,7 @@ async function _sync(
       syncedTables: [],
       latestRevisions: {},
       realms: [],
-      inviteRealms: []
+      inviteRealms: [],
     };
     newSyncState.syncedTables = tablesToSync
       .map((tbl) => tbl.name)
@@ -316,7 +326,7 @@ async function _sync(
   });
   if (!done) {
     console.debug('MORE SYNC NEEDED. Go for it again!');
-    return await sync(db, options, schema, { isInitialSync, cancelToken });
+    return await _sync(db, options, schema, { isInitialSync, cancelToken });
   }
   console.debug('SYNC DONE', { isInitialSync });
   return false; // Not needed anymore

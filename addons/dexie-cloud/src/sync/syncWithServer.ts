@@ -46,10 +46,17 @@ export async function syncWithServer(
     changes
   };
   console.debug("Sync request", syncRequest);
+  db.syncStateChangedEvent.next({
+    phase: 'pushing',
+  });
   const res = await fetch(`${databaseUrl}/sync`, {
     method: 'post',
     headers,
     body: TSON.stringify(syncRequest)
+  });
+  //const contentLength = Number(res.headers.get('content-length'));
+  db.syncStateChangedEvent.next({
+    phase: 'pulling'
   });
 
   if (!res.ok) {

@@ -3,7 +3,7 @@ import './extend-dexie-interface';
 import { BehaviorSubject, from, Observable, Subject } from 'rxjs';
 import {
   createIdGenerationMiddleware,
-  generateTablePrefix
+  generateTablePrefix,
 } from './middlewares/createIdGenerationMiddleware';
 import { DexieCloudOptions } from './DexieCloudOptions';
 //import { dexieCloudSyncProtocol } from "./dexieCloudSyncProtocol";
@@ -17,7 +17,7 @@ import {
   OTPTokenRequest,
   TokenFinalResponse,
   TokenOtpSentResponse,
-  TokenResponse
+  TokenResponse,
 } from 'dexie-cloud-common';
 import { LoginState } from './types/LoginState';
 import { SyncState } from './types/SyncState';
@@ -32,7 +32,7 @@ import { createMutationTrackingMiddleware } from './middlewares/createMutationTr
 import { updateSchemaFromOptions } from './updateSchemaFromOptions';
 import {
   registerPeriodicSyncEvent,
-  registerSyncEvent
+  registerSyncEvent,
 } from './sync/registerSyncEvent';
 import { createImplicitPropSetterMiddleware } from './middlewares/createImplicitPropSetterMiddleware';
 import { sync } from './sync/sync';
@@ -41,6 +41,7 @@ import { triggerSync } from './sync/triggerSync';
 import { DexieCloudSyncOptions } from './extend-dexie-interface';
 import { isSyncNeeded } from './sync/isSyncNeeded';
 import { connectWebSocket } from './sync/connectWebSocket';
+import { PersistedSyncState } from './db/entities/PersistedSyncState';
 
 export { DexieCloudTable } from './extend-dexie-interface';
 
@@ -76,7 +77,7 @@ export function dexieCloud(dexie: Dexie) {
             await Promise.all([
               db.getOptions(),
               db.getSchema(),
-              db.getPersistedSyncState()
+              db.getPersistedSyncState(),
             ]);
           if (!options) {
             // Options not specified programatically (use case for SW!)
@@ -160,6 +161,12 @@ export function dexieCloud(dexie: Dexie) {
       subscriptions.push(
         liveQuery(() => db.getCurrentUser()).subscribe(currentUserEmitter)
       );
+      // Manage PersistendSyncState observable:
+      subscriptions.push(
+        liveQuery(() => db.getPersistedSyncState()).subscribe(
+          db.cloud.persistedSyncState
+        )
+      );
 
       // HERE: If requireAuth, do athentication now.
       if (db.cloud.options?.requireAuth) {
@@ -176,7 +183,11 @@ export function dexieCloud(dexie: Dexie) {
         subscriptions.push(
           db.syncStateChangedEvent.subscribe(dexie.cloud.syncState)
         );
-      } else if (db.cloud.options?.databaseUrl && db.cloud.schema) {
+      } else if (
+        db.cloud.options?.databaseUrl &&
+        db.cloud.schema &&
+        !IS_SERVICE_WORKER
+      ) {
         // There's no SW. Start SyncWorker instead.
         localSyncWorker = LocalSyncWorker(
           db,
@@ -215,6 +226,9 @@ export function dexieCloud(dexie: Dexie) {
     },
     currentUser: currentUserEmitter,
     syncState: new BehaviorSubject<SyncState>({ phase: 'initial' }),
+    persistedSyncState: new BehaviorSubject<PersistedSyncState | undefined>(
+      undefined
+    ),
     loginState: new BehaviorSubject<LoginState>({ type: 'silent' }), // fixthis! Or remove this observable?
     async login(hint) {
       const db = DexieCloudDB(dexie);
@@ -237,12 +251,10 @@ export function dexieCloud(dexie: Dexie) {
       if (wait === undefined) wait = true;
       const db = DexieCloudDB(dexie);
       if (force) {
-        const syncState = await db.getPersistedSyncState();
+        const syncState = db.cloud.persistedSyncState.value;
         triggerSync(db);
         if (wait) {
-          const newSyncState = await from(
-            liveQuery(() => db.getPersistedSyncState())
-          )
+          const newSyncState = await db.cloud.persistedSyncState
             .pipe(
               filter(
                 (newSyncState) =>
@@ -257,7 +269,7 @@ export function dexieCloud(dexie: Dexie) {
           }
         }
       } else if (await isSyncNeeded(db)) {
-        const syncState = await db.getPersistedSyncState();
+        const syncState = db.cloud.persistedSyncState.value;
         triggerSync(db);
         if (wait) {
           console.debug('db.cloud.login() is waiting for sync completion...');
@@ -283,7 +295,7 @@ export function dexieCloud(dexie: Dexie) {
           );
         }
       }
-    }
+    },
   };
 
   dexie.Version.prototype['_parseStoresSpec'] = Dexie.override(
@@ -294,7 +306,7 @@ export function dexieCloud(dexie: Dexie) {
   dexie.use(
     createMutationTrackingMiddleware({
       currentUserObservable: dexie.cloud.currentUser,
-      db: DexieCloudDB(dexie)
+      db: DexieCloudDB(dexie),
     })
   );
   dexie.use(createImplicitPropSetterMiddleware(DexieCloudDB(dexie)));

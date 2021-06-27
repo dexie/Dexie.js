@@ -35,7 +35,7 @@ export class BroadcastedLocalEvent<T> extends Observable<T>{
     this.bc = bc;
   }
 
-  postMessage(message: T) {
+  next(message: T) {
     this.bc.postMessage(message);
     const ev = new CustomEvent(`lbc-${this.name}`, { detail: message });
     self.dispatchEvent(ev);

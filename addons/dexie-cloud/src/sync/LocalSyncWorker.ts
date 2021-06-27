@@ -39,9 +39,13 @@ export function LocalSyncWorker(
   const start = () => {
     // Sync eagerly whenever a change has happened (+ initially when there's no syncState yet)
     // This initial subscribe will also trigger an sync also now.
-    console.error("Starting LocalSyncWorker", db.localSyncEvent["id"])
+    console.error('Starting LocalSyncWorker', db.localSyncEvent['id']);
     syncNeededSubscription = db.localSyncEvent.subscribe(() => {
-      try {syncAndRetry();} catch(err) {console.error("Whathe f....")}
+      try {
+        syncAndRetry();
+      } catch (err) {
+        console.error('What-the....', err);
+      }
     });
     //setTimeout(()=>db.localSyncEvent.next({}), 5000);
 
@@ -68,7 +72,7 @@ export function LocalSyncWorker(
   };
 
   const stop = () => {
-    console.error("Stopping LocalSyncWorker")
+    console.error('Stopping LocalSyncWorker');
     cancelToken.cancelled = true;
     if (typeof self !== 'undefined') {
       if (onlineHandler) {
@@ -85,6 +89,6 @@ export function LocalSyncWorker(
 
   return {
     start,
-    stop
+    stop,
   };
 }
