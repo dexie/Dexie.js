@@ -240,6 +240,9 @@ export const getIteratorOf = typeof iteratorSymbol === "symbol" ? function(x) {
     var i;
     return x != null && (i = x[iteratorSymbol]) && i.apply(x);
 } : function () { return null; };
+export const asyncIteratorSymbol = typeof Symbol !== 'undefined'
+    ? Symbol.asyncIterator || Symbol.for("Symbol.asyncIterator")
+    : '@asyncIterator';
 
 export const NO_CHAR_ARRAY = {};
 // Takes one or several arguments and returns an array based on the following criteras:
