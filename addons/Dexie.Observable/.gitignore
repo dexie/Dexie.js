@@ -1,0 +1,5 @@
+dist/*.js
+dist/*.map
+dist/*.ts
+dist/*.gz
+**/tmp/

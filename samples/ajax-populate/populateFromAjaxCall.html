@@ -1,0 +1,119 @@
+﻿<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml">
+<head>
+    <title>Dexie Sample - populate from ajax call</title>
+    <script src="https://unpkg.com/dexie@^3.0.0-alpha"></script>
+    <script>
+        //
+        // PREPARATION
+        //
+
+        // Fake jquery ajax
+        var $ = {
+            ajax: function (url, params) {
+                setTimeout(function () {
+                    //params.error({}, "Oj vad fel det blev");
+                    params.success({ someInitArrayOfObjects: [{ someIndex: "item1" }, { someIndex: "item2" }] });
+                }, 1);
+            }
+        };
+        var url = "http://dummy";
+
+        // To make the sample more visible - replace window.console with one that shows the content on page
+        function Console() {
+            this.table = document.createElement('table');
+            this.log = function (txt, type) {
+                var tr = document.createElement('tr');
+                var td = document.createElement('td');
+                td.textContent = type || "";
+                tr.appendChild(td);
+                td = document.createElement('td');
+                td.textContent = txt;
+                tr.appendChild(td);
+                this.table.appendChild(tr);
+            }
+            this.warn = function (txt) {
+                this.log(txt, "WARN");
+            }
+            this.error = function (txt) {
+                this.log(txt, "ERROR!");
+            }
+        }
+        window.console = new Console();
+        document.addEventListener('DOMContentLoaded', function () {
+            document.getElementById('consoleArea').appendChild(console.table);
+        });
+
+    </script>
+    <script>
+        //
+        // SAMPLE CODE
+        //
+
+        var db = new Dexie('someDB');
+        db.version(3).stores({
+            someTable: "++id,someIndex"
+        });
+
+        // Populate from AJAX:
+        db.on('ready', function () {
+            // on('ready') event will fire when database is open but before any
+            // other queued operations start executing.
+            // By returning a Promise from this event,
+            // the framework will wait until promise completes before
+            // resuming any queued database operations.
+            // Let's start by counting the number of objects in our table.
+            return db.someTable.count(function (count) {
+                if (count > 0) {
+                    console.log("Already populated");
+                } else {
+                    console.log("Database is empty. Populating from ajax call...");
+                    // We want framework to continue waiting, so we encapsulate the ajax call
+                    // in a Dexie.Promise that we return here.
+                    return new Dexie.Promise(function (resolve, reject) {
+                        $.ajax(url, {
+                            type: 'get',
+                            dataType: 'json',
+                            error: function (xhr, textStatus) {
+                                reject(textStatus); // Rejecting promise to make db.open() fail.
+                            },
+                            success: function (data) {
+                                resolve(data); // Resolving Promise will launch then() below.
+                            }
+                        });
+                    }).then(function (data) {
+                        console.log("Got ajax response. We'll now add the objects.");
+                        // By returning the a promise, framework will keep
+                        // waiting for this promise to complete before resuming other
+                        // db-operations.
+                        console.log("Calling bulkAdd() to insert objects...");
+                        return db.someTable.bulkAdd(data.someInitArrayOfObjects);
+                    }).then(function () {
+                        console.log ("Done populating.");
+                    });
+                }
+            });
+        });
+
+        // Following operation will be queued until we're finished populating data:
+        db.someTable.each(function (obj) {
+            // When we come here, data is fully populated and we can log all objects.
+            console.log("Found object: " + JSON.stringify(obj));
+        }).then(function () {
+            console.log("Finished.");
+        }).catch(function (error) {
+            // In our each() callback above fails, OR db.open() fails due to any reason,
+            // including our ajax call failed, this operation will fail and we will get
+            // the error here!
+            console.error(error.stack || error);
+            // Note that we could also have catched it on db.open() but in this sample,
+            // we show it here.
+        });
+    </script>
+</head>
+<body>    
+    <div id="consoleArea"></div>
+    <button onclick="window.location.reload();">Reload page</button>
+    <button onclick="db.delete().then(function(){window.location.reload()});">Delete Database and reload page</button>
+</body>
+</html>

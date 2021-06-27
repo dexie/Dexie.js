@@ -1,0 +1,6 @@
+dist/*.js
+dist/*.map
+dist/*.ts
+dist/*.gz
+.eslintcache
+**/tmp/

@@ -1,0 +1,120 @@
+{
+  "name": "dexie",
+  "version": "3.2.0-beta.1",
+  "description": "A Minimalistic Wrapper for IndexedDB",
+  "main": "dist/dexie.js",
+  "module": "dist/dexie.mjs",
+  "jsnext:main": "dist/dexie.mjs",
+  "exports": "./dist/modern/dexie.mjs",
+  "typings": "dist/dexie.d.ts",
+  "jspm": {
+    "format": "cjs",
+    "ignore": [
+      "src/"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dfahlander/Dexie.js.git"
+  },
+  "keywords": [
+    "indexeddb",
+    "browser",
+    "database"
+  ],
+  "author": "David Fahlander <https://github.com/dfahlander>",
+  "contributors": [
+    "Christopher Hunt <https://github.com/chrahunt>",
+    "Nikolas Poniros <https://github.com/nponiros>",
+    "Anders Ekdahl <https://github.com/andersekdahl>",
+    "Yury Solovyov <https://github.com/YurySolovyov>",
+    "Martin Diphoorn <https://github.com/martindiphoorn>"
+  ],
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/dfahlander/Dexie.js/issues"
+  },
+  "scripts": {
+    "build": "just-build",
+    "watch": "just-build --watch",
+    "clean": "rm -rf tools/tmp && rm dist/*.js && rm dist/*.map && rm dist/*.ts && rm dist/*.mjs",
+    "test": "npm run build && npm run test:typings && npm run test:unit",
+    "test:unit": "karma start test/karma.conf.js --single-run",
+    "test:typings": "tsc -p test/typings-test/",
+    "test:debug": "karma start test/karma.conf.js --log-level debug"
+  },
+  "just-build": {
+    "default": [
+      "# Build all targets (es5, es6 and test) and minify the default es5 UMD module",
+      "just-build release test"
+    ],
+    "dexie": [
+      "# Build dist/dexie.js, dist/dexie.mjs and dist/dexie.d.ts",
+      "cd src",
+      "tsc [--watch 'Watching for file changes']",
+      "tsc --target es2018 --outdir ../tools/tmp/modern/src/",
+      "rollup -c ../tools/build-configs/rollup.config.js",
+      "rollup -c ../tools/build-configs/rollup.umd.config.js",
+      "rollup -c ../tools/build-configs/rollup.modern.config.js",
+      "node ../tools/replaceVersionAndDate.js ../dist/dexie.js",
+      "node ../tools/replaceVersionAndDate.js ../dist/dexie.mjs",
+      "node ../tools/replaceVersionAndDate.js ../dist/modern/dexie.mjs",
+      "dts-bundle-generator --inline-declare-externals --umd-module-name Dexie -o ../dist/dexie.d.ts public/index.d.ts",
+      "node ../tools/prepend.js ../dist/dexie.d.ts ../tools/build-configs/banner.txt",
+      "node ../tools/replaceVersionAndDate.js ../dist/dexie.d.ts"
+    ],
+    "release": [
+      "# Build ES5 umd module as well as the es6 module.",
+      "just-build dexie",
+      "node tools/replaceVersionAndDate.js dist/dexie.d.ts",
+      "# Minify the default ES5 UMD module",
+      "cd dist",
+      "uglifyjs dexie.js -m -c negate_iife=0 -o dexie.min.js --source-map",
+      "# Minify modern bundle",
+      "cd modern",
+      "terser --comments false --compress --mangle --module --source-map -o dexie.min.mjs -- dexie.mjs"
+    ],
+    "dev": [
+      "# Build ES5 module and the tests",
+      "just-build dexie test"
+    ],
+    "gzip": [
+      "# Optionally gzip to find the size of the minified & gzipped version",
+      "gzip dist/dexie.min.js -k -f -9"
+    ],
+    "test": [
+      "# Build the test suite.",
+      "cd test",
+      "tsc [--watch 'Watching for file changes']",
+      "rollup -c ../tools/build-configs/rollup.tests.config.js"
+    ]
+  },
+  "engines": {
+    "node": ">=6.0"
+  },
+  "homepage": "https://dexie.org",
+  "devDependencies": {
+    "dts-bundle-generator": "^5.7.0",
+    "just-build": "^0.9.19",
+    "karma": "^6.1.1",
+    "karma-browserstack-launcher": "^1.5.2",
+    "karma-chrome-launcher": "^3.1.0",
+    "karma-firefox-launcher": "^2.1.0",
+    "karma-mocha-reporter": "^2.2.5",
+    "karma-qunit": "^4.1.1",
+    "qunit": "^2.10.0",
+    "qunitjs": "^1.23.1",
+    "rollup": "^2.40.0",
+    "rollup-plugin-cleanup": "^3.2.1",
+    "rollup-plugin-commonjs": "^10.1.0",
+    "rollup-plugin-node-resolve": "^5.2.0",
+    "rollup-plugin-sourcemaps": "^0.6.3",
+    "rxjs": "^6.6.6",
+    "serve-static": "^1.14.1",
+    "sorted-json": "^0.2.6",
+    "terser": "^5.3.1",
+    "tslib": "^2.1.0",
+    "typescript": "^4.3.4",
+    "uglify-js": "^3.9.2"
+  }
+}

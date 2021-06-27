@@ -1,0 +1,38 @@
+<!DOCTYPE HTML>
+<html>
+ <head>
+  <script>
+    // Import Dexie
+    const Dexie = require('dexie');
+    // Force debug mode to get async stacks from exceptions.
+    Dexie.debug = true; // In production, set to false to increase performance a little.
+
+    //
+    // Declare Database
+    //
+    let db = new Dexie("FriendDatabase");
+    db.version(1).stores({ friends: "++id,name,age" });
+
+    //
+    // Have Fun
+    //
+    db.transaction('rw', db.friends, function*() {
+
+        // Make sure we have something in DB:
+        if ((yield db.friends.where('name').equals('Josephine').count()) === 0) {
+            let id = yield db.friends.add({name: "Josephine", age: 21});
+            alert (`Added friend with id ${id}`);
+        }
+
+        // Query:
+        let youngFriends = yield db.friends.where("age").below(25).toArray();
+
+        // Show result:
+        alert ("My young friends: " + JSON.stringify(youngFriends));
+
+    }).catch(e => {
+        console.error (e.stack);
+    });    
+  </script>
+ </head>
+</html>

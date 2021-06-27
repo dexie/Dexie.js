@@ -1,0 +1,121 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Extended indexedDB queries using Dexie.js</title>
+    <script>
+        if (!(window.indexedDB || window.window.mozIndexedDB || window.webkitIndexedDB || window.msIndexedDB))
+            // Pull down the polyfill if needed (Safari + older opera browser)
+            document.write('<script src="https://rawgit.com/axemclion/IndexedDBShim/master/dist/indexeddbshim.js">\x3C/script>');
+    </script>
+    <script type="text/javascript" src="../../dist/dexie.js"></script>
+    <script>
+        //
+        // App global database instance and schema
+        //
+        var db = new Dexie("MyDB");
+        db.version(1).stores({
+            friends: "++id,name,shoeSize"
+        });
+        db.open();
+
+        //
+        // Populate some data
+        //
+        function populateSomeData() {
+            log("Populating some data", "heading");
+            return db.transaction("rw", db.friends, function () {
+                db.friends.clear();
+                db.friends.add({ name: "David", shoeSize: 43 });
+                db.friends.add({ name: "Ylva", shoeSize: 37 });
+                db.friends.add({ name: "Jon", shoeSize: 44 });
+                db.friends.add({ name: "Måns", shoeSize: 42 });
+                db.friends.add({ name: "Daniel", shoeSize: 39 });
+                db.friends.add({ name: "Nils", shoeSize: 45 });
+                db.friends.add({ name: "Zlatan", shoeSize: 47 });
+                // Log data from DB:
+                db.friends.orderBy('name').each(function (friend) {
+                    log(JSON.stringify(friend));
+                });
+            }).catch(function (e) {
+                log(e, "error");
+            });
+        }
+
+        //
+        // Examples
+        //
+        function equalsAnyOf() {
+            log("db.friends.where('name').anyOf('David', 'Zlatan', 'Daniel')", "heading");
+            return db.friends.where('name').anyOf('David', 'Zlatan', 'Daniel')
+                             .each(function (friend) {
+                                 log(JSON.stringify(friend));
+                             });
+        }
+
+        function equalsIgnoreCase() {
+            log("db.friends.where('name').equalsIgnoreCase('david')", "heading");
+            return db.friends.where('name').equalsIgnoreCase('david')
+                             .each(function (friend) {
+                                 log(JSON.stringify(friend));
+                             });
+        }
+
+        function startsWithIgnoreCase() {
+            log("db.friends.where('name').startsWithIgnoreCase('da')", "heading");
+            return db.friends.where('name').startsWithIgnoreCase('da')
+                             .each(function (friend) {
+                                 log(JSON.stringify(friend));
+                             });
+        }
+
+        function logicalOR() {
+            log("db.friends.where('name').startsWithIgnoreCase('da').or('shoeSize').below(40)", "heading");
+            return db.friends.where('name').startsWithIgnoreCase('da')
+                             .or('shoeSize').below(40)
+                             .each(function (friend) {
+                                 log(JSON.stringify(friend));
+                             });
+        }
+
+        function logicalAND() {
+            log("db.friends.where('name').startsWithIgnoreCase('da').and(function (friend) { return friend.shoeSize > 40; })", "heading");
+            return db.friends.where('name').startsWithIgnoreCase('da')
+                .and(function (friend) { return friend.shoeSize > 40; })
+                .each(function (friend) {
+                    log(JSON.stringify(friend));
+                });
+        }
+
+        //
+        // Helpers
+        //
+        function log(txt, clazz) {
+            var li = document.createElement('li');
+            li.textContent = txt.toString();
+            if (clazz) li.className = clazz;
+            document.getElementById('log').appendChild(li);
+        }
+
+        function runSamples() {
+            populateSomeData()
+                .then(equalsAnyOf)
+                .then(equalsIgnoreCase)
+                .then(startsWithIgnoreCase)
+                .then(logicalOR)
+                .then(logicalAND)
+            .catch(function (e) {
+                log(e, "error");
+            });
+        }
+
+    </script>
+    <style>
+        li {list-style-type:none;}
+        .error { color: red; }
+        .heading { color: #808080; margin-top: 12px;}
+    </style>
+</head>
+<body onload="runSamples();">
+    <ul id="log"></ul>
+</body>
+</html> 

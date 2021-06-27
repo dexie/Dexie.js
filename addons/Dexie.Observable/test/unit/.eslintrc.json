@@ -1,0 +1,18 @@
+{
+  "parserOptions": {
+    "ecmaVersion": 6,
+    "sourceType": "module",
+    "ecmaFeatures": {
+    }
+  },
+  "env": {
+    "browser": true,
+    "node": true
+  },
+  "rules": {
+    "no-undef": ["error"]
+  },
+  "globals": {
+    "Promise": true
+  }
+}

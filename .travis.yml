@@ -1,0 +1,30 @@
+language: node_js
+before_install: if [[ `npm -v` != 7* ]]; then npm i -g npm@7; fi
+addons:
+  firefox: "85.0"
+node_js:
+  - "12"
+matrix:
+  fast_finish: true
+services:
+  - xvfb
+env:
+  - TF=test
+  - TF=addons/Dexie.Observable/test/unit
+  - TF=addons/Dexie.Observable/test/integration
+  - TF=addons/Dexie.Syncable/test/unit
+  - TF=addons/Dexie.Syncable/test/integration
+  - TF=addons/dexie-export-import/test
+  - TF=libs/dexie-react-hooks/test
+  - TF=test/integrations/test-dexie-relationships
+branches:
+  only:
+  - master
+  - master-2
+  - master-1
+script:
+  - npm run build
+  - cd $TF
+  - pwd
+  - bash ./travis.sh
+

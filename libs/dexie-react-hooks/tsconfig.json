@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "lib": ["es2016", "dom"],
+    "moduleResolution": "node",
+    "importHelpers": false,
+    "jsx": "react",
+    "target": "es5",
+    "module": "es6",
+    "noImplicitAny": false,
+    "strictNullChecks": true,
+    "declaration": true,
+    "declarationMap": true,
+    "allowSyntheticDefaultImports": true,
+    "outDir": "dist",
+    "rootDir": "src",
+    "skipLibCheck": true
+  },
+  "include": ["src"]
+}

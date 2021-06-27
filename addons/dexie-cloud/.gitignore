@@ -1,0 +1,7 @@
+dist/
+esnext/
+.eslintcache
+**/tmp/
+test/**/bundle.*
+dexie-cloud.key
+dexie-cloud.json

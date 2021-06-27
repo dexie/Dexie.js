@@ -1,0 +1,15 @@
+{
+    "compilerOptions": {
+        "module": "es6",
+        "target": "es5",
+        "noImplicitAny": true,
+        "strictNullChecks": true,
+        "noImplicitThis": true,
+        "outDir": "../../tools/tmp/test-typings",
+        "moduleResolution": "node",
+        "lib": ["dom", "es2015"]
+    },
+    "files": [
+        "test-typings.ts"
+    ]
+}

@@ -1,0 +1,48 @@
+{
+  "name": "dexie-export-import",
+  "version": "1.0.0",
+  "description": "Dexie addon that adds export and import capabilities",
+  "main": "dist/dexie-export-import.js",
+  "module": "dist/dexie-export-import.mjs",
+  "typings": "dist/dexie-export-import.d.ts",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dfahlander/Dexie.js.git"
+  },
+  "scripts": {
+    "test": "just-build test && npx karma start test/karma.conf.js --single-run",
+    "build": "just-build",
+    "watch": "just-build --watch",
+    "clean": "rm -rf tools/tmp dist/*.js dist/*.mjs dist/*.map dist/*.d.ts test/bundle.*"
+  },
+  "just-build": {
+    "default": [
+      "just-build src",
+      "just-build test"
+    ],
+    "src": [
+      "tsc -p src",
+      "rollup -c tools/build-configs/rollup.config.js"
+    ],
+    "test": [
+      "tsc -p test [--watch 'Watching for file changes.']",
+      "rollup -c tools/build-configs/rollup.config.js",
+      "rollup -c tools/build-configs/rollup.tests.config.js"
+    ]
+  },
+  "author": "david.fahlander@gmail.com",
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@rollup/plugin-alias": "^3.1.2",
+    "@types/node": "^13.5.1",
+    "base64-arraybuffer-es6": "*",
+    "clarinet": "dfahlander/clarinet",
+    "just-build": "^0.9.19",
+    "rollup-plugin-alias": "^2.2.0",
+    "typeson": "^5.8.2",
+    "typeson-registry": "^1.0.0-alpha.21"
+  },
+  "dependencies": {
+    "dexie": "^3.0.0-alpha.5 || ^2.0.4"
+  }
+}

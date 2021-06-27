@@ -1,0 +1,30 @@
+{
+  "name": "dexie-sample-browserify",
+  "version": "1.0.0",
+  "description": "Sample on how to use Dexie.js with browserify",
+  "main": "scripts/main.js",
+  "scripts": {
+    "build": "browserify scripts/main.js -o bundle.js",
+    "test": "http-server . -a localhost -p 8081"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dfahlander/Dexie.js.git"
+  },
+  "keywords": [
+    "dexie",
+    "samples"
+  ],
+  "author": "David Fahlander",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/dfahlander/Dexie.js/issues"
+  },
+  "homepage": "https://github.com/dfahlander/Dexie.js#readme",
+  "dependencies": {
+    "dexie": "1.x"
+  },
+  "devDependencies": {
+    "browserify": "^13.0.0"
+  }
+}

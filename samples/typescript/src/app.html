@@ -1,0 +1,18 @@
+﻿<!DOCTYPE html>
+<html>
+<head>
+    <title>Demo how to include Dexie with typescript</title>
+    <link rel="stylesheet" href="app.css" />
+
+    <!-- window.Promise is needed for Typescript async/await to work.
+        Incluing promise-polyfill for IE and other old browsers that don't have window.Promise: -->
+    <script src="../node_modules/promise-polyfill/promise.min.js"></script>
+
+    <!-- Include the app bundle: -->
+    <script src="../out/bundle.js"></script>
+    
+</head>
+<body>
+    <div id="consoleArea"></div>
+</body>
+</html>

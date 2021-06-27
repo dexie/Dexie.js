@@ -1,0 +1,70 @@
+{
+  "name": "dexie-react-hooks",
+  "version": "1.0.7",
+  "description": "React hooks for reactive data fetching using Dexie.js",
+  "main": "dist/dexie-react-hooks.js",
+  "typings": "dist/index.d.ts",
+  "scripts": {
+    "test": "just-build build-tests && just-build run-tests",
+    "build": "just-build"
+  },
+  "just-build": {
+    "default": [
+      "just-build dexie",
+      "rollup -c rollup.config.js",
+      "tsc --emitDeclarationOnly"
+    ],
+    "run-tests": [
+      "karma start test/karma.conf.js --single-run"
+    ],
+    "build-tests": [
+      "just-build dexie",
+      "cd test",
+      "webpack"
+    ],
+    "dexie": [
+      "cd ../..",
+      "npm run build"
+    ]
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dfahlander/Dexie.js.git"
+  },
+  "keywords": [
+    "react",
+    "hooks",
+    "indexeddb",
+    "storage",
+    "data-fetching",
+    "reactive",
+    "subscription",
+    "dexie"
+  ],
+  "author": "David Fahlander <https://github.com/dfahlander>",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/dfahlander/Dexie.js/issues"
+  },
+  "homepage": "https://github.com/dfahlander/Dexie.js#readme",
+  "peerDependencies": {
+    "@types/react": ">=16",
+    "dexie": "~3.1.0-alpha.1 || ~3.2.0-beta.1",
+    "react": ">=16"
+  },
+  "devDependencies": {
+    "@rollup/plugin-commonjs": "^17.1.0",
+    "@rollup/plugin-node-resolve": "^11.1.1",
+    "@rollup/plugin-typescript": "^8.1.1",
+    "@types/qunit": "^2.9.6",
+    "@types/react": "^17.0.0",
+    "@types/react-dom": "^17.0.0",
+    "dexie": "file:../..",
+    "just-build": "^0.9.19",
+    "qunit": "^2.12.0",
+    "react": "^17.0.1",
+    "react-dom": "^17.0.1",
+    "ts-loader": "^8.0.17",
+    "webpack-cli": "^4.5.0"
+  }
+}

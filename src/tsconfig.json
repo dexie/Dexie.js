@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "allowJs": true,
+    "target": "es5",
+    "module": "es2015",
+    "importHelpers": true,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "noImplicitReturns": false,
+    "moduleResolution": "node",
+    "lib": ["es2015", "dom"],
+    "forceConsistentCasingInFileNames": true,
+    "outDir": "../tools/tmp/src/",
+    "sourceMap": true
+  },
+  "dirs": [
+    "."
+  ]
+}

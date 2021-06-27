@@ -1,0 +1,11 @@
+**/tmp/
+samples/
+addons/
+libs/
+*.njsproj
+.*
+*.log
+test/
+tools/
+bower.json
+src/

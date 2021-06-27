@@ -1,0 +1,35 @@
+{
+  "name": "dexie-sample-typescript",
+  "version": "1.0.0",
+  "description": "Sample on how to use Dexie.js with Typescript",
+  "scripts": {
+    "build": "npm run build:ts && npm run build:rollup",
+    "build:ts": "node node_modules/typescript/bin/tsc",
+    "build:rollup": "node node_modules/rollup/bin/rollup -c",
+    "clean": "rm -rf out",
+    "test": "http-server . -a localhost -p 8081"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dfahlander/Dexie.js.git"
+  },
+  "keywords": [
+    "dexie",
+    "samples"
+  ],
+  "author": "David Fahlander",
+  "license": "Apache-2.0",
+  "bugs": {
+    "url": "https://github.com/dfahlander/Dexie.js/issues"
+  },
+  "homepage": "https://github.com/dfahlander/Dexie.js#readme",
+  "dependencies": {
+    "dexie": "^3.0.0-rc.2"
+  },
+  "devDependencies": {
+    "rollup": "0.36.3",
+    "rollup-plugin-commonjs": "5.0.5",
+    "rollup-plugin-node-resolve": "2.0.0",
+    "typescript": "^3.7.5"
+  }
+}
