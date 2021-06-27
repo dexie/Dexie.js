@@ -16,14 +16,14 @@ export class Observable<T> implements IObservable<T> {
   }
 
   subscribe(
-    onNext: (value: T) => void,
-    onError?: (error: any) => void,
-    onComplete?: () => void
+    onNext?: ((value: T) => void) | null,
+    onError?: ((error: any) => void) | null,
+    onComplete?: (() => void) | null
   ): Subscription;
-  subscribe(observer: Observer<T>): Subscription;
-  subscribe(x: any, error?: any, complete?: any): Subscription {
+  subscribe(observer?: Observer<T> | null): Subscription;
+  subscribe(x?: any, error?: any, complete?: any): Subscription {
     return this._subscribe(
-      typeof x === "function" ? { next: x, error, complete } : x
+      !x || typeof x === "function" ? { next: x, error, complete } : x
     );
   }
 

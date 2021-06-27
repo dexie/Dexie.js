@@ -2,11 +2,11 @@
 
 export interface Observable<T = any> {
   subscribe(
-    onNext: (value: T) => void,
-    onError?: (error: any) => void,
-    onComplete?: () => void
+    onNext?: ((value: T) => void) | null,
+    onError?: ((error: any) => void) | null,
+    onComplete?: (() => void) | null
   ): Subscription;
-  subscribe(observer: Observer<T>): Subscription;
+  subscribe(observer?: Observer<T> | null): Subscription;
 }
 
 export interface Subscription {
