@@ -4156,15 +4156,23 @@ detect-port-alt@1.1.6:
     address "^1.0.1"
     debug "^2.6.0"
 
-dexie-react-hooks@^1.0.6:
-  version "1.0.6"
-  resolved "https://registry.yarnpkg.com/dexie-react-hooks/-/dexie-react-hooks-1.0.6.tgz#a21d116addb2bb785507bf924cc6e963d858d5d5"
-  integrity sha512-OFoOBC4BQzkVGicuWl/cIMtlPp0wTAnUXwUJzq+l/zp0XVGmwEWkemRFq7JbudJLT0DINFVVzgVhGV7KOUK7uA==
+dexie-cloud-addon@^1.0.0-beta.1:
+  version "1.0.0-beta.1"
+  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-1.0.0-beta.1.tgz#93a231b6904614f83d715311b205387783c9477e"
+  integrity sha512-Cm5++UPZbS07ftO/xXTzxkTu6G1Np0w97PqC8Tv+Iio5aos5snlpuP07lW4DXKzYXUigdgwXHBTWF3Sd/utTXQ==
+  dependencies:
+    dexie "^3.2.0-beta.1"
+    rxjs "^6.6.7"
 
-dexie@^3.1.0-beta.13:
-  version "3.1.0-beta.13"
-  resolved "https://registry.yarnpkg.com/dexie/-/dexie-3.1.0-beta.13.tgz#54b3438e2aca3b60f87a823a535ce1b4313056ec"
-  integrity sha512-pUcX9YyX1VDjF1oMqiOys6N2zoXIA/CeTghB3P4Ee77U8n9q0qa2pmNYoHyyYPKLU58+gzsMJuOc6HLPJDQrQQ==
+dexie-react-hooks@1.0.7:
+  version "1.0.7"
+  resolved "https://registry.yarnpkg.com/dexie-react-hooks/-/dexie-react-hooks-1.0.7.tgz#50316a7829a6dfa013b8471f66b010cc77f00d3e"
+  integrity sha512-hqXGFbfgu1rdfcGHQUPwW2G0iWyupoNWnk3ODvqr+HdZt2ip3y1e/dcWIOsEnlUWWCWk6a3+ok0fvECU05eE2A==
+
+dexie@^3.2.0-beta.1:
+  version "3.2.0-beta.1"
+  resolved "https://registry.yarnpkg.com/dexie/-/dexie-3.2.0-beta.1.tgz#85a7a81bf887250f9bfcfcb548d2285162c58a2f"
+  integrity sha512-tFkGa/SqGoPXLvxg5tg/fLedbQzPNB7FpOcGB/maRVpNsMAVJ8i/M1Sf47kK4Whqkmm4o3tqqVL1jWEB0LO3vA==
 
 diff-sequences@^26.6.2:
   version "26.6.2"
@@ -9800,6 +9808,13 @@ run-queue@^1.0.0, run-queue@^1.0.3:
   integrity sha1-6Eg5bwV9Ij8kOGkkYY4laUFh7Ec=
   dependencies:
     aproba "^1.1.1"
+
+rxjs@^6.6.7:
+  version "6.6.7"
+  resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-6.6.7.tgz#90ac018acabf491bf65044235d5863c4dab804c9"
+  integrity sha512-hTdwr+7yYNIT5n4AMYp85KA6yw2Va0FLa3Rguvbpa4W3I5xynaBZo41cM3XM+4Q6fRMj3sBYIR1VAmZMXYJvRQ==
+  dependencies:
+    tslib "^1.9.0"
 
 safe-buffer@5.1.2, safe-buffer@~5.1.0, safe-buffer@~5.1.1:
   version "5.1.2"
