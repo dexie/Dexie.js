@@ -194,7 +194,7 @@ export class WSConnection extends Subscription {
 
     // The following vars are needed because we must know which callback to ack when server sends it's ack to us.
     const wsUrl = new URL(this.databaseUrl);
-    wsUrl.protocol = wsUrl.protocol === 'https' ? 'wss' : 'ws';
+    wsUrl.protocol = wsUrl.protocol === 'http:' ? 'ws' : 'wss';
     const searchParams = new URLSearchParams();
     if (this.subscriber.closed) return;
     searchParams.set('rev', this.rev);
