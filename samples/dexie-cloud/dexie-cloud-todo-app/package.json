@@ -41,6 +41,8 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
+    "predeploy": "PUBLIC_URL=. yarn build",
+    "deploy": "gh-pages -d build -e dexie-cloud-todo-app",
     "test": "react-scripts test",
     "eject": "react-scripts eject"
   },
@@ -61,5 +63,8 @@
       "last 1 firefox version",
       "last 1 safari version"
     ]
+  },
+  "devDependencies": {
+    "gh-pages": "^3.2.3"
   }
 }
