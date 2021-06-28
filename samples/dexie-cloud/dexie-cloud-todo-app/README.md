@@ -60,8 +60,6 @@ See the section about [deployment](https://facebook.github.io/create-react-app/d
 
 Deploys the built app to gh-pages branch of this github repository under the folder /dexie-cloud-todo-app/.
 
-Run `yarn build` before `yarn deploy`.
-
 ### `yarn eject`
 
 **Note: this is a one-way operation. Once you `eject`, you can’t go back!**
