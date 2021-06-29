@@ -78,7 +78,7 @@ export class WSConnection extends Subscription {
     subscriber: Subscriber<WSConnectionMsg>
   ) {
     super(() => this.teardown());
-    console.debug('New WebSocket Connection', this.id, token);
+    console.debug('New WebSocket Connection', this.id, token ? "authorized" : "unauthorized");
     this.databaseUrl = databaseUrl;
     this.rev = rev;
     this.token = token;
