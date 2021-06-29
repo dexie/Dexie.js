@@ -4,18 +4,12 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 # How to use the sample
 
-If you just want to see the app in action, navigate to the pre-built published version at:
-
-    https://dfahlander.github.io/Dexie.js/dexie-cloud-todo-app/.
-
-    (The build is a PWA with service worker and periodic sync if put on a mobile start screen)
+If you just want to see the app in action, navigate to the [pre-built published version](https://dfahlander.github.io/Dexie.js/dexie-cloud-todo-app/). Currently it is bugging out on Safari so please use any other browser if possible.
 
 If you want to build and play with it locally, follow these steps:
 
 1. Create a dexie-cloud database to sync the data for your version of the app:
-
-    `npx dexie-cloud create` - create your own database in the cloud.
-
+   `npx dexie-cloud create` - create your own database in the cloud.
 2. `yarn install` - install dependencies.
 3. `./configure-app.sh` (or manually set env variable REACT_APP_DBURL=`<database URL>`)
 4. `yarn start`
