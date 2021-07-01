@@ -1,6 +1,8 @@
 import sourcemaps from 'rollup-plugin-sourcemaps';
 import commonjs from 'rollup-plugin-commonjs';
 import nodeResolve from 'rollup-plugin-node-resolve';
+import path from 'path';
+import alias from '@rollup/plugin-alias';
 
 const ERRORS_TO_IGNORE = [
   "THIS_IS_UNDEFINED"
@@ -24,6 +26,9 @@ export default {
   external: ['dexie', "qunit", "dexie-export-import"],
   plugins: [
     sourcemaps(),
+    alias({entries: [{
+      find: "stream", replacement: path.resolve(__dirname, './fake-stream')}
+    ]}),
     nodeResolve({browser: true}),
     commonjs()
   ],
