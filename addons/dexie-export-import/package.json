@@ -1,6 +1,6 @@
 {
   "name": "dexie-export-import",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Dexie addon that adds export and import capabilities",
   "main": "dist/dexie-export-import.js",
   "module": "dist/dexie-export-import.mjs",
@@ -43,6 +43,6 @@
     "typeson-registry": "^1.0.0-alpha.21"
   },
   "dependencies": {
-    "dexie": "^3.0.0-alpha.5 || ^2.0.4"
+    "dexie": "^3.2.0-beta.1 || ^3.0.0 || ^2.0.4"
   }
 }
