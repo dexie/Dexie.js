@@ -117,10 +117,7 @@ export function dexieOpen (db: Dexie) {
       // Dexie.vip() makes subscribers able to use the database while being opened.
       // This is a must since these subscribers take part of the opening procedure.
       state.onReadyBeingFired = [];
-      const vipedDb = Object.create(db) as Dexie;
-      vipedDb._state = Object.create(db._state);
-      vipedDb._state.openComplete = true;
-      return Promise.resolve(vip(()=>db.on.ready.fire(vipedDb))).then(function fireRemainders() {
+      return Promise.resolve(vip(()=>db.on.ready.fire(db.vip))).then(function fireRemainders() {
           if (state.onReadyBeingFired.length > 0) {
               // In case additional subscribers to db.on('ready') were added during the time db.on.ready.fire was executed.
               let remainders = state.onReadyBeingFired.reduce(promisableChain, nop);

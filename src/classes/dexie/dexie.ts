@@ -76,6 +76,7 @@ export class Dexie implements IDexie {
   name: string;
   verno: number = 0;
   idbdb: IDBDatabase | null;
+  vip: Dexie;
   on: DbEvents;
 
   Table: TableConstructor;
@@ -209,6 +210,11 @@ export class Dexie implements IDexie {
     this.use(hooksMiddleware);
     this.use(observabilityMiddleware);
     this.use(cacheExistingValuesMiddleware);
+
+    const vipedDb = Object.create(this) as Dexie;
+      vipedDb._state = Object.create(this._state);
+      vipedDb._state.openComplete = true;
+    this.vip = vipedDb;
 
     // Call each addon:
     addons.forEach(addon => addon(this));
