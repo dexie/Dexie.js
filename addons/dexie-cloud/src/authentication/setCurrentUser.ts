@@ -31,7 +31,7 @@ export async function setCurrentUser(db: DexieCloudDB, user: AuthPersistedContex
   await authenticate(
     db.cloud.options!.databaseUrl,
     user,
-    dummyAuthDialog, // TODO: Fixthis!
+    dummyAuthDialog(db), // TODO: Fixthis!
     db.cloud.options!.fetchTokens
   );
   const $logins = db.table('$logins');

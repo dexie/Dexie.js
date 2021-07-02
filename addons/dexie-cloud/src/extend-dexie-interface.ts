@@ -15,6 +15,7 @@ import { DexieCloudServerState } from './DexieCloudServerState';
 import { Member } from './db/entities/Member';
 import { Role } from './db/entities/Role';
 import { EntityCommon } from './db/entities/EntityCommon';
+import { DXCUserInteraction } from './types/DXCUserInteraction';
 
 export interface DexieCloudSyncOptions {
   wait: boolean;
@@ -37,7 +38,8 @@ declare module 'dexie' {
       currentUser: Rx.BehaviorSubject<UserLogin>;
       syncState: Rx.BehaviorSubject<SyncState>;
       persistedSyncState: Rx.BehaviorSubject<PersistedSyncState | undefined>;
-      loginState: Rx.BehaviorSubject<LoginState>;
+      userInteraction: Rx.BehaviorSubject<DXCUserInteraction | undefined>;
+      //loginState: Rx.BehaviorSubject<LoginState>;
       usingServiceWorker?: boolean;
       /** Login using Dexie Cloud OTP or Demo user.
        *
