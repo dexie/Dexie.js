@@ -42,6 +42,7 @@ import { DexieCloudSyncOptions } from './extend-dexie-interface';
 import { isSyncNeeded } from './sync/isSyncNeeded';
 import { connectWebSocket } from './sync/connectWebSocket';
 import { PersistedSyncState } from './db/entities/PersistedSyncState';
+import { DXCUserInteraction } from './types/DXCUserInteraction';
 
 export { DexieCloudTable } from './extend-dexie-interface';
 
@@ -230,7 +231,9 @@ export function dexieCloud(dexie: Dexie) {
     persistedSyncState: new BehaviorSubject<PersistedSyncState | undefined>(
       undefined
     ),
-    loginState: new BehaviorSubject<LoginState>({ type: 'silent' }), // fixthis! Or remove this observable?
+    userInteraction: new BehaviorSubject<DXCUserInteraction | undefined>(
+      undefined
+    ),
     async login(hint) {
       const db = DexieCloudDB(dexie);
       await db.cloud.sync();

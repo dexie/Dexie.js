@@ -1,22 +1,51 @@
 import type {
   RefreshTokenRequest,
-  TokenFinalResponse
+  TokenFinalResponse,
 } from 'dexie-cloud-common';
 import { b64encode } from 'dreambase-library/dist/common/base64';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { UserLogin } from '../db/entities/UserLogin';
+import { LoginPromptReply } from '../types/LoginState';
 import { AuthPersistedContext } from './AuthPersistedContext';
 import { otpFetchTokenCallback } from './otpFetchTokenCallback';
 
 export interface AuthenticationDialog {
-  prompt(msg: string): string | null | Promise<string | null>;
-  alert(msg: string): any;
+  prompt(
+    msg: string,
+    type: 'email' | 'otp' | 'userId' | 'name'
+  ): string | null | Promise<string | null>;
+  alert(msg: string, type: 'error' | 'warning' | 'info'): any;
 }
 
-export const dummyAuthDialog: AuthenticationDialog = {
-  prompt: async (msg) => prompt(msg),
-  alert: async (msg) => alert(msg)
-};
+export function dummyAuthDialog(db: DexieCloudDB): AuthenticationDialog {
+  return {
+    prompt: (msg, type) => {
+      return new Promise<string>((resolve, reject) => {
+        switch (type) {
+          case 'email':
+            db.cloud.loginState.next({
+              type: 'interaction',
+              interactionType: 'emailRequested',
+              submitText: 'Send OTP',
+              onCancel: () => reject(new Error('user cancelled')),
+              onSubmit: (params) => resolve(params.email || ""),
+            });
+            case 'otp':
+              db.cloud.loginState.next({
+                type: 'interaction',
+                interactionType: 'otpRequested',
+                submitText: 'Login',
+                isWorking: false,
+                onCancel: () => reject(new Error('user cancelled')),
+                onSubmit: (params) => resolve(params.otp || ""),
+              });
+  
+        }
+      });
+    },
+    alert: async (msg) => {},
+  };
+}
 
 export type FetchTokenCallback = (tokenParams: {
   public_key: string;
@@ -31,7 +60,7 @@ export async function loadAccessToken(
     accessTokenExpiration,
     refreshToken,
     refreshTokenExpiration,
-    claims
+    claims,
   } = db.cloud.currentUser.value;
   if (!accessToken) return;
   const expTime = accessTokenExpiration?.getTime() ?? Infinity;
@@ -51,7 +80,7 @@ export async function loadAccessToken(
   );
   await db.table('$logins').update(claims.sub, {
     accessToken: refreshedLogin.accessToken,
-    accessTokenExpiration: refreshedLogin.accessTokenExpiration
+    accessTokenExpiration: refreshedLogin.accessTokenExpiration,
   });
   return refreshedLogin.accessToken;
 }
@@ -113,13 +142,13 @@ export async function refreshAccessToken(
     scopes: ['ACCESS_DB'],
     signature,
     signing_algorithm,
-    time_stamp
+    time_stamp,
   };
   const res = await fetch(`${url}/token`, {
     body: JSON.stringify(tokenRequest),
     method: 'post',
     headers: { 'Content-Type': 'application/json' },
-    mode: 'cors'
+    mode: 'cors',
   });
   if (res.status !== 200)
     throw new Error(`RefreshToken: Status ${res.status} from ${url}/token`);
@@ -143,7 +172,7 @@ async function userAuthenticate(
       name: 'RSASSA-PKCS1-v1_5',
       modulusLength: 2048,
       publicExponent: new Uint8Array([0x01, 0x00, 0x01]),
-      hash: { name: 'SHA-256' }
+      hash: { name: 'SHA-256' },
     },
     false, // Non-exportable...
     ['sign', 'verify']
@@ -155,7 +184,7 @@ async function userAuthenticate(
 
   const response2 = await fetchToken({
     public_key: publicKeyPEM,
-    hints
+    hints,
   });
 
   if (response2.type !== 'tokens')
@@ -176,7 +205,7 @@ async function userAuthenticate(
 
   if (response2.alerts) {
     for (const a of response2.alerts) {
-      dlg.alert(`${a.type}: ${a.message}`);
+      dlg.alert(a.message, a.type);
     }
   }
   return context;

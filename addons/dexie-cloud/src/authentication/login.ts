@@ -26,7 +26,7 @@ export async function login(
   await authenticate(
     db.cloud.options!.databaseUrl,
     context,
-    dummyAuthDialog, // TODO: Fixthis!
+    dummyAuthDialog(db), // TODO: Fixthis!
     db.cloud.options!.fetchTokens,
     hints
   );

@@ -17,7 +17,7 @@ export function otpFetchTokenCallback(
       const demo_user =
         hints?.userId ||
         hints?.email ||
-        (await dlg.prompt('Enter userId of a demo user')); // TODO: Fixthis!
+        (await dlg.prompt('Enter userId of a demo user', "userId"));
       if (!demo_user) throw new Error(`No demo userId provided`);
       tokenRequest = {
         demo_user,
@@ -26,7 +26,7 @@ export function otpFetchTokenCallback(
         public_key
       };
     } else {
-      const email = hints?.email || (await dlg.prompt('Email')); // TODO: Fixthis!
+      const email = hints?.email || (await dlg.prompt('Email', "email"));
       if (!email) throw new Error(`No email was given`);
 
       tokenRequest = {
@@ -50,7 +50,7 @@ export function otpFetchTokenCallback(
     } else if (tokenRequest.grant_type === 'otp') {
       if (response.type !== 'otp-sent')
         throw new Error(`Unexpected response from ${url}/token`);
-      const otp = await dlg.prompt('OTP'); // TODO: Fixthis!
+      const otp = await dlg.prompt('OTP', "otp"); // TODO: Fixthis!
       if (!otp) throw new Error('Invalid OTP');
       tokenRequest.otp = otp;
       tokenRequest.otp_id = response.otp_id;

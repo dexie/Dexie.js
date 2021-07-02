@@ -1,49 +1,50 @@
-
 export type LoginState =
   | LoginStateSilent
   | LoginStateInteraction
   | LoginStateError;
 
 export interface LoginStateSilent {
-  type: "silent";
+  type: 'silent';
 }
 
-export type LoginStateInteraction = (
-  | Alert
-  | EmailRequested
-  | OTPRequested
-) & {
-  type: "interaction";
+export type LoginStateInteraction = (Alert | EmailRequested | OTPRequested) & {
+  type: 'interaction';
   alerts?: {
-    type: "error" | "warning" | "info";
+    type: 'error' | 'warning' | 'info';
     message: string;
   }[];
   isWorking?: boolean;
-  onSubmit: (params: {email?: string, otp?: string, name?: string}) => void;
+  onSubmit: (params: LoginPromptReply) => void;
   onCancel: () => void;
 };
 
+export type LoginPromptReply = {
+  email?: string;
+  otp?: string;
+  name?: string;
+};
+
 export interface LoginStateError {
-  type: "error";
+  type: 'error';
   message: string;
 }
 
 interface Alert {
-  interactionType: "alert";
+  interactionType: 'alert';
   alerts: {
-    type: "error" | "warning" | "info";
+    type: 'error' | 'warning' | 'info';
     message: string;
-  };
-  submitText: "OK";
-};
+  }[];
+  submitText: 'OK';
+}
 
 interface EmailRequested {
-  interactionType: "emailRequested";
-  submitText: "Send OTP";
-};
+  interactionType: 'emailRequested';
+  submitText: 'Send OTP';
+}
 
 interface OTPRequested {
-  interactionType: "otpRequested";
+  interactionType: 'otpRequested';
   isWorking: boolean;
-  submitText: "Login";
+  submitText: 'Login';
 }
