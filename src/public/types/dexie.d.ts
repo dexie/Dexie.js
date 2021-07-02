@@ -18,6 +18,7 @@ export interface Dexie extends Database {
   readonly name: string;
   readonly tables: Table[];
   readonly verno: number;
+  readonly vip: Dexie;
   
   readonly _allTables: {[name: string]: Table<any,IndexableType>};
 
