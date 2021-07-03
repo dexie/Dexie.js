@@ -9,7 +9,12 @@ import { UNAUTHORIZED_USER } from '../authentication/UNAUTHORIZED_USER';
 import { DexieCloudOptions } from '../DexieCloudOptions';
 import { BehaviorSubject } from 'rxjs';
 import { BaseRevisionMapEntry } from './entities/BaseRevisionMapEntry';
-import { DBRealm, DBRealmMember, DBRealmRole, DexieCloudSchema } from "dexie-cloud-common";
+import {
+  DBRealm,
+  DBRealmMember,
+  DBRealmRole,
+  DexieCloudSchema,
+} from 'dexie-cloud-common';
 import { BroadcastedLocalEvent } from '../helpers/BroadcastedLocalEvent';
 import { SyncState } from '../types/SyncState';
 
@@ -65,16 +70,19 @@ export const DEXIE_CLOUD_SCHEMA = {
   $jobs: '',
   $syncState: '',
   $baseRevs: '[tableName+clientRev]',
-  $logins: 'claims.sub, lastLogin'
+  $logins: 'claims.sub, lastLogin',
 };
 
 let static_counter = 0;
 export function DexieCloudDB(dx: Dexie): DexieCloudDB {
+  if ('vip' in dx) dx = dx['vip']; // Avoid race condition. Always map to a vipped dexie that don't block during db.on.ready().
   let db = wm.get(dx.cloud);
   if (!db) {
     const localSyncEvent = new BehaviorSubject({});
-    const syncStateChangedEvent = new BroadcastedLocalEvent<SyncState>(`syncstatechanged-${dx.name}`);
-    localSyncEvent["id"] = ++static_counter;
+    const syncStateChangedEvent = new BroadcastedLocalEvent<SyncState>(
+      `syncstatechanged-${dx.name}`
+    );
+    localSyncEvent['id'] = ++static_counter;
     let initiallySynced = false;
     db = {
       get name() {
@@ -147,7 +155,7 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
       },
       setInitiallySynced(value) {
         initiallySynced = value;
-      }
+      },
     };
 
     Object.assign(db, helperMethods);

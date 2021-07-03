@@ -48,7 +48,6 @@ import { DISABLE_SERVICEWORKER_STRATEGY } from './DISABLE_SERVICEWORKER_STRATEGY
 export { DexieCloudTable } from './extend-dexie-interface';
 
 export function dexieCloud(dexie: Dexie) {
-  if ('vip' in dexie) dexie = dexie['vip'] as Dexie;
   const origIdbName = dexie.name;
   //
   //
