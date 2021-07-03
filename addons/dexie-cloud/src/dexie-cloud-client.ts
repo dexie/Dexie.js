@@ -43,6 +43,7 @@ import { isSyncNeeded } from './sync/isSyncNeeded';
 import { connectWebSocket } from './sync/connectWebSocket';
 import { PersistedSyncState } from './db/entities/PersistedSyncState';
 import { DXCUserInteraction } from './types/DXCUserInteraction';
+import { DISABLE_SERVICEWORKER_STRATEGY } from './DISABLE_SERVICEWORKER_STRATEGY';
 
 export { DexieCloudTable } from './extend-dexie-interface';
 
@@ -95,7 +96,8 @@ export function dexieCloud(dexie: Dexie) {
           if (
             db.cloud.options?.tryUseServiceWorker &&
             'serviceWorker' in navigator &&
-            swRegistrations.length > 0
+            swRegistrations.length > 0 &&
+            !DISABLE_SERVICEWORKER_STRATEGY
           ) {
             // * Configured for using service worker if available.
             // * Browser supports service workers
@@ -111,6 +113,9 @@ export function dexieCloud(dexie: Dexie) {
                 'dexie-cloud-addon: Not using service worker.',
                 swRegistrations.length === 0
                   ? 'No SW registrations found.'
+                  : 'serviceWorker' in navigator &&
+                    DISABLE_SERVICEWORKER_STRATEGY
+                  ? "Avoiding Safari crash triggered by dexie-cloud's service worker."
                   : 'navigator.serviceWorker not present'
               );
             }
