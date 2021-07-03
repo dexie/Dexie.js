@@ -122,7 +122,7 @@ export function dexieOpen (db: Dexie) {
               // In case additional subscribers to db.on('ready') were added during the time db.on.ready.fire was executed.
               let remainders = state.onReadyBeingFired.reduce(promisableChain, nop);
               state.onReadyBeingFired = [];
-              return Promise.resolve(vip(remainders)).then(fireRemainders)
+              return Promise.resolve(vip(()=>remainders(db.vip))).then(fireRemainders)
           }
       });
   }).finally(()=>{
