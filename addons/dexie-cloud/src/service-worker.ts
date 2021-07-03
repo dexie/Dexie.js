@@ -1,6 +1,8 @@
 import Dexie from 'dexie';
 import { DexieCloudDB } from './db/DexieCloudDB';
 import dexieCloud from './dexie-cloud-client';
+import { DISABLE_SERVICEWORKER_STRATEGY } from './DISABLE_SERVICEWORKER_STRATEGY';
+import { isSafari, safariVersion } from './isSafari';
 import { syncIfPossible } from './sync/syncIfPossible';
 import { SWMessageEvent } from './types/SWMessageEvent';
 import { SyncEvent } from './types/SWSyncEvent';
@@ -55,42 +57,45 @@ async function syncDB(dbName: string) {
   }
 }
 
-self.addEventListener('sync', (event: SyncEvent) => {
-  console.debug('SW "sync" Event', event.tag);
-  const dbName = getDbNameFromTag(event.tag);
-  if (dbName) {
-    event.waitUntil(syncDB(dbName));
-  }
-});
-
-self.addEventListener('periodicsync', (event: SyncEvent) => {
-  console.debug('SW "periodicsync" Event', event.tag);
-  const dbName = getDbNameFromTag(event.tag);
-  if (dbName) {
-    event.waitUntil(syncDB(dbName));
-  }
-});
-
-self.addEventListener('message', (event: SWMessageEvent) => {
-  console.debug('SW "message" Event', event.data);
-  if (event.data.type === 'dexie-cloud-sync') {
-    const { dbName } = event.data;
-    // Mimic background sync behavior - retry in X minutes on failure.
-    // But lesser timeout and more number of times.
-    const syncAndRetry = (num = 1) => {
-      return syncDB(dbName).catch(async (e) => {
-        if (num === 3) throw e;
-        await sleep(60_000); // 1 minute
-        syncAndRetry(num + 1);
-      });
-    };
-    if ('waitUntil' in event) {
-      event.waitUntil(syncAndRetry());
-    } else {
-      syncAndRetry();
+// Avoid taking care of events if browser bugs out by using dexie cloud from a service worker.
+if (!DISABLE_SERVICEWORKER_STRATEGY) {
+  self.addEventListener('sync', (event: SyncEvent) => {
+    console.debug('SW "sync" Event', event.tag);
+    const dbName = getDbNameFromTag(event.tag);
+    if (dbName) {
+      event.waitUntil(syncDB(dbName));
     }
-  }
-});
+  });
+
+  self.addEventListener('periodicsync', (event: SyncEvent) => {
+    console.debug('SW "periodicsync" Event', event.tag);
+    const dbName = getDbNameFromTag(event.tag);
+    if (dbName) {
+      event.waitUntil(syncDB(dbName));
+    }
+  });
+
+  self.addEventListener('message', (event: SWMessageEvent) => {
+    console.debug('SW "message" Event', event.data);
+    if (event.data.type === 'dexie-cloud-sync') {
+      const { dbName } = event.data;
+      // Mimic background sync behavior - retry in X minutes on failure.
+      // But lesser timeout and more number of times.
+      const syncAndRetry = (num = 1) => {
+        return syncDB(dbName).catch(async (e) => {
+          if (num === 3) throw e;
+          await sleep(60_000); // 1 minute
+          syncAndRetry(num + 1);
+        });
+      };
+      if ('waitUntil' in event) {
+        event.waitUntil(syncAndRetry());
+      } else {
+        syncAndRetry();
+      }
+    }
+  });
+}
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
