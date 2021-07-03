@@ -3,6 +3,7 @@ import "dexie-export-import";
 import {module, asyncTest, start, stop, strictEqual, ok, equal} from 'qunit';
 import {promisedTest, readBlob, readBlobBinary, deepEqual} from './tools';
 import {getSimpleImportData} from './test-data';
+import {importInto} from "../src";
 
 module("edge-cases");
 
@@ -65,4 +66,29 @@ promisedTest("filtered-chunkedExport (issue #862)", async ()=>{
   const rejson3 = JSON.stringify(parsed3);
   equal (rejson1, rejson2, "First and second exports are equal");
   equal (rejson2, rejson3, "Second and third expots are equal");
+});
+
+promisedTest("import-into (issue #1342)", async ()=>{
+  const blob = new Blob([JSON.stringify(IMPORT_DATA)]);
+
+  await Dexie.delete(DATABASE_NAME);
+
+  const db = new Dexie(DATABASE_NAME);
+  const dbSchemes = {};
+  for (const table of IMPORT_DATA.data.tables) {
+    dbSchemes[table.name] = table.schema;
+  }
+  db.version(IMPORT_DATA.data.databaseVersion).stores(dbSchemes);
+
+  await importInto(db, blob, {
+    chunkSizeBytes: 11,
+    clearTablesBeforeImport: true,
+  });
+
+  const friends = await db.table("friends").toArray();
+  deepEqual(friends, IMPORT_DATA.data.data[0].rows, "Imported data should equal");
+
+  db.close();
+
+  await Dexie.delete(DATABASE_NAME);
 });

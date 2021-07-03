@@ -49,7 +49,7 @@ props(Dexie, {
   // Static delete() method.
   //
   delete(databaseName: string) {
-    const db = new Dexie(databaseName);
+    const db = new Dexie(databaseName, {addons: []});
     return db.delete();
   },
 

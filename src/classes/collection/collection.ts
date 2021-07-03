@@ -533,7 +533,13 @@ export class Collection implements ICollection {
                 }
               }
             }
-            
+            const criteria = isPlainKeyRange(ctx) &&
+              ctx.limit === Infinity &&
+              (typeof changes !== 'function' || changes === deleteCallback) && {
+                index: ctx.index,
+                range: ctx.range
+              };
+
             return Promise.resolve(addValues.length > 0 &&
               coreTable.mutate({trans, type: 'add', values: addValues})
                 .then(res => {
@@ -543,12 +549,23 @@ export class Collection implements ICollection {
                   }
                   applyMutateResult(addValues.length, res);
                 })
-            ).then(()=>putValues.length > 0 &&
-                coreTable.mutate({trans, type: 'put', keys: putKeys, values: putValues})
-                  .then(res=>applyMutateResult(putValues.length, res))
-            ).then(()=>deleteKeys.length > 0 &&
-                coreTable.mutate({trans, type: 'delete', keys: deleteKeys})
-                  .then(res=>applyMutateResult(deleteKeys.length, res))
+            ).then(()=>(putValues.length > 0 || (criteria && typeof changes === 'object')) &&
+                coreTable.mutate({
+                  trans,
+                  type: 'put',
+                  keys: putKeys,
+                  values: putValues,
+                  criteria,
+                  changeSpec: typeof changes !== 'function'
+                    && changes
+                }).then(res=>applyMutateResult(putValues.length, res))
+            ).then(()=>(deleteKeys.length > 0 || (criteria && changes === deleteCallback)) &&
+                coreTable.mutate({
+                  trans,
+                  type: 'delete',
+                  keys: deleteKeys,
+                  criteria
+                }).then(res=>applyMutateResult(deleteKeys.length, res))
             ).then(()=>{
               return keys.length > offset + count && nextChunk(offset + limit);
             });
@@ -599,8 +616,8 @@ export class Collection implements ICollection {
       });
     }
 
-    return this.modify((value, ctx) => ctx.value = null);
+    return this.modify(deleteCallback);
   }
 }
 
-
+const deleteCallback = (value, ctx) => ctx.value = null;

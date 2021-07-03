@@ -87,6 +87,12 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
     Dexie.ignoreTransaction(()=>progressCallback(progress));
   }
 
+  if (options!.clearTablesBeforeImport) {
+    for (const table of db.tables) {
+      await table.clear();
+    }
+  }
+
   if (options.noTransaction) {
     await importAll();
   } else {
@@ -141,9 +147,6 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
           [undefined, filteredRows] :
           [filteredRows.map(row=>row[0]), rows.map(row=>row[1])];
 
-        if (options!.clearTablesBeforeImport) {
-          await table.clear();
-        }
         if (options!.overwriteValues)
           await table.bulkPut(values, keys);
         else

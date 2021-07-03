@@ -113,7 +113,12 @@ export class Transaction implements ITransaction {
     if (!this.active) throw new exceptions.TransactionInactive();
     assert(this._completion._state === null); // Completion Promise must still be pending.
 
-    idbtrans = this.idbtrans = idbtrans || idbdb.transaction(safariMultiStoreFix(this.storeNames), this.mode) as IDBTransaction;
+    idbtrans = this.idbtrans = idbtrans ||
+      (this.db.core 
+        ? this.db.core.transaction(this.storeNames, this.mode as 'readwrite' | 'readonly')
+        : idbdb.transaction(this.storeNames, this.mode)
+      ) as IDBTransaction;
+
     idbtrans.onerror = wrap(ev => {
       preventDefault(ev);// Prohibit default bubbling to window.error
       this._reject(idbtrans.error);
