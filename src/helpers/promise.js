@@ -659,7 +659,7 @@ export function wrap (fn, errorCatcher) {
 //
 // variables used for native await support
 //
-const task = { awaits: 0, echoes: 0, id: 0}; // The ongoing macro-task when using zone-echoing.
+const task = { awaits: 0, echoes: 0, id: 0, stack: ""}; // The ongoing macro-task when using zone-echoing.
 var taskCounter = 0; // ID counter for macro tasks.
 var zoneStack = []; // Stack of left zones to restore asynchronically.
 var zoneEchoes = 0; // zoneEchoes is a must in order to persist zones between native await expressions.
@@ -706,7 +706,12 @@ export function newScope (fn, props, a1, a2) {
 // Function to call if scopeFunc returns NativePromise
 // Also for each NativePromise in the arguments to Promise.all()
 export function incrementExpectedAwaits() {
-    if (!task.id) task.id = ++taskCounter;
+    if (!task.id) {
+        task.id = ++taskCounter;
+        if (debug) {
+            task.stack = new Error().stack;
+        }
+    }
     ++task.awaits;
     task.echoes += ZONE_ECHO_LIMIT;
     return task.id;
@@ -746,12 +751,21 @@ export function onPossibleParallellAsync (possiblePromise) {
 function zoneEnterEcho(targetZone) {
     ++totalEchoes;
     //console.log("Total echoes ", totalEchoes);
+    let taskEchoLimitReached = task.echoes === 1;
     if (!task.echoes || --task.echoes === 0) {
         task.echoes = task.id = 0; // Cancel zone echoing.
     }
 
     zoneStack.push(PSD);
     switchToZone(targetZone, true);
+    if (taskEchoLimitReached) {
+        const e = new exceptions.ForeignAwait("Failed to maintain zone.");
+        if (task.stack) Object.defineProperty(e, 'stack', {
+            value: task.stack,
+            writable: false
+        });
+        throw e;
+    }
 }
 
 function zoneLeaveEcho() {
