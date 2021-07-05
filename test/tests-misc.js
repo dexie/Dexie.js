@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, deepEqual, ok} from 'QUnit';
-import {resetDatabase, spawnedTest, promisedTest} from './dexie-unittest-utils';
+import {resetDatabase, spawnedTest, promisedTest, supports} from './dexie-unittest-utils';
 
 const async = Dexie.async;
 
@@ -407,6 +407,9 @@ asyncTest("Issue #1280 - Don't perform deep-clone workaround when adding non-POJ
 });
 
 asyncTest("Issue #1333 - uniqueKeys on virtual index should produce unique results", async () => {
+    if (!supports('compound'))
+        return ok(true, "SKIPPED - COMPOUND UNSUPPORTED");
+
     try {
         await db.metrics.add({ id: "id1", name: "a", time: 1 });
         await db.metrics.add({ id: "id2", name: "b", time: 2 });
