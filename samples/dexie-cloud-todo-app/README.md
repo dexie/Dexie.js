@@ -11,7 +11,7 @@ If you want to build and play with it locally, follow these steps:
 1. Create a dexie-cloud database to sync the data for your version of the app:
    `npx dexie-cloud create` - create your own database in the cloud.
 2. `yarn install` - install dependencies.
-3. `./configure-app.sh` (or manually set env variable REACT_APP_DBURL=`<database URL>`)
+3. `./configure-app.sh`
 4. `yarn start`
 
 See https://dexie.org/cloud/
