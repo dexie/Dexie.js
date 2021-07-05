@@ -406,19 +406,13 @@ asyncTest("Issue #1280 - Don't perform deep-clone workaround when adding non-POJ
     }
 });
 
-asyncTest("Issue #1333 - uniqueKeys on virtual index should produce unique results", async () => {
+promisedTest("Issue #1333 - uniqueKeys on virtual index should produce unique results", async () => {
     if (!supports('compound'))
         return ok(true, "SKIPPED - COMPOUND UNSUPPORTED");
 
-    try {
-        await db.metrics.add({ id: "id1", name: "a", time: 1 });
-        await db.metrics.add({ id: "id2", name: "b", time: 2 });
-        await db.metrics.add({ id: "id3", name: "a", time: 3 });
-        const result = await db.metrics.orderBy("name").uniqueKeys();
-        ok(result.length === 2, `Unexpected array length ${result.length} from uniqueKeys on virtual index, expected 2. Got ${result.join(',')}`);
-    } catch (error) {
-        ok(false, error);
-    } finally {
-        start();
-    }
+    await db.metrics.add({ id: "id1", name: "a", time: 1 });
+    await db.metrics.add({ id: "id2", name: "b", time: 2 });
+    await db.metrics.add({ id: "id3", name: "a", time: 3 });
+    const result = await db.metrics.orderBy("name").uniqueKeys();
+    ok(result.length === 2, `Unexpected array length ${result.length} from uniqueKeys on virtual index, expected 2. Got ${result.join(',')}`);
 });
