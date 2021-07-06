@@ -141,9 +141,9 @@ export function dexieOpen (db: Dexie) {
       });
   }).finally(()=>{
       state.onReadyBeingFired = null;
+      state.isBeingOpened = false;
   }).then(()=>{
       // Resolve the db.open() with the db instance.
-      state.isBeingOpened = false;
       return db;
   }).catch(err => {
       state.dbOpenError = err; // Record the error. It will be used to reject further promises of db operations.
