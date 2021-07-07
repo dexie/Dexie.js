@@ -48,156 +48,11 @@ export function dexieCloud(dexie: Dexie) {
   dexie.on(
     'ready',
     async (dexie: Dexie) => {
-      const db = DexieCloudDB(dexie);
-      //verifyConfig(db.cloud.options); Not needed (yet at least!)
-      // Verify the user has allowed version increment.
-      if (!db.tables.every((table) => table.core)) {
-        throwVersionIncrementNeeded();
-      }
-      const swRegistrations =
-        'serviceWorker' in navigator
-          ? await navigator.serviceWorker.getRegistrations()
-          : [];
-      const initiallySynced = await db.transaction(
-        'rw',
-        db.$syncState,
-        async () => {
-          const { options, schema } = db.cloud;
-          const [persistedOptions, persistedSchema, persistedSyncState] =
-            await Promise.all([
-              db.getOptions(),
-              db.getSchema(),
-              db.getPersistedSyncState(),
-            ]);
-          if (!options) {
-            // Options not specified programatically (use case for SW!)
-            // Take persisted options:
-            db.cloud.options = persistedOptions || null;
-          } else if (
-            !persistedOptions ||
-            JSON.stringify(persistedOptions) !== JSON.stringify(options)
-          ) {
-            // Update persisted options:
-            await db.$syncState.put(options, 'options');
-          }
-          if (
-            db.cloud.options?.tryUseServiceWorker &&
-            'serviceWorker' in navigator &&
-            swRegistrations.length > 0 &&
-            !DISABLE_SERVICEWORKER_STRATEGY
-          ) {
-            // * Configured for using service worker if available.
-            // * Browser supports service workers
-            // * There are at least one service worker registration
-            console.debug('Dexie Cloud Addon: Using service worker');
-            db.cloud.usingServiceWorker = true;
-          } else {
-            // Not configured for using service worker or no service worker
-            // registration exists. Don't rely on service worker to do any job.
-            // Use LocalSyncWorker instead.
-            if (db.cloud.options?.tryUseServiceWorker && !IS_SERVICE_WORKER) {
-              console.debug(
-                'dexie-cloud-addon: Not using service worker.',
-                swRegistrations.length === 0
-                  ? 'No SW registrations found.'
-                  : 'serviceWorker' in navigator &&
-                    DISABLE_SERVICEWORKER_STRATEGY
-                  ? "Avoiding Safari crash triggered by dexie-cloud's service worker."
-                  : 'navigator.serviceWorker not present'
-              );
-            }
-            db.cloud.usingServiceWorker = false;
-          }
-          updateSchemaFromOptions(schema, db.cloud.options);
-          updateSchemaFromOptions(persistedSchema, db.cloud.options);
-          if (!schema) {
-            // Database opened dynamically (use case for SW!)
-            // Take persisted schema:
-            db.cloud.schema = persistedSchema || null;
-          } else if (
-            !persistedSchema ||
-            JSON.stringify(persistedSchema) !== JSON.stringify(schema)
-          ) {
-            // Update persisted schema (but don't overwrite table prefixes)
-            const newPersistedSchema = persistedSchema || {};
-            for (const [table, tblSchema] of Object.entries(schema)) {
-              const newTblSchema = newPersistedSchema[table];
-              if (!newTblSchema) {
-                newPersistedSchema[table] = { ...tblSchema };
-              } else {
-                newTblSchema.markedForSync = tblSchema.markedForSync;
-                tblSchema.deleted = newTblSchema.deleted;
-                newTblSchema.generatedGlobalId = tblSchema.generatedGlobalId;
-              }
-            }
-            await db.$syncState.put(newPersistedSchema, 'schema');
-
-            // Make sure persisted table prefixes are being used instead of computed ones:
-            // Let's assign all props as the newPersistedSchems should be what we should be working with.
-            Object.assign(schema, newPersistedSchema);
-          }
-          return persistedSyncState?.initiallySynced;
-        }
-      );
-
-      if (initiallySynced) {
-        db.setInitiallySynced(true);
-      }
-
-      verifySchema(db);
-
-      if (db.cloud.options?.databaseUrl && !initiallySynced) {
-        await performInitialSync(db, db.cloud.options, db.cloud.schema!);
-        db.setInitiallySynced(true);
-      }
-
-      // Manage CurrentUser observable:
-      subscriptions.push(
-        liveQuery(() => db.getCurrentUser()).subscribe(currentUserEmitter)
-      );
-      // Manage PersistendSyncState observable:
-      subscriptions.push(
-        liveQuery(() => db.getPersistedSyncState()).subscribe(
-          db.cloud.persistedSyncState
-        )
-      );
-
-      // HERE: If requireAuth, do athentication now.
-      if (db.cloud.options?.requireAuth) {
-        // TODO: Do authentication here. BUT! Wait with this part for now!
-        // First, make sure all other sync flows are complete!
-        await login(db);
-      }
-
-      if (localSyncWorker) localSyncWorker.stop();
-      localSyncWorker = null;
-      if (db.cloud.usingServiceWorker && db.cloud.options?.databaseUrl) {
-        registerSyncEvent(db).catch(() => {});
-        registerPeriodicSyncEvent(db).catch(() => {});
-        subscriptions.push(
-          db.syncStateChangedEvent.subscribe(dexie.cloud.syncState)
-        );
-      } else if (
-        db.cloud.options?.databaseUrl &&
-        db.cloud.schema &&
-        !IS_SERVICE_WORKER
-      ) {
-        // There's no SW. Start SyncWorker instead.
-        localSyncWorker = LocalSyncWorker(
-          db,
-          db.cloud.options,
-          db.cloud.schema!
-        );
-        localSyncWorker.start();
-      }
-
-      // Connect WebSocket only if we're a browser window
-      if (
-        typeof window !== 'undefined' &&
-        !IS_SERVICE_WORKER &&
-        db.cloud.options?.databaseUrl
-      ) {
-        subscriptions.push(connectWebSocket(db));
+      try {
+        await onDbReady(dexie);
+      } catch (error) {
+        console.error(error);
+        // Make sure to succeed with database open even if network is down.
       }
     },
     true // true = sticky
@@ -310,6 +165,149 @@ export function dexieCloud(dexie: Dexie) {
 
   // Setup default GUI:
   subscriptions.push(setupDefaultGUI(dexie))
+
+  async function onDbReady(dexie: Dexie) {
+    const db = DexieCloudDB(dexie);
+    //verifyConfig(db.cloud.options); Not needed (yet at least!)
+    // Verify the user has allowed version increment.
+    if (!db.tables.every((table) => table.core)) {
+      throwVersionIncrementNeeded();
+    }
+    const swRegistrations = 'serviceWorker' in navigator
+      ? await navigator.serviceWorker.getRegistrations()
+      : [];
+    const initiallySynced = await db.transaction(
+      'rw',
+      db.$syncState,
+      async () => {
+        const { options, schema } = db.cloud;
+        const [persistedOptions, persistedSchema, persistedSyncState] = await Promise.all([
+          db.getOptions(),
+          db.getSchema(),
+          db.getPersistedSyncState(),
+        ]);
+        if (!options) {
+          // Options not specified programatically (use case for SW!)
+          // Take persisted options:
+          db.cloud.options = persistedOptions || null;
+        } else if (!persistedOptions ||
+          JSON.stringify(persistedOptions) !== JSON.stringify(options)) {
+          // Update persisted options:
+          await db.$syncState.put(options, 'options');
+        }
+        if (db.cloud.options?.tryUseServiceWorker &&
+          'serviceWorker' in navigator &&
+          swRegistrations.length > 0 &&
+          !DISABLE_SERVICEWORKER_STRATEGY) {
+          // * Configured for using service worker if available.
+          // * Browser supports service workers
+          // * There are at least one service worker registration
+          console.debug('Dexie Cloud Addon: Using service worker');
+          db.cloud.usingServiceWorker = true;
+        } else {
+          // Not configured for using service worker or no service worker
+          // registration exists. Don't rely on service worker to do any job.
+          // Use LocalSyncWorker instead.
+          if (db.cloud.options?.tryUseServiceWorker && !IS_SERVICE_WORKER) {
+            console.debug(
+              'dexie-cloud-addon: Not using service worker.',
+              swRegistrations.length === 0
+                ? 'No SW registrations found.'
+                : 'serviceWorker' in navigator &&
+                  DISABLE_SERVICEWORKER_STRATEGY
+                  ? "Avoiding Safari crash triggered by dexie-cloud's service worker."
+                  : 'navigator.serviceWorker not present'
+            );
+          }
+          db.cloud.usingServiceWorker = false;
+        }
+        updateSchemaFromOptions(schema, db.cloud.options);
+        updateSchemaFromOptions(persistedSchema, db.cloud.options);
+        if (!schema) {
+          // Database opened dynamically (use case for SW!)
+          // Take persisted schema:
+          db.cloud.schema = persistedSchema || null;
+        } else if (!persistedSchema ||
+          JSON.stringify(persistedSchema) !== JSON.stringify(schema)) {
+          // Update persisted schema (but don't overwrite table prefixes)
+          const newPersistedSchema = persistedSchema || {};
+          for (const [table, tblSchema] of Object.entries(schema)) {
+            const newTblSchema = newPersistedSchema[table];
+            if (!newTblSchema) {
+              newPersistedSchema[table] = { ...tblSchema };
+            } else {
+              newTblSchema.markedForSync = tblSchema.markedForSync;
+              tblSchema.deleted = newTblSchema.deleted;
+              newTblSchema.generatedGlobalId = tblSchema.generatedGlobalId;
+            }
+          }
+          await db.$syncState.put(newPersistedSchema, 'schema');
+
+          // Make sure persisted table prefixes are being used instead of computed ones:
+          // Let's assign all props as the newPersistedSchems should be what we should be working with.
+          Object.assign(schema, newPersistedSchema);
+        }
+        return persistedSyncState?.initiallySynced;
+      }
+    );
+
+    if (initiallySynced) {
+      db.setInitiallySynced(true);
+    }
+
+    verifySchema(db);
+
+    if (db.cloud.options?.databaseUrl && !initiallySynced) {
+      await performInitialSync(db, db.cloud.options, db.cloud.schema!);
+      db.setInitiallySynced(true);
+    }
+
+    // Manage CurrentUser observable:
+    subscriptions.push(
+      liveQuery(() => db.getCurrentUser()).subscribe(currentUserEmitter)
+    );
+    // Manage PersistendSyncState observable:
+    subscriptions.push(
+      liveQuery(() => db.getPersistedSyncState()).subscribe(
+        db.cloud.persistedSyncState
+      )
+    );
+
+    // HERE: If requireAuth, do athentication now.
+    if (db.cloud.options?.requireAuth) {
+      // TODO: Do authentication here. BUT! Wait with this part for now!
+      // First, make sure all other sync flows are complete!
+      await login(db);
+    }
+
+    if (localSyncWorker)
+      localSyncWorker.stop();
+    localSyncWorker = null;
+    if (db.cloud.usingServiceWorker && db.cloud.options?.databaseUrl) {
+      registerSyncEvent(db).catch(() => { });
+      registerPeriodicSyncEvent(db).catch(() => { });
+      subscriptions.push(
+        db.syncStateChangedEvent.subscribe(dexie.cloud.syncState)
+      );
+    } else if (db.cloud.options?.databaseUrl &&
+      db.cloud.schema &&
+      !IS_SERVICE_WORKER) {
+      // There's no SW. Start SyncWorker instead.
+      localSyncWorker = LocalSyncWorker(
+        db,
+        db.cloud.options,
+        db.cloud.schema!
+      );
+      localSyncWorker.start();
+    }
+
+    // Connect WebSocket only if we're a browser window
+    if (typeof window !== 'undefined' &&
+      !IS_SERVICE_WORKER &&
+      db.cloud.options?.databaseUrl) {
+      subscriptions.push(connectWebSocket(db));
+    }
+  }
 }
 
 dexieCloud.version = '{version}';

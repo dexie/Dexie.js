@@ -24,7 +24,7 @@ export function NavBar() {
         ) : (
           <Button
             onClick={() =>
-              db.cloud.login({ grant_type: 'demo', userId: 'foo@demo.local' })
+              db.cloud.login()
             }
           >
             Login
