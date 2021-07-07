@@ -20,7 +20,7 @@ export interface DXCWarningAlert {
 
 export interface DXCInfoAlert {
   type: 'info';
-  messageCode: 'GENERIC_INFO';
+  messageCode: 'GENERIC_INFO' | 'OTP_SENT';
   message: string;
   messageParams: { [paramName: string]: string; };
 }

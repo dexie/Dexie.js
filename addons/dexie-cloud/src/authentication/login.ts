@@ -1,11 +1,12 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { authenticate, dummyAuthDialog } from './authenticate';
+import { authenticate } from './authenticate';
 import { AuthPersistedContext } from './AuthPersistedContext';
+import { otpFetchTokenCallback } from './otpFetchTokenCallback';
 import { setCurrentUser } from './setCurrentUser';
 
 export async function login(
   db: DexieCloudDB,
-  hints?: {email?: string, userId?: string, grant_type?: string}
+  hints?: { email?: string; userId?: string; grant_type?: string }
 ) {
   if (db.cloud.currentUser.value.isLoggedIn) {
     if (hints) {
@@ -21,13 +22,13 @@ export async function login(
   }
   const context = new AuthPersistedContext(db, {
     claims: {},
-    lastLogin: new Date(0)
+    lastLogin: new Date(0),
   });
   await authenticate(
     db.cloud.options!.databaseUrl,
     context,
-    dummyAuthDialog(db), // TODO: Fixthis!
-    db.cloud.options!.fetchTokens,
+    db.cloud.options!.fetchTokens || otpFetchTokenCallback(db),
+    db.cloud.userInteraction,
     hints
   );
   await context.save();

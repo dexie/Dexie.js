@@ -7,12 +7,12 @@ export type DXCUserInteraction =
   | DXCOTPPrompt
   | DXCMessageAlert;
 
-export interface DXCGenericUserInteraction {
-  type: 'generic';
+export interface DXCGenericUserInteraction<Type extends string="generic", TFields extends {[name: string]: DXCInputField} = any> {
+  type: Type;
   title: string;
   alerts: DXCAlert[];
-  fields: { [name: string]: DXCInputField };
-  onSubmit: (params: { [paramName: string]: string }) => void;
+  fields: TFields;
+  onSubmit: (params: { [P in keyof TFields]: string} ) => void;
   onCancel: () => void;
 }
 
@@ -40,7 +40,7 @@ export interface DXCOTPPrompt {
       label: string;
     };
   };
-  onSumbit: (params: { otp: string }) => void;
+  onSubmit: (params: { otp: string }) => void;
   onCancel: () => void;
 }
 

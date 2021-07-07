@@ -1,49 +1,37 @@
-import Dexie, { liveQuery, Subscription, Table } from 'dexie';
-import './extend-dexie-interface';
-import { BehaviorSubject, from, Observable, Subject } from 'rxjs';
-import {
-  createIdGenerationMiddleware,
-  generateTablePrefix,
-} from './middlewares/createIdGenerationMiddleware';
-import { DexieCloudOptions } from './DexieCloudOptions';
-//import { dexieCloudSyncProtocol } from "./dexieCloudSyncProtocol";
-import { overrideParseStoresSpec } from './overrideParseStoresSpec';
-import { DexieCloudDB } from './db/DexieCloudDB';
-import { UserLogin } from './db/entities/UserLogin';
-import { UNAUTHORIZED_USER } from './authentication/UNAUTHORIZED_USER';
+import Dexie, { liveQuery, Subscription } from 'dexie';
+import { getDbNameFromDbUrl } from 'dexie-cloud-common';
+import { BehaviorSubject, from } from 'rxjs';
+import { filter, take } from 'rxjs/operators';
 import { login } from './authentication/login';
-import {
-  getDbNameFromDbUrl,
-  OTPTokenRequest,
-  TokenFinalResponse,
-  TokenOtpSentResponse,
-  TokenResponse,
-} from 'dexie-cloud-common';
-import { LoginState } from './types/LoginState';
-import { SyncState } from './types/SyncState';
-import { verifySchema } from './verifySchema';
-import { throwVersionIncrementNeeded } from './helpers/throwVersionIncrementNeeded';
-import { performInitialSync } from './performInitialSync';
-import { LocalSyncWorker } from './sync/LocalSyncWorker';
+import { UNAUTHORIZED_USER } from './authentication/UNAUTHORIZED_USER';
+import { DexieCloudDB } from './db/DexieCloudDB';
+import { PersistedSyncState } from './db/entities/PersistedSyncState';
+import { DexieCloudOptions } from './DexieCloudOptions';
+import { DISABLE_SERVICEWORKER_STRATEGY } from './DISABLE_SERVICEWORKER_STRATEGY';
+import './extend-dexie-interface';
+import { DexieCloudSyncOptions } from './extend-dexie-interface';
 import { dbOnClosed } from './helpers/dbOnClosed';
 import { IS_SERVICE_WORKER } from './helpers/IS_SERVICE_WORKER';
-import { authenticate, loadAccessToken } from './authentication/authenticate';
+import { throwVersionIncrementNeeded } from './helpers/throwVersionIncrementNeeded';
+import { createIdGenerationMiddleware } from './middlewares/createIdGenerationMiddleware';
+import { createImplicitPropSetterMiddleware } from './middlewares/createImplicitPropSetterMiddleware';
 import { createMutationTrackingMiddleware } from './middlewares/createMutationTrackingMiddleware';
-import { updateSchemaFromOptions } from './updateSchemaFromOptions';
+//import { dexieCloudSyncProtocol } from "./dexieCloudSyncProtocol";
+import { overrideParseStoresSpec } from './overrideParseStoresSpec';
+import { performInitialSync } from './performInitialSync';
+import { connectWebSocket } from './sync/connectWebSocket';
+import { isSyncNeeded } from './sync/isSyncNeeded';
+import { LocalSyncWorker } from './sync/LocalSyncWorker';
 import {
   registerPeriodicSyncEvent,
   registerSyncEvent,
 } from './sync/registerSyncEvent';
-import { createImplicitPropSetterMiddleware } from './middlewares/createImplicitPropSetterMiddleware';
-import { sync } from './sync/sync';
-import { filter, map, take } from 'rxjs/operators';
 import { triggerSync } from './sync/triggerSync';
-import { DexieCloudSyncOptions } from './extend-dexie-interface';
-import { isSyncNeeded } from './sync/isSyncNeeded';
-import { connectWebSocket } from './sync/connectWebSocket';
-import { PersistedSyncState } from './db/entities/PersistedSyncState';
 import { DXCUserInteraction } from './types/DXCUserInteraction';
-import { DISABLE_SERVICEWORKER_STRATEGY } from './DISABLE_SERVICEWORKER_STRATEGY';
+import { SyncState } from './types/SyncState';
+import { updateSchemaFromOptions } from './updateSchemaFromOptions';
+import { verifySchema } from './verifySchema';
+import { setupDefaultGUI } from "./default-ui";
 
 export { DexieCloudTable } from './extend-dexie-interface';
 
@@ -319,6 +307,9 @@ export function dexieCloud(dexie: Dexie) {
   );
   dexie.use(createImplicitPropSetterMiddleware(DexieCloudDB(dexie)));
   dexie.use(createIdGenerationMiddleware(DexieCloudDB(dexie)));
+
+  // Setup default GUI:
+  subscriptions.push(setupDefaultGUI(dexie))
 }
 
 dexieCloud.version = '{version}';

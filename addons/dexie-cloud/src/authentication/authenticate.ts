@@ -3,49 +3,15 @@ import type {
   TokenFinalResponse,
 } from 'dexie-cloud-common';
 import { b64encode } from 'dreambase-library/dist/common/base64';
+import { BehaviorSubject } from 'rxjs';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { UserLogin } from '../db/entities/UserLogin';
-import { LoginPromptReply } from '../types/LoginState';
-import { AuthPersistedContext } from './AuthPersistedContext';
-import { otpFetchTokenCallback } from './otpFetchTokenCallback';
-
-export interface AuthenticationDialog {
-  prompt(
-    msg: string,
-    type: 'email' | 'otp' | 'userId' | 'name'
-  ): string | null | Promise<string | null>;
-  alert(msg: string, type: 'error' | 'warning' | 'info'): any;
-}
-
-export function dummyAuthDialog(db: DexieCloudDB): AuthenticationDialog {
-  return {
-    prompt: (msg, type) => {
-      return new Promise<string>((resolve, reject) => {
-        switch (type) {
-          case 'email':
-            db.cloud.loginState.next({
-              type: 'interaction',
-              interactionType: 'emailRequested',
-              submitText: 'Send OTP',
-              onCancel: () => reject(new Error('user cancelled')),
-              onSubmit: (params) => resolve(params.email || ""),
-            });
-            case 'otp':
-              db.cloud.loginState.next({
-                type: 'interaction',
-                interactionType: 'otpRequested',
-                submitText: 'Login',
-                isWorking: false,
-                onCancel: () => reject(new Error('user cancelled')),
-                onSubmit: (params) => resolve(params.otp || ""),
-              });
-  
-        }
-      });
-    },
-    alert: async (msg) => {},
-  };
-}
+import { DXCAlert } from '../types/DXCAlert';
+import {
+  DXCMessageAlert,
+  DXCUserInteraction,
+} from '../types/DXCUserInteraction';
+import { interactWithUser } from './interactWithUser';
 
 export type FetchTokenCallback = (tokenParams: {
   public_key: string;
@@ -88,8 +54,8 @@ export async function loadAccessToken(
 export async function authenticate(
   url: string,
   context: UserLogin,
-  dlg: AuthenticationDialog,
-  fetchToken: undefined | FetchTokenCallback,
+  fetchToken: FetchTokenCallback,
+  userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
   hints?: { userId?: string; email?: string; grant_type?: string }
 ): Promise<UserLogin> {
   if (
@@ -104,13 +70,7 @@ export async function authenticate(
   ) {
     return await refreshAccessToken(url, context);
   } else {
-    return await userAuthenticate(
-      url,
-      context,
-      dlg,
-      fetchToken || otpFetchTokenCallback(dlg, url),
-      hints
-    );
+    return await userAuthenticate(context, fetchToken, userInteraction, hints);
   }
 }
 
@@ -161,10 +121,9 @@ export async function refreshAccessToken(
 }
 
 async function userAuthenticate(
-  url: string,
   context: UserLogin,
-  dlg: AuthenticationDialog,
   fetchToken: FetchTokenCallback,
+  userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
   hints?: { userId?: string; email?: string; grant_type?: string }
 ) {
   const { privateKey, publicKey } = await crypto.subtle.generateKey(
@@ -203,10 +162,13 @@ async function userAuthenticate(
   context.name = response2.claims.name;
   context.claims = response2.claims;
 
-  if (response2.alerts) {
-    for (const a of response2.alerts) {
-      dlg.alert(a.message, a.type);
-    }
+  if (response2.alerts && response2.alerts.length > 0) {
+    await interactWithUser(userInteraction, {
+      type: 'message-alert',
+      title: 'Authentication Alert',
+      fields: {},
+      alerts: response2.alerts as DXCAlert[],
+    });
   }
   return context;
 }

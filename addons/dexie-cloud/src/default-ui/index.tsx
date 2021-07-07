@@ -1,29 +1,33 @@
 import Dexie from "dexie";
 import "../extend-dexie-interface";
 import { h, Component } from "preact";
-import { from, Subscription } from "rxjs";
-import { LoginState } from "../types/LoginState";
+import { from, Observer, Subscription } from "rxjs";
 import { LoginDialog } from './LoginDialog';
 import { Styles } from "./Styles";
+import { DXCGenericUserInteraction, DXCUserInteraction } from "../types/DXCUserInteraction";
+import { DXCInputField } from "../types/DXCInputField";
+import { DexieCloudDB } from "../db/DexieCloudDB";
+import * as preact from "preact";
 
 export interface Props {
   db: Dexie;
 }
 
-export default class LoginGui extends Component<Props, LoginState> {
+interface State {
+  userInteraction: DXCUserInteraction | undefined;
+}
+
+export default class LoginGui extends Component<Props, State> {
   subscription?: Subscription;
+  observer = (userInteraction: DXCUserInteraction | undefined) => this.setState({userInteraction});
 
   constructor(props: Props) {
     super(props);
-    this.state = { type: "silent" };
+    this.state = { userInteraction: undefined };
   }
 
   componentDidMount() {
-    this.subscription = from(this.props.db.cloud.loginState).subscribe({
-      next: (state) => this.setState(state),
-      error: (error) =>
-        this.setState({ type: "error", message: error?.message || error }),
-    });
+    this.subscription = from(this.props.db.cloud.userInteraction).subscribe(this.observer);
   }
 
   componentWillUnmount() {
@@ -33,13 +37,38 @@ export default class LoginGui extends Component<Props, LoginState> {
     }
   }
 
-  render(props: Props, state: LoginState) {
-    if (state.type === "error") {
-      return <p style={Styles.Error}>{state.message}</p>;
-    }
-    if (state.type === "interaction") {
-      return <LoginDialog {...state} />;
-    }
-    return null;
+  render(props: Props, {userInteraction}: State) {
+    if (!userInteraction) return null;
+    if (props.db.cloud.userInteraction.observers.length > 1) return null; // Someone else subscribes.
+    return <LoginDialog {...userInteraction as DXCGenericUserInteraction<string, {[name: string]: DXCInputField}>} />;
   }
 }
+
+export function setupDefaultGUI(db: Dexie) {
+  const el = document.createElement('div');
+  window.addEventListener("load", onload);
+
+  function onload() {
+    document.body.appendChild(el);
+    preact.render(<LoginGui db={db.vip} />, el);
+  }
+
+  let closed = false;
+
+  return {
+    unsubscribe() {
+      el.remove();
+      closed = true;
+      window.removeEventListener("load", onload);
+    },
+    get closed() {
+      return closed;
+    }
+  }
+}
+
+// TODO:
+/*
+    * Gjort klart allt kring user interaction förutom att mounta default-ui på ett element.
+    * Också att kolla först om nån annan subscribar och i så fall inte göra nåt.
+*/

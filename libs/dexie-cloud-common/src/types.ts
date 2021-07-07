@@ -1,8 +1,11 @@
-
-export type TokenRequest = OTPTokenRequest | ClientCredentialsTokenRequest | RefreshTokenRequest | DemoTokenRequest;
+export type TokenRequest =
+  | OTPTokenRequest
+  | ClientCredentialsTokenRequest
+  | RefreshTokenRequest
+  | DemoTokenRequest;
 
 export interface OTPTokenRequest {
-  grant_type: "otp";
+  grant_type: 'otp';
   public_key?: string; // If a refresh token is requested. Clients own the keypair and sign refresh_token requests using it.
   email: string;
   scopes: string[]; // TODO use CLIENT_SCOPE type.
@@ -11,7 +14,7 @@ export interface OTPTokenRequest {
 }
 
 export interface ClientCredentialsTokenRequest {
-  grant_type: "client_credentials";
+  grant_type: 'client_credentials';
   client_id: string;
   client_secret: string;
   public_key?: string; // If a refresh token is requested. The web client calling the server-client should own corresponding private key.
@@ -27,7 +30,7 @@ export interface ClientCredentialsTokenRequest {
 }
 
 export interface RefreshTokenRequest {
-  grant_type: "refresh_token";
+  grant_type: 'refresh_token';
   scopes: string[]; // TODO use CLIENT_SCOPE type.
   public_key?: string; // Optional. Makes it possible to renew keypair. Given signature must still be generated using the old keypair.
   refresh_token: string;
@@ -37,30 +40,32 @@ export interface RefreshTokenRequest {
 }
 
 export interface DemoTokenRequest {
-  grant_type: "demo";
-  scopes: ["ACCESS_DB"];
+  grant_type: 'demo';
+  scopes: ['ACCESS_DB'];
   demo_user: string; // Email of a demo user that must have been added using the dexie cloud CLI.
   public_key?: string;
 }
 
 export interface TokenFinalResponse {
-  type: "tokens";
+  type: 'tokens';
   claims: {
     sub: string;
     [claimName: string]: any;
-  },
+  };
   accessToken: string;
   accessTokenExpiration: number;
   refreshToken?: string;
   refreshTokenExpiration?: number | null;
   alerts?: {
-    type: "warning" | "info",
+    type: 'warning' | 'info';
+    messageCode: string;
     message: string;
+    messageParams?: { [param: string]: string };
   }[];
 }
 
 export interface TokenOtpSentResponse {
-  type: "otp-sent";
+  type: 'otp-sent';
   otp_id: string;
 }
 
@@ -70,12 +75,15 @@ export interface TokenOtpSentResponse {
  * regenerate the signature from (server_time + refresh_token).
  */
 export interface TokenResponseInvalidTimestamp {
-  type: "invalid-timestamp";
+  type: 'invalid-timestamp';
   server_time: number; // Allows client to adjust its timestamp by diffing server time with client and redo refresh_token request.
   message: string;
 }
 
-export type TokenResponse = TokenFinalResponse | TokenOtpSentResponse | TokenResponseInvalidTimestamp;
+export type TokenResponse =
+  | TokenFinalResponse
+  | TokenOtpSentResponse
+  | TokenResponseInvalidTimestamp;
 export interface CreateDbResponse {
   url: string;
   clientId: string;
