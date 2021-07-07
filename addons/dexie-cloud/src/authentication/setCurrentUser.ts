@@ -1,13 +1,5 @@
-import { combineLatest, Observable } from "rxjs";
-import { filter } from "rxjs/operators";
-import { UNAUTHORIZED_USER } from "./UNAUTHORIZED_USER";
-import { authenticate, dummyAuthDialog } from "./authenticate";
-import { AuthPersistedContext } from "./AuthPersistedContext";
-import { makeArray } from "../helpers/makeArray";
-import { outstandingTransactions } from "../middlewares/outstandingTransaction";
 import { DexieCloudDB } from "../db/DexieCloudDB";
-import { UserLogin } from "../db/entities/UserLogin";
-import { getNumUnsyncedMutationsObservable } from "../sync/numUnsyncedMutations";
+import { AuthPersistedContext } from "./AuthPersistedContext";
 
 /** This function changes or sets the current user as requested.
  * 
@@ -21,21 +13,10 @@ import { getNumUnsyncedMutationsObservable } from "../sync/numUnsyncedMutations"
  * @param newUser 
  */
 export async function setCurrentUser(db: DexieCloudDB, user: AuthPersistedContext) {
-  const currentUserObservable = db.cloud.currentUser;
-  if (!currentUserObservable)
-    throw new Error(`Given Dexie instance doesn't have the dexie-cloud addon.`);
   if (user.userId === db.cloud.currentUserId) return; // Already this user.
 
-  // Yes, I know, we're calling authenticate() again (if you were following login.ts and came here.)
-  // But this function can also be called from db.ready!
-  await authenticate(
-    db.cloud.options!.databaseUrl,
-    user,
-    dummyAuthDialog(db), // TODO: Fixthis!
-    db.cloud.options!.fetchTokens
-  );
   const $logins = db.table('$logins');
-  await db.transaction('rw', "$logins", async tx => {
+  await db.transaction('rw', $logins, async tx => {
     const existingLogins = await $logins.toArray();
     await Promise.all(existingLogins.filter(login => login.userId !== user.userId && login.isLoggedIn).map(login => {
       login.isLoggedIn = false;

@@ -1,3 +1,5 @@
+import { DXCUserInteraction } from "../../types/DXCUserInteraction";
+
 export interface UserLogin {
   userId?: string;
   name?: string;
@@ -13,4 +15,5 @@ export interface UserLogin {
   nonExportablePrivateKey?: CryptoKey;
   publicKey?: CryptoKey;
   isLoggedIn?: boolean;
+  interaction?: DXCUserInteraction;
 }

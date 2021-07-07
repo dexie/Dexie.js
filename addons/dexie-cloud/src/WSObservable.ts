@@ -1,7 +1,5 @@
-import { Observable, Subject, Subscriber, Subscription } from 'rxjs';
-import { authenticate, loadAccessToken } from './authentication/authenticate';
+import { Observable, Subscriber, Subscription } from 'rxjs';
 import { TokenExpiredError } from './authentication/TokenExpiredError';
-import { DexieCloudDB } from './db/DexieCloudDB';
 
 const USER_INACTIVITY_TIMEOUT = 300_000; // 300_000;
 const SERVER_PING_TIMEOUT = 20000;

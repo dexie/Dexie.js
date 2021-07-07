@@ -6,7 +6,6 @@ import {
   DBRealmRole,
   DexieCloudSchema
 } from 'dexie-cloud-common';
-import { LoginState } from './types/LoginState';
 import { UserLogin } from './db/entities/UserLogin';
 import * as Rx from 'rxjs';
 import { PersistedSyncState } from './db/entities/PersistedSyncState';
