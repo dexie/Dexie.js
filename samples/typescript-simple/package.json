@@ -5,7 +5,7 @@
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "webpack-dev-server --open",
+    "start": "webpack serve",
     "build": "webpack --mode production"
   },
   "repository": {
@@ -20,13 +20,13 @@
   "author": "David Fahlander",
   "license": "Apache-2.0",
   "devDependencies": {
-    "ts-loader": "^6.2.1",
-    "typescript": "^3.7.5",
-    "webpack": "^4.41.5",
-    "webpack-cli": "^3.3.10",
-    "webpack-dev-server": "^3.10.1"
+    "ts-loader": "^9.2.3",
+    "typescript": "^4.3.5",
+    "webpack": "^5.42.1",
+    "webpack-cli": "^4.7.2",
+    "webpack-dev-server": "^3.11.2"
   },
   "dependencies": {
-    "dexie": "^3.0.0-rc.2"
+    "dexie": "^3.0.3"
   }
 }

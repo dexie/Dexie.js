@@ -110,7 +110,7 @@
     "rollup-plugin-node-resolve": "^5.2.0",
     "rollup-plugin-sourcemaps": "^0.6.3",
     "rxjs": "^6.6.6",
-    "safari-14-idb-fix": "^1.0.0",
+    "safari-14-idb-fix": "^1.0.4",
     "serve-static": "^1.14.1",
     "sorted-json": "^0.2.6",
     "terser": "^5.3.1",

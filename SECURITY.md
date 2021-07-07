@@ -4,9 +4,9 @@
 
 | Version | Supported          | Branch
 | ------- | ------------------ | --------
-| 3.0.x   | :white_check_mark: | master
-| 2.0.x   | :white_check_mark: | master-2
-| 1.5.x   | :thinking: | master-1
+| 3.x     | :white_check_mark: | master
+| 2.0.x   | :thinking: | master-2
+| 1.5.x   | :x: | master-1
 | < 1.5.1 | :x:                |
 
 ## Reporting a Vulnerability

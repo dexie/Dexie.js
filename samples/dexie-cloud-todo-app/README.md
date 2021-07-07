@@ -4,17 +4,48 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 # How to use the sample
 
-If you just want to see the app in action, navigate to the [pre-built published version](https://dfahlander.github.io/Dexie.js/dexie-cloud-todo-app/). Currently it is bugging out on Safari so please use any other browser if possible.
+If you just want to see the app in action, navigate to the [pre-built published version](https://dfahlander.github.io/Dexie.js/dexie-cloud-todo-app/). Currently it is bugging out on Safari so please use any other browser if possible. Safari crashed from our service worker. *Next version will workaround this so that it will work well on iOS and Safari (by avoiding to do sync from the service worker and instead do it from the main thread).*
 
 If you want to build and play with it locally, follow these steps:
 
-1. Create a dexie-cloud database to sync the data for your version of the app:
-   `npx dexie-cloud create` - create your own database in the cloud.
-2. `yarn install` - install dependencies.
-3. `./configure-app.sh` (or manually set env variable REACT_APP_DBURL=`<database URL>`)
-4. `yarn start`
+1. `npm install --global yarn` (if yarn not already installed)
+2. `npx dexie-cloud create`
+3. `yarn install`
+4. `./configure-app.sh`
+5. `yarn start`
 
-See https://dexie.org/cloud/
+The steps above will:
+
+1. Install yarn (if you haven't already)
+2. Create a new database in the cloud *(Currently only for beta testers. You can apply for the waitlist if you're not in it already. See [Dexie Cloud page](https://dexie.org/cloud/))*.
+3. Install dependencies
+4. Import demo-users to your database and create a .env file that connects the ToDo app to your database.
+5. Build and start the application in local dev-mode (without a service worker).
+
+# Activating Service Worker
+
+Service worker is automatically disabled in dev-mode (the default for create-react-app). To enable it, the easiest way is to deploy the app:
+
+1. Fork Dexie.js (if you haven't already)
+2. Follow the instructions for using the app (see earlier in this README)
+3. `yarn deploy` (will publish the app to your gh-pages branch of the Dexie.js fork)
+4. Voila: Go to https://your-github-username.github.io/Dexie.js/dexie-cloud-todo-app/ from your browser. This is a full installable PWA that you can add to your start screen on a mobile phone.
+
+You can also [follow these instructions from create-react-app](https://create-react-app.dev/docs/making-a-progressive-web-app/#offline-first-considerations) to enable service worker in dev mode.
+
+Dexie Cloud works both with and without a service worker but there are some benefits of activating the service worker:
+
+* Your app becomes a real installable PWA that people can add to their start screen on mobile or desktop on a laptop.
+* If you do a change while being offline and close the app. It will be synced once you get online, no matter if you're still in the app or not.
+* If your PWA is installed via Chrome (or any browser that supports the periodicSync event), the app will periodically sync with the server also when you aren't using it, making sure that next time the app is started, it already has the fresh data from server.
+
+# Disabling Service Worker
+
+To disable Dexie Cloud from using its service worker (for syncing data):
+* Remove `tryUseServiceWorker: true` from `db.cloud.configure()` in [db.ts](https://github.com/dfahlander/Dexie.js/blob/master/samples/dexie-cloud-todo-app/src/models/db.ts)
+
+To disable the application from using service worker (for caching resources):
+* Change `serviceWorkerRegistration.register();` to `serviceWorkerRegistration.unregister();` in [index.tsx](https://github.com/dfahlander/Dexie.js/blob/master/samples/dexie-cloud-todo-app/src/index.tsx)
 
 ## Available Scripts
 

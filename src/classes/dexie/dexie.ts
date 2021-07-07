@@ -278,19 +278,14 @@ export class Dexie implements IDexie {
     return dexieOpen(this);
   }
 
-  close(): void {
-    const idx = connections.indexOf(this),
-      state = this._state;
+  _close(): void {
+    const state = this._state;
+    const idx = connections.indexOf(this);
     if (idx >= 0) connections.splice(idx, 1);
     if (this.idbdb) {
       try { this.idbdb.close(); } catch (e) { }
       this.idbdb = null;
-    }
-    this._options.autoOpen = false;
-    state.dbOpenError = new exceptions.DatabaseClosed();
-    if (state.isBeingOpened)
-      state.cancelOpen(state.dbOpenError);
-
+    }    
     // Reset dbReadyPromise promise:
     state.dbReadyPromise = new Promise(resolve => {
       state.dbReadyResolve = resolve;
@@ -298,6 +293,15 @@ export class Dexie implements IDexie {
     state.openCanceller = new Promise((_, reject) => {
       state.cancelOpen = reject;
     });
+  }
+
+  close(): void {
+    this._close();
+    const state = this._state;
+    this._options.autoOpen = false;
+    state.dbOpenError = new exceptions.DatabaseClosed();
+    if (state.isBeingOpened)
+      state.cancelOpen(state.dbOpenError);
   }
 
   delete(): Promise<void> {

@@ -25,6 +25,13 @@ export function dexieOpen (db: Dexie) {
   state.isBeingOpened = true;
   state.dbOpenError = null;
   state.openComplete = false;
+  const openCanceller = state.openCanceller;
+
+  function throwIfCancelled() {
+    // If state.openCanceller object reference is replaced, it means db.close() has been called,
+    // meaning this open flow should be cancelled.
+    if (state.openCanceller !== openCanceller) throw new exceptions.DatabaseClosed('db.open() was cancelled');
+  }
   
   // Function pointers to call when the core opening process completes.
   let resolveDbReady = state.dbReadyResolve,
@@ -33,12 +40,13 @@ export function dexieOpen (db: Dexie) {
       wasCreated = false;
   
   // safari14Workaround = Workaround by jakearchibald for new nasty bug in safari 14.
-  return Promise.race([state.openCanceller, safari14Workaround().then(() => new Promise((resolve, reject) => {
+  return Promise.race([openCanceller, safari14Workaround().then(() => new Promise((resolve, reject) => {
       // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
       // IE fails when deleting objectStore after reading from it.
       // A future version of Dexie.js will stopover an intermediate version to workaround this.
       // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
       
+      throwIfCancelled();
       // If no API, throw!
       if (!indexedDB) throw new exceptions.MissingAPI();
       const dbName = db.name;
@@ -118,6 +126,7 @@ export function dexieOpen (db: Dexie) {
       // call and await all on('ready') subscribers:
       // Dexie.vip() makes subscribers able to use the database while being opened.
       // This is a must since these subscribers take part of the opening procedure.
+      throwIfCancelled();
       state.onReadyBeingFired = [];
       return Promise.resolve(vip(()=>db.on.ready.fire(db.vip))).then(function fireRemainders() {
           if (state.onReadyBeingFired.length > 0) {
@@ -129,20 +138,22 @@ export function dexieOpen (db: Dexie) {
       });
   }).finally(()=>{
       state.onReadyBeingFired = null;
+      state.isBeingOpened = false;
   }).then(()=>{
       // Resolve the db.open() with the db instance.
-      state.isBeingOpened = false;
       return db;
   }).catch(err => {
-      try {
-          // Did we fail within onupgradeneeded? Make sure to abort the upgrade transaction so it doesnt commit.
-          upgradeTransaction && upgradeTransaction.abort();
-      } catch (e) { }
-      state.isBeingOpened = false; // Set before calling db.close() so that it doesnt reject openCanceller again (leads to unhandled rejection event).
-      db.close(); // Closes and resets idbdb, removes connections, resets dbReadyPromise and openCanceller so that a later db.open() is fresh.
-      // A call to db.close() may have made on-ready subscribers fail. Use dbOpenError if set, since err could be a follow-up error on that.
       state.dbOpenError = err; // Record the error. It will be used to reject further promises of db operations.
-      return rejection (state.dbOpenError);
+      try {
+        // Did we fail within onupgradeneeded? Make sure to abort the upgrade transaction so it doesnt commit.
+        upgradeTransaction && upgradeTransaction.abort();
+      } catch { }
+      if (openCanceller === state.openCanceller) {
+        // Still in the same open flow - The error reason was not due to external call to db.close().
+        // Make sure to call db.close() to finalize resources.
+        db._close(); // Closes and resets idbdb, removes connections, resets dbReadyPromise and openCanceller so that a later db.open() is fresh.
+      }
+      return rejection (err);
   }).finally(()=>{
       state.openComplete = true;
       resolveDbReady(); // dbReadyPromise is resolved no matter if open() rejects or resolved. It's just to wake up waiters.
