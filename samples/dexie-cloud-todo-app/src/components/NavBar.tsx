@@ -24,7 +24,14 @@ export function NavBar() {
         ) : (
           <Button
             onClick={() =>
-              db.cloud.login()
+              db.cloud.login().catch(error => {
+                if (error?.name === "AbortError") {
+                  console.warn("User cancelled login dialog");
+                } else {
+                  console.error("Failed to login", error);
+                  alert ("Failed to login: " + error);
+                }
+              })
             }
           >
             Login
