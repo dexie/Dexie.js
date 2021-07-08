@@ -22,8 +22,10 @@ async function syncDB(dbName: string) {
     const dexie = new Dexie(dbName, { addons: [dexieCloud] });
     db = DexieCloudDB(dexie);
     dexie.on('versionchange', stopManagingDB);
-    managedDBs.set(dbName, db);
     await db.dx.open(); // Makes sure db.cloud.options and db.cloud.schema are read from db,
+    if (!managedDBs.get(dbName)) { // Avoid race conditions.
+      managedDBs.set(dbName, db);
+    }
   }
   if (!db.cloud.options?.databaseUrl) {
     console.error(`Dexie Cloud: No databaseUrl configured`);
@@ -36,7 +38,9 @@ async function syncDB(dbName: string) {
 
   function stopManagingDB() {
     db!.dx.on.versionchange.unsubscribe(stopManagingDB);
-    managedDBs.delete(db!.name);
+    if (managedDBs.get(db!.name) === db) { // Avoid race conditions.
+      managedDBs.delete(db!.name);
+    }
     db!.dx.close();
     return false;
   }
