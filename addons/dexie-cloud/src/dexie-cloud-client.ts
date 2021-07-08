@@ -275,8 +275,6 @@ export function dexieCloud(dexie: Dexie) {
 
     // HERE: If requireAuth, do athentication now.
     if (db.cloud.options?.requireAuth) {
-      // TODO: Do authentication here. BUT! Wait with this part for now!
-      // First, make sure all other sync flows are complete!
       await login(db);
     }
 
