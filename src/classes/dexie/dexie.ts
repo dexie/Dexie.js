@@ -71,6 +71,7 @@ export class Dexie implements IDexie {
   _maxKey: IndexableType;
   _fireOnBlocked: (ev: Event) => void;
   _middlewares: {[StackName in keyof DexieStacks]?: Middleware<DexieStacks[StackName]>[]} = {};
+  _vip?: boolean;
   core: DBCore;
 
   name: string;
@@ -211,10 +212,7 @@ export class Dexie implements IDexie {
     this.use(observabilityMiddleware);
     this.use(cacheExistingValuesMiddleware);
 
-    const vipedDb = Object.create(this) as Dexie;
-      vipedDb._state = Object.create(this._state);
-      vipedDb._state.openComplete = true;
-    this.vip = vipedDb;
+    this.vip = Object.create(this, {_vip: {value: true}}) as Dexie;
 
     // Call each addon:
     addons.forEach(addon => addon(this));
@@ -240,7 +238,12 @@ export class Dexie implements IDexie {
   }
 
   _whenReady<T>(fn: () => Promise<T>): Promise<T> {
-    return this._state.openComplete || PSD.letThrough ? fn() : new Promise<T>((resolve, reject) => {
+    return (this.idbdb && (this._state.openComplete || PSD.letThrough || this._vip)) ? fn() : new Promise<T>((resolve, reject) => {
+      if (this._state.openComplete) {
+        // idbdb is falsy but openComplete is true. Must have been an exception durin open.
+        // Don't wait for openComplete as it would lead to infinite loop.
+        return reject(new exceptions.DatabaseClosed(this._state.dbOpenError));
+      }
       if (!this._state.isBeingOpened) {
         if (!this._options.autoOpen) {
           reject(new exceptions.DatabaseClosed());

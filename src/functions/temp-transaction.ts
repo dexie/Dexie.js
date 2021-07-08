@@ -14,7 +14,12 @@ export function tempTransaction (
   fn: (resolve, reject, trans: Transaction) => any)
   // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
 {
-  if (!db._state.openComplete && (!PSD.letThrough)) {
+  if (!db.idbdb || (!db._state.openComplete && (!PSD.letThrough && !db._vip))) {
+    if (db._state.openComplete) {
+      // db.idbdb is falsy but openComplete is true. Must have been an exception durin open.
+      // Don't wait for openComplete as it would lead to infinite loop.
+      return rejection(new exceptions.DatabaseClosed(db._state.dbOpenError));
+    }
     if (!db._state.isBeingOpened) {
       if (!db._options.autoOpen)
         return rejection(new exceptions.DatabaseClosed());
