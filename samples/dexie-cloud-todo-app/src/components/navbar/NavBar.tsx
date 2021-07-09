@@ -41,7 +41,7 @@ export function NavBar() {
       >
         {currentUser?.isLoggedIn ? (
           <>
-            <Navbar.Text className="d-none d-lg-inline-flex">
+            <Navbar.Text className="d-none d-lg-inline-flex status-icons-not-collapsed">
               <SyncStatusIcon />
             </Navbar.Text>
             <NavDropdown title={currentUser.name} id="basic-nav-dropdown">
