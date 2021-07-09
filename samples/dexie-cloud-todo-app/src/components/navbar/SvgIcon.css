@@ -1,0 +1,11 @@
+.svg-icon {
+  width: 1.6em;
+  height: 1.6em;
+  padding: 8px 2px 8px 2px;
+  box-sizing:content-box;
+  /*display: inline-block;*/
+}
+
+.svg-icon svg {
+  fill: #fff
+}
