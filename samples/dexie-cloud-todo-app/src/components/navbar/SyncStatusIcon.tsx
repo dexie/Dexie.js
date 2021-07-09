@@ -1,6 +1,9 @@
 import { useObservable } from 'react-use';
 import { db } from '../../models/db';
+import { IconError } from '../icons/IconError';
 import { IconInSync } from '../icons/IconInSync';
+import { IconOffline } from '../icons/IconOffline';
+import { IconSync } from '../icons/IconSync';
 import { IconSyncing } from '../icons/IconSyncing';
 import { ReactComponent as InSyncIcon } from '../icons/in-sync.svg';
 import { SvgIcon } from './SvgIcon';
@@ -11,10 +14,12 @@ interface Props {
 export function SyncStatusIcon({ className }: Props) {
   const syncStatus = useObservable(db.cloud.syncState);
   switch (syncStatus?.phase) {
-    case 'in-sync':
+    case 'initial':
+      return <SvgIcon className={className}></SvgIcon>;
+    case 'not-in-sync':
       return (
         <SvgIcon className={className}>
-          <IconInSync />
+          <IconSync />
         </SvgIcon>
       );
     case 'pulling':
@@ -24,7 +29,25 @@ export function SyncStatusIcon({ className }: Props) {
           <IconSyncing />
         </SvgIcon>
       );
-    case 'initial':
+    case 'in-sync':
+      return (
+        <SvgIcon className={className}>
+          <IconInSync />
+        </SvgIcon>
+      );
+    case 'offline':
+      return (
+        <SvgIcon className={className}>
+          <IconOffline />
+        </SvgIcon>
+      );
+    case 'error':
+      return (
+        <SvgIcon className={className}>
+          <IconError />
+        </SvgIcon>
+      );
+
     default:
       /*return (
         <SvgIcon className={className}>
