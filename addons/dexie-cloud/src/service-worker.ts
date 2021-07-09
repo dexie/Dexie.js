@@ -47,7 +47,7 @@ async function syncDB(dbName: string) {
 
   try {
     console.debug('Dexie Cloud SW: Syncing');
-    await syncIfPossible(db, db.cloud.options, db.cloud.schema);
+    await syncIfPossible(db, db.cloud.options, db.cloud.schema, {retryImmediatelyOnFetchError: true});
     console.debug('Dexie Cloud SW: Done Syncing');
   } catch (e) {
     console.error(`Dexie Cloud SW Error`, e);

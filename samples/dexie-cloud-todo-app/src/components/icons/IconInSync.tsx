@@ -1,3 +1,13 @@
+/*!
+
+    This icon is licensed under Creative Commons license.
+
+    Attribution Text: "Data by Alice Design from the Noun Project"
+
+    Make sure to give the creator credits by showing the attribution text in your app!
+    Else, buy a commercial license from The Noun Project to use the icon (https://thenounproject.com).
+    
+*/
 export const IconInSync = () => (
   <svg
     xmlns="http://www.w3.org/2000/svg"
