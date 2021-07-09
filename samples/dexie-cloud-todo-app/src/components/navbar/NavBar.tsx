@@ -51,7 +51,7 @@ export function NavBar() {
             </NavDropdown>
           </>
         ) : (
-          <NavDropdown id="basic-nav-dropdown" title="Sign in">
+          <NavDropdown id="basic-nav-dropdown" title="Sign in or create your account">
             <NavDropdown.Header>Sign in a demo user</NavDropdown.Header>
             <>
               {Object.keys(importData.demoUsers).map((email) => (
