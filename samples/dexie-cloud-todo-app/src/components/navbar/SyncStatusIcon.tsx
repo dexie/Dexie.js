@@ -37,13 +37,19 @@ export function SyncStatusIcon({ className }: Props) {
       );
     case 'offline':
       return (
-        <SvgIcon className={className}>
+        <SvgIcon
+          className={className}
+          title={syncStatus.error && '' + syncStatus.error}
+        >
           <IconOffline />
         </SvgIcon>
       );
     case 'error':
       return (
-        <SvgIcon className={className}>
+        <SvgIcon
+          className={className}
+          title={syncStatus.error && '' + syncStatus.error}
+        >
           <IconError />
         </SvgIcon>
       );
