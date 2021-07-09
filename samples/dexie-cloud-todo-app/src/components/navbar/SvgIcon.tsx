@@ -8,6 +8,6 @@ interface Props {
 
 export function SvgIcon({ children, className }: Props) {
   return <div className={"svg-icon" + (className ? ' ' + className : '')}>
-    {children}
+    <div>{children}</div>
   </div>;
 }

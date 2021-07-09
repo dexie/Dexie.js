@@ -1,7 +1,7 @@
 import { Observable } from "rxjs";
 import { SWBroadcastChannel } from "./SWBroadcastChannel";
 
-export class BroadcastedLocalEvent<T> extends Observable<T>{
+export class BroadcastedAndLocalEvent<T> extends Observable<T>{
   name: string;
   bc: BroadcastChannel | SWBroadcastChannel
 

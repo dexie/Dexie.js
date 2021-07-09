@@ -41,7 +41,7 @@ export async function syncIfPossible(
     } else {
       // We use a flow that is better suited for the case when multiple workers want to
       // do the same thing.
-      await performGuardedJob(db, CURRENT_SYNC_WORKER, '$jobs', () => sync(db, cloudOptions, cloudSchema));
+      await performGuardedJob(db, CURRENT_SYNC_WORKER, '$jobs', () => sync(db, cloudOptions, cloudSchema, options));
     }
     isSyncing.delete(db);
     console.debug("Done sync");

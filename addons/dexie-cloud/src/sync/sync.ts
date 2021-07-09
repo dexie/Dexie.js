@@ -22,6 +22,7 @@ import {
   toDBOperationSet,
 } from 'dexie-cloud-common';
 import { PersistedSyncState } from '../db/entities/PersistedSyncState';
+import { isOnline } from './isOnline';
 
 export const isSyncing = new WeakSet<DexieCloudDB>();
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
@@ -53,6 +54,7 @@ export interface SyncOptions {
   isInitialSync?: boolean;
   cancelToken?: { cancelled: boolean };
   justCheckIfNeeded?: boolean;
+  retryImmediatelyOnFetchError?: boolean;
 }
 
 export function sync(
@@ -69,6 +71,27 @@ export function sync(
       });
     })
     .catch(async (error: any) => {
+      console.debug('Error from _sync', {
+        isOnline,
+        syncOptions,
+        error,
+      });
+      if (
+        isOnline &&
+        syncOptions?.retryImmediatelyOnFetchError &&
+        error?.name === 'TypeError' &&
+        /fetch/.test(error?.message)
+      ) {
+        db.syncStateChangedEvent.next({
+          phase: 'error',
+        });
+        // Retry again in 500 ms but if it fails again, don't retry.
+        await new Promise((resolve) => setTimeout(resolve, 500));
+        return await sync(db, options, schema, {
+          ...syncOptions,
+          retryImmediatelyOnFetchError: false,
+        });
+      }
       // Make sure that no matter whether sync() explodes or not,
       // always update the timestamp. Also store the error.
       await db.$syncState.update('syncState', {
@@ -76,7 +99,7 @@ export function sync(
         error: '' + error,
       });
       db.syncStateChangedEvent.next({
-        phase: navigator.onLine ? 'error' : 'offline',
+        phase: isOnline ? 'error' : 'offline',
       });
       return Promise.reject(error);
     });

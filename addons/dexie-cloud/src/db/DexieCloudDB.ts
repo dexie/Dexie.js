@@ -15,7 +15,7 @@ import {
   DBRealmRole,
   DexieCloudSchema,
 } from 'dexie-cloud-common';
-import { BroadcastedLocalEvent } from '../helpers/BroadcastedLocalEvent';
+import { BroadcastedAndLocalEvent } from '../helpers/BroadcastedAndLocalEvent';
 import { SyncState } from '../types/SyncState';
 
 /*export interface DexieCloudDB extends Dexie {
@@ -48,7 +48,7 @@ export interface DexieCloudDBBase {
   readonly roles: Table<DBRealmRole, [string, string]>;
 
   readonly localSyncEvent: BehaviorSubject<any>;
-  readonly syncStateChangedEvent: BroadcastedLocalEvent<SyncState>;
+  readonly syncStateChangedEvent: BroadcastedAndLocalEvent<SyncState>;
   readonly dx: Dexie;
   readonly initiallySynced: boolean;
 }
@@ -79,7 +79,7 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
   let db = wm.get(dx.cloud);
   if (!db) {
     const localSyncEvent = new BehaviorSubject({});
-    const syncStateChangedEvent = new BroadcastedLocalEvent<SyncState>(
+    const syncStateChangedEvent = new BroadcastedAndLocalEvent<SyncState>(
       `syncstatechanged-${dx.name}`
     );
     localSyncEvent['id'] = ++static_counter;
