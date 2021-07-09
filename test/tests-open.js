@@ -508,3 +508,22 @@ promisedTest("#392 db.on('ready') don't fire if subscribed while waiting other p
     ok(third, "Third subscriber should have been called");
     
 });
+
+promisedTest("Should be possible to open a vip DB", async ()=>{
+    await Dexie.delete('TestDB');
+    let db = new Dexie('TestDB');
+    db.version(1).stores({foobar: 'id'});
+    await db.vip.open();
+    ok(true, "Could open viped db");
+    await db.vip.foobar.toArray();
+    ok(true, "Could query viped db");
+    await db.foobar.toArray();
+    ok(true, "Could query non-viped db after opening it through vip mode");
+    db.vip.close();
+    // Try testing it dynamically
+    db = new Dexie('TestDB');
+    await db.vip.open();
+    ok(true, "Could open viped db dynamically");
+    await db.vip.table('foobar').toArray();
+    ok(true, "Could query dynamically opened viped db");
+});
