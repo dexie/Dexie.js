@@ -84,6 +84,7 @@ export function sync(
       ) {
         db.syncStateChangedEvent.next({
           phase: 'error',
+          error
         });
         // Retry again in 500 ms but if it fails again, don't retry.
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -100,6 +101,7 @@ export function sync(
       });
       db.syncStateChangedEvent.next({
         phase: isOnline ? 'error' : 'offline',
+        error
       });
       return Promise.reject(error);
     });
