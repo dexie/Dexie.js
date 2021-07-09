@@ -17,7 +17,7 @@ export class TodoDB extends Dexie {
     // Connect to cloud
     this.cloud.configure({
       databaseUrl: process.env.REACT_APP_DBURL!,
-      tryUseServiceWorker: true,
+      tryUseServiceWorker: false, // true!
       requireAuth: false,
     });
   }
