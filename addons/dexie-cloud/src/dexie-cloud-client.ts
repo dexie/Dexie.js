@@ -171,7 +171,9 @@ export function dexieCloud(dexie: Dexie) {
   dexie.use(createIdGenerationMiddleware(DexieCloudDB(dexie)));
 
   // Setup default GUI:
-  subscriptions.push(setupDefaultGUI(dexie));
+  if (!IS_SERVICE_WORKER) {
+    subscriptions.push(setupDefaultGUI(dexie));
+  }
 
   async function onDbReady(dexie: Dexie) {
     closed = false; // As Dexie calls us, we are not closed anymore. Maybe reopened? Remember db.ready event is registered with sticky flag!
