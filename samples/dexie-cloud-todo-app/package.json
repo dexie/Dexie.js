@@ -41,7 +41,7 @@
   "scripts": {
     "start": "react-scripts start",
     "build": "react-scripts build",
-    "predeploy": "PUBLIC_URL=. yarn build",
+    "predeploy": "PUBLIC_URL=. REACT_APP_BUILD_TIME=$(date +%s) yarn build",
     "deploy": "gh-pages -d build -e dexie-cloud-todo-app",
     "test": "react-scripts test",
     "eject": "react-scripts eject"

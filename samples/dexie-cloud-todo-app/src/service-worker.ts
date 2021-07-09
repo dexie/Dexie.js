@@ -1,6 +1,10 @@
 /// <reference lib="webworker" />
 /* eslint-disable no-restricted-globals */
 
+// Log build date and time of the service worker.
+const buildDate = process.env.REACT_APP_BUILD_TIME;
+console.debug('Service worker build on', new Date(parseInt(buildDate + "000")));
+
 // Import Dexie Cloud Service Worker
 import "dexie-cloud-addon/dist/umd/service-worker";
 
