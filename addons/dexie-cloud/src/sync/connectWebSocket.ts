@@ -17,9 +17,10 @@ export function connectWebSocket(db: DexieCloudDB) {
     return db.cloud.currentUser.pipe(
       filter(
         (userLogin) =>
+          db.cloud.persistedSyncState?.value?.serverRevision && (
           !userLogin.accessToken || // Anonymous users can also subscribe to changes - OK.
           !userLogin.accessTokenExpiration || // If no expiraction on access token - OK.
-          userLogin.accessTokenExpiration > new Date()
+          userLogin.accessTokenExpiration > new Date())
       ), // If not expired - OK.
       switchMap(
         (userLogin) =>
