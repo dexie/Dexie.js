@@ -7,9 +7,16 @@ div.box {
   padding: 10px;
   border: 1px solid #ddd;
   margin: 5px 0 5px 0;
+  position: relative;
 }
 div.box > h2 {
   margin: 0 0 10px 0;
+}
+
+.grid-row {
+  display: inline-flex;
+  width: 100%;
+  position: relative;
 }
 
 button.large-button {
@@ -24,7 +31,7 @@ button.large-button {
   margin: 2px;
   transition-duration: 100ms;
   font-size: 20pt;
-  width: 80vw;
+  width: 100%;
   position: relative;
 }
 .row.add-item {
@@ -38,6 +45,20 @@ button.large-button {
 
 .narrow {
   padding: 10px;
+}
+
+.todo-list-trash {
+  padding: 0.7em 0.7em 0.7em 0.7em;
+  font-size: 12pt;
+  opacity: 0.3;
+}
+
+.todo-list-trash > a {
+  cursor: pointer;
+}
+
+.todo-list-trash:hover {
+  opacity: 1;
 }
 
 .todo-item-trash {
@@ -60,10 +81,10 @@ button.large-button {
 }
 
 .todo-item-input {
-  width: 100%;
+  width: 70vw;
   margin: 10px;
   outline: none;
-  padding-right: 15px;
+  padding-right: 10%;
 }
 
 input[type="checkbox"] {

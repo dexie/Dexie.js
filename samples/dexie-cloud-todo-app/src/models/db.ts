@@ -12,13 +12,20 @@ export class TodoDB extends Dexie {
     super('TodoDBCloud', { addons: [dexieCloud] });
     this.version(1).stores({
       todoLists: '@id',
-      todoItems: '@id, todoListId'
+      todoItems: '@id, todoListId',
     });
     // Connect to cloud
     this.cloud.configure({
       databaseUrl: process.env.REACT_APP_DBURL!,
       tryUseServiceWorker: true,
-      requireAuth: false
+      requireAuth: false,
+    });
+  }
+
+  deleteList(todoListId: string) {
+    return this.transaction('rw', this.todoItems, this.todoLists, () => {
+      this.todoItems.where({ todoListId }).delete();
+      this.todoLists.delete(todoListId);
     });
   }
 }

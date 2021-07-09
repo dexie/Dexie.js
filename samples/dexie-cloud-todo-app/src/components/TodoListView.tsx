@@ -1,9 +1,11 @@
-import React from "react";
-import { useLiveQuery } from "dexie-react-hooks";
-import { TodoList } from "../models/TodoList";
-import { db } from "../models/db";
-import { TodoItemView } from "./TodoItemView";
-import { AddTodoItem } from "./AddTodoItem";
+import React from 'react';
+import { useLiveQuery } from 'dexie-react-hooks';
+import { TodoList } from '../models/TodoList';
+import { db } from '../models/db';
+import { TodoItemView } from './TodoItemView';
+import { AddTodoItem } from './AddTodoItem';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faTrashAlt } from '@fortawesome/free-solid-svg-icons';
 
 interface Props {
   todoList: TodoList;
@@ -19,9 +21,16 @@ export function TodoListView({ todoList }: Props) {
 
   return (
     <div className="box">
-      <h2>{todoList.title}</h2>
+      <div className="grid-row">
+        <h2>{todoList.title}</h2>
+        <div className="todo-list-trash">
+          <a onClick={() => db.deleteList(todoList.id!)} title="Delete list">
+            <FontAwesomeIcon icon={faTrashAlt} />
+          </a>
+        </div>
+      </div>
       <div>
-        {items.map(item => (
+        {items.map((item) => (
           <TodoItemView key={item.id} item={item} />
         ))}
       </div>

@@ -2,7 +2,7 @@ import React from "react";
 import { db } from "../models/db";
 import { TodoItem } from "../models/TodoItem";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import { faTrashAlt } from "@fortawesome/free-solid-svg-icons";
+import { faTrash, faTrashAlt } from "@fortawesome/free-solid-svg-icons";
 
 interface Props {
   item: TodoItem;
@@ -25,7 +25,7 @@ export function TodoItemView({ item }: Props) {
       <div className="todo-item-text">{item.title}</div>
       <div className="todo-item-trash">
         <a onClick={() => db.todoItems.delete(item.id!)} title="Delete item">
-          <FontAwesomeIcon icon={faTrashAlt} />
+          <FontAwesomeIcon icon={faTrash} />
         </a>
       </div>
     </div>

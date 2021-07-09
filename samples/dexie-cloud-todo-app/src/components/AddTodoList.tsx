@@ -1,15 +1,21 @@
 import { faList } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
+import { useLiveQuery } from "dexie-react-hooks";
 import React, { useState } from "react";
 import { db } from "../models/db";
 
 export function AddTodoList() {
   const [isActive, setIsActive] = useState(false);
   const [title, setTitle] = useState("");
+  const hasAnyList = useLiveQuery(async () => {
+  const listCount = await db.todoLists.count();
+    return listCount > 0;
+  });
 
   return !isActive ? (
     <button className="large-button" onClick={() => setIsActive(!isActive)}>
-      <FontAwesomeIcon icon={faList} /> Add another list
+      <FontAwesomeIcon icon={faList} />{' '}
+      {hasAnyList ? `Add another list` : `Create ToDo List`}
     </button>
   ) : (
     <div className="box">
