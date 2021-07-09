@@ -81,7 +81,7 @@ export async function promptForEmail(
         fields: {
           email: {
             type: 'text',
-            placeholder: 'somename@somedomain.com',
+            placeholder: 'you@somedomain.com',
           },
         },
       })
