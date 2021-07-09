@@ -3,5 +3,5 @@
   which seem to be more reliable.
 */
 export let isOnline = navigator.onLine;
-window.addEventListener('online', ()=>isOnline = true);
-window.addEventListener('offline', ()=>isOnline = false);
+self.addEventListener('online', ()=>isOnline = true);
+self.addEventListener('offline', ()=>isOnline = false);
