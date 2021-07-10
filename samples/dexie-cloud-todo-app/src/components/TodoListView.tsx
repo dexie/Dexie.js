@@ -24,9 +24,9 @@ export function TodoListView({ todoList }: Props) {
       <div className="grid-row">
         <h2>{todoList.title}</h2>
         <div className="todo-list-trash">
-          <a onClick={() => db.deleteList(todoList.id!)} title="Delete list">
+          <button onClick={() => db.deleteList(todoList.id!)} title="Delete list">
             <FontAwesomeIcon icon={faTrashAlt} />
-          </a>
+          </button>
         </div>
       </div>
       <div>

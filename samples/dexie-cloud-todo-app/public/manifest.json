@@ -1,19 +1,19 @@
 {
-  "short_name": "React App",
-  "name": "Create React App Sample",
+  "short_name": "Dexie Cloud ToDo App",
+  "name": "ToDo App developed with Dexie Cloud, https://dexie.cloud",
   "icons": [
     {
-      "src": "favicon.ico",
+      "src": "dexie-icon-64x64.gif",
       "sizes": "64x64 32x32 24x24 16x16",
-      "type": "image/x-icon"
+      "type": "image/gif"
     },
     {
-      "src": "logo192.png",
+      "src": "dexie-icon-192x192.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "logo512.png",
+      "src": "dexie-icon-512x512.png",
       "type": "image/png",
       "sizes": "512x512"
     }
