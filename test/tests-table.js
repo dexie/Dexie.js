@@ -552,7 +552,7 @@ spawnedTest("Issue #1280 - add() with auto-incrementing ID and CryptoKey", funct
     var generatedKey = yield self.crypto.subtle.generateKey(
         {
             name: "RSA-OAEP",
-            modulusLength: 4096,
+            modulusLength: 1024,
             publicExponent: new Uint8Array([1, 0, 1]),
             hash: "SHA-256",
         },
@@ -560,18 +560,19 @@ spawnedTest("Issue #1280 - add() with auto-incrementing ID and CryptoKey", funct
         ["encrypt", "decrypt"],
     );
 
+    yield Dexie.delete("MyDatabaseToStoreCryptoKeys");
     var db = new Dexie("MyDatabaseToStoreCryptoKeys");
     db.version(1).stores({
         keys: "++id",
     });
     var objToAdd = { key: generatedKey.privateKey };
-    ok(generatedKey.privateKey instanceof CryptoKey, "The CryptoKey object was not generated correctly");
+    ok(generatedKey.privateKey instanceof CryptoKey, "The CryptoKey object was generated correctly");
 
     var id = yield db.keys.add(objToAdd);
-    ok(id != null, "Got unexpectedly nullish id");
+    ok(id != null, "The id we got was not nullish");
 
     var storedObj = yield db.keys.get(id);
-    ok(storedObj.key instanceof CryptoKey, "The CryptoKey object was destroyed in storage");
+    ok(storedObj.key instanceof CryptoKey, "The CryptoKey object exists in storage");
 });
 
 spawnedTest("bulkPut", function*(){
