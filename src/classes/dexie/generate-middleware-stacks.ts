@@ -29,7 +29,7 @@ function createMiddlewareStacks(
   };
 }
 
-export function generateMiddlewareStacks(db: Dexie, tmpTrans: IDBTransaction) {
+export function generateMiddlewareStacks({_novip: db}: Dexie, tmpTrans: IDBTransaction) {
   const idbdb = tmpTrans.db;
   const stacks = createMiddlewareStacks(db._middlewares, idbdb, db._deps, tmpTrans);
   db.core = stacks.dbcore!;
