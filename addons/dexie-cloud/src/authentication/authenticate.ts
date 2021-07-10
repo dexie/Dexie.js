@@ -11,7 +11,7 @@ import {
   DXCMessageAlert,
   DXCUserInteraction,
 } from '../types/DXCUserInteraction';
-import { interactWithUser } from './interactWithUser';
+import { alertUser, interactWithUser } from './interactWithUser';
 
 export type FetchTokenCallback = (tokenParams: {
   public_key: string;
@@ -141,36 +141,48 @@ async function userAuthenticate(
   const publicKeyPEM = spkiToPEM(publicKeySPKI);
   context.publicKey = publicKey;
 
-  const response2 = await fetchToken({
-    public_key: publicKeyPEM,
-    hints,
-  });
-
-  if (response2.type !== 'tokens')
-    throw new Error(
-      `Unexpected response type from token endpoint: ${response2.type}`
-    );
-
-  context.accessToken = response2.accessToken;
-  context.accessTokenExpiration = new Date(response2.accessTokenExpiration);
-  context.refreshToken = response2.refreshToken;
-  if (response2.refreshTokenExpiration) {
-    context.refreshTokenExpiration = new Date(response2.refreshTokenExpiration);
-  }
-  context.userId = response2.claims.sub;
-  context.email = response2.claims.email;
-  context.name = response2.claims.name;
-  context.claims = response2.claims;
-
-  if (response2.alerts && response2.alerts.length > 0) {
-    await interactWithUser(userInteraction, {
-      type: 'message-alert',
-      title: 'Authentication Alert',
-      fields: {},
-      alerts: response2.alerts as DXCAlert[],
+  try {
+    const response2 = await fetchToken({
+      public_key: publicKeyPEM,
+      hints,
     });
+
+    if (response2.type !== 'tokens')
+      throw new Error(
+        `Unexpected response type from token endpoint: ${response2.type}`
+      );
+
+    context.accessToken = response2.accessToken;
+    context.accessTokenExpiration = new Date(response2.accessTokenExpiration);
+    context.refreshToken = response2.refreshToken;
+    if (response2.refreshTokenExpiration) {
+      context.refreshTokenExpiration = new Date(
+        response2.refreshTokenExpiration
+      );
+    }
+    context.userId = response2.claims.sub;
+    context.email = response2.claims.email;
+    context.name = response2.claims.name;
+    context.claims = response2.claims;
+
+    if (response2.alerts && response2.alerts.length > 0) {
+      await interactWithUser(userInteraction, {
+        type: 'message-alert',
+        title: 'Authentication Alert',
+        fields: {},
+        alerts: response2.alerts as DXCAlert[],
+      });
+    }
+    return context;
+  } catch (error) {
+    await alertUser(userInteraction, 'Authentication Failed', {
+      type: 'error',
+      messageCode: 'GENERIC_ERROR',
+      message: `We're having a problem to authenticate rigth now.`,
+      messageParams: {}
+    }).catch(()=>{});
+    throw error;
   }
-  return context;
 }
 
 function spkiToPEM(keydata: ArrayBuffer) {

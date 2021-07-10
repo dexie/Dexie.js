@@ -2,7 +2,7 @@
 export type DXCInputField = DXCTextField | DXCPasswordField;
 
 export interface DXCTextField {
-  type: 'text';
+  type: 'text' | 'email' | 'otp';
   label?: string;
   placeholder?: string;
 }

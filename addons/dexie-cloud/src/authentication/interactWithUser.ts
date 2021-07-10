@@ -57,6 +57,19 @@ export function interactWithUser<T extends DXCUserInteractionRequest>(
   });
 }
 
+export function alertUser(
+  userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
+  title: string,
+  ...alerts: DXCAlert[]
+) {
+  return interactWithUser(userInteraction, {
+    type: 'message-alert',
+    title,
+    alerts,
+    fields: {}
+  });
+}
+
 export async function promptForEmail(
   userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
   title: string,
@@ -80,7 +93,7 @@ export async function promptForEmail(
           : [],
         fields: {
           email: {
-            type: 'text',
+            type: 'email',
             placeholder: 'you@somedomain.com',
           },
         },
@@ -92,22 +105,27 @@ export async function promptForEmail(
 
 export async function promptForOTP(
   userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
-  email: string
+  email: string,
+  alert?: DXCAlert
 ) {
+  const alerts: DXCAlert[] = [
+    {
+      type: 'info',
+      messageCode: 'OTP_SENT',
+      message: `A One-Time password has been sent to {email}`,
+      messageParams: { email },
+    },
+  ];
+  if (alert) {
+    alerts.push(alert);
+  }
   const { otp } = await interactWithUser(userInteraction, {
     type: 'otp',
     title: 'Enter OTP',
-    alerts: [
-      {
-        type: 'info',
-        messageCode: 'OTP_SENT',
-        message: `A One-Time password has been sent to {email}`,
-        messageParams: { email },
-      },
-    ],
+    alerts,
     fields: {
       otp: {
-        type: 'text',
+        type: 'otp',
         label: 'OTP',
         placeholder: 'Paste OTP here',
       },

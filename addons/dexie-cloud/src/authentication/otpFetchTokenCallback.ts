@@ -4,8 +4,9 @@ import {
   TokenResponse,
 } from 'dexie-cloud-common';
 import { DexieCloudDB } from '../db/DexieCloudDB';
+import { HttpError } from '../errors/HttpError';
 import { FetchTokenCallback } from './authenticate';
-import { promptForEmail, promptForOTP } from './interactWithUser';
+import { alertUser, promptForEmail, promptForOTP } from './interactWithUser';
 
 export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
   const { userInteraction } = db.cloud;
@@ -43,8 +44,16 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       method: 'post',
       headers: { 'Content-Type': 'application/json', mode: 'cors' },
     });
-    if (res1.status !== 200)
-      throw new Error(`Status ${res1.status} from ${url}/token`);
+    if (res1.status !== 200) {
+      const errMsg = await res1.text();
+      await alertUser(userInteraction, "Token request failed", {
+        type: 'error',
+        messageCode: 'GENERIC_ERROR',
+        message: errMsg,
+        messageParams: {}
+      }).catch(()=>{});
+      throw new HttpError(res1, errMsg);
+    }
     const response: TokenResponse = await res1.json();
     if (response.type === 'tokens') {
       // Demo user request can get a "tokens" response right away
@@ -56,14 +65,37 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       tokenRequest.otp = otp || '';
       tokenRequest.otp_id = response.otp_id;
 
-      const res2 = await fetch(`${url}/token`, {
+      let res2 = await fetch(`${url}/token`, {
         body: JSON.stringify(tokenRequest),
         method: 'post',
         headers: { 'Content-Type': 'application/json' },
         mode: 'cors',
       });
-      if (res2.status !== 200)
-        throw new Error(`OTP: Status ${res2.status} from ${url}/token`);
+      while (res2.status === 401) {
+        const errorText = await res2.text();
+        tokenRequest.otp = await promptForOTP(userInteraction, tokenRequest.email, {
+          type: 'error',
+          messageCode: 'INVALID_OTP',
+          message: errorText,
+          messageParams: {}
+        });
+        res2 = await fetch(`${url}/token`, {
+          body: JSON.stringify(tokenRequest),
+          method: 'post',
+          headers: { 'Content-Type': 'application/json' },
+          mode: 'cors',
+        });
+      }
+      if (res2.status !== 200) {
+        const errMsg = await res2.text();
+        await alertUser(userInteraction, "OTP Authentication Failed", {
+          type: 'error',
+          messageCode: 'GENERIC_ERROR',
+          message: errMsg,
+          messageParams: {}
+        }).catch(()=>{});
+        throw new HttpError(res2, errMsg);
+      }
       const response2: TokenFinalResponse = await res2.json();
       return response2;
     } else {

@@ -40,18 +40,23 @@ export const Styles: { [styleAlias: string]: Partial<CSSStyleDeclaration> | any}
     position: "relative",
     color: "#222",
     backgroundColor: "#fff",
-    padding: "5px 20px 20px 20px",
+    padding: "30px",
     marginBottom: "2em",
     maxWidth: "90%",
     maxHeight: "90%",
     overflowY: "auto",
-    border: "3px solid #3dbca2",
+    border: "3px solid #3d3d5d",
     borderRadius: "8px",
     boxShadow: "0 0 80px 10px #666",
     width: "auto"
   },
   Input: {
-    height: "1.2em",
-    width: "17em"
+    height: "35px",
+    width: "17em",
+    borderColor: "#ccf4",
+    outline: "none",
+    fontSize: "17pt",
+    padding: "8px"
+  
   }
 };

@@ -1,7 +1,7 @@
 import { Dialog } from './Dialog';
 import { Styles } from './Styles';
 import { h, Fragment } from 'preact';
-import { useLayoutEffect, useRef, useState } from 'preact/hooks';
+import { useEffect, useLayoutEffect, useRef, useState } from 'preact/hooks';
 import {
   DXCGenericUserInteraction,
   DXCUserInteraction,
@@ -35,16 +35,18 @@ export function LoginDialog({
         {Object.entries(fields).map(
           ([fieldName, { type, label, placeholder }], idx) => (
             <label style={Styles.Label}>
-              {label}
+              {label ? `${label}: ` : ''}
               <input
                 ref={idx === 0 ? firstFieldRef : undefined}
-                type="text"
+                type={type}
+                name={fieldName}
+                autoComplete="on"
                 style={Styles.Input}
                 autoFocus
                 placeholder={placeholder}
-                value={params.email || ''}
-                onChange={(ev) =>
-                  setParams({ ...params, [fieldName]: ev.target?.['value'] })
+                value={params[fieldName] || ''}
+                onInput={(ev) =>
+                  setParams({ ...params, [fieldName]: valueTransformer(type, ev.target?.['value']) })
                 }
               />
             </label>
@@ -62,4 +64,12 @@ export function LoginDialog({
       </div>
     </Dialog>
   );
+}
+
+function valueTransformer(type: string, value: string) {
+  switch(type) {
+    case "email": return value.toLowerCase();
+    case "otp": return value.toUpperCase();
+    default: return value;
+  }
 }
