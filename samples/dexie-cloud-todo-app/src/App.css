@@ -48,13 +48,16 @@ button.large-button {
 }
 
 .todo-list-trash {
-  padding: 0.7em 0.7em 0.7em 0.7em;
+  padding: 0.6em 1em;
   font-size: 12pt;
   opacity: 0.3;
 }
 
-.todo-list-trash > a {
+.todo-list-trash > button {
   cursor: pointer;
+  padding: 0;
+  border: none;
+  background: none;
 }
 
 .todo-list-trash:hover {
@@ -64,15 +67,18 @@ button.large-button {
 .todo-item-trash {
   position: absolute;
   right: 15px;
-  top: 15px;
+  top: 9px;
   opacity: 0.3;
 }
 .todo-item-trash:hover {
   opacity: 1;
 }
 
-.todo-item-trash > a {
+.todo-item-trash > button {
   cursor: pointer;
+  padding: 0;
+  border: none;
+  background: none;
 }
 
 .todo-item-text {
@@ -85,6 +91,7 @@ button.large-button {
   margin: 10px;
   outline: none;
   padding-right: 10%;
+  font-size: 8pt;
 }
 
 input[type="checkbox"] {
@@ -119,10 +126,11 @@ input[type="checkbox"]:disabled {
 }
 input[type="text"] {
   border-color: #ccf4;
-  height: 25px;
+  height: 35px;
   width: 100%;
   outline: none;
-  font-size: 20pt;
+  font-size: 17pt;
+  padding: 8px;
 }
 
 input::placeholder {
