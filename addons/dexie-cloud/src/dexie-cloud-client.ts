@@ -170,14 +170,14 @@ export function dexieCloud(dexie: Dexie) {
   dexie.use(createImplicitPropSetterMiddleware(DexieCloudDB(dexie)));
   dexie.use(createIdGenerationMiddleware(DexieCloudDB(dexie)));
 
-  // Setup default GUI:
-  if (!IS_SERVICE_WORKER) {
-    subscriptions.push(setupDefaultGUI(dexie));
-  }
-
   async function onDbReady(dexie: Dexie) {
     closed = false; // As Dexie calls us, we are not closed anymore. Maybe reopened? Remember db.ready event is registered with sticky flag!
     const db = DexieCloudDB(dexie);
+    // Setup default GUI:
+    if (!IS_SERVICE_WORKER && !db.cloud.options?.customLoginGui) {
+      subscriptions.push(setupDefaultGUI(dexie));
+    }
+
     //verifyConfig(db.cloud.options); Not needed (yet at least!)
     // Verify the user has allowed version increment.
     if (!db.tables.every((table) => table.core)) {

@@ -39,19 +39,15 @@ export default class LoginGui extends Component<Props, State> {
 
   render(props: Props, {userInteraction}: State) {
     if (!userInteraction) return null;
-    if (props.db.cloud.userInteraction.observers.length > 1) return null; // Someone else subscribes.
+    //if (props.db.cloud.userInteraction.observers.length > 1) return null; // Someone else subscribes.
     return <LoginDialog {...userInteraction as DXCGenericUserInteraction<string, {[name: string]: DXCInputField}>} />;
   }
 }
 
 export function setupDefaultGUI(db: Dexie) {
   const el = document.createElement('div');
-  window.addEventListener("load", onload);
-
-  function onload() {
-    document.body.appendChild(el);
-    preact.render(<LoginGui db={db.vip} />, el);
-  }
+  document.body.appendChild(el);
+  preact.render(<LoginGui db={db.vip} />, el);
 
   let closed = false;
 
@@ -59,7 +55,6 @@ export function setupDefaultGUI(db: Dexie) {
     unsubscribe() {
       el.remove();
       closed = true;
-      window.removeEventListener("load", onload);
     },
     get closed() {
       return closed;
