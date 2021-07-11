@@ -573,6 +573,11 @@ spawnedTest("Issue #1280 - add() with auto-incrementing ID and CryptoKey", funct
 
     var storedObj = yield db.keys.get(id);
     ok(storedObj.key instanceof CryptoKey, "The CryptoKey object exists in storage");
+
+    // Verify that update works
+    yield db.keys.update(id, {someOtherProp: 'x'});
+    storedObj = yield db.keys.get(id);
+    ok(storedObj.key instanceof CryptoKey, "The CryptoKey object is still a CryptoKey");
 });
 
 spawnedTest("bulkPut", function*(){
