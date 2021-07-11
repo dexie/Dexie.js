@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { TodoList } from '../models/TodoList';
-import { db } from '../models/db';
+import { db } from '../db';
 import { TodoItemView } from './TodoItemView';
 import { AddTodoItem } from './AddTodoItem';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
