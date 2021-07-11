@@ -1,5 +1,5 @@
 import { useObservable } from 'react-use';
-import { db } from '../../models/db';
+import { db } from '../../db';
 import { IconError } from '../icons/IconError';
 import { IconInSync } from '../icons/IconInSync';
 import { IconOffline } from '../icons/IconOffline';

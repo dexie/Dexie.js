@@ -11,7 +11,7 @@ import {
   NavLink,
 } from 'react-bootstrap';
 import { useObservable } from 'react-use';
-import { db, resetDatabase } from '../../models/db';
+import { db, resetDatabase } from '../../db';
 import { SyncStatusIcon } from './SyncStatusIcon';
 import './NavBar.css';
 import importData from '../../data/importfile.json';

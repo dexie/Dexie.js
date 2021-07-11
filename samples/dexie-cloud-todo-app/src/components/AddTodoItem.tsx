@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { db } from "../models/db";
+import { db } from "../db";
 import { TodoItem } from "../models/TodoItem";
 import { TodoList } from "../models/TodoList";
 
