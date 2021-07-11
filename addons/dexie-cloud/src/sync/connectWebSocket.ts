@@ -7,6 +7,7 @@ import {
   loadAccessToken,
   refreshAccessToken,
 } from '../authentication/authenticate';
+import { from } from 'rxjs';
 
 export function connectWebSocket(db: DexieCloudDB) {
   if (!db.cloud.options?.databaseUrl) {
@@ -17,10 +18,10 @@ export function connectWebSocket(db: DexieCloudDB) {
     return db.cloud.currentUser.pipe(
       filter(
         (userLogin) =>
-          db.cloud.persistedSyncState?.value?.serverRevision && (
-          !userLogin.accessToken || // Anonymous users can also subscribe to changes - OK.
-          !userLogin.accessTokenExpiration || // If no expiraction on access token - OK.
-          userLogin.accessTokenExpiration > new Date())
+          db.cloud.persistedSyncState?.value?.serverRevision &&
+          (!userLogin.accessToken || // Anonymous users can also subscribe to changes - OK.
+            !userLogin.accessTokenExpiration || // If no expiraction on access token - OK.
+            userLogin.accessTokenExpiration > new Date())
       ), // If not expired - OK.
       switchMap(
         (userLogin) =>
@@ -31,25 +32,27 @@ export function connectWebSocket(db: DexieCloudDB) {
             userLogin.accessTokenExpiration
           )
       ),
-      catchError(async (error) => {
-        if (error?.name === 'TokenExpiredError') {
-          console.debug(
-            'WebSocket observable: Token expired. Refreshing token...'
-          );
-          const user = db.cloud.currentUser.value;
-          const refreshedLogin = await refreshAccessToken(
-            db.cloud.options!.databaseUrl,
-            user
-          );
-          await db.table('$logins').update(user.userId, {
-            accessToken: refreshedLogin.accessToken,
-            accessTokenExpiration: refreshedLogin.accessTokenExpiration,
-          });
-          // Return a fresh observable from here (reconnect)
-          return createObservable();
-        } else {
-          console.error('WebSocket observable:', error);
-          throw error;
+      catchError((error) => {
+        return from(refreshToken()).pipe(switchMap(() => createObservable()));
+
+        async function refreshToken() {
+          if (error?.name === 'TokenExpiredError') {
+            console.debug(
+              'WebSocket observable: Token expired. Refreshing token...'
+            );
+            const user = db.cloud.currentUser.value;
+            const refreshedLogin = await refreshAccessToken(
+              db.cloud.options!.databaseUrl,
+              user
+            );
+            await db.table('$logins').update(user.userId, {
+              accessToken: refreshedLogin.accessToken,
+              accessTokenExpiration: refreshedLogin.accessTokenExpiration,
+            });
+          } else {
+            console.error('WebSocket observable:', error);
+            throw error;
+          }
         }
       })
     );
