@@ -13,6 +13,7 @@ export class BroadcastedAndLocalEvent<T> extends Observable<T>{
         subscriber.next(ev.detail);
       }
       function onMessageEvent(ev: MessageEvent) {
+        console.debug("BroadcastedAndLocalEvent: onMessageEvent", ev);
         subscriber.next(ev.data);
       }
       let unsubscribe: ()=>void;
@@ -20,6 +21,7 @@ export class BroadcastedAndLocalEvent<T> extends Observable<T>{
       if (bc instanceof SWBroadcastChannel) {
         unsubscribe = bc.subscribe(message => subscriber.next(message));
       } else {
+        console.debug("BroadcastedAndLocalEvent: bc.addEventListener()", name, "bc is a", bc);
         bc.addEventListener("message", onMessageEvent);
       }
       return () => {
@@ -36,6 +38,7 @@ export class BroadcastedAndLocalEvent<T> extends Observable<T>{
   }
 
   next(message: T) {
+    console.debug("BroadcastedAndLocalEvent: bc.postMessage()", {...message}, "bc is a", this.bc);
     this.bc.postMessage(message);
     const ev = new CustomEvent(`lbc-${this.name}`, { detail: message });
     self.dispatchEvent(ev);
