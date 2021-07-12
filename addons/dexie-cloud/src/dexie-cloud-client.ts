@@ -100,6 +100,7 @@ export function dexieCloud(dexie: Dexie) {
         dexie.name = `${origIdbName}-${getDbNameFromDbUrl(
           options.databaseUrl
         )}`;
+        DexieCloudDB(dexie).reconfigure(); // Update observable from new dexie.name
       }
       updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
     },
@@ -174,8 +175,13 @@ export function dexieCloud(dexie: Dexie) {
     closed = false; // As Dexie calls us, we are not closed anymore. Maybe reopened? Remember db.ready event is registered with sticky flag!
     const db = DexieCloudDB(dexie);
     // Setup default GUI:
-    if (!IS_SERVICE_WORKER && !db.cloud.options?.customLoginGui) {
-      subscriptions.push(setupDefaultGUI(dexie));
+    if (!IS_SERVICE_WORKER) {
+      if (!db.cloud.options?.customLoginGui) {
+        subscriptions.push(setupDefaultGUI(dexie));
+      }
+      subscriptions.push(
+        db.syncStateChangedEvent.subscribe(dexie.cloud.syncState)
+      );
     }
 
     //verifyConfig(db.cloud.options); Not needed (yet at least!)
@@ -282,15 +288,17 @@ export function dexieCloud(dexie: Dexie) {
 
     // Manage CurrentUser observable:
     throwIfClosed();
-    subscriptions.push(
-      liveQuery(() => db.getCurrentUser()).subscribe(currentUserEmitter)
-    );
-    // Manage PersistendSyncState observable:
-    subscriptions.push(
-      liveQuery(() => db.getPersistedSyncState()).subscribe(
-        db.cloud.persistedSyncState
-      )
-    );
+    if (!IS_SERVICE_WORKER) {
+      subscriptions.push(
+        liveQuery(() => db.getCurrentUser()).subscribe(currentUserEmitter)
+      );
+      // Manage PersistendSyncState observable:
+      subscriptions.push(
+        liveQuery(() => db.getPersistedSyncState()).subscribe(
+          db.cloud.persistedSyncState
+        )
+      );
+    }
 
     // HERE: If requireAuth, do athentication now.
     if (db.cloud.options?.requireAuth) {
@@ -300,9 +308,6 @@ export function dexieCloud(dexie: Dexie) {
     if (localSyncWorker) localSyncWorker.stop();
     localSyncWorker = null;
     throwIfClosed();
-    subscriptions.push(
-      db.syncStateChangedEvent.subscribe(dexie.cloud.syncState)
-    );
     if (db.cloud.usingServiceWorker && db.cloud.options?.databaseUrl) {
       registerSyncEvent(db).catch(() => {});
       registerPeriodicSyncEvent(db).catch(() => {});
@@ -318,21 +323,31 @@ export function dexieCloud(dexie: Dexie) {
 
     // Listen to online event and do sync.
     throwIfClosed();
-    subscriptions.push(
-      fromEvent(self, 'online').subscribe(() => {
-        console.debug('online!');
-        db.syncStateChangedEvent.next({
-          phase: 'not-in-sync',
-        });
-        triggerSync(db);
-      }),
-      fromEvent(self, 'offline').subscribe(() => {
-        console.debug('offline!');
-        db.syncStateChangedEvent.next({
-          phase: 'offline',
-        });  
-      })
-    );
+    if (!IS_SERVICE_WORKER) {
+      if (typeof document !== 'undefined') {
+        subscriptions.push(
+          fromEvent(document, 'visibilitychange').subscribe(()=>{
+            const {visibilityState} = document;
+            
+          })
+        );
+      }
+      subscriptions.push(
+        fromEvent(self, 'online').subscribe(() => {
+          console.debug('online!');
+          db.syncStateChangedEvent.next({
+            phase: 'not-in-sync',
+          });
+          triggerSync(db);
+        }),
+        fromEvent(self, 'offline').subscribe(() => {
+          console.debug('offline!');
+          db.syncStateChangedEvent.next({
+            phase: 'offline',
+          });
+        })
+      );
+    }
 
     // Connect WebSocket only if we're a browser window
     if (

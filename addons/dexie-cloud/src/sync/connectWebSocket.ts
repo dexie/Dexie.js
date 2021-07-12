@@ -8,6 +8,7 @@ import {
   refreshAccessToken,
 } from '../authentication/authenticate';
 import { from } from 'rxjs';
+import { createVisibilityStateObservable } from '../helpers/visibilityState';
 
 export function connectWebSocket(db: DexieCloudDB) {
   if (!db.cloud.options?.databaseUrl) {
@@ -15,7 +16,9 @@ export function connectWebSocket(db: DexieCloudDB) {
   }
 
   function createObservable() {
-    return db.cloud.currentUser.pipe(
+    return createVisibilityStateObservable().pipe(
+      filter((visibilityState) => visibilityState === 'visible'),
+      switchMap(() => db.cloud.currentUser),
       filter(
         (userLogin) =>
           db.cloud.persistedSyncState?.value?.serverRevision &&
