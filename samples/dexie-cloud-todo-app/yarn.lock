@@ -4156,12 +4156,11 @@ detect-port-alt@1.1.6:
     address "^1.0.1"
     debug "^2.6.0"
 
-dexie-cloud-addon@^1.0.0-beta.2:
-  version "1.0.0-beta.2"
-  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-1.0.0-beta.2.tgz#2f65901a6a26234b9c90ece7e97d3872af954a6b"
-  integrity sha512-V75tjlLPIexVnauHZKWFmW1lpZ9WuAP++PdApekj7cZaKlJ9HfEbKZTRrIHLEx7bxoG5CcAUGeTJj/Ck4QARJQ==
+dexie-cloud-addon@^1.0.0-beta.3:
+  version "1.0.0-beta.3"
+  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-1.0.0-beta.3.tgz#358ee2efc18b6576cf0f61a9ae9db16089bad822"
+  integrity sha512-SzXWSwQIEh21CZ0XN+KmPAxaYPFIxfeJn6de2sDYnMlfml9pOFVin2TP9o2etXQ6fqfigBk6Qxojf5PkfEYBdg==
   dependencies:
-    dexie "^3.2.0-beta.1"
     rxjs "^6.6.7"
 
 dexie-react-hooks@1.0.7:
@@ -4169,10 +4168,10 @@ dexie-react-hooks@1.0.7:
   resolved "https://registry.yarnpkg.com/dexie-react-hooks/-/dexie-react-hooks-1.0.7.tgz#50316a7829a6dfa013b8471f66b010cc77f00d3e"
   integrity sha512-hqXGFbfgu1rdfcGHQUPwW2G0iWyupoNWnk3ODvqr+HdZt2ip3y1e/dcWIOsEnlUWWCWk6a3+ok0fvECU05eE2A==
 
-dexie@^3.2.0-beta.1:
-  version "3.2.0-beta.1"
-  resolved "https://registry.yarnpkg.com/dexie/-/dexie-3.2.0-beta.1.tgz#85a7a81bf887250f9bfcfcb548d2285162c58a2f"
-  integrity sha512-tFkGa/SqGoPXLvxg5tg/fLedbQzPNB7FpOcGB/maRVpNsMAVJ8i/M1Sf47kK4Whqkmm4o3tqqVL1jWEB0LO3vA==
+dexie@^3.2.0-beta.2:
+  version "3.2.0-beta-2"
+  resolved "https://registry.yarnpkg.com/dexie/-/dexie-3.2.0-beta-2.tgz#9037bb09231b512afdf7db4fec5692276d2e3744"
+  integrity sha512-T6UutBUmDDbccDV80GdLfFftWsTfi35yohtO3Lm/KkemmMeQw2ndFFcKHJkkc6GjFR1DOolsNs4pL7RTwagHAQ==
 
 diff-sequences@^26.6.2:
   version "26.6.2"
