@@ -8,7 +8,8 @@ export async function login(
   db: DexieCloudDB,
   hints?: { email?: string; userId?: string; grant_type?: string }
 ) {
-  if (db.cloud.currentUser.value.isLoggedIn) {
+  const currentUser = await db.getCurrentUser();
+  if (currentUser.isLoggedIn) {
     if (hints) {
       if (hints.email && db.cloud.currentUser.value.email !== hints.email) {
         throw new Error(`Must logout before changing user`);
