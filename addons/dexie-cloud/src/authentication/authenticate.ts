@@ -21,13 +21,14 @@ export type FetchTokenCallback = (tokenParams: {
 export async function loadAccessToken(
   db: DexieCloudDB
 ): Promise<string | undefined> {
+  const currentUser = await db.getCurrentUser();
   const {
     accessToken,
     accessTokenExpiration,
     refreshToken,
     refreshTokenExpiration,
     claims,
-  } = db.cloud.currentUser.value;
+  } = currentUser;
   if (!accessToken) return;
   const expTime = accessTokenExpiration?.getTime() ?? Infinity;
   if (expTime > Date.now()) {
@@ -42,7 +43,7 @@ export async function loadAccessToken(
   }
   const refreshedLogin = await refreshAccessToken(
     db.cloud.options!.databaseUrl,
-    db.cloud.currentUser.value
+    currentUser
   );
   await db.table('$logins').update(claims.sub, {
     accessToken: refreshedLogin.accessToken,
