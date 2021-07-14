@@ -9,7 +9,6 @@ export interface DexieCloudOptions {
   requireAuth?: boolean;
   tryUseServiceWorker?: boolean;
   customLoginGui?: boolean;
-  syncedTables?: string[];
   unsyncedTables?: string[];
   periodicSync?: PeriodicSyncOptions;
   fetchTokens?: (tokenParams: {
