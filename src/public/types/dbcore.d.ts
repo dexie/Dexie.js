@@ -20,6 +20,12 @@ export interface DBCoreTransaction {
   abort(): void;
 }
 
+type DbCoreTransactionDurability = 'default' | 'strict' | 'relaxed'
+
+interface DbCoreTransactionOptions {
+  durability: DbCoreTransactionDurability
+}
+
 export type DBCoreMutateRequest = DBCoreAddRequest | DBCorePutRequest | DBCoreDeleteRequest | DBCoreDeleteRangeRequest;
 
 export interface DBCoreMutateResponse {
@@ -158,7 +164,7 @@ export interface DBCoreIndex {
 export interface DBCore {
   stack: "dbcore";
   // Transaction and Object Store
-  transaction(stores: string[], mode: 'readonly' | 'readwrite'): DBCoreTransaction;
+  transaction(stores: string[], mode: 'readonly' | 'readwrite', options?: DbCoreTransactionOptions): DBCoreTransaction;
 
   // Utility methods
   cmp(a: any, b: any) : number;

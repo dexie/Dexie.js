@@ -115,8 +115,8 @@ export class Transaction implements ITransaction {
 
     idbtrans = this.idbtrans = idbtrans ||
       (this.db.core 
-        ? this.db.core.transaction(this.storeNames, this.mode as 'readwrite' | 'readonly')
-        : idbdb.transaction(this.storeNames, this.mode)
+        ? this.db.core.transaction(this.storeNames, this.mode as 'readwrite' | 'readonly', { durability: 'relaxed' })
+        : idbdb.transaction(this.storeNames, this.mode, { durability: 'relaxed' })
       ) as IDBTransaction;
 
     idbtrans.onerror = wrap(ev => {
