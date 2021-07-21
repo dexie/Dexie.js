@@ -48,6 +48,14 @@ asyncTest("Transaction should work when returning native Promise in transaction 
     }).finally(start);
 });
 
+asyncTest("Transaction should specify durability as relaxed", function() {
+    db.transaction('rw', db.users, db.pets, trans => {
+        ok(trans.idbtrans.durability === 'relaxed', "Transaction has relaxed durability");
+    }).catch(function (err) {
+        ok(false, err);
+    }).finally(start);
+});
+
 asyncTest("empty transaction block", function () {
     db.transaction('rw', db.users, db.pets, function () {
         ok(true, "Entering transaction block but dont start any transaction");
