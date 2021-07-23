@@ -10,6 +10,7 @@ export interface TransactionConstructor<T extends Transaction=Transaction> {
     mode: IDBTransactionMode,
     storeNames: string[],
     dbschema: DbSchema,
+    chromeTransactionDurability: ChromeTransactionDurability,
     parent?: Transaction) : T;
   prototype: T;
 }
@@ -28,12 +29,14 @@ export function createTransactionConstructor(db: Dexie) {
       mode: IDBTransactionMode,
       storeNames: string[],
       dbschema: DbSchema,
+      chromeTransactionDurability: ChromeTransactionDurability,
       parent?: Transaction)
     {
       this.db = db;
       this.mode = mode;
       this.storeNames = storeNames;
       this.schema = dbschema;
+      this.chromeTransactionDurability = chromeTransactionDurability;
       this.idbtrans = null;
       this.on = Events(this, "complete", "error", "abort");
       this.parent = parent || null;

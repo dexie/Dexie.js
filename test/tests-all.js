@@ -1,6 +1,7 @@
 ﻿import Dexie from 'dexie';
 Dexie.test = true; // Improve code coverage
 import "./tests-table.js";
+import "./tests-chrome-transaction-durability.js";
 import "./tests-collection.js";
 import "./tests-whereclause.js";
 import "./tests-transaction.js";

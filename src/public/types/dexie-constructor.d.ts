@@ -10,13 +10,16 @@ import { DexieDOMDependencies } from "./dexie-dom-dependencies";
 import { GlobalDexieEvents, ObservabilitySet } from "./db-events";
 import { Observable } from "./observable";
 
+export type ChromeTransactionDurability = 'default' | 'strict' | 'relaxed'
+
 export interface DexieOptions {
   addons?: Array<(db: Dexie) => void>,
   autoOpen?: boolean,
   indexedDB?: {open: Function},
   IDBKeyRange?: {bound: Function, lowerBound: Function, upperBound: Function},
-  allowEmptyDB?: boolean;
-  modifyChunkSize?: number
+  allowEmptyDB?: boolean,
+  modifyChunkSize?: number,
+  chromeTransactionDurability?: ChromeTransactionDurability
 }
 
 export interface DexieConstructor extends DexieExceptionClasses {

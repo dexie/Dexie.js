@@ -1,5 +1,7 @@
 // For public interface
 
+import {ChromeTransactionDurability} from "./dexie-constructor";
+
 export const enum DBCoreRangeType {
   Equal = 1,
   Range = 2,
@@ -20,10 +22,8 @@ export interface DBCoreTransaction {
   abort(): void;
 }
 
-type DbCoreTransactionDurability = 'default' | 'strict' | 'relaxed'
-
 interface DbCoreTransactionOptions {
-  durability: DbCoreTransactionDurability
+  durability: ChromeTransactionDurability
 }
 
 export type DBCoreMutateRequest = DBCoreAddRequest | DBCorePutRequest | DBCoreDeleteRequest | DBCoreDeleteRangeRequest;
