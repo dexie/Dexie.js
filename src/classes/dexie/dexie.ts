@@ -96,7 +96,8 @@ export class Dexie implements IDexie {
       // Default DOM dependency implementations from static prop.
       indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to browser env.
       IDBKeyRange: deps.IDBKeyRange,  // Backend IDBKeyRange api. Default to browser env.
-      ...options
+      chromeTransactionDurability: options?.chromeTransactionDurability || 'default', // Fall back on 'default' if not passed
+      ...options,
     };
     this._deps = {
       indexedDB: options.indexedDB as IDBFactory,
@@ -198,7 +199,7 @@ export class Dexie implements IDexie {
       mode: IDBTransactionMode,
       storeNames: string[],
       dbschema: DbSchema,
-      parentTransaction?: Transaction) => new this.Transaction(mode, storeNames, dbschema, parentTransaction);
+      parentTransaction?: Transaction) => new this.Transaction(mode, storeNames, dbschema, this._options.chromeTransactionDurability, parentTransaction);
 
     this._fireOnBlocked = ev => {
       this.on("blocked").fire(ev);

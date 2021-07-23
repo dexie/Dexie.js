@@ -21,6 +21,7 @@ export class Transaction implements ITransaction {
   db: Dexie;
   active: boolean;
   mode: IDBTransactionMode;
+  chromeTransactionDurability: ChromeTransactionDurability;
   idbtrans: IDBTransaction;
   storeNames: string[];
   on: any;
@@ -115,8 +116,8 @@ export class Transaction implements ITransaction {
 
     idbtrans = this.idbtrans = idbtrans ||
       (this.db.core 
-        ? this.db.core.transaction(this.storeNames, this.mode as 'readwrite' | 'readonly', { durability: 'relaxed' })
-        : idbdb.transaction(this.storeNames, this.mode, { durability: 'relaxed' })
+        ? this.db.core.transaction(this.storeNames, this.mode as 'readwrite' | 'readonly', { durability: this.chromeTransactionDurability })
+        : idbdb.transaction(this.storeNames, this.mode, { durability: this.chromeTransactionDurability })
       ) as IDBTransaction;
 
     idbtrans.onerror = wrap(ev => {
