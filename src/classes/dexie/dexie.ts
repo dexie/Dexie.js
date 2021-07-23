@@ -96,7 +96,6 @@ export class Dexie implements IDexie {
       // Default DOM dependency implementations from static prop.
       indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to browser env.
       IDBKeyRange: deps.IDBKeyRange,  // Backend IDBKeyRange api. Default to browser env.
-      chromeTransactionDurability: options?.chromeTransactionDurability || 'default', // Fall back on 'default' if not passed
       ...options,
     };
     this._deps = {
