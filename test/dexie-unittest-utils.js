@@ -126,6 +126,7 @@ export function deleteDatabase(db) {
 
 export const isIE = !(window.ActiveXObject) && "ActiveXObject" in window;
 export const isEdge = /Edge\/\d+/.test(navigator.userAgent);
+export const isChrome = !!window.chrome && (!!window.chrome.webstore || !!window.chrome.runtime);
 var hasPolyfillIE = [].slice.call(document.getElementsByTagName("script")).some(
     s => s.src.indexOf("idb-iegap") !== -1);
 
@@ -149,6 +150,8 @@ export function supports (features) {
                 }
             case "domevents":
                 return typeof window === 'object' && window.addEventListener;
+            case "transactiondurability":
+                return IDBTransaction.prototype.durability === 'default';
 
             default:
                 throw new Error ("Unknown feature: " + feature);
