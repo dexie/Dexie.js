@@ -17,15 +17,12 @@ export function connectWebSocket(db: DexieCloudDB) {
 
   function createObservable() {
     return createVisibilityStateObservable().pipe(
-      filter((visibilityState) => visibilityState === 'visible'),
-      switchMap(() => db.cloud.currentUser),
+      filter((visibilityState) => visibilityState === 'visible'), // Reconnect when it gets visible
+      switchMap(() => db.cloud.currentUser), // Reconnect whenever user changes
       filter(
-        (userLogin) =>
-          db.cloud.persistedSyncState?.value?.serverRevision &&
-          (!userLogin.accessToken || // Anonymous users can also subscribe to changes - OK.
-            !userLogin.accessTokenExpiration || // If no expiraction on access token - OK.
-            userLogin.accessTokenExpiration > new Date())
-      ), // If not expired - OK.
+        () =>
+          db.cloud.persistedSyncState?.value?.serverRevision
+      ), // Don't connect before there's no initial sync performed.
       switchMap(
         (userLogin) =>
           new WSObservable(
