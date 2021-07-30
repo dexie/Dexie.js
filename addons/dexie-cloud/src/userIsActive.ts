@@ -43,6 +43,8 @@ export const userDoesSomething =
 // to make it emit values to userIsActive BehaviourSubject (which is the
 // most important global hot observable we have here)
 //
+// Live test: https://jsitor.com/LboCDHgbn
+//
 merge(
   of(true), // Make sure something is always emitted from start
   documentBecomesHidden, // so that we can eagerly emit false!
