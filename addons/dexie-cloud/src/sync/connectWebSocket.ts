@@ -1,26 +1,21 @@
-import { DexieCloudDB } from '../db/DexieCloudDB';
-import { WSObservable } from '../WSObservable';
-import { FakeBigInt } from '../TSON';
-import { triggerSync } from './triggerSync';
+import { from, of } from 'rxjs';
 import {
   catchError,
+  delay,
   filter,
-  mergeMap,
-  skip,
   switchMap,
-  take,
-  timeout,
+  take
 } from 'rxjs/operators';
 import {
-  loadAccessToken,
-  refreshAccessToken,
+  refreshAccessToken
 } from '../authentication/authenticate';
-import { from, of, timer } from 'rxjs';
-import { createVisibilityStateObservable } from '../helpers/visibilityState';
+import { DexieCloudDB } from '../db/DexieCloudDB';
+import { FakeBigInt } from '../TSON';
 import {
-  userIsActive,
-  userDoesSomething,
+  userDoesSomething, userIsActive
 } from '../userIsActive';
+import { WSObservable } from '../WSObservable';
+import { triggerSync } from './triggerSync';
 
 export function connectWebSocket(db: DexieCloudDB) {
   if (!db.cloud.options?.databaseUrl) {
@@ -50,7 +45,9 @@ export function connectWebSocket(db: DexieCloudDB) {
               `WebSocket observable: error but revive when user does some active thing...`,
               error
             );
-            return userDoesSomething.pipe(
+            return of(true).pipe(
+              delay(3000), // Give us some breath between errors
+              switchMap(()=>userDoesSomething),
               take(1), // Don't reconnect whenever user does something
               switchMap(() => createObservable()) // Relaunch the flow
             );
