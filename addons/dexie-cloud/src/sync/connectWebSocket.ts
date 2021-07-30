@@ -2,13 +2,25 @@ import { DexieCloudDB } from '../db/DexieCloudDB';
 import { WSObservable } from '../WSObservable';
 import { FakeBigInt } from '../TSON';
 import { triggerSync } from './triggerSync';
-import { catchError, filter, mergeMap, switchMap } from 'rxjs/operators';
+import {
+  catchError,
+  filter,
+  mergeMap,
+  skip,
+  switchMap,
+  take,
+  timeout,
+} from 'rxjs/operators';
 import {
   loadAccessToken,
   refreshAccessToken,
 } from '../authentication/authenticate';
-import { from } from 'rxjs';
+import { from, of, timer } from 'rxjs';
 import { createVisibilityStateObservable } from '../helpers/visibilityState';
+import {
+  userIsActive,
+  userDoesSomething,
+} from '../userIsActive';
 
 export function connectWebSocket(db: DexieCloudDB) {
   if (!db.cloud.options?.databaseUrl) {
@@ -16,13 +28,10 @@ export function connectWebSocket(db: DexieCloudDB) {
   }
 
   function createObservable() {
-    return createVisibilityStateObservable().pipe(
-      filter((visibilityState) => visibilityState === 'visible'), // Reconnect when it gets visible
-      switchMap(() => db.cloud.currentUser), // Reconnect whenever user changes
-      filter(
-        () =>
-          db.cloud.persistedSyncState?.value?.serverRevision
-      ), // Don't connect before there's no initial sync performed.
+    return userIsActive.pipe(
+      filter((isActive) => isActive), // Reconnect when user becomes active
+      switchMap(() => db.cloud.currentUser), // Reconnect whenever current user changes
+      filter(() => db.cloud.persistedSyncState?.value?.serverRevision), // Don't connect before there's no initial sync performed.
       switchMap(
         (userLogin) =>
           new WSObservable(
@@ -33,9 +42,22 @@ export function connectWebSocket(db: DexieCloudDB) {
           )
       ),
       catchError((error) => {
-        return from(refreshToken()).pipe(switchMap(() => createObservable()));
+        return from(handleError(error)).pipe(
+          switchMap(() => createObservable()),
+          catchError((error) => {
+            // Failed to refresh token (network error or so)
+            console.error(
+              `WebSocket observable: error but revive when user does some active thing...`,
+              error
+            );
+            return userDoesSomething.pipe(
+              take(1), // Don't reconnect whenever user does something
+              switchMap(() => createObservable()) // Relaunch the flow
+            );
+          })
+        );
 
-        async function refreshToken() {
+        async function handleError(error: any) {
           if (error?.name === 'TokenExpiredError') {
             console.debug(
               'WebSocket observable: Token expired. Refreshing token...'
