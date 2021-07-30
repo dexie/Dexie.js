@@ -1,7 +1,6 @@
 import { Observable, Subscriber, Subscription } from 'rxjs';
 import { TokenExpiredError } from './authentication/TokenExpiredError';
 
-const USER_INACTIVITY_TIMEOUT = 300_000; // 300_000;
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;
 const FAIL_RETRY_WAIT_TIME = 60000;
@@ -76,7 +75,11 @@ export class WSConnection extends Subscription {
     subscriber: Subscriber<WSConnectionMsg>
   ) {
     super(() => this.teardown());
-    console.debug('New WebSocket Connection', this.id, token ? "authorized" : "unauthorized");
+    console.debug(
+      'New WebSocket Connection',
+      this.id,
+      token ? 'authorized' : 'unauthorized'
+    );
     this.databaseUrl = databaseUrl;
     this.rev = rev;
     this.token = token;
@@ -84,23 +87,11 @@ export class WSConnection extends Subscription {
     this.subscriber = subscriber;
     this.lastUserActivity = new Date();
     this.connect();
-    window.addEventListener('mousemove', this.onUserActive);
-    window.addEventListener('keydown', this.onUserActive);
-    window.addEventListener('wheel', this.onUserActive);
-    if (typeof document !== 'undefined') {
-      document.addEventListener('visibilitychange', this.onVisibilityChange);
-    }
   }
 
   private teardown() {
     this.disconnect();
     console.debug('Teardown WebSocket Connection', this.id);
-    window.removeEventListener('mousemove', this.onUserActive);
-    window.removeEventListener('keydown', this.onUserActive);
-    window.removeEventListener('wheel', this.onUserActive);
-    if (typeof document !== 'undefined') {
-      document.removeEventListener('visibilitychange', this.onVisibilityChange);
-    }
   }
 
   private disconnect() {
@@ -115,40 +106,6 @@ export class WSConnection extends Subscription {
     }
     this.ws = null;
   }
-
-  isUserActive() {
-    const inacivityTimeoutMoment = this.lastUserActivity?.getTime() + USER_INACTIVITY_TIMEOUT;
-    const now = Date.now();
-    const isUserActive = (
-      now < inacivityTimeoutMoment
-    );
-    console.debug("WebSocket: isUserActive", isUserActive);
-    return isUserActive;
-  }
-
-  private onVisibilityChange = () => {
-    if (document.visibilityState === "visible") {
-      this.onUserActive();
-    } else {
-      this.teardown();
-    }
-  }
-
-  private onUserActive = () => {
-    this.lastUserActivity = new Date();
-    if (!this.ws) {
-      if (this.databaseUrl) {
-        this.reconnect();
-      }
-    } else {
-      if (
-        this.lastPing < new Date(Date.now() - SERVER_PING_TIMEOUT) &&
-        this.lastServerActivity < this.lastPing
-      ) {
-        this.reconnect();
-      }
-    }
-  };
 
   reconnect() {
     this.disconnect();
@@ -172,52 +129,49 @@ export class WSConnection extends Subscription {
     }
     this.pinger = setInterval(async () => {
       if (this.closed) {
-        console.debug('pinger check', this.id, "CLOSED.");
+        console.debug('pinger check', this.id, 'CLOSED.');
         this.teardown();
         return;
       }
-      if (this.isUserActive()) {
-        console.debug('pinger check', this.id, "user is active");
-        if (this.ws) {
-          try {
-            this.ws.send(JSON.stringify({ type: 'ping' } as PingMessage));
-            setTimeout(() => {
-              console.debug('pinger setTimeout', this.id, this.pinger ? `alive` : 'dead');
-              if (!this.pinger) return;
-              if (this.closed) {
-                console.debug('pinger setTimeout', this.id, 'subscription is closed');
-                this.teardown();
-                return;
-              }
-              if (
-                this.lastServerActivity <
-                new Date(Date.now() - SERVER_PING_TIMEOUT)
-              ) {
-                // Server inactive. Reconnect if user is active.
-                console.debug('pinger: server is inactive');
-                if (this.isUserActive()) {
-                  console.debug('pinger reconnecting');
-                  this.reconnect();
-                } else {
-                  console.debug('pinger disconnecting');
-                  this.disconnect();
-                }
-              } else {
-                console.debug('pinger: server still active');
-              }
-            }, SERVER_PING_TIMEOUT);
-          } catch {
-            console.debug('pinger catch error', this.id, "reconnecting");
-            this.reconnect();
-          }
-        } else {
-          console.debug('pinger', this.id, "reconnecting");
+      console.debug('pinger check', this.id, 'user is active');
+      if (this.ws) {
+        try {
+          this.ws.send(JSON.stringify({ type: 'ping' } as PingMessage));
+          setTimeout(() => {
+            console.debug(
+              'pinger setTimeout',
+              this.id,
+              this.pinger ? `alive` : 'dead'
+            );
+            if (!this.pinger) return;
+            if (this.closed) {
+              console.debug(
+                'pinger setTimeout',
+                this.id,
+                'subscription is closed'
+              );
+              this.teardown();
+              return;
+            }
+            if (
+              this.lastServerActivity <
+              new Date(Date.now() - SERVER_PING_TIMEOUT)
+            ) {
+              // Server inactive. Reconnect if user is active.
+              console.debug('pinger: server is inactive');
+              console.debug('pinger reconnecting');
+              this.reconnect();
+            } else {
+              console.debug('pinger: server still active');
+            }
+          }, SERVER_PING_TIMEOUT);
+        } catch {
+          console.debug('pinger catch error', this.id, 'reconnecting');
           this.reconnect();
         }
       } else {
-        // User not active
-        this.disconnect();
-        console.debug('pinger check', this.id, "user not active");
+        console.debug('pinger', this.id, 'reconnecting');
+        this.reconnect();
       }
     }, CLIENT_PING_INTERVAL);
 
@@ -237,16 +191,15 @@ export class WSConnection extends Subscription {
     //ws.binaryType = "arraybuffer"; // For future when subscribing to actual changes.
 
     ws.onclose = (event: Event) => {
+      if (!this.pinger) return;
       console.debug('dexie-cloud WebSocket onclosed');
-      if (this.isUserActive()) {
-        this.reconnect();
-      } else {
-        this.disconnect();
-      }
+      this.reconnect();
     };
 
     ws.onmessage = (event: MessageEvent) => {
+      if (!this.pinger) return;
       console.debug('dexie-cloud WebSocket onmessage', event.data);
+      
       this.lastServerActivity = new Date();
       try {
         const msg = JSON.parse(event.data) as
