@@ -1,6 +1,6 @@
 {
-  "short_name": "Dexie Cloud ToDo App",
-  "name": "ToDo App developed with Dexie Cloud, https://dexie.cloud",
+  "short_name": "DexieCloudToDo",
+  "name": "Dexie Cloud ToDo Sample App",
   "icons": [
     {
       "src": "dexie-icon-64x64.gif",
