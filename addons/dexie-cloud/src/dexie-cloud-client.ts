@@ -237,7 +237,7 @@ export function dexieCloud(dexie: Dexie) {
               swRegistrations.length === 0
                 ? 'No SW registrations found.'
                 : 'serviceWorker' in navigator && DISABLE_SERVICEWORKER_STRATEGY
-                ? "Avoiding Safari crash triggered by dexie-cloud's service worker."
+                ? "Avoiding SW background sync and SW periodic bg sync for this browser due to browser bugs."
                 : 'navigator.serviceWorker not present'
             );
           }
