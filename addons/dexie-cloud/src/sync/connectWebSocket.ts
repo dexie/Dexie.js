@@ -1,14 +1,21 @@
-import { DexieCloudDB } from '../db/DexieCloudDB';
-import { WSObservable } from '../WSObservable';
-import { FakeBigInt } from '../TSON';
-import { triggerSync } from './triggerSync';
-import { catchError, filter, mergeMap, switchMap } from 'rxjs/operators';
+import { from, of } from 'rxjs';
 import {
-  loadAccessToken,
-  refreshAccessToken,
+  catchError,
+  delay,
+  filter,
+  switchMap,
+  take
+} from 'rxjs/operators';
+import {
+  refreshAccessToken
 } from '../authentication/authenticate';
-import { from } from 'rxjs';
-import { createVisibilityStateObservable } from '../helpers/visibilityState';
+import { DexieCloudDB } from '../db/DexieCloudDB';
+import { FakeBigInt } from '../TSON';
+import {
+  userDoesSomething, userIsActive
+} from '../userIsActive';
+import { WSObservable } from '../WSObservable';
+import { triggerSync } from './triggerSync';
 
 export function connectWebSocket(db: DexieCloudDB) {
   if (!db.cloud.options?.databaseUrl) {
@@ -16,16 +23,10 @@ export function connectWebSocket(db: DexieCloudDB) {
   }
 
   function createObservable() {
-    return createVisibilityStateObservable().pipe(
-      filter((visibilityState) => visibilityState === 'visible'),
-      switchMap(() => db.cloud.currentUser),
-      filter(
-        (userLogin) =>
-          db.cloud.persistedSyncState?.value?.serverRevision &&
-          (!userLogin.accessToken || // Anonymous users can also subscribe to changes - OK.
-            !userLogin.accessTokenExpiration || // If no expiraction on access token - OK.
-            userLogin.accessTokenExpiration > new Date())
-      ), // If not expired - OK.
+    return userIsActive.pipe(
+      filter((isActive) => isActive), // Reconnect when user becomes active
+      switchMap(() => db.cloud.currentUser), // Reconnect whenever current user changes
+      filter(() => db.cloud.persistedSyncState?.value?.serverRevision), // Don't connect before there's no initial sync performed.
       switchMap(
         (userLogin) =>
           new WSObservable(
@@ -36,9 +37,24 @@ export function connectWebSocket(db: DexieCloudDB) {
           )
       ),
       catchError((error) => {
-        return from(refreshToken()).pipe(switchMap(() => createObservable()));
+        return from(handleError(error)).pipe(
+          switchMap(() => createObservable()),
+          catchError((error) => {
+            // Failed to refresh token (network error or so)
+            console.error(
+              `WebSocket observable: error but revive when user does some active thing...`,
+              error
+            );
+            return of(true).pipe(
+              delay(3000), // Give us some breath between errors
+              switchMap(()=>userDoesSomething),
+              take(1), // Don't reconnect whenever user does something
+              switchMap(() => createObservable()) // Relaunch the flow
+            );
+          })
+        );
 
-        async function refreshToken() {
+        async function handleError(error: any) {
           if (error?.name === 'TokenExpiredError') {
             console.debug(
               'WebSocket observable: Token expired. Refreshing token...'
