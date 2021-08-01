@@ -324,14 +324,6 @@ export function dexieCloud(dexie: Dexie) {
     // Listen to online event and do sync.
     throwIfClosed();
     if (!IS_SERVICE_WORKER) {
-      if (typeof document !== 'undefined') {
-        subscriptions.push(
-          fromEvent(document, 'visibilitychange').subscribe(()=>{
-            const {visibilityState} = document;
-            
-          })
-        );
-      }
       subscriptions.push(
         fromEvent(self, 'online').subscribe(() => {
           console.debug('online!');
