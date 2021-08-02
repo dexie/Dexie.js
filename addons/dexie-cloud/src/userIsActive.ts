@@ -28,7 +28,7 @@ export const documentBecomesVisible = visibilityStateIsChanged.pipe(
 
 // Any of various user-activity-related events happen:
 export const userDoesSomething =
-  typeof window !== undefined
+  typeof window !== 'undefined'
     ? merge(
         documentBecomesVisible,
         fromEvent(window, 'mousemove'),
