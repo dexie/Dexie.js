@@ -20,7 +20,11 @@ asyncTest("Transaction should use relaxed durability if specified", function() {
 
     const db = setupDb('relaxed')
     db.transaction('rw', db.users, trans => {
-        ok(trans.idbtrans.durability === 'relaxed', "Transaction has relaxed durability");
+        if (trans.idbtrans.durability === void 0) {
+            ok(true, "This version of Chromium does not support transaction durability");
+        } else {
+            ok(trans.idbtrans.durability === 'relaxed', "Transaction has relaxed durability");
+        }
     }).catch(function (err) {
         ok(false, err);
     }).finally(function () {
@@ -40,7 +44,11 @@ asyncTest("Transaction should use strict durability if specified", function() {
 
     const db = setupDb('strict')
     db.transaction('rw', db.users, trans => {
-        ok(trans.idbtrans.durability === 'strict', "Transaction has strict durability");
+        if (trans.idbtrans.durability === void 0) {
+            ok(true, "This version of Chromium does not support transaction durability");
+        } else {
+            ok(trans.idbtrans.durability === 'strict', "Transaction has strict durability");
+        }
     }).catch(function (err) {
         ok(false, err);
     }).finally(function () {
@@ -60,7 +68,11 @@ asyncTest("Transaction should use default durability if not specified", function
 
     const db = setupDb()
     db.transaction('rw', db.users, trans => {
-        ok(trans.idbtrans.durability === 'default', "Transaction has default durability");
+        if (trans.idbtrans.durability === void 0) {
+            ok(true, "This version of Chromium does not support transaction durability");
+        } else {
+            ok(trans.idbtrans.durability === 'default', "Transaction has default durability");
+        }
     }).catch(function (err) {
         ok(false, err);
     }).finally(function () {
