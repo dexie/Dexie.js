@@ -13,7 +13,7 @@ module("chrome-transaction-durability", {
 
 asyncTest("Transaction should use relaxed durability if specified", function() {
     if (!isChrome) {
-        ok(true, "This browser does not Chrome transaction durability");
+        ok(true, "This browser does not support Chrome transaction durability");
         start();
         return;
     }
@@ -33,7 +33,7 @@ asyncTest("Transaction should use relaxed durability if specified", function() {
 
 asyncTest("Transaction should use strict durability if specified", function() {
     if (!isChrome) {
-        ok(true, "This browser does not Chrome transaction durability");
+        ok(true, "This browser does not support Chrome transaction durability");
         start();
         return;
     }
@@ -53,7 +53,7 @@ asyncTest("Transaction should use strict durability if specified", function() {
 
 asyncTest("Transaction should use default durability if not specified", function() {
     if (!isChrome) {
-        ok(true, "This browser does not Chrome transaction durability");
+        ok(true, "This browser does not support Chrome transaction durability");
         start();
         return;
     }
