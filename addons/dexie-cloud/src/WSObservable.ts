@@ -133,7 +133,6 @@ export class WSConnection extends Subscription {
         this.teardown();
         return;
       }
-      console.debug('pinger check', this.id, 'user is active');
       if (this.ws) {
         try {
           this.ws.send(JSON.stringify({ type: 'ping' } as PingMessage));
