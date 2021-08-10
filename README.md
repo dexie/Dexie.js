@@ -268,5 +268,6 @@ npm run watch
 ```
 
 
+
 [npm-image]: https://img.shields.io/npm/v/dexie.svg?style=flat
 [npm-url]: https://npmjs.org/package/dexie
