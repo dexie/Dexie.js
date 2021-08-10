@@ -1,3 +1,4 @@
+import { DBOperationsSet } from 'dexie-cloud-common';
 import { Observable, Subscriber, Subscription } from 'rxjs';
 import { TokenExpiredError } from './authentication/TokenExpiredError';
 
@@ -8,7 +9,8 @@ const FAIL_RETRY_WAIT_TIME = 60000;
 export type WSConnectionMsg =
   | RevisionChangedMessage
   | RealmAddedMessage
-  | RealmRemovedMessage;
+  | RealmRemovedMessage
+  | ChangesFromServerMessage;
 interface PingMessage {
   type: 'ping';
 }
@@ -20,6 +22,13 @@ interface PongMessage {
 interface ErrorMessage {
   type: 'error';
   error: string;
+}
+
+export interface ChangesFromServerMessage {
+  type: 'changes';
+  baseRev: string;
+  newRev: string;
+  changes: DBOperationsSet;
 }
 export interface RevisionChangedMessage {
   type: 'rev';
