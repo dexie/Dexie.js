@@ -10,8 +10,10 @@ export async function registerSyncEvent(db: DexieCloudDB) {
     const sw = await navigator.serviceWorker.ready;
     if (sw.sync) {
       await sw.sync.register(`dexie-cloud:${db.name}`);
-    } else if (sw.active) {
-      // Fallback to postMessage (Firefox, Safari):
+    }
+    if (sw.active) {
+      // Fallback to postMessage (Firefox, Safari). Also chromium based
+      // browsers with sw.sync as a fallback for sleepy sync events not taking action for a while.
       sw.active.postMessage({
         type: 'dexie-cloud-sync',
         dbName: db.name

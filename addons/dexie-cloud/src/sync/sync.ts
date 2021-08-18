@@ -24,7 +24,6 @@ import {
 import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import { isOnline } from './isOnline';
 
-export const isSyncing = new WeakSet<DexieCloudDB>();
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 
 /*
