@@ -54,6 +54,7 @@ export interface SyncOptions {
   cancelToken?: { cancelled: boolean };
   justCheckIfNeeded?: boolean;
   retryImmediatelyOnFetchError?: boolean;
+  purpose?: 'pull' | 'push';
 }
 
 export function sync(
@@ -86,7 +87,7 @@ export function sync(
       ) {
         db.syncStateChangedEvent.next({
           phase: 'error',
-          error
+          error,
         });
         // Retry again in 500 ms but if it fails again, don't retry.
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -103,7 +104,7 @@ export function sync(
       });
       db.syncStateChangedEvent.next({
         phase: isOnline ? 'error' : 'offline',
-        error
+        error,
       });
       return Promise.reject(error);
     });
@@ -113,7 +114,7 @@ async function _sync(
   db: DexieCloudDB,
   options: DexieCloudOptions,
   schema: DexieCloudSchema,
-  { isInitialSync, cancelToken, justCheckIfNeeded }: SyncOptions = {
+  { isInitialSync, cancelToken, justCheckIfNeeded, purpose }: SyncOptions = {
     isInitialSync: false,
   }
 ): Promise<boolean> {
@@ -188,12 +189,16 @@ async function _sync(
     }
   );
 
+  const syncIsNeeded = clientChangeSet.some((set) =>
+    set.muts.some((mut) => mut.keys.length > 0)
+  );
   if (justCheckIfNeeded) {
-    const syncIsNeeded = clientChangeSet.some((set) =>
-      set.muts.some((mut) => mut.keys.length > 0)
-    );
     console.debug('Sync is needed:', syncIsNeeded);
     return syncIsNeeded;
+  }
+  if (purpose === "push" && !syncIsNeeded) {
+    // The purpose of this request was to push changes
+    return false;
   }
 
   const latestRevisions = getLatestRevisionsPerTable(

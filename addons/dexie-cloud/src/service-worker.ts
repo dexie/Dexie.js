@@ -16,27 +16,28 @@ function getDbNameFromTag(tag: string) {
 
 const syncDBSemaphore = new Map<string, Promise<void>>();
 
-function syncDB(dbName: string) {
+function syncDB(dbName: string, purpose: 'push' | 'pull') {
   // We're taking hight for being double-signalled both
   // via message event and sync event.
   // Which one comes first doesnt matter, just
   // that we return the existing promise if there is
   // an ongoing sync.
-  let promise = syncDBSemaphore.get(dbName);
+  let promise = syncDBSemaphore.get(dbName + '/' + purpose);
   if (!promise) {
-    promise = _syncDB(dbName)
-      .then(() => { // When legacy enough across browsers, use .finally() instead of then() and catch():
-        syncDBSemaphore.delete(dbName);
+    promise = _syncDB(dbName, purpose)
+      .then(() => {
+        // When legacy enough across browsers, use .finally() instead of then() and catch():
+        syncDBSemaphore.delete(dbName + '/' + purpose);
       })
       .catch((error) => {
-        syncDBSemaphore.delete(dbName);
+        syncDBSemaphore.delete(dbName + '/' + purpose);
         return Promise.reject(error);
       });
-    syncDBSemaphore.set(dbName, promise);
+    syncDBSemaphore.set(dbName + '/' + purpose, promise);
   }
   return promise;
 
-  async function _syncDB(dbName: string) {
+  async function _syncDB(dbName: string, purpose: 'push' | 'pull') {
     let db = managedDBs.get(dbName);
 
     if (!db) {
@@ -73,6 +74,7 @@ function syncDB(dbName: string) {
       console.debug('Dexie Cloud SW: Syncing');
       await syncIfPossible(db, db.cloud.options, db.cloud.schema, {
         retryImmediatelyOnFetchError: true,
+        purpose,
       });
       console.debug('Dexie Cloud SW: Done Syncing');
     } catch (e) {
@@ -94,7 +96,7 @@ if (!DISABLE_SERVICEWORKER_STRATEGY) {
     console.debug('SW "sync" Event', event.tag);
     const dbName = getDbNameFromTag(event.tag);
     if (dbName) {
-      event.waitUntil(syncDB(dbName));
+      event.waitUntil(syncDB(dbName, "push"));
     }
   });
 
@@ -102,7 +104,7 @@ if (!DISABLE_SERVICEWORKER_STRATEGY) {
     console.debug('SW "periodicsync" Event', event.tag);
     const dbName = getDbNameFromTag(event.tag);
     if (dbName) {
-      event.waitUntil(syncDB(dbName));
+      event.waitUntil(syncDB(dbName, "pull"));
     }
   });
 
@@ -113,7 +115,7 @@ if (!DISABLE_SERVICEWORKER_STRATEGY) {
       // Mimic background sync behavior - retry in X minutes on failure.
       // But lesser timeout and more number of times.
       const syncAndRetry = (num = 1) => {
-        return syncDB(dbName).catch(async (e) => {
+        return syncDB(dbName, "push").catch(async (e) => {
           if (num === 3) throw e;
           await sleep(60_000); // 1 minute
           syncAndRetry(num + 1);
