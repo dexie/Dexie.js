@@ -622,6 +622,10 @@ asyncTest("Promise chain from within each() operation", 2, function () {
 });
 
 promisedTest("Issue 1381: Collection.filter().primaryKeys() on virtual index", async () => {
+    if (!supports("compound")) {
+        ok(true, "Skipping this test as the browser does not support compound indexes");
+        return;
+    }
     // The original repro: https://jsitor.com/qPJXVESEcb failed when using Collection.delete().
     // Debugging it led me to that there is a general problem with virtual cursor's primaryKey property.
     // So that's what we're testing here:
