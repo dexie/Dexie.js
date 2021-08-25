@@ -151,6 +151,11 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
                   cursor.continuePrimaryKey(pad(key, down.MAX_KEY, keyTail), primaryKey);
                 }
               },
+              primaryKey: {
+                get() {
+                  return cursor.primaryKey;
+                }
+              },
               key: {
                 get() {
                   const key = cursor.key as any[]; // A virtual cursor always operates on compound key
