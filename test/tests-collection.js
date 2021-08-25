@@ -3,7 +3,7 @@ import {module, stop, start, test, asyncTest, equal, ok} from 'QUnit';
 import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBCollection");
-db.version(1).stores({ users: "id,first,last,&username,*&email,*pets" });
+db.version(1).stores({ users: "id,first,last,[foo+bar],&username,*&email,*pets" });
 
 var User = db.users.defineClass({
     id:         Number,
@@ -619,4 +619,14 @@ asyncTest("Promise chain from within each() operation", 2, function () {
     }).catch(function(err) {
         ok(false, err.stack || err);
     }).finally(start);
+});
+
+promisedTest("Issue 1381: Collection.filter().primaryKeys() on virtual index", async () => {
+    // The original repro: https://jsitor.com/qPJXVESEcb failed when using Collection.delete().
+    // Debugging it led me to that there is a general problem with virtual cursor's primaryKey property.
+    // So that's what we're testing here:
+    await db.users.add({id: 1000, foo: "A", bar: "B"});
+    const ids = await db.users.where({foo: "A"}).filter(x => true).primaryKeys();
+    ok(ids.length === 1, "Theres one id there");
+    equal(ids[0], 1000, "The ID is 1000");
 });
