@@ -1,13 +1,17 @@
-import { globalEvents } from "../globals/global-events";
-import { propagateLocally, propagatingLocally } from "./propagate-locally";
+import {
+  globalEvents,
+  STORAGE_MUTATED_DOM_EVENT_NAME,
+  DEXIE_STORAGE_MUTATED_EVENT_NAME,
+} from '../globals/global-events';
+import { propagateLocally, propagatingLocally } from './propagate-locally';
 
-if (typeof BroadcastChannel !== "undefined") {
-  const bc = new BroadcastChannel("dexie-txcommitted");
+if (typeof BroadcastChannel !== 'undefined') {
+  const bc = new BroadcastChannel(STORAGE_MUTATED_DOM_EVENT_NAME);
 
   //
   // Propagate local changes to remote tabs, windows and workers via BroadcastChannel
   //
-  globalEvents("txcommitted", (changedParts) => {
+  globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, (changedParts) => {
     if (!propagatingLocally) {
       bc.postMessage(changedParts);
     }
@@ -19,36 +23,36 @@ if (typeof BroadcastChannel !== "undefined") {
   bc.onmessage = (ev) => {
     if (ev.data) propagateLocally(ev.data);
   };
-} else if (typeof self !== "undefined" && typeof navigator !== "undefined") {
+} else if (typeof self !== 'undefined' && typeof navigator !== 'undefined') {
   // DOM verified - when typeof self !== "undefined", we are a window or worker. Not a Node process.
-  
+
   //
   // Propagate local changes to remote tabs/windows via storage event and service worker
   // via messages. We have this code here because of https://bugs.webkit.org/show_bug.cgi?id=161472.
   //
-  globalEvents("txcommitted", (changedParts) => {
+  globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, (changedParts) => {
     try {
       if (!propagatingLocally) {
-        if (typeof localStorage !== "undefined") {
+        if (typeof localStorage !== 'undefined') {
           // We're a browsing window or tab. Propagate to other windows/tabs via storage event:
           localStorage.setItem(
-            "dexie-txcommitted",
+            STORAGE_MUTATED_DOM_EVENT_NAME,
             JSON.stringify({
               trig: Math.random(),
               changedParts,
             })
           );
         }
-        if (typeof self["clients"] === "object") {
+        if (typeof self['clients'] === 'object') {
           // We're a service worker. Propagate to our browser clients.
-          [...self["clients"].matchAll({ includeUncontrolled: true })].forEach(
+          [...self['clients'].matchAll({ includeUncontrolled: true })].forEach(
             (client) =>
               client.postMessage({
-                type: "dexie-txcommitted",
+                type: STORAGE_MUTATED_DOM_EVENT_NAME,
                 changedParts,
               })
           );
-        }        
+        }
       }
     } catch {}
   });
@@ -56,13 +60,12 @@ if (typeof BroadcastChannel !== "undefined") {
   //
   // Propagate remote changes locally via storage event:
   //
-  addEventListener("storage", (ev: StorageEvent) => {
-    if (ev.key === "dexie-txcommitted") {
+  addEventListener('storage', (ev: StorageEvent) => {
+    if (ev.key === STORAGE_MUTATED_DOM_EVENT_NAME) {
       const data = JSON.parse(ev.newValue);
       if (data) propagateLocally(data.changedParts);
     }
   });
-
 
   //
   // Propagate messages from service worker
@@ -74,8 +77,8 @@ if (typeof BroadcastChannel !== "undefined") {
   }
 }
 
-function propagateMessageLocally({data}: MessageEvent) {
-  if (data && data.type === "dexie-txcommitted") {
+function propagateMessageLocally({ data }: MessageEvent) {
+  if (data && data.type === STORAGE_MUTATED_DOM_EVENT_NAME) {
     propagateLocally(data.changedParts);
   }
 }

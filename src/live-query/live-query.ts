@@ -1,5 +1,5 @@
 import { isAsyncFunction, keys } from "../functions/utils";
-import { globalEvents } from "../globals/global-events";
+import { globalEvents, DEXIE_STORAGE_MUTATED_EVENT_NAME } from "../globals/global-events";
 import {
   decrementExpectedAwaits,
   incrementExpectedAwaits,
@@ -48,7 +48,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       },
       unsubscribe: () => {
         closed = true;
-        globalEvents.txcommitted.unsubscribe(mutationListener);
+        globalEvents.storagemutated.unsubscribe(mutationListener);
       },
     };
 
@@ -77,7 +77,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       const subscr: ObservabilitySet = {};
       const ret = execute(subscr);
       if (!startedListening) {
-        globalEvents("txcommitted", mutationListener);
+        globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
         startedListening = true;
       }
       querying = true;
