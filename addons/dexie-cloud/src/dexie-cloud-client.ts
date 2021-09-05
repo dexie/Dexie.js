@@ -1,7 +1,7 @@
 import Dexie, { liveQuery, Subscription } from 'dexie';
 import { getDbNameFromDbUrl } from 'dexie-cloud-common';
-import { BehaviorSubject, from, fromEvent } from 'rxjs';
-import { filter, take } from 'rxjs/operators';
+import { BehaviorSubject, combineLatest, from, fromEvent } from 'rxjs';
+import { filter, map, startWith, switchMap, take } from 'rxjs/operators';
 import { login } from './authentication/login';
 import { UNAUTHORIZED_USER } from './authentication/UNAUTHORIZED_USER';
 import { DexieCloudDB } from './db/DexieCloudDB';
@@ -32,6 +32,8 @@ import { SyncState } from './types/SyncState';
 import { updateSchemaFromOptions } from './updateSchemaFromOptions';
 import { verifySchema } from './verifySchema';
 import { setupDefaultGUI } from './default-ui';
+import { DXCWebSocketStatus } from './DXCWebSocketStatus';
+import { computeSyncState } from './computeSyncState';
 
 export { DexieCloudTable } from './extend-dexie-interface';
 
@@ -81,13 +83,17 @@ export function dexieCloud(dexie: Dexie) {
       return currentUserEmitter.value.userId || UNAUTHORIZED_USER.userId!;
     },
     currentUser: currentUserEmitter,
-    syncState: new BehaviorSubject<SyncState>({ phase: 'initial' }),
+    syncState: new BehaviorSubject<SyncState>({
+      phase: 'initial',
+      status: 'not-started',
+    }),
     persistedSyncState: new BehaviorSubject<PersistedSyncState | undefined>(
       undefined
     ),
     userInteraction: new BehaviorSubject<DXCUserInteraction | undefined>(
       undefined
     ),
+    webSocketStatus: new BehaviorSubject<DXCWebSocketStatus>('not-started'),
     async login(hint) {
       const db = DexieCloudDB(dexie);
       await db.cloud.sync();
@@ -179,9 +185,7 @@ export function dexieCloud(dexie: Dexie) {
       if (!db.cloud.options?.customLoginGui) {
         subscriptions.push(setupDefaultGUI(dexie));
       }
-      subscriptions.push(
-        db.syncStateChangedEvent.subscribe(dexie.cloud.syncState)
-      );
+      subscriptions.push(computeSyncState(db).subscribe(dexie.cloud.syncState));
     }
 
     //verifyConfig(db.cloud.options); Not needed (yet at least!)
@@ -237,7 +241,7 @@ export function dexieCloud(dexie: Dexie) {
               swRegistrations.length === 0
                 ? 'No SW registrations found.'
                 : 'serviceWorker' in navigator && DISABLE_SERVICEWORKER_STRATEGY
-                ? "Avoiding SW background sync and SW periodic bg sync for this browser due to browser bugs."
+                ? 'Avoiding SW background sync and SW periodic bg sync for this browser due to browser bugs.'
                 : 'navigator.serviceWorker not present'
             );
           }

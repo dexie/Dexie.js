@@ -17,12 +17,15 @@ import {
   DBKeyMutationSet,
   DBOperationsSet,
   DexieCloudSchema,
+  randomString,
   subtractChanges,
   SyncResponse,
   toDBOperationSet,
 } from 'dexie-cloud-common';
 import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import { isOnline } from './isOnline';
+import { updateBaseRevs } from './updateBaseRevs';
+import { getLatestRevisionsPerTable } from './getLatestRevisionsPerTable';
 
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 
@@ -206,6 +209,8 @@ async function _sync(
     syncState?.latestRevisions
   );
 
+  const clientIdentity = syncState?.clientIdentity || randomString(16);
+
   //
   // Push changes to server
   //
@@ -216,7 +221,8 @@ async function _sync(
     baseRevs,
     db,
     databaseUrl,
-    schema
+    schema,
+    clientIdentity
   );
   console.debug('Sync response', res);
 
@@ -308,19 +314,7 @@ async function _sync(
     // The purpose of this operation is to mark a start revision (per table)
     // so that all client-mutations that come after this, will be mapped to current
     // server revision.
-    await db.$baseRevs.bulkPut(
-      Object.keys(schema)
-        .filter((table) => schema[table].markedForSync)
-        .map((tableName) => {
-          const lastClientRevOnPreviousServerRev =
-            latestRevisions[tableName] || 0;
-          return {
-            tableName,
-            clientRev: lastClientRevOnPreviousServerRev + 1,
-            serverRev: res.serverRevision,
-          };
-        })
-    );
+    await updateBaseRevs(db, schema, latestRevisions, res.serverRevision);
 
     const syncState = await db.getPersistedSyncState();
 
@@ -332,11 +326,12 @@ async function _sync(
     //
     // Update syncState
     //
-    const newSyncState = syncState || {
+    const newSyncState: PersistedSyncState = syncState || {
       syncedTables: [],
       latestRevisions: {},
       realms: [],
       inviteRealms: [],
+      clientIdentity
     };
     newSyncState.syncedTables = tablesToSync
       .map((tbl) => tbl.name)
@@ -409,17 +404,6 @@ async function deleteObjectsFromRemovedRealms(
       }
     }
   }
-}
-
-function getLatestRevisionsPerTable(
-  clientChangeSet: DBOperationsSet,
-  lastRevisions = {} as { [table: string]: number }
-) {
-  for (const { table, muts } of clientChangeSet) {
-    const lastRev = muts.length > 0 ? muts[muts.length - 1].rev || 0 : 0;
-    lastRevisions[table] = lastRev;
-  }
-  return lastRevisions;
 }
 
 export async function applyServerChanges(

@@ -5,6 +5,7 @@ export interface PersistedSyncState {
   };
   realms: string[];
   inviteRealms: string[];
+  clientIdentity: string;
   initiallySynced?: boolean;
   remoteDbId?: string;
   syncedTables: string[];

@@ -21,7 +21,7 @@ export function AddTodoItem({ todoList }: Props) {
       <div className="todo-item-input">
         <input
           type="text"
-          placeholder="Add todo item..."
+          placeholder="Add todo item 2..."
           value={item.title}
           onChange={ev =>
             setItem(item => ({

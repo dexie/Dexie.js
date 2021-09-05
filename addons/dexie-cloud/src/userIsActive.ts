@@ -1,10 +1,25 @@
 import { BehaviorSubject, fromEvent, merge, of } from 'rxjs';
-import { delay, filter, map, skip, switchMap, tap } from 'rxjs/operators';
+import {
+  debounceTime,
+  delay,
+  distinctUntilChanged,
+  filter,
+  map,
+  skip,
+  switchMap,
+  tap,
+} from 'rxjs/operators';
 
 const USER_INACTIVITY_TIMEOUT = 300_000; // 300_000;
 
 // This observable will be emitted to later down....
 export const userIsActive = new BehaviorSubject<boolean>(true);
+export const userIsReallyActive = userIsActive.pipe(
+  debounceTime(500),
+  distinctUntilChanged()
+);
+
+userIsReallyActive.subscribe((a) => console.debug('userIsActive became', a));
 
 //
 // First create some corner-stone observables to build the flow on

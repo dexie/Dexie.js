@@ -19,16 +19,26 @@ import { TypeDefSet } from 'dreambase-library/dist/typeson-simplified/TypeDefSet
 //     serverRev.rev = bigIntDef.bigint.revive(server.rev)
 //   else
 //     serverRev.rev = new FakeBigInt(server.rev)
-export const hasBigIntSupport = typeof BigInt !== 'undefined';
+export const hasBigIntSupport = typeof BigInt(0) === 'bigint';
 
+function getValueOfBigInt(x: bigint | FakeBigInt | string) {
+  if (typeof x === 'bigint') {
+    return x;
+  }
+  if (hasBigIntSupport) {
+    return typeof x === 'string' ? BigInt(x) : BigInt(x.v);
+  } else {
+    return typeof x === 'string' ? Number(x) : Number(x.v);
+  }
+}
+
+export function compareBigInts(a: bigint | FakeBigInt | string, b:bigint | FakeBigInt | string) {
+  const valA = getValueOfBigInt(a);
+  const valB = getValueOfBigInt(b);
+  return valA < valB ? -1 : valA > valB ? 1 : 0;
+}
 export class FakeBigInt {
   v: string;
-  static compare(a: bigint | FakeBigInt, b:bigint | FakeBigInt) {
-    if (typeof a === "bigint") return a < b ? -1 : a > b ? 1 : 0;
-    if (typeof b === "bigint") throw new TypeError("Can't compare real bigint with FakeBigInt");
-    // Here, we can only compare in best effort.
-    return Number(a) < Number(b) ? -1 : Number(a) > Number(b) ? 1 : 0;
-  }
   toString() {
     return this.v;
   }

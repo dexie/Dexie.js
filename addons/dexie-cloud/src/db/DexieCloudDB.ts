@@ -16,7 +16,8 @@ import {
   DexieCloudSchema,
 } from 'dexie-cloud-common';
 import { BroadcastedAndLocalEvent } from '../helpers/BroadcastedAndLocalEvent';
-import { SyncState } from '../types/SyncState';
+import { SyncState, SyncStatePhase } from '../types/SyncState';
+import { MessagesFromServerConsumer } from '../sync/messagesFromServerQueue';
 
 /*export interface DexieCloudDB extends Dexie {
   table(name: string): Table<any, any>;
@@ -26,6 +27,12 @@ import { SyncState } from '../types/SyncState';
   //table(name: "$pendingChangesFromServer"): Table<DBOperationsSet, number>;
 }
 */
+
+export interface SyncStateChangedEventData {
+  phase: SyncStatePhase;
+  error?: Error;
+  progress?: number;
+}
 
 type SyncStateTable = Table<
   PersistedSyncState | DexieCloudSchema | DexieCloudOptions,
@@ -48,7 +55,7 @@ export interface DexieCloudDBBase {
   readonly roles: Table<DBRealmRole, [string, string]>;
 
   readonly localSyncEvent: BehaviorSubject<any>;
-  readonly syncStateChangedEvent: BroadcastedAndLocalEvent<SyncState>;
+  readonly syncStateChangedEvent: BroadcastedAndLocalEvent<SyncStateChangedEventData>;
   readonly dx: Dexie;
   readonly initiallySynced: boolean;
 }
@@ -60,6 +67,7 @@ export interface DexieCloudDB extends DexieCloudDBBase {
   getPersistedSyncState(): Promise<PersistedSyncState | undefined>;
   setInitiallySynced(initiallySynced: boolean): void;
   reconfigure(): void;
+  messageConsumer: MessagesFromServerConsumer;
 }
 
 const wm = new WeakMap<object, DexieCloudDB>();
@@ -80,7 +88,7 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
   let db = wm.get(dx.cloud);
   if (!db) {
     const localSyncEvent = new BehaviorSubject({});
-    let syncStateChangedEvent = new BroadcastedAndLocalEvent<SyncState>(
+    let syncStateChangedEvent = new BroadcastedAndLocalEvent<SyncStateChangedEventData>(
       `syncstatechanged-${dx.name}`
     );
     localSyncEvent['id'] = ++static_counter;
@@ -163,10 +171,11 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
         syncStateChangedEvent = new BroadcastedAndLocalEvent<SyncState>(
           `syncstatechanged-${dx.name}`
         );
-      }
+      },
     };
 
     Object.assign(db, helperMethods);
+    db.messageConsumer = MessagesFromServerConsumer(db);
     wm.set(dx.cloud, db);
   }
   return db;
