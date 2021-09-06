@@ -115,11 +115,17 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
               console.debug('ws message queue: in transaction');
               // Verify again in ACID tx that we're on same server revision.
               if (!syncState || !schema || !currentUser) {
-                console.debug('required vars not present', {syncState, schema, currentUser});
+                console.debug('required vars not present', {
+                  syncState,
+                  schema,
+                  currentUser,
+                });
                 return; // Initial sync must have taken place - otherwise, ignore this.
               }
               if (compareBigInts(msg.baseRev, syncState.serverRevision) > 0) {
-                console.debug(`baseRev (${msg.baseRev}) greater than our serverRevision in syncState (${syncState.serverRevision})`)
+                console.debug(
+                  `baseRev (${msg.baseRev}) greater than our serverRevision in syncState (${syncState.serverRevision})`
+                );
                 return; // Ignore message (is old)
               }
               // Verify also that the message is based on the exact same set of realms
@@ -165,7 +171,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
                 clientChanges,
                 syncState.latestRevisions
               );
-              syncState.serverRevision = msg.newRev; 
+              syncState.serverRevision = msg.newRev;
 
               // Update base revs
               console.debug('Updating baseRefs', syncState.latestRevisions);
@@ -193,6 +199,6 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
 
   return {
     enqueue,
-    readyToServe
+    readyToServe,
   };
 }

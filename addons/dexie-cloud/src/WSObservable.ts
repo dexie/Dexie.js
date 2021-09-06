@@ -264,7 +264,7 @@ export class WSConnection extends Subscription {
           | PongMessage
           | ErrorMessage;
         if (msg.type === 'error') {
-          throw new Error(`dexie-cloud WebSocket Error ${msg.error}`);
+          throw new Error(`Error message from dexie-cloud: ${msg.error}`);
         }
         if (msg.type === 'rev') {
           this.rev = msg.rev; // No meaning but seems reasonable.
@@ -273,8 +273,7 @@ export class WSConnection extends Subscription {
           this.subscriber.next(msg);
         }
       } catch (e) {
-        this.disconnect();
-        this.pauseUntil = new Date(Date.now() + FAIL_RETRY_WAIT_TIME);
+        this.subscriber.error(e);
       }
     };
 
@@ -282,7 +281,6 @@ export class WSConnection extends Subscription {
       await new Promise((resolve, reject) => {
         ws.onopen = (event) => {
           console.debug('dexie-cloud WebSocket onopen');
-          this.webSocketStatus.next("connected");
           resolve(null);
         };
         ws.onerror = (event: ErrorEvent) => {
@@ -295,6 +293,9 @@ export class WSConnection extends Subscription {
       });
       this.messageProducerSubscription = this.messageProducer.subscribe(msg => {
         if (!this.closed) {
+          if (msg.type === 'ready' && this.webSocketStatus.value !== 'connected') {
+            this.webSocketStatus.next("connected");
+          }
           this.ws?.send(TSON.stringify(msg));
         }
       });

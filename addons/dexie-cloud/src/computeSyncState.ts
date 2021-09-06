@@ -1,8 +1,9 @@
 import { combineLatest, Observable, of } from 'rxjs';
 import { debounceTime, map, startWith, switchMap } from 'rxjs/operators';
 import { DexieCloudDB } from './db/DexieCloudDB';
+import { isOnline } from './sync/isOnline';
 import { SyncState } from './types/SyncState';
-import { userIsActive } from './userIsActive';
+import { userIsActive, userIsReallyActive } from './userIsActive';
 
 export function computeSyncState(db: DexieCloudDB): Observable<SyncState> {
   let _prevStatus = db.cloud.webSocketStatus.value;
@@ -34,33 +35,43 @@ export function computeSyncState(db: DexieCloudDB): Observable<SyncState> {
   return combineLatest([
     lazyWebSocketStatus,
     db.syncStateChangedEvent.pipe(startWith({ phase: 'initial' } as SyncState)),
+    userIsReallyActive
   ]).pipe(
-    map(([status, syncState]) => {
+    map(([status, syncState, userIsActive]) => {
       let { phase, error, progress } = syncState;
+      let adjustedStatus = status;
       if (phase === 'error') {
         // Let users only rely on the status property to display an icon.
         // If there's an error in the sync phase, let it show on that
         // status icon also.
-        status = 'error';
+        adjustedStatus = 'error';
       }
       if (status === 'not-started') {
         // If websocket isn't yet connected becase we're doing
         // the startup sync, let the icon show the symbol for connecting.
         if (phase === 'pushing' || phase === 'pulling') {
-          status = 'connecting';
+          adjustedStatus = 'connecting';
         }
-      }
+      }      
       const previousPhase = db.cloud.syncState.value.phase;
+      //const previousStatus = db.cloud.syncState.value.status;
       if (previousPhase === 'error' && (syncState.phase === 'pushing' || syncState.phase === 'pulling')) {
         // We were in an errored state but is now doing sync. Show "connecting" icon.
-        status = 'connecting';
+        adjustedStatus = 'connecting';
+      }
+      if (syncState.phase === 'in-sync' && adjustedStatus === 'connecting') {
+        adjustedStatus = 'connected';
+      }
+        
+      if (!userIsActive) {
+        adjustedStatus = 'disconnected';
       }
 
       const retState: SyncState = {
         phase,
         error,
         progress,
-        status: phase === 'offline' ? 'offline' : status,
+        status: isOnline ? adjustedStatus : 'offline',
       };
 
       return retState;
