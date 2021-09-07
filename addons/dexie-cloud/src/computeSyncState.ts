@@ -59,9 +59,9 @@ export function computeSyncState(db: DexieCloudDB): Observable<SyncState> {
         // We were in an errored state but is now doing sync. Show "connecting" icon.
         adjustedStatus = 'connecting';
       }
-      if (syncState.phase === 'in-sync' && adjustedStatus === 'connecting') {
+      /*if (syncState.phase === 'in-sync' && adjustedStatus === 'connecting') {
         adjustedStatus = 'connected';
-      }
+      }*/
         
       if (!userIsActive) {
         adjustedStatus = 'disconnected';

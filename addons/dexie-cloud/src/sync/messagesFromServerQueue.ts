@@ -54,7 +54,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
         console.debug('processing msg', msg);
         await db.cloud.syncState
           .pipe(
-            filter(({ phase }) => phase === 'in-sync'),
+            filter(({ phase }) => phase === 'in-sync' || phase === 'error'),
             take(1)
           )
           .toPromise();
@@ -102,6 +102,10 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
             break;
           case 'changes':
             console.debug('changes');
+            if (db.cloud.syncState.value?.phase === 'error') {
+              triggerSync(db);
+              break;
+            }
             await db.transaction('rw', db.dx.tables, async (tx) => {
               // @ts-ignore
               tx.idbtrans.disableChangeTracking = true;
@@ -113,7 +117,6 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
                 db.getCurrentUser(),
               ]);
               console.debug('ws message queue: in transaction');
-              // Verify again in ACID tx that we're on same server revision.
               if (!syncState || !schema || !currentUser) {
                 console.debug('required vars not present', {
                   syncState,
@@ -122,11 +125,12 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
                 });
                 return; // Initial sync must have taken place - otherwise, ignore this.
               }
-              if (compareBigInts(msg.baseRev, syncState.serverRevision) > 0) {
+              // Verify again in ACID tx that we're on same server revision.
+              if (compareBigInts(msg.baseRev, syncState.serverRevision) !== 0) {
                 console.debug(
-                  `baseRev (${msg.baseRev}) greater than our serverRevision in syncState (${syncState.serverRevision})`
+                  `baseRev (${msg.baseRev}) differs from our serverRevision in syncState (${syncState.serverRevision})`
                 );
-                return; // Ignore message (is old)
+                return; // Ignore message
               }
               // Verify also that the message is based on the exact same set of realms
               const ourRealmSetHash = await Dexie.waitFor(

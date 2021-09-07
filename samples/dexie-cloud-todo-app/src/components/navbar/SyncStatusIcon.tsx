@@ -16,7 +16,6 @@ interface Props {
 }
 export function SyncStatusIcon({ className }: Props) {
   const syncStatus = useObservable(db.cloud.syncState);
-  console.log("SyncStatue:", syncStatus);
   switch (syncStatus?.status) {
     case 'not-started':
       return <SvgIcon className={className}></SvgIcon>;

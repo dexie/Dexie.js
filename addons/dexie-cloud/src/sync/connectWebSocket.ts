@@ -48,7 +48,7 @@ export function connectWebSocket(db: DexieCloudDB) {
 
   const messageProducer = db.messageConsumer.readyToServe.pipe(
     filter((isReady) => isReady), // When consumer is ready for new messages, produce such a message to inform server about it
-    switchMap(() => db.cloud.persistedSyncState), // We need the info on which server revision we are at:
+    switchMap(() => db.getPersistedSyncState()), // We need the info on which server revision we are at:
     filter((syncState) => syncState && syncState.serverRevision), // We wont send anything to server before inital sync has taken place
     map<PersistedSyncState, ReadyForChangesMessage>((syncState) => ({
       // Produce the message to trigger server to send us new messages to consume:
@@ -58,15 +58,15 @@ export function connectWebSocket(db: DexieCloudDB) {
   );
 
   function createObservable(): Observable<WSConnectionMsg | null> {
-    return db.cloud.currentUser.pipe(
-      tap((currentUser) => console.debug('currentUser emit', currentUser)),
-      filter(() => db.cloud.persistedSyncState?.value?.serverRevision), // Don't connect before there's no initial sync performed.
+    return db.cloud.persistedSyncState.pipe(
+      filter(syncState => syncState?.serverRevision),// Don't connect before there's no initial sync performed.
+      take(1), // Don't continue waking up whenever syncState change
+      switchMap(()=> db.cloud.currentUser),
       switchMap((userLogin) =>
         userIsReallyActive.pipe(
           map((isActive) => (isActive ? userLogin : null))
         )
       ),
-      tap((userLogin) => console.debug('userIsActive emit', userLogin)),
       switchMap((userLogin) =>
         // Let server end query changes from last entry of same client-ID and forward.
         // If no new entries, server won't bother the client. If new entries, server sends only those
@@ -116,6 +116,7 @@ export function connectWebSocket(db: DexieCloudDB) {
     );
   }
 
+  console.debug("CROBS: creating observable");
   return createObservable().subscribe(
     (msg) => {
       if (msg) {
