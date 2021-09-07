@@ -111,13 +111,13 @@ export function dexieCloud(dexie: Dexie) {
       updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
     },
     async sync(
-      { wait, force }: DexieCloudSyncOptions = { wait: true, force: false }
+      { wait, purpose }: DexieCloudSyncOptions = { wait: true, purpose: "push" }
     ) {
       if (wait === undefined) wait = true;
       const db = DexieCloudDB(dexie);
-      if (force) {
+      if (purpose === "pull") {
         const syncState = db.cloud.persistedSyncState.value;
-        triggerSync(db);
+        triggerSync(db, purpose);
         if (wait) {
           const newSyncState = await db.cloud.persistedSyncState
             .pipe(
@@ -135,7 +135,7 @@ export function dexieCloud(dexie: Dexie) {
         }
       } else if (await isSyncNeeded(db)) {
         const syncState = db.cloud.persistedSyncState.value;
-        triggerSync(db);
+        triggerSync(db, purpose);
         if (wait) {
           console.debug('db.cloud.login() is waiting for sync completion...');
           await from(
@@ -313,7 +313,7 @@ export function dexieCloud(dexie: Dexie) {
     localSyncWorker = null;
     throwIfClosed();
     if (db.cloud.usingServiceWorker && db.cloud.options?.databaseUrl) {
-      registerSyncEvent(db).catch(() => {});
+      registerSyncEvent(db, "pull").catch(() => {});
       registerPeriodicSyncEvent(db).catch(() => {});
     } else if (
       db.cloud.options?.databaseUrl &&
@@ -334,7 +334,7 @@ export function dexieCloud(dexie: Dexie) {
           db.syncStateChangedEvent.next({
             phase: 'not-in-sync',
           });
-          triggerSync(db);
+          triggerSync(db, "push");
         }),
         fromEvent(self, 'offline').subscribe(() => {
           console.debug('offline!');

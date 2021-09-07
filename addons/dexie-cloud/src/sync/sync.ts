@@ -122,7 +122,7 @@ async function _sync(
   }
 ): Promise<boolean> {
   if (!justCheckIfNeeded) {
-    console.debug('SYNC STARTED', { isInitialSync });
+    console.debug('SYNC STARTED', { isInitialSync, purpose });
   }
   if (!db.cloud.options?.databaseUrl)
     throw new Error(

@@ -19,7 +19,7 @@ import { DXCWebSocketStatus } from './DXCWebSocketStatus';
 
 export interface DexieCloudSyncOptions {
   wait: boolean;
-  force: boolean;
+  purpose: "push" | "pull"
 }
 
 export type DexieCloudTable<T = any> = Table<T & EntityCommon, string>;

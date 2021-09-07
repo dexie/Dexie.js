@@ -5,7 +5,10 @@ import { sync, CURRENT_SYNC_WORKER, SyncOptions } from './sync';
 import { DexieCloudOptions } from '../DexieCloudOptions';
 import { DexieCloudSchema } from 'dexie-cloud-common';
 
-const isSyncing = new WeakMap<DexieCloudDB, Promise<void>>();
+const ongoingSyncs = new WeakMap<
+  DexieCloudDB,
+  { promise: Promise<void>; pull: boolean }
+>();
 
 export function syncIfPossible(
   db: DexieCloudDB,
@@ -13,13 +16,19 @@ export function syncIfPossible(
   cloudSchema: DexieCloudSchema,
   options?: SyncOptions
 ) {
-  let promise = isSyncing.get(db);
-  if (promise) {
-    console.debug("syncIfPossible(): returning the ongoing sync promise.");
-    return promise;
+  let ongoing = ongoingSyncs.get(db);
+  if (ongoing) {
+    if (ongoing.pull || options?.purpose === 'push') {
+      console.debug('syncIfPossible(): returning the ongoing sync promise.');
+      return ongoing.promise;
+    } else {
+      return ongoing.promise.then(() =>
+        syncIfPossible(db, cloudOptions, cloudSchema, options)
+      );
+    }
   }
-  promise = _syncIfPossible();
-  isSyncing.set(db, promise);
+  const promise = _syncIfPossible();
+  ongoingSyncs.set(db, { promise, pull: options?.purpose !== 'push' });
   return promise;
 
   async function _syncIfPossible() {
@@ -35,10 +44,10 @@ export function syncIfPossible(
           sync(db, cloudOptions, cloudSchema, options)
         );
       }
-      isSyncing.delete(db);
+      ongoingSyncs.delete(db);
       console.debug('Done sync');
     } catch (error) {
-      isSyncing.delete(db);
+      ongoingSyncs.delete(db);
       console.error(`Failed to sync client changes`, error);
       throw error; // Make sure we rethrow error so that sync event is retried.
       // I don't think we should setTimout or so here.

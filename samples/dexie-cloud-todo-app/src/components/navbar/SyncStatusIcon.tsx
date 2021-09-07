@@ -2,13 +2,9 @@ import { useObservable } from 'react-use';
 import { db } from '../../db';
 import { IconConnecting } from '../icons/IconConnecting';
 import { IconError } from '../icons/IconError';
-import { IconInSync } from '../icons/IconInSync';
 import { IconOffline } from '../icons/IconOffline';
 import { IconOnline } from '../icons/IconOnline';
 import { IconSleepyCloud } from '../icons/IconSleepyCloud';
-import { IconSync } from '../icons/IconSync';
-import { IconSyncing } from '../icons/IconSyncing';
-import { ReactComponent as InSyncIcon } from '../icons/in-sync.svg';
 import { SvgIcon } from './SvgIcon';
 
 interface Props {

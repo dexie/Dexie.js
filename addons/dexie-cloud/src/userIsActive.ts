@@ -40,10 +40,6 @@ userIsActive
   )
   .subscribe(userIsReallyActive);
 
-userIsReallyActive.subscribe((a) =>
-  console.debug('CROBS: userIsActive became', a)
-);
-
 //
 // First create some corner-stone observables to build the flow on
 //

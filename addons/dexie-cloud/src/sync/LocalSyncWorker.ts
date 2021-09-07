@@ -15,10 +15,11 @@ export function LocalSyncWorker(
   //let periodicSyncHandler: ((event: Event) => void) | null = null;
   let cancelToken = { cancelled: false };
 
-  function syncAndRetry(retryNum = 1) {
+  function syncAndRetry(purpose: "pull" | "push", retryNum = 1) {
     syncIfPossible(db, cloudOptions, cloudSchema, {
       cancelToken,
       retryImmediatelyOnFetchError: true, // workaround for "net::ERR_NETWORK_CHANGED" in chrome.
+      purpose
     }).catch((e) => {
       console.error('error in syncIfPossible()', e);
       if (cancelToken.cancelled) {
@@ -28,7 +29,7 @@ export function LocalSyncWorker(
         // * first retry after 5 minutes
         // * second retry 15 minutes later
         setTimeout(
-          () => syncAndRetry(retryNum + 1),
+          () => syncAndRetry(purpose, retryNum + 1),
           [0, 5, 15][retryNum] * MINUTES
         );
       }
@@ -39,9 +40,9 @@ export function LocalSyncWorker(
     // Sync eagerly whenever a change has happened (+ initially when there's no syncState yet)
     // This initial subscribe will also trigger an sync also now.
     console.debug('Starting LocalSyncWorker', db.localSyncEvent['id']);
-    localSyncEventSubscription = db.localSyncEvent.subscribe(() => {
+    localSyncEventSubscription = db.localSyncEvent.subscribe(({purpose}) => {
       try {
-        syncAndRetry();
+        syncAndRetry(purpose || "pull");
       } catch (err) {
         console.error('What-the....', err);
       }

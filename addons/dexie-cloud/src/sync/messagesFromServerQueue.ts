@@ -87,23 +87,23 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
               !persistedSyncState?.serverRevision ||
               compareBigInts(persistedSyncState.serverRevision, msg.rev) < 0
             ) {
-              triggerSync(db);
+              triggerSync(db, "pull");
             }
             break;
           case 'realm-added':
             if (!persistedSyncState?.realms?.includes(msg.realm)) {
-              triggerSync(db);
+              triggerSync(db, "pull");
             }
             break;
           case 'realm-removed':
             if (persistedSyncState?.realms?.includes(msg.realm)) {
-              triggerSync(db);
+              triggerSync(db, "pull");
             }
             break;
           case 'changes':
             console.debug('changes');
             if (db.cloud.syncState.value?.phase === 'error') {
-              triggerSync(db);
+              triggerSync(db, "pull");
               break;
             }
             await db.transaction('rw', db.dx.tables, async (tx) => {
@@ -139,7 +139,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
               console.debug('ourRealmSetHash', ourRealmSetHash);
               if (ourRealmSetHash !== msg.realmSetHash) {
                 console.debug('not same realmSetHash', msg.realmSetHash);
-                triggerSync(db);
+                triggerSync(db, "pull");
                 // The message isn't based on the same realms.
                 // Trigger a sync instead to resolve all things up.
                 return;

@@ -116,7 +116,6 @@ export function connectWebSocket(db: DexieCloudDB) {
     );
   }
 
-  console.debug("CROBS: creating observable");
   return createObservable().subscribe(
     (msg) => {
       if (msg) {

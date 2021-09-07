@@ -4,19 +4,20 @@ import { DexieCloudDB } from '../db/DexieCloudDB';
 //const hasSW = 'serviceWorker' in navigator;
 let hasComplainedAboutSyncEvent = false;
 
-export async function registerSyncEvent(db: DexieCloudDB) {
+export async function registerSyncEvent(db: DexieCloudDB, purpose: "push" | "pull") {
   try {
     // Send sync event to SW:
     const sw = await navigator.serviceWorker.ready;
-    if (sw.sync) {
+    if (purpose === "push" && sw.sync) {
       await sw.sync.register(`dexie-cloud:${db.name}`);
     }
     if (sw.active) {
-      // Fallback to postMessage (Firefox, Safari). Also chromium based
-      // browsers with sw.sync as a fallback for sleepy sync events not taking action for a while.
+      // Use postMessage for pull syncs and for browsers not supporting sync event (Firefox, Safari).
+      // Also chromium based browsers with sw.sync as a fallback for sleepy sync events not taking action for a while.
       sw.active.postMessage({
         type: 'dexie-cloud-sync',
-        dbName: db.name
+        dbName: db.name,
+        purpose
       });
     } else {
       console.error(`Dexie Cloud: There's no active service worker. Can this ever happen??`);
