@@ -47,13 +47,13 @@ export type ObservabilitySet = {
   [part: string]: IntervalTree;
 };
 
-export interface DexieOnTxCommittedEvent {
+export interface DexieOnStorageMutatedEvent {
   subscribe(fn: (parts: ObservabilitySet) => any): void;
   unsubscribe(fn: (parts: ObservabilitySet) => any): void;
   fire(parts: ObservabilitySet): any;
 }
 
 export interface GlobalDexieEvents extends DexieEventSet {
-  (eventName: 'txcommitted', subscriber: (parts: ObservabilitySet) => any): void;
-  txcommitted: DexieOnTxCommittedEvent;
+  (eventName: 'storagemutated', subscriber: (parts: ObservabilitySet) => any): void;
+  storagemutated: DexieOnStorageMutatedEvent;
 }

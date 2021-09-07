@@ -134,7 +134,7 @@ export class Transaction implements ITransaction {
       this.active = false;
       this._resolve();
       if ('mutatedParts' in idbtrans) {
-        globalEvents.txcommitted.fire(idbtrans["mutatedParts"]);
+        globalEvents.storagemutated.fire(idbtrans["mutatedParts"]);
       }
     });
     return this;
