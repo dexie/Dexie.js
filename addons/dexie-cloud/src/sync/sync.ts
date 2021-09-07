@@ -226,17 +226,6 @@ async function _sync(
   );
   console.debug('Sync response', res);
 
-  // TODO: Break out the rest in a new async function applyServerResponse()
-  // - make sure it doesn't rely on memory state at all unless it can be used as an optimization only and is still waterproof.
-  // - when done, use it from the websocket "changes" event. Could we handle realm additions and removals as well? inviteRealms? NO! Those would be heavier
-  //   and require each "changes" response to include schema, realms, inviteRealms etc. Better if we could separate those specialities from the basic ones
-  //   Maybe two function instead of one - the one for basic changes that are more simple, and then other code that applies the things that regards
-  //   to schema, realms and inviteRealms.
-  //   There is one state we are relying on here that would need to be passed as an argument: client changes that was part of the request.
-  //   Either, we are totally stateless and let the server tell us the client revs that the reponse applies to (websocket variant will not include that property
-  //   as it will only be regarded accurate in case there's no sync request going on - so all client changes will be avoided. Maybe: let server remember the latest
-  //   client revs per client and also provide it with the response? Not needed.)
-
   //
   // Apply changes locally and clear old change entries:
   //
