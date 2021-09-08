@@ -1,7 +1,7 @@
 import Dexie, { liveQuery, Subscription } from 'dexie';
 import { getDbNameFromDbUrl } from 'dexie-cloud-common';
 import { BehaviorSubject, combineLatest, from, fromEvent } from 'rxjs';
-import { filter, map, startWith, switchMap, take } from 'rxjs/operators';
+import { filter, map, skip, startWith, switchMap, take } from 'rxjs/operators';
 import { login } from './authentication/login';
 import { UNAUTHORIZED_USER } from './authentication/UNAUTHORIZED_USER';
 import { DexieCloudDB } from './db/DexieCloudDB';
@@ -302,6 +302,14 @@ export function dexieCloud(dexie: Dexie) {
           db.cloud.persistedSyncState
         )
       );
+      // Wait till currentUser and persistedSyncState gets populated
+      // with things from the database and not just the default values.
+      // This is so that when db.open() completes, user should be safe
+      // to subscribe to these observables and get actual data.
+      await combineLatest([
+        currentUserEmitter.pipe(skip(1), take(1)),
+        db.cloud.persistedSyncState.pipe(skip(1), take(1))
+      ]).toPromise();
     }
 
     // HERE: If requireAuth, do athentication now.
@@ -323,6 +331,7 @@ export function dexieCloud(dexie: Dexie) {
       // There's no SW. Start SyncWorker instead.
       localSyncWorker = LocalSyncWorker(db, db.cloud.options, db.cloud.schema!);
       localSyncWorker.start();
+      triggerSync(db, "push");
     }
 
     // Listen to online event and do sync.
