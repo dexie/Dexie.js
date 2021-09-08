@@ -48,7 +48,7 @@ export function NavBar() {
             <NavDropdown.Header>Sign in a demo user</NavDropdown.Header>
             <>
               {Object.keys(importData.demoUsers).map((email) => (
-                <NavDropdown.Item>
+                <NavDropdown.Item key={email}>
                   <NavLink
                     onClick={handleError(() =>
                       db.cloud.login({ grant_type: 'demo', email })
