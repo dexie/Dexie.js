@@ -7,7 +7,7 @@ import { Member } from './entities/Member';
 import { Role } from './entities/Role';
 import { UNAUTHORIZED_USER } from '../authentication/UNAUTHORIZED_USER';
 import { DexieCloudOptions } from '../DexieCloudOptions';
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, Subject } from 'rxjs';
 import { BaseRevisionMapEntry } from './entities/BaseRevisionMapEntry';
 import {
   DBRealm,
@@ -54,7 +54,7 @@ export interface DexieCloudDBBase {
   readonly members: Table<DBRealmMember, string>;
   readonly roles: Table<DBRealmRole, [string, string]>;
 
-  readonly localSyncEvent: BehaviorSubject<{purpose?: "pull" | "push"}>;
+  readonly localSyncEvent: BehaviorSubject<{ purpose?: 'pull' | 'push' }>;
   readonly syncStateChangedEvent: BroadcastedAndLocalEvent<SyncStateChangedEventData>;
   readonly dx: Dexie;
   readonly initiallySynced: boolean;
@@ -87,10 +87,11 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
   if ('vip' in dx) dx = dx['vip']; // Avoid race condition. Always map to a vipped dexie that don't block during db.on.ready().
   let db = wm.get(dx.cloud);
   if (!db) {
-    const localSyncEvent = new BehaviorSubject({purpose: "pull"});
-    let syncStateChangedEvent = new BroadcastedAndLocalEvent<SyncStateChangedEventData>(
-      `syncstatechanged-${dx.name}`
-    );
+    const localSyncEvent = new Subject<{ purpose: 'push' | 'pull' }>();
+    let syncStateChangedEvent =
+      new BroadcastedAndLocalEvent<SyncStateChangedEventData>(
+        `syncstatechanged-${dx.name}`
+      );
     localSyncEvent['id'] = ++static_counter;
     let initiallySynced = false;
     db = {

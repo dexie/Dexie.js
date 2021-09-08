@@ -313,7 +313,7 @@ export function dexieCloud(dexie: Dexie) {
     localSyncWorker = null;
     throwIfClosed();
     if (db.cloud.usingServiceWorker && db.cloud.options?.databaseUrl) {
-      registerSyncEvent(db, "pull").catch(() => {});
+      registerSyncEvent(db, "push").catch(() => {});
       registerPeriodicSyncEvent(db).catch(() => {});
     } else if (
       db.cloud.options?.databaseUrl &&

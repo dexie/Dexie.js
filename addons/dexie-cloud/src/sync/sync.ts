@@ -29,6 +29,8 @@ import { getLatestRevisionsPerTable } from './getLatestRevisionsPerTable';
 
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 
+export let numberOfSyncRequests = 0;
+
 /*
   TODO:
     1. V: Rätta flödet och gör det persistent mellan transaktioner

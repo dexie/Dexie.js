@@ -1,4 +1,5 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
+import { triggerSync } from '../sync/triggerSync';
 import { authenticate } from './authenticate';
 import { AuthPersistedContext } from './AuthPersistedContext';
 import { otpFetchTokenCallback } from './otpFetchTokenCallback';
@@ -34,4 +35,7 @@ export async function login(
   );
   await context.save();
   await setCurrentUser(db, context);
+  // Make sure to resync as the new login will be authorized
+  // for new realms.
+  triggerSync(db, "pull");
 }
