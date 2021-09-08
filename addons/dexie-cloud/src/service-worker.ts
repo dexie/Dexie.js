@@ -14,49 +14,78 @@ function getDbNameFromTag(tag: string) {
   return tag.startsWith('dexie-cloud:') && tag.split(':')[1];
 }
 
-async function syncDB(dbName: string) {
-  let db = managedDBs.get(dbName);
+const syncDBSemaphore = new Map<string, Promise<void>>();
 
-  if (!db) {
-    console.debug('Dexie Cloud SW: Creating new Dexie instance for', dbName);
-    const dexie = new Dexie(dbName, { addons: [dexieCloud] });
-    db = DexieCloudDB(dexie);
-    dexie.on('versionchange', stopManagingDB);
-    await db.dx.open(); // Makes sure db.cloud.options and db.cloud.schema are read from db,
-    if (!managedDBs.get(dbName)) { // Avoid race conditions.
-      managedDBs.set(dbName, db);
+function syncDB(dbName: string, purpose: 'push' | 'pull') {
+  // We're taking hight for being double-signalled both
+  // via message event and sync event.
+  // Which one comes first doesnt matter, just
+  // that we return the existing promise if there is
+  // an ongoing sync.
+  let promise = syncDBSemaphore.get(dbName + '/' + purpose);
+  if (!promise) {
+    promise = _syncDB(dbName, purpose)
+      .then(() => {
+        // When legacy enough across browsers, use .finally() instead of then() and catch():
+        syncDBSemaphore.delete(dbName + '/' + purpose);
+      })
+      .catch((error) => {
+        syncDBSemaphore.delete(dbName + '/' + purpose);
+        return Promise.reject(error);
+      });
+    syncDBSemaphore.set(dbName + '/' + purpose, promise);
+  }
+  return promise;
+
+  async function _syncDB(dbName: string, purpose: 'push' | 'pull') {
+    let db = managedDBs.get(dbName);
+
+    if (!db) {
+      console.debug('Dexie Cloud SW: Creating new Dexie instance for', dbName);
+      const dexie = new Dexie(dbName, { addons: [dexieCloud] });
+      db = DexieCloudDB(dexie);
+      dexie.on('versionchange', stopManagingDB);
+      await db.dx.open(); // Makes sure db.cloud.options and db.cloud.schema are read from db,
+      if (!managedDBs.get(dbName)) {
+        // Avoid race conditions.
+        managedDBs.set(dbName, db);
+      }
     }
-  }
-  if (!db.cloud.options?.databaseUrl) {
-    console.error(`Dexie Cloud: No databaseUrl configured`);
-    return; // Nothing to sync.
-  }
-  if (!db.cloud.schema) {
-    console.error(`Dexie Cloud: No schema persisted`);
-    return; // Nothing to sync.
-  }
-
-  function stopManagingDB() {
-    db!.dx.on.versionchange.unsubscribe(stopManagingDB);
-    if (managedDBs.get(db!.name) === db) { // Avoid race conditions.
-      managedDBs.delete(db!.name);
+    if (!db.cloud.options?.databaseUrl) {
+      console.error(`Dexie Cloud: No databaseUrl configured`);
+      return; // Nothing to sync.
     }
-    db!.dx.close();
-    return false;
-  }
+    if (!db.cloud.schema) {
+      console.error(`Dexie Cloud: No schema persisted`);
+      return; // Nothing to sync.
+    }
 
-  try {
-    console.debug('Dexie Cloud SW: Syncing');
-    await syncIfPossible(db, db.cloud.options, db.cloud.schema, {retryImmediatelyOnFetchError: true});
-    console.debug('Dexie Cloud SW: Done Syncing');
-  } catch (e) {
-    console.error(`Dexie Cloud SW Error`, e);
-    // Error occured. Stop managing this DB until we wake up again by a sync event,
-    // which will open a new Dexie and start trying to sync it.
-    stopManagingDB();
-    if (e.name !== Dexie.errnames.NoSuchDatabase) {
-      // Unless the error was that DB doesn't exist, rethrow to trigger sync retry.
-      throw e; // Throw e to make syncEvent.waitUntil() receive a rejected promis, so it will retry.
+    function stopManagingDB() {
+      db!.dx.on.versionchange.unsubscribe(stopManagingDB);
+      if (managedDBs.get(db!.name) === db) {
+        // Avoid race conditions.
+        managedDBs.delete(db!.name);
+      }
+      db!.dx.close();
+      return false;
+    }
+
+    try {
+      console.debug('Dexie Cloud SW: Syncing');
+      await syncIfPossible(db, db.cloud.options, db.cloud.schema, {
+        retryImmediatelyOnFetchError: true,
+        purpose,
+      });
+      console.debug('Dexie Cloud SW: Done Syncing');
+    } catch (e) {
+      console.error(`Dexie Cloud SW Error`, e);
+      // Error occured. Stop managing this DB until we wake up again by a sync event,
+      // which will open a new Dexie and start trying to sync it.
+      stopManagingDB();
+      if (e.name !== Dexie.errnames.NoSuchDatabase) {
+        // Unless the error was that DB doesn't exist, rethrow to trigger sync retry.
+        throw e; // Throw e to make syncEvent.waitUntil() receive a rejected promis, so it will retry.
+      }
     }
   }
 }
@@ -67,7 +96,7 @@ if (!DISABLE_SERVICEWORKER_STRATEGY) {
     console.debug('SW "sync" Event', event.tag);
     const dbName = getDbNameFromTag(event.tag);
     if (dbName) {
-      event.waitUntil(syncDB(dbName));
+      event.waitUntil(syncDB(dbName, "push")); // The purpose of sync events are "push"
     }
   });
 
@@ -75,7 +104,7 @@ if (!DISABLE_SERVICEWORKER_STRATEGY) {
     console.debug('SW "periodicsync" Event', event.tag);
     const dbName = getDbNameFromTag(event.tag);
     if (dbName) {
-      event.waitUntil(syncDB(dbName));
+      event.waitUntil(syncDB(dbName, "pull")); // The purpose of periodic sync events are "pull"
     }
   });
 
@@ -86,16 +115,16 @@ if (!DISABLE_SERVICEWORKER_STRATEGY) {
       // Mimic background sync behavior - retry in X minutes on failure.
       // But lesser timeout and more number of times.
       const syncAndRetry = (num = 1) => {
-        return syncDB(dbName).catch(async (e) => {
+        return syncDB(dbName, event.data.purpuse || "pull").catch(async (e) => {
           if (num === 3) throw e;
           await sleep(60_000); // 1 minute
           syncAndRetry(num + 1);
         });
       };
       if ('waitUntil' in event) {
-        event.waitUntil(syncAndRetry());
+        event.waitUntil(syncAndRetry().catch(error => console.error(error)));
       } else {
-        syncAndRetry();
+        syncAndRetry().catch(error => console.error(error));
       }
     }
   });

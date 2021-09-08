@@ -19,7 +19,8 @@ export async function syncWithServer(
   baseRevs: BaseRevisionMapEntry[],
   db: DexieCloudDB,
   databaseUrl: string,
-  schema: DexieCloudSchema | null
+  schema: DexieCloudSchema | null,
+  clientIdentity: string
 ): Promise<SyncResponse> {
   //
   // Push changes to server using fetch
@@ -35,6 +36,7 @@ export async function syncWithServer(
 
   const syncRequest: SyncRequest = {
     dbID: syncState?.remoteDbId,
+    clientIdentity,
     schema: schema || {},
     lastPull: syncState ? {
       serverRevision: syncState.serverRevision!,

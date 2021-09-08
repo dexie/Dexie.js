@@ -15,10 +15,11 @@ import { Member } from './db/entities/Member';
 import { Role } from './db/entities/Role';
 import { EntityCommon } from './db/entities/EntityCommon';
 import { DXCUserInteraction } from './types/DXCUserInteraction';
+import { DXCWebSocketStatus } from './DXCWebSocketStatus';
 
 export interface DexieCloudSyncOptions {
   wait: boolean;
-  force: boolean;
+  purpose: "push" | "pull"
 }
 
 export type DexieCloudTable<T = any> = Table<T & EntityCommon, string>;
@@ -35,6 +36,7 @@ declare module 'dexie' {
       serverState: DexieCloudServerState | null;
       currentUserId: string;
       currentUser: Rx.BehaviorSubject<UserLogin>;
+      webSocketStatus: Rx.BehaviorSubject<DXCWebSocketStatus>;
       syncState: Rx.BehaviorSubject<SyncState>;
       persistedSyncState: Rx.BehaviorSubject<PersistedSyncState | undefined>;
       userInteraction: Rx.BehaviorSubject<DXCUserInteraction | undefined>;

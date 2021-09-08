@@ -1,12 +1,7 @@
-import { faSync, faSyncAlt } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import React from 'react';
 import {
   Navbar,
-  Nav,
   NavDropdown,
-  Form,
-  FormControl,
   Button,
   NavLink,
 } from 'react-bootstrap';
@@ -16,8 +11,6 @@ import { SyncStatusIcon } from './SyncStatusIcon';
 import './NavBar.css';
 import importData from '../../data/importfile.json';
 import { handleError } from '../../helpers/handleError';
-
-function ignore() {}
 
 export function NavBar() {
   const currentUser = useObservable(db.cloud.currentUser);

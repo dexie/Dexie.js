@@ -1,4 +1,4 @@
-import Dexie, { Table } from 'dexie';
+import Dexie from 'dexie';
 import dexieCloud, { DexieCloudTable } from 'dexie-cloud-addon';
 import { populate } from '../models/populate';
 import { TodoItem } from '../models/TodoItem';

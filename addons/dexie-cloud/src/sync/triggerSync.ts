@@ -1,10 +1,10 @@
 import { DexieCloudDB } from "../db/DexieCloudDB";
 import { registerSyncEvent } from "./registerSyncEvent";
 
-export function triggerSync(db: DexieCloudDB) {
+export function triggerSync(db: DexieCloudDB, purpose: "push" | "pull") {
   if (db.cloud.usingServiceWorker) {
-    registerSyncEvent(db);
+    registerSyncEvent(db, purpose);
   } else {
-    db.localSyncEvent.next({});
+    db.localSyncEvent.next({purpose});
   }
 }

@@ -4,6 +4,7 @@ import { DexieCloudSchema } from './DexieCloudSchema.js';
 
 export interface SyncRequest {
   dbID?: string;
+  clientIdentity?: string;
   schema: DexieCloudSchema;
   lastPull?: {
     serverRevision: any;

@@ -94,9 +94,9 @@ export function createMutationTrackingMiddleware({
               if (tx.mutationsAdded && db.cloud.options?.databaseUrl) {
                 if (db.cloud.usingServiceWorker) {
                   console.debug('registering sync event');
-                  registerSyncEvent(db);
+                  registerSyncEvent(db, "push");
                 } else {
-                  db.localSyncEvent.next({});
+                  db.localSyncEvent.next({purpose: "push"});
                 }
               }
               removeTransaction();

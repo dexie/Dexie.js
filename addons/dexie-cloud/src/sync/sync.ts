@@ -17,14 +17,16 @@ import {
   DBKeyMutationSet,
   DBOperationsSet,
   DexieCloudSchema,
+  randomString,
   subtractChanges,
   SyncResponse,
   toDBOperationSet,
 } from 'dexie-cloud-common';
 import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import { isOnline } from './isOnline';
+import { updateBaseRevs } from './updateBaseRevs';
+import { getLatestRevisionsPerTable } from './getLatestRevisionsPerTable';
 
-export const isSyncing = new WeakSet<DexieCloudDB>();
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 
 /*
@@ -55,6 +57,7 @@ export interface SyncOptions {
   cancelToken?: { cancelled: boolean };
   justCheckIfNeeded?: boolean;
   retryImmediatelyOnFetchError?: boolean;
+  purpose?: 'pull' | 'push';
 }
 
 export function sync(
@@ -66,11 +69,14 @@ export function sync(
   return _sync
     .apply(this, arguments)
     .then(() => {
-      db.syncStateChangedEvent.next({
-        phase: 'in-sync',
-      });
+      if (!syncOptions?.justCheckIfNeeded) {
+        db.syncStateChangedEvent.next({
+          phase: 'in-sync',
+        });
+      }
     })
     .catch(async (error: any) => {
+      if (syncOptions?.justCheckIfNeeded) return Promise.reject(error); // Just rethrow.
       console.debug('Error from _sync', {
         isOnline,
         syncOptions,
@@ -84,7 +90,7 @@ export function sync(
       ) {
         db.syncStateChangedEvent.next({
           phase: 'error',
-          error
+          error,
         });
         // Retry again in 500 ms but if it fails again, don't retry.
         await new Promise((resolve) => setTimeout(resolve, 500));
@@ -101,7 +107,7 @@ export function sync(
       });
       db.syncStateChangedEvent.next({
         phase: isOnline ? 'error' : 'offline',
-        error
+        error,
       });
       return Promise.reject(error);
     });
@@ -111,12 +117,12 @@ async function _sync(
   db: DexieCloudDB,
   options: DexieCloudOptions,
   schema: DexieCloudSchema,
-  { isInitialSync, cancelToken, justCheckIfNeeded }: SyncOptions = {
+  { isInitialSync, cancelToken, justCheckIfNeeded, purpose }: SyncOptions = {
     isInitialSync: false,
   }
 ): Promise<boolean> {
   if (!justCheckIfNeeded) {
-    console.debug('SYNC STARTED', { isInitialSync });
+    console.debug('SYNC STARTED', { isInitialSync, purpose });
   }
   if (!db.cloud.options?.databaseUrl)
     throw new Error(
@@ -186,18 +192,24 @@ async function _sync(
     }
   );
 
+  const syncIsNeeded = clientChangeSet.some((set) =>
+    set.muts.some((mut) => mut.keys.length > 0)
+  );
   if (justCheckIfNeeded) {
-    const syncIsNeeded = clientChangeSet.some((set) =>
-      set.muts.some((mut) => mut.keys.length > 0)
-    );
     console.debug('Sync is needed:', syncIsNeeded);
     return syncIsNeeded;
+  }
+  if (purpose === "push" && !syncIsNeeded) {
+    // The purpose of this request was to push changes
+    return false;
   }
 
   const latestRevisions = getLatestRevisionsPerTable(
     clientChangeSet,
     syncState?.latestRevisions
   );
+
+  const clientIdentity = syncState?.clientIdentity || randomString(16);
 
   //
   // Push changes to server
@@ -209,7 +221,8 @@ async function _sync(
     baseRevs,
     db,
     databaseUrl,
-    schema
+    schema,
+    clientIdentity
   );
   console.debug('Sync response', res);
 
@@ -290,19 +303,7 @@ async function _sync(
     // The purpose of this operation is to mark a start revision (per table)
     // so that all client-mutations that come after this, will be mapped to current
     // server revision.
-    await db.$baseRevs.bulkPut(
-      Object.keys(schema)
-        .filter((table) => schema[table].markedForSync)
-        .map((tableName) => {
-          const lastClientRevOnPreviousServerRev =
-            latestRevisions[tableName] || 0;
-          return {
-            tableName,
-            clientRev: lastClientRevOnPreviousServerRev + 1,
-            serverRev: res.serverRevision,
-          };
-        })
-    );
+    await updateBaseRevs(db, schema, latestRevisions, res.serverRevision);
 
     const syncState = await db.getPersistedSyncState();
 
@@ -314,11 +315,12 @@ async function _sync(
     //
     // Update syncState
     //
-    const newSyncState = syncState || {
+    const newSyncState: PersistedSyncState = syncState || {
       syncedTables: [],
       latestRevisions: {},
       realms: [],
       inviteRealms: [],
+      clientIdentity
     };
     newSyncState.syncedTables = tablesToSync
       .map((tbl) => tbl.name)
@@ -393,17 +395,6 @@ async function deleteObjectsFromRemovedRealms(
   }
 }
 
-function getLatestRevisionsPerTable(
-  clientChangeSet: DBOperationsSet,
-  lastRevisions = {} as { [table: string]: number }
-) {
-  for (const { table, muts } of clientChangeSet) {
-    const lastRev = muts.length > 0 ? muts[muts.length - 1].rev || 0 : 0;
-    lastRevisions[table] = lastRev;
-  }
-  return lastRevisions;
-}
-
 export async function applyServerChanges(
   changes: DBOperationsSet,
   db: DexieCloudDB
@@ -411,6 +402,7 @@ export async function applyServerChanges(
   console.debug('Applying server changes', changes, Dexie.currentTransaction);
   for (const { table: tableName, muts } of changes) {
     const table = db.table(tableName);
+    if (!table) continue; // If server sends changes on a table we don't have, ignore it.
     const { primaryKey } = table.core.schema;
     for (const mut of muts) {
       switch (mut.type) {
@@ -452,7 +444,7 @@ export async function applyServerChanges(
   }
 }
 
-function filterServerChangesThroughAddedClientChanges(
+export function filterServerChangesThroughAddedClientChanges(
   serverChanges: DBOperationsSet,
   addedClientChanges: DBOperationsSet
 ): DBOperationsSet {

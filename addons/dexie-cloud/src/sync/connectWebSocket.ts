@@ -1,110 +1,133 @@
-import { from, of } from 'rxjs';
+import { BehaviorSubject, from, Observable, of, throwError } from 'rxjs';
 import {
   catchError,
+  debounceTime,
   delay,
+  distinctUntilChanged,
   filter,
+  map,
   switchMap,
-  take
+  take,
+  tap,
 } from 'rxjs/operators';
-import {
-  refreshAccessToken
-} from '../authentication/authenticate';
+import { refreshAccessToken } from '../authentication/authenticate';
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { FakeBigInt } from '../TSON';
+import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import {
-  userDoesSomething, userIsActive
+  userDoesSomething,
+  userIsActive,
+  userIsReallyActive,
 } from '../userIsActive';
-import { WSObservable } from '../WSObservable';
-import { triggerSync } from './triggerSync';
+import {
+  ReadyForChangesMessage,
+  WSConnectionMsg,
+  WSObservable,
+} from '../WSObservable';
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+async function waitAndReconnectWhenUserDoesSomething(error: Error) {
+  console.error(
+    `WebSocket observable: error but revive when user does some active thing...`,
+    error
+  );
+  // Sleep some seconds...
+  await sleep(3000);
+  // Wait til user does something (move mouse, tap, scroll, click etc)
+  console.debug('waiting for someone to do something');
+  await userDoesSomething.pipe(take(1)).toPromise();
+  console.debug('someone did something!');
+}
 
 export function connectWebSocket(db: DexieCloudDB) {
   if (!db.cloud.options?.databaseUrl) {
     throw new Error(`No database URL to connect WebSocket to`);
   }
 
-  function createObservable() {
-    return userIsActive.pipe(
-      filter((isActive) => isActive), // Reconnect when user becomes active
-      switchMap(() => db.cloud.currentUser), // Reconnect whenever current user changes
-      filter(() => db.cloud.persistedSyncState?.value?.serverRevision), // Don't connect before there's no initial sync performed.
-      switchMap(
-        (userLogin) =>
-          new WSObservable(
-            db.cloud.options!.databaseUrl,
-            db.cloud.persistedSyncState?.value?.serverRevision,
-            userLogin.accessToken,
-            userLogin.accessTokenExpiration
-          )
+  const messageProducer = db.messageConsumer.readyToServe.pipe(
+    filter((isReady) => isReady), // When consumer is ready for new messages, produce such a message to inform server about it
+    switchMap(() => db.getPersistedSyncState()), // We need the info on which server revision we are at:
+    filter((syncState) => syncState && syncState.serverRevision), // We wont send anything to server before inital sync has taken place
+    map<PersistedSyncState, ReadyForChangesMessage>((syncState) => ({
+      // Produce the message to trigger server to send us new messages to consume:
+      type: 'ready',
+      rev: syncState.serverRevision,
+    }))
+  );
+
+  function createObservable(): Observable<WSConnectionMsg | null> {
+    return db.cloud.persistedSyncState.pipe(
+      filter(syncState => syncState?.serverRevision),// Don't connect before there's no initial sync performed.
+      take(1), // Don't continue waking up whenever syncState change
+      switchMap(()=> db.cloud.currentUser),
+      switchMap((userLogin) =>
+        userIsReallyActive.pipe(
+          map((isActive) => (isActive ? userLogin : null))
+        )
+      ),
+      switchMap((userLogin) =>
+        // Let server end query changes from last entry of same client-ID and forward.
+        // If no new entries, server won't bother the client. If new entries, server sends only those
+        // and the baseRev of the last from same client-ID.
+        userLogin
+          ? new WSObservable(
+              db.cloud.options!.databaseUrl,
+              db.cloud.persistedSyncState!.value!.serverRevision,
+              db.cloud.persistedSyncState!.value!.clientIdentity,
+              messageProducer,
+              db.cloud.webSocketStatus,
+              userLogin.accessToken,
+              userLogin.accessTokenExpiration
+            )
+          : from([] as WSConnectionMsg[])
       ),
       catchError((error) => {
-        return from(handleError(error)).pipe(
-          switchMap(() => createObservable()),
-          catchError((error) => {
-            // Failed to refresh token (network error or so)
-            console.error(
-              `WebSocket observable: error but revive when user does some active thing...`,
-              error
-            );
-            return of(true).pipe(
-              delay(3000), // Give us some breath between errors
-              switchMap(()=>userDoesSomething),
-              take(1), // Don't reconnect whenever user does something
-              switchMap(() => createObservable()) // Relaunch the flow
-            );
-          })
-        );
-
-        async function handleError(error: any) {
-          if (error?.name === 'TokenExpiredError') {
-            console.debug(
-              'WebSocket observable: Token expired. Refreshing token...'
-            );
-            const user = db.cloud.currentUser.value;
-            const refreshedLogin = await refreshAccessToken(
-              db.cloud.options!.databaseUrl,
-              user
-            );
-            await db.table('$logins').update(user.userId, {
-              accessToken: refreshedLogin.accessToken,
-              accessTokenExpiration: refreshedLogin.accessTokenExpiration,
-            });
-          } else {
-            console.error('WebSocket observable:', error);
-            throw error;
-          }
+        if (error?.name === 'TokenExpiredError') {
+          console.debug(
+            'WebSocket observable: Token expired. Refreshing token...'
+          );
+          return of(true).pipe(
+            switchMap(async () => {
+              // Refresh access token
+              const user = await db.getCurrentUser();
+              const refreshedLogin = await refreshAccessToken(
+                db.cloud.options!.databaseUrl,
+                user
+              );
+              // Persist updated access token
+              await db.table('$logins').update(user.userId, {
+                accessToken: refreshedLogin.accessToken,
+                accessTokenExpiration: refreshedLogin.accessTokenExpiration,
+              });
+            }),
+            switchMap(() => createObservable())
+          );
+        } else {
+          return throwError(error);
         }
-      })
+      }),
+      catchError((error) =>
+        from(waitAndReconnectWhenUserDoesSomething(error)).pipe(
+          switchMap(() => createObservable())
+        )
+      )
     );
   }
 
-  return createObservable().subscribe(async (msg) => {
-    const syncState = await db.getPersistedSyncState();
-    switch (msg.type) {
-      case 'rev':
-        if (
-          !syncState?.serverRevision ||
-          FakeBigInt.compare(
-            syncState.serverRevision,
-            typeof BigInt === 'undefined'
-              ? new FakeBigInt(msg.rev)
-              : BigInt(msg.rev)
-          ) < 0
-        ) {
-          triggerSync(db);
-        }
-        break;
-      case 'realm-added':
-        {
-          if (!syncState?.realms?.includes(msg.realm)) {
-            triggerSync(db);
-          }
-        }
-        break;
-      case 'realm-removed':
-        if (syncState?.realms?.includes(msg.realm)) {
-          triggerSync(db);
-        }
-        break;
+  return createObservable().subscribe(
+    (msg) => {
+      if (msg) {
+        console.debug('WS got message', msg);
+        db.messageConsumer.enqueue(msg);
+      }
+    },
+    (error) => {
+      console.error('Oops! The main observable errored!', error);
+    },
+    () => {
+      console.error('Oops! The main observable completed!');
     }
-  });
+  );
 }
