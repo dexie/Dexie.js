@@ -87,23 +87,23 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
               !persistedSyncState?.serverRevision ||
               compareBigInts(persistedSyncState.serverRevision, msg.rev) < 0
             ) {
-              triggerSync(db, "pull");
+              triggerSync(db, 'pull');
             }
             break;
           case 'realm-added':
             if (!persistedSyncState?.realms?.includes(msg.realm)) {
-              triggerSync(db, "pull");
+              triggerSync(db, 'pull');
             }
             break;
           case 'realm-removed':
             if (persistedSyncState?.realms?.includes(msg.realm)) {
-              triggerSync(db, "pull");
+              triggerSync(db, 'pull');
             }
             break;
           case 'changes':
             console.debug('changes');
             if (db.cloud.syncState.value?.phase === 'error') {
-              triggerSync(db, "pull");
+              triggerSync(db, 'pull');
               break;
             }
             await db.transaction('rw', db.dx.tables, async (tx) => {
@@ -139,11 +139,12 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
               console.debug('ourRealmSetHash', ourRealmSetHash);
               if (ourRealmSetHash !== msg.realmSetHash) {
                 console.debug('not same realmSetHash', msg.realmSetHash);
-                triggerSync(db, "pull");
+                triggerSync(db, 'pull');
                 // The message isn't based on the same realms.
                 // Trigger a sync instead to resolve all things up.
                 return;
               }
+
               // Get clientChanges
               let clientChanges: DBOperationsSet = [];
               if (currentUser.isLoggedIn) {
@@ -153,20 +154,22 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
                 clientChanges = await listClientChanges(mutationTables, db);
                 console.debug('msg queue: client changes', clientChanges);
               }
-              const filteredChanges =
-                filterServerChangesThroughAddedClientChanges(
-                  msg.changes,
-                  clientChanges
-                );
+              if (msg.changes.length > 0) {
+                const filteredChanges =
+                  filterServerChangesThroughAddedClientChanges(
+                    msg.changes,
+                    clientChanges
+                  );
 
-              //
-              // apply server changes
-              //
-              console.debug(
-                'applying filtered server changes',
-                filteredChanges
-              );
-              await applyServerChanges(filteredChanges, db);
+                //
+                // apply server changes
+                //
+                console.debug(
+                  'applying filtered server changes',
+                  filteredChanges
+                );
+                await applyServerChanges(filteredChanges, db);
+              }
 
               // Update latest revisions per table in case there are unsynced changes
               // This can be a real case in future when we allow non-eagery sync.
@@ -175,6 +178,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
                 clientChanges,
                 syncState.latestRevisions
               );
+
               syncState.serverRevision = msg.newRev;
 
               // Update base revs
