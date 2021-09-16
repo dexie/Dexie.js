@@ -66,6 +66,7 @@ function syncDB(dbName: string, purpose: 'push' | 'pull') {
         // Avoid race conditions.
         managedDBs.delete(db!.name);
       }
+      console.debug(`Dexie Cloud SW: Closing Dexie instance for ${dbName}`);
       db!.dx.close();
       return false;
     }
@@ -115,7 +116,7 @@ if (!DISABLE_SERVICEWORKER_STRATEGY) {
       // Mimic background sync behavior - retry in X minutes on failure.
       // But lesser timeout and more number of times.
       const syncAndRetry = (num = 1) => {
-        return syncDB(dbName, event.data.purpuse || "pull").catch(async (e) => {
+        return syncDB(dbName, event.data.purpose || "pull").catch(async (e) => {
           if (num === 3) throw e;
           await sleep(60_000); // 1 minute
           syncAndRetry(num + 1);
