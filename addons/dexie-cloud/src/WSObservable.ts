@@ -11,7 +11,7 @@ const FAIL_RETRY_WAIT_TIME = 60000;
 export type WSClientToServerMsg = ReadyForChangesMessage;
 export interface ReadyForChangesMessage {
   type: 'ready';
-  rev: bigint;
+  rev: string;
 }
 
 export type WSConnectionMsg =
@@ -35,9 +35,9 @@ interface ErrorMessage {
 
 export interface ChangesFromServerMessage {
   type: 'changes';
-  baseRev: bigint;
+  baseRev: string;
   realmSetHash: string;
-  newRev: bigint;
+  newRev: string;
   changes: DBOperationsSet;
 }
 export interface RevisionChangedMessage {
@@ -236,6 +236,7 @@ export class WSConnection extends Subscription {
     wsUrl.protocol = wsUrl.protocol === 'http:' ? 'ws' : 'wss';
     const searchParams = new URLSearchParams();
     if (this.subscriber.closed) return;
+    searchParams.set('v', "2");
     searchParams.set('rev', this.rev);
     searchParams.set('clientId', this.clientIdentity);
     if (this.token) {

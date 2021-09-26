@@ -35,6 +35,7 @@ export async function syncWithServer(
   }
 
   const syncRequest: SyncRequest = {
+    v:2,
     dbID: syncState?.remoteDbId,
     clientIdentity,
     schema: schema || {},

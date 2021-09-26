@@ -3,11 +3,12 @@ import { DBOperationsSet } from './DBOperationsSet.js';
 import { DexieCloudSchema } from './DexieCloudSchema.js';
 
 export interface SyncRequest {
+  v?: number;
   dbID?: string;
   clientIdentity?: string;
   schema: DexieCloudSchema;
   lastPull?: {
-    serverRevision: any;
+    serverRevision: string | bigint;
     realms: string[];
     inviteRealms: string[];
   };

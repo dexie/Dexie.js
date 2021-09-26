@@ -1,7 +1,6 @@
 import { BehaviorSubject } from 'rxjs';
 import { filter, take } from 'rxjs/operators';
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { compareBigInts, FakeBigInt } from '../TSON';
 import { WSConnectionMsg } from '../WSObservable';
 import { triggerSync } from './triggerSync';
 import Dexie from 'dexie';
@@ -82,14 +81,6 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
             // in turn will lead to that connectWebSocket.ts will reconnect the socket with the
             // new token. So we don't need to do anything more here.
             break;
-          case 'rev':
-            if (
-              !persistedSyncState?.serverRevision ||
-              compareBigInts(persistedSyncState.serverRevision, msg.rev) < 0
-            ) {
-              triggerSync(db, 'pull');
-            }
-            break;
           case 'realm-added':
             if (!persistedSyncState?.realms?.includes(msg.realm)) {
               triggerSync(db, 'pull');
@@ -126,14 +117,21 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
                 return; // Initial sync must have taken place - otherwise, ignore this.
               }
               // Verify again in ACID tx that we're on same server revision.
-              if (compareBigInts(msg.baseRev, syncState.serverRevision) !== 0) {
+              if (msg.baseRev !== syncState.serverRevision) {
                 console.debug(
                   `baseRev (${msg.baseRev}) differs from our serverRevision in syncState (${syncState.serverRevision})`
                 );
+                // Should we trigger a sync now? No. This is a normal case
+                // when another local peer (such as the SW or a websocket channel on other tab) has
+                // updated syncState from new server information but we are not aware yet. It would
+                // be unnescessary to do a sync in that case. Instead, the caller of this consumeQueue()
+                // function will do readyToServe.next(true) right after this return, which will lead
+                // to a "ready" message being sent to server with the new accurate serverRev we have,
+                // so that the next message indeed will be correct.
                 return; // Ignore message
               }
               // Verify also that the message is based on the exact same set of realms
-              const ourRealmSetHash = await Dexie.waitFor(
+              const ourRealmSetHash = await Dexie.waitFor( // Keep TX in non-IDB work
                 computeRealmSetHash(syncState)
               );
               console.debug('ourRealmSetHash', ourRealmSetHash);
