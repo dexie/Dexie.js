@@ -11,6 +11,7 @@ import Promise, {
   rejection,
   incrementExpectedAwaits
 } from '../../helpers/promise';
+import { workaroundIssue613 } from '../../helpers/workaround-issue-613';
 
 export function extractTransactionArgs(mode: TransactionMode, _tableArgs_, scopeFunc) {
   // Let table arguments be all arguments between mode and last argument.
@@ -88,6 +89,24 @@ export function enterTransactionScope(
       // (if root transaction, this means 'complete' event. If sub-transaction, we've just fired it ourselves)
       return trans._completion.then(() => x);
     }).catch(e => {
+      if (!parentTransaction) {
+        // Only do this in topmost transactions.
+        // If we are in a sub transaction,
+        // the error will propagate to its parent and
+        // reach this code path on the parent transaction.
+        // What we want is to re-execute the entire topmost
+        // transaction again.
+        const reopenPromise = workaroundIssue613(db, e);
+        if (reopenPromise) {
+          return reopenPromise.then(() => enterTransactionScope(
+            db,
+            mode,
+            storeNames,
+            null,
+            scopeFunc
+          ));
+        }
+      }
       trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
       return rejection(e);
     });

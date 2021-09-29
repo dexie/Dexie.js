@@ -4,6 +4,7 @@ import { exceptions } from "../errors";
 import { nop } from "./chaining-functions";
 import { Transaction } from "../classes/transaction";
 import { Dexie } from '../classes/dexie';
+import { workaroundIssue613 } from "../helpers/workaround-issue-613";
 
 /* Generate a temporary transaction when db operations are done outside a transaction scope.
 */
@@ -28,7 +29,11 @@ export function tempTransaction (
     return db._state.dbReadyPromise.then(() => tempTransaction(db, mode, storeNames, fn));
   } else {
     var trans = db._createTransaction(mode, storeNames, db._dbSchema);
-    try { trans.create(); } catch (ex) { return rejection(ex); }
+    try { trans.create(); } catch (ex) {
+      const reopenPromise = workaroundIssue613(db, ex);
+      if (reopenPromise) return reopenPromise.then(()=>tempTransaction(db, mode, storeNames, fn));
+      return rejection(ex);
+    }
     return trans._promise(mode, (resolve, reject) => {
       return newScope(() => { // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
         PSD.trans = trans;
@@ -46,7 +51,12 @@ export function tempTransaction (
       //   });
       //
       return trans._completion.then(() => result);
-    });/*.catch(err => { // Don't do this as of now. If would affect bulk- and modify methods in a way that could be more intuitive. But wait! Maybe change in next major.
+    }).catch(err => {
+      const reopenPromise = workaroundIssue613(db, err);
+      if (reopenPromise) return reopenPromise.then(()=>tempTransaction(db, mode, storeNames, fn));
+      return rejection(err);
+    });
+    ;/*.catch(err => { // Don't do this as of now. If would affect bulk- and modify methods in a way that could be more intuitive. But wait! Maybe change in next major.
           trans._reject(err);
           return rejection(err);
       });*/
