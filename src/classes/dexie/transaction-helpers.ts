@@ -1,5 +1,5 @@
 import { TransactionMode } from '../../public/types/transaction-mode';
-import { exceptions } from '../../errors';
+import { errnames, exceptions } from '../../errors';
 import { flatten, isAsyncFunction } from '../../functions/utils';
 import { Dexie } from './dexie';
 import { Transaction } from '../transaction';
@@ -11,7 +11,6 @@ import Promise, {
   rejection,
   incrementExpectedAwaits
 } from '../../helpers/promise';
-import { workaroundIssue613 } from '../../helpers/workaround-issue-613';
 
 export function extractTransactionArgs(mode: TransactionMode, _tableArgs_, scopeFunc) {
   // Let table arguments be all arguments between mode and last argument.
@@ -50,7 +49,22 @@ export function enterTransactionScope(
       // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
       trans.idbtrans = parentTransaction.idbtrans;
     } else {
-      trans.create(); // Create the backend transaction so that complete() or error() will trigger even if no operation is made upon it.
+      try {
+        trans.create(); // Create the native transaction so that complete() or error() will trigger even if no operation is made upon it.
+      } catch (ex) {
+        if (ex.name === errnames.InvalidState && db.isOpen()) {
+          console.warn('Dexie: Need to reopen db');
+          db.close();
+          return db.open().then(() => enterTransactionScope(
+            db,
+            mode,
+            storeNames,
+            null,
+            scopeFunc
+          ));
+        }
+        return rejection(ex);
+      }
     }
 
     // Support for native async await.
@@ -89,24 +103,6 @@ export function enterTransactionScope(
       // (if root transaction, this means 'complete' event. If sub-transaction, we've just fired it ourselves)
       return trans._completion.then(() => x);
     }).catch(e => {
-      if (!parentTransaction) {
-        // Only do this in topmost transactions.
-        // If we are in a sub transaction,
-        // the error will propagate to its parent and
-        // reach this code path on the parent transaction.
-        // What we want is to re-execute the entire topmost
-        // transaction again.
-        const reopenPromise = workaroundIssue613(db, e);
-        if (reopenPromise) {
-          return reopenPromise.then(() => enterTransactionScope(
-            db,
-            mode,
-            storeNames,
-            null,
-            scopeFunc
-          ));
-        }
-      }
       trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
       return rejection(e);
     });
