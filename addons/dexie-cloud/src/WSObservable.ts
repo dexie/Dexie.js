@@ -18,6 +18,7 @@ export type WSConnectionMsg =
   | RevisionChangedMessage
   | RealmAddedMessage
   | RealmRemovedMessage
+  | RealmsChangedMessage
   | ChangesFromServerMessage
   | TokenExpiredMessage;
 interface PingMessage {
@@ -54,6 +55,11 @@ export interface RealmRemovedMessage {
   type: 'realm-removed';
   realm: string;
 }
+
+export interface RealmsChangedMessage {
+  type: 'realms-changed';
+  realmsHash: string;
+}
 export interface TokenExpiredMessage {
   type: 'token-expired';
 }
@@ -62,6 +68,7 @@ export class WSObservable extends Observable<WSConnectionMsg> {
   constructor(
     databaseUrl: string,
     rev: string,
+    realmSetHash: string,
     clientIdentity: string,
     messageProducer: Observable<WSClientToServerMsg>,
     webSocketStatus: BehaviorSubject<DXCWebSocketStatus>,
@@ -73,6 +80,7 @@ export class WSObservable extends Observable<WSConnectionMsg> {
         new WSConnection(
           databaseUrl,
           rev,
+          realmSetHash,
           clientIdentity,
           token,
           tokenExpiration,
@@ -93,6 +101,7 @@ export class WSConnection extends Subscription {
   lastPing: Date;
   databaseUrl: string;
   rev: string;
+  realmSetHash: string;
   clientIdentity: string;
   token: string | undefined;
   tokenExpiration: Date | undefined;
@@ -108,6 +117,7 @@ export class WSConnection extends Subscription {
   constructor(
     databaseUrl: string,
     rev: string,
+    realmSetHash: string,
     clientIdentity: string,
     token: string | undefined,
     tokenExpiration: Date | undefined,
@@ -123,6 +133,7 @@ export class WSConnection extends Subscription {
     );
     this.databaseUrl = databaseUrl;
     this.rev = rev;
+    this.realmSetHash = realmSetHash;
     this.clientIdentity = clientIdentity;
     this.token = token;
     this.tokenExpiration = tokenExpiration;
@@ -238,6 +249,7 @@ export class WSConnection extends Subscription {
     if (this.subscriber.closed) return;
     searchParams.set('v', "2");
     searchParams.set('rev', this.rev);
+    searchParams.set('realmsHash', this.realmSetHash);
     searchParams.set('clientId', this.clientIdentity);
     if (this.token) {
       searchParams.set('token', this.token);

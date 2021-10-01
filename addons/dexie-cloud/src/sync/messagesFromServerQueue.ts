@@ -91,6 +91,9 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
               triggerSync(db, 'pull');
             }
             break;
+          case 'realms-changed':
+            triggerSync(db, 'pull');
+            break;
           case 'changes':
             console.debug('changes');
             if (db.cloud.syncState.value?.phase === 'error') {
