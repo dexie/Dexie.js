@@ -51,6 +51,9 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
       const msg = queue.shift();
       try {
         console.debug('processing msg', msg);
+        // If the sync worker or service worker is syncing, wait 'til thei're done.
+        // It's no need to have two channels at the same time - even though it wouldnt
+        // be a problem - this is an optimization.
         await db.cloud.syncState
           .pipe(
             filter(({ phase }) => phase === 'in-sync' || phase === 'error'),
@@ -131,10 +134,21 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
                 // function will do readyToServe.next(true) right after this return, which will lead
                 // to a "ready" message being sent to server with the new accurate serverRev we have,
                 // so that the next message indeed will be correct.
+                if (
+                  typeof msg.baseRev === 'string' && // v2 format
+                  (typeof syncState.serverRevision === 'bigint' || // v1 format
+                    typeof syncState.serverRevision === 'object') // v1 format old browser
+                ) {
+                  // The reason for the diff seems to be that server has migrated the revision format.
+                  // Do a full sync to update revision format.
+                  // If we don't do a sync request now, we could stuck in an endless loop.
+                  triggerSync(db, 'pull');
+                }
                 return; // Ignore message
               }
               // Verify also that the message is based on the exact same set of realms
-              const ourRealmSetHash = await Dexie.waitFor( // Keep TX in non-IDB work
+              const ourRealmSetHash = await Dexie.waitFor(
+                // Keep TX in non-IDB work
                 computeRealmSetHash(syncState)
               );
               console.debug('ourRealmSetHash', ourRealmSetHash);
