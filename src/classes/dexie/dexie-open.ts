@@ -40,7 +40,7 @@ export function dexieOpen (db: Dexie) {
       wasCreated = false;
   
   // safari14Workaround = Workaround by jakearchibald for new nasty bug in safari 14.
-  return Promise.race([openCanceller, safari14Workaround().then(() => new Promise((resolve, reject) => {
+  return Promise.race([openCanceller, (typeof navigator === 'undefined' ? Promise.resolve() : safari14Workaround()).then(() => new Promise((resolve, reject) => {
       // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
       // IE fails when deleting objectStore after reading from it.
       // A future version of Dexie.js will stopover an intermediate version to workaround this.
