@@ -4,7 +4,6 @@ import { DexieCloudDB } from '../db/DexieCloudDB';
 import { sync, CURRENT_SYNC_WORKER, SyncOptions } from './sync';
 import { DexieCloudOptions } from '../DexieCloudOptions';
 import { DexieCloudSchema } from 'dexie-cloud-common';
-import { compareBigInts } from '../TSON';
 
 const ongoingSyncs = new WeakMap<
   DexieCloudDB,

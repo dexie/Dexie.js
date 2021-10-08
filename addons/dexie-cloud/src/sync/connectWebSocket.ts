@@ -13,6 +13,7 @@ import {
 import { refreshAccessToken } from '../authentication/authenticate';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { PersistedSyncState } from '../db/entities/PersistedSyncState';
+import { computeRealmSetHash } from '../helpers/computeRealmSetHash';
 import {
   userDoesSomething,
   userIsActive,
@@ -61,13 +62,14 @@ export function connectWebSocket(db: DexieCloudDB) {
     return db.cloud.persistedSyncState.pipe(
       filter(syncState => syncState?.serverRevision),// Don't connect before there's no initial sync performed.
       take(1), // Don't continue waking up whenever syncState change
-      switchMap(()=> db.cloud.currentUser),
-      switchMap((userLogin) =>
+      switchMap((syncState)=> db.cloud.currentUser.pipe(map(userLogin => [userLogin, syncState] as const))),
+      switchMap(([userLogin, syncState]) =>
         userIsReallyActive.pipe(
-          map((isActive) => (isActive ? userLogin : null))
+          map((isActive) => ([isActive ? userLogin : null, syncState] as const))
         )
       ),
-      switchMap((userLogin) =>
+      switchMap(async ([userLogin, syncState]) => [userLogin, await computeRealmSetHash(syncState!)] as const),
+      switchMap(([userLogin, realmSetHash]) =>
         // Let server end query changes from last entry of same client-ID and forward.
         // If no new entries, server won't bother the client. If new entries, server sends only those
         // and the baseRev of the last from same client-ID.
@@ -75,6 +77,7 @@ export function connectWebSocket(db: DexieCloudDB) {
           ? new WSObservable(
               db.cloud.options!.databaseUrl,
               db.cloud.persistedSyncState!.value!.serverRevision,
+              realmSetHash,
               db.cloud.persistedSyncState!.value!.clientIdentity,
               messageProducer,
               db.cloud.webSocketStatus,
