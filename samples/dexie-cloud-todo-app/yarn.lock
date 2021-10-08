@@ -3190,9 +3190,9 @@ caniuse-api@^3.0.0:
     lodash.uniq "^4.5.0"
 
 caniuse-lite@^1.0.0, caniuse-lite@^1.0.30000981, caniuse-lite@^1.0.30001109, caniuse-lite@^1.0.30001125, caniuse-lite@^1.0.30001181:
-  version "1.0.30001191"
-  resolved "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001191.tgz"
-  integrity sha512-xJJqzyd+7GCJXkcoBiQ1GuxEiOBCLQ0aVW9HMekifZsAVGdj5eJ4mFB9fEhSHipq9IOk/QXFJUiIr9lZT+EsGw==
+  version "1.0.30001265"
+  resolved "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001265.tgz"
+  integrity sha512-YzBnspggWV5hep1m9Z6sZVLOt7vrju8xWooFAgN6BA5qvy98qPAPb7vNUzypFaoh2pb3vlfzbDO8tB57UPGbtw==
 
 capture-exit@^2.0.0:
   version "2.0.0"
@@ -4157,9 +4157,9 @@ detect-port-alt@1.1.6:
     debug "^2.6.0"
 
 dexie-cloud-addon@^1.0.0-beta.10:
-  version "1.0.0-beta.10"
-  resolved "https://registry.npmjs.org/dexie-cloud-addon/-/dexie-cloud-addon-1.0.0-beta.10.tgz"
-  integrity sha512-8unQbfFJouiepsL1SBV3L4o/xKiW+cuspQVz9fENigBMxnR9yVGOh+EEOTahIhNrdiCC7NYjYw+lUmKROZxZPw==
+  version "1.0.0-beta.11"
+  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-1.0.0-beta.11.tgz#20d5989aca0f77ba65393e020debc5583c996bbf"
+  integrity sha512-EFsz70V6jtqH/Yq2+m6Glr+ylMxM80UlcuEGMNkpNrokk5KA0NkTu/CFdzWwq5HFTf+67or6uBAEssI5Ju/LdQ==
   dependencies:
     rxjs "^6.6.7"
 
@@ -4169,9 +4169,9 @@ dexie-react-hooks@1.0.7:
   integrity sha512-hqXGFbfgu1rdfcGHQUPwW2G0iWyupoNWnk3ODvqr+HdZt2ip3y1e/dcWIOsEnlUWWCWk6a3+ok0fvECU05eE2A==
 
 dexie@^3.2.0-beta.2:
-  version "3.2.0-rc.1"
-  resolved "https://registry.yarnpkg.com/dexie/-/dexie-3.2.0-rc.1.tgz#e7b0cdecbb192cdccbcdcb6d1cb0db318eeb72ac"
-  integrity sha512-G8KmAt27MsD8Cdh3lzYUSU0dunBeUPHHsWsG0Ax0BHFozuSeHxMb+D5hnucG34spwAj7qXkupnsF7SDudjrBhw==
+  version "3.2.0-rc.2"
+  resolved "https://registry.yarnpkg.com/dexie/-/dexie-3.2.0-rc.2.tgz#4eab428b2e0c7c59a34e0a65e761b773f1cfa91f"
+  integrity sha512-QUOyDxDOha4sPFlQazUaiEMg04Lo4ceyIrFB8E59q1nMH0K3HRzCmUObM177gd8bDfIcT4qdjlUo9X2SSxBqdA==
 
 diff-sequences@^26.6.2:
   version "26.6.2"
@@ -9842,7 +9842,7 @@ run-queue@^1.0.0, run-queue@^1.0.3:
 
 rxjs@^6.6.7:
   version "6.6.7"
-  resolved "https://registry.npmjs.org/rxjs/-/rxjs-6.6.7.tgz"
+  resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-6.6.7.tgz#90ac018acabf491bf65044235d5863c4dab804c9"
   integrity sha512-hTdwr+7yYNIT5n4AMYp85KA6yw2Va0FLa3Rguvbpa4W3I5xynaBZo41cM3XM+4Q6fRMj3sBYIR1VAmZMXYJvRQ==
   dependencies:
     tslib "^1.9.0"
