@@ -271,9 +271,8 @@ async function _sync(
           mutTable.clear(),
           db.$baseRevs.where({ tableName }).delete(),
         ]);
-      } else if (latestRevisions[mutTable.name]) {
-        const latestRev = latestRevisions[mutTable.name] || 0;
-        //await mutTable.where('rev').belowOrEqual(latestRev).reverse().offset(1).delete();
+      } else if (latestRevisions[tableName]) {
+        const latestRev = latestRevisions[tableName] || 0;
         await Promise.all([
           mutTable.where('rev').belowOrEqual(latestRev).delete(),
           db.$baseRevs
