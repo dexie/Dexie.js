@@ -34,6 +34,8 @@ test('it should support indexable types', () => {
   ok(cmp([1], [-1]) === 1, 'Greater than arrays should return 1');
   ok(cmp([1], [1, 0]) === -1, 'If second array is longer return -1');
   ok(cmp([1, 0], [1]) === 1, 'If first array is longer return 1');
+  ok(cmp([1], [0,0]) === 1, 'If first array is shorter by has greater leading entries, return 1');
+  ok(cmp([0,0], [1]) === 1, 'If second array is shorter by has greater leading entries, return -1');
 
   /* Binary types
   | DataView
