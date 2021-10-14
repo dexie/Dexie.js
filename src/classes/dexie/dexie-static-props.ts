@@ -22,6 +22,7 @@ import { globalEvents } from '../../globals/global-events';
 import { liveQuery } from '../../live-query/live-query';
 import { extendObservabilitySet } from '../../live-query/extend-observability-set';
 import { domDeps } from './dexie-dom-dependencies';
+import { cmp } from '../../functions/cmp';
 
 /* (Dexie) is an instance of DexieConstructor, as defined in public/types/dexie-constructor.d.ts
 *  (new Dexie()) is an instance of Dexie, as defined in public/types/dexie.d.ts
@@ -186,6 +187,7 @@ props(Dexie, {
   shallowClone: shallowClone,
   deepClone: deepClone,
   getObjectDiff: getObjectDiff,
+  cmp,
   asap: asap,
   //maxKey: new Dexie('',{addons:[]})._maxKey,
   minKey: minKey,
