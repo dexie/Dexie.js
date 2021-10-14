@@ -39,7 +39,7 @@ export function compareArrays(a: any[], b: any[]): number {
   const l = al < bl ? al : bl;
   for (let i = 0; i < l; ++i) {
     const res = cmp(a[i], b[i]);
-    if (res) return res;
+    if (res !== 0) return res;
   }
   return al === bl ? 0 : al < bl ? -1 : 1;
 }

@@ -142,3 +142,9 @@ test('it should treat different binary types as if they were equal', () => {
     ok(cmp(v1, zeroes1) === 0, `Comparing ${typeName} with ArrayBuffer should return 0 if they have identical data`);
   }
 });
+
+test('it should return NaN if comparing arrays where any item or sub array item includes an invalid key', ()=> {
+  ok(cmp([1, [[2, "3"]]], [1,[[2, "3"]]]) === 0, "It can deep compare arrays with valid keys (equals)");
+  ok(cmp([1, [[2, "3"]]], [1,[[2, 3]]]) === 1, "It can deep compare arrays with valid keys (greater than)");
+  ok(isNaN(cmp([1, [[2, 3]]], [1,[[{foo: "bar"}, 3]]])), "It returns NaN when any item in the any of the arrays are invalid keys");
+});
