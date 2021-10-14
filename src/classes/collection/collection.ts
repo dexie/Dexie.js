@@ -12,6 +12,7 @@ import { hangsOnDeleteLargeKeyRange } from "../../globals/constants";
 import { ThenShortcut } from "../../public/types/then-shortcut";
 import { Transaction } from '../transaction';
 import { DBCoreCursor, DBCoreTransaction, DBCoreRangeType, DBCoreMutateResponse, DBCoreKeyRange } from '../../public/types/dbcore';
+import { cmp } from "../../functions/cmp";
 
 /** class Collection
  * 
@@ -485,7 +486,6 @@ export class Collection implements ICollection {
       const coreTable = ctx.table.core;
       const {outbound, extractKey} = coreTable.schema.primaryKey;
       const limit = this.db._options.modifyChunkSize || 200;
-      const {cmp} = this.db.core;
       const totalFailures = [];
       let successCount = 0;
       const failedKeys: IndexableType[] = [];
