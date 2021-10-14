@@ -74,7 +74,6 @@ export function compareNumberArrays(
 function type(x: any) {
   const t = typeof x;
   if (t !== 'object') return t;
-  if (!t) return 'null';
   if (ArrayBuffer.isView(x)) return 'binary';
   const tsTag = toStringTag(x); // Cannot use instanceof in Safari
   return tsTag === 'ArrayBuffer' ? 'binary' : (tsTag as 'Array' | 'Date');
