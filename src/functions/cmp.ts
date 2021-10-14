@@ -24,26 +24,48 @@ export function cmp(a: any, b: any): number {
       case 'string':
         return a > b ? 1 : a < b ? -1 : 0;
       case 'binary': {
-        return compareNumberArrays(getUint8Array(a), getUint8Array(b));
+        return compareUint8Arrays(getUint8Array(a), getUint8Array(b));
       }
       case 'Array':
-        return idbCompareArrays(a, b);
+        return compareArrays(a, b);
     }
   } catch {}
   return NaN; // Return value if any given args are valid keys.
 }
 
-export function idbCompareArrays(a: any[], b: any[]): number {
-  const l = a.length;
-  if (l !== b.length) return l < b.length ? -1 : 1;
+export function compareArrays(a: any[], b: any[]): number {
+  const al = a.length;
+  const bl = b.length;
+  const l = al < bl ? al : bl;
   for (let i = 0; i < l; ++i) {
     const res = cmp(a[i], b[i]);
     if (res) return res;
   }
-  return 0;
+  return al === bl ? 0 : al < bl ? -1 : 1;
 }
 
-// Add binary types to TypeMap:
+export function compareUint8Arrays(
+  a: Uint8Array,
+  b: Uint8Array
+) {
+  const al = a.length;
+  const bl = b.length;
+  const l = al < bl ? al : bl;
+  for (let i = 0; i < l; ++i) {
+    if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
+  }
+  return al === bl ? 0 : al < bl ? -1 : 1;
+}
+
+// Implementation of https://www.w3.org/TR/IndexedDB-3/#key-type
+function type(x: any) {
+  const t = typeof x;
+  if (t !== 'object') return t;
+  if (ArrayBuffer.isView(x)) return 'binary';
+  const tsTag = toStringTag(x); // Cannot use instanceof in Safari
+  return tsTag === 'ArrayBuffer' ? 'binary' : (tsTag as 'Array' | 'Date');
+}
+
 type BinaryType =
   | ArrayBuffer
   | DataView
@@ -57,27 +79,6 @@ type BinaryType =
   | Int32Array
   | Float32Array
   | Float64Array;
-
-export function compareNumberArrays(
-  a: ArrayLike<number>,
-  b: ArrayLike<number>
-) {
-  const l = a.length;
-  if (l !== b.length) return l < b.length ? -1 : 1;
-  for (let i = 0; i < l; ++i) {
-    if (a[i] !== b[i]) return a[i] < b[i] ? -1 : 1;
-  }
-  return 0;
-}
-
-// Implementation of https://www.w3.org/TR/IndexedDB-3/#key-type
-function type(x: any) {
-  const t = typeof x;
-  if (t !== 'object') return t;
-  if (ArrayBuffer.isView(x)) return 'binary';
-  const tsTag = toStringTag(x); // Cannot use instanceof in Safari
-  return tsTag === 'ArrayBuffer' ? 'binary' : (tsTag as 'Array' | 'Date');
-}
 
 function getUint8Array(a: BinaryType): Uint8Array {
   if (a instanceof Uint8Array) return a;
