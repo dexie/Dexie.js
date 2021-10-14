@@ -90,7 +90,7 @@ test("it should respect IndexedDB's type order", () => {
     new Date(),
     Infinity,
     -Infinity,
-    new ArrayBuffer(),
+    new ArrayBuffer(1),
     [[]],
   ];
   const [minusInfinity, num, infinity, date, string, binary, array] =
