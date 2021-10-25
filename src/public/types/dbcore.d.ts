@@ -126,7 +126,7 @@ export interface DBCoreCursor {
   advance(count: number): void;
   start(onNext: ()=>void): Promise<any>
   stop(value?: any | Promise<any>): void;
-  next(): Promise<DBCoreCursor>;
+  next(key?: any, primaryKey?: any): Promise<DBCoreCursor>;
   fail(error: Error): void;
 }
 

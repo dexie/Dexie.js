@@ -233,11 +233,17 @@ export function createDBCore (
           (cursor as any).trans = trans;
           cursor.stop = cursor.continue = cursor.continuePrimaryKey = cursor.advance = doThrowCursorIsNotStarted;
           cursor.fail = wrap(reject);
-          cursor.next = function (this: DBCoreCursor) {
+          cursor.next = function (this: DBCoreCursor, key?: any, primaryKey?: any) {
             // next() must work with "this" pointer in order to function correctly for ProxyCursors (derived objects)
             // without having to re-define next() on each child.
             let gotOne = 1;
-            return this.start(() => gotOne-- ? this.continue() : this.stop()).then(() => this);
+            return this.start(() => gotOne--
+            ? primaryKey == null
+              ? key == null
+                ? this.continue()
+                : this.continue(key)
+              : this.continuePrimaryKey(key, primaryKey)
+            : this.stop()).then(() => this);
           };
           cursor.start = (callback) => {
             //console.log("Starting cursor", (cursor as any).___id);
