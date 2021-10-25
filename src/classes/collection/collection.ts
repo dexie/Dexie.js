@@ -22,17 +22,19 @@ export class Collection implements ICollection {
   db: Dexie;
   _ctx: {
     table: Table;
-    index?: string | null;
-    isPrimKey?: boolean;
-    range: DBCoreKeyRange;
-    keysOnly: boolean;
+    //index?: string | null;
+    criterias: {keyPath: string | null, op: string, args: any[]}[];
+    orderBy?: {keyPath: string}[];
+    //isPrimKey?: boolean;
+    //range: DBCoreKeyRange;
+    //keysOnly: boolean;
     dir: "next" | "prev";
     unique: "" | "unique";
-    algorithm?: Function | null;
-    filter?: Function | null;
-    replayFilter: Function | null;
-    justLimit: boolean; // True if a replayFilter is just a filter that performs a "limit" operation (or none at all)
-    isMatch: Function | null;
+    //algorithm?: Function | null;
+    filter?: (x: any) => boolean;
+    //replayFilter: Function | null;
+    //justLimit: boolean; // True if a replayFilter is just a filter that performs a "limit" operation (or none at all)
+    //isMatch: Function | null;
     offset: number,
     limit: number,
     error: any, // If set, any promise must be rejected with this error
@@ -40,7 +42,7 @@ export class Collection implements ICollection {
     valueMapper: (any) => any
   }
   
-  _ondirectionchange?: Function;
+  //_ondirectionchange?: Function;
 
   _read<T>(fn: (idbtrans: IDBTransaction, dxTrans: Transaction) => PromiseLike<T>, cb?): PromiseExtended<T> {
     var ctx = this._ctx;
@@ -56,11 +58,6 @@ export class Collection implements ICollection {
       ctx.table._trans('readwrite', fn, "locked"); // When doing write operations on collections, always lock the operation so that upcoming operations gets queued.
   }
 
-  _addAlgorithm(fn) {
-    var ctx = this._ctx;
-    ctx.algorithm = combine(ctx.algorithm, fn);
-  }
-
   _iterate(
     fn: (item, cursor: DBCoreCursor, advance: Function) => void,
     coreTrans: DBCoreTransaction) : Promise<any>
@@ -73,7 +70,7 @@ export class Collection implements ICollection {
    * http://dexie.org/docs/Collection/Collection.clone()
    * 
    **/
-  clone(props?) {
+  clone(props?: Partial<Collection["_ctx"]>) {
     var rv = Object.create(this.constructor.prototype),
       ctx = Object.create(this._ctx);
     if (props) extend(ctx, props);
@@ -87,8 +84,7 @@ export class Collection implements ICollection {
    * 
    **/
   raw() {
-    this._ctx.valueMapper = null;
-    return this;
+    return this.clone({valueMapper: null});
   }
 
   /** Collection.each()

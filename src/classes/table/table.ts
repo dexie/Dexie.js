@@ -16,6 +16,9 @@ import { debug } from '../../helpers/debug';
 import { DBCoreTable } from '../../public/types/dbcore';
 import { AnyRange } from '../../dbcore/keyrange';
 import { workaroundForUndefinedPrimKey } from '../../functions/workaround-undefined-primkey';
+import { cmp, type } from '../../functions/cmp';
+import { resolveMango } from './resolveMango';
+import { fail } from '../where-clause/where-clause-helpers';
 
 /** class Table
  * 
@@ -88,49 +91,57 @@ export class Table implements ITable<any, IndexableType> {
    * 
    **/
   where(indexOrCrit: string | string[] | { [key: string]: IndexableType }) {
-    if (typeof indexOrCrit === 'string')
-      return new this.db.WhereClause(this, indexOrCrit);
-    if (isArray(indexOrCrit))
-      return new this.db.WhereClause(this, `[${indexOrCrit.join('+')}]`);
+    const typ = type(indexOrCrit);
+    if (typ === 'string')
+      return new this.db.WhereClause(this, indexOrCrit as string);
+    if (typ === 'Array')
+      return new this.db.WhereClause(this, `[${(indexOrCrit as string[]).join('+')}]`);
     // indexOrCrit is an object map of {[keyPath]:value} 
+    if (typ !== "Object") {
+      throw exceptions.Type(`Invalid where-criteria`);
+    }
     const keyPaths = keys(indexOrCrit);
-    if (keyPaths.length === 1)
-      // Only one critera. This was the easy case:
-      return this
-        .where(keyPaths[0])
-        .equals(indexOrCrit[keyPaths[0]]);
+    const plainKeyPaths = keyPaths.filter(kp => type(indexOrCrit[kp]) !== "Object");
 
     // Multiple criterias.
-    // Let's try finding a compound index that matches all keyPaths in
-    // arbritary order:
-    const compoundIndex = this.schema.indexes.concat(this.schema.primKey).filter(ix =>
-      ix.compound &&
-      keyPaths.every(keyPath => ix.keyPath.indexOf(keyPath) >= 0) &&
-      (ix.keyPath as string[]).every(keyPath => keyPaths.indexOf(keyPath) >= 0))[0];
+    // Let's try finding indexes that matches as many keyPaths as possible:
+    const relatedIndexes = this.schema.indexes.concat(this.schema.primKey).map(ix => [
+      ix,
+      (ix.compound ? ix.keyPath as string[] : [ix.keyPath] as string[])
+        .filter((keyPath, i) => i < ix.keyPath.length - 1
+          ? plainKeyPaths.indexOf(keyPath) >= 0
+          : keyPaths.indexOf(keyPath) >= 0)
+    ] as const);
+    const bestIndex = relatedIndexes.sort((a, b) => b[1].length - a[1].length)[0];
+    if (!bestIndex) {
+      // No index at all. Fail lazily.
+      return fail(this.where(keyPaths), `No matching index for where expression on ${keyPaths}`, exceptions.Schema);
+    }
+    const [index, compoundKeyPaths] = bestIndex;
+    const uncoveredKeyPaths = keyPaths.filter(kp => compoundKeyPaths.indexOf(kp) === -1);
 
-    if (compoundIndex && this.db._maxKey !== maxString)
-      // Cool! We found such compound index
-      // and this browser supports compound indexes (maxKey !== maxString)!
-      return this
-        .where(compoundIndex.name)
-        .equals((compoundIndex.keyPath as string[]).map(kp => indexOrCrit[kp]));
+    const compoundMango = {...indexOrCrit[compoundKeyPaths[compoundKeyPaths.length - 1]]};
+    if (compoundKeyPaths.length > 1) {
+      keys(compoundMango).forEach(op =>
+        compoundMango[op] =
+          compoundKeyPaths.map((kp, i) =>
+            i < compoundKeyPaths.length - 1
+            ? indexOrCrit[kp]
+            : compoundMango[op]))
+    }
 
-    if (!compoundIndex && debug) console.warn(
-      `The query ${JSON.stringify(indexOrCrit)} on ${this.name} would benefit of a ` +
-      `compound index [${keyPaths.join('+')}]`);
+    const [operator, args] = resolveMango(compoundMango);
+    const whereClause = this.where(index.name);
+    let collection = whereClause[operator].apply(whereClause, args);
+
+    if (uncoveredKeyPaths.length > 0) {
+      collection = collection.filter(x =>
+        uncoveredKeyPaths.every(kp => getByKeyPath(x, kp)))
+    }
 
     // Ok, now let's fallback to finding at least one matching index
     // and filter the rest.
     const { idxByName } = this.schema;
-    const idb = this.db._deps.indexedDB;
-
-    function equals (a, b) {
-      try {
-        return idb.cmp(a,b) === 0; // Works with all indexable types including binary keys.
-      } catch (e) {
-        return false;
-      }
-    }
 
     const [idx, filterFunction] = keyPaths.reduce(([prevIndex, prevFilterFn], keyPath) => {
       const index = idxByName[keyPath];
@@ -143,8 +154,8 @@ export class Table implements ITable<any, IndexableType> {
             index && index.multi ?
               x => {
                 const prop = getByKeyPath(x, keyPath);
-                return isArray(prop) && prop.some(item => equals(value, item));
-              } : x => equals(value, getByKeyPath(x, keyPath)))
+                return isArray(prop) && prop.some(item => cmp(value, item) === 0);
+              } : x => cmp(value, getByKeyPath(x, keyPath)) === 0)
           : prevFilterFn
       ];
     }, [null, null]);

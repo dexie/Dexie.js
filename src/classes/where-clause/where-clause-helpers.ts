@@ -30,11 +30,11 @@ export function lowerFactory(dir: 'next' | 'prev') {
     (s: string) => s.toUpperCase();
 }
 
-export function nextCasing(key, lowerKey, upperNeedle, lowerNeedle, cmp, dir) {
-  var length = Math.min(key.length, lowerNeedle.length);
-  var llp = -1;
-  for (var i = 0; i < length; ++i) {
-      var lwrKeyChar = lowerKey[i];
+export function nextCasing(key: string, lowerKey: string, upperNeedle: string, lowerNeedle: string, cmp: (a: any, b: any) => number, dir: 'next' | 'prev') {
+  const length = Math.min(key.length, lowerNeedle.length);
+  let llp = -1;
+  for (let i = 0; i < length; ++i) {
+      let lwrKeyChar = lowerKey[i];
       if (lwrKeyChar !== lowerNeedle[i]) {
           if (cmp(key[i], upperNeedle[i]) < 0) return key.substr(0, i) + upperNeedle[i] + upperNeedle.substr(i + 1);
           if (cmp(key[i], lowerNeedle[i]) < 0) return key.substr(0, i) + lowerNeedle[i] + upperNeedle.substr(i + 1);

@@ -253,7 +253,7 @@ export const NO_CHAR_ARRAY = {};
 //   case to the two bullets below.
 // * If single argument is an iterable, convert it to an array and return the resulting array.
 // * If single argument is array-like (has length of type number), convert it to an array.
-export function getArrayOf (arrayLike) {
+export function getArrayOf (arrayLike): any[] {
     var i, a, x, it;
     if (arguments.length === 1) {
         if (isArray(arrayLike)) return arrayLike.slice();

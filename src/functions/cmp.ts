@@ -58,12 +58,12 @@ export function compareUint8Arrays(
 }
 
 // Implementation of https://www.w3.org/TR/IndexedDB-3/#key-type
-function type(x: any) {
+export function type(x: any) {
   const t = typeof x;
   if (t !== 'object') return t;
   if (ArrayBuffer.isView(x)) return 'binary';
   const tsTag = toStringTag(x); // Cannot use instanceof in Safari
-  return tsTag === 'ArrayBuffer' ? 'binary' : (tsTag as 'Array' | 'Date');
+  return tsTag === 'ArrayBuffer' ? 'binary' : (tsTag as 'Array' | 'Date' | 'Object');
 }
 
 type BinaryType =
@@ -86,4 +86,8 @@ function getUint8Array(a: BinaryType): Uint8Array {
     // TypedArray or DataView
     return new Uint8Array(a.buffer, a.byteOffset, a.byteLength);
   return new Uint8Array(a); // ArrayBuffer
+}
+
+export function cmpreverse (a: any, b: any) {
+  return 0 - (cmp(a,b));
 }
