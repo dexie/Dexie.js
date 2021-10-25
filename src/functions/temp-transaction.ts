@@ -28,10 +28,13 @@ export function tempTransaction (
     return db._state.dbReadyPromise.then(() => tempTransaction(db, mode, storeNames, fn));
   } else {
     var trans = db._createTransaction(mode, storeNames, db._dbSchema);
-    try { trans.create(); } catch (ex) {
-      if (ex.name === errnames.InvalidState && db.isOpen()) {
+    try {
+      trans.create();
+      db._state.PR1398_maxLoop = 3;
+    } catch (ex) {
+      if (ex.name === errnames.InvalidState && db.isOpen() && --db._state.PR1398_maxLoop > 0) {
         console.warn('Dexie: Need to reopen db');
-        db.close();
+        db._close();
         return db.open().then(()=>tempTransaction(db, mode, storeNames, fn));
       }
       return rejection(ex);
