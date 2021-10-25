@@ -51,10 +51,11 @@ export function enterTransactionScope(
     } else {
       try {
         trans.create(); // Create the native transaction so that complete() or error() will trigger even if no operation is made upon it.
+        db._state.PR1398_maxLoop = 3;
       } catch (ex) {
-        if (ex.name === errnames.InvalidState && db.isOpen()) {
+        if (ex.name === errnames.InvalidState && db.isOpen() && --db._state.PR1398_maxLoop > 0) {
           console.warn('Dexie: Need to reopen db');
-          db.close();
+          db._close();
           return db.open().then(() => enterTransactionScope(
             db,
             mode,
