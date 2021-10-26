@@ -59,7 +59,7 @@
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.mjs",
       "node ../tools/replaceVersionAndDate.js ../dist/modern/dexie.mjs",
-      "dts-bundle-generator --inline-declare-externals -o ../dist/dexie.d.ts public/index.d.ts",
+      "dts-bundle-generator --inline-declare-global --inline-declare-externals -o ../dist/dexie.d.ts public/index.d.ts",
       "node ../tools/prepend.js ../dist/dexie.d.ts ../tools/build-configs/banner.txt",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.d.ts"
     ],
@@ -94,7 +94,7 @@
   },
   "homepage": "https://dexie.org",
   "devDependencies": {
-    "dts-bundle-generator": "^5.7.0",
+    "dts-bundle-generator": "^5.9.0",
     "just-build": "^0.9.19",
     "karma": "^6.1.1",
     "karma-browserstack-launcher": "^1.5.2",
