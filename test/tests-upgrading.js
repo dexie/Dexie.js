@@ -218,7 +218,7 @@ test("upgrade", (assert) => {
         db.version(6).stores({ store1: "++id,*email" });
         db.version(7).stores({ store2: "uuid" });
         // Deleting a version.
-        db.version(8).stores({ store1: null });
+        db.version(8).stores({store1: null });
         return db.open().then(() => {
             ok(true, "Could upgrade to version 8 - deleting an object store");
             checkVersion(8);
@@ -826,3 +826,37 @@ promisedTest(
     }
   }
 );
+
+
+promisedTest(
+    "Issue 1418 - Not deleting all object stores",
+    async () => {
+      const DBNAME = "issue1418";
+      await Dexie.delete(DBNAME);
+      let db = new Dexie(DBNAME);
+      db.version(1).stores({
+        a: '++',
+        b: '++',
+        c: '++',
+        d: '++',
+        e: '++'          
+      });
+      await db.open();
+      equal(db.idbdb.objectStoreNames.length, 5, "There are 5 object stores");
+      db.close();
+
+      db = new Dexie(DBNAME);
+      db.version(2).stores({
+        a: null,
+        b: null,
+        c: null,
+        d: null,
+        e: '++'
+      });
+      await db.open();
+      equal(db.idbdb.objectStoreNames.length, 1, "There is only one object store now");
+      db.close();
+      await Dexie.delete(DBNAME);
+    }
+  );
+    
