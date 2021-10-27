@@ -1,12 +1,10 @@
-import { domDeps } from '../classes/dexie/dexie-dom-dependencies';
-import { getMaxKey } from '../functions/quirks';
 import { DBCoreKeyRange, DBCoreRangeType } from '../public/types/dbcore';
 
 export const AnyRange: DBCoreKeyRange = {
   type: DBCoreRangeType.Any,
   lower: -Infinity,
   lowerOpen: false,
-  get upper() { return getMaxKey(domDeps.IDBKeyRange) },
+  upper: [[]],
   upperOpen: false
 }
 

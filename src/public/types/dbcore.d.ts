@@ -167,7 +167,6 @@ export interface DBCore {
   transaction(stores: string[], mode: 'readonly' | 'readwrite', options?: DbCoreTransactionOptions): DBCoreTransaction;
 
   // Utility methods
-  cmp(a: any, b: any) : number;
   readonly MIN_KEY: any;
   readonly MAX_KEY: any;
   readonly schema: DBCoreSchema;

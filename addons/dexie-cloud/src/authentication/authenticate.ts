@@ -179,7 +179,7 @@ async function userAuthenticate(
     await alertUser(userInteraction, 'Authentication Failed', {
       type: 'error',
       messageCode: 'GENERIC_ERROR',
-      message: `We're having a problem to authenticate rigth now.`,
+      message: `We're having a problem authenticating right now.`,
       messageParams: {}
     }).catch(()=>{});
     throw error;

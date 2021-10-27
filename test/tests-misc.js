@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, deepEqual, ok} from 'QUnit';
-import {resetDatabase, spawnedTest, promisedTest, supports} from './dexie-unittest-utils';
+import {resetDatabase, spawnedTest, promisedTest, supports, isIE, isEdge} from './dexie-unittest-utils';
 
 const async = Dexie.async;
 
@@ -321,6 +321,11 @@ asyncTest ("#1079 mapToClass", function(){
 });
 
 asyncTest("PR #1108", async ()=>{
+    if (isIE || isEdge) {
+        ok(true, "Disabling this test for IE and legacy Edge");
+        start();
+        return;
+    }
     const origConsoleWarn = console.warn;
     const warnings = [];
     console.warn = function(msg){warnings.push(msg); return origConsoleWarn.apply(this, arguments)};
