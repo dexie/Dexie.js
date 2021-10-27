@@ -1,5 +1,10 @@
 // There typings are extracted from https://github.com/tc39/proposal-observable
 
+declare global {
+  interface SymbolConstructor {
+    readonly observable: symbol;
+  }
+}
 export interface Observable<T = any> {
   subscribe(
     onNext?: ((value: T) => void) | null,
@@ -7,6 +12,7 @@ export interface Observable<T = any> {
     onComplete?: (() => void) | null
   ): Subscription;
   subscribe(observer?: Observer<T> | null): Subscription;
+  [Symbol.observable]: () => Observable<T>;
 }
 
 export interface Subscription {
