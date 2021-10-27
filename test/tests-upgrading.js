@@ -831,6 +831,14 @@ promisedTest(
 promisedTest(
     "Issue 1418 - Not deleting all object stores",
     async () => {
+      if (!supports("deleteObjectStoreAfterRead")) {
+        ok(true, "Skipping this test - buggy browser.");
+        return;
+      }
+      if (Dexie.addons.length > 0) {
+        ok(true, "Skipping this test - default addons are acitve and can add more object stores");
+        return;
+      }
       const DBNAME = "issue1418";
       await Dexie.delete(DBNAME);
       let db = new Dexie(DBNAME);
