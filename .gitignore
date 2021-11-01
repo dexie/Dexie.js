@@ -184,3 +184,4 @@ samples/typescript/utils.js.map
 
 /.ntvs_analysis.dat
 /*.njsproj
+libs/dexie-cloud-common/tsconfig.tsbuildinfo
