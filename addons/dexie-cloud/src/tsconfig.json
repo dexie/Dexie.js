@@ -18,5 +18,8 @@
   },
   "include": [
     "**/*.ts"
+  ],
+  "references": [
+    {"path": "../../../libs/dexie-cloud-common"}
   ]
 }
