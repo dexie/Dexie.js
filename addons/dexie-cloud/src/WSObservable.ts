@@ -39,7 +39,7 @@ export interface ChangesFromServerMessage {
   baseRev: string;
   realmSetHash: string;
   newRev: string;
-  changes: DBOperationsSet;
+  changes: DBOperationsSet<string>;
 }
 export interface RevisionChangedMessage {
   type: 'rev';

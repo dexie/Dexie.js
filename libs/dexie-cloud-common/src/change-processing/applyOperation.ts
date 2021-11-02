@@ -10,11 +10,13 @@ export function applyOperation(
   op: DBOperation
 ) {
   const tbl = target[table] || (target[table] = {});
+  const keys = op.keys.map(key => typeof key === 'string' ? key : JSON.stringify(key));
+
   switch (op.type) {
     case "insert":
       // TODO: Don't treat insert and upsert the same?
     case "upsert":
-      op.keys.forEach((key, idx) => {
+      keys.forEach((key, idx) => {
         tbl[key] = {
           type: "ups",
           val: op.values[idx],
@@ -23,7 +25,7 @@ export function applyOperation(
       break;
     case "update":
     case "modify": {
-      op.keys.forEach((key, idx) => {
+      keys.forEach((key, idx) => {
         const changeSpec = op.type === "update"
           ? op.changeSpecs[idx]
           : op.changeSpec;
@@ -54,7 +56,7 @@ export function applyOperation(
       break;
     }
     case "delete":
-      op.keys.forEach((key) => {
+      keys.forEach((key) => {
         tbl[key] = {
           type: "del",
         };
