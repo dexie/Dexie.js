@@ -1,3 +1,3 @@
-import { DBOperation } from "./DBOperation.js";
+import { DBOperation, DBOpPrimaryKey } from "./DBOperation.js";
 
-export type DBOperationsSet = Array<{ table: string; muts: DBOperation[] }>;
+export type DBOperationsSet<PK=DBOpPrimaryKey> = Array<{ table: string; muts: DBOperation<PK>[] }>;

@@ -201,7 +201,7 @@ async function _sync(
     console.debug('Sync is needed:', syncIsNeeded);
     return syncIsNeeded;
   }
-  if (purpose === "push" && !syncIsNeeded) {
+  if (purpose === 'push' && !syncIsNeeded) {
     // The purpose of this request was to push changes
     return false;
   }
@@ -321,7 +321,7 @@ async function _sync(
       latestRevisions: {},
       realms: [],
       inviteRealms: [],
-      clientIdentity
+      clientIdentity,
     };
     newSyncState.syncedTables = tablesToSync
       .map((tbl) => tbl.name)
@@ -397,7 +397,7 @@ async function deleteObjectsFromRemovedRealms(
 }
 
 export async function applyServerChanges(
-  changes: DBOperationsSet,
+  changes: DBOperationsSet<string>,
   db: DexieCloudDB
 ) {
   console.debug('Applying server changes', changes, Dexie.currentTransaction);
@@ -405,13 +405,24 @@ export async function applyServerChanges(
     const table = db.table(tableName);
     if (!table) continue; // If server sends changes on a table we don't have, ignore it.
     const { primaryKey } = table.core.schema;
+    const keyDecoder = primaryKey.compound
+      ? (key: string) => {
+          try {
+            return JSON.parse(key);
+          } catch {
+            // Be backward compatible (for now)
+            return key.split(',');
+          }
+        }
+      : (key: string) => key;
     for (const mut of muts) {
+      const keys = mut.keys.map(keyDecoder);
       switch (mut.type) {
         case 'insert':
           if (primaryKey.outbound) {
-            await table.bulkAdd(mut.values, mut.keys);
+            await table.bulkAdd(mut.values, keys);
           } else {
-            mut.keys.forEach((key, i) => {
+            keys.forEach((key, i) => {
               Dexie.setByKeyPath(mut.values[i], primaryKey.keyPath as any, key);
             });
             await table.bulkAdd(mut.values);
@@ -419,26 +430,26 @@ export async function applyServerChanges(
           break;
         case 'upsert':
           if (primaryKey.outbound) {
-            await table.bulkPut(mut.values, mut.keys);
+            await table.bulkPut(mut.values, keys);
           } else {
-            mut.keys.forEach((key, i) => {
+            keys.forEach((key, i) => {
               Dexie.setByKeyPath(mut.values[i], primaryKey.keyPath as any, key);
             });
             await table.bulkPut(mut.values);
           }
           break;
         case 'modify':
-          if (mut.keys.length === 1) {
-            await table.update(mut.keys[0], mut.changeSpec);
+          if (keys.length === 1) {
+            await table.update(keys[0], mut.changeSpec);
           } else {
-            await table.where(':id').anyOf(mut.keys).modify(mut.changeSpec);
+            await table.where(':id').anyOf(keys).modify(mut.changeSpec);
           }
           break;
         case 'update':
-          await bulkUpdate(table, mut.keys, mut.changeSpecs);
+          await bulkUpdate(table, keys, mut.changeSpecs);
           break;
         case 'delete':
-          await table.bulkDelete(mut.keys);
+          await table.bulkDelete(keys);
           break;
       }
     }
@@ -446,9 +457,9 @@ export async function applyServerChanges(
 }
 
 export function filterServerChangesThroughAddedClientChanges(
-  serverChanges: DBOperationsSet,
+  serverChanges: DBOperationsSet<string>,
   addedClientChanges: DBOperationsSet
-): DBOperationsSet {
+): DBOperationsSet<string> {
   const changes: DBKeyMutationSet = {};
   applyOperations(changes, serverChanges);
   const localPostChanges: DBKeyMutationSet = {};

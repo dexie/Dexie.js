@@ -1,3 +1,6 @@
+
+export type DBOpPrimaryKey = string | (string | number)[];
+
 const enum DBCoreRangeType {
   Equal = 1,
   Range = 2,
@@ -17,36 +20,36 @@ interface DBCoreKeyRange {
   readonly upperOpen?: boolean;
 }
 
-export type DBOperation =
-  | DBInsertOperation
-  | DBUpsertOperation
-  | DBUpdateOperation
-  | DBModifyOperation
-  | DBDeleteOperation;
+export type DBOperation<PK=DBOpPrimaryKey> =
+  | DBInsertOperation<PK>
+  | DBUpsertOperation<PK>
+  | DBUpdateOperation<PK>
+  | DBModifyOperation<PK>
+  | DBDeleteOperation<PK>;
 
-export interface DBOperationCommon {
+export interface DBOperationCommon<PK=DBOpPrimaryKey> {
   rev?: number;
   ts?: number | null; // timestamp
-  keys: any[]; // Needed also in delete and update operations when criteria is specificied: for server->client rollback operation
+  keys: PK[]; // Needed also in delete and update operations when criteria is specificied: for server->client rollback operation
   txid?: string | null;
   userId?: string | null;
 }
-export interface DBInsertOperation extends DBOperationCommon {
+export interface DBInsertOperation<PK=DBOpPrimaryKey> extends DBOperationCommon<PK> {
   type: "insert";
   values: any[];
 }
 
-export interface DBUpsertOperation extends DBOperationCommon {
+export interface DBUpsertOperation<PK=DBOpPrimaryKey> extends DBOperationCommon<PK> {
   type: "upsert";
   values: any[];
 }
 
-export interface DBUpdateOperation extends DBOperationCommon {
+export interface DBUpdateOperation<PK=DBOpPrimaryKey> extends DBOperationCommon<PK> {
   type: "update";
   changeSpecs: { [keyPath: string]: any }[];
 }
 
-export interface DBModifyOperation extends DBOperationCommon {
+export interface DBModifyOperation<PK=DBOpPrimaryKey> extends DBOperationCommon<PK> {
   type: "modify";
   criteria: {
     index: string | null;
@@ -56,7 +59,7 @@ export interface DBModifyOperation extends DBOperationCommon {
 }
 
 
-export interface DBDeleteOperation extends DBOperationCommon {
+export interface DBDeleteOperation<PK=DBOpPrimaryKey> extends DBOperationCommon<PK> {
   type: "delete";
   criteria?:
     | {
