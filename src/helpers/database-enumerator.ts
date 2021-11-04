@@ -19,9 +19,7 @@ function getDbNamesTable(indexedDB: IDBFactory, IDBKeyRange: IDBKeyNamesVar) {
   return dbNamesDB.table("dbnames") as Table<{ name: string }, string>;
 }
 
-function hasDatabasesNative(
-  indexedDB: IDBFactory & { databases?: () => Promise<{ name: string }[]> }
-): indexedDB is IDBFactory & { databases: () => Promise<{ name: string }[]> } {
+function hasDatabasesNative(indexedDB: IDBFactory) {
   return indexedDB && typeof indexedDB.databases === "function";
 }
 

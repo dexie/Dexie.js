@@ -292,12 +292,8 @@ export function createMissingTables(newSchema: DbSchema, idbtrans: IDBTransactio
 }
 
 export function deleteRemovedTables(newSchema: DbSchema, idbtrans: IDBTransaction) {
-  for (var i = 0; i < idbtrans.db.objectStoreNames.length; ++i) {
-    var storeName = idbtrans.db.objectStoreNames[i];
-    if (newSchema[storeName] == null) {
-      idbtrans.db.deleteObjectStore(storeName);
-    }
-  }
+  [].slice.call(idbtrans.db.objectStoreNames).forEach(storeName =>
+    newSchema[storeName] == null && idbtrans.db.deleteObjectStore(storeName));
 }
 
 export function addIndex(store: IDBObjectStore, idx: IndexSpec) {

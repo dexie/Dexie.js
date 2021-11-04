@@ -129,7 +129,19 @@ test("Clicking next button will update the currently viewed item", async ()=>{
 
 test("Selecting invalid key trigger the err-boundrary", async ()=>{
   // Stop test from failing because we trigger an error!
-  QUnit["onUnhandledRejection"] = ()=>{};
+  QUnit["onUnhandledRejection"] = ()=>true;
+  QUnit["onUncaughtException"] = ()=>true; // Needed in latest version of qunit when "global failure: " is preventing test from succeeding.
+  QUnit["onError"] = ()=>true;
+  //QUnit.config.current.ignoreGlobalErrors = true;
+  /*
+  self.onunhandledrejection = (ev)=>{
+    ev.preventDefault();
+    ev.stopPropagation();
+    return false;
+  };*/
+  //console.error = ()=>{};
+  
+  
 
   listChanged.reset();
   currentChanged.reset();

@@ -4,10 +4,10 @@ import {
   Subscription,
 } from "../../public/types/observable";
 
-const symbolObservable =
+const symbolObservable: typeof Symbol.observable =
   typeof Symbol !== "undefined" && "observable" in Symbol
-    ? Symbol["observable"]
-    : "@@observable";
+    ? Symbol.observable
+    : "@@observable" as any;
 
 export class Observable<T> implements IObservable<T> {
   private _subscribe: (observer: Observer<T>) => Subscription;

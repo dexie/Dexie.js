@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "1.0.0-beta.10",
+  "version": "1.0.0-beta.11",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/umd/dexie-cloud-addon.js",
   "module": "dist/module-es5/dexie-cloud-addon.js",
@@ -87,7 +87,7 @@
     "@rollup/plugin-commonjs": "^18.0.0",
     "@rollup/plugin-node-resolve": "^11.2.1",
     "@types/node": "*",
-    "dexie-cloud-common": "^1.0.16",
+    "dexie-cloud-common": "^1.0.17",
     "dreambase-library": "^1.0.13",
     "just-build": "*",
     "karma": "*",

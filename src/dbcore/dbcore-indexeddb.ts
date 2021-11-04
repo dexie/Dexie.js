@@ -39,12 +39,9 @@ export function getKeyPathAlias(keyPath: null | string | string[]) {
 
 export function createDBCore (
   db: IDBDatabase,
-  indexedDB: IDBFactory,
   IdbKeyRange: typeof IDBKeyRange,
   tmpTrans: IDBTransaction) : DBCore
 {
-  const cmp = indexedDB.cmp.bind(indexedDB);
-  
   function extractSchema(db: IDBDatabase, trans: IDBTransaction) : {schema: DBCoreSchema, hasGetAll: boolean} {
     const tables = arrayify(db.objectStoreNames);
     return {
@@ -403,8 +400,6 @@ export function createDBCore (
       if (!result) throw new Error(`Table '${name}' not found`);
       return tableMap[name];
     },
-
-    cmp,
 
     MIN_KEY: -Infinity,
 
