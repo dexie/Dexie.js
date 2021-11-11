@@ -26,10 +26,10 @@ export function createImplicitPropSetterMiddleware(
                   // If user is logged in, make sure "owner" and "realmId" props are set properly.
                   // If not logged in, this will be set upon syncification of the tables (next sync after login)
                   for (const obj of req.values) {
-                    if (!('owner' in obj)) {
+                    if (!obj.owner) {
                       obj.owner = trans.currentUser.userId;
                     }
-                    if (!('realmId' in obj)) {
+                    if (!obj.realmId) {
                       obj.realmId = trans.currentUser.userId;
                     }
                   }
