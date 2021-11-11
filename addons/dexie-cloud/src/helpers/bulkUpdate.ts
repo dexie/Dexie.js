@@ -1,4 +1,4 @@
-import Dexie, { Table } from 'dexie';
+import Dexie, { Table, cmp } from 'dexie';
 
 export async function bulkUpdate(
   table: Table,
@@ -13,9 +13,12 @@ export async function bulkUpdate(
     if (obj) {
       for (const [keyPath, value] of Object.entries(changeSpecs[idx])) {
         if (keyPath === table.schema.primKey.keyPath) {
-          throw new Error(`Cannot change primary key`);
+          if (cmp(value, key) !== 0) {
+            throw new Error(`Cannot change primary key`);
+          }
+        } else {
+          Dexie.setByKeyPath(obj, keyPath, value);
         }
-        Dexie.setByKeyPath(obj, keyPath, value);
       }
       resultKeys.push(key);
       resultObjs.push(obj);

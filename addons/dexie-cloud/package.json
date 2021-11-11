@@ -53,7 +53,7 @@
     ],
     "src": [
       "# Build the entire typescript source into modern JS",
-      "tsc -p src -t es2018 --outDir tools/tmp/modern [--watch 'Watching for file changes.']"
+      "tsc -p src -t es2020 --outDir tools/tmp/modern [--watch 'Watching for file changes.']"
     ],
     "dexie-cloud": [
       "# Create a modern bundle in dist/modern",
