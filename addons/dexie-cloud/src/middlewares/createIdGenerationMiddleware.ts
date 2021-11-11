@@ -143,7 +143,7 @@ export function createIdGenerationMiddleware(
                   valueClones[idx] = Dexie.deepClone(valueClones[idx]);
                   Dexie.setByKeyPath(
                     valueClones[idx],
-                    table.schema.primaryKey.keyPath as any, // TODO: fix typings in dexie-constructor.d.ts!
+                    table.schema.primaryKey.keyPath!,
                     keys[idx]
                   );
                 }
