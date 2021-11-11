@@ -29,6 +29,11 @@ import { IntervalTree, RangeSetConstructor } from './types/rangeset';
 interface _Table<T, TKey> extends Table<T, TKey> {}
 interface _Collection<T,TKey> extends Collection<T,TKey> {}
 
+export class Entity<T> {
+  protected readonly db: T;
+  protected constructor();
+}
+
 // Besides being the only exported value, let Dexie also be
 // a namespace for types...
 declare module Dexie {
@@ -55,6 +60,8 @@ export function rangesOverlap(
   rangeSet2: IntervalTree
 ): boolean;
 declare var RangeSet: RangeSetConstructor;
+export function cmp(a: any, b: any): number;
+
 /** Exporting 'Dexie' as the default export.
  **/
 export default Dexie;
