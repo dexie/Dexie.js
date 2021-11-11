@@ -16,6 +16,7 @@ import { debug } from '../../helpers/debug';
 import { DBCoreTable } from '../../public/types/dbcore';
 import { AnyRange } from '../../dbcore/keyrange';
 import { workaroundForUndefinedPrimKey } from '../../functions/workaround-undefined-primkey';
+import { Entity } from '../entity/Entity';
 
 /** class Table
  * 
@@ -247,7 +248,14 @@ export class Table implements ITable<any, IndexableType> {
    * 
    **/
   mapToClass(constructor: Function) {
+    const {db} = this;
     this.schema.mappedClass = constructor;
+    if (constructor.prototype instanceof Entity) {
+      constructor = class extends (constructor as any) {
+        get db () { return db; }
+      }
+    }
+    
     // Now, subscribe to the when("reading") event to make all objects that come out from this table inherit from given class
     // no matter which method to use for reading (Table.get() or Table.where(...)... )
     const readHook = obj => {
@@ -255,7 +263,7 @@ export class Table implements ITable<any, IndexableType> {
       // Create a new object that derives from constructor:
       const res = Object.create(constructor.prototype);
       // Clone members:
-      for (var m in obj) if (hasOwn(obj, m)) try { res[m] = obj[m]; } catch (_) { }
+      for (let m in obj) if (hasOwn(obj, m)) try { res[m] = obj[m]; } catch (_) { }
       return res;
     };
 
