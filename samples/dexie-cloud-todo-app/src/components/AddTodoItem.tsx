@@ -1,17 +1,16 @@
 import React, { useState } from "react";
 import { db } from "../db";
-import { TodoItem } from "../models/TodoItem";
-import { TodoList } from "../models/TodoList";
+import { TodoItem } from "../db/TodoItem";
+import { TodoList } from "../db/TodoList";
 
 interface Props {
   todoList: TodoList;
 }
 
 export function AddTodoItem({ todoList }: Props) {
-  const [item, setItem] = useState({
-    todoListId: todoList.id,
+  const [state, setState] = useState({
     title: ""
-  } as TodoItem);
+  });
 
   return (
     <div className="row add-item">
@@ -22,17 +21,21 @@ export function AddTodoItem({ todoList }: Props) {
         <input
           type="text"
           placeholder="Add todo item ..."
-          value={item.title}
+          value={state.title}
           onChange={ev =>
-            setItem(item => ({
+            setState(item => ({
               ...item,
               title: ev.target.value
             }))
           }
           onKeyUp={ev => {
             if (ev.key === "Enter") {
-              db.todoItems.add(item);
-              setItem({
+              db.todoItems.add({
+                todoListId: todoList.id!,
+                realmId: todoList.realmId,
+                title: state.title
+              });
+              setState({
                 todoListId: todoList.id,
                 title: ""
               } as TodoItem);

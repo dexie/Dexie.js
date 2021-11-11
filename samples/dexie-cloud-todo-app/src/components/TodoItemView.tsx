@@ -1,6 +1,6 @@
 import React from "react";
 import { db } from "../db";
-import { TodoItem } from "../models/TodoItem";
+import { TodoItem } from "../db/TodoItem";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { faTrash } from "@fortawesome/free-solid-svg-icons";
 

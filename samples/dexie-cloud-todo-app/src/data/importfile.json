@@ -2,5 +2,13 @@
   "demoUsers": {
     "foo@demo.local": {},
     "bar@demo.local": {}
-  }
+  },
+  "roles": {
+    "manager": {"manage": "*"},
+    "doer": {
+      "update": {"todoItems": ["done"]}
+    },
+    "commenter": {"add": ["comments"]}
+  },
+  "data": {}
 }
