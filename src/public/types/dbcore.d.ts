@@ -146,9 +146,9 @@ export interface DBCoreIndex {
   readonly name: string | null;
   /** True if this index represents the primary key */
   readonly isPrimaryKey?: boolean;
-  /** True if this index represents the primary key and is not inbound (http://dexie.org/docs/inbound) */
+  /** True if this index represents the primary key and is not inbound (https://dexie.org/docs/inbound) */
   readonly outbound?: boolean; 
-  /** True if and only if keyPath is an array (http://dexie.org/docs/Compound-Index) */
+  /** True if and only if keyPath is an array (https://dexie.org/docs/Compound-Index) */
   readonly compound?: boolean;
   /** keyPath, null for primary key, string for single-property indexes, Array<string> for compound indexes */
   readonly keyPath: null | string | string[];
