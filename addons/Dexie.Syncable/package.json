@@ -68,7 +68,7 @@
       "uglifyjs dexie-syncable.js -m -c negate_iife=0 -o dexie-syncable.min.js --source-map"
     ]
   },
-  "homepage": "http://dexie.org",
+  "homepage": "https://dexie.org",
   "peerDependencies": {
     "dexie": "^3.0.2",
     "dexie-observable": "^3.0.0-beta.9"

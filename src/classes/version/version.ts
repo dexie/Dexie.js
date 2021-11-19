@@ -10,7 +10,7 @@ import { nop, promisableChain } from '../../functions/chaining-functions';
 
 /** class Version
  *
- * http://dexie.org/docs/Version/Version
+ * https://dexie.org/docs/Version/Version
  */
 export class Version implements IVersion {
   db: Dexie;

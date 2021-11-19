@@ -1,7 +1,7 @@
 {
   "name": "dexie",
-  "version": "3.2.0-rc.3",
-  "homepage": "http://dexie.org",
+  "version": "3.2.0",
+  "homepage": "https://dexie.org",
   "authors": [
     "David Fahlander"
   ],
