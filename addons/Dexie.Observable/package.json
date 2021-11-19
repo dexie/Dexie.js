@@ -77,7 +77,7 @@
       "tsc -p test/typings/"
     ]
   },
-  "homepage": "http://dexie.org",
+  "homepage": "https://dexie.org",
   "peerDependencies": {
     "dexie": "^3.0.2"
   },

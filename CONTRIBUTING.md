@@ -6,7 +6,7 @@ We appreciate contributions in forms of:
 * issues
 * help answering questions in [issues](https://github.com/dfahlander/Dexie.js/issues) and on [stackoverflow](https://stackexchange.com/filters/233583/dexie-stackoverflow)
 * fixing bugs via pull-requests
-* developing addons or other [derived work](http://dexie.org/docs/DerivedWork)
+* developing addons or other [derived work](https://dexie.org/docs/DerivedWork)
 * promoting Dexie.js
 * sharing ideas
 

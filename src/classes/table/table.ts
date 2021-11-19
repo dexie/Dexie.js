@@ -19,7 +19,7 @@ import { workaroundForUndefinedPrimKey } from '../../functions/workaround-undefi
 
 /** class Table
  * 
- * http://dexie.org/docs/Table/Table
+ * https://dexie.org/docs/Table/Table
  */
 export class Table implements ITable<any, IndexableType> {
   db: Dexie;
@@ -69,7 +69,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.get()
    * 
-   * http://dexie.org/docs/Table/Table.get()
+   * https://dexie.org/docs/Table/Table.get()
    * 
    **/
   get(keyOrCrit, cb?) {
@@ -84,7 +84,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.where()
    * 
-   * http://dexie.org/docs/Table/Table.where()
+   * https://dexie.org/docs/Table/Table.where()
    * 
    **/
   where(indexOrCrit: string | string[] | { [key: string]: IndexableType }) {
@@ -159,7 +159,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.filter()
    * 
-   * http://dexie.org/docs/Table/Table.filter()
+   * https://dexie.org/docs/Table/Table.filter()
    * 
    **/
   filter(filterFunction: (obj: any) => boolean) {
@@ -168,7 +168,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.count()
    * 
-   * http://dexie.org/docs/Table/Table.count()
+   * https://dexie.org/docs/Table/Table.count()
    * 
    **/
   count(thenShortcut?: any) {
@@ -177,7 +177,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.offset()
    * 
-   * http://dexie.org/docs/Table/Table.offset()
+   * https://dexie.org/docs/Table/Table.offset()
    * 
    **/
   offset(offset: number) {
@@ -186,7 +186,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.limit()
    * 
-   * http://dexie.org/docs/Table/Table.limit()
+   * https://dexie.org/docs/Table/Table.limit()
    * 
    **/
   limit(numRows: number) {
@@ -195,7 +195,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.each()
    * 
-   * http://dexie.org/docs/Table/Table.each()
+   * https://dexie.org/docs/Table/Table.each()
    * 
    **/
   each(callback: (obj: any, cursor: { key: IndexableType, primaryKey: IndexableType }) => any) {
@@ -204,7 +204,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.toArray()
    * 
-   * http://dexie.org/docs/Table/Table.toArray()
+   * https://dexie.org/docs/Table/Table.toArray()
    * 
    **/
   toArray(thenShortcut?: any) {
@@ -213,7 +213,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.toCollection()
    * 
-   * http://dexie.org/docs/Table/Table.toCollection()
+   * https://dexie.org/docs/Table/Table.toCollection()
    * 
    **/
   toCollection() {
@@ -222,7 +222,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.orderBy()
    * 
-   * http://dexie.org/docs/Table/Table.orderBy()
+   * https://dexie.org/docs/Table/Table.orderBy()
    * 
    **/
   orderBy(index: string | string[]) {
@@ -234,7 +234,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.reverse()
    * 
-   * http://dexie.org/docs/Table/Table.reverse()
+   * https://dexie.org/docs/Table/Table.reverse()
    * 
    **/
   reverse(): Collection {
@@ -243,7 +243,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.mapToClass()
    * 
-   * http://dexie.org/docs/Table/Table.mapToClass()
+   * https://dexie.org/docs/Table/Table.mapToClass()
    * 
    **/
   mapToClass(constructor: Function) {
@@ -277,7 +277,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.add()
    * 
-   * http://dexie.org/docs/Table/Table.add()
+   * https://dexie.org/docs/Table/Table.add()
    * 
    **/
   add(obj, key?: IndexableType): PromiseExtended<IndexableType> {
@@ -302,7 +302,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.update()
    * 
-   * http://dexie.org/docs/Table/Table.update()
+   * https://dexie.org/docs/Table/Table.update()
    * 
    **/
   update(keyOrObject, modifications: { [keyPath: string]: any; } | ((obj: any, ctx:{value: any, primKey: IndexableType}) => void | boolean)): PromiseExtended<number> {
@@ -337,7 +337,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.put()
    * 
-   * http://dexie.org/docs/Table/Table.put()
+   * https://dexie.org/docs/Table/Table.put()
    * 
    **/
   put(obj, key?: IndexableType): PromiseExtended<IndexableType> {
@@ -363,7 +363,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.delete()
    * 
-   * http://dexie.org/docs/Table/Table.delete()
+   * https://dexie.org/docs/Table/Table.delete()
    * 
    **/
   delete(key: IndexableType): PromiseExtended<void> {
@@ -374,7 +374,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.clear()
    * 
-   * http://dexie.org/docs/Table/Table.clear()
+   * https://dexie.org/docs/Table/Table.clear()
    * 
    **/
   clear() {
@@ -385,7 +385,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.bulkGet()
    * 
-   * http://dexie.org/docs/Table/Table.bulkGet()
+   * https://dexie.org/docs/Table/Table.bulkGet()
    * 
    * @param keys 
    */
@@ -400,7 +400,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.bulkAdd()
    * 
-   * http://dexie.org/docs/Table/Table.bulkAdd()
+   * https://dexie.org/docs/Table/Table.bulkAdd()
    * 
    **/
   bulkAdd(
@@ -437,7 +437,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.bulkPut()
    * 
-   * http://dexie.org/docs/Table/Table.bulkPut()
+   * https://dexie.org/docs/Table/Table.bulkPut()
    * 
    **/
   bulkPut(
@@ -475,7 +475,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.bulkDelete()
    * 
-   * http://dexie.org/docs/Table/Table.bulkDelete()
+   * https://dexie.org/docs/Table/Table.bulkDelete()
    * 
    **/
   bulkDelete(keys: ReadonlyArray<IndexableType>): PromiseExtended<void> {
