@@ -46,7 +46,7 @@ Dexie provides a neat database API with a well thought-through API design, robus
 ```
 Yes, it's that simple. 
 
-An equivalent module version using top-level await (works in all modern browsers):
+An equivalent modern version (works in all modern browsers):
 
 ```html
 <!doctype html>
