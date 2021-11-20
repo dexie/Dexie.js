@@ -46,6 +46,37 @@ Dexie provides a neat database API with a well thought-through API design, robus
 ```
 Yes, it's that simple. 
 
+An equivalent module version using top-level await (works in all modern browsers):
+
+```html
+<!doctype html>
+<html>
+ <head>
+  <script type="module">
+   import Dexie from "https://unpkg.com/dexie@latest/dist/modern/dexie.mjs";
+   //
+   // Declare Database
+   //
+   const db = new Dexie("FriendDatabase");
+   db.version(1).stores({
+     friends: "++id,name,age"
+   });
+
+   //
+   // Manipulate and Query Database
+   //
+   try {
+     await db.friends.add({name: "Josephine", age: 21});
+     const youngFriends = await db.friends.where("age").below(25).toArray();
+     alert (`My young friends: ${JSON.stringify(youngFriends)}`);
+   } catch (e) {
+     alert (`Error: ${e}`);
+   }
+  </script>
+ </head>
+</html>
+```
+
 [Tutorial](https://dexie.org/docs/Tutorial)
 
 [API Reference](https://dexie.org/docs/API-Reference)
