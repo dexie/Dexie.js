@@ -44,7 +44,7 @@ Dexie provides a neat database API with a well thought-through API design, robus
  </head>
 </html>
 ```
-Yes, it's that simple.
+Yes, it's that simple. 
 
 [Tutorial](https://dexie.org/docs/Tutorial)
 
@@ -143,7 +143,7 @@ db.transaction('rw', db.friends, async() => {
 #### Hello World (Typescript)
 
 ```js
-import Dexie from 'dexie';
+import Dexie, { Table } from 'dexie';
 
 interface Friend {
     id?: number;
@@ -155,14 +155,13 @@ interface Friend {
 // Declare Database
 //
 class FriendDatabase extends Dexie {
-    public friends: Dexie.Table<Friend, number>; // id is number in this case
+    public friends!: Table<Friend, number>; // id is number in this case
 
     public constructor() {
         super("FriendDatabase");
         this.version(1).stores({
             friends: "++id,name,age"
         });
-        this.friends = this.table("friends");
     }
 }
 
