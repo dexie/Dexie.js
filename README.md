@@ -212,11 +212,19 @@ Download
 --------
 For those who don't like package managers, here's the download links:
 
-https://unpkg.com/dexie@latest/dist/dexie.js
+### Legacy:
+https://unpkg.com/dexie@latest/dist/dexie.min.js
 
-https://unpkg.com/dexie@latest/dist/dexie.js.map
+https://unpkg.com/dexie@latest/dist/dexie.min.js.map
 
+### Modern:
+https://unpkg.com/dexie@latest/dist/modern/dexie.min.mjs
+
+https://unpkg.com/dexie@latest/dist/modern/dexie.min.mjs.map
+
+### Typings:
 https://unpkg.com/dexie@latest/dist/dexie.d.ts
+
 
 
 Contributing
