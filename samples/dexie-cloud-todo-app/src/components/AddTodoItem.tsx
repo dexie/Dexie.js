@@ -31,7 +31,7 @@ export function AddTodoItem({ todoList }: Props) {
           onKeyUp={ev => {
             if (ev.key === "Enter") {
               db.todoItems.add({
-                todoListId: todoList.id!,
+                todoListId: todoList.id,
                 realmId: todoList.realmId,
                 title: state.title
               });
