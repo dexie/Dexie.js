@@ -100,7 +100,11 @@ export async function performGuardedJob(
     const heartbeat = setInterval(() => {
       jobsTable.update(
         jobName,
-        (job: GuardedJob) => job.nodeId === myId && (job.heartbeat = new Date())
+        (job) => {
+          if (job.nodeId === myId) {
+            job.heartbeat = new Date();
+          }
+        }
       );
     }, GUARDED_JOB_HEARTBEAT);
 

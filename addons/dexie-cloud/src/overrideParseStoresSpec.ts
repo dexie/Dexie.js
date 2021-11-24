@@ -1,6 +1,6 @@
 import Dexie, { DbSchema } from 'dexie';
 import { DEXIE_CLOUD_SCHEMA } from './db/DexieCloudDB';
-import { generateTablePrefix } from './middlewares/createIdGenerationMiddleware';
+import { generateTablePrefix } from './middleware-helpers/idGenerationHelpers';
 
 export function overrideParseStoresSpec(origFunc: Function, dexie: Dexie) {
   return function(stores: {[tableName: string]: string}, dbSchema: DbSchema) {
