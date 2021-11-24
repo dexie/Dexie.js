@@ -6,8 +6,27 @@
   "module": "dist/dexie.mjs",
   "jsnext:main": "dist/dexie.mjs",
   "exports": {
-    "import": "./dist/modern/dexie.mjs",
-    "require": "./dist/dexie.js"    
+    ".": {
+      "production": {
+        "browser": "./dist/modern/dexie.min.mjs",
+        "import": "./dist/modern/dexie.min.mjs",
+        "require": "./dist/dexie.min.js",
+        "default": "./dist/dexie.min.js"
+      },
+      "development": {
+        "browser": "./dist/modern/dexie.mjs",
+        "import": "./dist/modern/dexie.mjs",
+        "require": "./dist/dexie.js",
+        "default": "./dist/dexie.js"
+      },
+      "default": {
+        "browser": "./dist/modern/dexie.mjs",
+        "import": "./dist/modern/dexie.mjs",
+        "require": "./dist/dexie.js",
+        "default": "./dist/dexie.js"
+      }
+    },
+    "./package.json": "./package.json"
   },
   "typings": "dist/dexie.d.ts",
   "jspm": {
