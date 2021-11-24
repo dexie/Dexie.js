@@ -9,22 +9,20 @@ import { DbSchema } from './db-schema';
 import { TableSchema } from './table-schema';
 import { DexieConstructor } from './dexie-constructor';
 import { PromiseExtended } from './promise-extended';
-import { Database } from './database';
 import { IndexableType } from './indexable-type';
 import { DBCore } from './dbcore';
 import { Middleware, DexieStacks } from './middleware';
 
-type TableProp<T extends Dexie> = {
-  [K in keyof T]: T[K] extends Table ? K : never;
-}[keyof T] & string;
+export type TableProp<DX extends Dexie> = {
+  [K in keyof DX]: DX[K] extends {schema: any, get: any, put: any, add: any, where: any} ? K : never;
+}[keyof DX] & string;
 
-type TXWithTables<DX extends Dexie, TP=Table> = TP extends TableProp<DX>
-  ? Transaction & { [P in TP]: DX[P] }
-  : TP extends Table
-  ? Transaction & { [P in TableProp<DX>]: DX[P] }
-  : Transaction;
+type TXWithTables<DX extends Dexie> = Dexie extends DX
+? Transaction // If not subclassed, just expect a Transaction without table props
+: Transaction & { [P in TableProp<DX>]: DX[P] };
 
-export interface Dexie extends Database {
+
+export interface Dexie {
   readonly name: string;
   readonly tables: Table[];
   readonly verno: number;
@@ -52,89 +50,9 @@ export interface Dexie extends Database {
 
   table<T = any, TKey = IndexableType>(tableName: string): Table<T, TKey>;
 
-  transaction<U,TP extends TableProp<this>>(
-    mode: TransactionMode,
-    tables: readonly TP[],
-    scope: (
-      trans: Transaction & { [P in TP]: this[P] }
-    ) => PromiseLike<U> | U
-  ): PromiseExtended<U>;
-
-  // Narrowly typed table names - put table props on tx:
-  transaction<U, TP extends TableProp<this>>(
-    mode: TransactionMode,
-    table: TP,
-    scope: (trans: Transaction & { [P in TP]: this[P] }) => PromiseLike<U> | U
-  ): PromiseExtended<U>;
-  transaction<U, TP extends TableProp<this>>(
-    mode: TransactionMode,
-    table: TP,
-    table2: TP,
-    scope: (trans: Transaction & { [P in TP]: this[P] }) => PromiseLike<U> | U
-  ): PromiseExtended<U>;
-  transaction<U, TP extends TableProp<this>>(
-    mode: TransactionMode,
-    table: TP,
-    table2: TP,
-    table3: TP,
-    scope: (trans: Transaction & { [P in TP]: this[P] }) => PromiseLike<U> | U
-  ): PromiseExtended<U>;
-  transaction<U, TP extends TableProp<this>>(
-    mode: TransactionMode,
-    table: TP,
-    table2: TP,
-    table3: TP,
-    table4: TP,
-    scope: (trans: Transaction & { [P in TP]: this[P] }) => PromiseLike<U> | U
-  ): PromiseExtended<U>;
-  transaction<U, TP extends TableProp<this>>(
-    mode: TransactionMode,
-    table: TP,
-    table2: TP,
-    table3: TP,
-    table4: TP,
-    table5: TP,
-    scope: (trans: Transaction & { [P in TP]: this[P] }) => PromiseLike<U> | U
-  ): PromiseExtended<U>;
-
   transaction<U>(
     mode: TransactionMode,
-    table: string,
-    scope: (trans: Transaction) => PromiseLike<U> | U
-  ): PromiseExtended<U>;
-  transaction<U>(
-    mode: TransactionMode,
-    table: string,
-    table2: string,
-    scope: (trans: Transaction) => PromiseLike<U> | U
-  ): PromiseExtended<U>;
-  transaction<U>(
-    mode: TransactionMode,
-    table: string,
-    table2: string,
-    table3: string,
-    scope: (trans: Transaction) => PromiseLike<U> | U
-  ): PromiseExtended<U>;
-  transaction<U>(
-    mode: TransactionMode,
-    table: string,
-    table2: string,
-    table3: string,
-    table4: string,
-    scope: (trans: Transaction) => PromiseLike<U> | U
-  ): PromiseExtended<U>;
-  transaction<U>(
-    mode: TransactionMode,
-    table: string,
-    table2: string,
-    table3: string,
-    table5: string,
-    scope: (trans: Transaction) => PromiseLike<U> | U
-  ): PromiseExtended<U>;
-
-  transaction<U>(
-    mode: TransactionMode,
-    table: Table,
+    tables: readonly (string | Table)[],
     scope: (
       trans: TXWithTables<this>
     ) => PromiseLike<U> | U
@@ -142,62 +60,39 @@ export interface Dexie extends Database {
 
   transaction<U>(
     mode: TransactionMode,
-    table: Table,
-    table2: Table,
-    scope: (
-      trans: Transaction & { [P in TableProp<this>]: this[P] }
-    ) => PromiseLike<U> | U
+    table: string | Table,
+    scope: (trans: TXWithTables<this>) => PromiseLike<U> | U
   ): PromiseExtended<U>;
-
   transaction<U>(
     mode: TransactionMode,
-    table: Table,
-    table2: Table,
-    table3: Table,
-    scope: (
-      trans: Transaction & { [P in TableProp<this>]: this[P] }
-    ) => PromiseLike<U> | U
+    table: string | Table,
+    table2: string | Table,
+    scope: (trans: TXWithTables<this>) => PromiseLike<U> | U
   ): PromiseExtended<U>;
-
   transaction<U>(
     mode: TransactionMode,
-    table: Table,
-    table2: Table,
-    table3: Table,
-    table4: Table,
-    scope: (
-      trans: Transaction & { [P in TableProp<this>]: this[P] }
-    ) => PromiseLike<U> | U
+    table: string | Table,
+    table2: string | Table,
+    table3: string | Table,
+    scope: (trans: TXWithTables<this>) => PromiseLike<U> | U
   ): PromiseExtended<U>;
-
   transaction<U>(
     mode: TransactionMode,
-    table: Table,
-    table2: Table,
-    table3: Table,
-    table4: Table,
-    table5: Table,
-    scope: (
-      trans: Transaction & { [P in TableProp<this>]: this[P] }
-    ) => PromiseLike<U> | U
+    table: string | Table,
+    table2: string | Table,
+    table3: string | Table,
+    table4: string | Table,
+    scope: (trans: TXWithTables<this>) => PromiseLike<U> | U
   ): PromiseExtended<U>;
-
   transaction<U>(
     mode: TransactionMode,
-    tables: Table[],
-    scope: (
-      trans: Transaction & { [P in TableProp<this>]: this[P] }
-    ) => PromiseLike<U> | U
+    table: string | Table,
+    table2: string | Table,
+    table3: string | Table,
+    table5: string | Table,
+    scope: (trans: TXWithTables<this>) => PromiseLike<U> | U
   ): PromiseExtended<U>;
-
-  transaction<U>(
-    mode: TransactionMode,
-    tables: string[],
-    scope: (
-      trans: Transaction
-    ) => PromiseLike<U> | U
-  ): PromiseExtended<U>;
-
+  
   close(): void;
 
   delete(): PromiseExtended<void>;
