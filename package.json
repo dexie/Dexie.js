@@ -5,7 +5,10 @@
   "main": "dist/dexie.js",
   "module": "dist/dexie.mjs",
   "jsnext:main": "dist/dexie.mjs",
-  "exports": "./dist/modern/dexie.mjs",
+  "exports": {
+    "import": "./dist/modern/dexie.mjs",
+    "require": "./dist/dexie.js"    
+  },
   "typings": "dist/dexie.d.ts",
   "jspm": {
     "format": "cjs",
