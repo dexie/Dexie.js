@@ -36,12 +36,12 @@ export interface DBOperationCommon<PK=DBOpPrimaryKey> {
 }
 export interface DBInsertOperation<PK=DBOpPrimaryKey> extends DBOperationCommon<PK> {
   type: "insert";
-  values: any[];
+  values: readonly any[];
 }
 
 export interface DBUpsertOperation<PK=DBOpPrimaryKey> extends DBOperationCommon<PK> {
   type: "upsert";
-  values: any[];
+  values: readonly any[];
 }
 
 export interface DBUpdateOperation<PK=DBOpPrimaryKey> extends DBOperationCommon<PK> {
