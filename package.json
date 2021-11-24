@@ -9,22 +9,22 @@
     ".": {
       "production": {
         "browser": "./dist/modern/dexie.min.mjs",
-        "import": "./dist/modern/dexie.min.mjs",
-        "module": "./require-module-wrapper-prod.mjs",
+        "module": "./dist/modern/dexie.min.mjs",
+        "import": "./import-wrapper-prod.mjs",
         "require": "./dist/dexie.min.js",
         "default": "./dist/dexie.min.js"
       },
       "development": {
         "browser": "./dist/modern/dexie.mjs",
-        "import": "./dist/modern/dexie.mjs",
-        "module": "./require-module-wrapper.mjs",
+        "module": "./dist/modern/dexie.mjs",
+        "import": "./import-wrapper.mjs",
         "require": "./dist/dexie.js",
         "default": "./dist/dexie.js"
       },
       "default": {
         "browser": "./dist/modern/dexie.mjs",
-        "import": "./dist/modern/dexie.mjs",
-        "module": "./require-module-wrapper.mjs",
+        "module": "./dist/modern/dexie.mjs",
+        "import": "./import-wrapper.mjs",
         "require": "./dist/dexie.js",
         "default": "./dist/dexie.js"
       }
