@@ -1,5 +1,5 @@
 import {liveQuery} from "dexie";
-import {useSubscription} from "./use-subscription";
+import {useSubscription} from "./useSubscription";
 import React from "react";
 
 export function useLiveQuery<T>(querier: ()=>Promise<T> | T, dependencies?: any[]): T | undefined;
