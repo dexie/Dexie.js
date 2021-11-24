@@ -1,5 +1,5 @@
 import { TransactionMode } from '../../public/types/transaction-mode';
-import { exceptions } from '../../errors';
+import { errnames, exceptions } from '../../errors';
 import { flatten, isAsyncFunction } from '../../functions/utils';
 import { Dexie } from './dexie';
 import { Transaction } from '../transaction';
@@ -49,7 +49,23 @@ export function enterTransactionScope(
       // Emulate transaction commit awareness for inner transaction (must 'commit' when the inner transaction has no more operations ongoing)
       trans.idbtrans = parentTransaction.idbtrans;
     } else {
-      trans.create(); // Create the backend transaction so that complete() or error() will trigger even if no operation is made upon it.
+      try {
+        trans.create(); // Create the native transaction so that complete() or error() will trigger even if no operation is made upon it.
+        db._state.PR1398_maxLoop = 3;
+      } catch (ex) {
+        if (ex.name === errnames.InvalidState && db.isOpen() && --db._state.PR1398_maxLoop > 0) {
+          console.warn('Dexie: Need to reopen db');
+          db._close();
+          return db.open().then(() => enterTransactionScope(
+            db,
+            mode,
+            storeNames,
+            null,
+            scopeFunc
+          ));
+        }
+        return rejection(ex);
+      }
     }
 
     // Support for native async await.

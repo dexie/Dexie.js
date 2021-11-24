@@ -1,6 +1,6 @@
 import { PSD, rejection, newScope } from "../helpers/promise";
 import { DexieOptions } from "../public/types/dexie-constructor";
-import { exceptions } from "../errors";
+import { errnames, exceptions } from "../errors";
 import { nop } from "./chaining-functions";
 import { Transaction } from "../classes/transaction";
 import { Dexie } from '../classes/dexie';
@@ -28,7 +28,17 @@ export function tempTransaction (
     return db._state.dbReadyPromise.then(() => tempTransaction(db, mode, storeNames, fn));
   } else {
     var trans = db._createTransaction(mode, storeNames, db._dbSchema);
-    try { trans.create(); } catch (ex) { return rejection(ex); }
+    try {
+      trans.create();
+      db._state.PR1398_maxLoop = 3;
+    } catch (ex) {
+      if (ex.name === errnames.InvalidState && db.isOpen() && --db._state.PR1398_maxLoop > 0) {
+        console.warn('Dexie: Need to reopen db');
+        db._close();
+        return db.open().then(()=>tempTransaction(db, mode, storeNames, fn));
+      }
+      return rejection(ex);
+    }
     return trans._promise(mode, (resolve, reject) => {
       return newScope(() => { // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
         PSD.trans = trans;

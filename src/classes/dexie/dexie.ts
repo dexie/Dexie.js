@@ -56,6 +56,7 @@ export interface DbReadyState {
   openCanceller: Promise<any> & { _stackHolder?: Error };
   autoSchema: boolean;
   vcFired?: boolean;
+  PR1398_maxLoop?: number;
 }
 
 export class Dexie implements IDexie {
@@ -120,7 +121,8 @@ export class Dexie implements IDexie {
       dbReadyPromise: null as Promise,
       cancelOpen: nop,
       openCanceller: null as Promise,
-      autoSchema: true
+      autoSchema: true,
+      PR1398_maxLoop: 3
     };
     state.dbReadyPromise = new Promise(resolve => {
       state.dbReadyResolve = resolve;
