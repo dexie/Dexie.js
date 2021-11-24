@@ -24,15 +24,13 @@ import { Collection } from './types/collection';
 import { PromiseExtended } from './types/promise-extended';
 import { Observable } from './types/observable';
 import { IntervalTree, RangeSetConstructor } from './types/rangeset';
+import { Dexie, TableProp } from './types/dexie';
+export type { TableProp };
+export * from './types/entity';
 
 // Alias of Table and Collection in order to be able to refer them from module below...
 interface _Table<T, TKey> extends Table<T, TKey> {}
 interface _Collection<T,TKey> extends Collection<T,TKey> {}
-
-export class Entity<T> {
-  protected readonly db: T;
-  protected constructor();
-}
 
 // Besides being the only exported value, let Dexie also be
 // a namespace for types...

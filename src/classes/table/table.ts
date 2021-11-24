@@ -248,11 +248,12 @@ export class Table implements ITable<any, IndexableType> {
    * 
    **/
   mapToClass(constructor: Function) {
-    const {db} = this;
+    const {db, name: tableName} = this;
     this.schema.mappedClass = constructor;
     if (constructor.prototype instanceof Entity) {
       constructor = class extends (constructor as any) {
         get db () { return db; }
+        table() { return tableName; }
       }
     }
     // Collect all inherited property names (including method names) by
@@ -421,7 +422,7 @@ export class Table implements ITable<any, IndexableType> {
    * 
    **/
   bulkAdd(
-    objects: any[],
+    objects: readonly any[],
     keysOrOptions?: ReadonlyArray<IndexableType> | { allKeys?: boolean },
     options?: { allKeys?: boolean }
   ) {    
@@ -458,7 +459,7 @@ export class Table implements ITable<any, IndexableType> {
    * 
    **/
   bulkPut(
-    objects: any[],
+    objects: readonly any[],
     keysOrOptions?: ReadonlyArray<IndexableType> | { allKeys?: boolean },
     options?: { allKeys?: boolean }
   ) {   

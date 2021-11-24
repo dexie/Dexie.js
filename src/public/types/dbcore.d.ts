@@ -38,7 +38,7 @@ export interface DBCoreMutateResponse {
 export interface DBCoreAddRequest {
   type: 'add';
   trans: DBCoreTransaction;
-  values: any[];
+  values: readonly any[];
   keys?: any[];
   /** @deprecated Will always get results since 3.1.0-alpha.5 */
   wantResults?: boolean;
@@ -47,7 +47,7 @@ export interface DBCoreAddRequest {
 export interface DBCorePutRequest {
   type: 'put';
   trans: DBCoreTransaction;
-  values: any[];
+  values: readonly any[];
   keys?: any[];
   criteria?: {
     index: string | null;
