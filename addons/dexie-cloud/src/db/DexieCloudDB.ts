@@ -73,8 +73,7 @@ export interface DexieCloudDB extends DexieCloudDBBase {
 const wm = new WeakMap<object, DexieCloudDB>();
 
 export const DEXIE_CLOUD_SCHEMA = {
-  realms: '@realmId',
-  members: '@id',
+  members: '@id, [userId+realmId], [email+realmId], realmId',
   roles: '[realmId+name]',
   $jobs: '',
   $syncState: '',
