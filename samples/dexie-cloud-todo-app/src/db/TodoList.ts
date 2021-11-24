@@ -17,8 +17,9 @@ export class TodoList extends Entity<TodoDB> {
   // Persisted Properties
   //
 
-  id?: string;
-  realmId?: string;
+  id!: string;
+  realmId!: string;
+  owner!: string;
   title!: string;
 
   //
@@ -33,7 +34,7 @@ export class TodoList extends Entity<TodoDB> {
     const currentRealmId = this.realmId;
     const newRealmId = this.id;
 
-    await this.db.transaction('rw', 'todoLists', 'todoItems', async (tx) => {
+    await this.db.transaction('rw', this.db.todoLists, this.db.todoItems, async (tx) => {
       // "Realmify entity" (setting realmId equals own id will make it become a Realm)
       await tx.todoLists.update(this.id!, { realmId: newRealmId });
       // Move all todo items into the new realm consistently (modify() is consistent across sync peers)
