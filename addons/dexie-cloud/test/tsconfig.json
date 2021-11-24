@@ -14,7 +14,8 @@
     "forceConsistentCasingInFileNames": true,
     "outDir": "../tools/tmp/",
     "sourceMap": true,
-    "rootDir": ".."
+    "rootDir": "..",
+    "downlevelIteration": true
   },
   "include": [
     "../src/",

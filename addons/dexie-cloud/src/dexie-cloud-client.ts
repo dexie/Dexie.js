@@ -1,5 +1,5 @@
-import Dexie, { liveQuery, Subscription } from 'dexie';
-import { getDbNameFromDbUrl } from 'dexie-cloud-common';
+import Dexie, { liveQuery, Subscription, Table } from 'dexie';
+import { DBPermissionSet, DBRealmMember, getDbNameFromDbUrl } from 'dexie-cloud-common';
 import { BehaviorSubject, combineLatest, from, fromEvent } from 'rxjs';
 import { filter, map, skip, startWith, switchMap, take } from 'rxjs/operators';
 import { login } from './authentication/login';
@@ -9,7 +9,7 @@ import { PersistedSyncState } from './db/entities/PersistedSyncState';
 import { DexieCloudOptions } from './DexieCloudOptions';
 import { DISABLE_SERVICEWORKER_STRATEGY } from './DISABLE_SERVICEWORKER_STRATEGY';
 import './extend-dexie-interface';
-import { DexieCloudSyncOptions } from './extend-dexie-interface';
+import { DexieCloudAPI, DexieCloudSyncOptions } from './extend-dexie-interface';
 import { dbOnClosed } from './helpers/dbOnClosed';
 import { IS_SERVICE_WORKER } from './helpers/IS_SERVICE_WORKER';
 import { throwVersionIncrementNeeded } from './helpers/throwVersionIncrementNeeded';
@@ -34,6 +34,9 @@ import { verifySchema } from './verifySchema';
 import { setupDefaultGUI } from './default-ui';
 import { DXCWebSocketStatus } from './DXCWebSocketStatus';
 import { computeSyncState } from './computeSyncState';
+import { generateKey } from './middleware-helpers/idGenerationHelpers';
+import { PermissionChecker } from './PermissionChecker';
+import { mergePermissions } from './mergePermissions';
 
 export { DexieCloudTable } from './extend-dexie-interface';
 
@@ -161,12 +164,44 @@ export function dexieCloud(dexie: Dexie) {
         }
       }
     },
+    permissions(
+      this: DexieCloudAPI<Dexie>,
+      realmId: string | {owner: string, realmId: string, table: ()=>string},
+      tableName?: string,
+      owner?: string)
+    {
+      if (typeof realmId === 'object') {
+        tableName = realmId.table();
+        owner = realmId.owner;
+        realmId = realmId.realmId;
+      }
+      
+      const members$ = from(liveQuery(() => dexie.members.where({
+        realmId,
+        userId: this.currentUserId
+      }).toArray()));
+      return members$.pipe(
+        startWith([] as DBRealmMember[]),
+        map(members => {
+          const permissions = members.map(m => m.permissions!).filter(p => p);
+          return new PermissionChecker(
+            mergePermissions(...permissions),
+            tableName!,
+            owner === this.currentUserId);
+        })
+      );
+    }
   };
 
   dexie.Version.prototype['_parseStoresSpec'] = Dexie.override(
     dexie.Version.prototype['_parseStoresSpec'],
     (origFunc) => overrideParseStoresSpec(origFunc, dexie)
   );
+
+  dexie.Table.prototype.newId = function (this: Table<any>, colocateWith?: string) {
+    const shardKey = colocateWith && colocateWith.substr(colocateWith.length - 3);
+    return generateKey(dexie.cloud.schema![this.name].idPrefix || "", shardKey);
+  }
 
   dexie.use(
     createMutationTrackingMiddleware({

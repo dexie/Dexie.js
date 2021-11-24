@@ -14,7 +14,8 @@
     "rootDir": ".",
     "jsx": "react",
     "jsxFactory": "h",
-    "jsxFragmentFactory": "Fragment"
+    "jsxFragmentFactory": "Fragment",
+    "downlevelIteration": true
   },
   "include": [
     "**/*.ts"
