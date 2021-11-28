@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useEffect, useState } from "react";
 import { db } from "../db";
 import { TodoItem } from "../db/TodoItem";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
@@ -10,7 +10,8 @@ interface Props {
 }
 
 export function TodoItemView({ item }: Props) {
-  const can = usePermissions(item);
+  const can = usePermissions(db, "todoItems", item);
+  console.log("TodoItem", item.title, item.owner, item.realmId);
   return (
     <div className={"row " + (item.done ? "done" : "")}>
       <div className="narrow">

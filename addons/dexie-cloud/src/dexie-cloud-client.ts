@@ -9,7 +9,8 @@ import { PersistedSyncState } from './db/entities/PersistedSyncState';
 import { DexieCloudOptions } from './DexieCloudOptions';
 import { DISABLE_SERVICEWORKER_STRATEGY } from './DISABLE_SERVICEWORKER_STRATEGY';
 import './extend-dexie-interface';
-import { DexieCloudAPI, DexieCloudSyncOptions } from './extend-dexie-interface';
+import { DexieCloudSyncOptions } from "./DexieCloudSyncOptions";
+import { DexieCloudAPI } from "./DexieCloudAPI";
 import { dbOnClosed } from './helpers/dbOnClosed';
 import { IS_SERVICE_WORKER } from './helpers/IS_SERVICE_WORKER';
 import { throwVersionIncrementNeeded } from './helpers/throwVersionIncrementNeeded';
@@ -35,17 +36,18 @@ import { setupDefaultGUI } from './default-ui';
 import { DXCWebSocketStatus } from './DXCWebSocketStatus';
 import { computeSyncState } from './computeSyncState';
 import { generateKey } from './middleware-helpers/idGenerationHelpers';
-import { PermissionChecker } from './PermissionChecker';
-import { mergePermissions } from './mergePermissions';
+import { permissions } from './permissions';
+import { getCurrentUserEmitter } from './currentUserEmitter';
 
-export { DexieCloudTable } from './extend-dexie-interface';
+export { DexieCloudTable } from './DexieCloudTable';
+export * from './getTiedRealmId';
 
 export function dexieCloud(dexie: Dexie) {
   const origIdbName = dexie.name;
   //
   //
   //
-  const currentUserEmitter = new BehaviorSubject(UNAUTHORIZED_USER);
+  const currentUserEmitter = getCurrentUserEmitter(dexie);
   const subscriptions: Subscription[] = [];
 
   // local sync worker - used when there's no service worker.
@@ -165,31 +167,11 @@ export function dexieCloud(dexie: Dexie) {
       }
     },
     permissions(
-      this: DexieCloudAPI<Dexie>,
-      realmId: string | {owner: string, realmId: string, table: ()=>string},
-      tableName?: string,
-      owner?: string)
+      obj: {owner: string, realmId: string, table?: ()=>string},
+      tableName?: string
+    )
     {
-      if (typeof realmId === 'object') {
-        tableName = realmId.table();
-        owner = realmId.owner;
-        realmId = realmId.realmId;
-      }
-      
-      const members$ = from(liveQuery(() => dexie.members.where({
-        realmId,
-        userId: this.currentUserId
-      }).toArray()));
-      return members$.pipe(
-        startWith([] as DBRealmMember[]),
-        map(members => {
-          const permissions = members.map(m => m.permissions!).filter(p => p);
-          return new PermissionChecker(
-            mergePermissions(...permissions),
-            tableName!,
-            owner === this.currentUserId);
-        })
-      );
+      return permissions(dexie, obj, tableName);
     }
   };
 

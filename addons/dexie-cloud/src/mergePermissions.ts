@@ -3,7 +3,8 @@
 import { DBPermissionSet } from "dexie-cloud-common";
 
 export function mergePermissions(...permissions: DBPermissionSet[]): DBPermissionSet {
-  return permissions.reduce((result, next) => {
+  if (permissions.length === 0) return {};
+  const reduced = permissions.reduce((result, next) => {
     const ret = { ...result } as DBPermissionSet;
     for (const [verb, rights] of Object.entries(next) as [
       keyof DBPermissionSet,
@@ -61,4 +62,5 @@ export function mergePermissions(...permissions: DBPermissionSet[]): DBPermissio
     }
     return ret;
   });
+  return reduced;
 }

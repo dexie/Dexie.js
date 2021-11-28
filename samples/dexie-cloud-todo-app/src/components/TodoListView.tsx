@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useLiveQuery, usePermissions } from 'dexie-react-hooks';
 import { TodoList } from '../db/TodoList';
-import { db } from '../db';
+import { db, TodoDB } from '../db';
 import { TodoItemView } from './TodoItemView';
 import { AddTodoItem } from './AddTodoItem';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
@@ -17,7 +17,8 @@ export function TodoListView({ todoList }: Props) {
     () => db.todoItems.where({ todoListId: todoList.id }).toArray(),
     [todoList.id]
   );
-  const can = usePermissions(todoList);
+  const can = usePermissions(todoList);  
+  console.log("render TodoListView", can);
   const [showInviteForm, setShowInviteForm] = useState(false);
 
   if (!items) return null;

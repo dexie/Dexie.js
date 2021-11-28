@@ -1,6 +1,5 @@
 import { Observable } from 'dexie';
-import { useSubscription } from './useSubscription';
-import React from 'react';
+import React, { useEffect } from 'react';
 
 export function useObservable<T, TDefault>(
   observable: Observable<T>
@@ -25,40 +24,41 @@ export function useObservable<T, TDefault>(
 ) {
   const [deps, defaultResult] =
     typeof o === 'function' ? [arg2 || [], arg3] : [[], arg2];
-  const [lastResult, setLastResult] = React.useState(
-    defaultResult as T | TDefault
-  );
-  const subscription = React.useMemo(
-    () => {
-      // Make it remember previous subscription's default value when
-      // resubscribing (á la useTransition())
-      const observable = typeof o === 'function' ? o() : o;
-      return {
-        getCurrentValue: () => {
-          // @ts-ignore: Optimize for BehaviorSubject and other observables implementing getValue():
-          if (typeof observable.getValue === 'function') {
-            // @ts-ignore
-            return observable.getValue();
-          }
-          let currentValue = lastResult;
-          observable.subscribe((value) => (currentValue = value)).unsubscribe();
-          return currentValue;
-        },
-        subscribe: (onNext, onError) => {
-          const esSubscription = observable.subscribe((value) => {
-            setLastResult(value);
-            onNext(value);
-          }, onError);
-          return esSubscription.unsubscribe.bind(esSubscription);
-        },
-      };
-    },
+  const lastResult = React.useRef(defaultResult as T | TDefault);
+  const lastError = React.useRef(null as any);
+  const [_, triggerUpdate] = React.useState({});
+  const observable = React.useMemo(() => {
+    // Make it remember previous subscription's default value when
+    // resubscribing (á la useTransition())
+    const observable = typeof o === 'function' ? o() : o;
+    // @ts-ignore: Optimize for BehaviorSubject and other observables implementing getValue():
+    if (typeof observable?.getValue === 'function') {
+      // @ts-ignore
+      lastResult.current = observable.getValue();
+    } else {
+      // If the observable has a current value, try get it by subscribing and
+      // unsubscribing synchronously
+      observable.subscribe((val) => (lastResult.current = val)).unsubscribe();
+    }
+    return observable;
+  }, deps);
 
-    // Re-subscribe any time any of the given deps change
-    deps
-  );
+  useEffect(() => {
+    const subscription = observable.subscribe(
+      (val) => {
+        lastError.current = null;
+        lastResult.current = val;
+        triggerUpdate({});
+      },
+      (err) => {
+        lastError.current = err;
+        triggerUpdate({});
+      }
+    );
+    return subscription.unsubscribe.bind(subscription);
+  }, deps);
 
-  // The value returned by this hook reflects the current result from the observable
-  // Our component will automatically be re-rendered when that value changes.
-  return useSubscription(subscription);
+  if (lastError.current) throw lastError.current;
+
+  return lastResult.current;
 }

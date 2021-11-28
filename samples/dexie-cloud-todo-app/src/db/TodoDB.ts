@@ -1,6 +1,7 @@
 import Dexie from "dexie";
 import dexieCloud, { DexieCloudTable } from "dexie-cloud-addon";
-import type { TodoItem } from "./TodoItem";
+import { usePermissions } from "dexie-react-hooks";
+import { TodoItem } from "./TodoItem";
 import { TodoList } from "./TodoList";
 
 export class TodoDB extends Dexie {
@@ -10,11 +11,25 @@ export class TodoDB extends Dexie {
 
   constructor() {
     super('TodoDBCloud2', { addons: [dexieCloud] });
-    this.version(3).stores({
+    this.version(6).stores({
       todoLists: `@id`,
-      todoItems: `@id, [todoListId+realmId]`,
-      members: `@id, realmId, [email+realmId]`, // We just indexes to built-in table. Keep both realmId and [realmId+email] in order to find members without email set.
+      todoItems: `@id, [todoListId+realmId]`
     });
     this.todoLists.mapToClass(TodoList);
   }
 }
+
+
+/*
+    TODO:
+
+      1. V: Felsök varför vi inte får rätt permissions
+
+      Sedan:
+      1. Låt TodoItem vara interface igen. Ingen poäng att mappa till klass!
+      2. Ändra överlagrade varianten till db.cloud.permissions att ta: const can = usePermissions(db, 'todoItems', todoItem);
+      3. Gör en överlagrad variant av usePermissions som tar (db, tableName, obj)
+
+      * Basera useLiveQuery på nya useObservable?
+      
+ */

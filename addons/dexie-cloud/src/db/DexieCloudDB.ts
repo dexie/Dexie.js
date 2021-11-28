@@ -2,9 +2,6 @@ import Dexie, { Table } from 'dexie';
 import { GuardedJob } from './entities/GuardedJob';
 import { UserLogin } from './entities/UserLogin';
 import { PersistedSyncState } from './entities/PersistedSyncState';
-import { Realm } from './entities/Realm';
-import { Member } from './entities/Member';
-import { Role } from './entities/Role';
 import { UNAUTHORIZED_USER } from '../authentication/UNAUTHORIZED_USER';
 import { DexieCloudOptions } from '../DexieCloudOptions';
 import { BehaviorSubject, Subject } from 'rxjs';
@@ -75,6 +72,7 @@ const wm = new WeakMap<object, DexieCloudDB>();
 export const DEXIE_CLOUD_SCHEMA = {
   members: '@id, [userId+realmId], [email+realmId], realmId',
   roles: '[realmId+name]',
+  realms: '@realmId',
   $jobs: '',
   $syncState: '',
   $baseRevs: '[tableName+clientRev]',
