@@ -1,5 +1,5 @@
 import { Observable } from 'dexie';
-import React, { useEffect } from 'react';
+import React from 'react';
 
 export function useObservable<T, TDefault>(
   observable: Observable<T>
@@ -43,16 +43,22 @@ export function useObservable<T, TDefault>(
     return observable;
   }, deps);
 
-  useEffect(() => {
+  React.useDebugValue(lastResult.current);
+
+  React.useEffect(() => {
     const subscription = observable.subscribe(
       (val) => {
-        lastError.current = null;
-        lastResult.current = val;
-        triggerUpdate({});
+        if (lastError.current !== null || lastResult.current !== val) {
+          lastError.current = null;
+          lastResult.current = val;
+          triggerUpdate({});
+        }
       },
       (err) => {
-        lastError.current = err;
-        triggerUpdate({});
+        if (lastError.current !== err) {
+          lastError.current = err;
+          triggerUpdate({});
+        }
       }
     );
     return subscription.unsubscribe.bind(subscription);
