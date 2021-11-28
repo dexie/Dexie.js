@@ -7,7 +7,8 @@ export function Invites() {
   const currentUser = useObservable(db.cloud.currentUser);
   /*const invites = useLiveQuery(()=>
     db.members.filter(m => m.email === currentUser?.email && !m.accepted).toArray());*/
-  const invites = useLiveQuery(()=>db.members.orderBy('[email+realmId]').toArray());
+  const invites = useLiveQuery(()=>db.members.toArray());
+  //const invites = useObservable(db.cloud.myMembers);
   return <>
     <h3>Invites</h3>
     <table>

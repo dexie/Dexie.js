@@ -5,19 +5,19 @@ import React from "react";
 export function useLiveQuery<T>(querier: ()=>Promise<T> | T, dependencies?: any[]): T | undefined;
 export function useLiveQuery<T,TDefault> (querier: ()=>Promise<T> | T, dependencies: any[], defaultResult: TDefault) : T | TDefault;
 export function useLiveQuery<T,TDefault> (querier: ()=>Promise<T> | T, dependencies?: any[], defaultResult?: TDefault) : T | TDefault{
-  const [lastResult, setLastResult] = React.useState(defaultResult as T | TDefault);
+  const lastResult = React.useRef(defaultResult as T | TDefault);
   const subscription = React.useMemo(
     () => {
       // Make it remember previous subscription's default value when
       // resubscribing (á la useTransition())
-      let currentValue = lastResult;
+      let currentValue = lastResult.current;
       const observable = liveQuery(querier);
       return {
         getCurrentValue: () => currentValue,
         subscribe: (onNext, onError) => {
           const esSubscription = observable.subscribe(value => {
             currentValue = value;
-            setLastResult(value);
+            lastResult.current = value;
             onNext(value);
           }, onError);
           return esSubscription.unsubscribe.bind(esSubscription);

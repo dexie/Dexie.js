@@ -1,5 +1,6 @@
 import { Entity } from 'dexie';
 import type { TodoDB } from './TodoDB';
+import { getTiedRealmId } from 'dexie-cloud-addon';
 
 /** Since there are some actions associated with
  * this entity (share(), unshare() etc) it can be
@@ -27,93 +28,135 @@ export class TodoList extends Entity<TodoDB> {
   //
 
   isSharable() {
-    return this.id === this.realmId;
+    return this.realmId === getTiedRealmId(this.id);
   }
 
   async makeSharable() {
     const currentRealmId = this.realmId;
-    const newRealmId = this.id;
+    const newRealmId = getTiedRealmId(this.id);
+    const { db } = this;
 
-    await this.db.transaction('rw', this.db.todoLists, this.db.todoItems, async (tx) => {
-      // "Realmify entity" (setting realmId equals own id will make it become a Realm)
-      await tx.todoLists.update(this.id!, { realmId: newRealmId });
-      // Move all todo items into the new realm consistently (modify() is consistent across sync peers)
-      await tx.todoItems
-        .where({
-          realmId: currentRealmId,
-          todoListId: this.id,
-        })
-        .modify({ realmId: newRealmId });
-    });
+    await this.db.transaction(
+      'rw',
+      [db.todoLists, db.todoItems, db.realms],
+      async () => {
+        // Create tied realm
+        // We use put() here in case same user does this on
+        // two offline devices to add different members - we don't
+        // want one of the actions to fail - we want both to succeed
+        // and add both members
+        await db.realms.put({
+          realmId: newRealmId,
+          name: this.title,
+        });
+
+        // "Realmify entity" (setting realmId equals own id will make it become a Realm)
+        await db.todoLists.update(this.id!, { realmId: newRealmId });
+        // Move all todo items into the new realm consistently (modify() is consistent across sync peers)
+        await db.todoItems
+          .where({
+            realmId: currentRealmId,
+            todoListId: this.id,
+          })
+          .modify({ realmId: newRealmId });
+      }
+    );
+    return newRealmId;
   }
 
   async makePrivate() {
-    await this.db.transaction(
+    const { db, realmId: oldRealmId } = this;
+    await db.transaction(
       'rw',
-      ['todoLists', 'todoItems', 'members'],
-      async (tx) => {
+      [db.todoLists, db.todoItems, db.members, db.realms],
+      async () => {
         // Move todoItems out of the realm in a sync-consistent operation:
-        await tx.todoItems
+        await db.todoItems
           .where({
-            realmId: this.id, // This critera may seem ambigious, but it will optimize the sync operation.
+            realmId: oldRealmId,
             todoListId: this.id,
           })
-          .modify({ realmId: this.db.cloud.currentUserId });
-          
-        // Remove all access (Collection.delete() is a sync-consistent operation)
-        await tx.members.where('realmId').equals(this.id!).delete();
-        
+          .modify({ realmId: db.cloud.currentUserId });
+
         // Move the todoList back into your private realm:
-        await tx.todoLists.update(this.id!, {
+        await db.todoLists.update(this.id, {
           realmId: this.db.cloud.currentUserId,
         });
 
-
+        // Remove all access (Collection.delete() is a sync-consistent operation)
+        await db.members.where('realmId').equals(oldRealmId).delete();
+        // Delete tied realm
+        await db.realms.delete(this.realmId);
       }
     );
   }
 
   async shareWith(name: string, email: string, sendEmail: boolean) {
-    await this.db.transaction('rw', 'members', 'todoLists', 'todoItems', async ()=>{
-      if (!this.isSharable()) {
-      
-        await this.makeSharable();
-      }
+    const { db } = this;
+    await db.transaction(
+      'rw',
+      [db.members, db.todoLists, db.todoItems, db.realms],
+      async () => {
+        let realmId = this.realmId;
+        if (!this.isSharable()) {
+          realmId = await this.makeSharable();
+        }
 
-      // Add given name and email as a member with full permissions
-      await this.db.members.add({
-        realmId: this.id,
-        name,
-        email,
-        invite: sendEmail,
-        permissions: { add: ["todoItems"], update: {todoItems: ["done"]} },
-      });
-    });
+        // Add given name and email as a member with full permissions
+        await this.db.members.add({
+          realmId,
+          name,
+          email,
+          invite: sendEmail,
+          permissions: { add: ['todoItems'], update: { todoItems: ['done'] } },
+        });
+      }
+    );
   }
 
   async unshareWith(email: string) {
-    await this.db.transaction('rw', 'members', 'todoLists', 'todoItems', async ()=>{
-      await this.db.members
-        .where({
-          realmId: this.id,
-          email,
-        })
-        .delete();
-      const numMembers = await this.db.members.where({realmId: this.id}).count();
-      if (numMembers === 0) {
-        await this.makePrivate();
+    const { db } = this;
+    await db.transaction(
+      'rw',
+      [db.todoLists, db.todoItems, db.members, db.realms],
+      async () => {
+        await db.members
+          .where({
+            realmId: this.realmId,
+            email,
+          })
+          .delete();
+        const numMembers = await db.members
+          .where({ realmId: this.realmId })
+          .count();
+        if (numMembers <= 1) {
+          // Only our own member left.
+          await this.makePrivate();
+        }
       }
-    });
+    );
   }
 
   async delete() {
-    await this.db.transaction(
+    const { db } = this;
+    await db.transaction(
       'rw',
-      ['members', 'todoItems', 'todoLists'],
-      (tx) => {
-        tx.members.where({ realmId: this.id }).delete(); // Remove access if we are shared
-        tx.todoItems.where({ todoListId: this.id }).delete(); // Delete todo items
-        tx.todoLists.delete(this.id!); // Delete the list
+      [db.todoLists, db.todoItems, db.members, db.realms],
+      () => {
+        // Delete todo items
+        db.todoItems
+          .where({
+            todoListId: this.id,
+          })
+          .delete();
+
+        // Delete the list
+        db.todoLists.delete(this.id!);
+
+        // Delete any tied realm and related access:
+        const tiedRealmId = getTiedRealmId(this.id);
+        db.members.where({ realmId: tiedRealmId }).delete();
+        db.realms.delete(tiedRealmId);
       }
     );
   }

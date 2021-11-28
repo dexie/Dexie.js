@@ -3,22 +3,22 @@ import { DBPermissionSet } from 'dexie-cloud-common';
 
 type TableName<T> = T extends {table: ()=>infer TABLE} ? TABLE extends string ? TABLE : string : string;
 
-export class PermissionChecker<T> {
+export class PermissionChecker<T, TableNames extends string = TableName<T>> {
   private permissions: DBPermissionSet;
-  private tableName: TableName<T>;
+  private tableName: TableNames;
   private isOwner: boolean;
 
   constructor(
     permissions: DBPermissionSet,
-    tableName: TableName<T>,
+    tableName: TableNames,
     isOwner: boolean
   ) {
-    this.permissions = permissions;
+    this.permissions = permissions || {};
     this.tableName = tableName;
     this.isOwner = isOwner;
   }
 
-  add(...tableNames: TableName<T>[]) {
+  add(...tableNames: TableNames[]): boolean {
     // If user can manage the whole realm, return true.
     if (this.permissions.manage === '*') return true;
     // If user can manage given table in realm, return true
@@ -59,7 +59,7 @@ export class PermissionChecker<T> {
     );
   }
 
-  delete() {
+  delete(): boolean {
     // If user is owner of this object, or if user can manage the whole realm, return true.
     if (this.isOwner || this.permissions.manage === '*') return true;
     // If user can manage given table in realm, return true
