@@ -18,18 +18,3 @@ export class TodoDB extends Dexie {
     this.todoLists.mapToClass(TodoList);
   }
 }
-
-
-/*
-    TODO:
-
-      1. V: Felsök varför vi inte får rätt permissions
-
-      Sedan:
-      1. Låt TodoItem vara interface igen. Ingen poäng att mappa till klass!
-      2. Ändra överlagrade varianten till db.cloud.permissions att ta: const can = usePermissions(db, 'todoItems', todoItem);
-      3. Gör en överlagrad variant av usePermissions som tar (db, tableName, obj)
-
-      * Basera useLiveQuery på nya useObservable?
-      
- */
