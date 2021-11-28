@@ -44,22 +44,22 @@ export interface Table<T=any, TKeyPropNameOrKeyType=IndexableType, TOpt=void> {
   orderBy(index: string | string[]): Collection<T, IDType<T, TKeyPropNameOrKeyType>>;
   reverse(): Collection<T, IDType<T, TKeyPropNameOrKeyType>>;
   mapToClass(constructor: Function): Function;
-  add(item: InsertType<T, TOpt>, key?: IDType<T, TKeyPropNameOrKeyType>): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
+  add(item: InsertType<T, TOpt, TKeyPropNameOrKeyType>, key?: IDType<T, TKeyPropNameOrKeyType>): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
   update(
-    key: IDType<T, TKeyPropNameOrKeyType> | InsertType<T, TOpt>,
+    key: IDType<T, TKeyPropNameOrKeyType> | T,
     changes: { [KP in KeyPaths<T>]?: KeyPathValue<T, KP> } | ((obj: T, ctx:{value: any, primKey: IndexableType}) => void | boolean)): PromiseExtended<number>;
-  put(item: InsertType<T, TOpt>, key?: IDType<T, TKeyPropNameOrKeyType>): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
+  put(item: InsertType<T, TOpt, TKeyPropNameOrKeyType>, key?: IDType<T, TKeyPropNameOrKeyType>): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
   delete(key: IDType<T, TKeyPropNameOrKeyType>): PromiseExtended<void>;
   clear(): PromiseExtended<void>;
   bulkGet(keys: IDType<T, TKeyPropNameOrKeyType>[]): PromiseExtended<(T | undefined)[]>;
 
-  bulkAdd<B extends boolean>(items: readonly InsertType<T, TOpt>[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): PromiseExtended<B extends true ? IDType<T, TKeyPropNameOrKeyType>[] : IDType<T, TKeyPropNameOrKeyType>>;
-  bulkAdd<B extends boolean>(items: readonly InsertType<T, TOpt>[], options: { allKeys: B }): PromiseExtended<B extends true ? IDType<T, TKeyPropNameOrKeyType>[] : IDType<T, TKeyPropNameOrKeyType>>;
-  bulkAdd(items: readonly InsertType<T, TOpt>[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
+  bulkAdd<B extends boolean>(items: readonly InsertType<T, TOpt, TKeyPropNameOrKeyType>[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): PromiseExtended<B extends true ? IDType<T, TKeyPropNameOrKeyType>[] : IDType<T, TKeyPropNameOrKeyType>>;
+  bulkAdd<B extends boolean>(items: readonly InsertType<T, TOpt, TKeyPropNameOrKeyType>[], options: { allKeys: B }): PromiseExtended<B extends true ? IDType<T, TKeyPropNameOrKeyType>[] : IDType<T, TKeyPropNameOrKeyType>>;
+  bulkAdd(items: readonly InsertType<T, TOpt, TKeyPropNameOrKeyType>[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
 
-  bulkPut<B extends boolean>(items: readonly InsertType<T, TOpt>[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): PromiseExtended<B extends true ? IDType<T, TKeyPropNameOrKeyType>[] : IDType<T, TKeyPropNameOrKeyType>>;
-  bulkPut<B extends boolean>(items: readonly InsertType<T, TOpt>[], options: { allKeys: B }): PromiseExtended<B extends true ? IDType<T, TKeyPropNameOrKeyType>[] : IDType<T, TKeyPropNameOrKeyType>>;
-  bulkPut(items: readonly InsertType<T, TOpt>[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
+  bulkPut<B extends boolean>(items: readonly InsertType<T, TOpt, TKeyPropNameOrKeyType>[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): PromiseExtended<B extends true ? IDType<T, TKeyPropNameOrKeyType>[] : IDType<T, TKeyPropNameOrKeyType>>;
+  bulkPut<B extends boolean>(items: readonly InsertType<T, TOpt ,TKeyPropNameOrKeyType>[], options: { allKeys: B }): PromiseExtended<B extends true ? IDType<T, TKeyPropNameOrKeyType>[] : IDType<T, TKeyPropNameOrKeyType>>;
+  bulkPut(items: readonly InsertType<T, TOpt, TKeyPropNameOrKeyType>[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
 
   bulkDelete(keys: IDType<T, TKeyPropNameOrKeyType>[]): PromiseExtended<void>;
 }
