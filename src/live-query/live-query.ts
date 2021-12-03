@@ -16,14 +16,22 @@ import { Observable } from "../classes/observable/observable";
 import { extendObservabilitySet } from "./extend-observability-set";
 import { rangesOverlap } from "../helpers/rangeset";
 
+export interface LiveQueryContext {
+  subscr: ObservabilitySet;
+  txs: IDBTransaction[];
+  signal: {
+    readonly aborted: boolean;  
+  }
+}
+
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
   return new Observable<T>((observer) => {
     const scopeFuncIsAsync = isAsyncFunction(querier);
-    function execute(subscr: ObservabilitySet) {
+    function execute(ctx: LiveQueryContext) {
       if (scopeFuncIsAsync) {
         incrementExpectedAwaits();
       }
-      const exec = () => newScope(querier, { subscr, trans: null });
+      const exec = () => newScope(querier, { ...ctx, trans: null });
       const rv = PSD.trans
         ? // Ignore current transaction if active when calling subscribe().
           usePSD(PSD.transless, exec)
@@ -38,6 +46,13 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     }
 
     let closed = false;
+    const ctx: LiveQueryContext = {
+      subscr: {},
+      txs: [],
+      signal: {
+        get aborted() { return closed; }
+      }
+    }
 
     let accumMuts: ObservabilitySet = {};
     let currentObs: ObservabilitySet = {};
@@ -49,6 +64,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       unsubscribe: () => {
         closed = true;
         globalEvents.storagemutated.unsubscribe(mutationListener);
+        ctx.txs.forEach(idbtrans => {try {idbtrans.abort();} catch {}});
       },
     };
 
@@ -74,8 +90,9 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     const doQuery = () => {
       if (querying || closed) return;
       accumMuts = {};
-      const subscr: ObservabilitySet = {};
-      const ret = execute(subscr);
+      const subscr = {};
+      ctx.subscr = subscr;
+      const ret = execute(ctx);
       if (!startedListening) {
         globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
         startedListening = true;

@@ -1,4 +1,6 @@
+import { LiveQueryContext } from ".";
 import { getFromTransactionCache } from "../dbcore/cache-existing-values-middleware";
+import { exceptions } from "../errors";
 import { cmp } from "../functions/cmp";
 import { isArray, keys } from "../functions/utils";
 import { PSD } from "../helpers/promise";
@@ -29,6 +31,28 @@ export const observabilityMiddleware: Middleware<DBCore> = {
 
     return {
       ...core,
+      transaction: (stores, mode, options) => {
+        if (!PSD.subscr) return core.transaction(stores, mode, options);
+        if (mode !== 'readonly') throw new exceptions.ReadOnly('write transaction not allowed within liveQueries');
+        const idbtrans = core.transaction(stores, mode, options) as IDBTransaction;
+        // Maintain PSD.txs array of ongoing transactions in case they need to be
+        // aborted in live-query.ts before done.
+        const { txs } = PSD as LiveQueryContext;
+        if (txs) {
+          txs.push(idbtrans);
+          const remove = () => {
+            const idx = txs.indexOf(idbtrans);
+            if (idx > -1) txs.splice(idx, 1);
+            idbtrans.removeEventListener('abort', remove);
+            idbtrans.removeEventListener('complete', remove);
+            idbtrans.removeEventListener('error', remove);
+          };
+          idbtrans.addEventListener('abort', remove);
+          idbtrans.addEventListener('complete', remove);
+          idbtrans.addEventListener('error', remove);
+        }
+        return idbtrans;
+      },
       table: (tableName) => {
         const table = core.table(tableName);
         const { schema } = table;
@@ -133,6 +157,9 @@ export const observabilityMiddleware: Middleware<DBCore> = {
           ) {
             const { subscr } = PSD;
             if (subscr) {
+              // Abort handling
+              const { signal } = PSD as LiveQueryContext;
+              if (signal && signal.aborted) throw new exceptions.Abort();
               // Current zone want's to track all queries so they can be subscribed to.
               // (The query is executed within a "liveQuery" zone)
               // Check whether the query applies to a certain set of ranges:
