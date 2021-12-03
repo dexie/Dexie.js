@@ -100,7 +100,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         return;
       }
       accumMuts = {};
-      const subscr = {};
+      const subscr: ObservabilitySet = {};
       ctx.subscr = subscr;
       const ret = execute(ctx);
       if (!startedListening) {
