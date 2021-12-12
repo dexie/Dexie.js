@@ -4,7 +4,7 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 # How to use the sample
 
-If you just want to see the app in action, navigate to the [pre-built published version](https://dfahlander.github.io/Dexie.js/dexie-cloud-todo-app/). Currently it is bugging out on Safari so please use any other browser if possible. Safari crashed from our service worker. *Next version will workaround this so that it will work well on iOS and Safari (by avoiding to do sync from the service worker and instead do it from the main thread).*
+If you just want to see the app in action, navigate to the [pre-built published version](https://dexie.github.io/Dexie.js/dexie-cloud-todo-app/). Currently it is bugging out on Safari so please use any other browser if possible. Safari crashed from our service worker. *Next version will workaround this so that it will work well on iOS and Safari (by avoiding to do sync from the service worker and instead do it from the main thread).*
 
 If you want to build and play with it locally, follow these steps:
 
