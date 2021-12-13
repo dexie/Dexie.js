@@ -10,6 +10,7 @@ import { DBCoreTable } from "./dbcore";
 import { InsertType } from "./insert-type";
 import { KeyPaths, KeyPathValue } from "./keypaths";
 import { Dexie } from "./dexie";
+import { UpdateSpec } from "./update-spec";
 
 export type IDType<T, TKey> = TKey extends keyof T ? T[TKey] : TKey;
 export interface Table<T=any, TKeyPropNameOrKeyType=IndexableType, TOpt=void> {
@@ -47,7 +48,7 @@ export interface Table<T=any, TKeyPropNameOrKeyType=IndexableType, TOpt=void> {
   add(item: InsertType<T, TOpt, TKeyPropNameOrKeyType>, key?: IDType<T, TKeyPropNameOrKeyType>): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
   update(
     key: IDType<T, TKeyPropNameOrKeyType> | T,
-    changes: { [KP in KeyPaths<T>]?: KeyPathValue<T, KP> } | ((obj: T, ctx:{value: any, primKey: IndexableType}) => void | boolean)): PromiseExtended<number>;
+    changes: UpdateSpec<T> | ((obj: T, ctx:{value: any, primKey: IndexableType}) => void | boolean)): PromiseExtended<number>;
   put(item: InsertType<T, TOpt, TKeyPropNameOrKeyType>, key?: IDType<T, TKeyPropNameOrKeyType>): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
   delete(key: IDType<T, TKeyPropNameOrKeyType>): PromiseExtended<void>;
   clear(): PromiseExtended<void>;

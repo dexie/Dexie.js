@@ -27,6 +27,7 @@ import { IntervalTree, RangeSetConstructor } from './types/rangeset';
 import { Dexie, TableProp } from './types/dexie';
 export type { TableProp };
 export * from './types/entity';
+export { UpdateSpec } from './types/update-spec';
 
 // Alias of Table and Collection in order to be able to refer them from module below...
 interface _Table<T, TKey> extends Table<T, TKey> {}

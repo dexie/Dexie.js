@@ -4,6 +4,7 @@ import { WhereClause } from "./where-clause";
 import { PromiseExtended } from "./promise-extended";
 import { IndexableType } from "./indexable-type";
 import { Dexie } from "./dexie";
+import { UpdateSpec } from "./update-spec";
 
 export interface Collection<T=any, TKey=IndexableType> {
   db: Dexie;
@@ -40,5 +41,5 @@ export interface Collection<T=any, TKey=IndexableType> {
   // Mutating methods
   delete(): PromiseExtended<number>;
   modify(changeCallback: (obj: T, ctx:{value: T}) => void | boolean): PromiseExtended<number>;
-  modify(changes: { [keyPath: string]: any } ): PromiseExtended<number>;
+  modify(changes: UpdateSpec<T>): PromiseExtended<number>;
 }
