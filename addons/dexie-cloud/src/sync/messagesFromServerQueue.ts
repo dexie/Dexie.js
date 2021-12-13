@@ -28,7 +28,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
   let isWorking = false;
 
   let loopWarning = 0;
-  let loopDetection = [0,0,0,0,0,0,0,0,0,Date.now()];
+  let loopDetection = [0, 0, 0, 0, 0, 0, 0, 0, 0, Date.now()];
 
   event.subscribe(async () => {
     if (isWorking) return;
@@ -40,18 +40,21 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
       try {
         await consumeQueue();
       } finally {
-        if (loopDetection[loopDetection.length-1] - loopDetection[0] < 10000) {
+        if (
+          loopDetection[loopDetection.length - 1] - loopDetection[0] <
+          10000
+        ) {
           // Ten loops within 10 seconds. Slow down!
           if (Date.now() - loopWarning < 5000) {
             // Last time we did this, we ended up here too. Wait for a minute.
-            console.warn(`Slowing down websocket loop for one minute`)
+            console.warn(`Slowing down websocket loop for one minute`);
             loopWarning = Date.now() + 60000;
-            await new Promise(resolve => setTimeout(resolve, 60000));
+            await new Promise((resolve) => setTimeout(resolve, 60000));
           } else {
             // This is a one-time event. Just pause 10 seconds.
             console.warn(`Slowing down websocket loop for 10 seconds`);
             loopWarning = Date.now() + 10000;
-            await new Promise(resolve => setTimeout(resolve, 10000));
+            await new Promise((resolve) => setTimeout(resolve, 10000));
           }
         }
         isWorking = false;
@@ -104,14 +107,22 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
             // new token. So we don't need to do anything more here.
             break;
           case 'realm-added':
-            if (!persistedSyncState?.realms?.includes(msg.realm)) {
-              triggerSync(db, 'pull');
-            }
+            //if (!persistedSyncState?.realms?.includes(msg.realm) && !persistedSyncState?.inviteRealms?.includes(msg.realm)) {
+            triggerSync(db, 'pull');
+            //}
+            break;
+          case 'realm-accepted':
+            //if (!persistedSyncState?.realms?.includes(msg.realm)) {
+            triggerSync(db, 'pull');
+            //}
             break;
           case 'realm-removed':
-            if (persistedSyncState?.realms?.includes(msg.realm)) {
-              triggerSync(db, 'pull');
-            }
+            //if (
+            persistedSyncState?.realms?.includes(msg.realm) ||
+              persistedSyncState?.inviteRealms?.includes(msg.realm);
+            //) {
+            triggerSync(db, 'pull');
+            //}
             break;
           case 'realms-changed':
             triggerSync(db, 'pull');
