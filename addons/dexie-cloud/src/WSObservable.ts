@@ -17,6 +17,7 @@ export interface ReadyForChangesMessage {
 export type WSConnectionMsg =
   | RevisionChangedMessage
   | RealmAddedMessage
+  | RealmAcceptedMessage
   | RealmRemovedMessage
   | RealmsChangedMessage
   | ChangesFromServerMessage
@@ -48,6 +49,11 @@ export interface RevisionChangedMessage {
 
 export interface RealmAddedMessage {
   type: 'realm-added';
+  realm: string;
+}
+
+export interface RealmAcceptedMessage {
+  type: 'realm-accepted';
   realm: string;
 }
 
