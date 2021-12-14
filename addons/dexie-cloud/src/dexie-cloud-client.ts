@@ -42,6 +42,10 @@ import { getCurrentUserEmitter } from './currentUserEmitter';
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 
+const DEFAULT_OPTIONS: Partial<DexieCloudOptions> = {
+  nameSuffix: true
+};
+
 export function dexieCloud(dexie: Dexie) {
   const origIdbName = dexie.name;
   //
@@ -81,7 +85,7 @@ export function dexieCloud(dexie: Dexie) {
 
   dexie.cloud = {
     version: '{version}',
-    options: null,
+    options: {...DEFAULT_OPTIONS} as DexieCloudOptions,
     schema: null,
     serverState: null,
     get currentUserId() {
@@ -105,8 +109,8 @@ export function dexieCloud(dexie: Dexie) {
       await login(db, hint);
     },
     configure(options: DexieCloudOptions) {
-      dexie.cloud.options = options;
-      if (options.databaseUrl) {
+      options = (dexie.cloud.options = {...dexie.cloud.options, ...options});
+      if (options.databaseUrl && options.nameSuffix) {
         // @ts-ignore
         dexie.name = `${origIdbName}-${getDbNameFromDbUrl(
           options.databaseUrl

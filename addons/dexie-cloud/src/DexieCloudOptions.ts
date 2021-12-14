@@ -11,6 +11,7 @@ export interface DexieCloudOptions {
   customLoginGui?: boolean;
   unsyncedTables?: string[];
   periodicSync?: PeriodicSyncOptions;
+  nameSuffix?: boolean;
   fetchTokens?: (tokenParams: {
     public_key: string;
     hints?: { userId?: string; email?: string };
