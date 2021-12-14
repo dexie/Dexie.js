@@ -26,11 +26,9 @@ export function permissions(
     if (!realm) return new PermissionChecker({}, tableName!, owner === dexie.cloud.currentUserId);
     return new PermissionChecker(realm.permissions, tableName!, owner === dexie.cloud.currentUserId);
   }
-  const getValue = ()=>mapper(source.getValue());
   const o = source.pipe(
-    startWith(source.getValue()),
     map(mapper)
   ) as Observable<PermissionChecker<any>> & {getValue: ()=>PermissionChecker<any>};
-  o.getValue = getValue;
+  o.getValue = () => mapper(source.getValue());
   return o;
 }
