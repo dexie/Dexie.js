@@ -50,7 +50,11 @@ export function useObservable<T, TDefault>(
       (val) => {
         if (lastError.current !== null || lastResult.current !== val) {
           lastError.current = null;
+          // @ts-ignore
+          //lastResult.current = 'getValue' in observable ? observable.getValue() : val;
           lastResult.current = val;
+          //console.debug('Emitt triggerUpdate', lastResult.current);
+          //console.debug('Emitt triggerUpdate', val);
           triggerUpdate({});
         }
       },
@@ -65,6 +69,7 @@ export function useObservable<T, TDefault>(
   }, deps);
 
   if (lastError.current) throw lastError.current;
+  //console.debug('Emitt returning', lastResult.current);
 
   return lastResult.current;
 }
