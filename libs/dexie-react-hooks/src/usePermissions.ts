@@ -25,43 +25,59 @@ export function usePermissions<
   T extends { realmId: string; owner: string }
 >(db: TDB, table: TableProp<TDB>, obj: T): PermissionChecker<T, TableProp<TDB>>;
 export function usePermissions(
-  dbOrEntity:
+  firstArg:
     | Dexie
     | {
-        realmId: string;
-        owner: string;
+        realmId?: string;
+        owner?: string;
         table?: () => string;
         readonly db?: Dexie;
       },
   table?: string,
-  obj?: { realmId: string; owner: string }
+  obj?: { realmId?: string; owner?: string }
 ) {
-  if (!dbOrEntity)
+  if (!firstArg)
     throw new TypeError(
       `Invalid arguments to usePermissions(): undefined or null`
     );
   let db: Dexie;
-  if (
-    'transaction' in dbOrEntity &&
-    typeof table === 'string' &&
-    obj &&
-    typeof obj === 'object'
-  ) {
-    db = dbOrEntity;
-  } else if (
-    'realmId' in dbOrEntity &&
-    typeof dbOrEntity.table === 'function' &&
-    typeof dbOrEntity.db === 'object'
-  ) {
-    db = dbOrEntity.db!;
-    obj = dbOrEntity;
-    table = dbOrEntity.table();
+  if (arguments.length >= 3) {
+    if (!('transaction' in firstArg)) {
+      // Using ducktyping instead of instanceof in case there are multiple Dexie modules in app.
+      // First arg is  ensures first arg is a Dexie instance
+      throw new TypeError(
+        `Invalid arguments to usePermission(db, table, obj): 1st arg must be a Dexie instance`
+      );
+    }
+    if (typeof table !== 'string')
+      throw new TypeError(
+        `Invalid arguments to usePermission(db, table, obj): 2nd arg must be string`
+      );
+    if (!obj || typeof obj !== 'object')
+      throw new TypeError(
+        `Invalid arguments to usePermission(db, table, obj): 3rd arg must be an object`
+      );
+    db = firstArg;
   } else {
-    throw new TypeError(
-      `Invalid arguments to usePermissions(). ` +
-        `Expected usePermissions(entity: DexieCloudEntity) or ` +
-        `usePermissions(db: Dexie, table: string, obj: DexieCloudObject)`
-    );
+    if (firstArg instanceof Dexie)
+      throw new TypeError(
+        `Invalid arguments to usePermission(db, table, obj): Missing table and obj arguments.`
+      );
+
+    if (
+      typeof firstArg.table === 'function' &&
+      typeof firstArg.db === 'object'
+    ) {
+      db = firstArg.db!;
+      obj = firstArg;
+      table = firstArg.table();
+    } else {
+      throw new TypeError(
+        `Invalid arguments to usePermissions(). ` +
+          `Expected usePermissions(entity: DexieCloudEntity) or ` +
+          `usePermissions(db: Dexie, table: string, obj: DexieCloudObject)`
+      );
+    }
   }
   if (!('cloud' in db))
     throw new Error(

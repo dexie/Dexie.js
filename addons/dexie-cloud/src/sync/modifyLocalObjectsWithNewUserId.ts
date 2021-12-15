@@ -14,7 +14,7 @@ export async function modifyLocalObjectsWithNewUserId(
     if (table.name === "members") {
       // members
       await table.toCollection().modify((member: Member) => {
-        if (!ignoredRealms.has(member.realmId) && member.userId === UNAUTHORIZED_USER.userId) {
+        if (!ignoredRealms.has(member.realmId) && (!member.userId || member.userId === UNAUTHORIZED_USER.userId)) {
           member.userId = currentUser.userId;
         }
       });
@@ -24,7 +24,7 @@ export async function modifyLocalObjectsWithNewUserId(
     } else if (table.name === "realms") {
       // realms
       await table.toCollection().modify((realm: Realm) => {
-        if (!ignoredRealms.has(realm.realmId) && !realm.owner || realm.owner === UNAUTHORIZED_USER.userId) {
+        if (!ignoredRealms.has(realm.realmId) && (realm.owner === undefined || realm.owner === UNAUTHORIZED_USER.userId)) {
           realm.owner = currentUser.userId;
         }
       });

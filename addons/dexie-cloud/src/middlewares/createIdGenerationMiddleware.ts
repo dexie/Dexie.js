@@ -3,11 +3,15 @@ import Dexie, {
   DBCoreAddRequest,
   DBCoreMutateRequest,
   DBCorePutRequest,
-  Middleware
+  Middleware,
 } from 'dexie';
 import { isValidSyncableID } from 'dexie-cloud-common';
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { getEffectiveKeys, generateKey, toStringTag } from '../middleware-helpers/idGenerationHelpers';
+import {
+  getEffectiveKeys,
+  generateKey,
+  toStringTag,
+} from '../middleware-helpers/idGenerationHelpers';
 
 export function createIdGenerationMiddleware(
   db: DexieCloudDB
@@ -22,7 +26,10 @@ export function createIdGenerationMiddleware(
         table: (tableName) => {
           const table = core.table(tableName);
 
-          function generateOrVerifyAtKeys(req: DBCoreAddRequest | DBCorePutRequest, idPrefix: string) {
+          function generateOrVerifyAtKeys(
+            req: DBCoreAddRequest | DBCorePutRequest,
+            idPrefix: string
+          ) {
             let valueClones: null | object[] = null;
             const keys = getEffectiveKeys(table.schema.primaryKey, req);
             keys.forEach((key, idx) => {
@@ -43,12 +50,12 @@ export function createIdGenerationMiddleware(
                 }
               } else if (
                 typeof key !== 'string' ||
-                !key.startsWith(idPrefix)
+                (!key.startsWith(idPrefix) && !key.startsWith('#' + idPrefix))
               ) {
                 // Key was specified by caller. Verify it complies with id prefix.
                 throw new Dexie.ConstraintError(
                   `The ID "${key}" is not valid for table "${tableName}". ` +
-                    `Primary '@' keys requires the key to be prefixed with "${idPrefix}.\n"` +
+                    `Primary '@' keys requires the key to be prefixed with "${idPrefix}" (or "#${idPrefix}).\n` +
                     `If you want to generate IDs programmatically, remove '@' from the schema to get rid of this constraint. Dexie Cloud supports custom IDs as long as they are random and globally unique.`
                 );
               }
@@ -56,7 +63,7 @@ export function createIdGenerationMiddleware(
             return table.mutate({
               ...req,
               keys,
-              values: valueClones || req.values
+              values: valueClones || req.values,
             });
           }
 
@@ -76,7 +83,9 @@ export function createIdGenerationMiddleware(
                     const keys = getEffectiveKeys(table.schema.primaryKey, req);
                     keys.forEach((key, idx) => {
                       if (!isValidSyncableID(key)) {
-                        const type = Array.isArray(key) ? key.map(toStringTag).join(',') : toStringTag(key);
+                        const type = Array.isArray(key)
+                          ? key.map(toStringTag).join(',')
+                          : toStringTag(key);
                         throw new Dexie.ConstraintError(
                           `Invalid primary key type ${type} for table ${tableName}. Tables marked for sync has primary keys of type string or Array of string (and optional numbers)`
                         );
@@ -88,25 +97,32 @@ export function createIdGenerationMiddleware(
                     // A database URL is configured but no initial sync has been performed.
                     const keys = getEffectiveKeys(table.schema.primaryKey, req);
                     // Check if the operation would yield any INSERT. If so, complain! We never want wrong ID prefixes stored.
-                    return table.getMany({keys, trans: req.trans, cache: "immutable"}).then(results => {
-                      if (results.length < keys.length) {
-                        // At least one of the given objects would be created. Complain since
-                        // the generated ID would be based on a locally computed ID prefix only - we wouldn't
-                        // know if the server would give the same ID prefix until an initial sync has been
-                        // performed.
-                        throw new Error(`Unable to create new objects without an initial sync having been performed.`);
-                      }
-                      return table.mutate(req);
-                    });
+                    return table
+                      .getMany({ keys, trans: req.trans, cache: 'immutable' })
+                      .then((results) => {
+                        if (results.length < keys.length) {
+                          // At least one of the given objects would be created. Complain since
+                          // the generated ID would be based on a locally computed ID prefix only - we wouldn't
+                          // know if the server would give the same ID prefix until an initial sync has been
+                          // performed.
+                          throw new Error(
+                            `Unable to create new objects without an initial sync having been performed.`
+                          );
+                        }
+                        return table.mutate(req);
+                      });
                   }
-                  return generateOrVerifyAtKeys(req, cloudTableSchema.idPrefix!);
+                  return generateOrVerifyAtKeys(
+                    req,
+                    cloudTableSchema.idPrefix!
+                  );
                 }
               }
               return table.mutate(req);
-            }
+            },
           };
-        }
+        },
       };
-    }
+    },
   };
 }

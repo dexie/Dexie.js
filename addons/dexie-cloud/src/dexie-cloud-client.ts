@@ -38,6 +38,7 @@ import { computeSyncState } from './computeSyncState';
 import { generateKey } from './middleware-helpers/idGenerationHelpers';
 import { permissions } from './permissions';
 import { getCurrentUserEmitter } from './currentUserEmitter';
+import { NewIdOptions } from './types/NewIdOptions';
 
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
@@ -184,9 +185,13 @@ export function dexieCloud(dexie: Dexie) {
     (origFunc) => overrideParseStoresSpec(origFunc, dexie)
   );
 
-  dexie.Table.prototype.newId = function (this: Table<any>, colocateWith?: string) {
+  dexie.Table.prototype.newId = function (this: Table<any>, {colocateWith}: NewIdOptions = {}) {
     const shardKey = colocateWith && colocateWith.substr(colocateWith.length - 3);
     return generateKey(dexie.cloud.schema![this.name].idPrefix || "", shardKey);
+  }
+
+  dexie.Table.prototype.idPrefix = function (this: Table<any>) {
+    return this.db.cloud.schema?.[this.name]?.idPrefix || "";
   }
 
   dexie.use(

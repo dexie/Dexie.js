@@ -5,9 +5,7 @@ import { listSyncifiedChanges } from './listSyncifiedChanges';
 import { getTablesToSyncify } from './getTablesToSyncify';
 import { listClientChanges } from './listClientChanges';
 import { syncWithServer } from './syncWithServer';
-import Dexie from 'dexie';
 import { modifyLocalObjectsWithNewUserId } from './modifyLocalObjectsWithNewUserId';
-import { bulkUpdate } from '../helpers/bulkUpdate';
 import { throwIfCancelled } from '../helpers/CancelToken';
 import { DexieCloudOptions } from '../DexieCloudOptions';
 import { BaseRevisionMapEntry } from '../db/entities/BaseRevisionMapEntry';
@@ -26,6 +24,7 @@ import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import { isOnline } from './isOnline';
 import { updateBaseRevs } from './updateBaseRevs';
 import { getLatestRevisionsPerTable } from './getLatestRevisionsPerTable';
+import { applyServerChanges } from './applyServerChanges';
 
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 
@@ -180,11 +179,12 @@ async function _sync(
       let clientChanges = await listClientChanges(mutationTables, db);
       throwIfCancelled(cancelToken);
       if (doSyncify) {
+        const alreadySyncedRealms = [...(persistedSyncState?.realms || []), ...(persistedSyncState?.inviteRealms || [])];
         const syncificationInserts = await listSyncifiedChanges(
           tablesToSyncify,
           currentUser,
           schema!,
-          persistedSyncState?.realms
+          alreadySyncedRealms
         );
         throwIfCancelled(cancelToken);
         clientChanges = clientChanges.concat(syncificationInserts);
@@ -224,7 +224,8 @@ async function _sync(
     db,
     databaseUrl,
     schema,
-    clientIdentity
+    clientIdentity,
+    currentUser
   );
   console.debug('Sync response', res);
 
@@ -391,66 +392,6 @@ async function deleteObjectsFromRemovedRealms(
         await table
           .filter((obj) => !!obj?.realmId && deletedRealmSet.has(obj.realmId))
           .delete();
-      }
-    }
-  }
-}
-
-export async function applyServerChanges(
-  changes: DBOperationsSet<string>,
-  db: DexieCloudDB
-) {
-  console.debug('Applying server changes', changes, Dexie.currentTransaction);
-  for (const { table: tableName, muts } of changes) {
-    const table = db.table(tableName);
-    if (!table) continue; // If server sends changes on a table we don't have, ignore it.
-    const { primaryKey } = table.core.schema;
-    const keyDecoder = primaryKey.compound
-      ? (key: string) => {
-          try {
-            return JSON.parse(key);
-          } catch {
-            // Be backward compatible (for now)
-            return key.split(',');
-          }
-        }
-      : (key: string) => key;
-    for (const mut of muts) {
-      const keys = mut.keys.map(keyDecoder);
-      switch (mut.type) {
-        case 'insert':
-          if (primaryKey.outbound) {
-            await table.bulkAdd(mut.values, keys);
-          } else {
-            keys.forEach((key, i) => {
-              Dexie.setByKeyPath(mut.values[i], primaryKey.keyPath as any, key);
-            });
-            await table.bulkAdd(mut.values);
-          }
-          break;
-        case 'upsert':
-          if (primaryKey.outbound) {
-            await table.bulkPut(mut.values, keys);
-          } else {
-            keys.forEach((key, i) => {
-              Dexie.setByKeyPath(mut.values[i], primaryKey.keyPath as any, key);
-            });
-            await table.bulkPut(mut.values);
-          }
-          break;
-        case 'modify':
-          if (keys.length === 1) {
-            await table.update(keys[0], mut.changeSpec);
-          } else {
-            await table.where(':id').anyOf(keys).modify(mut.changeSpec);
-          }
-          break;
-        case 'update':
-          await bulkUpdate(table, keys, mut.changeSpecs);
-          break;
-        case 'delete':
-          await table.bulkDelete(keys);
-          break;
       }
     }
   }

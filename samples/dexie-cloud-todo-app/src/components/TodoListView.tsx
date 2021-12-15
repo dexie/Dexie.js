@@ -17,8 +17,8 @@ export function TodoListView({ todoList }: Props) {
     () => db.todoItems.where({ todoListId: todoList.id }).toArray(),
     [todoList.id]
   );
-  const can = usePermissions(todoList);  
-  console.log("render TodoListView", can);
+  const can = usePermissions(todoList);
+  console.log('render TodoListView', can);
   const [showInviteForm, setShowInviteForm] = useState(false);
 
   if (!items) return null;
@@ -31,12 +31,14 @@ export function TodoListView({ todoList }: Props) {
           <button onClick={() => todoList.delete()} title="Delete list">
             <FontAwesomeIcon icon={faTrashAlt} />
           </button>
-          </div>
-          <div className="todo-list-trash">
-          <button onClick={()=>setShowInviteForm(!showInviteForm)}>
-            <FontAwesomeIcon icon={faShareAlt} />
-          </button>
         </div>
+        {!todoList.isPrivate() && (
+          <div className="todo-list-trash">
+            <button onClick={() => setShowInviteForm(!showInviteForm)}>
+              <FontAwesomeIcon icon={faShareAlt} />
+            </button>
+          </div>
+        )}
       </div>
       {showInviteForm && <InviteForm todoList={todoList} />}
       <div>
@@ -44,9 +46,7 @@ export function TodoListView({ todoList }: Props) {
           <TodoItemView key={item.id} item={item} />
         ))}
       </div>
-      <div>
-        {can.add("todoItems") && <AddTodoItem todoList={todoList} />}
-      </div>
+      <div>{can.add('todoItems') && <AddTodoItem todoList={todoList} />}</div>
     </div>
   );
 }

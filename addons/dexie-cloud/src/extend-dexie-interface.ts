@@ -9,6 +9,7 @@ import { Role } from './db/entities/Role';
 import { EntityCommon } from './db/entities/EntityCommon';
 import { DexieCloudAPI } from './DexieCloudAPI';
 import { DexieCloudTable } from './DexieCloudTable';
+import { NewIdOptions } from './types/NewIdOptions';
 
 //
 // Extend Dexie interface
@@ -22,7 +23,8 @@ declare module 'dexie' {
   }
 
   interface Table<T, TKeyPropNameOrKeyType, TOpt> {
-    newId(colocateWith?: string): string;
+    newId(options: NewIdOptions): string;
+    idPrefix(): string;
   }
 
   interface DexieConstructor {
