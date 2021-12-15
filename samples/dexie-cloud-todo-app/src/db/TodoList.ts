@@ -31,7 +31,12 @@ export class TodoList extends Entity<TodoDB> {
     return this.realmId === getTiedRealmId(this.id);
   }
 
+  isPrivate() {
+    return this.id[0] === '#';
+  }
+
   async makeSharable() {
+    if (this.isPrivate()) throw new Error('Private lists cannot be made sharable');
     const currentRealmId = this.realmId;
     const newRealmId = getTiedRealmId(this.id);
     const { db } = this;
@@ -64,8 +69,9 @@ export class TodoList extends Entity<TodoDB> {
     return newRealmId;
   }
 
-  async makePrivate() {
-    const { db, realmId: oldRealmId } = this;
+  async unshareWithEveryone() {
+    const { db } = this;
+    const tiedRealmId = getTiedRealmId(this.id);
     await db.transaction(
       'rw',
       [db.todoLists, db.todoItems, db.members, db.realms],
@@ -73,7 +79,7 @@ export class TodoList extends Entity<TodoDB> {
         // Move todoItems out of the realm in a sync-consistent operation:
         await db.todoItems
           .where({
-            realmId: oldRealmId,
+            realmId: tiedRealmId,
             todoListId: this.id,
           })
           .modify({ realmId: db.cloud.currentUserId });
@@ -84,9 +90,9 @@ export class TodoList extends Entity<TodoDB> {
         });
 
         // Remove all access (Collection.delete() is a sync-consistent operation)
-        await db.members.where('realmId').equals(oldRealmId).delete();
+        await db.members.where('realmId').equals(tiedRealmId).delete();
         // Delete tied realm
-        await db.realms.delete(this.realmId);
+        await db.realms.delete(tiedRealmId);
       }
     );
   }
@@ -131,7 +137,7 @@ export class TodoList extends Entity<TodoDB> {
           .count();
         if (numMembers <= 1) {
           // Only our own member left.
-          await this.makePrivate();
+          await this.unshareWithEveryone();
         }
       }
     );

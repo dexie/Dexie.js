@@ -21,7 +21,7 @@ export const getPermissionsLookupObservable = associate((db: Dexie) => {
   } = {};
 
   let o = currentUserObservable.pipe(
-    tap((currUs) => console.log('CurrUs', currUs)),
+    //tap((currUs) => console.log('CurrUs', currUs)),
     switchMap((currentUser) =>
       liveQuery(() =>
         db.transaction('r', 'realms', 'members', () =>
@@ -34,7 +34,7 @@ export const getPermissionsLookupObservable = associate((db: Dexie) => {
       )
     ),
     map(([members, realms, userId]) => {
-      console.debug('currUs emit:', members, realms, userId);
+      //console.debug('currUs emit:', members, realms, userId);
       const rv = realms
         .map((realm) => ({
           ...realm,

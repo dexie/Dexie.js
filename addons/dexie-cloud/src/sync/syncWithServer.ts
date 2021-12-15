@@ -11,6 +11,8 @@ import {
   SyncRequest,
   SyncResponse
 } from 'dexie-cloud-common';
+import { encodeIdsForServer } from './encodeIdsForServer';
+import { UserLogin } from '../db/entities/UserLogin';
 //import {BisonWebStreamReader} from "dreambase-library/dist/typeson-simplified/BisonWebStreamReader";
 
 export async function syncWithServer(
@@ -20,7 +22,8 @@ export async function syncWithServer(
   db: DexieCloudDB,
   databaseUrl: string,
   schema: DexieCloudSchema | null,
-  clientIdentity: string
+  clientIdentity: string,
+  currentUser: UserLogin
 ): Promise<SyncResponse> {
   //
   // Push changes to server using fetch
@@ -45,8 +48,7 @@ export async function syncWithServer(
       inviteRealms: syncState.inviteRealms
     } : undefined,
     baseRevs,
-    //baseRevisions: syncState?.baseRevisions || [],
-    changes
+    changes: encodeIdsForServer(db.dx.core.schema, currentUser, changes)
   };
   console.debug("Sync request", syncRequest);
   db.syncStateChangedEvent.next({

@@ -1,6 +1,7 @@
 import Dexie, { Table } from 'dexie';
 import dexieCloud, { DexieCloudTable } from 'dexie-cloud-addon';
 import { usePermissions } from 'dexie-react-hooks';
+import { populate } from './populate';
 import { TodoItem } from './TodoItem';
 import { TodoList } from './TodoList';
 
@@ -16,5 +17,10 @@ export class TodoDB extends Dexie {
       todoItems: `@id, [todoListId+realmId]`,
     });
     this.todoLists.mapToClass(TodoList);
+    this.on('populate', () => {
+      this.on('ready', () => {
+        return populate(this);
+      });
+    });
   }
 }

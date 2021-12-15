@@ -4,7 +4,7 @@ import { UserLogin } from "../db/entities/UserLogin";
 import { randomString } from "../helpers/randomString";
 import { EntityCommon } from "../db/entities/EntityCommon";
 import { Table } from "dexie";
-import { DBInsertOperation, DBOperationsSet, DexieCloudSchema, isValidAtID, isValidSyncableID } from "dexie-cloud-common";
+import { DBInsertOperation, DBOperationsSet, DBUpsertOperation, DexieCloudSchema, isValidAtID, isValidSyncableID } from "dexie-cloud-common";
 
 export async function listSyncifiedChanges(
   tablesToSyncify: Table<EntityCommon>[],
@@ -12,10 +12,11 @@ export async function listSyncifiedChanges(
   schema: DexieCloudSchema,
   alreadySyncedRealms?: string[]
 ): Promise<DBOperationsSet> {
+  const txid = `upload-${randomString(8)}`
   if (currentUser.isLoggedIn) {
     if (tablesToSyncify.length > 0) {
       const ignoredRealms = new Set(alreadySyncedRealms || []);
-      const inserts = await Promise.all(
+      const upserts = await Promise.all(
         tablesToSyncify.map(async (table) => {
           const { extractKey } = table.core.schema.primaryKey;
           if (!extractKey) return { table: table.name, muts: [] }; // Outbound tables are not synced.
@@ -30,11 +31,12 @@ export async function listSyncifiedChanges(
               );
           const unsyncedObjects = await query.toArray();
           if (unsyncedObjects.length > 0) {
-            const mut: DBInsertOperation = {
-              type: "insert",
+            const mut: DBUpsertOperation = {
+              type: "upsert",
               values: unsyncedObjects,
               keys: unsyncedObjects.map(extractKey),
               userId: currentUser.userId,
+              txid
             };
             return {
               table: table.name,
@@ -48,7 +50,7 @@ export async function listSyncifiedChanges(
           }
         })
       );
-      return inserts.filter(op => op.muts.length > 0);
+      return upserts.filter(op => op.muts.length > 0);
     }
   }
   return [];

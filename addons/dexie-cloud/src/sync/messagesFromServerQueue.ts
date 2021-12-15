@@ -10,9 +10,9 @@ import { getSyncableTables } from '../helpers/getSyncableTables';
 import { getMutationTable } from '../helpers/getMutationTable';
 import { listClientChanges } from './listClientChanges';
 import {
-  applyServerChanges,
   filterServerChangesThroughAddedClientChanges,
 } from './sync';
+import { applyServerChanges } from "./applyServerChanges";
 import { updateBaseRevs } from './updateBaseRevs';
 import { getLatestRevisionsPerTable } from './getLatestRevisionsPerTable';
 import { refreshAccessToken } from '../authentication/authenticate';
