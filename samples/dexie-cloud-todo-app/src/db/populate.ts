@@ -27,25 +27,27 @@ export function populate(db: TodoDB) {
   //    but that does not matter as they have the same IDs. The items that
   //    Alice added on other device is now synced back.
   const todoListId = `#tdl-defaultTodoList`;
-  db.todoLists.add({
-    id: todoListId,
-    title: 'To Do Today',
+  return db.transaction('rw', db.todoLists, db.todoItems, () => {
+    db.todoLists.add({
+      id: todoListId,
+      title: 'To Do Today',
+    });
+    db.todoItems.bulkAdd([
+      {
+        id: '#tdi-defaultItem001',
+        title: 'Feed the birds',
+        todoListId,
+      },
+      {
+        id: '#tdi-defaultItem002',
+        title: 'Watch a movie',
+        todoListId,
+      },
+      {
+        id: '#tdi-defaultItem003',
+        title: 'Have some sleep',
+        todoListId,
+      },
+    ]);
   });
-  db.todoItems.bulkAdd([
-    {
-      id: '#tdi-defaultItem001',
-      title: 'Feed the birds',
-      todoListId,
-    },
-    {
-      id: '#tdi-defaultItem002',
-      title: 'Watch a movie',
-      todoListId,
-    },
-    {
-      id: '#tdi-defaultItem003',
-      title: 'Have some sleep',
-      todoListId,
-    },
-  ]);
 }
