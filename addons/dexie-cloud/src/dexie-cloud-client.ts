@@ -1,5 +1,9 @@
 import Dexie, { liveQuery, Subscription, Table } from 'dexie';
-import { DBPermissionSet, DBRealmMember, getDbNameFromDbUrl } from 'dexie-cloud-common';
+import {
+  DBPermissionSet,
+  DBRealmMember,
+  getDbNameFromDbUrl,
+} from 'dexie-cloud-common';
 import { BehaviorSubject, combineLatest, from, fromEvent } from 'rxjs';
 import { filter, map, skip, startWith, switchMap, take } from 'rxjs/operators';
 import { login } from './authentication/login';
@@ -9,8 +13,7 @@ import { PersistedSyncState } from './db/entities/PersistedSyncState';
 import { DexieCloudOptions } from './DexieCloudOptions';
 import { DISABLE_SERVICEWORKER_STRATEGY } from './DISABLE_SERVICEWORKER_STRATEGY';
 import './extend-dexie-interface';
-import { DexieCloudSyncOptions } from "./DexieCloudSyncOptions";
-import { DexieCloudAPI } from "./DexieCloudAPI";
+import { DexieCloudSyncOptions } from './DexieCloudSyncOptions';
 import { dbOnClosed } from './helpers/dbOnClosed';
 import { IS_SERVICE_WORKER } from './helpers/IS_SERVICE_WORKER';
 import { throwVersionIncrementNeeded } from './helpers/throwVersionIncrementNeeded';
@@ -39,12 +42,20 @@ import { generateKey } from './middleware-helpers/idGenerationHelpers';
 import { permissions } from './permissions';
 import { getCurrentUserEmitter } from './currentUserEmitter';
 import { NewIdOptions } from './types/NewIdOptions';
+import { getInvitesObservable } from './getInvitesObservable';
 
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
+export {
+  DBRealm,
+  DBRealmMember,
+  DBRealmRole,
+  DBSyncedObject,
+  DBPermissionSet,
+} from 'dexie-cloud-common';
 
 const DEFAULT_OPTIONS: Partial<DexieCloudOptions> = {
-  nameSuffix: true
+  nameSuffix: true,
 };
 
 export function dexieCloud(dexie: Dexie) {
@@ -86,7 +97,7 @@ export function dexieCloud(dexie: Dexie) {
 
   dexie.cloud = {
     version: '{version}',
-    options: {...DEFAULT_OPTIONS} as DexieCloudOptions,
+    options: { ...DEFAULT_OPTIONS } as DexieCloudOptions,
     schema: null,
     serverState: null,
     get currentUserId() {
@@ -109,8 +120,9 @@ export function dexieCloud(dexie: Dexie) {
       await db.cloud.sync();
       await login(db, hint);
     },
+    invites: getInvitesObservable(dexie),
     configure(options: DexieCloudOptions) {
-      options = (dexie.cloud.options = {...dexie.cloud.options, ...options});
+      options = dexie.cloud.options = { ...dexie.cloud.options, ...options };
       if (options.databaseUrl && options.nameSuffix) {
         // @ts-ignore
         dexie.name = `${origIdbName}-${getDbNameFromDbUrl(
@@ -121,11 +133,11 @@ export function dexieCloud(dexie: Dexie) {
       updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
     },
     async sync(
-      { wait, purpose }: DexieCloudSyncOptions = { wait: true, purpose: "push" }
+      { wait, purpose }: DexieCloudSyncOptions = { wait: true, purpose: 'push' }
     ) {
       if (wait === undefined) wait = true;
       const db = DexieCloudDB(dexie);
-      if (purpose === "pull") {
+      if (purpose === 'pull') {
         const syncState = db.cloud.persistedSyncState.value;
         triggerSync(db, purpose);
         if (wait) {
@@ -172,12 +184,11 @@ export function dexieCloud(dexie: Dexie) {
       }
     },
     permissions(
-      obj: {owner: string, realmId: string, table?: ()=>string},
+      obj: { owner: string; realmId: string; table?: () => string },
       tableName?: string
-    )
-    {
-      return permissions(dexie, obj, tableName);
-    }
+    ) {
+      return permissions(dexie._novip, obj, tableName);
+    },
   };
 
   dexie.Version.prototype['_parseStoresSpec'] = Dexie.override(
@@ -185,14 +196,18 @@ export function dexieCloud(dexie: Dexie) {
     (origFunc) => overrideParseStoresSpec(origFunc, dexie)
   );
 
-  dexie.Table.prototype.newId = function (this: Table<any>, {colocateWith}: NewIdOptions = {}) {
-    const shardKey = colocateWith && colocateWith.substr(colocateWith.length - 3);
-    return generateKey(dexie.cloud.schema![this.name].idPrefix || "", shardKey);
-  }
+  dexie.Table.prototype.newId = function (
+    this: Table<any>,
+    { colocateWith }: NewIdOptions = {}
+  ) {
+    const shardKey =
+      colocateWith && colocateWith.substr(colocateWith.length - 3);
+    return generateKey(dexie.cloud.schema![this.name].idPrefix || '', shardKey);
+  };
 
   dexie.Table.prototype.idPrefix = function (this: Table<any>) {
-    return this.db.cloud.schema?.[this.name]?.idPrefix || "";
-  }
+    return this.db.cloud.schema?.[this.name]?.idPrefix || '';
+  };
 
   dexie.use(
     createMutationTrackingMiddleware({
@@ -334,7 +349,7 @@ export function dexieCloud(dexie: Dexie) {
       // to subscribe to these observables and get actual data.
       await combineLatest([
         currentUserEmitter.pipe(skip(1), take(1)),
-        db.cloud.persistedSyncState.pipe(skip(1), take(1))
+        db.cloud.persistedSyncState.pipe(skip(1), take(1)),
       ]).toPromise();
     }
 
@@ -347,7 +362,7 @@ export function dexieCloud(dexie: Dexie) {
     localSyncWorker = null;
     throwIfClosed();
     if (db.cloud.usingServiceWorker && db.cloud.options?.databaseUrl) {
-      registerSyncEvent(db, "push").catch(() => {});
+      registerSyncEvent(db, 'push').catch(() => {});
       registerPeriodicSyncEvent(db).catch(() => {});
     } else if (
       db.cloud.options?.databaseUrl &&
@@ -357,7 +372,7 @@ export function dexieCloud(dexie: Dexie) {
       // There's no SW. Start SyncWorker instead.
       localSyncWorker = LocalSyncWorker(db, db.cloud.options, db.cloud.schema!);
       localSyncWorker.start();
-      triggerSync(db, "push");
+      triggerSync(db, 'push');
     }
 
     // Listen to online event and do sync.
@@ -369,7 +384,7 @@ export function dexieCloud(dexie: Dexie) {
           db.syncStateChangedEvent.next({
             phase: 'not-in-sync',
           });
-          triggerSync(db, "push");
+          triggerSync(db, 'push');
         }),
         fromEvent(self, 'offline').subscribe(() => {
           console.debug('offline!');

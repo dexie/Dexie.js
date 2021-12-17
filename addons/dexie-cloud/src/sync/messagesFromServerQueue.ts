@@ -72,7 +72,6 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
     while (queue.length > 0) {
       const msg = queue.shift();
       try {
-        console.debug('processing msg', msg);
         // If the sync worker or service worker is syncing, wait 'til thei're done.
         // It's no need to have two channels at the same time - even though it wouldnt
         // be a problem - this is an optimization.

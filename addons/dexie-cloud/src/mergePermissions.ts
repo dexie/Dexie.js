@@ -1,8 +1,10 @@
 // TODO: Move to dexie-cloud-common
 
-import { DBPermissionSet } from "dexie-cloud-common";
+import { DBPermissionSet } from 'dexie-cloud-common';
 
-export function mergePermissions(...permissions: DBPermissionSet[]): DBPermissionSet {
+export function mergePermissions(
+  ...permissions: DBPermissionSet[]
+): DBPermissionSet {
   if (permissions.length === 0) return {};
   const reduced = permissions.reduce((result, next) => {
     const ret = { ...result } as DBPermissionSet;
@@ -19,8 +21,7 @@ export function mergePermissions(...permissions: DBPermissionSet[]): DBPermissio
           const r = ret as { [v in typeof verb]?: string[] };
           const retVerb = r[verb]!; // "!" because Array.isArray(ret[verb])
           r[verb] = [...new Set([...retVerb, ...rights])];
-        }
-        if (
+        } else if (
           typeof rights === 'object' &&
           rights &&
           typeof ret[verb] === 'object'
@@ -36,9 +37,12 @@ export function mergePermissions(...permissions: DBPermissionSet[]): DBPermissio
             if (mergedRights[tableName] === '*') continue;
             if (tableRights === '*') {
               mergedRights[tableName] = '*';
-            } else {
+            } else if (
+              Array.isArray(mergedRights[tableName]) &&
+              Array.isArray(tableRights)
+            ) {
               mergedRights[tableName] = [
-                ...new Set([...mergedRights[tableName], ...tableRights])
+                ...new Set([...mergedRights[tableName], ...tableRights]),
               ];
             }
           }

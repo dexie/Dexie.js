@@ -40,6 +40,8 @@ export interface Dexie {
     parentTransaction?: Transaction | null
   ) => Transaction;
 
+  readonly _novip: Dexie;
+
   _dbSchema: DbSchema;
 
   version(versionNumber: number): Version;

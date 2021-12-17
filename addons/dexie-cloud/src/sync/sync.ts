@@ -153,7 +153,7 @@ async function _sync(
 
   if (doSyncify) {
     if (justCheckIfNeeded) return true;
-    console.debug('sync doSyncify is true');
+    //console.debug('sync doSyncify is true');
     await db.transaction('rw', tablesToSyncify, async (tx) => {
       // @ts-ignore
       tx.idbtrans.disableChangeTracking = true;
@@ -179,7 +179,10 @@ async function _sync(
       let clientChanges = await listClientChanges(mutationTables, db);
       throwIfCancelled(cancelToken);
       if (doSyncify) {
-        const alreadySyncedRealms = [...(persistedSyncState?.realms || []), ...(persistedSyncState?.inviteRealms || [])];
+        const alreadySyncedRealms = [
+          ...(persistedSyncState?.realms || []),
+          ...(persistedSyncState?.inviteRealms || []),
+        ];
         const syncificationInserts = await listSyncifiedChanges(
           tablesToSyncify,
           currentUser,
@@ -366,18 +369,32 @@ async function deleteObjectsFromRemovedRealms(
   res: SyncResponse,
   prevState: PersistedSyncState | undefined
 ) {
-  const deletedRealms: string[] = [];
-  const previousRealmSet = prevState
-    ? prevState.realms.concat(prevState.inviteRealms)
-    : [];
-  const updatedRealmSet = new Set([...res.realms, ...res.inviteRealms]);
+  const deletedRealms = new Set<string>();
+  const rejectedRealms = new Set<string>();
+  const previousRealmSet = prevState ? prevState.realms : [];
+  const previousInviteRealmSet = prevState ? prevState.inviteRealms : [];
+  const updatedRealmSet = new Set(res.realms);
+  const updatedTotalRealmSet = new Set(res.realms.concat(res.inviteRealms));
   for (const realmId of previousRealmSet) {
-    if (!updatedRealmSet.has(realmId)) deletedRealms.push(realmId);
+    if (!updatedRealmSet.has(realmId)) {
+      rejectedRealms.add(realmId);
+      if (!updatedTotalRealmSet.has(realmId)) {
+        deletedRealms.add(realmId);
+      }
+    }
   }
-  if (deletedRealms.length > 0) {
-    const deletedRealmSet = new Set(deletedRealms);
+  for (const realmId of previousInviteRealmSet.concat(previousRealmSet)) {
+    if (!updatedTotalRealmSet.has(realmId)) {
+      deletedRealms.add(realmId);
+    }
+  }
+  if (deletedRealms.size > 0 || rejectedRealms.size > 0) {
     const tables = getSyncableTables(db);
     for (const table of tables) {
+      let realmsToDelete = ['realms', 'members', 'roles'].includes(table.name)
+        ? deletedRealms // These tables should spare rejected ones.
+        : rejectedRealms; // All other tables shoudl delete rejected+deleted ones
+      if (realmsToDelete.size === 0) continue;
       if (
         table.schema.indexes.some(
           (idx) =>
@@ -386,11 +403,16 @@ async function deleteObjectsFromRemovedRealms(
         )
       ) {
         // There's an index to use:
-        await table.where('realmId').anyOf(deletedRealms).delete();
+        //console.debug(`REMOVAL: deleting all ${table.name} where realmId anyOf `, JSON.stringify([...realmsToDelete]));
+        await table
+          .where('realmId')
+          .anyOf([...realmsToDelete])
+          .delete();
       } else {
         // No index to use:
+        //console.debug(`REMOVAL: deleting all ${table.name} where realmId is any of `, JSON.stringify([...realmsToDelete]), realmsToDelete.size);
         await table
-          .filter((obj) => !!obj?.realmId && deletedRealmSet.has(obj.realmId))
+          .filter((obj) => !!obj?.realmId && realmsToDelete.has(obj.realmId))
           .delete();
       }
     }

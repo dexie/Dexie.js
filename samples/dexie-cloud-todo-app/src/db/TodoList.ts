@@ -36,7 +36,8 @@ export class TodoList extends Entity<TodoDB> {
   }
 
   async makeSharable() {
-    if (this.isPrivate()) throw new Error('Private lists cannot be made sharable');
+    if (this.isPrivate())
+      throw new Error('Private lists cannot be made sharable');
     const currentRealmId = this.realmId;
     const newRealmId = getTiedRealmId(this.id);
     const { db } = this;
@@ -53,6 +54,7 @@ export class TodoList extends Entity<TodoDB> {
         await db.realms.put({
           realmId: newRealmId,
           name: this.title,
+          represents: 'a to-do list',
         });
 
         // "Realmify entity" (setting realmId equals own id will make it become a Realm)
@@ -141,6 +143,13 @@ export class TodoList extends Entity<TodoDB> {
         }
       }
     );
+  }
+
+  async leave() {
+    const { db } = this;
+    await db.members
+      .where({ userId: db.cloud.currentUserId })
+      .modify({ rejected: new Date(), accepted: undefined });
   }
 
   async delete() {

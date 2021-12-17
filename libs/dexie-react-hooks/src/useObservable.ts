@@ -24,6 +24,7 @@ export function useObservable<T, TDefault>(
 ) {
   const [deps, defaultResult] =
     typeof o === 'function' ? [arg2 || [], arg3] : [[], arg2];
+  const hasLastResult = React.useRef(false);
   const lastResult = React.useRef(defaultResult as T | TDefault);
   const lastError = React.useRef(null as any);
   const [_, triggerUpdate] = React.useState({});
@@ -32,13 +33,19 @@ export function useObservable<T, TDefault>(
     // resubscribing (á la useTransition())
     const observable = typeof o === 'function' ? o() : o;
     // @ts-ignore: Optimize for BehaviorSubject and other observables implementing getValue():
-    if (typeof observable?.getValue === 'function') {
+    if (typeof observable?.getValue === 'function' && !hasLastResult.current) {
       // @ts-ignore
       lastResult.current = observable.getValue();
+      hasLastResult.current = true;
     } else {
       // If the observable has a current value, try get it by subscribing and
       // unsubscribing synchronously
-      observable.subscribe((val) => (lastResult.current = val)).unsubscribe();
+      observable
+        .subscribe((val) => {
+          lastResult.current = val;
+          hasLastResult.current = true;
+        })
+        .unsubscribe();
     }
     return observable;
   }, deps);
@@ -53,6 +60,7 @@ export function useObservable<T, TDefault>(
           // @ts-ignore
           //lastResult.current = 'getValue' in observable ? observable.getValue() : val;
           lastResult.current = val;
+          hasLastResult.current = true;
           //console.debug('Emitt triggerUpdate', lastResult.current);
           //console.debug('Emitt triggerUpdate', val);
           triggerUpdate({});

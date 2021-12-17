@@ -6,7 +6,8 @@ import { TodoItemView } from './TodoItemView';
 import { AddTodoItem } from './AddTodoItem';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShareAlt, faTrashAlt } from '@fortawesome/free-solid-svg-icons';
-import { InviteForm } from './InviteForm';
+import { SharingForm } from './SharingForm';
+import { usePersistedOpenState } from '../helpers/usePersistedOpenState';
 
 interface Props {
   todoList: TodoList;
@@ -18,8 +19,7 @@ export function TodoListView({ todoList }: Props) {
     [todoList.id]
   );
   const can = usePermissions(todoList);
-  console.log('render TodoListView', can);
-  const [showInviteForm, setShowInviteForm] = useState(false);
+  const [showInviteForm, setShowInviteForm] = usePersistedOpenState('sharing-menu', todoList.id, false);
 
   if (!items) return null;
 
@@ -28,19 +28,24 @@ export function TodoListView({ todoList }: Props) {
       <div className="grid-row">
         <h2>{todoList.title}</h2>
         <div className="todo-list-trash">
-          <button onClick={() => todoList.delete()} title="Delete list">
+          <button
+            disabled={!can.delete()}
+            onClick={() => todoList.delete()}
+            title="Delete list"
+          >
             <FontAwesomeIcon icon={faTrashAlt} />
           </button>
         </div>
-        {!todoList.isPrivate() && (
-          <div className="todo-list-trash">
-            <button onClick={() => setShowInviteForm(!showInviteForm)}>
-              <FontAwesomeIcon icon={faShareAlt} />
-            </button>
-          </div>
-        )}
+
+        {!todoList.isPrivate() && <div className="todo-list-trash">
+          <button
+            onClick={() => setShowInviteForm(!showInviteForm)}
+          >
+            <FontAwesomeIcon icon={faShareAlt} />
+          </button>
+        </div>}
       </div>
-      {showInviteForm && <InviteForm todoList={todoList} />}
+      {showInviteForm && <SharingForm todoList={todoList} />}
       <div>
         {items.map((item) => (
           <TodoItemView key={item.id} item={item} />
