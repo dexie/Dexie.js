@@ -73,7 +73,7 @@ export class Dexie implements IDexie {
   _fireOnBlocked: (ev: Event) => void;
   _middlewares: {[StackName in keyof DexieStacks]?: Middleware<DexieStacks[StackName]>[]} = {};
   _vip?: boolean;
-  _novip?: Dexie;// db._novip is to escape to orig db from db.vip.
+  _novip: Dexie;// db._novip is to escape to orig db from db.vip.
   core: DBCore;
 
   name: string;

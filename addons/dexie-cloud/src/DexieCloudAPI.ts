@@ -10,9 +10,8 @@ import { DXCUserInteraction } from './types/DXCUserInteraction';
 import { DXCWebSocketStatus } from './DXCWebSocketStatus';
 import { PermissionChecker } from './PermissionChecker';
 import { DexieCloudSyncOptions } from "./DexieCloudSyncOptions";
-
-
-export interface DexieCloudAPI<TDexieSubClass extends Dexie=Dexie> {
+import { Invite } from './Invite';
+export interface DexieCloudAPI {
   version: string;
   options: DexieCloudOptions | null;
   schema: DexieCloudSchema | null;
@@ -27,7 +26,7 @@ export interface DexieCloudAPI<TDexieSubClass extends Dexie=Dexie> {
     invites: (DBRealmMember & {realm: DBRealm})[];
     permissions: (DBRealm & {permissions: DBPermissionSet})[];
   }>;*/
-  //invites: Rx.Observable<DBRealmMember[]>;
+  invites: Rx.Observable<Invite[]>;
   //realms: Rx.Observable<DBRealm[]>;
   //loginState: Rx.BehaviorSubject<LoginState>;
   usingServiceWorker?: boolean;

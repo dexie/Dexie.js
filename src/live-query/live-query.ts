@@ -1,20 +1,23 @@
-import { isAsyncFunction, keys } from "../functions/utils";
-import { globalEvents, DEXIE_STORAGE_MUTATED_EVENT_NAME } from "../globals/global-events";
+import { isAsyncFunction, keys } from '../functions/utils';
+import {
+  globalEvents,
+  DEXIE_STORAGE_MUTATED_EVENT_NAME,
+} from '../globals/global-events';
 import {
   decrementExpectedAwaits,
   incrementExpectedAwaits,
   newScope,
   PSD,
   usePSD,
-} from "../helpers/promise";
-import { ObservabilitySet } from "../public/types/db-events";
+} from '../helpers/promise';
+import { ObservabilitySet } from '../public/types/db-events';
 import {
   Observable as IObservable,
   Subscription,
-} from "../public/types/observable";
-import { Observable } from "../classes/observable/observable";
-import { extendObservabilitySet } from "./extend-observability-set";
-import { rangesOverlap } from "../helpers/rangeset";
+} from '../public/types/observable';
+import { Observable } from '../classes/observable/observable';
+import { extendObservabilitySet } from './extend-observability-set';
+import { rangesOverlap } from '../helpers/rangeset';
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
   return new Observable<T>((observer) => {
@@ -72,7 +75,9 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     };
 
     const doQuery = () => {
-      if (querying || closed) return;
+      if (querying || closed) {
+        return;
+      }
       accumMuts = {};
       const subscr: ObservabilitySet = {};
       const ret = execute(subscr);
@@ -84,7 +89,9 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       Promise.resolve(ret).then(
         (result) => {
           querying = false;
-          if (closed) return;
+          if (closed) {
+            return;
+          }
           if (shouldNotify()) {
             // Mutations has happened while we were querying. Redo query.
             doQuery();
@@ -96,9 +103,11 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
           }
         },
         (err) => {
-          querying = false;
-          observer.error && observer.error(err);
-          subscription.unsubscribe();
+          if (!['DatabaseClosedError', 'AbortError'].includes(err?.name)) {
+            querying = false;
+            observer.error && observer.error(err);
+            subscription.unsubscribe();
+          }
         }
       );
     };

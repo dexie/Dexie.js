@@ -16,13 +16,13 @@ import { NewIdOptions } from './types/NewIdOptions';
 //
 declare module 'dexie' {
   interface Dexie {
-    cloud: DexieCloudAPI<this>;
-    realms: DexieCloudTable<DBRealm, string>;
-    members: DexieCloudTable<DBRealmMember, string>;
-    roles: DexieCloudTable<DBRealmRole, [string, string]>;
+    cloud: DexieCloudAPI;
+    realms: Table<DBRealm, 'realmId', 'owner'>;
+    members: Table<DBRealmMember, 'id', 'realmId' | 'owner'>;
+    roles: Table<DBRealmRole, [string, string], 'owner'>;
   }
 
-  interface Table<T, TKeyPropNameOrKeyType, TOpt> {
+  interface Table {
     newId(options: NewIdOptions): string;
     idPrefix(): string;
   }

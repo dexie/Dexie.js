@@ -5,7 +5,6 @@ import { TodoListView } from "./TodoListView";
 
 export function TodoLists() {
   const lists = useLiveQuery(() => db.todoLists.toArray());
-
   if (!lists) return null;
 
   return (
