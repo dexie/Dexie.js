@@ -1,0 +1,60 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="importmap">
+      {
+        "imports": {
+          "dexie": "https://unpkg.com/dexie@^3.2/dist/modern/dexie.min.mjs"
+        }
+      }
+    </script>
+    <script type="module">
+      import Dexie, { liveQuery } from 'dexie';
+
+      const db = new Dexie('MyDatabase');
+      db.version(1).stores({
+        friends: '++id, name, age',
+      });
+
+      const friendsObservable = liveQuery(() =>
+        db.friends.where('age').between(50, 75).toArray()
+      );
+
+      const subscription = friendsObservable.subscribe({
+        next: (result) => console.log('Got result:', JSON.stringify(result)),
+        error: (error) => console.error(error),
+      });
+
+      const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+      await sleep(1000);
+
+      console.log('1. Adding friend');
+      const friendId = await db.friends.add({ name: 'Magdalena', age: 54 });
+      await sleep(1000);
+
+      console.log('2. Changing age to 99');
+      await db.friends.update(friendId, { age: 99 });
+      await sleep(1000);
+
+      console.log('3. Changing age to 55');
+      await db.friends.update(friendId, { age: 55 });
+      await sleep(1000);
+
+      console.log("4. Setting property 'foo' to 'bar'");
+      await db.friends.update(friendId, { foo: 'bar' });
+      await sleep(1000);
+
+      console.log('5. Deleting friend');
+      await db.friends.delete(friendId);
+
+      subscription.unsubscribe();
+    </script>
+  </head>
+  <body>
+    <h1>Dexie liveQuery() playground</h1>
+    <p>Please open your console to see anything happen...</p>
+    <p>Mac: Press CMD+ALT+I</p>
+    <p>Windows: Press F12</p>
+  </body>
+</html>
