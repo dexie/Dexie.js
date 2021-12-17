@@ -1,83 +1,129 @@
-import { Observable } from 'dexie';
 import React from 'react';
+interface InteropableObservable<T> {
+  subscribe(
+    onNext: (x: T) => any,
+    onError?: (error: any) => any
+  ): (() => any) | { unsubscribe(): any };
+}
 
 export function useObservable<T, TDefault>(
-  observable: Observable<T>
+  observable: InteropableObservable<T>
 ): T | undefined;
 export function useObservable<T, TDefault>(
-  observable: Observable<T>,
+  observable: InteropableObservable<T>,
   defaultResult: TDefault
 ): T | TDefault;
 export function useObservable<T>(
-  factory: () => Observable<T>,
+  observableFactory: () => InteropableObservable<T>,
   deps?: any[]
 ): T | undefined;
 export function useObservable<T, TDefault>(
-  factory: () => Observable<T>,
+  factory: () => InteropableObservable<T>,
   deps: any[],
   defaultResult: TDefault
 ): T | TDefault;
 export function useObservable<T, TDefault>(
-  o: Observable<T> | (() => Observable<T>),
+  observableFactory:
+    | InteropableObservable<T>
+    | (() => InteropableObservable<T>),
   arg2?: any,
   arg3?: any
 ) {
-  const [deps, defaultResult] =
-    typeof o === 'function' ? [arg2 || [], arg3] : [[], arg2];
-  const hasLastResult = React.useRef(false);
-  const lastResult = React.useRef(defaultResult as T | TDefault);
-  const lastError = React.useRef(null as any);
-  const [_, triggerUpdate] = React.useState({});
+  // Resolve vars from overloading variants of this function:
+  let deps: any[];
+  let defaultResult: TDefault;
+  if (typeof observableFactory === 'function') {
+    deps = arg2 || [];
+    defaultResult = arg3;
+  } else {
+    deps = [];
+    defaultResult = arg2;
+  }
+
+  // Create a ref that keeps the state we need
+  const monitor = React.useRef({
+    hasResult: false,
+    result: defaultResult as T | TDefault,
+    error: null as any,
+  });
+  // We control when component should rerender. Make triggerUpdate
+  // as examplified on React's docs at:
+  // https://reactjs.org/docs/hooks-faq.html#is-there-something-like-forceupdate
+  const [_, triggerUpdate] = React.useReducer((x) => x + 1, 0);
+
+  // Memoize the observable based on deps
   const observable = React.useMemo(() => {
     // Make it remember previous subscription's default value when
-    // resubscribing (á la useTransition())
-    const observable = typeof o === 'function' ? o() : o;
+    // resubscribing.
+    const observable =
+      typeof observableFactory === 'function'
+        ? observableFactory()
+        : observableFactory;
+    if (!observable || typeof observable.subscribe !== 'function') {
+      if (observableFactory === observable) {
+        throw new TypeError(
+          `Given argument to useObservable() was neither a valid observable nor a function.`
+        );
+      } else {
+        throw new TypeError(
+          `Observable factory given to useObservable() did not return a valid observable.`
+        );
+      }
+    }
     // @ts-ignore: Optimize for BehaviorSubject and other observables implementing getValue():
-    if (typeof observable?.getValue === 'function' && !hasLastResult.current) {
+    if (typeof observable.getValue === 'function' && !hasLastResult.current) {
       // @ts-ignore
       lastResult.current = observable.getValue();
-      hasLastResult.current = true;
+      monitor.current.hasResult = true;
     } else {
-      // If the observable has a current value, try get it by subscribing and
+      // Find out if the observable has a current value: try get it by subscribing and
       // unsubscribing synchronously
-      observable
-        .subscribe((val) => {
-          lastResult.current = val;
-          hasLastResult.current = true;
-        })
-        .unsubscribe();
+      const subscription = observable.subscribe((val) => {
+        monitor.current.result = val;
+        monitor.current.hasResult = true;
+      });
+      // Unsubscribe directly. We only needed any synchronous value if it was possible.
+      if (typeof subscription === 'function') {
+        subscription();
+      } else {
+        subscription.unsubscribe();
+      }
     }
     return observable;
   }, deps);
 
-  React.useDebugValue(lastResult.current);
+  // Integrate with react devtools:
+  React.useDebugValue(monitor.current.result);
 
+  // Subscribe to the observable
   React.useEffect(() => {
     const subscription = observable.subscribe(
       (val) => {
-        if (lastError.current !== null || lastResult.current !== val) {
-          lastError.current = null;
-          // @ts-ignore
-          //lastResult.current = 'getValue' in observable ? observable.getValue() : val;
-          lastResult.current = val;
-          hasLastResult.current = true;
-          //console.debug('Emitt triggerUpdate', lastResult.current);
-          //console.debug('Emitt triggerUpdate', val);
-          triggerUpdate({});
+        const { current } = monitor;
+        if (current.error !== null || current.result !== val) {
+          current.error = null;
+          current.result = val;
+          current.hasResult = true;
+          triggerUpdate();
         }
       },
       (err) => {
-        if (lastError.current !== err) {
-          lastError.current = err;
-          triggerUpdate({});
+        const { current } = monitor;
+        if (current.error !== err) {
+          current.error = err;
+          triggerUpdate();
         }
       }
     );
-    return subscription.unsubscribe.bind(subscription);
+    return typeof subscription === 'function'
+      ? subscription // Support observables that return unsubscribe directly
+      : subscription.unsubscribe.bind(subscription);
   }, deps);
 
-  if (lastError.current) throw lastError.current;
-  //console.debug('Emitt returning', lastResult.current);
+  // Throw if observable has emitted error so that
+  // an ErrorBoundrary can catch it
+  if (monitor.current.error) throw monitor.current.error;
 
-  return lastResult.current;
+  // Return the current result
+  return monitor.current.result;
 }
