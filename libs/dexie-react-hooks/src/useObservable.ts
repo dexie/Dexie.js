@@ -4,6 +4,7 @@ interface InteropableObservable<T> {
     onNext: (x: T) => any,
     onError?: (error: any) => any
   ): (() => any) | { unsubscribe(): any };
+  getValue?(): T;
 }
 
 export function useObservable<T, TDefault>(
@@ -70,23 +71,25 @@ export function useObservable<T, TDefault>(
         );
       }
     }
-    // @ts-ignore: Optimize for BehaviorSubject and other observables implementing getValue():
-    if (typeof observable.getValue === 'function' && !hasLastResult.current) {
-      // @ts-ignore
-      lastResult.current = observable.getValue();
-      monitor.current.hasResult = true;
-    } else {
-      // Find out if the observable has a current value: try get it by subscribing and
-      // unsubscribing synchronously
-      const subscription = observable.subscribe((val) => {
-        monitor.current.result = val;
+
+    if (!monitor.current.hasResult) {
+      // Optimize for BehaviorSubject and other observables implementing getValue():
+      if (typeof observable.getValue === 'function') {
+        monitor.current.result = observable.getValue();
         monitor.current.hasResult = true;
-      });
-      // Unsubscribe directly. We only needed any synchronous value if it was possible.
-      if (typeof subscription === 'function') {
-        subscription();
       } else {
-        subscription.unsubscribe();
+        // Find out if the observable has a current value: try get it by subscribing and
+        // unsubscribing synchronously
+        const subscription = observable.subscribe((val) => {
+          monitor.current.result = val;
+          monitor.current.hasResult = true;
+        });
+        // Unsubscribe directly. We only needed any synchronous value if it was possible.
+        if (typeof subscription === 'function') {
+          subscription();
+        } else {
+          subscription.unsubscribe();
+        }
       }
     }
     return observable;
