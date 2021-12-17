@@ -1,5 +1,5 @@
 import React from 'react';
-interface InteropableObservable<T> {
+export interface InteropableObservable<T> {
   subscribe(
     onNext: (x: T) => any,
     onError?: (error: any) => any
@@ -19,7 +19,7 @@ export function useObservable<T>(
   deps?: any[]
 ): T | undefined;
 export function useObservable<T, TDefault>(
-  factory: () => InteropableObservable<T>,
+  observableFactory: () => InteropableObservable<T>,
   deps: any[],
   defaultResult: TDefault
 ): T | TDefault;
