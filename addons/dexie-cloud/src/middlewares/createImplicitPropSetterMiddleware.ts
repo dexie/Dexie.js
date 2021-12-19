@@ -23,7 +23,6 @@ export function createImplicitPropSetterMiddleware(
               }
 
               const trans = req.trans as DBCoreTransaction & TXExpandos;
-              //const { primaryKey } = table.schema;
               if (db.cloud.schema?.[tableName]?.markedForSync) {
                 if (req.type === 'add' || req.type === 'put') {
                   // No matter if user is logged in or not, make sure "owner" and "realmId" props are set properly.
@@ -38,13 +37,31 @@ export function createImplicitPropSetterMiddleware(
                     if (!obj.realmId) {
                       obj.realmId = trans.currentUser.userId;
                     }
-                    //const key = primaryKey.extractKey?.(obj);
-                    //if (key && key[0] === '#') {
-                    // Add $ts prop for put operations
-                    if (req.type === 'put') {
-                      obj.$ts = Date.now();
+                    const key = table.schema.primaryKey.extractKey?.(obj);
+                    if (typeof key === 'string' && key[0] === '#') {
+                      // Add $ts prop for put operations and
+                      // disable update operations as well as consistent
+                      // modify operations. Reason: Server may not have
+                      // the object. Object should be created on server only
+                      // if is being updated. An update operation won't create it
+                      // so we must delete req.changeSpec to decrate operation to
+                      // an upsert operation with timestamp so that it will be created.
+                      // We must also degrade from consistent modify operations for the
+                      // same reason - object might be there on server. Must but put up instead.
+
+                      // FUTURE: This clumpsy behavior of private IDs could be refined later.
+                      // Suggestion is to in future, treat private IDs as we treat all objects 
+                      // and sync operations normally. Only that deletions should become soft deletes
+                      // for them - so that server knows when a private ID has been deleted on server
+                      // not accept insert/upserts on them.
+                      if (req.type === 'put') {
+                        const now = Date.now();
+                        delete req.criteria;
+                        delete req.changeSpec;
+                        delete req.changeSpecs;
+                        obj.$ts = Date.now();
+                      }
                     }
-                    //}
                   }
                 }
               }
