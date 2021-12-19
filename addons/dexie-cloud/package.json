@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "1.0.0-beta.11",
+  "version": "4.0.0-beta.12",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/umd/dexie-cloud-addon.js",
   "module": "dist/module-es5/dexie-cloud-addon.js",
@@ -106,9 +106,9 @@
     "universal-imports": "^1.0.3"
   },
   "dependencies": {
-    "rxjs": "^7.4.0"
   },
   "peerDependencies": {
-    "dexie": "^3.2.0-beta.2 || ^4.0.0-alpha.1"
+    "rxjs": "^7.x",
+    "dexie": "^4.0.0-alpha.1"
   }
 }
