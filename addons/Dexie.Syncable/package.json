@@ -70,11 +70,11 @@
   },
   "homepage": "https://dexie.org",
   "peerDependencies": {
-    "dexie": "^3.0.2",
+    "dexie": "^3.0.2 || ^4.0.0-alpha.1",
     "dexie-observable": "^3.0.0-beta.9"
   },
   "devDependencies": {
-    "dexie": "^3.0.2",
+    "dexie": "^3.0.2 || ^4.0.0-alpha.1",
     "dexie-observable": "^3.0.0-beta.9",
     "eslint": "^5.16.0",
     "just-build": "^0.9.19",

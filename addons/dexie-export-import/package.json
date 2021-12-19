@@ -43,6 +43,6 @@
     "typeson-registry": "^1.0.0-alpha.21"
   },
   "peerDependencies": {
-    "dexie": "^3.0.0 || ^2.0.4"
+    "dexie": "^2.0.4 || ^3.0.0 || ^4.0.0-alpha.1"
   }
 }

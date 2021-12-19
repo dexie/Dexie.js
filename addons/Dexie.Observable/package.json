@@ -79,10 +79,10 @@
   },
   "homepage": "https://dexie.org",
   "peerDependencies": {
-    "dexie": "^3.0.2"
+    "dexie": "^3.0.2 || ^4.0.0-alpha.1"
   },
   "devDependencies": {
-    "dexie": "^3.0.2",
+    "dexie": "^3.0.2 || ^4.0.0-alpha.1",
     "eslint": "^7.27.0",
     "just-build": "^0.9.19",
     "qunit": "^2.9.2",
