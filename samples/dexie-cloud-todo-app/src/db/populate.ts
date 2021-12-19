@@ -26,7 +26,11 @@ export function populate(db: TodoDB) {
   // 3. Alice logs in --> items are synced to cloud and replaces existing ones for Alice
   //    but that does not matter as they have the same IDs. The items that
   //    Alice added on other device is now synced back.
-  const todoListId = `#tdl-defaultTodoList`;
+
+  // Private IDs are possible to test but does not behave optimally yet (as of 2021-12-19)
+  // Need to refine how they sync before using them by default.
+  // If you want to try, uncomment the code below:
+  /*const todoListId = `#tdl-defaultTodoList`;
   return db.transaction('rw', db.todoLists, db.todoItems, () => {
     db.todoLists.add({
       id: todoListId,
@@ -49,5 +53,5 @@ export function populate(db: TodoDB) {
         todoListId,
       },
     ]);
-  });
+  });*/
 }
