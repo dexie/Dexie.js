@@ -43,7 +43,6 @@ import { permissions } from './permissions';
 import { getCurrentUserEmitter } from './currentUserEmitter';
 import { NewIdOptions } from './types/NewIdOptions';
 import { getInvitesObservable } from './getInvitesObservable';
-
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 export {
@@ -53,6 +52,8 @@ export {
   DBSyncedObject,
   DBPermissionSet,
 } from 'dexie-cloud-common';
+export { Invite } from './Invite';
+
 
 const DEFAULT_OPTIONS: Partial<DexieCloudOptions> = {
   nameSuffix: true,
