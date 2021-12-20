@@ -66,6 +66,7 @@ export function dexieCloud(dexie: Dexie) {
   //
   const currentUserEmitter = getCurrentUserEmitter(dexie);
   const subscriptions: Subscription[] = [];
+  let configuredProgramatically = false;
 
   // local sync worker - used when there's no service worker.
   let localSyncWorker: { start: () => void; stop: () => void } | null = null;
@@ -124,6 +125,7 @@ export function dexieCloud(dexie: Dexie) {
     invites: getInvitesObservable(dexie),
     configure(options: DexieCloudOptions) {
       options = dexie.cloud.options = { ...dexie.cloud.options, ...options };
+      configuredProgramatically = true;
       if (options.databaseUrl && options.nameSuffix) {
         // @ts-ignore
         dexie.name = `${origIdbName}-${getDbNameFromDbUrl(
@@ -251,7 +253,7 @@ export function dexieCloud(dexie: Dexie) {
             db.getSchema(),
             db.getPersistedSyncState(),
           ]);
-        if (!options) {
+        if (!configuredProgramatically) {
           // Options not specified programatically (use case for SW!)
           // Take persisted options:
           db.cloud.options = persistedOptions || null;
@@ -260,6 +262,7 @@ export function dexieCloud(dexie: Dexie) {
           JSON.stringify(persistedOptions) !== JSON.stringify(options)
         ) {
           // Update persisted options:
+          if (!options) throw new Error(`Internal error`); // options cannot be null if configuredProgramatically is set.
           await db.$syncState.put(options, 'options');
         }
         if (
