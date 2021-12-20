@@ -1,10 +1,16 @@
 # Dexie Cloud ToDo app
 
+**[Run and install this app at https://dexie.github.io/Dexie.js/dexie-cloud-todo-app](https://dexie.github.io/Dexie.js/dexie-cloud-todo-app)**
+
 This project was bootstrapped with [Create React App](https://github.com/facebook/create-react-app).
 
 # How to use the sample
 
-If you just want to see the app in action, navigate to the [pre-built published version](https://dexie.github.io/Dexie.js/dexie-cloud-todo-app/). Currently it is bugging out on Safari so please use any other browser if possible. Safari crashed from our service worker. *Next version will workaround this so that it will work well on iOS and Safari (by avoiding to do sync from the service worker and instead do it from the main thread).*
+**[Run and install this app at https://dexie.github.io/Dexie.js/dexie-cloud-todo-app](https://dexie.github.io/Dexie.js/dexie-cloud-todo-app)**
+
+*NOTE: Previous versions of the published app (before december 2021) were on an old URL and we recommend to uninstall it.*
+
+If you just want to see the app in action, navigate to the [pre-built published version](https://dexie.github.io/Dexie.js/dexie-cloud-todo-app/).
 
 If you want to build and play with it locally, follow these steps:
 
