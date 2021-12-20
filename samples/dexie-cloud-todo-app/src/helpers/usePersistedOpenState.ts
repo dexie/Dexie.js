@@ -8,11 +8,11 @@ export function usePersistedOpenState(
 ) {
   const isOpen =
     useLiveQuery(
-      () => db.localOpenIds.get([namespace, id]),
+      () => db.openCloseStates.get([namespace, id]),
       [namespace, id],
       defaultOpen
     ) ?? defaultOpen;
   const setIsOpen = (isOpen: boolean) =>
-    db.localOpenIds.put(isOpen, [namespace, id]);
+    db.openCloseStates.put(isOpen, [namespace, id]);
   return [isOpen, setIsOpen] as const;
 }
