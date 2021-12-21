@@ -148,8 +148,8 @@ export class TodoList extends Entity<TodoDB> {
   async leave() {
     const { db } = this;
     await db.members
-      .where({ userId: db.cloud.currentUserId })
-      .modify({ rejected: new Date(), accepted: undefined });
+      .where({ realmId: this.realmId, userId: db.cloud.currentUserId })
+      .delete();
   }
 
   async delete() {
