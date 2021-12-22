@@ -6,7 +6,7 @@ import { NavBar } from './components/navbar/NavBar';
 
 import 'bootstrap/dist/css/bootstrap.min.css';
 import './App.css';
-import { Invites } from './components/Invites';
+import { Invites } from './components/access-control/Invites';
 
 function App() {
   return (

@@ -1,8 +1,11 @@
 import { useState } from 'react';
-import { TodoList } from '../db/TodoList';
+import { TodoList } from '../../db/TodoList';
 import { useLiveQuery, usePermissions } from 'dexie-react-hooks';
-import { db } from '../db';
+import { db } from '../../db';
 import { DBRealmMember } from 'dexie-cloud-addon';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { faArchive, faStop, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { EditMember } from './EditMember';
 
 interface Props {
   todoList: TodoList;
@@ -12,18 +15,12 @@ export function SharingForm({ todoList }: Props) {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const members = useLiveQuery(async () => {
-    console.log(
-      'QUERY useLiveQuery() for members on realm ',
-      todoList.realmId
-    );
-    const result = (await db.members
+    const result = await db.members
       .where({ realmId: todoList.realmId })
       //.filter((m) => !!m.email)
-      .toArray()).filter((m) => !!m.email);
-    console.log(`QUERY result: ${JSON.stringify(result)}`)
+      .toArray();
     return result;
   }, [todoList.realmId]);
-  console.log(`QUERY rendering result ${JSON.stringify(members)}`)
 
   const can = usePermissions(todoList);
   return (
@@ -77,17 +74,28 @@ function MemberRow({
   todoList: TodoList;
 }) {
   const can = usePermissions(db, 'members', member);
+  const isMe = member.userId === db.cloud.currentUserId;
+  const isOwner = member.userId === todoList.owner;
+  const memberText = isMe ? 'Me' : member.email ? `${member.name} <${member.email}>` : member.userId;
   return (
     <tr>
       <td>
-        {member.name} &lt;{member.email}&gt;
+        {memberText}
       </td>
       <td>
-        {can.delete() ? (
-          <button onClick={() => todoList.unshareWith(member.email!)}>
-            Remove
-          </button>
-        ) : (
+        <EditMember member={member} todoList={todoList} />
+      </td>
+      <td>
+        {can.delete() && !isOwner ? (
+          <div className="todo-list-trash">
+            <button
+              className="button"
+              onClick={() => todoList.unshareWith(member.email!)}
+            >
+              <FontAwesomeIcon icon={faTrash} />
+            </button>
+          </div>
+        ) : !isOwner && (
           member.userId === db.cloud.currentUserId &&
           ((member.accepted?.getTime() || 0) >
           (member.rejected?.getTime() || 0) ? (

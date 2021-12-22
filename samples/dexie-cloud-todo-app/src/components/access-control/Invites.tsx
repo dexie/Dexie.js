@@ -1,5 +1,5 @@
 import { useObservable } from 'react-use';
-import { db } from '../db';
+import { db } from '../../db';
 
 export function Invites() {
   const currentUser = useObservable(db.cloud.currentUser);
