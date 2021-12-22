@@ -144,3 +144,13 @@ input::placeholder {
   font-style: italic;
   font-weight: normal;
 }
+
+fieldset {
+  padding: 0;
+  margin: 0;
+}
+legend {
+  font-size: 9pt;
+  padding: 0 5px;
+  margin: 0;
+}

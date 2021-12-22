@@ -6,7 +6,7 @@ import { TodoItemView } from './TodoItemView';
 import { AddTodoItem } from './AddTodoItem';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faShareAlt, faTrashAlt } from '@fortawesome/free-solid-svg-icons';
-import { SharingForm } from './SharingForm';
+import { SharingForm } from './access-control/SharingForm';
 import { usePersistedOpenState } from '../helpers/usePersistedOpenState';
 
 interface Props {
