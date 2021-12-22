@@ -5,25 +5,9 @@ import {
 } from '../globals/global-events';
 import { propagateLocally, propagatingLocally } from './propagate-locally';
 
-if (typeof BroadcastChannel !== 'undefined') {
-  const bc = new BroadcastChannel(STORAGE_MUTATED_DOM_EVENT_NAME);
+const broadcastChannelSuccess = createBroadcastChannel()
 
-  //
-  // Propagate local changes to remote tabs, windows and workers via BroadcastChannel
-  //
-  globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, (changedParts) => {
-    if (!propagatingLocally) {
-      bc.postMessage(changedParts);
-    }
-  });
-
-  //
-  // Propagate remote changes locally via storage event:
-  //
-  bc.onmessage = (ev) => {
-    if (ev.data) propagateLocally(ev.data);
-  };
-} else if (typeof self !== 'undefined' && typeof navigator !== 'undefined') {
+if (!broadcastChannelSuccess || typeof self !== 'undefined' && typeof navigator !== 'undefined') {
   // DOM verified - when typeof self !== "undefined", we are a window or worker. Not a Node process.
 
   //
@@ -74,6 +58,36 @@ if (typeof BroadcastChannel !== 'undefined') {
   if (swContainer) {
     // We're a browser window and want to propagate message from the SW:
     swContainer.addEventListener('message', propagateMessageLocally);
+  }
+}
+
+function createBroadcastChannel () {
+  if (typeof BroadcastChannel === 'undefined') {
+    return false;
+  }
+
+  try {
+    const bc = new BroadcastChannel(STORAGE_MUTATED_DOM_EVENT_NAME);
+
+    //
+    // Propagate local changes to remote tabs, windows and workers via BroadcastChannel
+    //
+    globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, (changedParts) => {
+      if (!propagatingLocally) {
+        bc.postMessage(changedParts);
+      }
+    });
+
+    //
+    // Propagate remote changes locally via storage event:
+    //
+    bc.onmessage = (ev) => {
+      if (ev.data) propagateLocally(ev.data);
+    };
+
+    return true;
+  } catch {
+    return false;
   }
 }
 
