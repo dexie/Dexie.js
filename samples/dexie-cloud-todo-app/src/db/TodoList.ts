@@ -1,6 +1,6 @@
 import { Entity } from 'dexie';
 import type { TodoDB } from './TodoDB';
-import { getTiedRealmId } from 'dexie-cloud-addon';
+import { DBRealmMember, getTiedRealmId } from 'dexie-cloud-addon';
 
 /** Since there are some actions associated with
  * this entity (share(), unshare() etc) it can be
@@ -122,22 +122,18 @@ export class TodoList extends Entity<TodoDB> {
     );
   }
 
-  async unshareWith(email: string) {
+  async unshareWith(member: DBRealmMember) {
     const { db } = this;
     await db.transaction(
       'rw',
       [db.todoLists, db.todoItems, db.members, db.realms],
       async () => {
-        await db.members
-          .where({
-            realmId: this.realmId,
-            email,
-          })
-          .delete();
-        const numMembers = await db.members
+        await db.members.delete(member.id);
+        const numOtherPeople = await db.members
           .where({ realmId: this.realmId })
+          .filter(m => m.userId !== db.cloud.currentUserId)
           .count();
-        if (numMembers <= 1) {
+        if (numOtherPeople === 0) {
           // Only our own member left.
           await this.unshareWithEveryone();
         }
