@@ -85,3 +85,24 @@ self.addEventListener('message', (event) => {
 });
 
 // Any other custom service worker logic can go here.
+
+
+// ---------------------------------------------------------------------------
+// Forcefull takeover strategy (while we are in active development)
+//
+// Might use other strategy if this application would be business critical.
+// see https://whatwebcando.today/articles/handling-service-worker-updates/
+//
+self.addEventListener('install', ()=>{
+  // Take over immediately:
+  self.skipWaiting();
+});
+self.addEventListener('activate', async ()=>{
+  const tabs = await self.clients.matchAll({type: 'window'});
+  // after we've taken over, iterate over all the current clients (windows)
+  tabs.forEach((tab) => {
+    // ...and refresh each one of them
+    tab.navigate(tab.url)
+  })  
+});
+// ---------------------------------------------------------------------------
