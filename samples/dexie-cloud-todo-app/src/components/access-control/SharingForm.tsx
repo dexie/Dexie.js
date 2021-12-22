@@ -90,7 +90,7 @@ function MemberRow({
           <div className="todo-list-trash">
             <button
               className="button"
-              onClick={() => todoList.unshareWith(member.email!)}
+              onClick={() => todoList.unshareWith(member)}
             >
               <FontAwesomeIcon icon={faTrash} />
             </button>
