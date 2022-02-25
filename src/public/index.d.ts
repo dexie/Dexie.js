@@ -45,6 +45,9 @@ declare module Dexie {
   interface Collection<T=any,Key=any> extends _Collection<T, Key> {} // Because app-code may declare it.
 }
 
+/** Explicitely export getEffectiveKeys. */
+export { getEffectiveKeys } from '../dbcore/get-effective-keys';
+
 /** Explicitely export IndexableType. Mostly for backward compatibility.*/
 export { IndexableType } from './types/indexable-type';
 

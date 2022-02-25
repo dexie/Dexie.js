@@ -13,6 +13,7 @@ import { liveQuery } from './live-query/live-query';
 import { Entity } from './classes/entity/Entity';
 import { cmp } from './functions/cmp';
 
+
 // Set rejectionMapper of DexiePromise so that it generally tries to map
 // DOMErrors and DOMExceptions to a DexieError instance with same name but with
 // async stack support and with a prototypal inheritance from DexieError and Error.
@@ -22,6 +23,7 @@ DexiePromise.rejectionMapper = mapError;
 // Let the async stack filter focus on app code and filter away frames from dexie.min.js:
 Debug.setDebug(Debug.debug, dexieStackFrameFilter);
 
+export { getEffectiveKeys } from './dbcore/get-effective-keys';
 export { RangeSet, mergeRanges, rangesOverlap } from "./helpers/rangeset";
 export { Dexie, liveQuery }; // Comply with public/index.d.ts.
 export { Entity };
