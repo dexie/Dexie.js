@@ -38,12 +38,12 @@ export const hooksMiddleware: Middleware<DBCore>  = {
           switch (req.type) {
             case 'add':
               // Ensure that the req has keys
-              req.keys = getEffectiveKeys(downTable.schema.primaryKey, req)
+              req.keys = getEffectiveKeys(downTable.schema.primaryKey, req);
               if (creating.fire === nop) break;
               return dxTrans._promise('readwrite', ()=>addPutOrDelete(req), true);
             case 'put':
               // Ensure that the req has keys
-              req.keys = getEffectiveKeys(downTable.schema.primaryKey, req)
+              req.keys = getEffectiveKeys(downTable.schema.primaryKey, req);
               if (creating.fire === nop && updating.fire === nop) break;
               return dxTrans._promise('readwrite', ()=>addPutOrDelete(req), true);
             case 'delete':
