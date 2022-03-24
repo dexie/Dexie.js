@@ -11,7 +11,7 @@ import {
   tap,
 } from 'rxjs/operators';
 
-const USER_INACTIVITY_TIMEOUT = 300_000; // 300_000;
+const USER_INACTIVITY_TIMEOUT = 180_000; // 3 minutes
 const ACTIVE_WAIT_TIME = 0; // For now, it's nicer to react instantly on user activity
 const INACTIVE_WAIT_TIME = 20_000;
 
@@ -68,6 +68,7 @@ export const userDoesSomething =
   typeof window !== 'undefined'
     ? merge(
         documentBecomesVisible,
+        fromEvent(window, 'mousedown'),
         fromEvent(window, 'mousemove'),
         fromEvent(window, 'keydown'),
         fromEvent(window, 'wheel'),
