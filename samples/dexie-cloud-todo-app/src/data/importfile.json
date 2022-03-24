@@ -6,11 +6,21 @@
     "bar@demo.local": {}
   },
   "roles": {
-    "manager": {"manage": "*"},
-    "doer": {
-      "update": {"todoItems": ["done"]}
+    "manager": {
+      "displayName": "Manager",
+      "description": "Members with this role gains full permissions within the realm pointed out by the member entry",
+      "permissions": { "manage": "*" }
     },
-    "commenter": {"add": ["comments"]}
+    "doer": {
+      "displayName": "Doer",
+      "description": "Members with this role can mark or unmark todo items as done",
+      "permissions": { "update": { "todoItems": ["done"] } }
+    },
+    "readonly": {
+      "displayName": "ReadOnly",
+      "description": "Members with this role have no permissions to change any data",
+      "permissions": {}
+    }
   },
   "data": {}
 }
