@@ -29,12 +29,15 @@ export const userIsActive = new BehaviorSubject<boolean>(true);
 export const userIsReallyActive = new BehaviorSubject<boolean>(true);
 userIsActive
   .pipe(
-    switchMap((isActive) =>
-      isActive
+    switchMap((isActive) => {
+      //console.debug('SyncStatus: DUBB: isActive changed to', isActive);
+      return isActive
         ? ACTIVE_WAIT_TIME
           ? of(true).pipe(delay(ACTIVE_WAIT_TIME))
           : of(true)
-        : of(false).pipe(delay(INACTIVE_WAIT_TIME))
+        : INACTIVE_WAIT_TIME
+        ? of(false).pipe(delay(INACTIVE_WAIT_TIME))
+        : of(false);}
     ),
     distinctUntilChanged()
   )
