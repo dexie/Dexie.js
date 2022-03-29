@@ -2,16 +2,16 @@ import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
   faCheckDouble,
   faEye,
+  faQuestion,
   faUserEdit,
   faUserTie,
 } from '@fortawesome/free-solid-svg-icons';
 import { DBRealmMember, getTiedRealmId } from 'dexie-cloud-addon';
+import { useObservable } from 'dexie-react-hooks';
 import { db, TodoList } from '../../db';
 
-export type MemberAccess = 'owner' | 'doer' | 'manager' | 'readonly';
-
 export const memberAccessIcon: {
-  [memberAccess in MemberAccess]: IconDefinition;
+  [memberAccess: string]: IconDefinition;
 } = {
   owner: faUserEdit,
   doer: faCheckDouble,
@@ -22,21 +22,26 @@ export const memberAccessIcon: {
 interface Props {
   todoList: TodoList;
   member: DBRealmMember;
-  access: MemberAccess;
+  access: string;
 }
 
 export function EditMemberAccess({ todoList, member, access }: Props) {
+  const roles = useObservable(db.cloud.roles, {});
   return (
     <select
-      disabled={todoList.owner === member.userId && member.userId === db.cloud.currentUserId}
-      value={access}
-      onChange={(ev) =>
-        changeAccess(todoList, member, access, ev.target.value as MemberAccess)
+      disabled={
+        todoList.owner === member.userId &&
+        member.userId === db.cloud.currentUserId
       }
+      value={access}
+      onChange={(ev) => changeAccess(todoList, member, access, ev.target.value)}
     >
-      {Object.keys(memberAccessIcon).map((a) => (
-        <option key={a} value={a} disabled={a === 'owner' && !member.userId}>
-          {a}
+      <option value="owner" disabled={!member.userId}>
+        Owner
+      </option>
+      {Object.entries(roles).map(([roleName, role]) => (
+        <option key={roleName} value={roleName}>
+          {role.displayName}
         </option>
       ))}
     </select>
@@ -46,42 +51,27 @@ export function EditMemberAccess({ todoList, member, access }: Props) {
 function changeAccess(
   todoList: TodoList,
   member: DBRealmMember,
-  existingAccess: MemberAccess,
-  newAccess: MemberAccess
+  existingAccess: string,
+  newAccess: string
 ) {
   const realmId = getTiedRealmId(todoList.id);
   return db.transaction('rw', db.todoLists, db.members, db.realms, () => {
     if (existingAccess !== 'owner' && newAccess === 'owner') {
       if (!member.userId)
-        throw new Error(`Cannot give ownership to user before invite is accepted.`);
+        throw new Error(
+          `Cannot give ownership to user before invite is accepted.`
+        );
       // Before changing owner, give full permissions to the old owner:
       db.members
         .where({ realmId, userId: todoList.owner })
-        .modify({ permissions: { manage: '*' } });
+        .modify({ permissions: { manage: '*' }, roles: [] });
       // Change owner of the todo list:
       db.todoLists.update(todoList, { owner: member.userId });
       // Change owner of realm:
       db.realms.update(realmId, { owner: member.userId });
     }
-    switch (newAccess) {
-      case 'doer':
-        db.members.update(member, {
-          permissions: {
-            add: ['todoItems'],
-            update: { todoItems: ['done'] },
-          },
-        });
-        break;
-      case 'manager':
-        db.members.update(member, {
-          permissions: {
-            manage: '*'
-          },
-        });
-        break;
-      case 'readonly':
-        db.members.update(member, { permissions: {} });
-        break;
+    if (newAccess !== 'owner') {
+      db.members.update(member, { permissions: {}, roles: [newAccess] });
     }
     if (existingAccess === 'owner' && newAccess !== 'owner') {
       // Remove ownership by letting current user take ownership instead:

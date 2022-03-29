@@ -1,6 +1,6 @@
 import Dexie, { TableProp } from 'dexie';
 import { DexieCloudOptions } from './DexieCloudOptions';
-import { DBPermissionSet, DBRealm, DBRealmMember, DexieCloudSchema } from 'dexie-cloud-common';
+import { DBPermissionSet, DBRealm, DBRealmMember, DBRealmRole, DexieCloudSchema } from 'dexie-cloud-common';
 import { UserLogin } from './db/entities/UserLogin';
 import * as Rx from 'rxjs';
 import { PersistedSyncState } from './db/entities/PersistedSyncState';
@@ -27,6 +27,7 @@ export interface DexieCloudAPI {
     permissions: (DBRealm & {permissions: DBPermissionSet})[];
   }>;*/
   invites: Rx.Observable<Invite[]>;
+  roles: Rx.Observable<{[roleName: string]: DBRealmRole}>;
   //realms: Rx.Observable<DBRealm[]>;
   //loginState: Rx.BehaviorSubject<LoginState>;
   usingServiceWorker?: boolean;

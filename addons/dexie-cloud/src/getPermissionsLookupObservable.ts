@@ -55,7 +55,8 @@ export const getPermissionsLookupObservable = associate((db: Dexie) => {
             selfRealmMembers.map((m) => m.roles!).filter((roleName) => roleName)
           )
             .map((role) => globalRoles[role]!)
-            .filter((role) => role);
+            .filter((role) => role)
+            .map((role) => role.permissions);
 
           return {
             ...realm,

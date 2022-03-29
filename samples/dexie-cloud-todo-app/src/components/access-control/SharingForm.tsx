@@ -1,10 +1,10 @@
 import { useState } from 'react';
 import { TodoList } from '../../db/TodoList';
-import { useLiveQuery, usePermissions } from 'dexie-react-hooks';
+import { useLiveQuery, useObservable, usePermissions } from 'dexie-react-hooks';
 import { db } from '../../db';
 import { DBRealmMember } from 'dexie-cloud-addon';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faArchive, faStop, faTrash } from '@fortawesome/free-solid-svg-icons';
+import { faTrash } from '@fortawesome/free-solid-svg-icons';
 import { EditMember } from './EditMember';
 
 interface Props {
@@ -77,6 +77,8 @@ function MemberRow({
   const isMe = member.userId === db.cloud.currentUserId;
   const isOwner = member.userId === todoList.owner;
   const memberText = isMe ? 'Me' : member.email ? `${member.name} <${member.email}>` : member.userId;
+  const roles = useObservable(db.cloud.roles);
+
   return (
     <tr>
       <td>
