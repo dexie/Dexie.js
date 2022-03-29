@@ -13,8 +13,8 @@
     },
     "doer": {
       "displayName": "Doer",
-      "description": "Members with this role can mark or unmark todo items as done",
-      "permissions": { "update": { "todoItems": ["done"] } }
+      "description": "Members with this role can add todo items and mark or unmark existing todo items as done",
+      "permissions": { "add": ["todoItems"], "update": { "todoItems": ["done"] } }
     },
     "readonly": {
       "displayName": "ReadOnly",

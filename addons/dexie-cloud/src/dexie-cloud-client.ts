@@ -43,6 +43,7 @@ import { permissions } from './permissions';
 import { getCurrentUserEmitter } from './currentUserEmitter';
 import { NewIdOptions } from './types/NewIdOptions';
 import { getInvitesObservable } from './getInvitesObservable';
+import { getGlobalRolesObservable } from './getGlobalRolesObservable';
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 export {
@@ -123,6 +124,7 @@ export function dexieCloud(dexie: Dexie) {
       await login(db, hint);
     },
     invites: getInvitesObservable(dexie),
+    roles: getGlobalRolesObservable(dexie),
     configure(options: DexieCloudOptions) {
       options = dexie.cloud.options = { ...dexie.cloud.options, ...options };
       configuredProgramatically = true;

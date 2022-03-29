@@ -1,8 +1,9 @@
+import { faQuestion } from '@fortawesome/free-solid-svg-icons';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { DBRealmMember } from 'dexie-cloud-addon';
-import { usePermissions } from 'dexie-react-hooks';
+import { useObservable, usePermissions } from 'dexie-react-hooks';
 import { db, TodoList } from '../../db';
-import { EditMemberAccess, MemberAccess, memberAccessIcon } from './EditMemberAccess';
+import { EditMemberAccess, memberAccessIcon } from './EditMemberAccess';
 
 interface Props {
   member: DBRealmMember;
@@ -11,19 +12,20 @@ interface Props {
 
 export function EditMember({ member, todoList }: Props) {
   const can = usePermissions(db, 'members', member);
-  const memberAccess: MemberAccess =
+  const globalRoles = useObservable(db.cloud.roles);
+  const roleName = member.roles?.[0];
+  const role = roleName ? globalRoles?.[roleName] : null;
+
+  const memberAccess =
     member.userId === todoList.owner
       ? 'owner'
-      : member.permissions?.manage === '*'
-      ? 'manager'
-      : member.permissions?.add === '*' ||
-        member.permissions?.add?.includes('todoItems')
-      ? 'doer'
-      : 'readonly';
+      : roleName || '';
+
+  const memberAccessDisplayName = memberAccess === 'owner' ? 'Owner' : role?.displayName || memberAccess;
   return (
     <fieldset className="border p-1">
-      <FontAwesomeIcon icon={memberAccessIcon[memberAccess]} />
-      {can.update('permissions') ? <EditMemberAccess todoList={todoList} member={member} access={memberAccess} /> : memberAccess}
+      <FontAwesomeIcon icon={memberAccessIcon[memberAccess] || faQuestion} />
+      {can.update('roles') ? <EditMemberAccess todoList={todoList} member={member} access={memberAccess} /> : memberAccessDisplayName}
     </fieldset>
   );
 }

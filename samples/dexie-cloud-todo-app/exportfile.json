@@ -1,0 +1,251 @@
+{
+  "demoUsers": {
+    "foo@demo.local": {},
+    "bar@demo.local": {},
+    "alice@demo.local": {},
+    "bob@demo.local": {}
+  },
+  "roles": {
+    "commenter": {
+      "description": "Members with this role can add comments",
+      "displayName": "Commenter",
+      "permissions": {
+        "add": [
+          "comments"
+        ]
+      }
+    },
+    "doer": {
+      "description": "Members with this role can add todo items and mark or unmark existing todo items as done",
+      "displayName": "Doer",
+      "permissions": {
+        "add": [
+          "todoItems"
+        ],
+        "update": {
+          "todoItems": [
+            "done"
+          ]
+        }
+      }
+    },
+    "manager": {
+      "description": "Members with this role gains full permissions within the realm pointed out by the member entry",
+      "displayName": "Manager",
+      "permissions": {
+        "manage": "*"
+      }
+    },
+    "readonly": {
+      "description": "Members with this role have no permissions to change any data",
+      "displayName": "ReadOnly",
+      "permissions": {}
+    }
+  },
+  "data": {
+    "rlm:tdl0Nqj2cBP2nd6O32icKUPQVgFcal": {
+      "members": {
+        "mmb0Ns8x7Z9jqXCoDP5fN6T|Px|cal": {
+          "id": "mmb0Ns8x7Z9jqXCoDP5fN6T|Px|cal",
+          "name": "David Fahlander",
+          "email": "david.fahlander@gmail.com",
+          "owner": "foo@demo.local",
+          "invite": true,
+          "userId": "david.fahlander@gmail.com",
+          "accepted": {
+            "$t": "Date",
+            "v": "2021-12-17T15:13:09.154Z"
+          },
+          "invitedBy": {
+            "name": "foo@demo.local",
+            "email": "foo@demo.local",
+            "userId": "foo@demo.local"
+          },
+          "invitedDate": {
+            "$t": "Date",
+            "v": "2021-12-17T15:09:02.833Z"
+          },
+          "permissions": {
+            "add": [
+              "todoItems"
+            ],
+            "update": {
+              "todoItems": [
+                "done"
+              ]
+            }
+          }
+        },
+        "mmb-owner-rlm:tdl0Nqj2cBP2nd6O32icKUPQVgFcal": {
+          "id": "mmb-owner-rlm:tdl0Nqj2cBP2nd6O32icKUPQVgFcal",
+          "owner": "foo@demo.local",
+          "userId": "foo@demo.local",
+          "accepted": {
+            "$t": "Date",
+            "v": "2021-12-17T15:09:02.833Z"
+          }
+        }
+      },
+      "realms": {
+        "rlm:tdl0Nqj2cBP2nd6O32icKUPQVgFcal": {
+          "name": "Foos list",
+          "owner": "foo@demo.local",
+          "represents": "a to-do list",
+          "$$ts": 1639753742528
+        }
+      },
+      "todoItems": {
+        "tdi0Nqj2uCkxY0IiNHMNmQcHZRwcal": {
+          "id": "tdi0Nqj2uCkxY0IiNHMNmQcHZRwcal",
+          "done": true,
+          "owner": "bar@demo.local",
+          "title": "fds",
+          "todoListId": "tdl0Nqj2cBP2nd6O32icKUPQVgFcal"
+        },
+        "tdi0Nqj2uv5v2eLMkGxO4sL8Rqgcal": {
+          "id": "tdi0Nqj2uv5v2eLMkGxO4sL8Rqgcal",
+          "done": true,
+          "owner": "foo@demo.local",
+          "title": "fsfd",
+          "todoListId": "tdl0Nqj2cBP2nd6O32icKUPQVgFcal"
+        },
+        "tdi0Nrq6lJRhedQLPP3RIXgT5oucal": {
+          "id": "tdi0Nrq6lJRhedQLPP3RIXgT5oucal",
+          "done": true,
+          "owner": "foo@demo.local",
+          "title": "Ny",
+          "todoListId": "tdl0Nqj2cBP2nd6O32icKUPQVgFcal"
+        },
+        "tdi0Nrq73OOt6VKL4pH3mcSsfnWcal": {
+          "id": "tdi0Nrq73OOt6VKL4pH3mcSsfnWcal",
+          "done": true,
+          "owner": "foo@demo.local",
+          "title": "df",
+          "todoListId": "tdl0Nqj2cBP2nd6O32icKUPQVgFcal"
+        },
+        "tdi0Nrr6E|EDdlY0gzL7hdWZe1|cal": {
+          "id": "tdi0Nrr6E|EDdlY0gzL7hdWZe1|cal",
+          "done": true,
+          "owner": "david.fahlander@gmail.com",
+          "title": "x",
+          "todoListId": "tdl0Nqj2cBP2nd6O32icKUPQVgFcal"
+        },
+        "tdi0Nrr775yNzgsyjEIZ2nYUBeFcal": {
+          "id": "tdi0Nrr775yNzgsyjEIZ2nYUBeFcal",
+          "done": true,
+          "owner": "david.fahlander@gmail.com",
+          "title": "y",
+          "todoListId": "tdl0Nqj2cBP2nd6O32icKUPQVgFcal"
+        }
+      },
+      "todoLists": {
+        "tdl0Nqj2cBP2nd6O32icKUPQVgFcal": {
+          "id": "tdl0Nqj2cBP2nd6O32icKUPQVgFcal",
+          "owner": "foo@demo.local",
+          "title": "Foos list"
+        }
+      }
+    },
+    "rlm-public": {
+      "realms": {
+        "rlm-public": {
+          "name": "public",
+          "owner": "rlm-public"
+        }
+      },
+      "todoLists": {
+        "tdl-fdhjfdjhk-lic": {
+          "id": "tdl-fdhjfdjhk-lic",
+          "title": "A public list"
+        }
+      }
+    },
+    "foo@demo.local": {
+      "todoItems": {
+        "tdi0Nrzn|PlDPN|hh7|S2KP4wkXzed": {
+          "id": "tdi0Nrzn|PlDPN|hh7|S2KP4wkXzed",
+          "done": true,
+          "owner": "foo@demo.local",
+          "title": "Oj",
+          "todoListId": "#tdl-defaultTodoList"
+        },
+        "tdi0Nrznx_vZktYncmwwQTc7likcal": {
+          "id": "tdi0Nrznx_vZktYncmwwQTc7likcal",
+          "done": true,
+          "owner": "foo@demo.local",
+          "title": "Hej",
+          "todoListId": "#tdl-defaultTodoList"
+        },
+        "tdi0NrzuX|qVhSjJ0QR2gJdRsFqzed": {
+          "id": "tdi0NrzuX|qVhSjJ0QR2gJdRsFqzed",
+          "owner": "foo@demo.local",
+          "title": "P",
+          "todoListId": "#tdl-defaultTodoList"
+        },
+        "#tdi-defaultItem001:foo@demo.local": {
+          "id": "#tdi-defaultItem001:foo@demo.local",
+          "done": true,
+          "owner": "foo@demo.local",
+          "title": "Feed the birds",
+          "todoListId": "#tdl-defaultTodoList",
+          "$$ts": 1648120555884
+        },
+        "#tdi-defaultItem002:foo@demo.local": {
+          "id": "#tdi-defaultItem002:foo@demo.local",
+          "done": true,
+          "owner": "foo@demo.local",
+          "title": "Watch a movie",
+          "todoListId": "#tdl-defaultTodoList",
+          "$$ts": 1648131533131
+        },
+        "#tdi-defaultItem003:foo@demo.local": {
+          "id": "#tdi-defaultItem003:foo@demo.local",
+          "done": true,
+          "owner": "foo@demo.local",
+          "title": "Have some sleep",
+          "todoListId": "#tdl-defaultTodoList",
+          "$$ts": 1639584615900
+        }
+      },
+      "todoLists": {
+        "#tdl-defaultTodoList:foo@demo.local": {
+          "id": "#tdl-defaultTodoList:foo@demo.local",
+          "owner": "foo@demo.local",
+          "title": "To Do Today"
+        }
+      }
+    },
+    "david.fahlander@gmail.com": {
+      "todoItems": {
+        "#tdi-defaultItem001:david.fahlander@gmail.com": {
+          "id": "#tdi-defaultItem001:david.fahlander@gmail.com",
+          "done": true,
+          "owner": "david.fahlander@gmail.com",
+          "title": "Feed the birds",
+          "todoListId": "#tdl-defaultTodoList"
+        },
+        "#tdi-defaultItem002:david.fahlander@gmail.com": {
+          "id": "#tdi-defaultItem002:david.fahlander@gmail.com",
+          "done": true,
+          "owner": "david.fahlander@gmail.com",
+          "title": "Watch a movie",
+          "todoListId": "#tdl-defaultTodoList",
+          "$$ts": 1648030371234
+        },
+        "#tdi-defaultItem003:david.fahlander@gmail.com": {
+          "id": "#tdi-defaultItem003:david.fahlander@gmail.com",
+          "owner": "david.fahlander@gmail.com",
+          "title": "Have some sleep",
+          "todoListId": "#tdl-defaultTodoList"
+        }
+      },
+      "todoLists": {
+        "#tdl-defaultTodoList:david.fahlander@gmail.com": {
+          "id": "#tdl-defaultTodoList:david.fahlander@gmail.com",
+          "owner": "david.fahlander@gmail.com",
+          "title": "To Do Today"
+        }
+      }
+    }
+  }
+}
