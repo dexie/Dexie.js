@@ -26,13 +26,14 @@ interface Props {
 }
 
 export function EditMemberAccess({ todoList, member, access }: Props) {
-  const roles = useObservable(db.cloud.roles, {});
+  const roles = useObservable(db.cloud.roles) || {};
   return (
     <select
       disabled={
         todoList.owner === member.userId &&
         member.userId === db.cloud.currentUserId
       }
+      style={{border: 0}}
       value={access}
       onChange={(ev) => changeAccess(todoList, member, access, ev.target.value)}
     >
@@ -44,6 +45,7 @@ export function EditMemberAccess({ todoList, member, access }: Props) {
           {role.displayName}
         </option>
       ))}
+      {!roles[access] && access !== 'owner' && <option key={access}>(unknown)</option>}
     </select>
   );
 }
@@ -64,7 +66,7 @@ function changeAccess(
       // Before changing owner, give full permissions to the old owner:
       db.members
         .where({ realmId, userId: todoList.owner })
-        .modify({ permissions: { manage: '*' }, roles: [] });
+        .modify({ roles: ['manager'] });
       // Change owner of the todo list:
       db.todoLists.update(todoList, { owner: member.userId });
       // Change owner of realm:
