@@ -6,4 +6,5 @@ export interface DBRealmRole extends DBSyncedObject {
   permissions: DBPermissionSet;
   description?: string;
   displayName?: string;
+  sortOrder?: number;
 }

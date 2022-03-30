@@ -9,16 +9,23 @@
     "manager": {
       "displayName": "Manager",
       "description": "Members with this role gains full permissions within the realm pointed out by the member entry",
+      "sortOrder": 1,
       "permissions": { "manage": "*" }
     },
     "doer": {
       "displayName": "Doer",
       "description": "Members with this role can add todo items and mark or unmark existing todo items as done",
-      "permissions": { "add": ["todoItems"], "update": { "todoItems": ["done"] } }
+      "sortOrder": 2,
+      "permissions": {
+        "update": {
+          "todoItems": ["done"]
+        }
+      }
     },
     "readonly": {
       "displayName": "ReadOnly",
       "description": "Members with this role have no permissions to change any data",
+      "sortOrder": 3,
       "permissions": {}
     }
   },
