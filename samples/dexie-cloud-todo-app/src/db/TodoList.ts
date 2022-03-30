@@ -99,7 +99,7 @@ export class TodoList extends Entity<TodoDB> {
     );
   }
 
-  async shareWith(name: string, email: string, sendEmail: boolean) {
+  async shareWith(name: string, email: string, sendEmail: boolean, roles: string[]) {
     const { db } = this;
     await db.transaction(
       'rw',
@@ -116,7 +116,7 @@ export class TodoList extends Entity<TodoDB> {
           name,
           email,
           invite: sendEmail,
-          permissions: { add: ['todoItems'], update: { todoItems: ['done'] } },
+          roles
         });
       }
     );

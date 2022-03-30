@@ -6,7 +6,7 @@ import { DBRealmMember } from 'dexie-cloud-addon';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash } from '@fortawesome/free-solid-svg-icons';
 import { EditMember } from './EditMember';
-
+import * as importFile from '../../data/importfile.json';
 interface Props {
   todoList: TodoList;
 }
@@ -21,44 +21,82 @@ export function SharingForm({ todoList }: Props) {
       .toArray();
     return result;
   }, [todoList.realmId]);
+  const [manualInviteOpen, setManualInviteOpen] = useState(false);
 
   const can = usePermissions(todoList);
   return (
     <>
-      <h5>Shared with</h5>
-      <table>
-        <tbody>
-          {members?.map((member) => (
-            <MemberRow key={member.id} {...{ todoList, member }} />
-          ))}
-        </tbody>
-      </table>
+      {members && members.length > 0 && (
+        <table>
+          <thead>
+            <tr>
+              <th>Shared with:</th>
+              <th>Role</th>
+            </tr>
+          </thead>
+          <tbody>
+            {members?.map((member) => (
+              <MemberRow key={member.id} {...{ todoList, member }} />
+            ))}
+          </tbody>
+        </table>
+      )}
       <hr />
       {can.add('members') && (
         <>
           <h4>Invite someone?</h4>
-          <form
-            onSubmit={(ev) => {
-              ev.preventDefault();
-              todoList.shareWith(name, email, true);
-            }}
-          >
-            <input
-              type="email"
-              placeholder="Email"
-              value={email}
-              onChange={(ev) => setEmail(ev.target.value)}
-            />
-            <input
-              type="text"
-              placeholder="Name"
-              value={name}
-              onChange={(ev) => setName(ev.target.value)}
-            />
-            <button type="submit" disabled={!/@/.test(email)}>
-              Send invite
-            </button>
-          </form>
+          <table>
+            <tbody>
+              {Object.keys(importFile.demoUsers).map((demoUser) => (
+                <tr>
+                  <td>{demoUser}</td>
+                  <td>
+                    <button type="button" onClick={()=>{
+                      setManualInviteOpen(false);
+                      todoList.shareWith(demoUser, demoUser, true, ["doer"]);
+                    }}>
+                      Invite
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {manualInviteOpen ? (
+            <form
+              onSubmit={(ev) => {
+                ev.preventDefault();
+                setManualInviteOpen(false);
+                todoList.shareWith(name, email, true, ["doer"]);
+              }}
+            >
+              <input
+                type="email"
+                placeholder="Email"
+                value={email}
+                onChange={(ev) => setEmail(ev.target.value)}
+              />
+              <input
+                type="text"
+                placeholder="Name"
+                value={name}
+                onChange={(ev) => setName(ev.target.value)}
+              />
+              <button type="submit" disabled={!/@/.test(email)}>
+                Send invite
+              </button>
+            </form>
+          ) : (
+            <a
+              href="#"
+              onClick={(ev) => {
+                ev.preventDefault();
+                setManualInviteOpen(true);
+              }}
+            >
+              Invite by email address
+            </a>
+          )}
           <hr />
         </>
       )}
@@ -76,14 +114,12 @@ function MemberRow({
   const can = usePermissions(db, 'members', member);
   const isMe = member.userId === db.cloud.currentUserId;
   const isOwner = member.userId === todoList.owner;
-  const memberText = isMe ? 'Me' : member.email ? `${member.name} <${member.email}>` : member.userId;
-  const roles = useObservable(db.cloud.roles);
+  let memberText = member.name || member.email || member.userId;
+  if (isMe) memberText += ' (me)';
 
   return (
     <tr>
-      <td>
-        {memberText}
-      </td>
+      <td style={{ paddingRight: 12 }}>{memberText}</td>
       <td>
         <EditMember member={member} todoList={todoList} />
       </td>
@@ -97,7 +133,8 @@ function MemberRow({
               <FontAwesomeIcon icon={faTrash} />
             </button>
           </div>
-        ) : !isOwner && (
+        ) : (
+          !isOwner &&
           member.userId === db.cloud.currentUserId &&
           ((member.accepted?.getTime() || 0) >
           (member.rejected?.getTime() || 0) ? (

@@ -17,15 +17,22 @@ export function EditMember({ member, todoList }: Props) {
   const role = roleName ? globalRoles?.[roleName] : null;
 
   const memberAccess =
-    member.userId === todoList.owner
-      ? 'owner'
-      : roleName || '';
+    member.userId === todoList.owner ? 'owner' : roleName || 'readonly';
 
-  const memberAccessDisplayName = memberAccess === 'owner' ? 'Owner' : role?.displayName || memberAccess;
+  const memberAccessDisplayName =
+    memberAccess === 'owner' ? 'Owner' : role?.displayName || memberAccess;
   return (
     <fieldset className="border p-1">
-      <FontAwesomeIcon icon={memberAccessIcon[memberAccess] || faQuestion} />
-      {can.update('roles') ? <EditMemberAccess todoList={todoList} member={member} access={memberAccess} /> : memberAccessDisplayName}
+        <FontAwesomeIcon style={{margin: '0 4px 0 0', width: 22}} icon={memberAccessIcon[memberAccess] || faQuestion} />
+      {can.update('roles') ? (
+        <EditMemberAccess
+          todoList={todoList}
+          member={member}
+          access={memberAccess}
+        />
+      ) : (
+        memberAccessDisplayName
+      )}
     </fieldset>
   );
 }
