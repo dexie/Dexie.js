@@ -11,7 +11,6 @@ interface Props {
 
 export function TodoItemView({ item }: Props) {
   const can = usePermissions(db, 'todoItems', item);
-  console.log('TodoItem', item.title, item.owner, item.realmId);
   return (
     <div className={'row ' + (item.done ? 'done' : '')}>
       <div className="narrow">
