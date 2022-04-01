@@ -47,19 +47,26 @@ export function SharingForm({ todoList }: Props) {
           <h4>Invite someone?</h4>
           <table>
             <tbody>
-              {Object.keys(importFile.demoUsers).map((demoUser) => (
-                <tr>
-                  <td>{demoUser}</td>
-                  <td>
-                    <button type="button" onClick={()=>{
-                      setManualInviteOpen(false);
-                      todoList.shareWith(demoUser, demoUser, true, ["doer"]);
-                    }}>
-                      Invite
-                    </button>
-                  </td>
-                </tr>
-              ))}
+              {Object.keys(importFile.demoUsers)
+                .filter((demoUser) => demoUser !== db.cloud.currentUserId)
+                .map((demoUser) => (
+                  <tr key={demoUser}>
+                    <td>{demoUser}</td>
+                    <td>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setManualInviteOpen(false);
+                          todoList.shareWith(demoUser, demoUser, true, [
+                            'doer',
+                          ]);
+                        }}
+                      >
+                        Invite
+                      </button>
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
           {manualInviteOpen ? (
@@ -67,7 +74,7 @@ export function SharingForm({ todoList }: Props) {
               onSubmit={(ev) => {
                 ev.preventDefault();
                 setManualInviteOpen(false);
-                todoList.shareWith(name, email, true, ["doer"]);
+                todoList.shareWith(name, email, true, ['doer']);
               }}
             >
               <input
