@@ -14,9 +14,10 @@
     },
     "doer": {
       "displayName": "Doer",
-      "description": "Members with this role can add todo items and mark or unmark existing todo items as done",
+      "description": "Members with this role can add todoItems, manage own todoItems and mark other todoItems as done or undone",
       "sortOrder": 2,
       "permissions": {
+        "add": ["todoItems"],
         "update": {
           "todoItems": ["done"]
         }
