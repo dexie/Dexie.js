@@ -4157,16 +4157,16 @@ detect-port-alt@1.1.6:
     debug "^2.6.0"
 
 dexie-cloud-addon@^4.0.0-beta.15:
-  version "4.0.0-beta.15"
-  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-4.0.0-beta.15.tgz#35e48397658793433d16834ec1b66c7d158d0c9f"
-  integrity sha512-rkAwJeiMSHV4UrivqMQthDW8c2UZ6WvHOoRatyXi38sVD6QYQz9ZfKKZzTOGi1vsrbCmdC1L7Wvll3mq0gCKKg==
+  version "4.0.0-beta.16"
+  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-4.0.0-beta.16.tgz#b344cd0348e1601fd1cd3e9bbca360a20162742a"
+  integrity sha512-hXQzpubtQ3M704WyUe1UJQTOJLOzDjyyaDVHHXDhLlTxOhQ2S6MMCb8KPcRgby5J1P62N7/89lNIoTF2IPOjaQ==
   dependencies:
-    dexie-cloud-common "^1.0.20"
+    dexie-cloud-common "^1.0.23"
 
-dexie-cloud-common@^1.0.20:
-  version "1.0.20"
-  resolved "https://registry.yarnpkg.com/dexie-cloud-common/-/dexie-cloud-common-1.0.20.tgz#28468fc1c424500c72bda1ff96124f1acc67944c"
-  integrity sha512-+6m1AmHYP2srzv3vmWrZuC/vwjElBgCfbByhMvsJdhw84qHEjGvq0TjB+evh7m70fGDUqBh4lPvfZFXuin+ssQ==
+dexie-cloud-common@^1.0.23:
+  version "1.0.23"
+  resolved "https://registry.yarnpkg.com/dexie-cloud-common/-/dexie-cloud-common-1.0.23.tgz#7389517bedfe7812d583c38c81a16f3fcb644ee4"
+  integrity sha512-UTIn+ajmGLKh6iLTxsYk4eOP/TbRw98UzKwI/N/q78N8PxkOMos2KFJq8KTvky73KyMH6hNFS04Q2BGbA2E2Eg==
   dependencies:
     universal-imports "^1.0.1"
 
@@ -7603,9 +7603,9 @@ no-case@^3.0.4:
     tslib "^2.0.3"
 
 node-fetch@^2.6.1:
-  version "2.6.6"
-  resolved "https://registry.yarnpkg.com/node-fetch/-/node-fetch-2.6.6.tgz#1751a7c01834e8e1697758732e9efb6eeadfaf89"
-  integrity sha512-Z8/6vRlTUChSdIgMa51jxQ4lrw/Jy5SOW10ObaA47/RElsAN2c5Pn8bTgFGWn/ibwzXTE8qwr1Yzx28vsecXEA==
+  version "2.6.7"
+  resolved "https://registry.yarnpkg.com/node-fetch/-/node-fetch-2.6.7.tgz#24de9fba827e3b4ae44dc8b20256a379160052ad"
+  integrity sha512-ZjMPFEfVx5j+y2yF35Kzx5sF7kDzxuDj6ziH4FFbOp87zKDZNx8yExJIb05OGF4Nlt9IHFIMBkRl41VdvcNdbQ==
   dependencies:
     whatwg-url "^5.0.0"
 
