@@ -35,7 +35,8 @@ Service worker is automatically disabled in dev-mode (the default for create-rea
 1. Fork Dexie.js (if you haven't already)
 2. Follow the instructions for using the app (see earlier in this README)
 3. `yarn deploy` (will publish the app to your gh-pages branch of the Dexie.js fork)
-4. Voila: Go to https://your-github-username.github.io/Dexie.js/dexie-cloud-todo-app/ from your browser. This is a full installable PWA that you can add to your start screen on a mobile phone.
+4. `npx dexie-cloud whitelist https://your-github-username.github.io` (replace `your-github-username`)
+5. Voila: Go to https://your-github-username.github.io/Dexie.js/dexie-cloud-todo-app/ from your browser. This is a full installable PWA that you can add to your start screen on a mobile phone.
 
 You can also [follow these instructions from create-react-app](https://create-react-app.dev/docs/making-a-progressive-web-app/#offline-first-considerations) to enable service worker in dev mode.
 
