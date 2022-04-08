@@ -4156,7 +4156,7 @@ detect-port-alt@1.1.6:
     address "^1.0.1"
     debug "^2.6.0"
 
-dexie-cloud-addon@^4.0.0-beta.16:
+dexie-cloud-addon@^4.0.0-beta.17:
   version "4.0.0-beta.17"
   resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-4.0.0-beta.17.tgz#e251a6d69aef3519e06899251579d2fa422c87d7"
   integrity sha512-SrZJLK3hduwXL7jMwX+R9r9vAZVHQxiGOK6zUto+BPs5C8yeKkw4cXayFRZT7dPDRLsN5fQSfnMwkH4Tr/l6vw==
