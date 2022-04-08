@@ -117,7 +117,7 @@ export async function performGuardedJob(
       await db.transaction('rw!', jobsTableName, async () => {
         const currentWork = await jobsTable.get(jobName);
         if (currentWork && currentWork.nodeId === myId) {
-          jobsTable.delete(jobName);
+          await jobsTable.delete(jobName);
         }
       });
     }
