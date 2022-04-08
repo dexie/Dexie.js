@@ -3,14 +3,14 @@ if [ ! -f "./dexie-cloud.json" ]; then
     echo "Please run:"
     echo "  npx dexie-cloud create"
     echo "or: "
-    echo "  nxp dexie-cloud connect <DB-URL>"
+    echo "  npx dexie-cloud connect <DB-URL>"
     echo "...to create a database in the cloud"
     echo "Then retry this script!"
     exit 1;
 fi
 echo "Adding demo users to your application..."
 npx dexie-cloud import src/data/importfile.json
-echo "Whitelisting localhost origin"
+echo "Whitelisting origin: http://localhost:3000"
 npx dexie-cloud whitelist http://localhost:3000
 DB_URL=$(node -p "require('./dexie-cloud.json').dbUrl")
 echo ""
