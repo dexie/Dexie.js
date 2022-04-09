@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "4.0.0-beta.17",
+  "version": "4.0.0-beta.18",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/umd/dexie-cloud-addon.js",
   "module": "dist/module-es5/dexie-cloud-addon.js",
@@ -53,7 +53,7 @@
     ],
     "src": [
       "# Build the entire typescript source into modern JS",
-      "tsc -p src -t es2020 --outDir tools/tmp/modern [--watch 'Watching for file changes.']"
+      "tsc -p src -t es2016 --outDir tools/tmp/modern [--watch 'Watching for file changes.']"
     ],
     "dexie-cloud": [
       "# Create a modern bundle in dist/modern",
