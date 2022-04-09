@@ -24,10 +24,11 @@ export function setApiOnPlace(objs: Array<Dexie | Transaction>, tableNames: stri
         // Either the prop is not declared, or it is initialized to undefined, or is already a Table
         // on parent prototype prop but we need to set it as own prop (on the vip Dexie instance that derives from real instance)
         if (obj instanceof Transaction) {
-          // obj is a Transaction prototype (or prototype of a subclass to Transaction)
+          // obj is a Transaction instance or the db.Transaction.prototype
+          // (which prototypally derives from Transaction.prototype, see transaction-contructor.ts)
           // Make the API a getter that returns this.table(tableName)
           setProp(obj, tableName, {
-            get(this: Transaction | Dexie) { return this.table(tableName); },
+            get(this: Transaction) { return this.table(tableName); },
             set(value: any) {
               // Issue #1039
               // Let "this.schema = dbschema;" and other props in transaction constructor work even if there's a name collision with the table name.
