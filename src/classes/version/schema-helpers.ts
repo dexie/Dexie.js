@@ -13,16 +13,19 @@ import { safariMultiStoreFix } from '../../functions/quirks';
 import { createIndexSpec, nameFromKeyPath } from '../../helpers/index-spec';
 import { createTableSchema } from '../../helpers/table-schema';
 import { generateMiddlewareStacks } from '../dexie/generate-middleware-stacks';
+import { Table } from '../table';
 
-export function setApiOnPlace({_novip: db}: Dexie, objs: Object[], tableNames: string[], dbschema: DbSchema) {
+export function setApiOnPlace(objs: Array<Dexie | Transaction>, tableNames: string[], dbschema: DbSchema) {
   tableNames.forEach(tableName => {
     const schema = dbschema[tableName];
     objs.forEach(obj => {
       const propDesc = getPropertyDescriptor(obj, tableName);
-      if (!propDesc || ("value" in propDesc && propDesc.value === undefined)) {
-        // Either the prop is not declared, or it is initialized to undefined.
-        if (obj === db.Transaction.prototype || obj instanceof db.Transaction) {
-          // obj is a Transaction prototype (or prototype of a subclass to Transaction)
+      if (!propDesc || ("value" in propDesc && (propDesc.value === undefined || propDesc.value instanceof Table))) {
+        // Either the prop is not declared, or it is initialized to undefined, or is already a Table
+        // on parent prototype prop but we need to set it as own prop (on the vip Dexie instance that derives from real instance)
+        if (obj instanceof Transaction) {
+          // obj is a Transaction instance or the db.Transaction.prototype
+          // (which prototypally derives from Transaction.prototype, see transaction-contructor.ts)
           // Make the API a getter that returns this.table(tableName)
           setProp(obj, tableName, {
             get(this: Transaction) { return this.table(tableName); },
@@ -32,21 +35,24 @@ export function setApiOnPlace({_novip: db}: Dexie, objs: Object[], tableNames: s
               defineProperty(this, tableName, {value, writable: true, configurable: true, enumerable: true});
             }
           });
-        } else {
-          // Table will not be bound to a transaction (will use Dexie.currentTransaction)
-          obj[tableName] = new db.Table(tableName, schema);
+        } else if (obj instanceof Dexie) {
+          obj._allTables[tableName] = obj[tableName] = new obj.Table(tableName, schema);
         }
       }
     });
   });
 }
 
-export function removeTablesApi({_novip: db}: Dexie, objs: Object[]) {
+export function removeTablesApi(objs: Array<Dexie | Transaction>) {
   objs.forEach(obj => {
-    for (let key in obj) {
-      if (obj[key] instanceof db.Table) delete obj[key];
-    }
-  });
+    (obj instanceof Dexie ? [obj, obj._allTables] : [obj]).forEach((obj: object) => {
+      for (let key in obj) {
+        if (obj[key] instanceof Table) {
+          delete obj[key];
+        }        
+      }  
+    });
+  })
 }
 
 export function lowerVersionFirst(a: Version, b: Version) {
@@ -142,8 +148,8 @@ export function updateTablesAndIndexes(
         // because when this code runs, there may not be any other code
         // that can access any transaction instance, else than this particular
         // upgrader function.
-        removeTablesApi(db, [db.Transaction.prototype]);
-        setApiOnPlace(db, [db.Transaction.prototype], keys(upgradeSchema), upgradeSchema);
+        removeTablesApi([db.Transaction.prototype]);
+        setApiOnPlace([db.Transaction.prototype], keys(upgradeSchema), upgradeSchema);
         trans.schema = upgradeSchema;
 
         // Support for native async await.
@@ -175,8 +181,8 @@ export function updateTablesAndIndexes(
         deleteRemovedTables(newSchema, idbtrans);
       }
       // Restore the final API
-      removeTablesApi(db, [db.Transaction.prototype]);
-      setApiOnPlace(db, [db.Transaction.prototype], db._storeNames, db._dbSchema);
+      removeTablesApi([db.Transaction.prototype]);
+      setApiOnPlace([db.Transaction.prototype], db._storeNames, db._dbSchema);
       trans.schema = db._dbSchema;
     });
   });
@@ -343,7 +349,7 @@ export function readGlobalSchema({_novip: db}: Dexie, idbdb: IDBDatabase, tmpTra
   db.verno = idbdb.version / 10;
   const globalSchema = db._dbSchema = buildGlobalSchema(db, idbdb, tmpTrans);
   db._storeNames = slice(idbdb.objectStoreNames, 0);
-  setApiOnPlace(db, [db._allTables], keys(globalSchema), globalSchema);
+  setApiOnPlace([db, db.vip], keys(globalSchema), globalSchema);
 }
 
 export function verifyInstalledSchema(db: Dexie, tmpTrans: IDBTransaction): boolean {

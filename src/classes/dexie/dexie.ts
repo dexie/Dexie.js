@@ -216,7 +216,12 @@ export class Dexie implements IDexie {
     this.use(observabilityMiddleware);
     this.use(cacheExistingValuesMiddleware);
 
-    this.vip = Object.create(this, {_vip: {value: true}}) as Dexie;
+    // vip is a Dexie instance used in db.on('ready') that don't block until db is ready.
+    const vipDexie = Object.create(this) as Dexie;
+    vipDexie._vip = true;
+    vipDexie.Table = createTableConstructor(vipDexie);
+    vipDexie._allTables = {}; // So that it has it's own tables that refers back to the vip instance.
+    this.vip = vipDexie;
 
     // Call each addon:
     addons.forEach(addon => addon(this));
