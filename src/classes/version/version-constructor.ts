@@ -23,7 +23,6 @@ export function createVersionConstructor(db: Dexie) {
         version: versionNumber,
         storesSource: null,
         dbschema: {},
-        tables: {},
         contentUpgrade: null
       };
     });

@@ -38,7 +38,7 @@ export function generateMiddlewareStacks({_novip: db}: Dexie, tmpTrans: IDBTrans
     if (db.core.schema.tables.some(tbl => tbl.name === tableName)) {
       table.core = db.core.table(tableName);
       if (db[tableName] instanceof db.Table) {
-          db[tableName].core = table.core;
+          db[tableName].core = db.vip[tableName].core = table.core;
       }
     }
   });
