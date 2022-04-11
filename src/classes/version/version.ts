@@ -18,6 +18,7 @@ export class Version implements IVersion {
     version: number,
     storesSource: { [tableName: string]: string | null },
     dbschema: DbSchema,
+    tables: {},
     contentUpgrade: Function | null
   }
 
@@ -37,7 +38,7 @@ export class Version implements IVersion {
   }
 
   stores(stores: { [key: string]: string | null; }): IVersion {
-    const db = this.db._novip;
+    const db = this.db;
     this._cfg.storesSource = this._cfg.storesSource ?
       extend(this._cfg.storesSource, stores) :
       stores;
@@ -54,8 +55,8 @@ export class Version implements IVersion {
     // Update the latest schema to this version
     db._dbSchema = dbschema;
     // Update APIs
-    removeTablesApi([db, db.vip, db.Transaction.prototype]);
-    setApiOnPlace([db, db.vip, db.Transaction.prototype], keys(dbschema), dbschema);
+    removeTablesApi(db, [db._allTables, db, db.Transaction.prototype]);
+    setApiOnPlace(db, [db._allTables, db, db.Transaction.prototype, this._cfg.tables], keys(dbschema), dbschema);
     db._storeNames = keys(dbschema);
     return this;
   }
