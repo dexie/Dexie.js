@@ -26,7 +26,6 @@ export interface Dexie {
   readonly name: string;
   readonly tables: Table[];
   readonly verno: number;
-  /** The 'vip' instance - passed to db.on('ready') and allows usage before db.on('ready') completes. */
   readonly vip: Dexie;
 
   readonly _allTables: { [name: string]: Table<any, IndexableType> };
