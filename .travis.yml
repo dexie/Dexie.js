@@ -20,6 +20,7 @@ env:
 branches:
   only:
   - master
+  - master-3
   - master-2
   - master-1
 script:
