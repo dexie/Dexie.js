@@ -4,6 +4,11 @@ export function assert(b: boolean): asserts b is true {
   if (!b) throw new Error('Assertion Failed');
 }
 
+const _hasOwn = {}.hasOwnProperty;
+export function hasOwn(obj, prop) {
+    return _hasOwn.call(obj, prop);
+}
+
 type SetByKeyPathTarget =
   | { [keyPath: string]: SetByKeyPathTarget }
   | SetByKeyPathTarget[];
