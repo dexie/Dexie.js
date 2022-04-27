@@ -143,7 +143,7 @@ export function setByKeyPath(obj, keyPath, value) {
                 if (value === undefined) delete obj[currentKeyPath]; else obj[currentKeyPath] = value;
             else {
                 var innerObj = obj[currentKeyPath];
-                if (!innerObj) innerObj = (obj[currentKeyPath] = {});
+                if (!innerObj || !hasOwn(obj, currentKeyPath)) innerObj = (obj[currentKeyPath] = {});
                 setByKeyPath(innerObj, remainingKeyPath, value);
             }
         } else {
