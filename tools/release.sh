@@ -40,8 +40,7 @@ validate_semver $next_version
 if echo "$next_version" | grep -q "-"; then
 	NPMTAG="next$master_suffix"
 else
-  #NPMTAG="latest$master_suffix" # Use this line as soon as Dexie v3.0.0 get the latest tag!
-  NPMTAG="latest" # Replace this line with the above line as soon as Dexie v3.0.0 get 'latest' tag!
+  NPMTAG="latest$master_suffix" # Use this line as soon as Dexie v3.0.0 get the latest tag!
 fi
 
 echo "Will use: npm publish --tag $NPMTAG"
