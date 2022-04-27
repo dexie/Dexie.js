@@ -37,7 +37,7 @@ export function setByKeyPath(
         //@ts-ignore: even if currentKeyPath would be numeric string and obj would be array - it works.
         var innerObj = obj[currentKeyPath];
         //@ts-ignore: even if currentKeyPath would be numeric string and obj would be array - it works.
-        if (!innerObj) innerObj = obj[currentKeyPath] = {};
+        if (!innerObj || !hasOwn(obj, currentKeyPath)) innerObj = (obj[currentKeyPath] = {});
         setByKeyPath(innerObj, remainingKeyPath, value);
       }
     } else {
