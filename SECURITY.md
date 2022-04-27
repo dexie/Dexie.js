@@ -11,7 +11,7 @@
 
 ## Reporting a Vulnerability
 
-To report a security vulnerability in Dexie.js, just file an issue in this repo.
+To report a security vulnerability in Dexie.js, please send an email to code@dexie.org describing the vulnerability and how to reproduce it.
 
 If we find an issue to be regarded as a security vulnerability, we will patch and release a new version in all the supported versions as soon as possible.
 Keep in mind though that this is an uncommercial open source project which means that sometimes you might have to be the one that
