@@ -4,7 +4,8 @@
 
 | Version | Supported          | Branch
 | ------- | ------------------ | --------
-| 3.x     | :white_check_mark: | master
+| 4.x     | :white_check_mark: | master
+| 3.x     | :white_check_mark: | master-3
 | 2.0.x   | :thinking: | master-2
 | 1.5.x   | :x: | master-1
 | < 1.5.1 | :x:                |
