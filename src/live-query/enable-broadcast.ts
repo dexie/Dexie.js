@@ -60,12 +60,14 @@ if (typeof BroadcastChannel !== 'undefined') {
   //
   // Propagate remote changes locally via storage event:
   //
-  addEventListener('storage', (ev: StorageEvent) => {
-    if (ev.key === STORAGE_MUTATED_DOM_EVENT_NAME) {
-      const data = JSON.parse(ev.newValue);
-      if (data) propagateLocally(data.changedParts);
-    }
-  });
+  if (typeof addEventListener !== 'undefined') {
+      addEventListener('storage', (ev: StorageEvent) => {
+      if (ev.key === STORAGE_MUTATED_DOM_EVENT_NAME) {
+        const data = JSON.parse(ev.newValue);
+        if (data) propagateLocally(data.changedParts);
+      }
+    });
+  }
 
   //
   // Propagate messages from service worker
