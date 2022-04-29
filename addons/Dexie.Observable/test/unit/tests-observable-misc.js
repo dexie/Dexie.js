@@ -257,7 +257,7 @@ asyncTest('sender should be able to react on broadcast if bIncludeSelf is true',
       });
 });
 
-// This tests relates to https://github.com/dfahlander/Dexie.js/issues/429#issuecomment-269793599
+// This tests relates to https://github.com/dexie/Dexie.js/issues/429#issuecomment-269793599
 // If db2 receives its message multiple times qunit will error as start() is called multiple times
 asyncTest('no matter how many times sendMessage is called a receiver should receive its message only once', 4, () => {
   const db1 = createDB();

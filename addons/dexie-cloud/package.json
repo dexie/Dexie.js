@@ -18,7 +18,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dfahlander/Dexie.js.git"
+    "url": "https://github.com/dexie/Dexie.js.git"
   },
   "scripts": {
     "test": "just-build test && npm run test-unit",
