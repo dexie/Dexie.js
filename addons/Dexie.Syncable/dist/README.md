@@ -1,6 +1,6 @@
 ## Can't find dexie-syncable.js?
 Transpiled code (dist version) IS ONLY checked in to
-the [releases](https://github.com/dfahlander/Dexie.js/tree/releases/addons/Dexie.Syncable/dist).
+the [releases](https://github.com/dexie/Dexie.js/tree/releases/addons/Dexie.Syncable/dist).
 branch.
 
 ## Download

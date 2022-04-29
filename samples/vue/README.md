@@ -26,7 +26,7 @@ Run `npm run build` to build the project. The build artifacts will be stored in 
 
 * [Vue CLI guide](https://cli.vuejs.org)
 * [Vue.js Guide](https://v3.vuejs.org/guide/introduction.html) for core Vue 3 concepts
-* To get more help on Dexie check out the [Dexie Wiki](https://github.com/dfahlander/Dexie.js/wiki)
+* To get more help on Dexie check out the [Dexie Docs](https://dexie.org/docs/)
 
 
 ## See Also

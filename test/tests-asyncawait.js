@@ -489,7 +489,7 @@ promisedTest ("Should be able to use transpiled async await", async () => {
         ok(Dexie.currentTransaction === trans, "Transaction persisted between await calls of mixed promises");
 
     }).catch ('PrematureCommitError', ()=> {
-        ok(true, "PROMISE IS INCOMPATIBLE WITH INDEXEDDB (https://github.com/dfahlander/Dexie.js/issues/317). Ignoring test.");
+        ok(true, "PROMISE IS INCOMPATIBLE WITH INDEXEDDB (https://github.com/dexie/Dexie.js/issues/317). Ignoring test.");
     })
 });
 

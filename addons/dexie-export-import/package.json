@@ -7,7 +7,7 @@
   "typings": "dist/dexie-export-import.d.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dfahlander/Dexie.js.git"
+    "url": "https://github.com/dexie/Dexie.js.git"
   },
   "scripts": {
     "test": "just-build test && npx karma start test/karma.conf.js --single-run",
