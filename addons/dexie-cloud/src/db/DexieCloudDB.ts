@@ -191,17 +191,16 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
         console.info("[alternativeLogin] about to call `await authenticate` ...")
         context = await authenticate(
           this.cloud.options.databaseUrl,
-          this.getAuthContext(currentUser),
-          // currentUser,
+          context,
           this.cloud.options.fetchTokens,
           // this.cloud.userInteraction,
           new BehaviorSubject(undefined),
           hints,
         )
-        // console.info("[alternativeLogin] done with `await authenticate`", {context})
-        // console.info("[alternativeLogin] about to call `context.save()`", {context})
-        // await context.save()
-        // console.info("[alternativeLogin] done with `context.save()`", {context})
+        console.info("[alternativeLogin] done with `await authenticate`", {context})
+        console.info("[alternativeLogin] about to call `context.save()`", {context})
+        await context.save()
+        console.info("[alternativeLogin] done with `context.save()`", {context})
         console.info("[alternativeLogin] about to call `this.setCurrentUser(context)` ...", {context})
         await this.setCurrentUser(context)
         console.info("[alternativeLogin] done with this.setCurrentUser.")
