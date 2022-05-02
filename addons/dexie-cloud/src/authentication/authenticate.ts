@@ -59,19 +59,37 @@ export async function authenticate(
   userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
   hints?: { userId?: string; email?: string; grant_type?: string }
 ): Promise<UserLogin> {
-  if (
-    context.accessToken &&
-    context.accessTokenExpiration!.getTime() > Date.now()
-  ) {
-    return context;
-  } else if (
-    context.refreshToken &&
-    (!context.refreshTokenExpiration ||
-      context.refreshTokenExpiration.getTime() > Date.now())
-  ) {
-    return await refreshAccessToken(url, context);
-  } else {
-    return await userAuthenticate(context, fetchToken, userInteraction, hints);
+  console.info('... ... ... ...', context)
+  try {
+    // /////////////////////////////////////////////////////////////
+    // let condition1 = context.accessToken &&
+    //   context.accessTokenExpiration!.getTime() > Date.now()
+    // console.info('... ... ... ...', {condition1}, context)
+    // let condition2 = context.refreshToken &&
+    //   (!context.refreshTokenExpiration ||
+    //     context.refreshTokenExpiration.getTime() > Date.now())
+    // console.info('... ... ... ...', {condition2}, context)
+    // /////////////////////////////////////////////////////////////
+    if (
+      context.accessToken &&
+      context.accessTokenExpiration!.getTime() > Date.now()
+    ) {
+      console.info('[authenticate.ts] have accessToken and it is not expired, just return context')
+      return context;
+    } else if (
+      context.refreshToken &&
+      (!context.refreshTokenExpiration ||
+        context.refreshTokenExpiration.getTime() > Date.now())
+    ) {
+      console.info('[authenticate.ts] about to call refreshAccessToken...', {url, context})
+      return await refreshAccessToken(url, context);
+    } else {
+      console.info('[authenticate.ts] about to call userAuthenticate...', {url, context})
+      return await userAuthenticate(context, fetchToken, userInteraction, hints);
+    }
+  } catch (err) {
+    console.warn(err)
+    throw err
   }
 }
 
@@ -127,6 +145,7 @@ async function userAuthenticate(
   userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
   hints?: { userId?: string; email?: string; grant_type?: string }
 ) {
+  console.log('~~ ~~~ ~~ ~~~ ~~ ~~~ ~~ ~~~ ~~')
   const { privateKey, publicKey } = await crypto.subtle.generateKey(
     {
       name: 'RSASSA-PKCS1-v1_5',
@@ -144,6 +163,7 @@ async function userAuthenticate(
   context.publicKey = publicKey;
 
   try {
+    console.log('~~ ~~~ ~~ ~~~ ~~ ~~~ ~~ ~~~ ~~ about to fetchToken')
     const response2 = await fetchToken({
       public_key: publicKeyPEM,
       hints,
@@ -168,6 +188,7 @@ async function userAuthenticate(
     context.claims = response2.claims;
 
     if (response2.alerts && response2.alerts.length > 0) {
+      console.log('~~ ~~~ ~~ ~~~ ~~ ~~~ ~~ ~~~ ~~ about to interactWithUser ...')
       await interactWithUser(userInteraction, {
         type: 'message-alert',
         title: 'Authentication Alert',
@@ -177,6 +198,7 @@ async function userAuthenticate(
     }
     return context;
   } catch (error) {
+    console.warn(error)
     await alertUser(userInteraction, 'Authentication Failed', {
       type: 'error',
       messageCode: 'GENERIC_ERROR',

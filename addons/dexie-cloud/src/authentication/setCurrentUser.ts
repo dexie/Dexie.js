@@ -18,7 +18,9 @@ export async function setCurrentUser(
 ) {
   if (user.userId === db.cloud.currentUserId) return; // Already this user.
 
+  console.info('[setCurrentUser] L21')
   const $logins = db.table('$logins');
+  console.info('[setCurrentUser] L23')
   await db.transaction('rw', $logins, async (tx) => {
     const existingLogins = await $logins.toArray();
     await Promise.all(
@@ -34,18 +36,23 @@ export async function setCurrentUser(
     await user.save();
     console.debug('Saved new user', user.email);
   });
+  console.info('[setCurrentUser] L39')
   await new Promise((resolve) => {
     if (db.cloud.currentUserId === user.userId) {
       resolve(null);
+      console.info('[setCurrentUser] L43')
     } else {
       const subscription = db.cloud.currentUser.subscribe((currentUser) => {
         if (currentUser.userId === user.userId) {
           subscription.unsubscribe();
+          console.info('[setCurrentUser] L48 (A)')
           resolve(null);
         }
+        console.info('[setCurrentUser] L51 (B)', {currentUser, user})
       });
     }
   });
+  console.info('[setCurrentUser] L54 ... is it ever reached?')
 
   // TANKAR!!!!
   // V: Service workern kommer inte ha tillgång till currentUserObservable om den inte istället härrör från ett liveQuery.

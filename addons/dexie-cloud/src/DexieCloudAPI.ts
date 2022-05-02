@@ -41,6 +41,11 @@ export interface DexieCloudAPI {
     userId?: string;
     grant_type?: 'demo' | 'otp';
   }): Promise<void>;
+  alternativeLogin(
+    currentUser: UserLogin,
+    hints?: { userId?: string; email?: string; grant_type?: string }
+  ): Promise<void>
+
   /**
    * Connect to given URL
    */

@@ -30,7 +30,15 @@ export class AuthPersistedContext {
   }
 
   async save() {
-    const db = wm.get(this)!;
-    db.table("$logins").put(this);
+    try {
+      console.info('[AuthPersistedContext.save] about to wm.get(this) ...')
+      let db = wm.get(this)!;
+      console.info('[AuthPersistedContext.save] about to db.table($logins).put(this) ...')
+      await db.table("$logins").put(this);
+      console.info('[AuthPersistedContext.save] saved.')
+    } catch (err) {
+      console.error(err)
+      throw err
+    }
   }
 }

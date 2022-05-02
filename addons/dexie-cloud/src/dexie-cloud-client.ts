@@ -10,6 +10,7 @@ import { login } from './authentication/login';
 import { UNAUTHORIZED_USER } from './authentication/UNAUTHORIZED_USER';
 import { DexieCloudDB } from './db/DexieCloudDB';
 import { PersistedSyncState } from './db/entities/PersistedSyncState';
+import { UserLogin } from './db/entities/UserLogin'
 import { DexieCloudOptions } from './DexieCloudOptions';
 import { DISABLE_SERVICEWORKER_STRATEGY } from './DISABLE_SERVICEWORKER_STRATEGY';
 import './extend-dexie-interface';
@@ -122,6 +123,17 @@ export function dexieCloud(dexie: Dexie) {
       const db = DexieCloudDB(dexie);
       await db.cloud.sync();
       await login(db, hint);
+    },
+    async alternativeLogin(
+      currentUser: UserLogin,
+      hints?: { userId?: string; email?: string; grant_type?: string }
+    ) {
+      const db = DexieCloudDB(dexie);
+      // console.debug("[dexie-cloud-client] -- about to call `await db.cloud.sync()` ...", {db})
+      // await db.cloud.sync();
+      // console.debug("[dexie-cloud-client] -- done with `await db.cloud.sync()` ...")
+      console.debug("[dexie-cloud-client] -- about to call `await db.alternativeLogin` ...", {db, currentUser, hints})
+      await db.alternativeLogin(currentUser, hints)
     },
     invites: getInvitesObservable(dexie),
     roles: getGlobalRolesObservable(dexie),

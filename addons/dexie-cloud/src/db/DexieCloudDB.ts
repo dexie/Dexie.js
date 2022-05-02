@@ -66,20 +66,13 @@ export interface DexieCloudDB extends DexieCloudDBBase {
   reconfigure(): void;
   messageConsumer: MessagesFromServerConsumer;
 
-  // XXX Temporary extra methods ...
-  alternativeLogin?(
+  // XXX Experimental (probably temporary) extra methods ...
+  alternativeLogin(
     currentUser: UserLogin,
     hints?: { userId?: string; email?: string; grant_type?: string }
-  )
-  setCurrentUser?(context: AuthPersistedContext)
-  getAuthContext?(currentUser: UserLogin)
-  authenticate?(
-    url: string,
-    context: UserLogin,
-    fetchToken: FetchTokenCallback,
-    userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
-    hints?: { userId?: string; email?: string; grant_type?: string },
-  )
+  ): Promise<void>
+  setCurrentUser(context: AuthPersistedContext): Promise<void>
+  getAuthContext(currentUser: UserLogin): AuthPersistedContext
 
 }
 
@@ -188,22 +181,30 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
       },
 
       // XXX: Exposing some extra methods to debug issue with using Dexie Cloud from within a MV3 service worker
-
       async alternativeLogin(
         currentUser: UserLogin,
         hints?: { userId?: string; email?: string; grant_type?: string }
       ) {
         // Taken from authentication/login.ts, but adjusted so it can accept a currentUser argument.
-        const context = this.getAuthContext(currentUser)
-        await authenticate(
+        let context = this.getAuthContext(currentUser)
+        console.info("[alternativeLogin] about to call `await authenticate` ...", {context})
+        console.info("[alternativeLogin] about to call `await authenticate` ...")
+        context = await authenticate(
           this.cloud.options.databaseUrl,
-          context,
+          this.getAuthContext(currentUser),
+          // currentUser,
           this.cloud.options.fetchTokens,
-          this.cloud.userInteraction,
+          // this.cloud.userInteraction,
+          new BehaviorSubject(undefined),
           hints,
         )
-        await context.save()
+        // console.info("[alternativeLogin] done with `await authenticate`", {context})
+        // console.info("[alternativeLogin] about to call `context.save()`", {context})
+        // await context.save()
+        // console.info("[alternativeLogin] done with `context.save()`", {context})
+        console.info("[alternativeLogin] about to call `this.setCurrentUser(context)` ...", {context})
         await this.setCurrentUser(context)
+        console.info("[alternativeLogin] done with this.setCurrentUser.")
         triggerSync(this, "pull")
       },
 
@@ -217,27 +218,14 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
         const context = new AuthPersistedContext(this, currentUser)
         return context
       },
-
-      async authenticate(
-        url: string,
-        context: UserLogin,
-        fetchToken: FetchTokenCallback,
-        userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
-        hints?: { userId?: string; email?: string; grant_type?: string }
-      ) {
-        return authenticate(
-          url,
-          context,
-          fetchToken,
-          userInteraction,
-          hints
-        )
-      }
     };
 
     Object.assign(db, helperMethods);
+    console.info('@@ @@ @@ 244 @@ @@ @@', {db})
     db.messageConsumer = MessagesFromServerConsumer(db);
     wm.set(dx.cloud, db);
   }
   return db;
 }
+
+
