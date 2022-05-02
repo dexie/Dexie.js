@@ -1,20 +1,20 @@
-import Dexie, { Table } from 'dexie';
-import { GuardedJob } from './entities/GuardedJob';
-import { UserLogin } from './entities/UserLogin';
-import { PersistedSyncState } from './entities/PersistedSyncState';
-import { UNAUTHORIZED_USER } from '../authentication/UNAUTHORIZED_USER';
-import { DexieCloudOptions } from '../DexieCloudOptions';
-import { BehaviorSubject, Subject } from 'rxjs';
-import { BaseRevisionMapEntry } from './entities/BaseRevisionMapEntry';
-import {
-  DBRealm,
-  DBRealmMember,
-  DBRealmRole,
-  DexieCloudSchema,
-} from 'dexie-cloud-common';
-import { BroadcastedAndLocalEvent } from '../helpers/BroadcastedAndLocalEvent';
-import { SyncState, SyncStatePhase } from '../types/SyncState';
-import { MessagesFromServerConsumer } from '../sync/messagesFromServerQueue';
+import Dexie, { Table } from 'dexie'
+import { DBRealm, DBRealmMember, DBRealmRole, DexieCloudSchema } from 'dexie-cloud-common'
+import { BehaviorSubject, Subject } from 'rxjs'
+import { authenticate, FetchTokenCallback } from '../authentication/authenticate'
+import { AuthPersistedContext } from '../authentication/AuthPersistedContext'
+import { setCurrentUser } from '../authentication/setCurrentUser'
+import { UNAUTHORIZED_USER } from '../authentication/UNAUTHORIZED_USER'
+import { DexieCloudOptions } from '../DexieCloudOptions'
+import { BroadcastedAndLocalEvent } from '../helpers/BroadcastedAndLocalEvent'
+import { MessagesFromServerConsumer } from '../sync/messagesFromServerQueue'
+import { triggerSync } from '../sync/triggerSync'
+import { DXCUserInteraction } from '../types/DXCUserInteraction'
+import { SyncState, SyncStatePhase } from '../types/SyncState'
+import { BaseRevisionMapEntry } from './entities/BaseRevisionMapEntry'
+import { GuardedJob } from './entities/GuardedJob'
+import { PersistedSyncState } from './entities/PersistedSyncState'
+import { UserLogin } from './entities/UserLogin'
 
 /*export interface DexieCloudDB extends Dexie {
   table(name: string): Table<any, any>;
@@ -65,6 +65,22 @@ export interface DexieCloudDB extends DexieCloudDBBase {
   setInitiallySynced(initiallySynced: boolean): void;
   reconfigure(): void;
   messageConsumer: MessagesFromServerConsumer;
+
+  // XXX Temporary extra methods ...
+  alternativeLogin?(
+    currentUser: UserLogin,
+    hints?: { userId?: string; email?: string; grant_type?: string }
+  )
+  setCurrentUser?(context: AuthPersistedContext)
+  getAuthContext?(currentUser: UserLogin)
+  authenticate?(
+    url: string,
+    context: UserLogin,
+    fetchToken: FetchTokenCallback,
+    userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
+    hints?: { userId?: string; email?: string; grant_type?: string },
+  )
+
 }
 
 const wm = new WeakMap<object, DexieCloudDB>();
@@ -170,6 +186,53 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
           `syncstatechanged-${dx.name}`
         );
       },
+
+      // XXX: Exposing some extra methods to debug issue with using Dexie Cloud from within a MV3 service worker
+
+      async alternativeLogin(
+        currentUser: UserLogin,
+        hints?: { userId?: string; email?: string; grant_type?: string }
+      ) {
+        // Taken from authentication/login.ts, but adjusted so it can accept a currentUser argument.
+        const context = this.getAuthContext(currentUser)
+        await authenticate(
+          this.cloud.options.databaseUrl,
+          context,
+          this.cloud.options.fetchTokens,
+          this.cloud.userInteraction,
+          hints,
+        )
+        await context.save()
+        await this.setCurrentUser(context)
+        triggerSync(this, "pull")
+      },
+
+      async setCurrentUser(context: AuthPersistedContext) {
+        return setCurrentUser(this, context)
+      },
+
+      getAuthContext(
+        currentUser: UserLogin
+      ) {
+        const context = new AuthPersistedContext(this, currentUser)
+        return context
+      },
+
+      async authenticate(
+        url: string,
+        context: UserLogin,
+        fetchToken: FetchTokenCallback,
+        userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
+        hints?: { userId?: string; email?: string; grant_type?: string }
+      ) {
+        return authenticate(
+          url,
+          context,
+          fetchToken,
+          userInteraction,
+          hints
+        )
+      }
     };
 
     Object.assign(db, helperMethods);
