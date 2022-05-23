@@ -22,7 +22,7 @@ export function LoginDialog({
   useLayoutEffect(()=>firstFieldRef.current?.focus(), []);
 
   return (
-    <Dialog>
+    <Dialog className="dxc-login-dlg">
       <>
         <h3 style={Styles.WindowHeader}>{title}</h3>
         {alerts.map((alert) => (
