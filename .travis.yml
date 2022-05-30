@@ -3,7 +3,7 @@ before_install: if [[ `npm -v` != 7* ]]; then npm i -g npm@7; fi
 addons:
   firefox: "85.0"
 node_js:
-  - "12"
+  - "18"
 matrix:
   fast_finish: true
 services:
