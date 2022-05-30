@@ -31,6 +31,7 @@ export interface DexieCloudAPI {
   //realms: Rx.Observable<DBRealm[]>;
   //loginState: Rx.BehaviorSubject<LoginState>;
   usingServiceWorker?: boolean;
+  isServiceWorkerDB?: boolean;
 
   /** Login using Dexie Cloud OTP or Demo user.
    *

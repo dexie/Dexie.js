@@ -12,6 +12,7 @@ export interface DexieCloudOptions {
   unsyncedTables?: string[];
   periodicSync?: PeriodicSyncOptions;
   nameSuffix?: boolean;
+  disableWebSocket?: boolean;
   fetchTokens?: (tokenParams: {
     public_key: string;
     hints?: { userId?: string; email?: string };

@@ -33,9 +33,9 @@ function syncDB(dbName: string, purpose: 'push' | 'pull') {
         syncDBSemaphore.delete(dbName + '/' + purpose);
         return Promise.reject(error);
       });
-    syncDBSemaphore.set(dbName + '/' + purpose, promise);
+    syncDBSemaphore.set(dbName + '/' + purpose, promise!);
   }
-  return promise;
+  return promise!;
 
   async function _syncDB(dbName: string, purpose: 'push' | 'pull') {
     let db = managedDBs.get(dbName);
@@ -44,12 +44,15 @@ function syncDB(dbName: string, purpose: 'push' | 'pull') {
       console.debug('Dexie Cloud SW: Creating new Dexie instance for', dbName);
       const dexie = new Dexie(dbName, { addons: [dexieCloud] });
       db = DexieCloudDB(dexie);
+      db.cloud.isServiceWorkerDB = true;
       dexie.on('versionchange', stopManagingDB);
       await db.dx.open(); // Makes sure db.cloud.options and db.cloud.schema are read from db,
-      if (!managedDBs.get(dbName)) {
+      if (managedDBs.get(dbName)) {
         // Avoid race conditions.
-        managedDBs.set(dbName, db);
+        db.close();
+        return await _syncDB(dbName, purpose);
       }
+      managedDBs.set(dbName, db);
     }
     if (!db.cloud.options?.databaseUrl) {
       console.error(`Dexie Cloud: No databaseUrl configured`);
