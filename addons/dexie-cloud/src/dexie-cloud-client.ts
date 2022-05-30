@@ -55,7 +55,6 @@ export {
 } from 'dexie-cloud-common';
 export { Invite } from './Invite';
 
-
 const DEFAULT_OPTIONS: Partial<DexieCloudOptions> = {
   nameSuffix: true,
 };
@@ -227,10 +226,12 @@ export function dexieCloud(dexie: Dexie) {
     closed = false; // As Dexie calls us, we are not closed anymore. Maybe reopened? Remember db.ready event is registered with sticky flag!
     const db = DexieCloudDB(dexie);
     // Setup default GUI:
-    if (!IS_SERVICE_WORKER) {
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       if (!db.cloud.options?.customLoginGui) {
         subscriptions.push(setupDefaultGUI(dexie));
       }
+    }
+    if (!db.cloud.isServiceWorkerDB) {
       subscriptions.push(computeSyncState(db).subscribe(dexie.cloud.syncState));
     }
 
@@ -282,7 +283,10 @@ export function dexieCloud(dexie: Dexie) {
           // Not configured for using service worker or no service worker
           // registration exists. Don't rely on service worker to do any job.
           // Use LocalSyncWorker instead.
-          if (db.cloud.options?.tryUseServiceWorker && !IS_SERVICE_WORKER) {
+          if (
+            db.cloud.options?.tryUseServiceWorker &&
+            !db.cloud.isServiceWorkerDB
+          ) {
             console.debug(
               'dexie-cloud-addon: Not using service worker.',
               swRegistrations.length === 0
@@ -339,7 +343,7 @@ export function dexieCloud(dexie: Dexie) {
 
     // Manage CurrentUser observable:
     throwIfClosed();
-    if (!IS_SERVICE_WORKER) {
+    if (!db.cloud.isServiceWorkerDB) {
       subscriptions.push(
         liveQuery(() => db.getCurrentUser()).subscribe(currentUserEmitter)
       );
@@ -373,7 +377,7 @@ export function dexieCloud(dexie: Dexie) {
     } else if (
       db.cloud.options?.databaseUrl &&
       db.cloud.schema &&
-      !IS_SERVICE_WORKER
+      !db.cloud.isServiceWorkerDB
     ) {
       // There's no SW. Start SyncWorker instead.
       localSyncWorker = LocalSyncWorker(db, db.cloud.options, db.cloud.schema!);
@@ -383,7 +387,7 @@ export function dexieCloud(dexie: Dexie) {
 
     // Listen to online event and do sync.
     throwIfClosed();
-    if (!IS_SERVICE_WORKER) {
+    if (!db.cloud.isServiceWorkerDB) {
       subscriptions.push(
         fromEvent(self, 'online').subscribe(() => {
           console.debug('online!');
@@ -401,11 +405,11 @@ export function dexieCloud(dexie: Dexie) {
       );
     }
 
-    // Connect WebSocket only if we're a browser window
+    // Connect WebSocket unless we
     if (
-      typeof window !== 'undefined' &&
-      !IS_SERVICE_WORKER &&
-      db.cloud.options?.databaseUrl
+      db.cloud.options?.databaseUrl &&
+      !db.cloud.options?.disableWebSocket &&
+      !IS_SERVICE_WORKER
     ) {
       subscriptions.push(connectWebSocket(db));
     }

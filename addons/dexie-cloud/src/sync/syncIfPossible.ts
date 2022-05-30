@@ -3,7 +3,7 @@ import { performGuardedJob } from './performGuardedJob';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { sync, CURRENT_SYNC_WORKER, SyncOptions } from './sync';
 import { DexieCloudOptions } from '../DexieCloudOptions';
-import { DexieCloudSchema } from 'dexie-cloud-common';
+import { assert, DexieCloudSchema } from 'dexie-cloud-common';
 
 const ongoingSyncs = new WeakMap<
   DexieCloudDB,
@@ -67,16 +67,18 @@ export function syncIfPossible(
 
   async function _syncIfPossible() {
     try {
-      if (db.cloud.usingServiceWorker) {
-        if (IS_SERVICE_WORKER) {
-          await sync(db, cloudOptions, cloudSchema, options);
-        }
-      } else {
+      if (db.cloud.isServiceWorkerDB) {
+        // We are the dedicated sync SW:
+        await sync(db, cloudOptions, cloudSchema, options);
+      } else if (!db.cloud.usingServiceWorker) {
         // We use a flow that is better suited for the case when multiple workers want to
         // do the same thing.
         await performGuardedJob(db, CURRENT_SYNC_WORKER, '$jobs', () =>
           sync(db, cloudOptions, cloudSchema, options)
         );
+      } else {
+        assert(false);
+        throw new Error('Internal _syncIfPossible() - invalid precondition - should not have been called.');
       }
       ongoingSyncs.delete(db);
       console.debug('Done sync');
