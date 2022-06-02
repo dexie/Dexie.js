@@ -101,7 +101,6 @@ export function dexieCloud(dexie: Dexie) {
     version: '{version}',
     options: { ...DEFAULT_OPTIONS } as DexieCloudOptions,
     schema: null,
-    serverState: null,
     get currentUserId() {
       return currentUserEmitter.value.userId || UNAUTHORIZED_USER.userId!;
     },
