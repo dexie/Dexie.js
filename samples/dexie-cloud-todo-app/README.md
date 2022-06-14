@@ -6,7 +6,7 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 **[You can open a deployed version of this PWA at https://dexie.github.io/Dexie.js/dexie-cloud-todo-app](https://dexie.github.io/Dexie.js/dexie-cloud-todo-app)**
 
-*NOTE: Previous versions of the published app (before december 2021) were on an old URL and we recommend to uninstall it.*
+*NOTE: Previous versions of the published app (before december 2021) were on an old URL and we recommend to uninstall the PWA from your device if you did save it to your home screen or desktop.*
 
 If you just want to see the app in action, navigate to the [pre-built published version](https://dexie.github.io/Dexie.js/dexie-cloud-todo-app/).
 
