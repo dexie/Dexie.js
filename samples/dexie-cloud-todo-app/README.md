@@ -106,4 +106,4 @@ You can learn more in the [Create React App documentation](https://facebook.gith
 
 To learn React, check out the [React documentation](https://reactjs.org/).
 
-To learn about Dexie Cloud, check out the [Dexie Cloud documentation](https://dexie.org/cloud/).
+To learn about Dexie Cloud, check out the [Dexie Cloud documentation](https://dexie.org/cloud/docs/).
