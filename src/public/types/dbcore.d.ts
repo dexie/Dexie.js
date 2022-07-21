@@ -54,7 +54,7 @@ export interface DBCorePutRequest {
     range: DBCoreKeyRange;
   };
   changeSpec?: {[keyPath: string]: any}; // Common changeSpec for each key
-  changeSpecs?: {[keyPath: string]: any}[]; // changeSpec per key. 
+  changeSpecs?: {[keyPath: string]: any}[]; // changeSpec per key.
   /** @deprecated Will always get results since 3.1.0-alpha.5 */
   wantResults?: boolean;
 }
@@ -83,7 +83,7 @@ export interface DBCoreGetManyRequest {
 
 export interface DBCoreGetRequest {
   trans: DBCoreTransaction;
-  key: any;  
+  key: any;
 }
 
 export interface DBCoreQuery {
@@ -147,7 +147,7 @@ export interface DBCoreIndex {
   /** True if this index represents the primary key */
   readonly isPrimaryKey?: boolean;
   /** True if this index represents the primary key and is not inbound (https://dexie.org/docs/inbound) */
-  readonly outbound?: boolean; 
+  readonly outbound?: boolean;
   /** True if and only if keyPath is an array (https://dexie.org/docs/Compound-Index) */
   readonly compound?: boolean;
   /** keyPath, null for primary key, string for single-property indexes, Array<string> for compound indexes */

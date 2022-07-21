@@ -1,12 +1,12 @@
 import { IndexableTypeArrayReadonly } from "./indexable-type";
 
 /** DexieError
- * 
+ *
  * Common base class for all errors originating from Dexie.js except TypeError,
  * SyntaxError and RangeError.
- * 
+ *
  * https://dexie.org/docs/DexieErrors/DexieError
- * 
+ *
  */
 export interface DexieError extends Error {
   name: string;
@@ -19,14 +19,14 @@ export interface DexieError extends Error {
 /**
  * List of the names of auto-generated error classes that extends DexieError
  * and shares the interface of DexieError.
- * 
+ *
  * Each error should be documented at https://dexie.org/docs/DexieErrors/Dexie.<errname>
- * 
+ *
  * The generic type DexieExceptionClasses is a map of full error name to
  * error constructor. The DexieExceptionClasses is mixed in into Dexie,
  * so that it is always possible to throw or catch certain errors via
  * Dexie.ErrorName. Example:
- * 
+ *
  * try {
  *   throw new Dexie.InvalidTableError("Invalid table foo", innerError?);
  * } catch (err) {
@@ -96,7 +96,7 @@ export type DexieErrors = {
 
   // https://dexie.org/docs/DexieErrors/Dexie.ReadOnlyError
   ReadOnly: 'ReadOnlyError',
-  
+
   // https://dexie.org/docs/DexieErrors/Dexie.VersionError
   Version: 'VersionError',
 
@@ -123,7 +123,7 @@ export type DexieErrors = {
 }
 
 /** ModifyError
- * 
+ *
  * https://dexie.org/docs/DexieErrors/Dexie.ModifyError
  */
 export interface ModifyError extends DexieError {
@@ -133,7 +133,7 @@ export interface ModifyError extends DexieError {
 }
 
 /** BulkError
- * 
+ *
  * https://dexie.org/docs/DexieErrors/Dexie.BulkError
  */
 export interface BulkError extends DexieError {

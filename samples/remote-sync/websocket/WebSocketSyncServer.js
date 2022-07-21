@@ -199,7 +199,7 @@ function SyncServer(port) {
                         if (!("baseRevision" in request)) {
                             throw "Property 'baseRevision' missing";
                         }
-                        // First, if sent change set is partial. 
+                        // First, if sent change set is partial.
                         if (request.partial) {
                             // Don't commit changes just yet. Store it in the partialChanges table so far. (In real db, uncommittedChanges would be its own table with columns: {clientID, type, table, key, obj, mods}).
                             // Get or create db.uncommittedChanges array for current client

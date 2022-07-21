@@ -10,7 +10,7 @@ import { Dexie } from '../dexie';
 import { Collection as ICollection} from "../../public/types/collection";
 
 /** class WhereClause
- * 
+ *
  * https://dexie.org/docs/WhereClause/WhereClause
  */
 export class WhereClause implements IWhereClause {
@@ -32,9 +32,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.between()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.between()
-   * 
+   *
    **/
   between(lower: IndexableType, upper: IndexableType, includeLower?: boolean, includeUpper?: boolean) {
     includeLower = includeLower !== false;   // Default to true
@@ -50,9 +50,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.equals()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.equals()
-   * 
+   *
    **/
   equals(value: IndexableType) {
     if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
@@ -60,9 +60,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.above()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.above()
-   * 
+   *
    **/
   above(value: IndexableType) {
     if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
@@ -70,9 +70,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.aboveOrEqual()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.aboveOrEqual()
-   * 
+   *
    **/
   aboveOrEqual(value: IndexableType) {
     if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
@@ -80,9 +80,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.below()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.below()
-   * 
+   *
    **/
   below(value: IndexableType) {
     if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
@@ -90,9 +90,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.belowOrEqual()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.belowOrEqual()
-   * 
+   *
    **/
   belowOrEqual(value: IndexableType) {
     if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
@@ -100,9 +100,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.startsWith()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.startsWith()
-   * 
+   *
    **/
   startsWith(str: string) {
     if (typeof str !== 'string') return fail(this, STRING_EXPECTED);
@@ -110,9 +110,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.startsWithIgnoreCase()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.startsWithIgnoreCase()
-   * 
+   *
    **/
   startsWithIgnoreCase(str: string) {
     if (str === "") return this.startsWith(str);
@@ -120,18 +120,18 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.equalsIgnoreCase()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.equalsIgnoreCase()
-   * 
+   *
    **/
   equalsIgnoreCase(str: string) {
     return addIgnoreCaseAlgorithm(this, (x, a) => x === a[0], [str], "");
   }
 
   /** WhereClause.anyOfIgnoreCase()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.anyOfIgnoreCase()
-   * 
+   *
    **/
   anyOfIgnoreCase(...values: string[]): Collection;
   anyOfIgnoreCase(values: string[]): Collection;
@@ -142,9 +142,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.startsWithAnyOfIgnoreCase()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.startsWithAnyOfIgnoreCase()
-   * 
+   *
    **/
   startsWithAnyOfIgnoreCase(...values: string[]): Collection;
   startsWithAnyOfIgnoreCase(values: string[]): Collection;
@@ -155,9 +155,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.anyOf()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.anyOf()
-   * 
+   *
    **/
   anyOf(...values: string[]): Collection;
   anyOf(values: string[]): Collection;
@@ -200,18 +200,18 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.notEqual()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.notEqual()
-   * 
+   *
    **/
   notEqual(value: IndexableType) {
     return this.inAnyRange([[minKey, value], [value, this.db._maxKey]], { includeLowers: false, includeUppers: false });
   }
 
   /** WhereClause.noneOf()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.noneOf()
-   * 
+   *
    **/
   noneOf(...values: string[]): Collection;
   noneOf(values: string[]): Collection;
@@ -230,9 +230,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.inAnyRange()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.inAnyRange()
-   * 
+   *
    **/
   inAnyRange(
     ranges: ReadonlyArray<{ 0: IndexableType, 1: IndexableType }>,
@@ -345,9 +345,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.startsWithAnyOf()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.startsWithAnyOf()
-   * 
+   *
    **/
   startsWithAnyOf(...prefixes: string[]): Collection;
   startsWithAnyOf(prefixes: string[]): Collection;

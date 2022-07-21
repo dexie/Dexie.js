@@ -7,7 +7,6 @@ import { DexieConstructor } from '../../public/types/dexie-constructor';
 import { getDatabaseNames } from '../../helpers/database-enumerator';
 import { PSD } from '../../helpers/promise';
 import { usePSD } from '../../helpers/promise';
-import { newScope } from '../../helpers/promise';
 import { rejection } from '../../helpers/promise';
 import { awaitIterator } from '../../helpers/yield-support';
 import Promise from '../../helpers/promise';
@@ -26,7 +25,7 @@ import { cmp } from '../../functions/cmp';
 
 /* (Dexie) is an instance of DexieConstructor, as defined in public/types/dexie-constructor.d.ts
 *  (new Dexie()) is an instance of Dexie, as defined in public/types/dexie.d.ts
-* 
+*
 * Why we're doing this?
 
 * Because we've choosen to define the public Dexie API using a DexieConstructor interface
@@ -39,7 +38,7 @@ const Dexie = _Dexie as any as DexieConstructor;
 
 //
 // Set all static methods and properties onto Dexie:
-// 
+//
 props(Dexie, {
 
   // Dexie.BulkError = class BulkError {...};
@@ -147,7 +146,7 @@ props(Dexie, {
       typeof promiseOrFunction === 'function' ?
         Dexie.ignoreTransaction(promiseOrFunction) :
         promiseOrFunction)
-      .timeout(optionalTimeout || 60000); // Default the timeout to one minute. Caller may specify Infinity if required.       
+      .timeout(optionalTimeout || 60000); // Default the timeout to one minute. Caller may specify Infinity if required.
 
     // Run given promise on current transaction. If no current transaction, just return a Dexie promise based
     // on given value.

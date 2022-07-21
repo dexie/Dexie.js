@@ -27,7 +27,7 @@ import {exceptions} from '../errors';
 //   native async / await.
 // * Promise.follow() method built upon the custom zone engine, that allows user to track all promises created from current stack frame
 //   and below + all promises that those promises creates or awaits.
-// * Detect any unhandled promise in a PSD-scope (PSD.onunhandled). 
+// * Detect any unhandled promise in a PSD-scope (PSD.onunhandled).
 //
 // David Fahlander, https://github.com/dfahlander
 //
@@ -39,7 +39,7 @@ var INTERNAL = {};
 // Async stacks (long stacks) must not grow infinitely.
 const
     LONG_STACKS_CLIP_LIMIT = 100,
-    // When calling error.stack or promise.stack, limit the number of asyncronic stacks to print out. 
+    // When calling error.stack or promise.stack, limit the number of asyncronic stacks to print out.
     MAX_LONG_STACKS = 20,
     ZONE_ECHO_LIMIT = 100,
     [resolvedNativePromise, nativePromiseProto, resolvedGlobalPromise] = typeof Promise === 'undefined' ?
@@ -65,15 +65,15 @@ var stack_being_generated = false;
 
 /* The default function used only for the very first promise in a promise chain.
    As soon as then promise is resolved or rejected, all next tasks will be executed in micro ticks
-   emulated in this module. For indexedDB compatibility, this means that every method needs to 
-   execute at least one promise before doing an indexedDB operation. Dexie will always call 
+   emulated in this module. For indexedDB compatibility, this means that every method needs to
+   execute at least one promise before doing an indexedDB operation. Dexie will always call
    db.ready().then() for every operation to make sure the indexedDB event is started in an
    indexedDB-compatible emulated micro task loop.
 */
 var schedulePhysicalTick = resolvedGlobalPromise ?
     () => {resolvedGlobalPromise.then(physicalTick);}
     :
-    _global.setImmediate ? 
+    _global.setImmediate ?
         // setImmediate supported. Those modern platforms also supports Function.bind().
         setImmediate.bind(null, physicalTick) :
         _global.MutationObserver ?
@@ -88,7 +88,7 @@ var schedulePhysicalTick = resolvedGlobalPromise ?
             } :
             // No support for setImmediate or MutationObserver. No worry, setTimeout is only called
             // once time. Every tick that follows will be our emulated micro tick.
-            // Could have uses setTimeout.bind(null, 0, physicalTick) if it wasnt for that FF13 and below has a bug 
+            // Could have uses setTimeout.bind(null, 0, physicalTick) if it wasnt for that FF13 and below has a bug
             ()=>{setTimeout(physicalTick,0);};
 
 // Configurable through Promise.scheduler.
@@ -110,7 +110,7 @@ var isOutsideMicroTick = true, // True when NOT in a virtual microTick.
     rejectingErrors = [], // Tracks if errors are being re-rejected during onRejected callback.
     currentFulfiller = null,
     rejectionMapper = mirror; // Remove in next major when removing error mapping of DOMErrors and DOMExceptions
-    
+
 export var globalPSD = {
     id: 'global',
     global: true,
@@ -135,10 +135,10 @@ export var numScheduledCalls = 0; // Number of listener-calls left to do in this
 export var tickFinalizers = []; // Finalizers to call when there are no more async calls scheduled within current physical tick.
 
 export default function DexiePromise(fn) {
-    if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');    
+    if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');
     this._listeners = [];
     this.onuncatched = nop; // Deprecate in next major. Not needed. Better to use global error handler.
-    
+
     // A library may set `promise._lib = true;` after promise is created to make resolve() or reject()
     // execute the microtask engine implicitely within the call to resolve() or reject().
     // To remain A+ compliant, a library must only set `_lib=true` if it can guarantee that the stack
@@ -154,7 +154,7 @@ export default function DexiePromise(fn) {
         this._prev = null;
         this._numPrev = 0; // Number of previous promises (for long stacks)
     }
-    
+
     if (typeof fn !== 'function') {
         if (fn !== INTERNAL) throw new TypeError('Not a function');
         // Private constructor (INTERNAL, state, value).
@@ -165,7 +165,7 @@ export default function DexiePromise(fn) {
             handleRejection(this, this._value); // Map error, set stack and addPossiblyUnhandledError().
         return;
     }
-    
+
     this._state = null; // null (=pending), false (=rejected) or true (=resolved)
     this._value = null; // error or result
     ++psd.ref; // Refcounting current scope
@@ -215,7 +215,7 @@ props(DexiePromise.prototype, {
     then: thenProp, // Defined above.
     _then: function (onFulfilled, onRejected) {
         // A little tinier version of then() that don't have to create a resulting promise.
-        propagateToListener(this, new Listener(null, null, onFulfilled, onRejected, PSD));        
+        propagateToListener(this, new Listener(null, null, onFulfilled, onRejected, PSD));
     },
 
     catch: function (onRejected) {
@@ -243,7 +243,7 @@ props(DexiePromise.prototype, {
             return PromiseReject(err);
         });
     },
-    
+
     stack: {
         get: function() {
             if (this._stack) return this._stack;
@@ -287,7 +287,7 @@ function Listener(onFulfilled, onRejected, resolve, reject, zone) {
 props (DexiePromise, {
     all: function () {
         var values = getArrayOf.apply(null, arguments) // Supports iterables, implicit arguments and array-like.
-            .map(onPossibleParallellAsync); // Handle parallell async/awaits 
+            .map(onPossibleParallellAsync); // Handle parallell async/awaits
         return new DexiePromise(function (resolve, reject) {
             if (values.length === 0) resolve([]);
             var remaining = values.length;
@@ -297,7 +297,7 @@ props (DexiePromise, {
             }, reject));
         });
     },
-    
+
     resolve: value => {
         if (value instanceof DexiePromise) return value;
         if (value && typeof value.then === 'function') return new DexiePromise((resolve, reject)=>{
@@ -307,9 +307,9 @@ props (DexiePromise, {
         linkToPreviousPromise(rv, currentFulfiller);
         return rv;
     },
-    
+
     reject: PromiseReject,
-    
+
     race: function () {
         var values = getArrayOf.apply(null, arguments).map(onPossibleParallellAsync);
         return new DexiePromise((resolve, reject) => {
@@ -325,21 +325,21 @@ props (DexiePromise, {
     totalEchoes: {get: ()=>totalEchoes},
 
     //task: {get: ()=>task},
-    
+
     newPSD: newScope,
-    
+
     usePSD: usePSD,
-    
+
     scheduler: {
         get: () => asap,
         set: value => {asap = value}
     },
-    
+
     rejectionMapper: {
         get: () => rejectionMapper,
         set: value => {rejectionMapper = value;} // Map reject failures
     },
-            
+
     follow: (fn, zoneProps) => {
         return new DexiePromise((resolve, reject) => {
             return newScope((resolve, reject) => {
@@ -429,8 +429,8 @@ function handleRejection (promise, reason) {
     promise._state = false;
     promise._value = reason;
     debug && reason !== null && typeof reason === 'object' && !reason._promise && tryCatch(()=>{
-        var origProp = getPropertyDescriptor(reason, "stack");        
-        reason._promise = promise;    
+        var origProp = getPropertyDescriptor(reason, "stack");
+        reason._promise = promise;
         setProp(reason, "stack", {
             get: () =>
                 stack_being_generated ?
@@ -489,10 +489,10 @@ function callListener (cb, promise, listener) {
         // Set static variable currentFulfiller to the promise that is being fullfilled,
         // so that we connect the chain of promises (for long stacks support)
         currentFulfiller = promise;
-        
+
         // Call callback and resolve our listener with it's return value.
         var ret, value = promise._value;
-            
+
         if (promise._state) {
             // cb is onResolved
             ret = cb (value);
@@ -522,7 +522,7 @@ function getStack (promise, stacks, limit) {
         var failure = promise._value,
             errorName,
             message;
-        
+
         if (failure != null) {
             errorName = failure.name || "Error";
             message = failure.message || failure;
@@ -597,7 +597,7 @@ function finalizePhysicalTick() {
     });
     var finalizers = tickFinalizers.slice(0); // Clone first because finalizer may remove itself from list.
     var i = finalizers.length;
-    while (i) finalizers[--i]();    
+    while (i) finalizers[--i]();
 }
 
 function run_at_end_of_this_or_next_physical_tick (fn) {
@@ -689,7 +689,7 @@ export function newScope (fn, props, a1, a2) {
         gthen: getPatchedPromiseThen (globalEnv.gthen, psd) // global then
     } : {};
     if (props) extend(psd, props);
-    
+
     // unhandleds and onunhandled should not be specifically set here.
     // Leave them on parent prototype.
     // unhandleds.push(err) will push to parent's prototype
@@ -731,7 +731,7 @@ if ((''+nativePromiseThen).indexOf('[native code]') === -1) {
 // Call from Promise.all() and Promise.race()
 export function onPossibleParallellAsync (possiblePromise) {
     if (task.echoes && possiblePromise && possiblePromise.constructor === NativePromise) {
-        incrementExpectedAwaits(); 
+        incrementExpectedAwaits();
         return possiblePromise.then(x => {
             decrementExpectedAwaits();
             return x;

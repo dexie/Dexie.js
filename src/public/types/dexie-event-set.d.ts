@@ -9,5 +9,5 @@ export interface DexieEventSet {
       defaultFunction?: Function): DexieEvent;
   addEventType (
       events: {[eventName:string]: ('asap' | [(f1:Function,f2:Function)=>Function, Function])})
-      : DexieEvent;    
+      : DexieEvent;
 }

@@ -94,7 +94,7 @@ export interface Dexie {
     table5: string | Table,
     scope: (trans: TXWithTables<this>) => PromiseLike<U> | U
   ): PromiseExtended<U>;
-  
+
   close(): void;
 
   delete(): PromiseExtended<void>;

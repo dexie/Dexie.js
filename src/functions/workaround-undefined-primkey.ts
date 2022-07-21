@@ -5,7 +5,7 @@ import { deepClone, delByKeyPath, getByKeyPath } from './utils';
 // https://github.com/dfahlander/Dexie.js/issues/1280#issuecomment-823557881
 export function workaroundForUndefinedPrimKey(keyPath: string | ArrayLike<string>) {
   // Workaround only needed for plain non-dotted keyPaths
-  return typeof keyPath === "string" && !/\./.test(keyPath) 
+  return typeof keyPath === "string" && !/\./.test(keyPath)
   ? (obj: object) => {
     if (obj[keyPath] === undefined && (keyPath in obj)) {
       // property exists but is undefined. This will not be liked by Indexeddb.

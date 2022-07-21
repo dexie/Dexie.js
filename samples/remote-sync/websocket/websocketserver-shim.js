@@ -1,5 +1,5 @@
 ﻿/* This shim helps you unit test both WebSocket client and a websocket server in the browser.
-   
+
    This shim will implement a simple web socket server with same API as "nodejs-websocket".
    It will also replace the browser's WebSocket class with a emulated WebSocket class that
    will only communicate with instances of the emulated websocket server.

@@ -17,11 +17,11 @@ export default function Events(ctx) {
         }
     };
     rv.addEventType = add;
-    
+
     for (var i = 1, l = arguments.length; i < l; ++i) {
         add(arguments[i]);
     }
-    
+
     return rv;
 
     function add(eventName, chainFunction, defaultFunction) {

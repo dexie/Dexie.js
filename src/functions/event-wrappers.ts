@@ -17,7 +17,7 @@ export function eventSuccessHandler (resolve) {
 export function hookedEventRejectHandler (reject) {
   return wrap(function (event) {
       // See comment on hookedEventSuccessHandler() why wrap() is needed only when supporting hooks.
-      
+
       var req = event.target,
           err = req.error,
           ctx = req._hookCtx,// Contains the hook error handler. Put here instead of closure to boost performance.
@@ -63,4 +63,3 @@ export function BulkErrorHandlerCatchAll(errorList, done?, supportHooks?) {
       done && done();
   });
 }
-

@@ -12,7 +12,7 @@ import {
 /* An interval tree implementation to efficiently detect overlapping ranges of queried indexes.
  *
  * https://en.wikipedia.org/wiki/Interval_tree
- * 
+ *
  */
 
 function isEmptyRange(node: IntervalTree | {from: IndexableType, to: IndexableType}): node is EmptyRange {
@@ -62,7 +62,7 @@ function addRange(target: IntervalTree, from: IndexableType, to: IndexableType) 
 
   // Caller is trying to add a range where from is greater than to:
   if (diff > 0) throw RangeError();
-  
+
   if (isEmptyRange(target)) return extend(target, { from, to, d: 1 });
   const left = target.l;
   const right = target.r;
@@ -202,17 +202,17 @@ function rebalance(target: IntervalTreeNode) {
 
     // Rotate (https://en.wikipedia.org/wiki/Tree_rotation)
     //
-    // 
+    //
     //                    [OLDROOT]
     //       [OLDROOT.L]            [NEWROOT]
     //                        [NEWROOT.L] [NEWROOT.R]
     //
     // Is going to become:
     //
-    // 
+    //
     //                    [NEWROOT]
     //        [OLDROOT]             [NEWROOT.R]
-    // [OLDROOT.L] [NEWROOT.L]  
+    // [OLDROOT.L] [NEWROOT.L]
 
     // * clone now has the props of OLDROOT
     // Plan:
@@ -225,7 +225,7 @@ function rebalance(target: IntervalTreeNode) {
     // We're gonna copy props from target's right node into target so that target will
     // have same range as old target[r] (instead of changing pointers, we copy values.
     // that way we do not need to adjust pointers in parents).
-    const oldRootRight = target[r]; 
+    const oldRootRight = target[r];
     target.from = oldRootRight.from;
     target.to = oldRootRight.to;
     target[r] = oldRootRight[r];

@@ -1,11 +1,11 @@
 /* public/index.d.ts - The source of dexie.d.ts
- * 
+ *
  * We're using dts-bundle-generator to bundle this file to the
  * final version.
- * 
+ *
  * We're separating public from internal types as a way to keep package-private
  * properties and types without exposing them to the public API.
- * 
+ *
  * All internal types extends their corresponding public type though, so that
  * we still get the benefit from the tsc compilator checking type correctness.
  */

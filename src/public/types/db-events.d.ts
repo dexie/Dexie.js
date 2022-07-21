@@ -45,14 +45,14 @@ export interface DbEvents extends DexieEventSet {
  */
 export type ObservabilitySet = {
   /** Database part having been mutated.
-   * 
+   *
    * This structure is produced in observability-middleware.ts
    * and consumed in live-query.ts.
-   * 
+   *
    * Format of 'part':
-   * 
+   *
    *   `idb://${dbName}/${tableName}/${indexName}`
-   * 
+   *
    * * dbName is the database name
    * * tableName is the table name
    * * indexName is any of:
@@ -61,7 +61,7 @@ export type ObservabilitySet = {
    *    3. The keyPath of an index, such as "name", "age" or "address.city" -
    *       represents indexes that, if used in a query, might affect the
    *       result of that query.
-   * 
+   *
    * IntervalTree
    *    * See definition of IntervalTree type in rangeset.d.ts
    *    * See rangesOverlap() in rangeset.ts that can be used to compare two

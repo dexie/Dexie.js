@@ -9,7 +9,7 @@ export function fail(collectionOrWhereClause: Collection | WhereClause, err, T?)
   var collection = collectionOrWhereClause instanceof WhereClause ?
       new collectionOrWhereClause.Collection (collectionOrWhereClause) :
       collectionOrWhereClause;
-      
+
   collection._ctx.error = T ? new T(err) : new TypeError(err);
   return collection;
 }

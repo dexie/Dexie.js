@@ -27,7 +27,7 @@ export const hooksMiddleware: Middleware<DBCore>  = {
     table(tableName: string) {
       const downTable = downCore.table(tableName);
       const {primaryKey} = downTable.schema;
-  
+
       const tableMiddleware: DBCoreTable = {
         ...downTable,
         mutate(req):Promise<DBCoreMutateResponse> {
@@ -63,7 +63,7 @@ export const hooksMiddleware: Middleware<DBCore>  = {
               {...req};
             if (req.type !== 'delete') req.values = [...req.values];
             if (req.keys) req.keys = [...req.keys];
-  
+
             return getExistingValues(downTable, req, keys).then (existingValues => {
               const contexts = keys.map((key, i) => {
                 const existingValue = existingValues[i];
@@ -121,11 +121,11 @@ export const hooksMiddleware: Middleware<DBCore>  = {
               });
             });
           }
-  
+
           function deleteRange(req: DBCoreDeleteRangeRequest): Promise<DBCoreMutateResponse> {
             return deleteNextChunk(req.trans, req.range, 10000);
           }
-  
+
           function deleteNextChunk(trans: DBCoreTransaction, range: DBCoreKeyRange, limit: number) {
             // Query what keys in the DB within the given range
             return downTable.query({trans, values: false, query: {index: primaryKey, range}, limit})

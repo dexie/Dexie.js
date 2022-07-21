@@ -11,7 +11,7 @@ type CollectionContext = Collection["_ctx"];
 export function isPlainKeyRange (ctx: CollectionContext, ignoreLimitFilter?: boolean) {
   return !(ctx.filter || ctx.algorithm || ctx.or) &&
       (ignoreLimitFilter ? ctx.justLimit : !ctx.replayFilter);
-}    
+}
 
 export function addFilter(ctx: CollectionContext, fn: Function) {
   ctx.filter = combine(ctx.filter, fn);
@@ -44,14 +44,14 @@ export function openCursor(ctx: CollectionContext, coreTable: DBCoreTable, trans
     reverse: ctx.dir === 'prev',
     unique: !!ctx.unique,
     query: {
-      index, 
+      index,
       range: ctx.range
     }
   });
 }
 
 export function iter (
-  ctx: CollectionContext, 
+  ctx: CollectionContext,
   fn: (item, cursor: DBCoreCursor, advance: Function)=>void,
   coreTrans: DBCoreTransaction,
   coreTable: DBCoreTable): Promise<any>
@@ -84,12 +84,12 @@ export function iter (
 }
 
 function iterate(cursorPromise: Promise<DBCoreCursor>, filter, fn, valueMapper): Promise<any> {
-  
+
   // Apply valueMapper (hook('reading') or mappped class)
   var mappedFn = valueMapper ? (x,c,a) => fn(valueMapper(x),c,a) : fn;
   // Wrap fn with PSD and microtick stuff from Promise.
   var wrappedFn = wrap(mappedFn);
-  
+
   return cursorPromise.then(cursor => {
     if (cursor) {
       return cursor.start(()=>{

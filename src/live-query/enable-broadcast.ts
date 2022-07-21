@@ -19,7 +19,7 @@ if (typeof BroadcastChannel !== 'undefined') {
   if (typeof (bc as any).unref === 'function') {
     (bc as any).unref();
   }
-  
+
   //
   // Propagate local changes to remote tabs, windows and workers via BroadcastChannel
   //

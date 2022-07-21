@@ -6,7 +6,7 @@ module.exports = {
   },
 
   customLaunchers: {
-    bs_firefox_latest_supported: { 
+    bs_firefox_latest_supported: {
       base: 'BrowserStack',
       browser: 'firefox',
       browser_version: '85',
@@ -48,7 +48,7 @@ module.exports = {
       os: 'OS X',
       os_version: 'Sierra'
     },
-    bs_chrome_latest_supported: {      
+    bs_chrome_latest_supported: {
       base: 'BrowserStack',
       browser: "Chrome",
       browser_version: "88",

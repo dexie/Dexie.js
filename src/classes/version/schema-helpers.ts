@@ -101,7 +101,7 @@ export function updateTablesAndIndexes(
       globalSchema = db._dbSchema = newSchema;
 
       const diff = getSchemaDiff(oldSchema, newSchema);
-      // Add tables           
+      // Add tables
       diff.add.forEach(tuple => {
         createTable(idbUpgradeTrans, tuple[0], tuple[1].primKey, tuple[1].indexes);
       });
@@ -151,7 +151,7 @@ export function updateTablesAndIndexes(
         if (contentUpgradeIsAsync) {
           incrementExpectedAwaits();
         }
-        
+
         let returnValue: any;
         const promiseFollowed = Promise.follow(() => {
           // Finally, call the scope function with our table and transaction arguments.

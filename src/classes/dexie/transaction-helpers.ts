@@ -95,7 +95,7 @@ export function enterTransactionScope(
         x // Transaction still active. Continue.
         : rejection(new exceptions.PrematureCommit(
           "Transaction committed too early. See http://bit.ly/2kdckMn")))
-      // No promise returned. Wait for all outstanding promises before continuing. 
+      // No promise returned. Wait for all outstanding promises before continuing.
       : promiseFollowed.then(() => returnValue)
     ).then(x => {
       // sub transactions don't react to idbtrans.oncomplete. We must trigger a completion:

@@ -32,25 +32,25 @@ export function dexieOpen (db: Dexie) {
     // meaning this open flow should be cancelled.
     if (state.openCanceller !== openCanceller) throw new exceptions.DatabaseClosed('db.open() was cancelled');
   }
-  
+
   // Function pointers to call when the core opening process completes.
   let resolveDbReady = state.dbReadyResolve,
       // upgradeTransaction to abort on failure.
       upgradeTransaction: (IDBTransaction | null) = null,
       wasCreated = false;
-  
+
   // safari14Workaround = Workaround by jakearchibald for new nasty bug in safari 14.
   return Promise.race([openCanceller, (typeof navigator === 'undefined' ? Promise.resolve() : safari14Workaround()).then(() => new Promise((resolve, reject) => {
       // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
       // IE fails when deleting objectStore after reading from it.
       // A future version of Dexie.js will stopover an intermediate version to workaround this.
       // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
-      
+
       throwIfCancelled();
       // If no API, throw!
       if (!indexedDB) throw new exceptions.MissingAPI();
       const dbName = db.name;
-      
+
       const req = state.autoSchema ?
         indexedDB.open(dbName) :
         indexedDB.open(dbName, Math.round(db.verno * 10));
@@ -79,7 +79,7 @@ export function dexieOpen (db: Dexie) {
               runUpgraders(db, oldVer / 10, upgradeTransaction, reject);
           }
       }, reject);
-      
+
       req.onsuccess = wrap (() => {
           // Core opening procedure complete. Now let's just record some stuff.
           upgradeTransaction = null;
@@ -104,14 +104,14 @@ export function dexieOpen (db: Dexie) {
             // If removing Safari 8 support, go ahead and remove the safariMultiStoreFix() function
             // as well as absurd upgrade version quirk for Safari.
           }
-          
+
           connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.
-          
+
           idbdb.onversionchange = wrap(ev => {
               state.vcFired = true; // detect implementations that not support versionchange (IE/Edge/Safari)
               db.on("versionchange").fire(ev);
           });
-          
+
           idbdb.onclose = wrap(ev => {
               db.on("close").fire(ev);
           });

@@ -15,7 +15,7 @@ import { DBCoreCursor, DBCoreTransaction, DBCoreRangeType, DBCoreMutateResponse,
 import { cmp } from "../../functions/cmp";
 
 /** class Collection
- * 
+ *
  * https://dexie.org/docs/Collection/Collection
  */
 export class Collection implements ICollection {
@@ -39,7 +39,7 @@ export class Collection implements ICollection {
     or: Collection,
     valueMapper: (any) => any
   }
-  
+
   _ondirectionchange?: Function;
 
   _read<T>(fn: (idbtrans: IDBTransaction, dxTrans: Transaction) => PromiseLike<T>, cb?): PromiseExtended<T> {
@@ -69,9 +69,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.clone()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.clone()
-   * 
+   *
    **/
   clone(props?) {
     var rv = Object.create(this.constructor.prototype),
@@ -82,9 +82,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.raw()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.raw()
-   * 
+   *
    **/
   raw() {
     this._ctx.valueMapper = null;
@@ -92,9 +92,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.each()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.each()
-   * 
+   *
    **/
   each(fn: (obj, cursor: DBCoreCursor) => any): PromiseExtended<void> {
     var ctx = this._ctx;
@@ -103,9 +103,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.count()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.count()
-   * 
+   *
    **/
   count(cb?) {
     return this._read(trans => {
@@ -130,9 +130,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.sortBy()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.sortBy()
-   * 
+   *
    **/
   sortBy(keyPath: string): PromiseExtended<any[]>;
   sortBy<R>(keyPath: string, thenShortcut: ThenShortcut<any[], R>) : PromiseExtended<R>;
@@ -157,9 +157,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.toArray()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.toArray()
-   * 
+   *
    **/
   toArray(cb?): PromiseExtended<any[]> {
     return this._read(trans => {
@@ -187,9 +187,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.offset()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.offset()
-   * 
+   *
    **/
   offset(offset: number) : Collection{
     var ctx = this._ctx;
@@ -218,9 +218,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.limit()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.limit()
-   * 
+   *
    **/
   limit(numRows: number) : Collection {
     this._ctx.limit = Math.min(this._ctx.limit, numRows); // For count()
@@ -235,9 +235,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.until()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.until()
-   * 
+   *
    **/
   until(filterFunction: (x) => boolean, bIncludeStopEntry?) {
     addFilter(this._ctx, function (cursor, advance, resolve) {
@@ -252,27 +252,27 @@ export class Collection implements ICollection {
   }
 
   /** Collection.first()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.first()
-   * 
+   *
    **/
   first(cb?) {
     return this.limit(1).toArray(function (a) { return a[0]; }).then(cb);
   }
 
   /** Collection.last()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.last()
-   * 
+   *
    **/
   last(cb?) {
     return this.reverse().first(cb);
   }
 
   /** Collection.filter()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.filter()
-   * 
+   *
    **/
   filter(filterFunction: (x) => boolean): Collection {
     /// <param name="jsFunctionFilter" type="Function">function(val){return true/false}</param>
@@ -286,27 +286,27 @@ export class Collection implements ICollection {
   }
 
   /** Collection.and()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.and()
-   * 
+   *
    **/
   and(filter: (x) => boolean) {
     return this.filter(filter);
   }
 
   /** Collection.or()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.or()
-   * 
+   *
    **/
   or(indexName: string) {
     return new this.db.WhereClause(this._ctx.table, indexName, this);
   }
 
   /** Collection.reverse()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.reverse()
-   * 
+   *
    **/
   reverse() {
     this._ctx.dir = (this._ctx.dir === "prev" ? "next" : "prev");
@@ -315,18 +315,18 @@ export class Collection implements ICollection {
   }
 
   /** Collection.desc()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.desc()
-   * 
+   *
    **/
   desc() {
     return this.reverse();
   }
 
   /** Collection.eachKey()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.eachKey()
-   * 
+   *
    **/
   eachKey(cb?) {
     var ctx = this._ctx;
@@ -335,9 +335,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.eachUniqueKey()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.eachUniqueKey()
-   * 
+   *
    **/
   eachUniqueKey(cb?) {
     this._ctx.unique = "unique";
@@ -345,9 +345,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.eachPrimaryKey()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.eachPrimaryKey()
-   * 
+   *
    **/
   eachPrimaryKey(cb?) {
     var ctx = this._ctx;
@@ -356,9 +356,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.keys()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.keys()
-   * 
+   *
    **/
   keys(cb?) {
     var ctx = this._ctx;
@@ -372,9 +372,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.primaryKeys()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.primaryKeys()
-   * 
+   *
    **/
   primaryKeys(cb?) : PromiseExtended<IndexableType[]> {
     var ctx = this._ctx;
@@ -403,9 +403,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.uniqueKeys()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.uniqueKeys()
-   * 
+   *
    **/
   uniqueKeys(cb?) {
     this._ctx.unique = "unique";
@@ -413,27 +413,27 @@ export class Collection implements ICollection {
   }
 
   /** Collection.firstKey()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.firstKey()
-   * 
+   *
    **/
   firstKey(cb?) {
     return this.limit(1).keys(function (a) { return a[0]; }).then(cb);
   }
 
   /** Collection.lastKey()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.lastKey()
-   * 
+   *
    **/
   lastKey(cb?) {
     return this.reverse().firstKey(cb);
   }
 
   /** Collection.distinct()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.distinct()
-   * 
+   *
    **/
   distinct() {
     var ctx = this._ctx,
@@ -454,9 +454,9 @@ export class Collection implements ICollection {
   //
 
   /** Collection.modify()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.modify()
-   * 
+   *
    **/
   modify(changes: { [keyPath: string]: any }) : PromiseExtended<number>
   modify(changes: (obj: any, ctx:{value: any, primKey: IndexableType}) => void | boolean): PromiseExtended<number> {
@@ -584,9 +584,9 @@ export class Collection implements ICollection {
   }
 
   /** Collection.delete()
-   * 
+   *
    * https://dexie.org/docs/Collection/Collection.delete()
-   * 
+   *
    **/
   delete() : PromiseExtended<number> {
     var ctx = this._ctx,

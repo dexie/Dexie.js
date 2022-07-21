@@ -7,7 +7,7 @@ Dexie.Syncable.registerSyncProtocol("logger", {
         changes.forEach(function (change) {
             console.log(JSON.stringify(change, null, true));
         });
-    
+
         setTimeout(function () {
             var dummyRev = 1,
                 CREATE = 1,
@@ -29,7 +29,7 @@ Dexie.Syncable.registerSyncProtocol("logger", {
             applyRemoteChanges([], "ServerRevision" + dummyRev++, true, false);
             applyRemoteChanges([], "ServerRevision" + dummyRev++, false, false);
         }, 10);*/
-        
+
             onSuccess({
                 react: function (changes, baseRevision, partial, onChangesAccepted) {
                     console.log("react(changes.length: " + changes.length + ", baseRevision:" + baseRevision + ", " + (partial ? "partial" : "full") + ")");

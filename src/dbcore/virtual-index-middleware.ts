@@ -73,18 +73,18 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
         indexList.sort((a,b) => a.keyTail - b.keyTail); // Shortest keyTail is the best one (represents real index)
         return virtualIndex;
       }
-    
+
       const primaryKey = addVirtualIndexes(schema.primaryKey.keyPath, 0, schema.primaryKey);
       indexLookup[":id"] = [primaryKey];
       for (const index of schema.indexes) {
         addVirtualIndexes(index.keyPath, 0, index);
       }
-    
+
       function findBestIndex(keyPath: null | string | string[]): VirtualIndex {
         const result = indexLookup[getKeyPathAlias(keyPath)];
         return result && result[0];
       }
-    
+
       function translateRange (range: DBCoreKeyRange, keyTail: number): DBCoreKeyRange {
         return {
           type: range.type === DBCoreRangeType.Equal ?
@@ -96,7 +96,7 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
           upperOpen: true // doesn't matter true or false
         };
       }
-    
+
       function translateRequest (req: DBCoreQueryRequest): DBCoreQueryRequest;
       function translateRequest (req: DBCoreOpenCursorRequest): DBCoreOpenCursorRequest;
       function translateRequest (req: DBCoreCountRequest): DBCoreCountRequest {
@@ -109,7 +109,7 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
           }
         } : req;
       }
-    
+
       const result: DBCoreTable = {
         ...table,
         schema: {
@@ -121,16 +121,16 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
 
         count(req) {
           return table.count(translateRequest(req));
-        },    
-    
+        },
+
         query(req) {
           return table.query(translateRequest(req));
         },
-    
+
         openCursor(req) {
           const {keyTail, isVirtual, keyLength} = (req.query.index as VirtualIndex);
           if (!isVirtual) return table.openCursor(req);
-    
+
           function createVirtualCursor(cursor: DBCoreCursor) : DBCoreCursor {
             function _continue (key?: any) {
               key != null ?
@@ -172,7 +172,7 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
             });
             return virtualCursor;
           }
-    
+
           return table.openCursor(translateRequest(req))
             .then(cursor => cursor && createVirtualCursor(cursor));
         }

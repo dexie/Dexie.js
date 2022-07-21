@@ -13,9 +13,9 @@ import { Table } from '../table';
 import { globalEvents } from '../../globals/global-events';
 
 /** Transaction
- * 
+ *
  * https://dexie.org/docs/Transaction/Transaction
- * 
+ *
  **/
 export class Transaction implements ITransaction {
   db: Dexie;
@@ -43,7 +43,7 @@ export class Transaction implements ITransaction {
   //
 
   /** Transaction._lock()
-   * 
+   *
    * Internal method.
    */
   _lock() {
@@ -55,7 +55,7 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction._unlock()
-   * 
+   *
    * Internal method.
    */
   _unlock() {
@@ -71,7 +71,7 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction._lock()
-   * 
+   *
    * Internal method.
    */
   _locked() {
@@ -89,9 +89,9 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction.create()
-   * 
+   *
    * Internal method.
-   * 
+   *
    */
   create(idbtrans?: IDBTransaction) {
     if (!this.mode) return this;
@@ -115,7 +115,7 @@ export class Transaction implements ITransaction {
     assert(this._completion._state === null); // Completion Promise must still be pending.
 
     idbtrans = this.idbtrans = idbtrans ||
-      (this.db.core 
+      (this.db.core
         ? this.db.core.transaction(this.storeNames, this.mode as 'readwrite' | 'readonly', { durability: this.chromeTransactionDurability })
         : idbdb.transaction(this.storeNames, this.mode, { durability: this.chromeTransactionDurability })
       ) as IDBTransaction;
@@ -141,7 +141,7 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction._promise()
-   * 
+   *
    * Internal method.
    */
   _promise(
@@ -185,7 +185,7 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction._root()
-   * 
+   *
    * Internal method. Retrieves the root transaction in the tree of sub transactions.
    */
   _root() {
@@ -193,10 +193,10 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction.waitFor()
-   * 
+   *
    * Internal method. Can be accessed from the public API through
    * Dexie.waitFor(): https://dexie.org/docs/Dexie/Dexie.waitFor()
-   * 
+   *
    **/
   waitFor(promiseLike: PromiseLike<any>) {
     // Always operate on the root transaction (in case this is a sub stransaction)
@@ -231,10 +231,10 @@ export class Transaction implements ITransaction {
         }
       });
     });
-  }  
+  }
 
   /** Transaction.abort()
-   * 
+   *
    * https://dexie.org/docs/Transaction/Transaction.abort()
    */
   abort() {
@@ -246,7 +246,7 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction.table()
-   * 
+   *
    * https://dexie.org/docs/Transaction/Transaction.table()
    */
   table(tableName: string) {
@@ -255,7 +255,7 @@ export class Transaction implements ITransaction {
       return memoizedTables[tableName];
     const tableSchema = this.schema[tableName];
     if (!tableSchema) {
-      throw new exceptions.NotFound("Table " + tableName + " not part of transaction");        
+      throw new exceptions.NotFound("Table " + tableName + " not part of transaction");
     }
 
     const transactionBoundTable = new this.db.Table(tableName, tableSchema, this);

@@ -140,7 +140,7 @@ export class Dexie implements IDexie {
           if (state.openComplete) {
             // Database already open. Call subscriber asap.
             if (!state.dbOpenError) Promise.resolve().then(subscriber);
-            // bSticky: Also subscribe to future open sucesses (after close / reopen) 
+            // bSticky: Also subscribe to future open sucesses (after close / reopen)
             if (bSticky) subscribe(subscriber);
           } else if (state.onReadyBeingFired) {
             // db.on('ready') subscribers are currently being executed and have not yet resolved or rejected
@@ -275,7 +275,7 @@ export class Dexie implements IDexie {
     if (stack && this._middlewares[stack]) {
       this._middlewares[stack] = this._middlewares[stack].filter(mw =>
         create ? mw.create !== create : // Given middleware has a create method. Match that exactly.
-        name ? mw.name !== name : // Given middleware spec 
+        name ? mw.name !== name : // Given middleware spec
         false);
     }
     return this;
@@ -292,7 +292,7 @@ export class Dexie implements IDexie {
     if (this.idbdb) {
       try { this.idbdb.close(); } catch (e) { }
       this._novip.idbdb = null; // db._novip is because db can be an Object.create(origDb).
-    }    
+    }
     // Reset dbReadyPromise promise:
     state.dbReadyPromise = new Promise(resolve => {
       state.dbReadyResolve = resolve;
@@ -399,7 +399,7 @@ export class Dexie implements IDexie {
             if (parentTransaction.mode === READONLY && idbMode === READWRITE) {
                 if (onlyIfCompatible) {
                     // Spawn new transaction instead.
-                    parentTransaction = null; 
+                    parentTransaction = null;
                 }
                 else throw new exceptions.SubTransaction("Cannot enter a sub-transaction with READWRITE mode when parent transaction is READONLY");
             }
@@ -408,7 +408,7 @@ export class Dexie implements IDexie {
                     if (parentTransaction && parentTransaction.storeNames.indexOf(storeName) === -1) {
                         if (onlyIfCompatible) {
                             // Spawn new transaction instead.
-                            parentTransaction = null; 
+                            parentTransaction = null;
                         }
                         else throw new exceptions.SubTransaction("Table " + storeName +
                             " not included in parent transaction.");

@@ -112,7 +112,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
         ];
 
         const readSubscribers: {[method in
-          Exclude<keyof DBCoreTable, "name" | "schema" | "mutate">]: 
+          Exclude<keyof DBCoreTable, "name" | "schema" | "mutate">]:
           (req: any) => [DBCoreIndex, RangeSet]
         } = {
           get: (req) => [primaryKey, new RangeSet(req.key)],

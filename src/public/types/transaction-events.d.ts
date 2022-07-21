@@ -8,4 +8,4 @@ export interface TransactionEvents extends DexieEventSet {
   complete: DexieEvent;
   abort: DexieEvent;
   error: DexieEvent;
-}    
+}
