@@ -18,7 +18,7 @@ export function LoginDialog({
 }: DXCGenericUserInteraction<string, { [name: string]: DXCInputField }>) {
   const [params, setParams] = useState<{ [param: string]: string }>({});
 
-  const firstFieldRef = useRef<HTMLInputElement>();
+  const firstFieldRef = useRef<HTMLInputElement>(null);
   useLayoutEffect(()=>firstFieldRef.current?.focus(), []);
 
   return (

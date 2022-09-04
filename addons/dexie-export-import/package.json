@@ -1,6 +1,7 @@
 {
   "name": "dexie-export-import",
   "version": "4.0.4",
+  "packageManager": "^pnpm@7.9.5",
   "description": "Dexie addon that adds export and import capabilities",
   "main": "dist/dexie-export-import.js",
   "module": "dist/dexie-export-import.mjs",
@@ -37,12 +38,12 @@
     "@types/node": "^13.5.1",
     "base64-arraybuffer-es6": "*",
     "clarinet": "dfahlander/clarinet",
-    "just-build": "^0.9.19",
+    "just-build": "^0.9.24",
     "rollup-plugin-alias": "^2.2.0",
     "typeson": "^5.8.2",
     "typeson-registry": "^1.0.0-alpha.21"
   },
   "peerDependencies": {
-    "dexie": "^2.0.4 || ^3.0.0 || ^4.0.0-alpha.1"
+    "dexie": "workspace:^2.0.4 || ^3.0.0 || ^4.0.0-alpha.1"
   }
 }

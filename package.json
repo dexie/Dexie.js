@@ -32,6 +32,7 @@
     "./package.json": "./package.json"
   },
   "typings": "dist/dexie.d.ts",
+  "packageManager": "^pnpm@7.9.5",
   "jspm": {
     "format": "cjs",
     "ignore": [
@@ -117,7 +118,7 @@
   "homepage": "https://dexie.org",
   "devDependencies": {
     "dts-bundle-generator": "^5.9.0",
-    "just-build": "^0.9.19",
+    "just-build": "^0.9.24",
     "karma": "^6.1.1",
     "karma-browserstack-launcher": "^1.5.2",
     "karma-chrome-launcher": "^3.1.0",

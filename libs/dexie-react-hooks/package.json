@@ -1,6 +1,7 @@
 {
   "name": "dexie-react-hooks",
   "version": "1.1.1",
+  "packageManager": "^pnpm@7.9.5",
   "description": "React hooks for reactive data fetching using Dexie.js",
   "main": "dist/dexie-react-hooks.js",
   "typings": "dist/index.d.ts",
@@ -10,7 +11,7 @@
   },
   "just-build": {
     "default": [
-      "just-build dexie",
+      "#just-build dexie",
       "rollup -c rollup.config.js",
       "tsc --emitDeclarationOnly"
     ],
@@ -18,13 +19,13 @@
       "karma start test/karma.conf.js --single-run"
     ],
     "build-tests": [
-      "just-build dexie",
+      "#just-build dexie",
       "cd test",
       "webpack"
     ],
     "dexie": [
       "cd ../..",
-      "npm run build"
+      "pnpm run build"
     ]
   },
   "repository": {
@@ -49,7 +50,7 @@
   "homepage": "https://dexie.org",
   "peerDependencies": {
     "@types/react": ">=16",
-    "dexie": ">=3.1.0-alpha.1 <5.0.0",
+    "dexie": "workspace:>=3.1.0-alpha.1 <5.0.0",
     "react": ">=16"
   },
   "devDependencies": {
@@ -59,11 +60,16 @@
     "@types/qunit": "^2.9.6",
     "@types/react": "^17.0.0",
     "@types/react-dom": "^17.0.0",
-    "dexie": "file:../..",
-    "just-build": "^0.9.19",
+    "dexie": "workspace:>=3.1.0-alpha.1 || ^4.0.0-alpha.1",
+    "just-build": "^0.9.24",
     "qunit": "^2.12.0",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
+    "rollup": "^2.40.0",
+    "rollup-plugin-cleanup": "^3.2.1",
+    "rollup-plugin-commonjs": "^10.1.0",
+    "rollup-plugin-node-resolve": "^5.2.0",
+    "rollup-plugin-sourcemaps": "^0.6.3",
     "ts-loader": "^8.0.17",
     "webpack-cli": "^4.5.0"
   }
