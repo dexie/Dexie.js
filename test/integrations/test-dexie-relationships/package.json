@@ -5,7 +5,7 @@
   "private": true,
   "main": "index.js",
   "scripts": {
-    "test": "webpack --mode development && npm run test:karma",
+    "test": "webpack --mode development && pnpm run test:karma",
     "test:karma": "../../../node_modules/karma/bin/karma start karma.conf.js --single-run"
   },
   "author": "",

@@ -1,8 +1,7 @@
 packages:
-  # all packages in direct subdirs of packages/
-  - 'libs/*'
-  # all packages in subdirs of components/
-  - 'addons/**'
-  # exclude packages that are inside test directories
+  # The "dexie" package in the root
   - '.'
-  
+  # all packages in direct subdirs of addons/
+  - 'addons/*'
+  # all packages in direct subdirs of libs/
+  - 'libs/*'

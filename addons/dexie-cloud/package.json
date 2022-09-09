@@ -22,7 +22,7 @@
     "url": "https://github.com/dexie/Dexie.js.git"
   },
   "scripts": {
-    "test": "just-build test && npm run test-unit",
+    "test": "just-build test && pnpm run test-unit",
     "test-unit": "karma start test/unit/karma.conf.js --single-run",
     "build": "just-build && bash ./copydts.sh",
     "watch": "just-build --watch",

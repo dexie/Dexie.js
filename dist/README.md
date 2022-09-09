@@ -25,12 +25,7 @@ to the following download site:
 
 ## Install from NPM
 ```
-npm install dexie --save
-```
-
-## Install from bower
-```
-bower install dexie --save
+npm install dexie
 ```
 
 ## How to build

@@ -37,7 +37,7 @@
   "scripts": {
     "build": "just-build",
     "watch": "just-build --watch",
-    "test": "npm run build && npm run test:typings && npm run test:unit && npm run test:integration",
+    "test": "pnpm run build && pnpm run test:typings && pnpm run test:unit && pnpm run test:integration",
     "test:unit": "karma start test/unit/karma.conf.js --single-run",
     "test:integration": "karma start test/integration/karma.conf.js --single-run",
     "test:typings": "just-build test-typings",

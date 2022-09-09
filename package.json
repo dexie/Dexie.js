@@ -64,7 +64,7 @@
     "build": "just-build",
     "watch": "just-build --watch",
     "clean": "rm -rf tools/tmp && rm dist/*.js && rm dist/*.map && rm dist/*.ts && rm dist/*.mjs",
-    "test": "npm run build && npm run test:typings && npm run test:unit",
+    "test": "pnpm run build && pnpm run test:typings && pnpm run test:unit",
     "test:unit": "karma start test/karma.conf.js --single-run",
     "test:typings": "tsc -p test/typings-test/",
     "test:debug": "karma start test/karma.conf.js --log-level debug"
