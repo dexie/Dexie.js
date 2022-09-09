@@ -1,5 +1,13 @@
+cache:
+  npm: false
+  directories:
+    - "~/.pnpm-store"
+before_install:
+  - curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7
+  - pnpm config set store-dir ~/.pnpm-store
+install:
+  - pnpm install
 language: node_js
-before_install: if [[ `npm -v` != 7* ]]; then npm i -g npm@7; fi
 addons:
   firefox: "85.0"
 node_js:
@@ -24,7 +32,7 @@ branches:
   - master-2
   - master-1
 script:
-  - npm run build
+  - pnpm run build
   - cd $TF
   - pwd
   - bash ./travis.sh
