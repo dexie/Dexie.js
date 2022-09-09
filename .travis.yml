@@ -11,7 +11,7 @@ language: node_js
 addons:
   firefox: "85.0"
 node_js:
-  - "12"
+  - "16"
 matrix:
   fast_finish: true
 services:
