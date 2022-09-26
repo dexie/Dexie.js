@@ -5,21 +5,13 @@
   </div>
 </template>
 
-<script>
-export default {
-  name: 'AddTodo',
-  components: {},
-  data() {
-    return {
-      value: '',
-    }
-  },
-  methods: {
-    // addTodo emits an event to add a todo to the todo list.
-    addTodo() {
-      this.$emit('add-todo', { text: this.value });
-      this.value = '';
-    }
-  }
+<script setup>
+// vue reactivityTransform details on https://vuejs.org/guide/extras/reactivity-transform.html
+let value = $ref();
+const emits = defineEmits(['add-todo']);
+// addTodo emits an event to add a todo to the todo list.
+function addTodo() {
+  emits('add-todo', { text: value });
+  value = '';
 }
 </script>
