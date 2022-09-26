@@ -1,23 +1,13 @@
 <template>
   <div class="todo-list">
-    <div
-      class="select-order-group"
-      role="group"
-      aria-label="Update order"
-    >
+    <div class="select-order-group" role="group" aria-label="Update order">
       <span class="select-order-header" aria-hidden="true">Update order</span>
       <!-- [TODO] Define sort events these buttons will emit when we add the
            database.js file -->
-      <button
-        aria-label="oldest first"
-        @click="sortTodos(forwardOrder)"
-      >
+      <button aria-label="oldest first" @click="sortTodos(forwardOrder)">
         🦖 Oldest first
       </button>
-      <button
-        aria-label="newest first"
-        @click="sortTodos(reverseOrder)"
-      >
+      <button aria-label="newest first" @click="sortTodos(reverseOrder)">
         🛸 Newest first
       </button>
       <button
@@ -41,41 +31,28 @@
   </div>
 </template>
 
-<script>
+<script setup>
 import Todo from './Todo.vue';
 import { forwardOrder, reverseOrder, unfinishedFirstOrder } from '../database';
 
-export default {
-  name: 'TodoList',
-  components: {
-    Todo,
-  },
-  props: ['todos'],
-  data() {
-    return {};
-  },
-  methods: {
-    // toggleTodo emits an event to toggle a todo between finished and
-    // unfinished.
-    toggleTodo(togglePayload) {
-      this.$emit('toggle-todo', togglePayload);
-    },
+defineProps(['todos']);
 
-    // deleteTodo emits an event to delete a todo of the given ID
-    deleteTodo(deletePayload) {
-      this.$emit('delete-todo', deletePayload);
-    },
+const emits = defineEmits(['toggle-todo', 'delete-todo', 'sort-todos']);
 
-    // sortTodo emits an event to sort the todo list by a given order.
-    sortTodos(order) {
-      this.$emit('sort-todos', { order: order });
-    }
-  },
-  created() {
-    this.forwardOrder = forwardOrder;
-    this.reverseOrder = reverseOrder;
-    this.unfinishedFirstOrder = unfinishedFirstOrder;
-  }
+// toggleTodo emits an event to toggle a todo between finished and
+// unfinished.
+function toggleTodo(togglePayload) {
+  emits('toggle-todo', togglePayload);
+}
+
+// deleteTodo emits an event to delete a todo of the given ID
+function deleteTodo(deletePayload) {
+  emits('delete-todo', deletePayload);
+}
+
+// sortTodo emits an event to sort the todo list by a given order.
+function sortTodos(order) {
+  emits('sort-todos', { order: order });
 }
 </script>
 
