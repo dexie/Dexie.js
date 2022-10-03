@@ -14,7 +14,7 @@
     "dexie-relationships": "^1.2.11"
   },
   "devDependencies": {
-    "webpack": "^4.46.0",
+    "webpack": "^5.74.0",
     "webpack-cli": "^3.3.10"
   }
 }
