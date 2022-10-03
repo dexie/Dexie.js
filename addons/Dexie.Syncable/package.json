@@ -1,6 +1,7 @@
 {
   "name": "dexie-syncable",
   "version": "4.0.0-beta.13",
+  "packageManager": "^pnpm@7.9.5",
   "description": "Addon to Dexie that makes it possible to sync indexeDB with remote databases.",
   "main": "dist/dexie-syncable.js",
   "module": "dist/dexie-syncable.es.js",
@@ -35,7 +36,7 @@
   "scripts": {
     "build": "just-build",
     "watch": "just-build --watch",
-    "test": "npm run build && npm run test:typings && npm run test:unit && npm run test:integration",
+    "test": "pnpm run build && pnpm run test:typings && pnpm run test:unit && pnpm run test:integration",
     "test:unit": "karma start test/unit/karma.conf.js --single-run",
     "test:integration": "karma start test/integration/karma.conf.js --single-run",
     "test:typings": "tsc -p test/test-typings/",
@@ -70,14 +71,14 @@
   },
   "homepage": "https://dexie.org",
   "peerDependencies": {
-    "dexie": "^3.0.2 || ^4.0.0-alpha.1",
-    "dexie-observable": "^3.0.0-beta.9"
+    "dexie": "workspace:^3.0.2 || ^4.0.0-alpha.1",
+    "dexie-observable": "workspace:^"
   },
   "devDependencies": {
-    "dexie": "^3.0.2 || ^4.0.0-alpha.1",
-    "dexie-observable": "^3.0.0-beta.9",
+    "dexie": "workspace:^3.0.2 || ^4.0.0-alpha.1",
+    "dexie-observable": "workspace:^",
     "eslint": "^5.16.0",
-    "just-build": "^0.9.19",
+    "just-build": "^0.9.24",
     "qunit": "^2.9.2",
     "uglify-js": "^3.5.6"
   }

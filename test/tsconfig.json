@@ -8,7 +8,7 @@
     "noImplicitAny": false,
     "noImplicitReturns": false,
     "moduleResolution": "node",
-    "lib": ["es2015", "dom"],
+    "lib": ["es2018", "dom"],
     "forceConsistentCasingInFileNames": true,
     "outDir": "../tools/tmp/",
     "sourceMap": true,

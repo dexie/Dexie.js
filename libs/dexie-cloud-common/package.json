@@ -1,6 +1,7 @@
 {
   "name": "dexie-cloud-common",
   "version": "1.0.23",
+  "packageManager": "^pnpm@7.9.5",
   "description": "Library for shared code between dexie-cloud-addon, dexie-cloud (CLI) and dexie-cloud-server",
   "type": "module",
   "module": "dist/index.js",
@@ -15,5 +16,8 @@
   "license": "Apache-2.0",
   "dependencies": {
     "universal-imports": "^1.0.1"
+  },
+  "devDependencies": {
+    "@types/node": "^18.7.14"
   }
 }

@@ -58,7 +58,7 @@ export function setByKeyPath(
   }
 }
 
-export const randomString = typeof self === 'undefined' ? (bytes: number) => {
+export const randomString = typeof Buffer !== 'undefined' ? (bytes: number) => {
   // Node
   const buf = Buffer.alloc(bytes);
   randomFillSync(buf);

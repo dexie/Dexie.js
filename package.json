@@ -32,6 +32,7 @@
     "./package.json": "./package.json"
   },
   "typings": "dist/dexie.d.ts",
+  "packageManager": "^pnpm@7.9.5",
   "jspm": {
     "format": "cjs",
     "ignore": [
@@ -63,7 +64,7 @@
     "build": "just-build",
     "watch": "just-build --watch",
     "clean": "rm -rf tools/tmp && rm dist/*.js && rm dist/*.map && rm dist/*.ts && rm dist/*.mjs",
-    "test": "npm run build && npm run test:typings && npm run test:unit",
+    "test": "pnpm run build && pnpm run test:typings && pnpm run test:unit",
     "test:unit": "karma start test/karma.conf.js --single-run",
     "test:typings": "tsc -p test/typings-test/",
     "test:debug": "karma start test/karma.conf.js --log-level debug"
@@ -117,7 +118,7 @@
   "homepage": "https://dexie.org",
   "devDependencies": {
     "dts-bundle-generator": "^5.9.0",
-    "just-build": "^0.9.19",
+    "just-build": "^0.9.24",
     "karma": "^6.1.1",
     "karma-browserstack-launcher": "^1.5.2",
     "karma-chrome-launcher": "^3.1.0",

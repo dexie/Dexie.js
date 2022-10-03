@@ -1,14 +1,14 @@
 #!/bin/bash -e
 cd ../../../Dexie.Observable
 echo "Installing dependencies for dexie-observable"
-npm install >/dev/null
+pnpm install >/dev/null
 echo "Building dexie-observable"
-npm run build
+pnpm run build
 cd -
 echo "Installing dependencies for dexie-syncable"
-npm install >/dev/null
+pnpm install >/dev/null
 echo "Building dexie-syncable"
-npm run build
+pnpm run build
 
-npm run test:typings
-npm run test:unit
+pnpm run test:typings
+pnpm run test:unit

@@ -4,15 +4,15 @@
 # eslint
 #
 printf "Running eslint Dexie src\n"
-$(npm bin)/eslint src
+$(pnpm bin)/eslint src
 printf "eslint ok.\n"
 
 printf "Running eslint Dexie.Syncable src\n"
-$(npm bin)/eslint --config "addons/Dexie.Syncable/src/.eslintrc.json" "addons/Dexie.Syncable/src"
+$(pnpm bin)/eslint --config "addons/Dexie.Syncable/src/.eslintrc.json" "addons/Dexie.Syncable/src"
 printf "eslint ok.\n\n"
 
 printf "Running eslint Dexie.Observable src\n"
-$(npm bin)/eslint --config "addons/Dexie.Observable/src/.eslintrc.json" "addons/Dexie.Observable/src"
+$(pnpm bin)/eslint --config "addons/Dexie.Observable/src/.eslintrc.json" "addons/Dexie.Observable/src"
 printf "eslint ok.\n\n"
 
 #
@@ -20,7 +20,7 @@ printf "eslint ok.\n\n"
 #
 
 printf "Building Dexie\n"
-npm run build
+pnpm run build
 printf "Dexie building done.\n\n"
 
 ADDONS_DIR="addons/"
@@ -31,18 +31,18 @@ addons=("Dexie.Observable" "Dexie.Syncable")
 for addon in "${addons[@]}"
 do
     dir="${ADDONS_DIR}${addon}"
-    # Copy Dexie node_modules to avoid having to install them for each addon
-    cp -R 'node_modules' ${dir}
     cd ${dir}
+    printf "Installing ${addon}\n"
+    pnpm install
     printf "Building ${addon}\n"
-    npm run build
+    pnpm run build
     printf "${addon} building done.\n\n"
     cd -
 done
 
 # test
 printf "Testing Dexie\n"
-$(npm bin)/karma start test/karma.travis.conf.js --single-run
+$(pnpm bin)/karma start test/karma.travis.conf.js --single-run
 printf "Dexie tests done.\n\n"
 
 # Run tests for addons
@@ -51,7 +51,7 @@ do
     dir="${ADDONS_DIR}${addon}"
     cd ${dir}
     printf "Testing ${addon}\n"
-    $(npm bin)/karma start test/karma.travis.conf.js --single-run
+    $(pnpm bin)/karma start test/karma.travis.conf.js --single-run
     printf "${addon} tests done.\n\n"
     cd -
 done
