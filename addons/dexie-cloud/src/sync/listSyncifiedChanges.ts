@@ -32,7 +32,7 @@ export async function listSyncifiedChanges(
                 return (
                   !ignoredRealms.has(item.realmId || '') &&
                   //(id[0] !== '#' || !!item.$ts) && // Private obj need no sync if not changed
-                  isValidSyncableID(id)
+                  isValidAtID(extractKey(item), dexieCloudTableSchema?.idPrefix)
                 );
               })
             : table.filter((item) => {
@@ -41,7 +41,7 @@ export async function listSyncifiedChanges(
                 return (
                   !ignoredRealms.has(item.realmId || '') &&
                   //(id[0] !== '#' || !!item.$ts) && // Private obj need no sync if not changed
-                  isValidAtID(extractKey(item), dexieCloudTableSchema?.idPrefix)
+                  isValidSyncableID(id)
                 );
               });
           const unsyncedObjects = await query.toArray();

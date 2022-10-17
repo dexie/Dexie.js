@@ -144,10 +144,10 @@ async function _sync(
   // Prepare for syncification by modifying locally unauthorized objects:
   //
   const persistedSyncState = await db.getPersistedSyncState();
-  const tablesToSyncify =
-    !isInitialSync && currentUser.isLoggedIn
-      ? getTablesToSyncify(db, persistedSyncState)
-      : [];
+  const readyForSyncification = !isInitialSync && currentUser.isLoggedIn;
+  const tablesToSyncify = readyForSyncification
+    ? getTablesToSyncify(db, persistedSyncState)
+    : [];
   throwIfCancelled(cancelToken);
   const doSyncify = tablesToSyncify.length > 0;
 
@@ -327,9 +327,11 @@ async function _sync(
       inviteRealms: [],
       clientIdentity,
     };
-    newSyncState.syncedTables = tablesToSync
-      .map((tbl) => tbl.name)
-      .concat(tablesToSyncify.map((tbl) => tbl.name));
+    if (readyForSyncification) {
+      newSyncState.syncedTables = tablesToSync
+        .map((tbl) => tbl.name)
+        .concat(tablesToSyncify.map((tbl) => tbl.name));
+    }
     newSyncState.latestRevisions = latestRevisions;
     newSyncState.remoteDbId = res.dbId;
     newSyncState.initiallySynced = true;
