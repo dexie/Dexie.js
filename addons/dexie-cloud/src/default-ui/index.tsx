@@ -45,15 +45,24 @@ export default class LoginGui extends Component<Props, State> {
 }
 
 export function setupDefaultGUI(db: Dexie) {
-  const el = document.createElement('div');
-  document.body.appendChild(el);
-  preact.render(<LoginGui db={db.vip} />, el);
-
   let closed = false;
+
+  const el = document.createElement('div');
+  if (document.body) {
+    document.body.appendChild(el);
+    preact.render(<LoginGui db={db.vip} />, el);
+  } else {
+    addEventListener('DOMContentLoaded', ()=>{
+      if (!closed) {
+        document.body.appendChild(el);
+        preact.render(<LoginGui db={db.vip} />, el);
+      }
+    });
+  }
 
   return {
     unsubscribe() {
-      el.remove();
+      try { el.remove(); } catch {}
       closed = true;
     },
     get closed() {
