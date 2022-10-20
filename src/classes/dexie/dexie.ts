@@ -438,7 +438,7 @@ export class Dexie implements IDexie {
   }
 
   table(tableName: string): Table;
-  table<T, TKey extends IndexableType=IndexableType>(tableName: string): ITable<T, TKey>;
+  table<T, TKey extends IndexableType = any, TEntity = T>(tableName: string): ITable<T, TKey, TEntity>;
   table(tableName: string): Table {
     if (!hasOwn(this._allTables, tableName)) {
       throw new exceptions.InvalidTable(`Table ${tableName} does not exist`); }

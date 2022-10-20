@@ -2,7 +2,7 @@ import { IndexableTypeArray, IndexableTypeArrayReadonly } from "./indexable-type
 import { Collection } from "./collection";
 import { IndexableType } from "./indexable-type";
 
-export interface WhereClause<T=any, TKey=IndexableType> {
+export interface WhereClause<T=any, TKey extends IndexableType=IndexableType> {
   above(key: any): Collection<T, TKey>;
   aboveOrEqual(key: any): Collection<T, TKey>;
   anyOf(keys: ReadonlyArray<IndexableType>): Collection<T, TKey>;

@@ -28,7 +28,7 @@ export interface Dexie {
   readonly verno: number;
   readonly vip: Dexie;
 
-  readonly _allTables: { [name: string]: Table<any, IndexableType> };
+  readonly _allTables: { [name: string]: Table };
 
   readonly core: DBCore;
 
@@ -50,7 +50,7 @@ export interface Dexie {
 
   open(): PromiseExtended<Dexie>;
 
-  table<T = any, TKey = IndexableType>(tableName: string): Table<T, TKey>;
+  table<T = any, TKey extends IndexableType = any, TEntity = T>(tableName: string): Table<T, TKey, TEntity>;
 
   transaction<U>(
     mode: TransactionMode,
