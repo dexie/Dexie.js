@@ -315,7 +315,6 @@ This feature has been asked for a lot:
 * https://github.com/dexie/Dexie.js/issues/391
 * https://github.com/dexie/Dexie.js/issues/99
 * https://stackoverflow.com/questions/46025699/dumping-indexeddb-data
-* https://feathub.com/dfahlander/Dexie.js/+9
 
 My simple answer initially was this:
 
