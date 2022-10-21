@@ -14,12 +14,16 @@ import { NewIdOptions } from './types/NewIdOptions';
 //
 // Extend Dexie interface
 //
+type DBRealmEntity = Omit<DBRealm, 'realmId' | 'owner'> & { realmId?: string, owner?: string };
+type DBRealmMemberEntity = Omit<DBRealmMember, 'id'| 'realmId' | 'owner'> & { id?: string, realmId?: string, owner?: string };
+type DBRealmRoleEntity = Omit<DBRealmRole, 'owner'> & { owner?: string };
+
 declare module 'dexie' {
   interface Dexie {
     cloud: DexieCloudAPI;
-    realms: Table<DBRealm, 'realmId', 'owner'>;
-    members: Table<DBRealmMember, 'id', 'realmId' | 'owner'>;
-    roles: Table<DBRealmRole, [string, string], 'owner'>;
+    realms: Table<DBRealm, string, DBRealmEntity>;
+    members: Table<DBRealmMember, string, DBRealmMemberEntity >;
+    roles: Table<DBRealmRole, [string, string], DBRealmRoleEntity>;
   }
 
   interface Table {
