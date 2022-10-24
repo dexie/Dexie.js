@@ -1,6 +1,7 @@
 import { Dexie, liveQuery } from 'dexie';
 import { DBRealmMember } from 'dexie-cloud-common';
-import { combineLatest, map, switchMap } from 'rxjs';
+import { combineLatest } from 'rxjs';
+import { map, switchMap } from 'rxjs/operators';
 import { associate } from './associate';
 import { createSharedValueObservable } from './createSharedValueObservable';
 import { getCurrentUserEmitter } from './currentUserEmitter';
