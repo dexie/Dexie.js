@@ -62,5 +62,7 @@ export interface Table<T=any, TKeyPropNameOrKeyType=IndexableType, TOpt=void> {
   bulkPut<B extends boolean>(items: readonly InsertType<T, TOpt ,TKeyPropNameOrKeyType>[], options: { allKeys: B }): PromiseExtended<B extends true ? IDType<T, TKeyPropNameOrKeyType>[] : IDType<T, TKeyPropNameOrKeyType>>;
   bulkPut(items: readonly InsertType<T, TOpt, TKeyPropNameOrKeyType>[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
 
+  bulkUpdate(keysAndChanges: ReadonlyArray<{key: IDType<T, TKeyPropNameOrKeyType>, changes: UpdateSpec<T>}>): PromiseExtended<number>;
+
   bulkDelete(keys: IDType<T, TKeyPropNameOrKeyType>[]): PromiseExtended<void>;
 }

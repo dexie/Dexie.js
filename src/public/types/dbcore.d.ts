@@ -54,7 +54,10 @@ export interface DBCorePutRequest {
     range: DBCoreKeyRange;
   };
   changeSpec?: {[keyPath: string]: any}; // Common changeSpec for each key
-  changeSpecs?: {[keyPath: string]: any}[]; // changeSpec per key. 
+  updates?: {
+    keys: any[],
+    changeSpecs: {[keyPath: string]: any}[]; // changeSpec per key.  
+  },
   /** @deprecated Will always get results since 3.1.0-alpha.5 */
   wantResults?: boolean;
 }

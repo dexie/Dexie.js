@@ -44,7 +44,7 @@ export function createImplicitPropSetterMiddleware(
                       // modify operations. Reason: Server may not have
                       // the object. Object should be created on server only
                       // if is being updated. An update operation won't create it
-                      // so we must delete req.changeSpec to decrate operation to
+                      // so we must delete req.changeSpec to degrade operation to
                       // an upsert operation with timestamp so that it will be created.
                       // We must also degrade from consistent modify operations for the
                       // same reason - object might be there on server. Must but put up instead.
@@ -58,7 +58,7 @@ export function createImplicitPropSetterMiddleware(
                         const now = Date.now();
                         delete req.criteria;
                         delete req.changeSpec;
-                        delete req.changeSpecs;
+                        delete req.updates;
                         obj.$ts = Date.now();
                       }
                     }
