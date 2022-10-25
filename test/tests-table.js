@@ -365,8 +365,10 @@ promisedTest("bulkUpdate without actual changes (check it doesn't bail out)", as
         return {
           ...downTable,
           mutate(req) {
-            dbCoreMutateCalls.push(req);
-            return downTable.mutate(req);
+            if (tableName === 'items') {
+                dbCoreMutateCalls.push(req);
+                return downTable.mutate(req);
+            }
           }
         };
       }
@@ -376,6 +378,8 @@ promisedTest("bulkUpdate without actual changes (check it doesn't bail out)", as
   await db.open(); // Apply the middleware
 
   try {
+    // Clear the log (in case another middleware or addon did something in db ready in integration tests)
+    dbCoreMutateCalls.splice(0, dbCoreMutateCalls.length);
     equal(dbCoreMutateCalls.length, 0, 'No mutate calls yet');
     await db.items.bulkUpdate([
       { key: 'nonexist1', changes: { 'foo.bar': 101 } },
