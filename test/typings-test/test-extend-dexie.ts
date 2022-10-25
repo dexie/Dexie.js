@@ -5,7 +5,7 @@ import {Dexie, Table, DexieConstructor, IndexableType} from '../../dist/dexie';
 // Extend Dexie interface
 //
 declare module '../../dist/dexie' {
-    interface Table<T, TKeyPropNameOrKeyType> {
+    interface Table<T, TKey extends IndexableType, TEntity> {
         extendedTableMethod() : any;
     }
     interface DbEvents {

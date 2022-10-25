@@ -71,9 +71,26 @@ import './test-extend-dexie';
         }
     }
 
-    class Entity2 {
+
+
+    class Entity2  {
         oid: string;
         prop1: Date;
+    }
+
+    class BaseEntity {
+        oid: string;
+        prop2: Date;
+        foo(): void {
+            console.log('foo');
+        }
+    }
+
+    class Entity3 extends BaseEntity {
+        prop1: Date;
+        foo2(): void {
+            console.log('foo');
+        }
     }
 
     interface CompoundKeyEntity {
@@ -84,6 +101,8 @@ import './test-extend-dexie';
     class MyDatabase extends Dexie {
         friends: Dexie.Table<Friend, number>;
         table2: Dexie.Table<Entity2, string>;
+        table3: Dexie.Table<Entity3, 'oid'>;
+        table4: Dexie.Table<Entity3>;
         compoundTable: Dexie.Table<CompoundKeyEntity, [string, string]>;
 
         constructor () {
@@ -91,6 +110,7 @@ import './test-extend-dexie';
             this.version(1).stores({
                 table1: '++id',
                 table2: 'oid',
+                table3: 'oid',
                 compoundTable: '[firstName+lastName]'
             });
         }
@@ -104,6 +124,10 @@ import './test-extend-dexie';
     db.extendedDBMethod();
     // Extended event
     db.on('customEvent2', ()=>{});
+
+    // db.table2.put()
+    // db.table3.add({oid: '', prop2: new Date(), prop1: new Date()})
+    // db.table4.bulkGet([''])
 
     // Table.get
     db.friends.get(1).then(friend => friend && friend.address.city);

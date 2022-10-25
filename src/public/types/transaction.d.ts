@@ -1,6 +1,7 @@
 import { Table } from "./table";
 import { Dexie } from "./dexie";
 import { TransactionEvents } from "./transaction-events";
+import { IndexableType } from "./indexable-type";
 
 export interface Transaction {
   db: Dexie;
@@ -11,7 +12,7 @@ export interface Transaction {
   parent?: Transaction;
   on: TransactionEvents;
   abort(): void;
-  table(tableName: string): Table<any, any>;
-  table<T>(tableName: string): Table<T, any>;
-  table<T, Key>(tableName: string): Table<T, Key>;
+  table(tableName: string): Table;
+  table<T>(tableName: string): Table<T>;
+  table<T, TKey extends IndexableType, TEntity>(tableName: string): Table<T, TKey, TEntity>;
 }

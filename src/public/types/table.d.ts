@@ -1,68 +1,72 @@
-import { TableSchema } from "./table-schema";
-import { IndexableTypeArrayReadonly } from "./indexable-type";
-import { TableHooks } from "./table-hooks";
-import { Collection } from "./collection";
-import { ThenShortcut } from "./then-shortcut";
-import { WhereClause } from "./where-clause";
-import { PromiseExtended } from "./promise-extended";
-import { IndexableType } from "./indexable-type";
-import { DBCoreTable } from "./dbcore";
-import { InsertType } from "./insert-type";
-import { KeyPaths, KeyPathValue } from "./keypaths";
-import { Dexie } from "./dexie";
-import { UpdateSpec } from "./update-spec";
+import { TableSchema } from './table-schema';
+import { IndexableTypeArrayReadonly } from './indexable-type';
+import { TableHooks } from './table-hooks';
+import { Collection } from './collection';
+import { ThenShortcut } from './then-shortcut';
+import { WhereClause } from './where-clause';
+import { PromiseExtended } from './promise-extended';
+import { Dexie } from './dexie';
+import { IndexableType } from './indexable-type';
+import { DBCoreTable } from './dbcore';
+import { InsertType } from './insert-type';
+import { UpdateSpec } from './update-spec';
 
-export type IDType<T, TKey> = TKey extends keyof T ? T[TKey] : TKey;
-export interface Table<T=any, TKeyPropNameOrKeyType=IndexableType, TOpt=void> {
+export type IsStrictlyAny<T> = (T extends never ? true : false) extends false ? false : true;
+export type IDType<T, TKey extends IndexableType> = TKey extends keyof T ? T[TKey] : TKey;
+export type IDType2<T, TKey extends IndexableType> = TKey extends keyof T ? (T[TKey] extends IndexableType ? T[TKey] : TKey) : TKey;
+export type IXType<T, TKey extends IndexableType> = IsStrictlyAny<TKey> extends true ? IndexableType : TKey extends keyof T ? T[TKey] extends IndexableType ? T[TKey] : IndexableType : TKey;
+
+export interface Table<T = any, TKey extends IndexableType = any, TEntity = T> {
   db: Dexie;
   name: string;
   schema: TableSchema;
-  hook: TableHooks<T, IDType<T, TKeyPropNameOrKeyType>>;
+  hook: TableHooks<T, TKey>;
   core: DBCoreTable;
 
-  get(key: IDType<T, TKeyPropNameOrKeyType>): PromiseExtended<T | undefined>;
-  get<R>(key: IDType<T, TKeyPropNameOrKeyType>, thenShortcut: ThenShortcut<T | undefined,R>): PromiseExtended<R>;
-  get(equalityCriterias: {[key:string]:any}): PromiseExtended<T | undefined>;
-  get<R>(equalityCriterias: {[key:string]:any}, thenShortcut: ThenShortcut<T | undefined, R>): PromiseExtended<R>;
-  where(index: string | string[]): WhereClause<T, IDType<T, TKeyPropNameOrKeyType>>;
-  where(equalityCriterias: {[key:string]:any}): Collection<T, IDType<T, TKeyPropNameOrKeyType>>;
+  get(key: TKey): PromiseExtended<T | undefined>;
+  get<R>(key: TKey, thenShortcut: ThenShortcut<T | undefined, R> ): PromiseExtended<R>;
+  get(equalityCriterias: {[key: string]: any}): PromiseExtended<T | undefined>;
+  get<R>(equalityCriterias: { [key: string]: any }, thenShortcut: ThenShortcut<T | undefined, R>): PromiseExtended<R>;
+  where(index: string | string[]): WhereClause<T, TKey>;
+  where(equalityCriterias: { [key: string]: any }): Collection<T, TKey>;
 
-  filter(fn: (obj: T) => boolean): Collection<T, IDType<T, TKeyPropNameOrKeyType>>;
+  filter(fn: (obj: T) => boolean): Collection<T, TKey>;
 
   count(): PromiseExtended<number>;
   count<R>(thenShortcut: ThenShortcut<number, R>): PromiseExtended<R>;
 
-  offset(n: number): Collection<T, IDType<T, TKeyPropNameOrKeyType>>;
+  offset(n: number): Collection<T, TKey>;
 
-  limit(n: number): Collection<T, IDType<T, TKeyPropNameOrKeyType>>;
+  limit(n: number): Collection<T, TKey>;
 
-  each(callback: (obj: T, cursor: {key: any, primaryKey: IDType<T, TKeyPropNameOrKeyType>}) => any): PromiseExtended<void>;
+  each(callback: (obj: T, cursor: { key: any; primaryKey: TKey }) => any): PromiseExtended<void>;
 
   toArray(): PromiseExtended<Array<T>>;
   toArray<R>(thenShortcut: ThenShortcut<T[], R>): PromiseExtended<R>;
 
-  toCollection(): Collection<T, IDType<T, TKeyPropNameOrKeyType>>;
-  orderBy(index: string | string[]): Collection<T, IDType<T, TKeyPropNameOrKeyType>>;
-  reverse(): Collection<T, IDType<T, TKeyPropNameOrKeyType>>;
+  toCollection(): Collection<T, TKey>;
+  orderBy(index: string | string[]): Collection<T, TKey>;
+  reverse(): Collection<T, TKey>;
   mapToClass(constructor: Function): Function;
-  add(item: InsertType<T, TOpt, TKeyPropNameOrKeyType>, key?: IDType<T, TKeyPropNameOrKeyType>): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
+  add(item: InsertType<TEntity, void, TKey>, key?: TKey): PromiseExtended<TKey>;
   update(
-    key: IDType<T, TKeyPropNameOrKeyType> | T,
-    changes: UpdateSpec<T> | ((obj: T, ctx:{value: any, primKey: IndexableType}) => void | boolean)): PromiseExtended<number>;
-  put(item: InsertType<T, TOpt, TKeyPropNameOrKeyType>, key?: IDType<T, TKeyPropNameOrKeyType>): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
-  delete(key: IDType<T, TKeyPropNameOrKeyType>): PromiseExtended<void>;
+    key: TKey | T,
+    changes: UpdateSpec<TEntity> | ((obj: T, ctx:{value: any, primKey: IndexableType}) => void | boolean)
+  ): PromiseExtended<number>;
+  put(item: InsertType<TEntity, void, TKey>, key?: TKey): PromiseExtended<TKey>;
+  delete(key: TKey): PromiseExtended<void>;
   clear(): PromiseExtended<void>;
-  bulkGet(keys: IDType<T, TKeyPropNameOrKeyType>[]): PromiseExtended<(T | undefined)[]>;
+  bulkGet(keys: TKey[]): PromiseExtended<(T | undefined)[]>;
 
-  bulkAdd<B extends boolean>(items: readonly InsertType<T, TOpt, TKeyPropNameOrKeyType>[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): PromiseExtended<B extends true ? IDType<T, TKeyPropNameOrKeyType>[] : IDType<T, TKeyPropNameOrKeyType>>;
-  bulkAdd<B extends boolean>(items: readonly InsertType<T, TOpt, TKeyPropNameOrKeyType>[], options: { allKeys: B }): PromiseExtended<B extends true ? IDType<T, TKeyPropNameOrKeyType>[] : IDType<T, TKeyPropNameOrKeyType>>;
-  bulkAdd(items: readonly InsertType<T, TOpt, TKeyPropNameOrKeyType>[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
+  bulkAdd<B extends boolean>(items: readonly InsertType<TEntity, void, TKey>[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
+  bulkAdd<B extends boolean>(items: readonly InsertType<TEntity, void, TKey>[], options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
+  bulkAdd(items: readonly InsertType<TEntity, void, TKey>[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): PromiseExtended<TKey>;
 
-  bulkPut<B extends boolean>(items: readonly InsertType<T, TOpt, TKeyPropNameOrKeyType>[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): PromiseExtended<B extends true ? IDType<T, TKeyPropNameOrKeyType>[] : IDType<T, TKeyPropNameOrKeyType>>;
-  bulkPut<B extends boolean>(items: readonly InsertType<T, TOpt ,TKeyPropNameOrKeyType>[], options: { allKeys: B }): PromiseExtended<B extends true ? IDType<T, TKeyPropNameOrKeyType>[] : IDType<T, TKeyPropNameOrKeyType>>;
-  bulkPut(items: readonly InsertType<T, TOpt, TKeyPropNameOrKeyType>[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): PromiseExtended<IDType<T, TKeyPropNameOrKeyType>>;
+  bulkPut<B extends boolean>(items: readonly InsertType<TEntity, void, TKey>[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
+  bulkPut<B extends boolean>(items: readonly InsertType<TEntity, void, TKey>[], options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
+  bulkPut(items: readonly InsertType<TEntity, void, TKey>[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): PromiseExtended<TKey>;
 
-  bulkUpdate(keysAndChanges: ReadonlyArray<{key: IDType<T, TKeyPropNameOrKeyType>, changes: UpdateSpec<T>}>): PromiseExtended<number>;
+  bulkUpdate(keysAndChanges: ReadonlyArray<{key: TKey, changes: UpdateSpec<T>}>): PromiseExtended<number>;
 
-  bulkDelete(keys: IDType<T, TKeyPropNameOrKeyType>[]): PromiseExtended<void>;
+  bulkDelete(keys: TKey[]): PromiseExtended<void>;
 }

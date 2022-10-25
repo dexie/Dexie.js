@@ -25,14 +25,15 @@ import { PromiseExtended } from './types/promise-extended';
 import { Observable } from './types/observable';
 import { IntervalTree, RangeSetConstructor } from './types/rangeset';
 import { Dexie, TableProp } from './types/dexie';
+import { IndexableType } from './types/indexable-type';
 export type { TableProp };
 export * from './types/entity';
 export { UpdateSpec } from './types/update-spec';
 export * from './types/insert-type';
 
 // Alias of Table and Collection in order to be able to refer them from module below...
-interface _Table<T, TKey> extends Table<T, TKey> {}
-interface _Collection<T,TKey> extends Collection<T,TKey> {}
+interface _Table<T, TKey extends IndexableType, TEntity = T> extends Table<T, TKey, TEntity> {}
+interface _Collection<T,TKey extends IndexableType, TEntity = T> extends Collection<T, TKey, TEntity> {}
 
 // Besides being the only exported value, let Dexie also be
 // a namespace for types...
@@ -40,9 +41,9 @@ declare module Dexie {
   // The "Dexie.Promise" type.
   type Promise<T=any> = PromiseExtended<T> // Because many samples have been Dexie.Promise.
   // The "Dexie.Table" interface. Same as named exported interface Table.
-  interface Table<T=any,Key=any> extends _Table<T,Key> {} // Because all samples have been Dexie.Table<...>
+  interface Table<T=any,Key extends IndexableType=IndexableType, TEntity = T> extends _Table<T, Key, TEntity> {} // Because all samples have been Dexie.Table<...>
   // The "Dexie.Collection" interface. Same as named exported interface Collection.
-  interface Collection<T=any,Key=any> extends _Collection<T, Key> {} // Because app-code may declare it.
+  interface Collection<T=any,Key extends IndexableType=IndexableType, TEntity = T> extends _Collection<T, Key, TEntity> {} // Because app-code may declare it.
 }
 
 /** Explicitely export IndexableType. Mostly for backward compatibility.*/

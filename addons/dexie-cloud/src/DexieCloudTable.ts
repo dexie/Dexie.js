@@ -1,6 +1,6 @@
-import { Table } from 'dexie';
+import { IndexableType, Table } from 'dexie';
 
 
-export type DexieCloudTable<T = any, TKey = string> = Table<
+export type DexieCloudTable<T = any, TKey extends IndexableType = string> = Table<
   T, TKey, 'realmId' | 'owner'
 >;

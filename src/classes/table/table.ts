@@ -24,7 +24,7 @@ import { cmp } from '../../functions/cmp';
  * 
  * https://dexie.org/docs/Table/Table
  */
-export class Table implements ITable<any, IndexableType> {
+export class Table implements ITable {
   db: Dexie;
   _tx?: Transaction;
   name: string;
