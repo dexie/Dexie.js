@@ -353,6 +353,69 @@ promisedTest("bulkUpdate", async ()=>{
     deepEqual(allItems, expected, "2 items updated as expected. nonexisting item not updated.");
 });
 
+promisedTest("bulkUpdate without actual changes (check it doesn't bail out)", async ()=>{
+  const dbCoreMutateCalls = [];
+  db.use({
+    stack: 'dbcore',
+    name: 'temp-logger',
+    create: (downDb) => ({
+      ...downDb,
+      table: (tableName) => {
+        const downTable = downDb.table(tableName);
+        return {
+          ...downTable,
+          mutate(req) {
+            dbCoreMutateCalls.push(req);
+            return downTable.mutate(req);
+          }
+        };
+      }
+    })
+  });
+  db.close();
+  await db.open(); // Apply the middleware
+
+  try {
+    equal(dbCoreMutateCalls.length, 0, 'No mutate calls yet');
+    await db.items.bulkUpdate([
+      { key: 'nonexist1', changes: { 'foo.bar': 101 } },
+      { key: 'nonexist2', changes: { 'foo.bar': 102 } },
+      { key: 'nonexist3', changes: { 'foo.bar': 103 } }
+    ]);
+    equal(dbCoreMutateCalls.length, 1, 'One mutate call has taken place');
+    deepEqualPartial(
+      dbCoreMutateCalls,
+      [
+        {
+          type: 'put',
+          values: [],
+          criteria: undefined,
+          changeSpec: undefined,
+          updates: {
+            keys: ['nonexist1', 'nonexist2', 'nonexist3'],
+            changeSpecs: [
+              { 'foo.bar': 101 },
+              { 'foo.bar': 102 },
+              { 'foo.bar': 103 }
+            ],
+          },
+        },
+      ],
+      'The mutate call was a put call and contained the intended updates for consistent sync addons to consume'
+    );
+
+    const allItems = await db.items.toArray();
+    const expected = [];
+    deepEqual(allItems, expected, 'Nonexisting item not updated.');
+  } finally {
+    // Cleanup temporary middleware:
+    db.unuse({ stack: 'dbcore', name: 'temp-logger' });
+    db.close();
+    await db.open();
+  }
+});
+
+
 promisedTest("bulkUpdate with failure", async ()=>{
     try {
         await db.users.bulkUpdate([
