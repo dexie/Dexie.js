@@ -367,8 +367,8 @@ promisedTest("bulkUpdate without actual changes (check it doesn't bail out)", as
           mutate(req) {
             if (tableName === 'items') {
                 dbCoreMutateCalls.push(req);
-                return downTable.mutate(req);
             }
+            return downTable.mutate(req);
           }
         };
       }
