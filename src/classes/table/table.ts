@@ -17,6 +17,8 @@ import { DBCoreTable } from '../../public/types/dbcore';
 import { AnyRange } from '../../dbcore/keyrange';
 import { workaroundForUndefinedPrimKey } from '../../functions/workaround-undefined-primkey';
 import { Entity } from '../entity/Entity';
+import { UpdateSpec } from '../../public';
+import { cmp } from '../../functions/cmp';
 
 /** class Table
  * 
@@ -488,6 +490,74 @@ export class Table implements ITable<any, IndexableType> {
           throw new BulkError(
             `${this.name}.bulkPut(): ${numFailures} of ${numObjects} operations failed`, failures);
         });
+    });
+  }
+
+  /** Table.bulkUpdate()
+   *
+   * https://dexie.org/docs/Table.Table.bulkUpdate()
+   */
+   bulkUpdate(
+    keysAndChanges: readonly { key: any; changes: UpdateSpec<any> }[]
+  ): PromiseExtended<number> {
+    const coreTable = this.core;
+    const keys = keysAndChanges.map((entry) => entry.key);
+    const changeSpecs = keysAndChanges.map((entry) => entry.changes);
+    const offsetMap: number[] = [];
+    return this._trans('readwrite', (trans) => {
+      return coreTable.getMany({ trans, keys, cache: 'clone' }).then((objs) => {
+        const resultKeys: any[] = [];
+        const resultObjs: any[] = [];
+        keysAndChanges.forEach(({ key, changes }, idx) => {
+          const obj = objs[idx];
+          if (obj) {
+            for (const keyPath of Object.keys(changes)) {
+              const value = changes[keyPath];
+              if (keyPath === this.schema.primKey.keyPath) {
+                if (cmp(value, key) !== 0) {
+                  throw new exceptions.Constraint(
+                    `Cannot update primary key in bulkUpdate()`
+                  );
+                }
+              } else {
+                setByKeyPath(obj, keyPath, value);
+              }
+            }
+            offsetMap.push(idx);
+            resultKeys.push(key);
+            resultObjs.push(obj);
+          }
+        });
+        const numEntries = resultKeys.length;
+        return coreTable
+          .mutate({
+            trans,
+            type: 'put',
+            keys: resultKeys,
+            values: resultObjs,
+            updates: {
+              keys,
+              changeSpecs
+            }
+          })
+          .then(({ numFailures, failures }) => {
+            if (numFailures === 0) return numEntries;
+            // Failure. bulkPut() may have a subset of keys
+            // so we must translate returned 'failutes' into the offsets of given argument:
+            for (const offset of Object.keys(failures)) {
+              const mappedOffset = offsetMap[Number(offset)];
+              if (mappedOffset != null) {
+                const failure = failures[offset];
+                delete failures[offset];
+                failures[mappedOffset] = failure;
+              }
+            }
+            throw new BulkError(
+              `${this.name}.bulkUpdate(): ${numFailures} of ${numEntries} operations failed`,
+              failures
+            );
+          });
+      });
     });
   }
 
