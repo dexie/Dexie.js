@@ -4,6 +4,7 @@ import { WhereClause } from './where-clause';
 import { Table } from '../table';
 import { Collection } from '../collection';
 import { exceptions } from '../../errors';
+import { cmp } from '../../functions/cmp';
 
 export interface WhereClauseConstructor {
   new(table: Table, index?: string, orCollection?: Collection): WhereClause;
@@ -27,13 +28,12 @@ export function createWhereClauseConstructor(db: Dexie) {
         index: index === ":id" ? null : index,
         or: orCollection
       };
-      const indexedDB = db._deps.indexedDB;
-      if (!indexedDB) throw new exceptions.MissingAPI();
-      this._cmp = this._ascending = indexedDB.cmp.bind(indexedDB);
-      this._descending = (a, b) => indexedDB.cmp(b, a);
-      this._max = (a, b) => indexedDB.cmp(a,b) > 0 ? a : b;
-      this._min = (a, b) => indexedDB.cmp(a,b) < 0 ? a : b;
+      this._cmp = this._ascending = cmp;
+      this._descending = (a, b) => cmp(b, a);
+      this._max = (a, b) => cmp(a,b) > 0 ? a : b;
+      this._min = (a, b) => cmp(a,b) < 0 ? a : b;
       this._IDBKeyRange = db._deps.IDBKeyRange;
+      if (!this._IDBKeyRange) throw new exceptions.MissingAPI();
     }
   );
 }
