@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unittest-utils';
+import {resetDatabase, supports, spawnedTest, promisedTest, isSafari} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBTable");
 db.version(1).stores({
@@ -421,7 +421,17 @@ promisedTest("bulkUpdate without actual changes (check it doesn't bail out)", as
 
 
 promisedTest("bulkUpdate with failure", async ()=>{
+    if (isSafari) {
+        // Avoid bug https://bugs.webkit.org/show_bug.cgi?id=247053
+        ok(true, "Avoiding Safari issue https://bugs.webkit.org/show_bug.cgi?id=247053");
+        return;
+    }
     try {
+        const users = await db.users.toArray();
+        deepEqualPartial(users, [
+            {first: "David", username: "dfahlander"},
+            {first: "Karl", username: "kceder" }
+        ], "We have the expected users to begin with");
         await db.users.bulkUpdate([
             {key: "nonexisting", changes: {username: "xyz"}}, // Shall be ignored
             {key: idOfFirstUser, changes: {username: "kceder"}}, // Shall fail (unique index)
@@ -435,7 +445,7 @@ promisedTest("bulkUpdate with failure", async ()=>{
         const failurePosition = failurePositions[0];
         equal(failurePosition, 1, "The failure should have occurred at position 1");
         const failure = error.failuresByPos[failurePosition];
-        ok(failure != null && failure instanceof Error, "There was a failure and it was an error");
+        ok(failure != null, "There was a failure");
     }
     const allItems = await db.users.toArray();
     const expected = [
@@ -473,6 +483,12 @@ promisedTest("bulkUpdate with failure (transactional)", async ()=>{
 });
 
 promisedTest("bulkUpdate with failure (transactional with catch)", async ()=>{
+    if (isSafari) {
+        // Avoid bug https://bugs.webkit.org/show_bug.cgi?id=247053
+        ok(true, "Avoiding Safari issue https://bugs.webkit.org/show_bug.cgi?id=247053");
+        return;
+    }
+
     await db.transaction('rw', db.users, async () => {
         try {
             await db.users.bulkUpdate([

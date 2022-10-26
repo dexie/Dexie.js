@@ -129,6 +129,10 @@ export const isEdge = /Edge\/\d+/.test(navigator.userAgent);
 export const isChrome = !!window.chrome;
 var hasPolyfillIE = [].slice.call(document.getElementsByTagName("script")).some(
     s => s.src.indexOf("idb-iegap") !== -1);
+    
+export const isSafari = typeof navigator !== 'undefined' &&
+    /Safari\//.test(navigator.userAgent) &&
+    !/Chrom(e|ium)\/|Edge\//.test(navigator.userAgent);
 
 export function supports (features) {
     return features.split('+').reduce((result,feature)=>{
