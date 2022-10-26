@@ -58,15 +58,14 @@ export function setByKeyPath(
   }
 }
 
-export const randomString = typeof Buffer !== 'undefined' ? (bytes: number) => {
-  // Node
-  const buf = Buffer.alloc(bytes);
-  randomFillSync(buf);
-  return buf.toString("base64");
-} : (bytes: number) => {
+export const randomString = typeof self !== 'undefined' && typeof crypto !== 'undefined' ? (bytes: number) => {
   // Web
   const buf = new Uint8Array(bytes);
   crypto.getRandomValues(buf);
   return btoa(String.fromCharCode.apply(null, buf as any));
-}
-
+} : typeof Buffer !== 'undefined' ? (bytes: number) => {
+  // Node
+  const buf = Buffer.alloc(bytes);
+  randomFillSync(buf);
+  return buf.toString("base64");
+} : ()=>{throw new Error("No implementation of randomString was found");}
