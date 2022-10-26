@@ -108,7 +108,7 @@ importers:
       rxjs: ^7.x
       tslib: '*'
       typescript: '*'
-      universal-imports: ^1.0.3
+      universal-imports: ^1.0.4
     dependencies:
       dexie: link:../..
       dexie-cloud-common: link:../../libs/dexie-cloud-common
@@ -123,7 +123,7 @@ importers:
       karma-browserstack-launcher: 1.6.0_karma@6.4.0
       karma-chrome-launcher: 3.1.1
       karma-firefox-launcher: 2.1.2
-      karma-qunit: 4.1.2_karma@6.4.0+qunit@2.19.1
+      karma-qunit: 4.1.2_karma@6.4.0+qunit@2.19.3
       preact: 10.10.6
       rollup: 2.79.0
       rollup-plugin-alias: 2.2.0
@@ -133,7 +133,7 @@ importers:
       rollup-plugin-sourcemaps: 0.6.3_fpbbcufdl4u4ztb4qwb46mjbhi
       tslib: 2.4.0
       typescript: 4.8.2
-      universal-imports: 1.0.3
+      universal-imports: 1.0.4
 
   addons/dexie-export-import:
     specifiers:
@@ -2343,14 +2343,14 @@ packages:
       qunit: 2.17.2
     dev: true
 
-  /karma-qunit/4.1.2_karma@6.4.0+qunit@2.19.1:
+  /karma-qunit/4.1.2_karma@6.4.0+qunit@2.19.3:
     resolution: {integrity: sha512-taTPqBeHCOlkeKTSzQgIKzAUb79vw3rfbCph+xwwh63tyGjNtljwx91VArhIM9DzIIR3gB9G214wQg+oXI9ycw==}
     peerDependencies:
       karma: ^4.0.0 || ^5.0.0 || ^6.0.0
       qunit: ^2.0.0
     dependencies:
       karma: 6.4.0
-      qunit: 2.19.1
+      qunit: 2.19.3
     dev: true
 
   /karma/6.3.17:
@@ -2935,6 +2935,16 @@ packages:
 
   /qunit/2.19.1:
     resolution: {integrity: sha512-gSGuw0vErE/rNjnlBW/JmE7NNubBlGrDPQvsug32ejYhcVFuZec9yoU0+C30+UgeCGwq6Ap89K65dMGo+kDGZQ==}
+    engines: {node: '>=10'}
+    hasBin: true
+    dependencies:
+      commander: 7.2.0
+      node-watch: 0.7.3
+      tiny-glob: 0.2.9
+    dev: true
+
+  /qunit/2.19.3:
+    resolution: {integrity: sha512-vEnspSZ37u2oR01OA/IZ1Td5V7BvQYFECdKPv86JaBplDNa5IHg0v7jFSPoP5L5o78Dbi8sl7/ATtpRDAKlSdw==}
     engines: {node: '>=10'}
     hasBin: true
     dependencies:
@@ -3984,8 +3994,8 @@ packages:
       - encoding
     dev: false
 
-  /universal-imports/1.0.3:
-    resolution: {integrity: sha512-0C3ledn2fe9yMHvT6PSRF0ptlnUk1bT2TLSuYwWeI3F9cRFg3khqWemaXI65TrMznK90iNP4KHPmr5z4G5bo5A==}
+  /universal-imports/1.0.4:
+    resolution: {integrity: sha512-/oEtKj4CAV5Xf1Ly9SupMbAeOUoTxFxW/BYoXlktQDsMDrO+dlt37Hz8rgqr3irfcKmVf76zkytfGzW+FYdHSg==}
     dependencies:
       node-fetch: 2.6.7
     transitivePeerDependencies:

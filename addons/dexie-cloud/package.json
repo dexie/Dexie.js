@@ -104,7 +104,7 @@
     "rollup-plugin-sourcemaps": "*",
     "tslib": "*",
     "typescript": "*",
-    "universal-imports": "^1.0.3"
+    "universal-imports": "^1.0.4"
   },
   "dependencies": {
     "dexie-cloud-common": "workspace:^1.0.23"
