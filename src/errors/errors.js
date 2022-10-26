@@ -96,7 +96,7 @@ export function BulkError (msg, failures) {
     this.name = "BulkError";
     this.failures = Object.keys(failures).map(pos => failures[pos]);
     this.failuresByPos = failures;
-    this.message = getMultiErrorMessage(msg, failures);
+    this.message = getMultiErrorMessage(msg, this.failures);
 }
 derive(BulkError).from(DexieError);
 

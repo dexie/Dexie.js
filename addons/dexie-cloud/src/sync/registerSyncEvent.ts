@@ -1,4 +1,3 @@
-import Dexie from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 
 //const hasSW = 'serviceWorker' in navigator;
@@ -7,7 +6,7 @@ let hasComplainedAboutSyncEvent = false;
 export async function registerSyncEvent(db: DexieCloudDB, purpose: "push" | "pull") {
   try {
     // Send sync event to SW:
-    const sw = await navigator.serviceWorker.ready;
+    const sw: ServiceWorkerRegistration & {sync?: any} = await navigator.serviceWorker.ready;
     if (purpose === "push" && sw.sync) {
       await sw.sync.register(`dexie-cloud:${db.name}`);
     }
@@ -20,7 +19,7 @@ export async function registerSyncEvent(db: DexieCloudDB, purpose: "push" | "pul
         purpose
       });
     } else {
-      console.error(`Dexie Cloud: There's no active service worker. Can this ever happen??`);
+      throw new Error(`Failed to trigger sync - there's no active service worker`);
     }
     return;
   } catch (e) {

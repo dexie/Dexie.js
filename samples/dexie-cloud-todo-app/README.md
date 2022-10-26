@@ -4,7 +4,11 @@ This project was bootstrapped with [Create React App](https://github.com/faceboo
 
 # How to use the sample
 
-If you just want to see the app in action, navigate to the [pre-built published version](https://dfahlander.github.io/Dexie.js/dexie-cloud-todo-app/). Currently it is bugging out on Safari so please use any other browser if possible. Safari crashed from our service worker. *Next version will workaround this so that it will work well on iOS and Safari (by avoiding to do sync from the service worker and instead do it from the main thread).*
+**[You can open a deployed version of this PWA at https://dexie.github.io/Dexie.js/dexie-cloud-todo-app](https://dexie.github.io/Dexie.js/dexie-cloud-todo-app)**
+
+*NOTE: Previous versions of the published app (before december 2021) were on an old URL and we recommend to uninstall the PWA from your device if you did save it to your home screen or desktop.*
+
+If you just want to see the app in action, navigate to the [pre-built published version](https://dexie.github.io/Dexie.js/dexie-cloud-todo-app/).
 
 If you want to build and play with it locally, follow these steps:
 
@@ -29,7 +33,8 @@ Service worker is automatically disabled in dev-mode (the default for create-rea
 1. Fork Dexie.js (if you haven't already)
 2. Follow the instructions for using the app (see earlier in this README)
 3. `yarn deploy` (will publish the app to your gh-pages branch of the Dexie.js fork)
-4. Voila: Go to https://your-github-username.github.io/Dexie.js/dexie-cloud-todo-app/ from your browser. This is a full installable PWA that you can add to your start screen on a mobile phone.
+4. `npx dexie-cloud whitelist https://your-github-username.github.io` (replace `your-github-username`)
+5. Voila: Go to https://your-github-username.github.io/Dexie.js/dexie-cloud-todo-app/ from your browser. This is a full installable PWA that you can add to your start screen on a mobile phone.
 
 You can also [follow these instructions from create-react-app](https://create-react-app.dev/docs/making-a-progressive-web-app/#offline-first-considerations) to enable service worker in dev mode.
 
@@ -101,4 +106,4 @@ You can learn more in the [Create React App documentation](https://facebook.gith
 
 To learn React, check out the [React documentation](https://reactjs.org/).
 
-To learn about Dexie Cloud, check out the [Dexie Cloud documentation](https://dexie.org/cloud/).
+To learn about Dexie Cloud, check out the [Dexie Cloud documentation](https://dexie.org/cloud/docs/).

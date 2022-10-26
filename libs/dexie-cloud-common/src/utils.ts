@@ -4,6 +4,11 @@ export function assert(b: boolean): asserts b is true {
   if (!b) throw new Error('Assertion Failed');
 }
 
+const _hasOwn = {}.hasOwnProperty;
+export function hasOwn(obj, prop) {
+    return _hasOwn.call(obj, prop);
+}
+
 type SetByKeyPathTarget =
   | { [keyPath: string]: SetByKeyPathTarget }
   | SetByKeyPathTarget[];
@@ -37,7 +42,7 @@ export function setByKeyPath(
         //@ts-ignore: even if currentKeyPath would be numeric string and obj would be array - it works.
         var innerObj = obj[currentKeyPath];
         //@ts-ignore: even if currentKeyPath would be numeric string and obj would be array - it works.
-        if (!innerObj) innerObj = obj[currentKeyPath] = {};
+        if (!innerObj || !hasOwn(obj, currentKeyPath)) innerObj = (obj[currentKeyPath] = {});
         setByKeyPath(innerObj, remainingKeyPath, value);
       }
     } else {
@@ -53,7 +58,7 @@ export function setByKeyPath(
   }
 }
 
-export const randomString = typeof self === 'undefined' ? (bytes: number) => {
+export const randomString = typeof Buffer !== 'undefined' ? (bytes: number) => {
   // Node
   const buf = Buffer.alloc(bytes);
   randomFillSync(buf);

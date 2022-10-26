@@ -286,8 +286,8 @@ export const observabilityMiddleware: Middleware<DBCore> = {
 function trackAffectedIndexes(
   getRangeSet: (index: string) => RangeSet,
   schema: DBCoreTableSchema,
-  oldObjs: any[] | undefined,
-  newObjs: any[] | undefined
+  oldObjs: readonly any[] | undefined,
+  newObjs: readonly any[] | undefined
 ) {
   function addAffectedIndex(ix: DBCoreIndex) {
     const rangeSet = getRangeSet(ix.name || "");

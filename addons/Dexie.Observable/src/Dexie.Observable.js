@@ -60,8 +60,8 @@ var browserIsShuttingDown = false;
  * @param {Dexie} db 
  */
 function Observable(db) {
-    if (!/^3\./.test(Dexie.version))
-        throw new Error(`Missing dexie version 3.x`);
+    if (!/^(3|4)\./.test(Dexie.version))
+        throw new Error(`Missing dexie version 3.x or 4.x`);
     if (db.observable) {
         if (db.observable.version !== "{version}") throw new Error(`Mixed versions of dexie-observable`);
         return; // Addon already active.

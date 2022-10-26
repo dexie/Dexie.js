@@ -130,15 +130,15 @@ export function createMutationTrackingMiddleware({
               return {
                 ...table,
                 mutate: (req) => {
-                  console.debug('Mutating $logins table', req);
+                  //console.debug('Mutating $logins table', req);
                   return table
                     .mutate(req)
                     .then((res) => {
-                      console.debug('Mutating $logins');
+                      //console.debug('Mutating $logins');
                       (
                         req.trans as DBCoreTransaction & TXExpandos
                       ).mutationsAdded = true;
-                      console.debug('$logins mutated');
+                      //console.debug('$logins mutated');
                       return res;
                     })
                     .catch((err) => {
@@ -159,6 +159,7 @@ export function createMutationTrackingMiddleware({
               const trans = req.trans as DBCoreTransaction & TXExpandos;
               if (!trans.txid) return table.mutate(req); // Upgrade transactions not guarded by us.
               if (trans.disableChangeTracking) return table.mutate(req);
+              if (!db.cloud.schema?.[tableName]?.markedForSync) return table.mutate(req);
               if (!trans.currentUser?.isLoggedIn) {
                 // Unauthorized user should not log mutations.
                 // Instead, after login all local data should be logged at once.
@@ -201,11 +202,10 @@ export function createMutationTrackingMiddleware({
               const { numFailures: hasFailures, failures } = res;
               let keys = type === 'delete' ? req.keys! : res.results!;
               let values = 'values' in req ? req.values : [];
-              let changeSpecs = 'changeSpecs' in req ? req.changeSpecs! : [];
+              let updates = 'updates' in req && req.updates!;
               if (hasFailures) {
                 keys = keys.filter((_, idx) => !failures[idx]);
                 values = values.filter((_, idx) => !failures[idx]);
-                changeSpecs = changeSpecs.filter((_, idx) => !failures[idx]);
               }
               const ts = Date.now();
 
@@ -239,13 +239,13 @@ export function createMutationTrackingMiddleware({
                       txid,
                       userId
                     }
-                  : req.changeSpecs
+                  : updates
                   ? {
                       // One changeSpec per key
                       type: 'update',
                       ts,
-                      keys,
-                      changeSpecs,
+                      keys: updates.keys,
+                      changeSpecs: updates.changeSpecs,
                       txid,
                       userId
                     }

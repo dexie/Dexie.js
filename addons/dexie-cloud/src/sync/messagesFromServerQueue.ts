@@ -10,9 +10,9 @@ import { getSyncableTables } from '../helpers/getSyncableTables';
 import { getMutationTable } from '../helpers/getMutationTable';
 import { listClientChanges } from './listClientChanges';
 import {
-  applyServerChanges,
   filterServerChangesThroughAddedClientChanges,
 } from './sync';
+import { applyServerChanges } from "./applyServerChanges";
 import { updateBaseRevs } from './updateBaseRevs';
 import { getLatestRevisionsPerTable } from './getLatestRevisionsPerTable';
 import { refreshAccessToken } from '../authentication/authenticate';
@@ -28,7 +28,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
   let isWorking = false;
 
   let loopWarning = 0;
-  let loopDetection = [0,0,0,0,0,0,0,0,0,Date.now()];
+  let loopDetection = [0, 0, 0, 0, 0, 0, 0, 0, 0, Date.now()];
 
   event.subscribe(async () => {
     if (isWorking) return;
@@ -40,18 +40,21 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
       try {
         await consumeQueue();
       } finally {
-        if (loopDetection[loopDetection.length-1] - loopDetection[0] < 10000) {
+        if (
+          loopDetection[loopDetection.length - 1] - loopDetection[0] <
+          10000
+        ) {
           // Ten loops within 10 seconds. Slow down!
           if (Date.now() - loopWarning < 5000) {
             // Last time we did this, we ended up here too. Wait for a minute.
-            console.warn(`Slowing down websocket loop for one minute`)
+            console.warn(`Slowing down websocket loop for one minute`);
             loopWarning = Date.now() + 60000;
-            await new Promise(resolve => setTimeout(resolve, 60000));
+            await new Promise((resolve) => setTimeout(resolve, 60000));
           } else {
             // This is a one-time event. Just pause 10 seconds.
             console.warn(`Slowing down websocket loop for 10 seconds`);
             loopWarning = Date.now() + 10000;
-            await new Promise(resolve => setTimeout(resolve, 10000));
+            await new Promise((resolve) => setTimeout(resolve, 10000));
           }
         }
         isWorking = false;
@@ -69,7 +72,6 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
     while (queue.length > 0) {
       const msg = queue.shift();
       try {
-        console.debug('processing msg', msg);
         // If the sync worker or service worker is syncing, wait 'til thei're done.
         // It's no need to have two channels at the same time - even though it wouldnt
         // be a problem - this is an optimization.
@@ -104,14 +106,22 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
             // new token. So we don't need to do anything more here.
             break;
           case 'realm-added':
-            if (!persistedSyncState?.realms?.includes(msg.realm)) {
-              triggerSync(db, 'pull');
-            }
+            //if (!persistedSyncState?.realms?.includes(msg.realm) && !persistedSyncState?.inviteRealms?.includes(msg.realm)) {
+            triggerSync(db, 'pull');
+            //}
+            break;
+          case 'realm-accepted':
+            //if (!persistedSyncState?.realms?.includes(msg.realm)) {
+            triggerSync(db, 'pull');
+            //}
             break;
           case 'realm-removed':
-            if (persistedSyncState?.realms?.includes(msg.realm)) {
-              triggerSync(db, 'pull');
-            }
+            //if (
+            persistedSyncState?.realms?.includes(msg.realm) ||
+              persistedSyncState?.inviteRealms?.includes(msg.realm);
+            //) {
+            triggerSync(db, 'pull');
+            //}
             break;
           case 'realms-changed':
             triggerSync(db, 'pull');

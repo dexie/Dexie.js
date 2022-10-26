@@ -15,5 +15,4 @@ export interface UserLogin {
   nonExportablePrivateKey?: CryptoKey;
   publicKey?: CryptoKey;
   isLoggedIn?: boolean;
-  interaction?: DXCUserInteraction;
 }

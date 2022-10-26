@@ -1,5 +1,5 @@
 // Type definitions for dexie-observable v{version}
-// Project: https://github.com/dfahlander/Dexie.js/tree/master/addons/Dexie.Observable
+// Project: https://github.com/dexie/Dexie.js/tree/master/addons/Dexie.Observable
 // Definitions by: David Fahlander <http://github.com/dfahlander>
 
 import Dexie, { DexieEventSet } from 'dexie';

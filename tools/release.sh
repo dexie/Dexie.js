@@ -44,7 +44,7 @@ else
 	NPMTAG="latest$master_suffix"
 fi
 
-echo "Will use: npm publish --tag $NPMTAG"
+echo "Will use: pnpm publish --tag $NPMTAG"
 
 next_ref="v$next_version"
 
@@ -60,7 +60,7 @@ do
     dir="${ADDONS_DIR}${addon}"
     cd ${dir}
     addonNpmName=$(node -p "require('./package').name")
-    addonPublishedVersion=$(npm show $addonNpmName version)
+    addonPublishedVersion=$(pnpm view $addonNpmName version)
     addonLocalVersion=$(node -p "require('./package').version")
     if ! [ "${addonPublishedVersion}" = "${addonLocalVersion}" ]; then
       printf "$addonNpmName version ($addonLocalVersion) differs from its published version ($addonPublishedVersion)\n"
@@ -83,7 +83,7 @@ fi
 update_version 'package.json' $next_version
 update_version 'package-lock.json' $next_version
 update_version 'bower.json' $next_version
-npm install # Updates package-lock.json
+pnpm install # Updates package-lock.json
 
 # Commit package.json change
 git commit package.json package-lock.json bower.json --allow-empty -m "Releasing v$next_version" 2>/dev/null
@@ -106,14 +106,14 @@ rm -rf addons/*/tools/tmp
 rm -rf addons/*/dist/*
 
 # build
-npm run build
+pnpm run build
    
 # test
 printf "Testing on browserstack (will retry up to 4 times)\n"
 n=0
 until [ $n -ge 4 ]
 do
-  npm run test && break
+  pnpm run test && break
   n=$[$n+1]
   printf "Browserstack tests failed.\n"
 done
@@ -135,18 +135,18 @@ do
     cd ${dir}
 
     addonNpmName=$(node -p "require('./package').name")
-    addonPublishedVersion=$(npm show $addonNpmName version)
+    addonPublishedVersion=$(pnpm view $addonNpmName version)
     addonLocalVersion=$(node -p "require('./package').version")
 
     printf "Installing dependencies for ${addonNpmName}"
-    npm install
+    pnpm install
 
     printf "Building and testing ${addon} on browserstack (will retry up to 4 times)\n"
 
     n=0
     until [ $n -ge 4 ]
     do
-      npm run test && break
+      pnpm run test && break
       n=$[$n+1]
       printf "${addon} Browserstack tests failed.\n"
     done
@@ -161,8 +161,8 @@ do
     if [ "${autoPublishAddons}" = "Y" ]; then
       if ! [ "${addonPublishedVersion}" = "${addonLocalVersion}" ]; then
         printf "Publishing ${addonNpmName} ${addonLocalVersion} on npm\n"
-        #echo "Would now invoke npm publish from $(pwd)!"
-        npm publish
+        #echo "Would now invoke pnpm publish from $(pwd)!"
+        pnpm publish
       fi
     fi
     cd -
@@ -183,8 +183,8 @@ git push origin master$master_suffix:releases$master_suffix --follow-tags
 
 printf "Successful push to master$master_suffix:releases$master_suffix\n\n"
 
-#echo "Would now invoke npm publish --tag $NPMTAG from $(pwd)"
-npm publish --tag $NPMTAG
+#echo "Would now invoke pnpm publish --tag $NPMTAG from $(pwd)"
+pnpm publish --tag $NPMTAG
 
 printf "Successful publish to npm.\n\n"
 

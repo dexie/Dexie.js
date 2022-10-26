@@ -17,8 +17,9 @@ export interface ReadyForChangesMessage {
 export type WSConnectionMsg =
   | RevisionChangedMessage
   | RealmAddedMessage
+  | RealmAcceptedMessage
   | RealmRemovedMessage
-  | RealmsChangedMessage
+  | RealmsChangedMessage
   | ChangesFromServerMessage
   | TokenExpiredMessage;
 interface PingMessage {
@@ -39,7 +40,7 @@ export interface ChangesFromServerMessage {
   baseRev: string;
   realmSetHash: string;
   newRev: string;
-  changes: DBOperationsSet;
+  changes: DBOperationsSet<string>;
 }
 export interface RevisionChangedMessage {
   type: 'rev';
@@ -48,6 +49,11 @@ export interface RevisionChangedMessage {
 
 export interface RealmAddedMessage {
   type: 'realm-added';
+  realm: string;
+}
+
+export interface RealmAcceptedMessage {
+  type: 'realm-accepted';
   realm: string;
 }
 
@@ -73,7 +79,7 @@ export class WSObservable extends Observable<WSConnectionMsg> {
     messageProducer: Observable<WSClientToServerMsg>,
     webSocketStatus: BehaviorSubject<DXCWebSocketStatus>,
     token?: string,
-    tokenExpiration?: Date,
+    tokenExpiration?: Date
   ) {
     super(
       (subscriber) =>
@@ -151,7 +157,7 @@ export class WSConnection extends Subscription {
   }
 
   private disconnect() {
-    this.webSocketStatus.next("disconnected");
+    this.webSocketStatus.next('disconnected');
     if (this.pinger) {
       clearInterval(this.pinger);
       this.pinger = null;
@@ -168,13 +174,19 @@ export class WSConnection extends Subscription {
     }
   }
 
+  reconnecting = false;
   reconnect() {
-    this.disconnect();
-    this.connect();
+    if (this.reconnecting) return;
+    this.reconnecting = true;
+    try {
+      this.disconnect();
+    } catch {}
+    this.connect()
+      .catch(() => {})
+      .then(() => (this.reconnecting = false)); // finally()
   }
 
   async connect() {
-    this.webSocketStatus.next("connecting");
     this.lastServerActivity = new Date();
     if (this.pauseUntil && this.pauseUntil > new Date()) {
       console.debug('WS not reconnecting just yet', {
@@ -189,12 +201,14 @@ export class WSConnection extends Subscription {
     if (!this.databaseUrl)
       throw new Error(`Cannot connect without a database URL`);
     if (this.closed) {
+      //console.debug('SyncStatus: DUBB: Ooops it was closed!');
       return;
     }
     if (this.tokenExpiration && this.tokenExpiration < new Date()) {
       this.subscriber.error(new TokenExpiredError()); // Will be handled in connectWebSocket.ts.
       return;
     }
+    this.webSocketStatus.next('connecting');
     this.pinger = setInterval(async () => {
       if (this.closed) {
         console.debug('pinger check', this.id, 'CLOSED.');
@@ -247,7 +261,7 @@ export class WSConnection extends Subscription {
     wsUrl.protocol = wsUrl.protocol === 'http:' ? 'ws' : 'wss';
     const searchParams = new URLSearchParams();
     if (this.subscriber.closed) return;
-    searchParams.set('v', "2");
+    searchParams.set('v', '2');
     searchParams.set('rev', this.rev);
     searchParams.set('realmsHash', this.realmSetHash);
     searchParams.set('clientId', this.clientIdentity);
@@ -291,27 +305,37 @@ export class WSConnection extends Subscription {
     };
 
     try {
+      let everConnected = false;
       await new Promise((resolve, reject) => {
         ws.onopen = (event) => {
           console.debug('dexie-cloud WebSocket onopen');
+          everConnected = true;
           resolve(null);
         };
         ws.onerror = (event: ErrorEvent) => {
-          const error = event.error || new Error('WebSocket Error');
-          this.disconnect();
-          this.subscriber.error(error);
-          this.webSocketStatus.next("error");
-          reject(error);
+          if (!everConnected) {
+            const error = event.error || new Error('WebSocket Error');
+            this.subscriber.error(error);
+            this.webSocketStatus.next('error');
+            reject(error);
+          } else {
+            this.reconnect();
+          }
         };
       });
-      this.messageProducerSubscription = this.messageProducer.subscribe(msg => {
-        if (!this.closed) {
-          if (msg.type === 'ready' && this.webSocketStatus.value !== 'connected') {
-            this.webSocketStatus.next("connected");
+      this.messageProducerSubscription = this.messageProducer.subscribe(
+        (msg) => {
+          if (!this.closed) {
+            if (
+              msg.type === 'ready' &&
+              this.webSocketStatus.value !== 'connected'
+            ) {
+              this.webSocketStatus.next('connected');
+            }
+            this.ws?.send(TSON.stringify(msg));
           }
-          this.ws?.send(TSON.stringify(msg));
         }
-      });
+      );
     } catch (error) {
       this.pauseUntil = new Date(Date.now() + FAIL_RETRY_WAIT_TIME);
     }

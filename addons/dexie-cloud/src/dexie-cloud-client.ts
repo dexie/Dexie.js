@@ -1,5 +1,9 @@
-import Dexie, { liveQuery, Subscription } from 'dexie';
-import { getDbNameFromDbUrl } from 'dexie-cloud-common';
+import Dexie, { liveQuery, Subscription, Table } from 'dexie';
+import {
+  DBPermissionSet,
+  DBRealmMember,
+  getDbNameFromDbUrl,
+} from 'dexie-cloud-common';
 import { BehaviorSubject, combineLatest, from, fromEvent } from 'rxjs';
 import { filter, map, skip, startWith, switchMap, take } from 'rxjs/operators';
 import { login } from './authentication/login';
@@ -9,7 +13,7 @@ import { PersistedSyncState } from './db/entities/PersistedSyncState';
 import { DexieCloudOptions } from './DexieCloudOptions';
 import { DISABLE_SERVICEWORKER_STRATEGY } from './DISABLE_SERVICEWORKER_STRATEGY';
 import './extend-dexie-interface';
-import { DexieCloudSyncOptions } from './extend-dexie-interface';
+import { DexieCloudSyncOptions } from './DexieCloudSyncOptions';
 import { dbOnClosed } from './helpers/dbOnClosed';
 import { IS_SERVICE_WORKER } from './helpers/IS_SERVICE_WORKER';
 import { throwVersionIncrementNeeded } from './helpers/throwVersionIncrementNeeded';
@@ -34,16 +38,35 @@ import { verifySchema } from './verifySchema';
 import { setupDefaultGUI } from './default-ui';
 import { DXCWebSocketStatus } from './DXCWebSocketStatus';
 import { computeSyncState } from './computeSyncState';
+import { generateKey } from './middleware-helpers/idGenerationHelpers';
+import { permissions } from './permissions';
+import { getCurrentUserEmitter } from './currentUserEmitter';
+import { NewIdOptions } from './types/NewIdOptions';
+import { getInvitesObservable } from './getInvitesObservable';
+import { getGlobalRolesObservable } from './getGlobalRolesObservable';
+export { DexieCloudTable } from './DexieCloudTable';
+export * from './getTiedRealmId';
+export {
+  DBRealm,
+  DBRealmMember,
+  DBRealmRole,
+  DBSyncedObject,
+  DBPermissionSet,
+} from 'dexie-cloud-common';
+export { Invite } from './Invite';
 
-export { DexieCloudTable } from './extend-dexie-interface';
+const DEFAULT_OPTIONS: Partial<DexieCloudOptions> = {
+  nameSuffix: true,
+};
 
 export function dexieCloud(dexie: Dexie) {
   const origIdbName = dexie.name;
   //
   //
   //
-  const currentUserEmitter = new BehaviorSubject(UNAUTHORIZED_USER);
+  const currentUserEmitter = getCurrentUserEmitter(dexie);
   const subscriptions: Subscription[] = [];
+  let configuredProgramatically = false;
 
   // local sync worker - used when there's no service worker.
   let localSyncWorker: { start: () => void; stop: () => void } | null = null;
@@ -76,9 +99,8 @@ export function dexieCloud(dexie: Dexie) {
 
   dexie.cloud = {
     version: '{version}',
-    options: null,
+    options: { ...DEFAULT_OPTIONS } as DexieCloudOptions,
     schema: null,
-    serverState: null,
     get currentUserId() {
       return currentUserEmitter.value.userId || UNAUTHORIZED_USER.userId!;
     },
@@ -99,9 +121,12 @@ export function dexieCloud(dexie: Dexie) {
       await db.cloud.sync();
       await login(db, hint);
     },
+    invites: getInvitesObservable(dexie),
+    roles: getGlobalRolesObservable(dexie),
     configure(options: DexieCloudOptions) {
-      dexie.cloud.options = options;
-      if (options.databaseUrl) {
+      options = dexie.cloud.options = { ...dexie.cloud.options, ...options };
+      configuredProgramatically = true;
+      if (options.databaseUrl && options.nameSuffix) {
         // @ts-ignore
         dexie.name = `${origIdbName}-${getDbNameFromDbUrl(
           options.databaseUrl
@@ -111,11 +136,11 @@ export function dexieCloud(dexie: Dexie) {
       updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
     },
     async sync(
-      { wait, purpose }: DexieCloudSyncOptions = { wait: true, purpose: "push" }
+      { wait, purpose }: DexieCloudSyncOptions = { wait: true, purpose: 'push' }
     ) {
       if (wait === undefined) wait = true;
       const db = DexieCloudDB(dexie);
-      if (purpose === "pull") {
+      if (purpose === 'pull') {
         const syncState = db.cloud.persistedSyncState.value;
         triggerSync(db, purpose);
         if (wait) {
@@ -161,12 +186,31 @@ export function dexieCloud(dexie: Dexie) {
         }
       }
     },
+    permissions(
+      obj: { owner: string; realmId: string; table?: () => string },
+      tableName?: string
+    ) {
+      return permissions(dexie._novip, obj, tableName);
+    },
   };
 
   dexie.Version.prototype['_parseStoresSpec'] = Dexie.override(
     dexie.Version.prototype['_parseStoresSpec'],
     (origFunc) => overrideParseStoresSpec(origFunc, dexie)
   );
+
+  dexie.Table.prototype.newId = function (
+    this: Table<any>,
+    { colocateWith }: NewIdOptions = {}
+  ) {
+    const shardKey =
+      colocateWith && colocateWith.substr(colocateWith.length - 3);
+    return generateKey(dexie.cloud.schema![this.name].idPrefix || '', shardKey);
+  };
+
+  dexie.Table.prototype.idPrefix = function (this: Table<any>) {
+    return this.db.cloud.schema?.[this.name]?.idPrefix || '';
+  };
 
   dexie.use(
     createMutationTrackingMiddleware({
@@ -181,10 +225,12 @@ export function dexieCloud(dexie: Dexie) {
     closed = false; // As Dexie calls us, we are not closed anymore. Maybe reopened? Remember db.ready event is registered with sticky flag!
     const db = DexieCloudDB(dexie);
     // Setup default GUI:
-    if (!IS_SERVICE_WORKER) {
+    if (typeof window !== 'undefined' && typeof document !== 'undefined') {
       if (!db.cloud.options?.customLoginGui) {
         subscriptions.push(setupDefaultGUI(dexie));
       }
+    }
+    if (!db.cloud.isServiceWorkerDB) {
       subscriptions.push(computeSyncState(db).subscribe(dexie.cloud.syncState));
     }
 
@@ -209,7 +255,7 @@ export function dexieCloud(dexie: Dexie) {
             db.getSchema(),
             db.getPersistedSyncState(),
           ]);
-        if (!options) {
+        if (!configuredProgramatically) {
           // Options not specified programatically (use case for SW!)
           // Take persisted options:
           db.cloud.options = persistedOptions || null;
@@ -218,6 +264,7 @@ export function dexieCloud(dexie: Dexie) {
           JSON.stringify(persistedOptions) !== JSON.stringify(options)
         ) {
           // Update persisted options:
+          if (!options) throw new Error(`Internal error`); // options cannot be null if configuredProgramatically is set.
           await db.$syncState.put(options, 'options');
         }
         if (
@@ -235,7 +282,10 @@ export function dexieCloud(dexie: Dexie) {
           // Not configured for using service worker or no service worker
           // registration exists. Don't rely on service worker to do any job.
           // Use LocalSyncWorker instead.
-          if (db.cloud.options?.tryUseServiceWorker && !IS_SERVICE_WORKER) {
+          if (
+            db.cloud.options?.tryUseServiceWorker &&
+            !db.cloud.isServiceWorkerDB
+          ) {
             console.debug(
               'dexie-cloud-addon: Not using service worker.',
               swRegistrations.length === 0
@@ -292,7 +342,7 @@ export function dexieCloud(dexie: Dexie) {
 
     // Manage CurrentUser observable:
     throwIfClosed();
-    if (!IS_SERVICE_WORKER) {
+    if (!db.cloud.isServiceWorkerDB) {
       subscriptions.push(
         liveQuery(() => db.getCurrentUser()).subscribe(currentUserEmitter)
       );
@@ -308,7 +358,7 @@ export function dexieCloud(dexie: Dexie) {
       // to subscribe to these observables and get actual data.
       await combineLatest([
         currentUserEmitter.pipe(skip(1), take(1)),
-        db.cloud.persistedSyncState.pipe(skip(1), take(1))
+        db.cloud.persistedSyncState.pipe(skip(1), take(1)),
       ]).toPromise();
     }
 
@@ -321,29 +371,29 @@ export function dexieCloud(dexie: Dexie) {
     localSyncWorker = null;
     throwIfClosed();
     if (db.cloud.usingServiceWorker && db.cloud.options?.databaseUrl) {
-      registerSyncEvent(db, "push").catch(() => {});
+      registerSyncEvent(db, 'push').catch(() => {});
       registerPeriodicSyncEvent(db).catch(() => {});
     } else if (
       db.cloud.options?.databaseUrl &&
       db.cloud.schema &&
-      !IS_SERVICE_WORKER
+      !db.cloud.isServiceWorkerDB
     ) {
       // There's no SW. Start SyncWorker instead.
       localSyncWorker = LocalSyncWorker(db, db.cloud.options, db.cloud.schema!);
       localSyncWorker.start();
-      triggerSync(db, "push");
+      triggerSync(db, 'push');
     }
 
     // Listen to online event and do sync.
     throwIfClosed();
-    if (!IS_SERVICE_WORKER) {
+    if (!db.cloud.isServiceWorkerDB) {
       subscriptions.push(
         fromEvent(self, 'online').subscribe(() => {
           console.debug('online!');
           db.syncStateChangedEvent.next({
             phase: 'not-in-sync',
           });
-          triggerSync(db, "push");
+          triggerSync(db, 'push');
         }),
         fromEvent(self, 'offline').subscribe(() => {
           console.debug('offline!');
@@ -354,11 +404,11 @@ export function dexieCloud(dexie: Dexie) {
       );
     }
 
-    // Connect WebSocket only if we're a browser window
+    // Connect WebSocket unless we
     if (
-      typeof window !== 'undefined' &&
-      !IS_SERVICE_WORKER &&
-      db.cloud.options?.databaseUrl
+      db.cloud.options?.databaseUrl &&
+      !db.cloud.options?.disableWebSocket &&
+      !IS_SERVICE_WORKER
     ) {
       subscriptions.push(connectWebSocket(db));
     }

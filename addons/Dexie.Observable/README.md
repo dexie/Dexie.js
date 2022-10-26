@@ -41,7 +41,7 @@ db.version(2).stores({}); // No need to add / remove tables. This is just to all
 
 ### Source
 
-[Dexie.Observable.js](https://github.com/dfahlander/Dexie.js/blob/master/addons/Dexie.Observable/src/Dexie.Observable.js)
+[Dexie.Observable.js](https://github.com/dexie/Dexie.js/blob/master/addons/Dexie.Observable/src/Dexie.Observable.js)
 
 ### Description
 

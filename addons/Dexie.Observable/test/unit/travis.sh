@@ -1,6 +1,6 @@
 #!/bin/bash -e
 echo "Installing dependencies for dexie-observable"
-npm install >/dev/null
-npm run build
-npm run test:typings
-npm run test:unit
+pnpm install >/dev/null
+pnpm run build
+pnpm run test:typings
+pnpm run test:unit

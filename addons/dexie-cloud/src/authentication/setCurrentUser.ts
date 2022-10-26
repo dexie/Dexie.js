@@ -1,37 +1,44 @@
-import { DexieCloudDB } from "../db/DexieCloudDB";
-import { AuthPersistedContext } from "./AuthPersistedContext";
+import { DexieCloudDB } from '../db/DexieCloudDB';
+import { AuthPersistedContext } from './AuthPersistedContext';
 
 /** This function changes or sets the current user as requested.
- * 
+ *
  * Use cases:
  * * Initially on db.ready after reading the current user from db.$logins.
  *   This will make sure that any unsynced operations from the previous user is synced before
  *   changing the user.
  * * Upon user request
- * 
- * @param db 
- * @param newUser 
+ *
+ * @param db
+ * @param newUser
  */
-export async function setCurrentUser(db: DexieCloudDB, user: AuthPersistedContext) {
+export async function setCurrentUser(
+  db: DexieCloudDB,
+  user: AuthPersistedContext
+) {
   if (user.userId === db.cloud.currentUserId) return; // Already this user.
 
   const $logins = db.table('$logins');
-  await db.transaction('rw', $logins, async tx => {
+  await db.transaction('rw', $logins, async (tx) => {
     const existingLogins = await $logins.toArray();
-    await Promise.all(existingLogins.filter(login => login.userId !== user.userId && login.isLoggedIn).map(login => {
-      login.isLoggedIn = false;
-      return $logins.put(login);
-    }));
+    await Promise.all(
+      existingLogins
+        .filter((login) => login.userId !== user.userId && login.isLoggedIn)
+        .map((login) => {
+          login.isLoggedIn = false;
+          return $logins.put(login);
+        })
+    );
     user.isLoggedIn = true;
     user.lastLogin = new Date();
     await user.save();
-    console.debug("Saved new user", user.email);
+    console.debug('Saved new user', user.email);
   });
-  await new Promise(resolve=>{
+  await new Promise((resolve) => {
     if (db.cloud.currentUserId === user.userId) {
       resolve(null);
     } else {
-      const subscription = db.cloud.currentUser.subscribe(currentUser=>{
+      const subscription = db.cloud.currentUser.subscribe((currentUser) => {
         if (currentUser.userId === user.userId) {
           subscription.unsubscribe();
           resolve(null);

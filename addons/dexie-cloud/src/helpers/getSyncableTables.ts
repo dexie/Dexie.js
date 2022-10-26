@@ -5,5 +5,6 @@ import { EntityCommon } from "../db/entities/EntityCommon";
 export function getSyncableTables(db: DexieCloudDB): Table<EntityCommon>[] {
   return Object.entries(db.cloud.schema || {})
     .filter(([, { markedForSync }]) => markedForSync)
-    .map(([tbl]) => db.table(tbl));
+    .map(([tbl]) => db.tables.filter(({name}) => name === tbl)[0])
+    .filter(cloudTableSchema => cloudTableSchema);
 }

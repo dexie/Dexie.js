@@ -37,10 +37,10 @@ var override = Dexie.override,
  * @param {Dexie} db 
  */
 function Syncable (db) {
-    if (!/^3\./.test(Dexie.version))
-        throw new Error(`Missing dexie version 3.x`);
-    if (!db.observable || (db.observable.version !== "{version}" && !/^3\./.test(db.observable.version)))
-        throw new Error(`Missing dexie-observable version 3.x`);
+    if (!/^(3|4)\./.test(Dexie.version))
+        throw new Error(`Missing dexie version 3.x or 4.x`);
+    if (!db.observable || (db.observable.version !== "{version}" && !/^(3|4)\./.test(db.observable.version)))
+        throw new Error(`Missing dexie-observable version 3.x or 4.x`);
     if (db.syncable) {
         if (db.syncable.version !== "{version}") throw new Error(`Mixed versions of dexie-syncable`);
         return; // Addon already active.

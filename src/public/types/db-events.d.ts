@@ -41,9 +41,34 @@ export interface DbEvents extends DexieEventSet {
   close: DexieCloseEvent;
 }
 
+/** Set of mutated parts of the database
+ */
 export type ObservabilitySet = {
-  // `idb:${dbName}/${tableName}/changedRowContents` - keys.
-  // `idb:${dbName}/${tableName}/changedIndexes/${indexName}` - indexes
+  /** Database part having been mutated.
+   * 
+   * This structure is produced in observability-middleware.ts
+   * and consumed in live-query.ts.
+   * 
+   * Format of 'part':
+   * 
+   *   `idb://${dbName}/${tableName}/${indexName}`
+   * 
+   * * dbName is the database name
+   * * tableName is the table name
+   * * indexName is any of:
+   *    1. An empty string - represents the primary keys of the affected objs
+   *    2. ":dels" - represents primary keys of deleted objects in the table
+   *    3. The keyPath of an index, such as "name", "age" or "address.city" -
+   *       represents indexes that, if used in a query, might affect the
+   *       result of that query.
+   * 
+   * IntervalTree
+   *    * See definition of IntervalTree type in rangeset.d.ts
+   *    * See rangesOverlap() in rangeset.ts that can be used to compare two
+   *      IntervalTrees and detect collissions.
+   *    * See RangeSet class that can be used to create an IntervalTree and add
+   *      ranges to it.
+   */
   [part: string]: IntervalTree;
 };
 

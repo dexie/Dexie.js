@@ -131,7 +131,7 @@ Get the options object for the given URL.
 
 ### Source
 
-[Dexie.Syncable.js](https://github.com/dfahlander/Dexie.js/blob/master/addons/Dexie.Syncable/src/Dexie.Syncable.js)
+[Dexie.Syncable.js](https://github.com/dexie/Dexie.js/blob/master/addons/Dexie.Syncable/src/Dexie.Syncable.js)
 
 ### Description
 

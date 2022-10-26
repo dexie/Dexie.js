@@ -8,6 +8,18 @@ import { propagateLocally, propagatingLocally } from './propagate-locally';
 if (typeof BroadcastChannel !== 'undefined') {
   const bc = new BroadcastChannel(STORAGE_MUTATED_DOM_EVENT_NAME);
 
+  /**
+   * The Node.js BroadcastChannel will prevent the node process from exiting
+   * if the BroadcastChannel is not closed.
+   * Therefore we have to call unref() which allows the process to finish
+   * properly even when the BroadcastChannel is never closed.
+   * @link https://nodejs.org/api/worker_threads.html#broadcastchannelunref
+   * @link https://github.com/dexie/Dexie.js/pull/1576
+   */
+  if (typeof (bc as any).unref === 'function') {
+    (bc as any).unref();
+  }
+  
   //
   // Propagate local changes to remote tabs, windows and workers via BroadcastChannel
   //
@@ -60,12 +72,14 @@ if (typeof BroadcastChannel !== 'undefined') {
   //
   // Propagate remote changes locally via storage event:
   //
-  addEventListener('storage', (ev: StorageEvent) => {
-    if (ev.key === STORAGE_MUTATED_DOM_EVENT_NAME) {
-      const data = JSON.parse(ev.newValue);
-      if (data) propagateLocally(data.changedParts);
-    }
-  });
+  if (typeof addEventListener !== 'undefined') {
+      addEventListener('storage', (ev: StorageEvent) => {
+      if (ev.key === STORAGE_MUTATED_DOM_EVENT_NAME) {
+        const data = JSON.parse(ev.newValue);
+        if (data) propagateLocally(data.changedParts);
+      }
+    });
+  }
 
   //
   // Propagate messages from service worker

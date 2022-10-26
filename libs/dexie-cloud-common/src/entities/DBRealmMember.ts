@@ -2,7 +2,7 @@ import { DBPermissionSet } from '../DBPermissionSet.js';
 import { DBSyncedObject } from './DBSyncedObject.js';
 
 export interface DBRealmMember extends DBSyncedObject {
-  id?: string;
+  id: string;
   userId?: string;
   email?: string;
   name?: string;

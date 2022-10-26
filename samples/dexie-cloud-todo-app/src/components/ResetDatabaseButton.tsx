@@ -1,17 +1,18 @@
-import { faDatabase } from "@fortawesome/free-solid-svg-icons";
-import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
-import React from "react";
-import { resetDatabase } from "../db";
+import React from 'react';
+import { faDatabase } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { db } from '../db';
 
 export function ResetDatabaseButton() {
   return (
     <button
       className="large-button"
-      onClick={() => {
-        resetDatabase();
+      onClick={async () => {
+        await db.delete();
+        window.location.reload();
       }}
     >
-      <FontAwesomeIcon icon={faDatabase} /> Reset Database
+      <FontAwesomeIcon icon={faDatabase} /> Factory reset client
     </button>
   );
 }

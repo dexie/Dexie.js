@@ -1,15 +1,8 @@
 <template>
   <li>
     <div role="group" :aria-label="titleLabel">
-      <input
-        type="checkbox"
-        :checked="done"
-        @change="toggleTodo"
-      />
-      <span
-        :class="{ done: done }"
-        :aria-label="titleLabel"
-      >
+      <input type="checkbox" :checked="done" @change="toggleTodo" />
+      <span :class="{ done: done }" :aria-label="titleLabel">
         {{ text }}
       </span>
       <button type="button" @click="deleteTodo">Delete</button>
@@ -17,31 +10,25 @@
   </li>
 </template>
 
-<script>
-export default {
-  name: 'Todo',
-  props: ['todoID', 'text', 'done'],
-  components: {},
-  methods: {
-    // toggleTodo emits an event to toggle this to-do between complete and
-    // incomplete.
-    toggleTodo() {
-      this.$emit('toggle-todo', { id: this.todoID, done: !this.done });
-    },
+<script setup>
+import { computed } from 'vue';
 
-    // deleteTodo emits an event to delete this to-do.
-    deleteTodo() {
-      this.$emit('delete-todo', { id: this.todoID });
-    }
-  },
-  computed: {
-    titleLabel() {
-      return this.done ?
-        `${this.text} (completed task)` :
-        this.text;
-    }
-  }
+const props = defineProps(['todoID', 'text', 'done']);
+const emits = defineEmits(['toggle-todo', 'delete-todo']);
+// toggleTodo emits an event to toggle this to-do between complete and
+// incomplete.
+function toggleTodo() {
+  emits('toggle-todo', { id: props.todoID, done: !props.done });
 }
+
+// deleteTodo emits an event to delete this to-do.
+function deleteTodo() {
+  emits('delete-todo', { id: props.todoID });
+}
+
+const titleLabel = computed(() => {
+  return props.done ? `${props.text} (completed task)` : props.text;
+});
 </script>
 
 <style scoped>

@@ -1,6 +1,6 @@
 ## Can't find dexie-observable.js?
 Transpiled code (dist version) IS ONLY checked in to
-the [releases](https://github.com/dfahlander/Dexie.js/tree/releases/addons/Dexie.Observable/dist)
+the [releases](https://github.com/dexie/Dexie.js/tree/releases/addons/Dexie.Observable/dist)
 branch.
 
 ## Download

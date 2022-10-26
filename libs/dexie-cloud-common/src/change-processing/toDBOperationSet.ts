@@ -10,7 +10,7 @@ import { DBKeyMutationSet } from "./DBKeyMutationSet.js";
  * @param inSet 
  * @returns DBOperationsSet representing inSet
  */
-export function toDBOperationSet(inSet: DBKeyMutationSet): DBOperationsSet {
+export function toDBOperationSet(inSet: DBKeyMutationSet): DBOperationsSet<string> {
   // Fictive transaction:
   const txid = randomString(16);
 
@@ -27,17 +27,17 @@ export function toDBOperationSet(inSet: DBKeyMutationSet): DBOperationsSet {
   }
 
   // Start computing the resulting format:
-  const result: DBOperationsSet = [];
+  const result: DBOperationsSet<string> = [];
 
   for (const [table, ops] of Object.entries(map)) {
     const resultEntry = {
       table,
-      muts: [] as DBOperation[],
+      muts: [] as DBOperation<string>[],
     };
     for (const [optype, muts] of Object.entries(ops)) {
       switch (optype) {
         case "ups": {
-          const op: DBUpsertOperation = {
+          const op: DBUpsertOperation<string> = {
             type: "upsert",
             keys: muts.map(mut => mut.key),
             values: muts.map(mut => mut.val),
@@ -47,7 +47,7 @@ export function toDBOperationSet(inSet: DBKeyMutationSet): DBOperationsSet {
           break;
         }
         case "upd": {
-          const op: DBUpdateOperation = {
+          const op: DBUpdateOperation<string> = {
             type: "update",
             keys: muts.map(mut => mut.key),
             changeSpecs: muts.map(mut => mut.mod),
@@ -57,7 +57,7 @@ export function toDBOperationSet(inSet: DBKeyMutationSet): DBOperationsSet {
           break;
         }
         case "del": {
-          const op: DBDeleteOperation = {
+          const op: DBDeleteOperation<string> = {
             type: "delete",
             keys: muts.map(mut => mut.key),
             txid,
