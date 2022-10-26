@@ -30,6 +30,7 @@ export type { TableProp };
 export * from './types/entity';
 export { UpdateSpec } from './types/update-spec';
 export * from './types/insert-type';
+export { Optional } from './types/optional';
 
 // Alias of Table and Collection in order to be able to refer them from module below...
 interface _Table<T, TKey extends IndexableType, TEntity = T> extends Table<T, TKey, TEntity> {}
