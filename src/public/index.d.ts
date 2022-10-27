@@ -27,6 +27,7 @@ import { IntervalTree, RangeSetConstructor } from './types/rangeset';
 import { Dexie, TableProp } from './types/dexie';
 export type { TableProp };
 export * from './types/entity';
+export * from './types/entity-table';
 export { UpdateSpec } from './types/update-spec';
 export * from './types/insert-type';
 
