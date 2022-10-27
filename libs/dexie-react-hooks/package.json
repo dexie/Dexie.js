@@ -1,6 +1,6 @@
 {
   "name": "dexie-react-hooks",
-  "version": "1.1.1",
+  "version": "1.1.2",
   "packageManager": "^pnpm@7.9.5",
   "description": "React hooks for reactive data fetching using Dexie.js",
   "main": "dist/dexie-react-hooks.js",
@@ -60,7 +60,7 @@
     "@types/qunit": "^2.9.6",
     "@types/react": "^17.0.0",
     "@types/react-dom": "^17.0.0",
-    "dexie": "workspace:>=3.1.0-alpha.1 || ^4.0.0-alpha.1",
+    "dexie": "workspace:>=3.1.0-alpha.1 || ^4.0.1-alpha.5",
     "just-build": "^0.9.24",
     "qunit": "^2.12.0",
     "react": "^17.0.1",
