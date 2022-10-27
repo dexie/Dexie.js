@@ -3,7 +3,7 @@
  * It tests Dexie.d.ts.
  */
 
-import Dexie from '../../dist/dexie'; // Imports the source Dexie.d.ts file
+import Dexie, { IndexableType, Table } from '../../dist/dexie'; // Imports the source Dexie.d.ts file
 import './test-extend-dexie';
 
 // constructor overloads:
@@ -102,7 +102,8 @@ import './test-extend-dexie';
         friends: Dexie.Table<Friend, number>;
         table2: Dexie.Table<Entity2, string>;
         table3: Dexie.Table<Entity3, 'oid'>;
-        table4: Dexie.Table<Entity3>;
+        table4: Dexie.Table<Entity3, string>;
+        table5: Table;
         compoundTable: Dexie.Table<CompoundKeyEntity, [string, string]>;
 
         constructor () {
@@ -110,11 +111,13 @@ import './test-extend-dexie';
             this.version(1).stores({
                 table1: '++id',
                 table2: 'oid',
-                table3: 'oid',
+                table3: '++oid',
                 compoundTable: '[firstName+lastName]'
             });
         }
     }
+    const fooAny: string = 'null'
+    const foo: IndexableType = fooAny
 
     let db = new MyDatabase();
 
@@ -126,8 +129,10 @@ import './test-extend-dexie';
     db.on('customEvent2', ()=>{});
 
     // db.table2.put()
+    // db.table5.where()
     // db.table3.add({oid: '', prop2: new Date(), prop1: new Date()})
-    // db.table4.bulkGet([''])
+    // db.table3.get()
+    //  db.table4 = db.table5
 
     // Table.get
     db.friends.get(1).then(friend => friend && friend.address.city);
