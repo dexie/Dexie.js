@@ -19,7 +19,7 @@ import { TypeDefSet } from 'dreambase-library/dist/typeson-simplified/TypeDefSet
 //     serverRev.rev = bigIntDef.bigint.revive(server.rev)
 //   else
 //     serverRev.rev = new FakeBigInt(server.rev)
-export const hasBigIntSupport = typeof BigInt(0) === 'bigint';
+export const hasBigIntSupport = typeof BigInt === 'function' && typeof BigInt(0) === 'bigint';
 
 function getValueOfBigInt(x: bigint | FakeBigInt | string) {
   if (typeof x === 'bigint') {
