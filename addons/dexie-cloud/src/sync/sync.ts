@@ -5,9 +5,7 @@ import { listSyncifiedChanges } from './listSyncifiedChanges';
 import { getTablesToSyncify } from './getTablesToSyncify';
 import { listClientChanges } from './listClientChanges';
 import { syncWithServer } from './syncWithServer';
-import Dexie from 'dexie';
 import { modifyLocalObjectsWithNewUserId } from './modifyLocalObjectsWithNewUserId';
-import { bulkUpdate } from '../helpers/bulkUpdate';
 import { throwIfCancelled } from '../helpers/CancelToken';
 import { DexieCloudOptions } from '../DexieCloudOptions';
 import { BaseRevisionMapEntry } from '../db/entities/BaseRevisionMapEntry';
@@ -26,6 +24,7 @@ import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import { isOnline } from './isOnline';
 import { updateBaseRevs } from './updateBaseRevs';
 import { getLatestRevisionsPerTable } from './getLatestRevisionsPerTable';
+import { applyServerChanges } from './applyServerChanges';
 
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 
@@ -145,16 +144,16 @@ async function _sync(
   // Prepare for syncification by modifying locally unauthorized objects:
   //
   const persistedSyncState = await db.getPersistedSyncState();
-  const tablesToSyncify =
-    !isInitialSync && currentUser.isLoggedIn
-      ? getTablesToSyncify(db, persistedSyncState)
-      : [];
+  const readyForSyncification = !isInitialSync && currentUser.isLoggedIn;
+  const tablesToSyncify = readyForSyncification
+    ? getTablesToSyncify(db, persistedSyncState)
+    : [];
   throwIfCancelled(cancelToken);
   const doSyncify = tablesToSyncify.length > 0;
 
   if (doSyncify) {
     if (justCheckIfNeeded) return true;
-    console.debug('sync doSyncify is true');
+    //console.debug('sync doSyncify is true');
     await db.transaction('rw', tablesToSyncify, async (tx) => {
       // @ts-ignore
       tx.idbtrans.disableChangeTracking = true;
@@ -180,11 +179,15 @@ async function _sync(
       let clientChanges = await listClientChanges(mutationTables, db);
       throwIfCancelled(cancelToken);
       if (doSyncify) {
+        const alreadySyncedRealms = [
+          ...(persistedSyncState?.realms || []),
+          ...(persistedSyncState?.inviteRealms || []),
+        ];
         const syncificationInserts = await listSyncifiedChanges(
           tablesToSyncify,
           currentUser,
           schema!,
-          persistedSyncState?.realms
+          alreadySyncedRealms
         );
         throwIfCancelled(cancelToken);
         clientChanges = clientChanges.concat(syncificationInserts);
@@ -201,7 +204,7 @@ async function _sync(
     console.debug('Sync is needed:', syncIsNeeded);
     return syncIsNeeded;
   }
-  if (purpose === "push" && !syncIsNeeded) {
+  if (purpose === 'push' && !syncIsNeeded) {
     // The purpose of this request was to push changes
     return false;
   }
@@ -224,7 +227,8 @@ async function _sync(
     db,
     databaseUrl,
     schema,
-    clientIdentity
+    clientIdentity,
+    currentUser
   );
   console.debug('Sync response', res);
 
@@ -321,11 +325,13 @@ async function _sync(
       latestRevisions: {},
       realms: [],
       inviteRealms: [],
-      clientIdentity
+      clientIdentity,
     };
-    newSyncState.syncedTables = tablesToSync
-      .map((tbl) => tbl.name)
-      .concat(tablesToSyncify.map((tbl) => tbl.name));
+    if (readyForSyncification) {
+      newSyncState.syncedTables = tablesToSync
+        .map((tbl) => tbl.name)
+        .concat(tablesToSyncify.map((tbl) => tbl.name));
+    }
     newSyncState.latestRevisions = latestRevisions;
     newSyncState.remoteDbId = res.dbId;
     newSyncState.initiallySynced = true;
@@ -365,18 +371,32 @@ async function deleteObjectsFromRemovedRealms(
   res: SyncResponse,
   prevState: PersistedSyncState | undefined
 ) {
-  const deletedRealms: string[] = [];
-  const previousRealmSet = prevState
-    ? prevState.realms.concat(prevState.inviteRealms)
-    : [];
-  const updatedRealmSet = new Set([...res.realms, ...res.inviteRealms]);
+  const deletedRealms = new Set<string>();
+  const rejectedRealms = new Set<string>();
+  const previousRealmSet = prevState ? prevState.realms : [];
+  const previousInviteRealmSet = prevState ? prevState.inviteRealms : [];
+  const updatedRealmSet = new Set(res.realms);
+  const updatedTotalRealmSet = new Set(res.realms.concat(res.inviteRealms));
   for (const realmId of previousRealmSet) {
-    if (!updatedRealmSet.has(realmId)) deletedRealms.push(realmId);
+    if (!updatedRealmSet.has(realmId)) {
+      rejectedRealms.add(realmId);
+      if (!updatedTotalRealmSet.has(realmId)) {
+        deletedRealms.add(realmId);
+      }
+    }
   }
-  if (deletedRealms.length > 0) {
-    const deletedRealmSet = new Set(deletedRealms);
+  for (const realmId of previousInviteRealmSet.concat(previousRealmSet)) {
+    if (!updatedTotalRealmSet.has(realmId)) {
+      deletedRealms.add(realmId);
+    }
+  }
+  if (deletedRealms.size > 0 || rejectedRealms.size > 0) {
     const tables = getSyncableTables(db);
     for (const table of tables) {
+      let realmsToDelete = ['realms', 'members', 'roles'].includes(table.name)
+        ? deletedRealms // These tables should spare rejected ones.
+        : rejectedRealms; // All other tables shoudl delete rejected+deleted ones
+      if (realmsToDelete.size === 0) continue;
       if (
         table.schema.indexes.some(
           (idx) =>
@@ -385,70 +405,26 @@ async function deleteObjectsFromRemovedRealms(
         )
       ) {
         // There's an index to use:
-        await table.where('realmId').anyOf(deletedRealms).delete();
+        //console.debug(`REMOVAL: deleting all ${table.name} where realmId anyOf `, JSON.stringify([...realmsToDelete]));
+        await table
+          .where('realmId')
+          .anyOf([...realmsToDelete])
+          .delete();
       } else {
         // No index to use:
+        //console.debug(`REMOVAL: deleting all ${table.name} where realmId is any of `, JSON.stringify([...realmsToDelete]), realmsToDelete.size);
         await table
-          .filter((obj) => !!obj?.realmId && deletedRealmSet.has(obj.realmId))
+          .filter((obj) => !!obj?.realmId && realmsToDelete.has(obj.realmId))
           .delete();
       }
     }
   }
 }
 
-export async function applyServerChanges(
-  changes: DBOperationsSet,
-  db: DexieCloudDB
-) {
-  console.debug('Applying server changes', changes, Dexie.currentTransaction);
-  for (const { table: tableName, muts } of changes) {
-    const table = db.table(tableName);
-    if (!table) continue; // If server sends changes on a table we don't have, ignore it.
-    const { primaryKey } = table.core.schema;
-    for (const mut of muts) {
-      switch (mut.type) {
-        case 'insert':
-          if (primaryKey.outbound) {
-            await table.bulkAdd(mut.values, mut.keys);
-          } else {
-            mut.keys.forEach((key, i) => {
-              Dexie.setByKeyPath(mut.values[i], primaryKey.keyPath as any, key);
-            });
-            await table.bulkAdd(mut.values);
-          }
-          break;
-        case 'upsert':
-          if (primaryKey.outbound) {
-            await table.bulkPut(mut.values, mut.keys);
-          } else {
-            mut.keys.forEach((key, i) => {
-              Dexie.setByKeyPath(mut.values[i], primaryKey.keyPath as any, key);
-            });
-            await table.bulkPut(mut.values);
-          }
-          break;
-        case 'modify':
-          if (mut.keys.length === 1) {
-            await table.update(mut.keys[0], mut.changeSpec);
-          } else {
-            await table.where(':id').anyOf(mut.keys).modify(mut.changeSpec);
-          }
-          break;
-        case 'update':
-          await bulkUpdate(table, mut.keys, mut.changeSpecs);
-          break;
-        case 'delete':
-          await table.bulkDelete(mut.keys);
-          break;
-      }
-    }
-  }
-}
-
 export function filterServerChangesThroughAddedClientChanges(
-  serverChanges: DBOperationsSet,
+  serverChanges: DBOperationsSet<string>,
   addedClientChanges: DBOperationsSet
-): DBOperationsSet {
+): DBOperationsSet<string> {
   const changes: DBKeyMutationSet = {};
   applyOperations(changes, serverChanges);
   const localPostChanges: DBKeyMutationSet = {};

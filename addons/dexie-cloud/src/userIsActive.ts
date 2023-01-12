@@ -11,7 +11,7 @@ import {
   tap,
 } from 'rxjs/operators';
 
-const USER_INACTIVITY_TIMEOUT = 300_000; // 300_000;
+const USER_INACTIVITY_TIMEOUT = 180_000; // 3 minutes
 const ACTIVE_WAIT_TIME = 0; // For now, it's nicer to react instantly on user activity
 const INACTIVE_WAIT_TIME = 20_000;
 
@@ -29,12 +29,15 @@ export const userIsActive = new BehaviorSubject<boolean>(true);
 export const userIsReallyActive = new BehaviorSubject<boolean>(true);
 userIsActive
   .pipe(
-    switchMap((isActive) =>
-      isActive
+    switchMap((isActive) => {
+      //console.debug('SyncStatus: DUBB: isActive changed to', isActive);
+      return isActive
         ? ACTIVE_WAIT_TIME
           ? of(true).pipe(delay(ACTIVE_WAIT_TIME))
           : of(true)
-        : of(false).pipe(delay(INACTIVE_WAIT_TIME))
+        : INACTIVE_WAIT_TIME
+        ? of(false).pipe(delay(INACTIVE_WAIT_TIME))
+        : of(false);}
     ),
     distinctUntilChanged()
   )
@@ -65,6 +68,7 @@ export const userDoesSomething =
   typeof window !== 'undefined'
     ? merge(
         documentBecomesVisible,
+        fromEvent(window, 'mousedown'),
         fromEvent(window, 'mousemove'),
         fromEvent(window, 'keydown'),
         fromEvent(window, 'wheel'),

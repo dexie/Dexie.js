@@ -34,13 +34,6 @@ module.exports = {
       os: 'Windows',
       os_version: '10'
     },
-    bs_ie11: {
-      base: 'BrowserStack',
-      browser: 'ie',
-      browser_version: '11',
-      os: 'Windows',
-      os_version: 10
-    },
     bs_chrome_oldest_supported: {
       base: 'BrowserStack',
       browser: "Chrome",

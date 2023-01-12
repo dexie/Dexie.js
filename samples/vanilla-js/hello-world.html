@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://unpkg.com/dexie@latest/dist/dexie.min.js"></script>
+    <script>
+      //
+      // Declare Database
+      //
+      var db = new Dexie('FriendDatabase');
+      db.version(1).stores({
+        friends: '++id, name, age',
+      });
+
+      //
+      // Manipulate and Query Database
+      //
+      db.friends.add({
+        name: 'Josephine',
+        age: 21,
+      }).then((id) => {
+        alert(`Successfully added a friend with id ${id}`);
+      }).then(() => {
+        return db.friends.where('age').below(25).toArray();
+      }).then((youngFriends) => {
+        alert(`My young friends: ${JSON.stringify(youngFriends)}`);
+      }).catch((error) => {
+        alert(`Oops, error: ${error}`);
+      });
+    </script>
+  </head>
+</html>

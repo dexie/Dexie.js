@@ -1,0 +1,7 @@
+packages:
+  # The "dexie" package in the root
+  - '.'
+  # all packages in direct subdirs of addons/
+  - 'addons/*'
+  # all packages in direct subdirs of libs/
+  - 'libs/*'

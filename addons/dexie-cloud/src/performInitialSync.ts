@@ -9,20 +9,7 @@ export async function performInitialSync(
   cloudOptions: DexieCloudOptions,
   cloudSchema: DexieCloudSchema
 ) {
-  console.debug("Performing initial sync");
-  await performGuardedJob(
-    db,
-    'initialSync',
-    '$jobs',
-    async () => {
-      // Even though caller has already checked it,
-      // Do check again (now within a transaction) that we really do not have a sync state:
-      const syncState = await db.getPersistedSyncState();
-      if (!syncState?.initiallySynced) {
-        await sync(db, cloudOptions, cloudSchema, {isInitialSync: true});
-      }
-    },
-    { awaitRemoteJob: true } // Don't return until the job is done!
-  );
-  console.debug("Done initial sync");
+  console.debug('Performing initial sync');  
+  await sync(db, cloudOptions, cloudSchema, { isInitialSync: true });
+  console.debug('Done initial sync');
 }

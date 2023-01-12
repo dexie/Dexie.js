@@ -5,7 +5,7 @@ import Promise from "../helpers/promise";
 import { cmp } from '../functions/cmp';
 
 export function getFromTransactionCache(
-  keys: any[],
+  keys: readonly any[],
   cache: { keys: any[]; values: any[] } | undefined | null,
   clone?: boolean
 ) {

@@ -60,15 +60,22 @@ export function connectWebSocket(db: DexieCloudDB) {
 
   function createObservable(): Observable<WSConnectionMsg | null> {
     return db.cloud.persistedSyncState.pipe(
-      filter(syncState => syncState?.serverRevision),// Don't connect before there's no initial sync performed.
+      filter((syncState) => syncState?.serverRevision), // Don't connect before there's no initial sync performed.
       take(1), // Don't continue waking up whenever syncState change
-      switchMap((syncState)=> db.cloud.currentUser.pipe(map(userLogin => [userLogin, syncState] as const))),
-      switchMap(([userLogin, syncState]) =>
-        userIsReallyActive.pipe(
-          map((isActive) => ([isActive ? userLogin : null, syncState] as const))
+      switchMap((syncState) =>
+        db.cloud.currentUser.pipe(
+          map((userLogin) => [userLogin, syncState] as const)
         )
       ),
-      switchMap(async ([userLogin, syncState]) => [userLogin, await computeRealmSetHash(syncState!)] as const),
+      switchMap(([userLogin, syncState]) =>
+        userIsReallyActive.pipe(
+          map((isActive) => [isActive ? userLogin : null, syncState] as const)
+        )
+      ),
+      switchMap(
+        async ([userLogin, syncState]) =>
+          [userLogin, await computeRealmSetHash(syncState!)] as const
+      ),
       switchMap(([userLogin, realmSetHash]) =>
         // Let server end query changes from last entry of same client-ID and forward.
         // If no new entries, server won't bother the client. If new entries, server sends only those
@@ -111,11 +118,12 @@ export function connectWebSocket(db: DexieCloudDB) {
           return throwError(error);
         }
       }),
-      catchError((error) =>
-        from(waitAndReconnectWhenUserDoesSomething(error)).pipe(
+      catchError((error) => {
+        db.cloud.webSocketStatus.next("error");
+        return from(waitAndReconnectWhenUserDoesSomething(error)).pipe(
           switchMap(() => createObservable())
-        )
-      )
+        );
+      })
     );
   }
 

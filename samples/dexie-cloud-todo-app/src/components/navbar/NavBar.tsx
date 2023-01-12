@@ -6,11 +6,12 @@ import {
   NavLink,
 } from 'react-bootstrap';
 import { useObservable } from 'react-use';
-import { db, resetDatabase } from '../../db';
+import { db } from '../../db';
 import { SyncStatusIcon } from './SyncStatusIcon';
 import './NavBar.css';
 import importData from '../../data/importfile.json';
 import { handleError } from '../../helpers/handleError';
+import { logout } from '../../db/logout';
 
 export function NavBar() {
   const currentUser = useObservable(db.cloud.currentUser);
@@ -38,7 +39,7 @@ export function NavBar() {
               <SyncStatusIcon />
             </Navbar.Text>
             <NavDropdown title={currentUser.name} id="basic-nav-dropdown">
-              <NavDropdown.Item onClick={() => resetDatabase()}>
+              <NavDropdown.Item onClick={() => logout()}>
                 Logout
               </NavDropdown.Item>
             </NavDropdown>

@@ -40,9 +40,9 @@ export interface DexieConstructor extends DexieExceptionClasses {
   liveQuery<T>(fn: () => T | Promise<T>): Observable<T>;
   extendObservabilitySet (target: ObservabilitySet, newSet: ObservabilitySet): ObservabilitySet;
   override<F> (origFunc:F, overridedFactory: (fn:any)=>any) : F; // ?
-  getByKeyPath(obj: Object, keyPath: string): any;
-  setByKeyPath(obj: Object, keyPath: string, value: any): void;
-  delByKeyPath(obj: Object, keyPath: string): void;
+  getByKeyPath(obj: Object, keyPath: string | string[]): any;
+  setByKeyPath(obj: Object, keyPath: string | string[], value: any): void;
+  delByKeyPath(obj: Object, keyPath: string | string[]): void;
   shallowClone<T> (obj: T): T;
   deepClone<T>(obj: T): T;
   asap(fn: Function) : void; //?

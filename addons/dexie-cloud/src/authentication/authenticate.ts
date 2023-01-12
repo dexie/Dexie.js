@@ -137,6 +137,7 @@ async function userAuthenticate(
     false, // Non-exportable...
     ['sign', 'verify']
   );
+  if (!privateKey || !publicKey) throw new Error(`Could not generate RSA keypair`); // Typings suggest these can be undefined...
   context.nonExportablePrivateKey = privateKey; //...but storable!
   const publicKeySPKI = await crypto.subtle.exportKey('spki', publicKey);
   const publicKeyPEM = spkiToPEM(publicKeySPKI);

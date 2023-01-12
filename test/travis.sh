@@ -1,3 +1,3 @@
 #!/bin/bash -e
-npm run test:typings
-npm run test:unit
+pnpm run test:typings
+pnpm run test:unit

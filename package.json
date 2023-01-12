@@ -1,12 +1,38 @@
 {
   "name": "dexie",
-  "version": "3.2.0-rc.2",
+  "version": "4.0.0-alpha.4",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "module": "dist/dexie.mjs",
   "jsnext:main": "dist/dexie.mjs",
-  "exports": "./dist/modern/dexie.mjs",
+  "exports": {
+    ".": {
+      "production": {
+        "browser": "./dist/modern/dexie.min.mjs",
+        "module": "./dist/modern/dexie.min.mjs",
+        "import": "./import-wrapper-prod.mjs",
+        "require": "./dist/dexie.min.js",
+        "default": "./dist/dexie.min.js"
+      },
+      "development": {
+        "browser": "./dist/modern/dexie.mjs",
+        "module": "./dist/modern/dexie.mjs",
+        "import": "./import-wrapper.mjs",
+        "require": "./dist/dexie.js",
+        "default": "./dist/dexie.js"
+      },
+      "default": {
+        "browser": "./dist/modern/dexie.mjs",
+        "module": "./dist/modern/dexie.mjs",
+        "import": "./import-wrapper.mjs",
+        "require": "./dist/dexie.js",
+        "default": "./dist/dexie.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
   "typings": "dist/dexie.d.ts",
+  "packageManager": "^pnpm@7.9.5",
   "jspm": {
     "format": "cjs",
     "ignore": [
@@ -15,7 +41,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dfahlander/Dexie.js.git"
+    "url": "https://github.com/dexie/Dexie.js.git"
   },
   "keywords": [
     "indexeddb",
@@ -32,13 +58,13 @@
   ],
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/dfahlander/Dexie.js/issues"
+    "url": "https://github.com/dexie/Dexie.js/issues"
   },
   "scripts": {
     "build": "just-build",
     "watch": "just-build --watch",
     "clean": "rm -rf tools/tmp && rm dist/*.js && rm dist/*.map && rm dist/*.ts && rm dist/*.mjs",
-    "test": "npm run build && npm run test:typings && npm run test:unit",
+    "test": "pnpm run build && pnpm run test:typings && pnpm run test:unit",
     "test:unit": "karma start test/karma.conf.js --single-run",
     "test:typings": "tsc -p test/typings-test/",
     "test:debug": "karma start test/karma.conf.js --log-level debug"
@@ -89,13 +115,10 @@
       "rollup -c ../tools/build-configs/rollup.tests.config.js"
     ]
   },
-  "engines": {
-    "node": ">=6.0"
-  },
   "homepage": "https://dexie.org",
   "devDependencies": {
     "dts-bundle-generator": "^5.9.0",
-    "just-build": "^0.9.19",
+    "just-build": "^0.9.24",
     "karma": "^6.1.1",
     "karma-browserstack-launcher": "^1.5.2",
     "karma-chrome-launcher": "^3.1.0",

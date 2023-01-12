@@ -1,6 +1,7 @@
 {
   "name": "dexie-observable",
-  "version": "3.0.0-beta.11",
+  "version": "4.0.0-beta.13",
+  "packageManager": "^pnpm@7.9.5",
   "description": "Addon to Dexie that makes it possible to observe database changes no matter if they occur on other db instance or other window.",
   "main": "dist/dexie-observable.js",
   "module": "dist/dexie-observable.es.js",
@@ -14,7 +15,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dfahlander/Dexie.js.git"
+    "url": "https://github.com/dexie/Dexie.js.git"
   },
   "keywords": [
     "indexeddb",
@@ -31,12 +32,12 @@
   ],
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/dfahlander/Dexie.js/issues"
+    "url": "https://github.com/dexie/Dexie.js/issues"
   },
   "scripts": {
     "build": "just-build",
     "watch": "just-build --watch",
-    "test": "npm run build && npm run test:typings && npm run test:unit && npm run test:integration",
+    "test": "pnpm run build && pnpm run test:typings && pnpm run test:unit && pnpm run test:integration",
     "test:unit": "karma start test/unit/karma.conf.js --single-run",
     "test:integration": "karma start test/integration/karma.conf.js --single-run",
     "test:typings": "just-build test-typings",
@@ -69,22 +70,22 @@
     ],
     "test": [
       "# Build the unit tests (integration tests need no build)",
-      "tsc --allowJs --moduleResolution node --lib es2015,dom -t es5 -m es2015 --outDir tools/tmp/es5/test --rootDir ../.. --sourceMap test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
-      "rollup -c tools/build-configs/rollup.tests.config.js",
-      "eslint test/unit --cache --ignore-pattern bundle.js"
+      "tsc --allowJs --moduleResolution node --lib es2018,dom -t es5 -m es2015 --outDir tools/tmp/es5/test --rootDir ../.. --sourceMap test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
+      "rollup -c tools/build-configs/rollup.tests.config.js"
     ],
     "test-typings": [
       "tsc -p test/typings/"
     ]
   },
-  "homepage": "http://dexie.org",
+  "homepage": "https://dexie.org",
   "peerDependencies": {
-    "dexie": "^3.0.2"
+    "dexie": "workspace:^3.0.2 || ^4.0.0-alpha.1"
   },
   "devDependencies": {
-    "dexie": "^3.0.2",
+    "@types/node": "^18.7.14",
+    "dexie": "workspace:^3.0.2 || ^4.0.0-alpha.1",
     "eslint": "^7.27.0",
-    "just-build": "^0.9.19",
+    "just-build": "^0.9.24",
     "qunit": "^2.9.2",
     "uglify-js": "^3.5.6"
   }

@@ -23,15 +23,15 @@ import 'dexie-syncable'; // will import dexie-observable as well.
 ### Dependency Tree
 
  * **Dexie.Syncable.js**
-   * [Dexie.Observable.js](http://dexie.org/docs/Observable/Dexie.Observable.js)
-     * [Dexie.js](http://dexie.org/docs/Dexie/Dexie.js)
+   * [Dexie.Observable.js](https://dexie.org/docs/Observable/Dexie.Observable.js)
+     * [Dexie.js](https://dexie.org/docs/Dexie/Dexie.js)
        * [IndexedDB](https://developer.mozilla.org/en-US/docs/Web/API/IndexedDB_API)
-   * _An implementation of [ISyncProtocol](http://dexie.org/docs/Syncable/Dexie.Syncable.ISyncProtocol)_
+   * _An implementation of [ISyncProtocol](https://dexie.org/docs/Syncable/Dexie.Syncable.ISyncProtocol)_
 
 ### Tutorial
 
 #### 1. Include Required Sources
-In your HTML, make sure to include Dexie.js, Dexie.Observable.js, Dexie.Syncable.js and an implementation of [ISyncProtocol](http://dexie.org/docs/Syncable/Dexie.Syncable.ISyncProtocol).
+In your HTML, make sure to include Dexie.js, Dexie.Observable.js, Dexie.Syncable.js and an implementation of [ISyncProtocol](https://dexie.org/docs/Syncable/Dexie.Syncable.ISyncProtocol).
 
     <html><head>
         <script src="dexie.min.js"></script>
@@ -93,54 +93,54 @@ _NOTE: Transactions only provide the Atomicity part of the [ACID](http://en.wiki
 
 #### Static Members
 
-[Dexie.Syncable.registerSyncProtocol (name, protocolInstance)](http://dexie.org/docs/Syncable/Dexie.Syncable.registerSyncProtocol())
+[Dexie.Syncable.registerSyncProtocol (name, protocolInstance)](https://dexie.org/docs/Syncable/Dexie.Syncable.registerSyncProtocol())
 Define how to replicate changes with your type of server.
 
-[Dexie.Syncable.Statuses](http://dexie.org/docs/Syncable/Dexie.Syncable.Statuses)
+[Dexie.Syncable.Statuses](https://dexie.org/docs/Syncable/Dexie.Syncable.Statuses)
 Enum of possible sync statuses, such as OFFLINE, CONNECTING, ONLINE and ERROR.
 
-[Dexie.Syncable.StatusTexts](http://dexie.org/docs/Syncable/Dexie.Syncable.StatusTexts)
+[Dexie.Syncable.StatusTexts](https://dexie.org/docs/Syncable/Dexie.Syncable.StatusTexts)
 Text lookup for status numbers
 
 #### Non-Static Methods and Events
 
-[db.syncable.connect (protocol, url, options)](http://dexie.org/docs/Syncable/db.syncable.connect())
+[db.syncable.connect (protocol, url, options)](https://dexie.org/docs/Syncable/db.syncable.connect())
 Create a persistend two-way sync connection with the given URL.
 
-[db.syncable.disconnect (url)](http://dexie.org/docs/Syncable/db.syncable.disconnect())
+[db.syncable.disconnect (url)](https://dexie.org/docs/Syncable/db.syncable.disconnect())
 Stop syncing with the given URL but keep revision states until next connect.
 
-[db.syncable.delete(url)](http://dexie.org/docs/Syncable/db.syncable.delete())
+[db.syncable.delete(url)](https://dexie.org/docs/Syncable/db.syncable.delete())
 Delete all states and change queue for given URL.
 
-[db.syncable.list()](http://dexie.org/docs/Syncable/db.syncable.list())
+[db.syncable.list()](https://dexie.org/docs/Syncable/db.syncable.list())
 List the URLs of each remote node we have a state saved for.
 
-[db.syncable.on('statusChanged')](http://dexie.org/docs/Syncable/db.syncable.on('statusChanged'))
+[db.syncable.on('statusChanged')](https://dexie.org/docs/Syncable/db.syncable.on('statusChanged'))
 Event triggered when sync status changes.
 
-[db.syncable.setFilter ([criteria], filter)](http://dexie.org/docs/Syncable/db.syncable.setFilter())
+[db.syncable.setFilter ([criteria], filter)](https://dexie.org/docs/Syncable/db.syncable.setFilter())
 Ignore certain objects from being synced defined by the given filter.
 
-[db.syncable.getStatus (url)](http://dexie.org/docs/Syncable/db.syncable.getStatus())
+[db.syncable.getStatus (url)](https://dexie.org/docs/Syncable/db.syncable.getStatus())
 Get sync status for the given URL.
 
-[db.syncable.getOptions (url)](http://dexie.org/docs/Syncable/db.syncable.getOptions())
+[db.syncable.getOptions (url)](https://dexie.org/docs/Syncable/db.syncable.getOptions())
 Get the options object for the given URL.
 
 
 ### Source
 
-[Dexie.Syncable.js](https://github.com/dfahlander/Dexie.js/blob/master/addons/Dexie.Syncable/src/Dexie.Syncable.js)
+[Dexie.Syncable.js](https://github.com/dexie/Dexie.js/blob/master/addons/Dexie.Syncable/src/Dexie.Syncable.js)
 
 ### Description
 
-Dexie.Syncable enables synchronization with a remote database (of almost any kind). It has its own API [ISyncProtocol](http://dexie.org/docs/Syncable/Dexie.Syncable.ISyncProtocol).
-The [ISyncProtocol](http://dexie.org/docs/Syncable/Dexie.Syncable.ISyncProtocol) is pretty straight-forward to implement.
+Dexie.Syncable enables synchronization with a remote database (of almost any kind). It has its own API [ISyncProtocol](https://dexie.org/docs/Syncable/Dexie.Syncable.ISyncProtocol).
+The [ISyncProtocol](https://dexie.org/docs/Syncable/Dexie.Syncable.ISyncProtocol) is pretty straight-forward to implement.
 The implementation of that API defines how client- and server- changes are transported between local and remote nodes. The API support both poll-patterns
 (such as ajax calls) and direct reaction pattern (such as WebSocket or long-polling methods). See samples below for each pattern.
 
-### Sample [ISyncProtocol](http://dexie.org/docs/Syncable/Dexie.Syncable.ISyncProtocol) Implementations
+### Sample [ISyncProtocol](https://dexie.org/docs/Syncable/Dexie.Syncable.ISyncProtocol) Implementations
  * [https://github.com/nponiros/sync_client](https://github.com/nponiros/sync_client)
  * [AjaxSyncProtocol.js](https://github.com/dfahlander/Dexie.js/blob/master/samples/remote-sync/ajax/AjaxSyncProtocol.js)
  * [WebSocketSyncProtocol.js](https://github.com/dfahlander/Dexie.js/blob/master/samples/remote-sync/websocket/WebSocketSyncProtocol.js)

@@ -4,6 +4,11 @@ export function assert(b: boolean): asserts b is true {
   if (!b) throw new Error('Assertion Failed');
 }
 
+const _hasOwn = {}.hasOwnProperty;
+export function hasOwn(obj, prop) {
+    return _hasOwn.call(obj, prop);
+}
+
 type SetByKeyPathTarget =
   | { [keyPath: string]: SetByKeyPathTarget }
   | SetByKeyPathTarget[];
@@ -37,7 +42,7 @@ export function setByKeyPath(
         //@ts-ignore: even if currentKeyPath would be numeric string and obj would be array - it works.
         var innerObj = obj[currentKeyPath];
         //@ts-ignore: even if currentKeyPath would be numeric string and obj would be array - it works.
-        if (!innerObj) innerObj = obj[currentKeyPath] = {};
+        if (!innerObj || !hasOwn(obj, currentKeyPath)) innerObj = (obj[currentKeyPath] = {});
         setByKeyPath(innerObj, remainingKeyPath, value);
       }
     } else {
@@ -53,15 +58,14 @@ export function setByKeyPath(
   }
 }
 
-export const randomString = typeof self === 'undefined' ? (bytes: number) => {
-  // Node
-  const buf = Buffer.alloc(bytes);
-  randomFillSync(buf);
-  return buf.toString("base64");
-} : (bytes: number) => {
+export const randomString = typeof self !== 'undefined' && typeof crypto !== 'undefined' ? (bytes: number) => {
   // Web
   const buf = new Uint8Array(bytes);
   crypto.getRandomValues(buf);
   return btoa(String.fromCharCode.apply(null, buf as any));
-}
-
+} : typeof Buffer !== 'undefined' ? (bytes: number) => {
+  // Node
+  const buf = Buffer.alloc(bytes);
+  randomFillSync(buf);
+  return buf.toString("base64");
+} : ()=>{throw new Error("No implementation of randomString was found");}

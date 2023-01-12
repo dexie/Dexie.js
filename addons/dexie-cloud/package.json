@@ -1,6 +1,7 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "1.0.0-beta.11",
+  "version": "4.0.0-beta.24",
+  "packageManager": "^pnpm@7.9.5",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/umd/dexie-cloud-addon.js",
   "module": "dist/module-es5/dexie-cloud-addon.js",
@@ -18,10 +19,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dfahlander/Dexie.js.git"
+    "url": "https://github.com/dexie/Dexie.js.git"
   },
   "scripts": {
-    "test": "just-build test && npm run test-unit",
+    "test": "just-build test && pnpm run test-unit",
     "test-unit": "karma start test/unit/karma.conf.js --single-run",
     "build": "just-build && bash ./copydts.sh",
     "watch": "just-build --watch",
@@ -53,7 +54,7 @@
     ],
     "src": [
       "# Build the entire typescript source into modern JS",
-      "tsc -p src -t es2018 --outDir tools/tmp/modern [--watch 'Watching for file changes.']"
+      "tsc -p src -t es2016 --outDir tools/tmp/modern [--watch 'Watching for file changes.']"
     ],
     "dexie-cloud": [
       "# Create a modern bundle in dist/modern",
@@ -87,8 +88,7 @@
     "@rollup/plugin-commonjs": "^18.0.0",
     "@rollup/plugin-node-resolve": "^11.2.1",
     "@types/node": "*",
-    "dexie-cloud-common": "^1.0.17",
-    "dreambase-library": "^1.0.13",
+    "dreambase-library": "^1.0.18",
     "just-build": "*",
     "karma": "*",
     "karma-browserstack-launcher": "*",
@@ -99,16 +99,18 @@
     "rollup": "^2.45.2",
     "rollup-plugin-alias": "*",
     "rollup-plugin-commonjs": "*",
+    "rollup-plugin-dts": "^4.0.1",
     "rollup-plugin-node-resolve": "*",
     "rollup-plugin-sourcemaps": "*",
     "tslib": "*",
     "typescript": "*",
-    "universal-imports": "^1.0.3"
+    "universal-imports": "^1.0.4"
   },
   "dependencies": {
-    "rxjs": "^6.6.7"
+    "dexie-cloud-common": "workspace:^1.0.23"
   },
   "peerDependencies": {
-    "dexie": "^3.2.0-beta.2"
+    "dexie": "workspace:^4.0.0-alpha.3",
+    "rxjs": "^7.x"
   }
 }

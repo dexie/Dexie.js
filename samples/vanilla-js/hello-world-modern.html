@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html>
+  <head>
+    <script type="module">
+      import Dexie from 'https://unpkg.com/dexie@latest/dist/modern/dexie.min.mjs';
+
+      //
+      // Declare Database
+      //
+      const db = new Dexie('FriendDatabase');
+      db.version(1).stores({
+        friends: '++id, name, age',
+      });
+
+      //
+      // Manipulate and Query Database
+      //
+      try {
+        let id = await db.friends.add({
+          name: 'Josephine',
+          age: 21,
+        });
+        alert(`Successfully added a friend with id ${id}`);
+
+        let youngFriends = await db.friends.where('age').below(25).toArray();
+
+        alert(`My young friends: ${JSON.stringify(youngFriends)}`);
+      } catch (error) {
+        alert(`Oops, error: ${error}`);
+      }
+    </script>
+  </head>
+</html>
