@@ -55,7 +55,7 @@ importers:
   addons/Dexie.Observable:
     specifiers:
       '@types/node': ^18.7.14
-      dexie: workspace:^3.0.2 || ^4.0.0-alpha.1
+      dexie: workspace:^3.0.2 || ^4.0.1-alpha.5
       eslint: ^7.27.0
       just-build: ^0.9.24
       qunit: ^2.9.2
@@ -70,7 +70,7 @@ importers:
 
   addons/Dexie.Syncable:
     specifiers:
-      dexie: workspace:^3.0.2 || ^4.0.0-alpha.1
+      dexie: workspace:^3.0.2 || ^4.0.1-alpha.5
       dexie-observable: workspace:^
       eslint: ^5.16.0
       just-build: ^0.9.24
@@ -89,7 +89,7 @@ importers:
       '@rollup/plugin-commonjs': ^18.0.0
       '@rollup/plugin-node-resolve': ^11.2.1
       '@types/node': '*'
-      dexie: workspace:^4.0.0-alpha.3
+      dexie: workspace:^4.0.1-alpha.5
       dexie-cloud-common: workspace:^1.0.23
       dreambase-library: ^1.0.18
       just-build: '*'
@@ -108,7 +108,7 @@ importers:
       rxjs: ^7.x
       tslib: '*'
       typescript: '*'
-      universal-imports: ^1.0.3
+      universal-imports: ^1.0.4
     dependencies:
       dexie: link:../..
       dexie-cloud-common: link:../../libs/dexie-cloud-common
@@ -123,7 +123,7 @@ importers:
       karma-browserstack-launcher: 1.6.0_karma@6.4.0
       karma-chrome-launcher: 3.1.1
       karma-firefox-launcher: 2.1.2
-      karma-qunit: 4.1.2_karma@6.4.0+qunit@2.19.1
+      karma-qunit: 4.1.2_karma@6.4.0+qunit@2.19.3
       preact: 10.10.6
       rollup: 2.79.0
       rollup-plugin-alias: 2.2.0
@@ -133,7 +133,7 @@ importers:
       rollup-plugin-sourcemaps: 0.6.3_fpbbcufdl4u4ztb4qwb46mjbhi
       tslib: 2.4.0
       typescript: 4.8.2
-      universal-imports: 1.0.3
+      universal-imports: 1.0.4
 
   addons/dexie-export-import:
     specifiers:
@@ -141,7 +141,7 @@ importers:
       '@types/node': ^13.5.1
       base64-arraybuffer-es6: '*'
       clarinet: dfahlander/clarinet
-      dexie: workspace:^2.0.4 || ^3.0.0 || ^4.0.0-alpha.1
+      dexie: workspace:^2.0.4 || ^3.0.0 || ^4.0.1-alpha.5
       just-build: ^0.9.24
       rollup-plugin-alias: ^2.2.0
       typeson: ^5.8.2
@@ -161,9 +161,9 @@ importers:
   libs/dexie-cloud-common:
     specifiers:
       '@types/node': ^18.7.14
-      universal-imports: ^1.0.1
+      universal-imports: ^1.0.4
     dependencies:
-      universal-imports: 1.0.1
+      universal-imports: 1.0.4
     devDependencies:
       '@types/node': 18.7.14
 
@@ -175,7 +175,7 @@ importers:
       '@types/qunit': ^2.9.6
       '@types/react': ^17.0.0
       '@types/react-dom': ^17.0.0
-      dexie: workspace:>=3.1.0-alpha.1 || ^4.0.0-alpha.1
+      dexie: workspace:>=3.1.0-alpha.1 || ^4.0.1-alpha.5
       just-build: ^0.9.24
       qunit: ^2.12.0
       react: ^17.0.1
@@ -459,13 +459,6 @@ packages:
     resolution: {integrity: sha512-wOuvG1SN4Us4rez+tylwwwCV1psiNVOkJeM3AUWUNWg/jDQY2+HE/444y5gc+jBmRqASOm2Oeh5c1axHobwRKQ==}
     dev: true
 
-  /@types/node-fetch/2.5.10:
-    resolution: {integrity: sha512-IpkX0AasN44hgEad0gEF/V6EgR5n69VEqPEgnmoM8GsIGro3PowbWs4tR6IhxUTyPLpOn+fiGG6nrQhcmoCuIQ==}
-    dependencies:
-      '@types/node': 18.7.14
-      form-data: 3.0.1
-    dev: false
-
   /@types/node/13.13.52:
     resolution: {integrity: sha512-s3nugnZumCC//n4moGGe6tkNMyYEdaDBitVjwPxXmR5lnMG5dHePinH2EdxkG3Rh1ghFHHixAG4NJhpJW1rthQ==}
     dev: true
@@ -480,6 +473,7 @@ packages:
 
   /@types/node/18.7.14:
     resolution: {integrity: sha512-6bbDaETVi8oyIARulOE9qF1/Qdi/23z6emrUh0fNJRUmjznqrixD4MpGDdgOFk5Xb0m2H6Xu42JGdvAxaJR/wA==}
+    dev: true
 
   /@types/prop-types/15.7.5:
     resolution: {integrity: sha512-JCB8C6SnDoQf0cNycqd/35A7MjcnK+ZTqE7judS6o7utxUCg6imJg3QK2qzHKszlTjcj2cn+NwMB2i96ubpj7w==}
@@ -823,10 +817,6 @@ packages:
     engines: {node: '>=8'}
     dev: true
 
-  /asynckit/0.4.0:
-    resolution: {integrity: sha512-Oei9OH4tRh0YqU3GxhX79dM/mwVgvbZJaSNaRk+bshkj0S5cfHcgYakreBjrHwatXKbz+IoIdYLxrKim2MjW0Q==}
-    dev: false
-
   /atob/2.1.2:
     resolution: {integrity: sha512-Wm6ukoaOGJi/73p/cl2GvLjTI5JM1k/O14isD73YML8StrH/7/lRFgmg8nICZgD3bZZvjwCGxtMOD3wWNAu8cg==}
     engines: {node: '>= 4.5.0'}
@@ -1100,13 +1090,6 @@ packages:
     resolution: {integrity: sha512-3tlv/dIP7FWvj3BsbHrGLJ6l/oKh1O3TcgBqMn+yyCagOxc23fyzDS6HypQbgxWbkpDnf52p1LuR4eWDQ/K9WQ==}
     dev: true
 
-  /combined-stream/1.0.8:
-    resolution: {integrity: sha512-FQN4MRfuJeHf7cBbBMJFXhKSDq+2kAArBlmRBvcvFE5BB1HZKXtSFASDhdlz9zOYwxh8lDdnvmMOe/+5cdoEdg==}
-    engines: {node: '>= 0.8'}
-    dependencies:
-      delayed-stream: 1.0.0
-    dev: false
-
   /commander/2.20.3:
     resolution: {integrity: sha512-GpVkmM8vF2vQUkj2LvZmD35JxeJOLCwJ9cUkugyk2nuhbv3+mJvpLYYt+0+USMxE+oj+ey/lJEnhZw75x/OMcQ==}
     dev: true
@@ -1257,11 +1240,6 @@ packages:
     resolution: {integrity: sha512-FJ3UgI4gIl+PHZm53knsuSFpE+nESMr7M4v9QcgB7S63Kj/6WqMiFQJpBBYz1Pt+66bZpP3Q7Lye0Oo9MPKEdg==}
     engines: {node: '>=0.10.0'}
     dev: true
-
-  /delayed-stream/1.0.0:
-    resolution: {integrity: sha512-ZySD7Nf91aLB0RxL4KGrKHBXl7Eds1DAmEdcoVawXnLD7SDhpNgtuII2aAkg7a7QS41jxPSZ17p4VdGnMHk3MQ==}
-    engines: {node: '>=0.4.0'}
-    dev: false
 
   /depd/1.1.2:
     resolution: {integrity: sha512-7emPTl6Dpo6JRXOXjLRxck+FlLRX5847cLKEn00PLAgc3g2hTZZgr+e4c2v6QpSmLeFP3n5yUo7ft6avBK/5jQ==}
@@ -1817,15 +1795,6 @@ packages:
         optional: true
     dev: true
 
-  /form-data/3.0.1:
-    resolution: {integrity: sha512-RHkBKtLWUVwd7SqRIvCZMEvAMoGUp0XU+seQiZejj0COz3RI3hWP4sCv3gZWWLjJTd7rGwcsF5eKZGii0r/hbg==}
-    engines: {node: '>= 6'}
-    dependencies:
-      asynckit: 0.4.0
-      combined-stream: 1.0.8
-      mime-types: 2.1.30
-    dev: false
-
   /fresh/0.5.2:
     resolution: {integrity: sha512-zJ2mQYM18rEFOudeV4GShTGIQ7RbzA7ozbU9I/XBpm7kqgMywgmylMwXHxZJmkVoYkna9d2pVXVXPdYTP9ej8Q==}
     engines: {node: '>= 0.6'}
@@ -2343,14 +2312,14 @@ packages:
       qunit: 2.17.2
     dev: true
 
-  /karma-qunit/4.1.2_karma@6.4.0+qunit@2.19.1:
+  /karma-qunit/4.1.2_karma@6.4.0+qunit@2.19.3:
     resolution: {integrity: sha512-taTPqBeHCOlkeKTSzQgIKzAUb79vw3rfbCph+xwwh63tyGjNtljwx91VArhIM9DzIIR3gB9G214wQg+oXI9ycw==}
     peerDependencies:
       karma: ^4.0.0 || ^5.0.0 || ^6.0.0
       qunit: ^2.0.0
     dependencies:
       karma: 6.4.0
-      qunit: 2.19.1
+      qunit: 2.19.3
     dev: true
 
   /karma/6.3.17:
@@ -2568,22 +2537,10 @@ packages:
       picomatch: 2.3.1
     dev: true
 
-  /mime-db/1.47.0:
-    resolution: {integrity: sha512-QBmA/G2y+IfeS4oktet3qRZ+P5kPhCKRXxXnQEudYqUaEioAU1/Lq2us3D/t1Jfo4hE9REQPrbB7K5sOczJVIw==}
-    engines: {node: '>= 0.6'}
-    dev: false
-
   /mime-db/1.52.0:
     resolution: {integrity: sha512-sPU4uV7dYlvtWJxwwxHD0PuihVNiE7TyAbQ5SWxDCB9mUYvOgroQOwYQQOKPJ8CIbE+1ETVlOoK1UC2nU3gYvg==}
     engines: {node: '>= 0.6'}
     dev: true
-
-  /mime-types/2.1.30:
-    resolution: {integrity: sha512-crmjA4bLtR8m9qLpHvgxSChT+XoSlZi8J4n/aIdn3z92e/U47Z0V/yl+Wh9W046GgFVAmoNR/fmdbZYcSSIUeg==}
-    engines: {node: '>= 0.6'}
-    dependencies:
-      mime-db: 1.47.0
-    dev: false
 
   /mime-types/2.1.35:
     resolution: {integrity: sha512-ZDY+bPm5zTTF+YpCrAU9nK0UgICYPT0QtT1NZWFv4s++TNkcgVaT0g6+4R2uI4MjQjzysHB1zxuWL50hzaeXiw==}
@@ -2935,6 +2892,16 @@ packages:
 
   /qunit/2.19.1:
     resolution: {integrity: sha512-gSGuw0vErE/rNjnlBW/JmE7NNubBlGrDPQvsug32ejYhcVFuZec9yoU0+C30+UgeCGwq6Ap89K65dMGo+kDGZQ==}
+    engines: {node: '>=10'}
+    hasBin: true
+    dependencies:
+      commander: 7.2.0
+      node-watch: 0.7.3
+      tiny-glob: 0.2.9
+    dev: true
+
+  /qunit/2.19.3:
+    resolution: {integrity: sha512-vEnspSZ37u2oR01OA/IZ1Td5V7BvQYFECdKPv86JaBplDNa5IHg0v7jFSPoP5L5o78Dbi8sl7/ATtpRDAKlSdw==}
     engines: {node: '>=10'}
     hasBin: true
     dependencies:
@@ -3975,22 +3942,12 @@ packages:
     hasBin: true
     dev: true
 
-  /universal-imports/1.0.1:
-    resolution: {integrity: sha512-sJ0+vSN+S7X8gkrsAr+uugWSWLF/0xsgoTXN8+o5upBegEQlv5X09+FjMQhWu6KC+iabm0BbFtlgJV4aRxKYEQ==}
-    dependencies:
-      '@types/node-fetch': 2.5.10
-      node-fetch: 2.6.7
-    transitivePeerDependencies:
-      - encoding
-    dev: false
-
-  /universal-imports/1.0.3:
-    resolution: {integrity: sha512-0C3ledn2fe9yMHvT6PSRF0ptlnUk1bT2TLSuYwWeI3F9cRFg3khqWemaXI65TrMznK90iNP4KHPmr5z4G5bo5A==}
+  /universal-imports/1.0.4:
+    resolution: {integrity: sha512-/oEtKj4CAV5Xf1Ly9SupMbAeOUoTxFxW/BYoXlktQDsMDrO+dlt37Hz8rgqr3irfcKmVf76zkytfGzW+FYdHSg==}
     dependencies:
       node-fetch: 2.6.7
     transitivePeerDependencies:
       - encoding
-    dev: true
 
   /universalify/0.1.2:
     resolution: {integrity: sha512-rBJeI5CXAlmy1pV+617WB9J63U6XcazHHF2f2dbJix4XzpUF0RS3Zbj0FGIOCAva5P/d/GBOYaACQ1w+0azUkg==}
