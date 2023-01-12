@@ -11,15 +11,17 @@ import { DexieCloudAPI } from './DexieCloudAPI';
 import { DexieCloudTable } from './DexieCloudTable';
 import { NewIdOptions } from './types/NewIdOptions';
 
+type Optional<T, Props extends keyof T> = Omit<T, Props> & Partial<T>;
+
 //
 // Extend Dexie interface
 //
 declare module 'dexie' {
   interface Dexie {
     cloud: DexieCloudAPI;
-    realms: Table<DBRealm, 'realmId', 'owner'>;
-    members: Table<DBRealmMember, 'id', 'realmId' | 'owner'>;
-    roles: Table<DBRealmRole, [string, string], 'owner'>;
+    realms: Table<DBRealm, string, Optional<DBRealm, 'realmId' | 'owner'>>;
+    members: Table<DBRealmMember, string, Optional<DBRealmMember, 'id' | 'owner'>>;
+    roles: Table<DBRealmRole, [string, string], Optional<DBRealmRole, 'owner'>>;
   }
 
   interface Table {

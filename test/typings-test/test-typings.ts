@@ -3,7 +3,7 @@
  * It tests Dexie.d.ts.
  */
 
-import Dexie from '../../dist/dexie'; // Imports the source Dexie.d.ts file
+import Dexie, { IndexableType, Table } from '../../dist/dexie'; // Imports the source Dexie.d.ts file
 import './test-extend-dexie';
 
 // constructor overloads:
@@ -76,6 +76,20 @@ import './test-extend-dexie';
         prop1: Date;
     }
 
+    class BaseEntity {
+        oid: string;
+        prop2: Date;
+        foo(): void {
+            console.log('foo');
+        }
+    }
+
+    class Entity3 extends BaseEntity {
+        prop1: Date;
+        foo2(): void {
+            console.log('foo');
+        }
+    }
     interface CompoundKeyEntity {
         firstName: string;
         lastName: string;
@@ -84,6 +98,9 @@ import './test-extend-dexie';
     class MyDatabase extends Dexie {
         friends: Dexie.Table<Friend, number>;
         table2: Dexie.Table<Entity2, string>;
+        table3: Dexie.Table<Entity3, 'oid'>;
+        table4: Dexie.Table<Entity3, string>;
+        table5: Table;
         compoundTable: Dexie.Table<CompoundKeyEntity, [string, string]>;
 
         constructor () {
@@ -91,10 +108,14 @@ import './test-extend-dexie';
             this.version(1).stores({
                 table1: '++id',
                 table2: 'oid',
+                table3: '++oid',
                 compoundTable: '[firstName+lastName]'
             });
         }
     }
+
+    const fooAny: string = 'null'
+    const foo: IndexableType = fooAny
 
     let db = new MyDatabase();
 

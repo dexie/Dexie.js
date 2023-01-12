@@ -1,6 +1,6 @@
 {
   "name": "dexie-export-import",
-  "version": "4.0.4",
+  "version": "4.0.5",
   "packageManager": "^pnpm@7.9.5",
   "description": "Dexie addon that adds export and import capabilities",
   "main": "dist/dexie-export-import.js",
@@ -44,6 +44,6 @@
     "typeson-registry": "^1.0.0-alpha.21"
   },
   "peerDependencies": {
-    "dexie": "workspace:^2.0.4 || ^3.0.0 || ^4.0.0-alpha.1"
+    "dexie": "workspace:^2.0.4 || ^3.0.0 || ^4.0.1-alpha.5"
   }
 }
