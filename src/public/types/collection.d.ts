@@ -17,6 +17,7 @@ export interface Collection<T=any, TKey=IndexableType> {
   eachKey(callback: (key: IndexableType, cursor: {key: IndexableType, primaryKey: TKey}) => any): PromiseExtended<void>;
   eachPrimaryKey(callback: (key: TKey, cursor: {key: IndexableType, primaryKey: TKey}) => any): PromiseExtended<void>;
   eachUniqueKey(callback: (key: IndexableType, cursor: {key: IndexableType, primaryKey: TKey}) => any): PromiseExtended<void>;
+  filter<S extends T>(filter: (x: T) => x is S): Collection<S, TKey>;
   filter(filter: (x: T) => boolean): Collection<T, TKey>;
   first(): PromiseExtended<T | undefined>;
   first<R>(thenShortcut: ThenShortcut<T | undefined, R>): PromiseExtended<R>;
