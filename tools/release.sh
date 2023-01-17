@@ -81,7 +81,7 @@ else
 fi
 
 update_version 'package.json' $next_version
-update_version 'package-lock.json' $next_version
+#update_version 'package-lock.json' $next_version
 pnpm install # Updates package-lock.json
 
 # Commit package.json change
