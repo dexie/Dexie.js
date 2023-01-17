@@ -89,7 +89,7 @@ importers:
       '@rollup/plugin-commonjs': ^18.0.0
       '@rollup/plugin-node-resolve': ^11.2.1
       '@types/node': '*'
-      dexie: workspace:^4.0.1-alpha.5
+      dexie: workspace:^4.0.1-alpha.6
       dexie-cloud-common: workspace:^1.0.23
       dreambase-library: ^1.0.18
       just-build: '*'
