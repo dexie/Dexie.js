@@ -161,7 +161,7 @@ do
       if ! [ "${addonPublishedVersion}" = "${addonLocalVersion}" ]; then
         printf "Publishing ${addonNpmName} ${addonLocalVersion} on npm\n"
         #echo "Would now invoke pnpm publish from $(pwd)!"
-        pnpm publish
+        pnpm publish --no-git-checks
       fi
     fi
     cd -
@@ -183,7 +183,7 @@ git push origin master$master_suffix:releases$master_suffix --follow-tags
 printf "Successful push to master$master_suffix:releases$master_suffix\n\n"
 
 #echo "Would now invoke pnpm publish --tag $NPMTAG from $(pwd)"
-pnpm publish --tag $NPMTAG
+pnpm publish --tag $NPMTAG --no-git-checks
 
 printf "Successful publish to npm.\n\n"
 
