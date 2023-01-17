@@ -82,10 +82,10 @@ fi
 
 update_version 'package.json' $next_version
 #update_version 'package-lock.json' $next_version
-pnpm install # Updates package-lock.json
+pnpm install
 
 # Commit package.json change
-git commit package.json package-lock.json bower.json --allow-empty -m "Releasing v$next_version" 2>/dev/null
+git commit package.json --allow-empty -m "Releasing v$next_version" 2>/dev/null
 # Save this SHA to cherry pick later
 master_release_commit=$(git rev-parse HEAD)
 
