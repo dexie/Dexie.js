@@ -1,7 +1,6 @@
 {
   "name": "dexie-cloud-addon",
   "version": "4.0.1-beta.26",
-  "packageManager": "^pnpm@7.9.5",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/umd/dexie-cloud-addon.js",
   "module": "dist/module-es5/dexie-cloud-addon.js",
@@ -87,7 +86,7 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^18.0.0",
     "@rollup/plugin-node-resolve": "^11.2.1",
-    "@types/node": "*",
+    "@types/node": "^18.11.18",
     "dreambase-library": "^1.0.18",
     "just-build": "*",
     "karma": "*",
@@ -103,7 +102,7 @@
     "rollup-plugin-node-resolve": "*",
     "rollup-plugin-sourcemaps": "*",
     "tslib": "*",
-    "typescript": "*",
+    "typescript": "^4.9.4",
     "universal-imports": "^1.0.4"
   },
   "dependencies": {
