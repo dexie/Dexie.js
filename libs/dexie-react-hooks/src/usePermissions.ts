@@ -83,7 +83,7 @@ export function usePermissions(
     throw new Error(
       `usePermissions() is only for Dexie Cloud but there's no dexie-cloud-addon active in given db.`
     );
-  if (!('permissions' in db['cloud']))
+  if (!('permissions' in (db as any).cloud))
     throw new Error(`usePermissions() requires a newer version of dexie-cloud-addon. Please upgrade it.`)
   return useObservable(
     // @ts-ignore
