@@ -93,7 +93,7 @@ export class Transaction implements ITransaction {
    * Internal method.
    * 
    */
-  create(idbtrans?: IDBTransaction) {
+  create(idbtrans?: IDBTransaction & {[prop: string]: any}) {
     if (!this.mode) return this;
     const idbdb = this.db.idbdb;
     const dbOpenError = this.db._state.dbOpenError;
