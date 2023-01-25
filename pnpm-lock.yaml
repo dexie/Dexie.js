@@ -25,7 +25,7 @@ importers:
       sorted-json: ^0.2.6
       terser: ^5.3.1
       tslib: ^2.1.0
-      typescript: ^4.3.4
+      typescript: ^4.9.4
       uglify-js: ^3.9.2
     devDependencies:
       dts-bundle-generator: 5.9.0
@@ -49,7 +49,7 @@ importers:
       sorted-json: 0.2.6
       terser: 5.9.0
       tslib: 2.3.1
-      typescript: 4.5.4
+      typescript: 4.9.4
       uglify-js: 3.14.2
 
   addons/Dexie.Observable:
@@ -89,7 +89,7 @@ importers:
       '@rollup/plugin-commonjs': ^18.0.0
       '@rollup/plugin-node-resolve': ^11.2.1
       '@types/node': '*'
-      dexie: workspace:^4.0.1-alpha.6
+      dexie: workspace:^4.0.1-alpha.5
       dexie-cloud-common: workspace:^1.0.23
       dreambase-library: ^1.0.18
       just-build: '*'
@@ -1290,7 +1290,7 @@ packages:
     engines: {node: '>=12.0.0'}
     hasBin: true
     dependencies:
-      typescript: 4.5.4
+      typescript: 4.9.4
       yargs: 15.4.1
     dev: true
 
@@ -3889,14 +3889,14 @@ packages:
       mime-types: 2.1.35
     dev: true
 
-  /typescript/4.5.4:
-    resolution: {integrity: sha512-VgYs2A2QIRuGphtzFV7aQJduJ2gyfTljngLzjpfW9FoYZF6xuw1W0vW9ghCKLfcWrCFxK81CSGRAvS1pn4fIUg==}
+  /typescript/4.8.2:
+    resolution: {integrity: sha512-C0I1UsrrDHo2fYI5oaCGbSejwX4ch+9Y5jTQELvovfmFkK3HHSZJB8MSJcWLmCUBzQBchCrZ9rMRV6GuNrvGtw==}
     engines: {node: '>=4.2.0'}
     hasBin: true
     dev: true
 
-  /typescript/4.8.2:
-    resolution: {integrity: sha512-C0I1UsrrDHo2fYI5oaCGbSejwX4ch+9Y5jTQELvovfmFkK3HHSZJB8MSJcWLmCUBzQBchCrZ9rMRV6GuNrvGtw==}
+  /typescript/4.9.4:
+    resolution: {integrity: sha512-Uz+dTXYzxXXbsFpM86Wh3dKCxrQqUcVMxwU54orwlJjOpO3ao8L7j5lH+dWfTwgCwIuM9GQ2kvVotzYJMXTBZg==}
     engines: {node: '>=4.2.0'}
     hasBin: true
     dev: true
