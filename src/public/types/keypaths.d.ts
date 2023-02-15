@@ -1,8 +1,8 @@
 export type KeyPaths<T> = {
   [P in keyof T]: P extends string
     ? T[P] extends any[]
-      ? P
-      : T[P] extends (...args: any[])=>any // Method
+      ? P | `${P}.${number}` | `${P}.${number}.${KeyPaths<T[P][number]>}`
+      : T[P] extends (...args: any[]) => any // Method
       ? never
       : T[P] extends object
       ? P | `${P}.${KeyPaths<T[P]>}`
@@ -10,10 +10,18 @@ export type KeyPaths<T> = {
     : never;
 }[keyof T];
 
-type Extract<T, P> = P extends keyof T ? T[P] : void;
-
 export type KeyPathValue<T, PATH> = PATH extends `${infer R}.${infer S}`
   ? R extends keyof T
-    ? Extract<T[R], S>
+    ? KeyPathValue<T[R], S>
+    : T extends any[]
+    ? PATH extends `${number}.${infer S}`
+      ? KeyPathValue<T[number], S>
+      : void
     : void
-  : Extract<T, PATH>;
+  : PATH extends `${number}`
+  ? T extends any[]
+    ? T[number]
+    : void
+  : PATH extends keyof T
+  ? T[PATH]
+  : void;

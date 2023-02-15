@@ -5,7 +5,7 @@
 type ChromeTransactionDurability = 'default' | 'strict' | 'relaxed'
 
 interface IDBTransactionOptions {
-    durability: ChromeTransactionDurability
+    durability?: ChromeTransactionDurability
 }
 
 interface IDBDatabase {

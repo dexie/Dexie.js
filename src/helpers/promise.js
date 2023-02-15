@@ -3,7 +3,7 @@
  * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/LICENSE-2.0
  */
 import { _global } from '../globals/global';
-import {tryCatch, props, setProp, _global,
+import {tryCatch, props, setProp,
     getPropertyDescriptor, getArrayOf, extend, getProto} from '../functions/utils';
 import {nop, callBoth, mirror} from '../functions/chaining-functions';
 import {debug, prettyStack, getErrorWithStack} from './debug';

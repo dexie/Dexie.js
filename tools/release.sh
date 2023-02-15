@@ -81,12 +81,11 @@ else
 fi
 
 update_version 'package.json' $next_version
-update_version 'package-lock.json' $next_version
-update_version 'bower.json' $next_version
-pnpm install # Updates package-lock.json
+#update_version 'package-lock.json' $next_version
+pnpm install
 
 # Commit package.json change
-git commit package.json package-lock.json bower.json --allow-empty -m "Releasing v$next_version" 2>/dev/null
+git commit package.json --allow-empty -m "Releasing v$next_version" 2>/dev/null
 # Save this SHA to cherry pick later
 master_release_commit=$(git rev-parse HEAD)
 
@@ -162,7 +161,7 @@ do
       if ! [ "${addonPublishedVersion}" = "${addonLocalVersion}" ]; then
         printf "Publishing ${addonNpmName} ${addonLocalVersion} on npm\n"
         #echo "Would now invoke pnpm publish from $(pwd)!"
-        pnpm publish
+        pnpm publish --no-git-checks
       fi
     fi
     cd -
@@ -184,7 +183,7 @@ git push origin master$master_suffix:releases$master_suffix --follow-tags
 printf "Successful push to master$master_suffix:releases$master_suffix\n\n"
 
 #echo "Would now invoke pnpm publish --tag $NPMTAG from $(pwd)"
-pnpm publish --tag $NPMTAG
+pnpm publish --tag $NPMTAG --no-git-checks
 
 printf "Successful publish to npm.\n\n"
 

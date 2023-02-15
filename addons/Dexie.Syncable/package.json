@@ -1,7 +1,6 @@
 {
   "name": "dexie-syncable",
   "version": "4.0.1-beta.13",
-  "packageManager": "^pnpm@7.9.5",
   "description": "Addon to Dexie that makes it possible to sync indexeDB with remote databases.",
   "main": "dist/dexie-syncable.js",
   "module": "dist/dexie-syncable.es.js",
@@ -80,6 +79,7 @@
     "eslint": "^5.16.0",
     "just-build": "^0.9.24",
     "qunit": "^2.9.2",
+    "typescript": "4.9.4",
     "uglify-js": "^3.5.6"
   }
 }
