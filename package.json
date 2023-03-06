@@ -1,6 +1,6 @@
 {
   "name": "dexie",
-  "version": "4.0.1-alpha.7",
+  "version": "4.0.1-alpha.8",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "module": "dist/dexie.mjs",
@@ -95,10 +95,10 @@
       "node tools/replaceVersionAndDate.js dist/dexie.d.ts",
       "# Minify the default ES5 UMD module",
       "cd dist",
-      "uglifyjs dexie.js -m -c negate_iife=0 -o dexie.min.js --source-map",
+      "uglifyjs dexie.js -m -c negate_iife=0 -o dexie.min.js --source-map url=dexie.min.js.map",
       "# Minify modern bundle",
       "cd modern",
-      "terser --comments false --compress --mangle --module --source-map -o dexie.min.mjs -- dexie.mjs"
+      "terser --comments false --compress --mangle --module --source-map url=dexie.min.mjs.map -o dexie.min.mjs -- dexie.mjs"
     ],
     "dev": [
       "# Build ES5 module and the tests",

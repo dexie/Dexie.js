@@ -61,10 +61,6 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
     TSON.finalize(); // Free up mem if error has occurred
   }
 
-  if (progressCallback) {
-    // Keep ongoing transaction private
-    Dexie.ignoreTransaction(()=>progressCallback(progress));
-  }
   return new Blob(slices,{type: "text/json"});
 
   async function exportAll() {
