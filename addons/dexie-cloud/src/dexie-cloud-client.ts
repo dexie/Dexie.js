@@ -265,7 +265,11 @@ export function dexieCloud(dexie: Dexie) {
         ) {
           // Update persisted options:
           if (!options) throw new Error(`Internal error`); // options cannot be null if configuredProgramatically is set.
-          await db.$syncState.put(options, 'options');
+          const newPersistedOptions: DexieCloudOptions = {
+            ...options
+          };
+          delete newPersistedOptions.fetchTokens;
+          await db.$syncState.put(newPersistedOptions, 'options');
         }
         if (
           db.cloud.options?.tryUseServiceWorker &&
