@@ -156,7 +156,7 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
         return db!.$syncState.get('schema').then((schema: DexieCloudSchema) => {
           if (schema) {
             for (const table of db!.tables) {
-              if (table.schema.primKey && table.schema.primKey.keyPath) {
+              if (table.schema.primKey && table.schema.primKey.keyPath && schema[table.name]) {
                 schema[table.name].primaryKey = nameFromKeyPath(
                   table.schema.primKey.keyPath
                 );
