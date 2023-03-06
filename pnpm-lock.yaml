@@ -93,8 +93,8 @@ importers:
       '@rollup/plugin-commonjs': ^18.0.0
       '@rollup/plugin-node-resolve': ^11.2.1
       '@types/node': ^18.11.18
-      dexie: workspace:^4.0.1-alpha.5
-      dexie-cloud-common: workspace:^1.0.23
+      dexie: ^4.0.1-alpha.5
+      dexie-cloud-common: ^1.0.23
       dreambase-library: ^1.0.18
       just-build: '*'
       karma: '*'
@@ -114,7 +114,7 @@ importers:
       typescript: ^4.9.4
       universal-imports: ^1.0.4
     dependencies:
-      dexie: link:../..
+      dexie: 4.0.1-alpha.8
       dexie-cloud-common: link:../../libs/dexie-cloud-common
       rxjs: 7.5.6
     devDependencies:
@@ -1258,6 +1258,10 @@ packages:
     engines: {node: '>= 0.8', npm: 1.2.8000 || >= 1.4.16}
     dev: true
 
+  /dexie/4.0.1-alpha.8:
+    resolution: {integrity: sha512-i47tssYy1en6SCImjKaYS/zd4q11ydVyPQYF5waF8BIQw4aaVaHmPIpVVH1BoNdY0EgJhHzZM4te7VXEEM6wFw==}
+    dev: false
+
   /di/0.0.1:
     resolution: {integrity: sha512-uJaamHkagcZtHPqCIHZxnFrXlunQXgBOsZSUOWwFw31QJCAbyTBoHMW75YOTur5ZNx8pIeAKgf6GWIgaqqiLhA==}
     dev: true
@@ -2229,7 +2233,7 @@ packages:
     dependencies:
       universalify: 2.0.0
     optionalDependencies:
-      graceful-fs: 4.2.9
+      graceful-fs: 4.2.10
     dev: true
 
   /just-build/0.9.24:

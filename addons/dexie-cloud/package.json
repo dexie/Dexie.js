@@ -106,10 +106,10 @@
     "universal-imports": "^1.0.4"
   },
   "dependencies": {
-    "dexie-cloud-common": "workspace:^1.0.23"
+    "dexie-cloud-common": "^1.0.23"
   },
   "peerDependencies": {
-    "dexie": "workspace:^4.0.1-alpha.5",
+    "dexie": "^4.0.1-alpha.5",
     "rxjs": "^7.x"
   }
 }
