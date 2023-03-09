@@ -1,5 +1,5 @@
 const swHolder: { registration?: ServiceWorkerRegistration } = {};
-const swContainer = self.document && navigator.serviceWorker; // self.document is to verify we're not the SW ourself
+const swContainer = typeof self !== undefined && self.document && navigator.serviceWorker; // self.document is to verify we're not the SW ourself
 if (swContainer)
   swContainer.ready.then(
     (registration) => (swHolder.registration = registration)
@@ -22,15 +22,14 @@ export class SWBroadcastChannel {
     this.name = name;
   }
   subscribe(listener: (message: any) => void) {
-    if (!swContainer) return ()=>{};
+    if (!swContainer) return () => {};
     const forwarder = (ev: MessageEvent) => {
       if (ev.data?.type === `sw-broadcast-${this.name}`) {
         listener(ev.data.message);
       }
     };
     swContainer.addEventListener('message', forwarder);
-    return () =>
-      swContainer.removeEventListener('message', forwarder);
+    return () => swContainer.removeEventListener('message', forwarder);
   }
   postMessage(message: any) {
     if (typeof self['clients'] === 'object') {
@@ -39,7 +38,7 @@ export class SWBroadcastChannel {
         (client) =>
           client.postMessage({
             type: `sw-broadcast-${this.name}`,
-            message
+            message,
           })
       );
     } else if (swHolder.registration) {
@@ -47,7 +46,7 @@ export class SWBroadcastChannel {
       // Post to SW so it can repost to all its clients and to itself
       swHolder.registration.active?.postMessage({
         type: `sw-broadcast-${this.name}`,
-        message
+        message,
       });
     }
   }
