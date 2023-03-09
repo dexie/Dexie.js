@@ -95,7 +95,7 @@ importers:
       '@types/node': ^18.11.18
       dexie: ^4.0.1-alpha.5
       dexie-cloud-common: ^1.0.23
-      dreambase-library: ^1.0.18
+      dreambase-library: ^1.0.19
       just-build: '*'
       karma: '*'
       karma-browserstack-launcher: '*'
@@ -120,7 +120,7 @@ importers:
       '@rollup/plugin-node-resolve': 11.2.1_rollup@2.79.0
       '@types/node': 18.11.18
       dexie-cloud-common: link:../../libs/dexie-cloud-common
-      dreambase-library: 1.0.18
+      dreambase-library: 1.0.19
       just-build: 0.9.24
       karma: 6.4.0
       karma-browserstack-launcher: 1.6.0_karma@6.4.0
@@ -1273,8 +1273,8 @@ packages:
       void-elements: 2.0.1
     dev: true
 
-  /dreambase-library/1.0.18:
-    resolution: {integrity: sha512-BLOBEjoyq0tKyqtaUQsPeVgSlLJ3sixH0VuPHly9PsDs6OkWJaXzKLVHNbqEV+UTqanMbYYnmEO/H+9bQ4v6LQ==}
+  /dreambase-library/1.0.19:
+    resolution: {integrity: sha512-JKfBctx4ukDybIrA3EKeNwBjISDK4ldPSnUF8NlCIEBCuzVQ/mwb2XhNxrPtYklNUM16T2QPoYi6o4P6xTf+nQ==}
     engines: {node: '>=14.8.0'}
     dev: true
 
