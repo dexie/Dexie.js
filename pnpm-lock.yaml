@@ -112,15 +112,14 @@ importers:
       rxjs: ^7.x
       tslib: '*'
       typescript: ^4.9.4
-      universal-imports: ^1.0.4
     dependencies:
-      dexie: 4.0.1-alpha.8
-      dexie-cloud-common: link:../../libs/dexie-cloud-common
+      dexie: link:../..
       rxjs: 7.5.6
     devDependencies:
       '@rollup/plugin-commonjs': 18.1.0_rollup@2.79.0
       '@rollup/plugin-node-resolve': 11.2.1_rollup@2.79.0
       '@types/node': 18.11.18
+      dexie-cloud-common: link:../../libs/dexie-cloud-common
       dreambase-library: 1.0.18
       just-build: 0.9.24
       karma: 6.4.0
@@ -137,7 +136,6 @@ importers:
       rollup-plugin-sourcemaps: 0.6.3_i4y7cumrbxacdh4glb7uc6ayrq
       tslib: 2.4.0
       typescript: 4.9.4
-      universal-imports: 1.0.4
 
   addons/dexie-export-import:
     specifiers:
@@ -168,9 +166,6 @@ importers:
     specifiers:
       '@types/node': ^18.11.18
       typescript: 4.9.4
-      universal-imports: ^1.0.4
-    dependencies:
-      universal-imports: 1.0.4
     devDependencies:
       '@types/node': 18.11.18
       typescript: 4.9.4
@@ -1257,10 +1252,6 @@ packages:
     resolution: {integrity: sha512-2sJGJTaXIIaR1w4iJSNoN0hnMY7Gpc/n8D4qSCJw8QqFWXf7cuAgnEHxBpweaVcPevC2l3KpjYCx3NypQQgaJg==}
     engines: {node: '>= 0.8', npm: 1.2.8000 || >= 1.4.16}
     dev: true
-
-  /dexie/4.0.1-alpha.8:
-    resolution: {integrity: sha512-i47tssYy1en6SCImjKaYS/zd4q11ydVyPQYF5waF8BIQw4aaVaHmPIpVVH1BoNdY0EgJhHzZM4te7VXEEM6wFw==}
-    dev: false
 
   /di/0.0.1:
     resolution: {integrity: sha512-uJaamHkagcZtHPqCIHZxnFrXlunQXgBOsZSUOWwFw31QJCAbyTBoHMW75YOTur5ZNx8pIeAKgf6GWIgaqqiLhA==}
@@ -2634,17 +2625,6 @@ packages:
     resolution: {integrity: sha512-1nh45deeb5olNY7eX82BkPO7SSxR5SSYJiPTrTdFUVYwAl8CKMA5N9PjTYkHiRjisVcxcQ1HXdLhx2qxxJzLNQ==}
     dev: true
 
-  /node-fetch/2.6.7:
-    resolution: {integrity: sha512-ZjMPFEfVx5j+y2yF35Kzx5sF7kDzxuDj6ziH4FFbOp87zKDZNx8yExJIb05OGF4Nlt9IHFIMBkRl41VdvcNdbQ==}
-    engines: {node: 4.x || >=6.0.0}
-    peerDependencies:
-      encoding: ^0.1.0
-    peerDependenciesMeta:
-      encoding:
-        optional: true
-    dependencies:
-      whatwg-url: 5.0.0
-
   /node-releases/2.0.6:
     resolution: {integrity: sha512-PiVXnNuFm5+iYkLBNeq5211hvO38y63T0i2KKh2KnUs3RpzJ+JtODFjkD8yjLwnDkTYF1eKXheUwdssR+NRZdg==}
     dev: true
@@ -3835,9 +3815,6 @@ packages:
     engines: {node: '>=0.6'}
     dev: true
 
-  /tr46/0.0.3:
-    resolution: {integrity: sha512-N3WMsuqV66lT30CrXNbEjx4GEwlow3v6rr4mCcv6prnfwhS01rkgyFdjPNBYd9br7LpXV1+Emh01fHnq2Gdgrw==}
-
   /tr46/2.1.0:
     resolution: {integrity: sha512-15Ih7phfcdP5YxqiB+iDtLoaTz4Nd35+IiAv0kQ5FNKHzXgdWqPoTIqEDDJmXceQt4JZk6lVPT8lnDlPpGDppw==}
     engines: {node: '>=8'}
@@ -3946,13 +3923,6 @@ packages:
     hasBin: true
     dev: true
 
-  /universal-imports/1.0.4:
-    resolution: {integrity: sha512-/oEtKj4CAV5Xf1Ly9SupMbAeOUoTxFxW/BYoXlktQDsMDrO+dlt37Hz8rgqr3irfcKmVf76zkytfGzW+FYdHSg==}
-    dependencies:
-      node-fetch: 2.6.7
-    transitivePeerDependencies:
-      - encoding
-
   /universalify/0.1.2:
     resolution: {integrity: sha512-rBJeI5CXAlmy1pV+617WB9J63U6XcazHHF2f2dbJix4XzpUF0RS3Zbj0FGIOCAva5P/d/GBOYaACQ1w+0azUkg==}
     engines: {node: '>= 4.0.0'}
@@ -4015,9 +3985,6 @@ packages:
       glob-to-regexp: 0.4.1
       graceful-fs: 4.2.10
     dev: true
-
-  /webidl-conversions/3.0.1:
-    resolution: {integrity: sha512-2JAn3z8AR6rjK8Sm8orRC0h/bcl/DqL7tRPdGZ4I1CjdF+EaMLmYxBHyXuKL849eucPFhvBoxMsflfOb8kxaeQ==}
 
   /webidl-conversions/6.1.0:
     resolution: {integrity: sha512-qBIvFLGiBpLjfwmYAaHPXsn+ho5xZnGvyGvsarywGNc8VyQJUMHJ8OBKGGrPER0okBeMDaan4mNBlgBROxuI8w==}
@@ -4112,12 +4079,6 @@ packages:
       - esbuild
       - uglify-js
     dev: true
-
-  /whatwg-url/5.0.0:
-    resolution: {integrity: sha512-saE57nupxk6v3HY35+jzBwYa0rKSy0XR8JSxZPwgLr7ys0IBzhGviA1/TUGJLmSVqs8pb9AnvICXEuOHLprYTw==}
-    dependencies:
-      tr46: 0.0.3
-      webidl-conversions: 3.0.1
 
   /whatwg-url/8.7.0:
     resolution: {integrity: sha512-gAojqb/m9Q8a5IV96E3fHJM70AzCkgt4uXYX2O7EmuyOnLrViCQlsEBmF9UQIu3/aeAIp2U17rtbpZWNntQqdg==}
