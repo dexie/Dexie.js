@@ -5,5 +5,6 @@ export type DexieCloudSchema = {
     deleted?: boolean;
     markedForSync?: boolean;
     initiallySynced?: boolean;
+    primaryKey?: string
   };
 };

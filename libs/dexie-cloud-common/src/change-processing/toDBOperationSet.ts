@@ -10,9 +10,9 @@ import { DBKeyMutationSet } from "./DBKeyMutationSet.js";
  * @param inSet 
  * @returns DBOperationsSet representing inSet
  */
-export function toDBOperationSet(inSet: DBKeyMutationSet): DBOperationsSet<string> {
+export function toDBOperationSet(inSet: DBKeyMutationSet, txid=""): DBOperationsSet<string> {
   // Fictive transaction:
-  const txid = randomString(16);
+  if (!txid) txid = randomString(16);
 
   // Convert data into a temporary map to collect mutations of same table and type
   const map: {

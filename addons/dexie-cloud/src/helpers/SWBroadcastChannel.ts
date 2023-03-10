@@ -1,5 +1,6 @@
 const swHolder: { registration?: ServiceWorkerRegistration } = {};
-const swContainer = self.document && navigator.serviceWorker; // self.document is to verify we're not the SW ourself
+const swContainer = typeof self !== 'undefined' && self.document && // self.document is to verify we're not the SW ourself
+                    typeof navigator !== 'undefined' && navigator.serviceWorker; 
 if (swContainer)
   swContainer.ready.then(
     (registration) => (swHolder.registration = registration)
@@ -16,21 +17,26 @@ if (typeof self !== 'undefined' && 'clients' in self && !self.document) {
   });
 }
 
+/** This class is a fallback for browsers that lacks BroadcastChannel but have
+ * service workers (which is Safari versions 11.1 through 15.3).
+ * Safari 15.4 with BroadcastChannel was released on 2022-03-14.
+ * We might be able to remove this class in a near future as Safari < 15.4 is
+ * already very low in market share as of 2023-03-10.
+ */
 export class SWBroadcastChannel {
   name: string;
   constructor(name: string) {
     this.name = name;
   }
   subscribe(listener: (message: any) => void) {
-    if (!swContainer) return ()=>{};
+    if (!swContainer) return () => {};
     const forwarder = (ev: MessageEvent) => {
       if (ev.data?.type === `sw-broadcast-${this.name}`) {
         listener(ev.data.message);
       }
     };
     swContainer.addEventListener('message', forwarder);
-    return () =>
-      swContainer.removeEventListener('message', forwarder);
+    return () => swContainer.removeEventListener('message', forwarder);
   }
   postMessage(message: any) {
     if (typeof self['clients'] === 'object') {
@@ -39,7 +45,7 @@ export class SWBroadcastChannel {
         (client) =>
           client.postMessage({
             type: `sw-broadcast-${this.name}`,
-            message
+            message,
           })
       );
     } else if (swHolder.registration) {
@@ -47,7 +53,7 @@ export class SWBroadcastChannel {
       // Post to SW so it can repost to all its clients and to itself
       swHolder.registration.active?.postMessage({
         type: `sw-broadcast-${this.name}`,
-        message
+        message,
       });
     }
   }
