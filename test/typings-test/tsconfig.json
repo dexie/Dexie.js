@@ -3,6 +3,7 @@
         "module": "es6",
         "target": "es5",
         "noImplicitAny": true,
+        "strictFunctionTypes": true,
         "strictNullChecks": true,
         "noImplicitThis": true,
         "outDir": "../../tools/tmp/test-typings",
