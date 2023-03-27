@@ -18,6 +18,7 @@ import {
 import { Observable } from '../classes/observable/observable';
 import { extendObservabilitySet } from './extend-observability-set';
 import { rangesOverlap } from '../helpers/rangeset';
+import { domDeps } from '../classes/dexie/dexie-dom-dependencies';
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
   return new Observable<T>((observer) => {
@@ -75,7 +76,11 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     };
 
     const doQuery = () => {
-      if (querying || closed) {
+      if (
+        querying || // already querying
+        closed || // closed - don't run!
+        !domDeps.indexedDB) // SSR in sveltekit, nextjs etc
+      {
         return;
       }
       accumMuts = {};
