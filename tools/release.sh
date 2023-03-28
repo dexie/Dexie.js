@@ -115,6 +115,9 @@ do
   pnpm run test && break
   n=$[$n+1]
   printf "Browserstack tests failed.\n"
+  if [ $n -lt 4 ]; then
+    printf "Retrying (this will be retry no ${n})..."
+  fi
 done
 if  [ $n -ge 4 ]; then
   printf "Browserstack failed 3 times. Quitting!"
@@ -147,7 +150,10 @@ do
     do
       pnpm run test && break
       n=$[$n+1]
-      printf "${addon} Browserstack tests failed.\n"
+      printf "${addon} Browserstack tests failed\n"
+      if [ $n -lt 4 ]; then
+        printf "Retrying (this will be retry no ${n})..."
+      fi
     done
     if  [ $n -ge 4 ]; then
       printf "${addon} tests failed 3 times. Quitting!"
