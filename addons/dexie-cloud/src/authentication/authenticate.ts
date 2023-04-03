@@ -127,6 +127,13 @@ async function userAuthenticate(
   userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
   hints?: { userId?: string; email?: string; grant_type?: string }
 ) {
+  if (!crypto.subtle) {
+    if (typeof location !== 'undefined' && location.protocol === 'http:') {
+      throw new Error(`Dexie Cloud Addon needs to use WebCrypto, but your browser has disabled it due to being served from an insecure location. Please serve it from https or http://localhost:<port> (See https://stackoverflow.com/questions/46670556/how-to-enable-crypto-subtle-for-unsecure-origins-in-chrome/46671627#46671627)`);
+    } else {
+      throw new Error(`This browser does not support WebCrypto.`);
+    }
+  }
   const { privateKey, publicKey } = await crypto.subtle.generateKey(
     {
       name: 'RSASSA-PKCS1-v1_5',
@@ -137,7 +144,8 @@ async function userAuthenticate(
     false, // Non-exportable...
     ['sign', 'verify']
   );
-  if (!privateKey || !publicKey) throw new Error(`Could not generate RSA keypair`); // Typings suggest these can be undefined...
+  if (!privateKey || !publicKey)
+    throw new Error(`Could not generate RSA keypair`); // Typings suggest these can be undefined...
   context.nonExportablePrivateKey = privateKey; //...but storable!
   const publicKeySPKI = await crypto.subtle.exportKey('spki', publicKey);
   const publicKeyPEM = spkiToPEM(publicKeySPKI);
@@ -181,8 +189,8 @@ async function userAuthenticate(
       type: 'error',
       messageCode: 'GENERIC_ERROR',
       message: `We're having a problem authenticating right now.`,
-      messageParams: {}
-    }).catch(()=>{});
+      messageParams: {},
+    }).catch(() => {});
     throw error;
   }
 }
