@@ -2,7 +2,7 @@ const {karmaCommon, getKarmaConfig, defaultBrowserMatrix} = require('./karma.com
 
 module.exports = function (config) {
   const cfg = getKarmaConfig (defaultBrowserMatrix, {
-    // Base path should point at the root 
+    // Base path should point at the root
     basePath: '..',
     // Files to include
     files: karmaCommon.files.concat([
@@ -11,6 +11,5 @@ module.exports = function (config) {
       { watched: true, included: false, served: true, pattern: 'test/worker.js' },
     ])
   });
-
   config.set(cfg);
 }
