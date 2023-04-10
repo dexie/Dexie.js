@@ -1,10 +1,4 @@
 module.exports = {
-  browserStack: {
-    username: process.env.LT_USERNAME,
-    accessKey: process.env.LT_ACCESS_KEY,
-    timeout: 1800
-  },
-
   customLaunchers: {
     lt_firefox_latest_supported: {
       browserName: 'firefox',
