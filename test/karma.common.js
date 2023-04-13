@@ -58,8 +58,8 @@ if (process.env.LAMBDATEST) {
     colors: true,
 
     browserNoActivityTimeout: 2 * 60 * 1000,
-    browserDisconnectTimeout: 10000,
-    processKillTimeout: 10000,
+    browserDisconnectTimeout: 15000,
+    processKillTimeout: 15000,
     browserSocketTimeout: 20000,
 
     plugins: [

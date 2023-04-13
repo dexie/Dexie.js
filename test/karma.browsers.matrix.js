@@ -31,8 +31,7 @@ module.exports = {
         'lt_chrome_oldest_supported',
         'lt_chrome_latest_supported',
         'lt_safari_oldest_supported',
-        'lt_safari_latest_supported',
-        'lt_iphone7'
+        'lt_safari_latest_supported'
     ],
 
     // Test matrix used before every npm publish.
