@@ -72,6 +72,19 @@ export function connectWebSocket(db: DexieCloudDB) {
           map((isActive) => [isActive ? userLogin : null, syncState] as const)
         )
       ),
+      switchMap(([userLogin, syncState]) => {
+        if (userLogin?.isLoggedIn && !syncState?.realms.includes(userLogin.userId!)) {
+          // We're in an in-between state when user is logged in but the user's realms are not yet synced.
+          // Don't make this change reconnect the websocket just yet. Wait till syncState is updated
+          // to iclude the user's realm.
+          return db.cloud.persistedSyncState.pipe(
+            filter((syncState) => syncState?.realms.includes(userLogin!.userId!) || false),
+            take(1),
+            map((syncState) => [userLogin, syncState] as const)
+          );
+        }
+        return new BehaviorSubject([userLogin, syncState] as const);
+      }),
       switchMap(
         async ([userLogin, syncState]) =>
           [userLogin, await computeRealmSetHash(syncState!)] as const
