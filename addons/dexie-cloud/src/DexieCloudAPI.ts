@@ -38,6 +38,10 @@ export interface DexieCloudAPI {
   // Observable of persisted sync state
   persistedSyncState: Rx.BehaviorSubject<PersistedSyncState | undefined>;
 
+  events: {
+    syncComplete: Rx.Observable<void>;
+  }
+
   // Observable reflecting the GUI data that Dexie Cloud wants you to render if using
   // db.cloud.configure({customLoginGui: true}).
   // The information it wants you to render is login dialogs and error alerts.

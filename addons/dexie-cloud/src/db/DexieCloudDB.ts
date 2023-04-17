@@ -51,8 +51,9 @@ export interface DexieCloudDBBase {
   readonly members: Table<DBRealmMember, string>;
   readonly roles: Table<DBRealmRole, [string, string]>;
 
-  readonly localSyncEvent: BehaviorSubject<{ purpose?: 'pull' | 'push' }>;
+  readonly localSyncEvent: Subject<{ purpose?: 'pull' | 'push' }>;
   readonly syncStateChangedEvent: BroadcastedAndLocalEvent<SyncStateChangedEventData>;
+  readonly syncCompleteEvent: BroadcastedAndLocalEvent<void>;
   readonly dx: Dexie;
   readonly initiallySynced: boolean;
 }
@@ -88,6 +89,9 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
     let syncStateChangedEvent =
       new BroadcastedAndLocalEvent<SyncStateChangedEventData>(
         `syncstatechanged-${dx.name}`
+      );
+    let syncCompleteEvent = new BroadcastedAndLocalEvent<void>(
+        `synccomplete-${dx.name}`
       );
     localSyncEvent['id'] = ++static_counter;
     let initiallySynced = false;
@@ -136,6 +140,9 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
       get syncStateChangedEvent() {
         return syncStateChangedEvent;
       },
+      get syncCompleteEvent() {
+        return syncCompleteEvent;
+      },
       dx,
     } as DexieCloudDB;
 
@@ -177,6 +184,9 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
       reconfigure() {
         syncStateChangedEvent = new BroadcastedAndLocalEvent<SyncState>(
           `syncstatechanged-${dx.name}`
+        );
+        syncCompleteEvent = new BroadcastedAndLocalEvent<void>(
+          `synccomplete-${dx.name}`
         );
       },
     };
