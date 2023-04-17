@@ -72,11 +72,18 @@ function cloneChange(change: DBOperationsSet[number], rewriteValues: boolean) {
   return {
     ...change,
     muts: rewriteValues
-      ? change.muts.map((m) => ({
-          ...m,
-          keys: m.keys.slice(),
-          values: (m as DBInsertOperation).values.slice(),
-        }))
+      ? change.muts.map((m) => {
+          return (m.type === 'insert' || m.type === 'upsert') && m.values
+            ? {
+                ...m,
+                keys: m.keys.slice(),
+                values: m.values.slice(),
+              }
+            : {
+                ...m,
+                keys: m.keys.slice(),
+              };
+        })
       : change.muts.map((m) => ({ ...m, keys: m.keys.slice() })),
   };
 }
