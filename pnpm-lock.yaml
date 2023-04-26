@@ -94,8 +94,9 @@ importers:
       '@rollup/plugin-node-resolve': ^11.2.1
       '@types/node': ^18.11.18
       dexie: ^4.0.1-alpha.5
-      dexie-cloud-common: ^1.0.23
+      dexie-cloud-common: ^1.0.26
       dreambase-library: ^1.0.19
+      dts-bundle-generator: ^8.0.1
       just-build: '*'
       karma: '*'
       karma-browserstack-launcher: '*'
@@ -114,13 +115,14 @@ importers:
       typescript: ^4.9.4
     dependencies:
       dexie: link:../..
+      dexie-cloud-common: link:../../libs/dexie-cloud-common
       rxjs: 7.5.6
     devDependencies:
       '@rollup/plugin-commonjs': 18.1.0_rollup@2.79.0
       '@rollup/plugin-node-resolve': 11.2.1_rollup@2.79.0
       '@types/node': 18.11.18
-      dexie-cloud-common: link:../../libs/dexie-cloud-common
       dreambase-library: 1.0.19
+      dts-bundle-generator: 8.0.1
       just-build: 0.9.24
       karma: 6.4.0
       karma-browserstack-launcher: 1.6.0_karma@6.4.0
@@ -1049,6 +1051,15 @@ packages:
       wrap-ansi: 7.0.0
     dev: true
 
+  /cliui/8.0.1:
+    resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
+    engines: {node: '>=12'}
+    dependencies:
+      string-width: 4.2.3
+      strip-ansi: 6.0.1
+      wrap-ansi: 7.0.0
+    dev: true
+
   /clone-deep/4.0.1:
     resolution: {integrity: sha512-neHB9xuzh/wk0dIHweyAXv2aPGZIVk3pLMe+/RNzINf17fe0OG96QroktYAUm7SM1PBnzTabaLboqqxDyMU+SQ==}
     engines: {node: '>=6'}
@@ -1285,6 +1296,15 @@ packages:
     dependencies:
       typescript: 4.9.4
       yargs: 15.4.1
+    dev: true
+
+  /dts-bundle-generator/8.0.1:
+    resolution: {integrity: sha512-9JVw78/OXdKfq+RUrmpLm6WAUJp+aOUGEHimVqIlOEH2VugRt1I8CVIoQZlirWZko+/SVZkNgpWCyZubUuzzPA==}
+    engines: {node: '>=14.0.0'}
+    hasBin: true
+    dependencies:
+      typescript: 5.0.4
+      yargs: 17.7.1
     dev: true
 
   /duplexer/0.1.2:
@@ -3882,6 +3902,12 @@ packages:
     hasBin: true
     dev: true
 
+  /typescript/5.0.4:
+    resolution: {integrity: sha512-cW9T5W9xY37cc+jfEnaUvX91foxtHkza3Nw3wkoF4sSlKn0MONdkdEndig/qPBWXNkmplh3NzayQzCiHM4/hqw==}
+    engines: {node: '>=12.20'}
+    hasBin: true
+    dev: true
+
   /typeson-registry/1.0.0-alpha.39:
     resolution: {integrity: sha512-NeGDEquhw+yfwNhguLPcZ9Oj0fzbADiX4R0WxvoY8nGhy98IbzQy1sezjoEFWOywOboj/DWehI+/aUlRVrJnnw==}
     engines: {node: '>=10.0.0'}
@@ -4185,6 +4211,11 @@ packages:
     engines: {node: '>=10'}
     dev: true
 
+  /yargs-parser/21.1.1:
+    resolution: {integrity: sha512-tVpsJW7DdjecAiFpbIB1e3qxIQsE6NoPc5/eTdrbbIC4h0LVsWhnoa3g+m2HclBIujHzsxZ4VJVA+GUuc2/LBw==}
+    engines: {node: '>=12'}
+    dev: true
+
   /yargs/15.4.1:
     resolution: {integrity: sha512-aePbxDmcYW++PaqBsJ+HYUFwCdv4LVvdnhBy78E57PIor8/OVvhMrADFFEDh8DHDFRv/O9i3lPhsENjO7QX0+A==}
     engines: {node: '>=8'}
@@ -4213,6 +4244,19 @@ packages:
       string-width: 4.2.2
       y18n: 5.0.5
       yargs-parser: 20.2.6
+    dev: true
+
+  /yargs/17.7.1:
+    resolution: {integrity: sha512-cwiTb08Xuv5fqF4AovYacTFNxk62th7LKJ6BL9IGUpTJrWoU7/7WdQGTP2SjKf1dUNBGzDd28p/Yfs/GI6JrLw==}
+    engines: {node: '>=12'}
+    dependencies:
+      cliui: 8.0.1
+      escalade: 3.1.1
+      get-caller-file: 2.0.5
+      require-directory: 2.1.1
+      string-width: 4.2.3
+      y18n: 5.0.5
+      yargs-parser: 21.1.1
     dev: true
 
   github.com/dfahlander/clarinet/d1dc89f7e67488b16ad98b2464d29a9b3bc6f5ef:
