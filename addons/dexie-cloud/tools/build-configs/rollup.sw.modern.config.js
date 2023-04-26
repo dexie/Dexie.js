@@ -18,13 +18,14 @@ export default {
     format: 'umd',
     globals: {
       dexie: 'Dexie',
-      rxjs: 'rxjs'
+      rxjs: 'rxjs',
+      "rxjs/operators": "rxjs.operators"
     },
     name: 'DexieCloudSW',
     sourcemap: true,
     exports: 'named'
   }],
-  external: ['dexie', 'rxjs'],
+  external: ['dexie', 'rxjs', 'rxjs/operators'],
   plugins: [
     sourcemaps(),
     nodeResolve({

@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "module": "es2015",
-    "target": "ES5",
+    "target": "es2018",
     "declaration": true,
     "importHelpers": true,
     "strictNullChecks": true,

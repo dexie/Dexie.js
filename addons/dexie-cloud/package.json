@@ -4,24 +4,24 @@
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/umd/dexie-cloud-addon.js",
   "type": "module",
-  "module": "dist/module-es5/dexie-cloud-addon.js",
+  "module": "dist/modern/dexie-cloud-addon.js",
   "homepage": "https://dexie.org/cloud/docs/dexie-cloud-addon",
   "exports": {
     ".": {
       "development": {
         "import": "./dist/modern/dexie-cloud-addon.js",
-        "require": "./dist/umd-modern/dexie-cloud-addon.js",
-        "default": "./dist/umd-modern/dexie-cloud-addon.js"
+        "require": "./dist/umd/dexie-cloud-addon.js",
+        "default": "./dist/umd/dexie-cloud-addon.js"
       },
       "production": {
         "import": "./dist/modern/dexie-cloud-addon.min.js",
-        "require": "./dist/umd-modern/dexie-cloud-addon.min.js",
-        "default": "./dist/umd-modern/dexie-cloud-addon.min.js"
+        "require": "./dist/umd/dexie-cloud-addon.min.js",
+        "default": "./dist/umd/dexie-cloud-addon.min.js"
       },
       "default": {
         "import": "./dist/modern/dexie-cloud-addon.js",
-        "require": "./dist/umd-modern/dexie-cloud-addon.js",
-        "default": "./dist/umd-modern/dexie-cloud-addon.js"
+        "require": "./dist/umd/dexie-cloud-addon.js",
+        "default": "./dist/umd/dexie-cloud-addon.js"
       }
     },
     "./service-worker": {
@@ -66,18 +66,11 @@
       "# Build outputs",
       "just-build src",
       "just-build dexie-cloud service-worker",
-      "# Minify the default ES5 UMD module",
-      "cd dist/umd",
-      "# Minify ES5 UMD bundle",
-      "uglifyjs dexie-cloud-addon.js -m -c negate_iife=0 -o dexie-cloud-addon.min.js --source-map",
-      "cd ../..",
-      "#dts-bundle-generator --external-imports=dexie --project src/tsconfig.json -o dist/dexie-cloud-addon.d.ts tools/tmp/modern/dexie-cloud-client.d.ts",
+      "#dts-bundle-generator --external-inlines=dexie-cloud-common --external-imports=rxjs dexie --project src/tsconfig.json -o dist/types/dexie-cloud-addon.d.ts tools/tmp/modern/dexie-cloud-client.d.ts",
       "# Minify modern bundle",
       "terser --comments false --compress --mangle --module --source-map url=dexie-cloud-addon.min.js.map -o dist/modern/dexie-cloud-addon.min.js -- dist/modern/dexie-cloud-addon.js",
-      "# Minify umd-modern bundle",
-      "terser --comments false --compress --mangle --source-map url=dexie-cloud-addon.min.js.map -o dist/umd-modern/dexie-cloud-addon.min.js -- dist/umd-modern/dexie-cloud-addon.js",
-      "# Minify module bundle",
-      "terser --comments false --compress --mangle --module --source-map url=dexie-cloud-addon.min.js.map -o dist/module-es5/dexie-cloud-addon.min.js -- dist/module-es5/dexie-cloud-addon.js",
+      "# Minify umd bundle",
+      "terser --comments false --compress --mangle --source-map url=dexie-cloud-addon.min.js.map -o dist/umd/dexie-cloud-addon.min.js -- dist/umd/dexie-cloud-addon.js",
       "# Minify modern service-worker",
       "terser --comments false --compress --mangle --module --source-map url=service-worker.min.js.map -o dist/modern/service-worker.min.js -- dist/modern/service-worker.js",
       "# Minify umd service-worker",
@@ -90,14 +83,8 @@
     "dexie-cloud": [
       "# Create a modern bundle in dist/modern",
       "rollup -c tools/build-configs/rollup.modern.config.js",
-      "# Transpile the modern dexie-cloud bundle into ES5 JS",
-      "tsc --allowJs -m es2015 -t es5 --sourceMap --importHelpers true --outDir tools/tmp/es5 dist/modern/dexie-cloud-addon.js",
-      "# Create ES5 bundles: One UMD and one MJS",
-      "rollup -c tools/build-configs/rollup.es5.config.js",
-      "# Copy dexie-cloud-client.d.ts to dist",
-      "#node -e \"fs.writeFileSync('dist/dexie-cloud-addon.d.ts', fs.readFileSync('tools/tmp/modern/dexie-cloud-client.d.ts'))\"",
       "# Replace {version} and {date} in output files",
-      "node tools/replaceVersionAndDate.cjs dist/umd/dexie-cloud-addon.js dist/module-es5/dexie-cloud-addon.js dist/modern/dexie-cloud-addon.js"
+      "node tools/replaceVersionAndDate.cjs dist/umd/dexie-cloud-addon.js dist/modern/dexie-cloud-addon.js"
     ],
     "service-worker": [
       "# Create a modern bundle in dist/modern",
@@ -119,8 +106,8 @@
     "@rollup/plugin-commonjs": "^18.0.0",
     "@rollup/plugin-node-resolve": "^11.2.1",
     "@types/node": "^18.11.18",
-    "dexie-cloud-common": "^1.0.23",
     "dreambase-library": "^1.0.19",
+    "dts-bundle-generator": "^8.0.1",
     "just-build": "*",
     "karma": "*",
     "karma-browserstack-launcher": "*",
@@ -138,6 +125,7 @@
     "typescript": "^4.9.4"
   },
   "dependencies": {
+    "dexie-cloud-common": "^1.0.26",
     "rxjs": "^7.x"
   },
   "peerDependencies": {
