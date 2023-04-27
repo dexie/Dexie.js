@@ -1,0 +1,39 @@
+name: Build and Test
+
+on:
+  pull_request:
+    branches:
+      - master
+      - master-3
+      - master-2
+      - master-1
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        TF: [test,addons/Dexie.Observable/test/unit,addons/Dexie.Observable/test/integration,addons/Dexie.Syncable/test/unit,addons/Dexie.Syncable/test/integration,addons/dexie-export-import/test,libs/dexie-react-hooks/test,test/integrations/test-dexie-relationships]
+    services:
+      xvfb:
+      firefox:
+        version: "85.0"
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 16
+      - name: Install dependencies
+        run: |
+          curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7
+          pnpm config set store-dir ~/.pnpm-store
+          pnpm install --no-frozen-lockfile
+      - name: Build
+        run: pnpm run build
+      - name: Test
+        run: |
+          cd ${{ matrix.TF }}
+          pwd
+          bash ./gh-actions.sh
