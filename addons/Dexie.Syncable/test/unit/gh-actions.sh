@@ -11,4 +11,4 @@ echo "Building dexie-syncable"
 pnpm run build
 
 pnpm run test:typings
-#pnpm run test:unit
+pnpm run test:unit
