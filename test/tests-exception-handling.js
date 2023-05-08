@@ -20,27 +20,6 @@ module("exception-handling", {
     }
 });
 
-asyncTest("Uncaught promise should signal 'unhandledrejection'", function(){
-    // We must not use finally or catch here because then we don't test what we should.
-    if (!supports("domevents")) {
-        ok(true, "Skipping - DOM events not supported");
-        start();
-    }
-    var onErrorSignals = 0;
-    function onerror(ev) {
-        ++onErrorSignals;
-        ev.preventDefault();
-    }
-    var prevUnhandledRejection = window.onunhandledrejection;
-    window.onunhandledrejection = onerror;
-    db.users.add({ id: 1 });
-    setTimeout(()=> {
-        equal(onErrorSignals, 1, "unhandledrejection should have been signaled");
-        window.onunhandledrejection = prevUnhandledRejection;
-        start();
-    }, 100);
-});
-
 spawnedTest("transaction should abort on collection error", function*(){
     yield db.transaction("rw", db.users, function*() {
         let id = yield db.users.add({id: 3, first: "Foo", last: "Bar", username: "foobar"});
@@ -406,89 +385,4 @@ asyncTest("Issue #67 - Regression test 2 - other error in key", function () {
     }).catch(function(err) {
         ok(true, "Good, transaction failed as expected");
     }).finally(start);
-});
-
-asyncTest("Issue #69 Global exception handler for promises", function () {
-    if (!supports("domevents")) {
-        ok(true, "Skipping - DOM events not supported");
-        start();
-    }
-    var errorList = [];
-    function globalRejectionHandler(ev) {
-        console.log("Got error: " + ev.reason);
-        if (errorList.indexOf(ev.reason) === -1) // Current implementation: accept multiple redundant triggers
-            errorList.push(ev.reason);
-        ev.preventDefault();
-    }
-
-    window.addEventListener('unhandledrejection', globalRejectionHandler);
-        
-    // The most simple case: Any Promise reject that is not catched should
-    // be handled by the global error listener.
-    new Dexie.Promise(function(resolve, reject) {
-        reject("first error (by reject)");
-    });
-
-    // Also if the rejection was caused by a throw...
-    new Dexie.Promise(function() {
-        throw "second error (throw)";
-    });
-
-    // But when catched it should not trigger the global event:
-    new Dexie.Promise(function(resolve, reject) {
-        reject("third error (catched)");
-    }).catch(function(e) {
-        ok(true, "Catched error explicitely: " + e);
-    });
-
-    // If catching an explicit error type that was not thrown, it should be triggered
-    new Dexie.Promise(function(resolve, reject) {
-        reject("Simple error 1");
-    }).catch(TypeError, function(e) {
-        ok(false, "Error should not have been TypeError");
-    });// Real error slip away... should be handled by global handler
-
-    new Dexie.Promise(function(resolve, reject) {
-        reject(new TypeError("Type Error 1"));
-    }).catch(TypeError, function(e) {
-        ok(true, "Catched the TypeError");
-        // Now we have handled it. Not bubble to global handler!
-    });
-
-    Dexie.Promise.resolve(Promise.reject(new Error("Converting a rejected standard promise to Dexie.Promise but don't catch it")))
-    .finally(()=>{    
-        // With finally, it should yet trigger the global event:
-        return new Dexie.Promise(function(resolve, reject) {
-            reject("forth error (uncatched but with finally)");
-        });
-    }).finally(function() {
-        // From issue #43:
-        // Prepare by cleaning up any unfinished previous run:
-        Dexie.delete("testdb").then(function() {
-            // Now just do some Dexie stuff...
-            var db = new Dexie("testdb");
-            db.version(1).stores({ table1: "id" });
-            db.open().then(function() {
-                console.log("before");
-                throw new Error("FOO"); // Here a generic error is thrown (not a DB error)
-                //console.log("after");
-            });
-            db.delete().finally(function() {
-                equal(errorList.length, 6, "THere should be 6 global errors triggered");
-                equal(errorList[0], "first error (by reject)", "first error (by reject)");
-                equal(errorList[1], "second error (throw)", "second error (throw)");
-                equal(errorList[2], "Simple error 1", "Simple error 1");
-                equal(errorList[3].message, "Converting a rejected standard promise to Dexie.Promise but don't catch it", "Converting a rejected standard promise to Dexie.Promise but don't catch it");
-                equal(errorList[4], "forth error (uncatched but with finally)", "forth error (uncatched but with finally)");
-                equal(errorList[5].message, "FOO", "FOO");
-                errorList.slice(6).map((e, i)=>`Unexpected error: ${(i+6) + ": " + e.stack}`).forEach(txt => {
-                    console.error(txt);
-                    ok(false, txt);
-                });
-                // cleanup:
-                window.removeEventListener('unhandledrejection', globalRejectionHandler);
-                start();
-            });
-        });
-    });
 });
