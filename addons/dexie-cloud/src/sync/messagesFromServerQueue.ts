@@ -9,10 +9,8 @@ import { DBOperationsSet } from 'dexie-cloud-common';
 import { getSyncableTables } from '../helpers/getSyncableTables';
 import { getMutationTable } from '../helpers/getMutationTable';
 import { listClientChanges } from './listClientChanges';
-import {
-  filterServerChangesThroughAddedClientChanges,
-} from './sync';
-import { applyServerChanges } from "./applyServerChanges";
+import { filterServerChangesThroughAddedClientChanges } from './sync';
+import { applyServerChanges } from './applyServerChanges';
 import { updateBaseRevs } from './updateBaseRevs';
 import { getLatestRevisionsPerTable } from './getLatestRevisionsPerTable';
 import { refreshAccessToken } from '../authentication/authenticate';
@@ -106,25 +104,32 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
             // new token. So we don't need to do anything more here.
             break;
           case 'realm-added':
-            //if (!persistedSyncState?.realms?.includes(msg.realm) && !persistedSyncState?.inviteRealms?.includes(msg.realm)) {
-            triggerSync(db, 'pull');
-            //}
+            if (
+              !persistedSyncState?.realms?.includes(msg.realm) &&
+              !persistedSyncState?.inviteRealms?.includes(msg.realm)
+            ) {
+              await db.cloud.sync({ purpose: 'pull', wait: true });
+              //triggerSync(db, 'pull');
+            }
             break;
           case 'realm-accepted':
-            //if (!persistedSyncState?.realms?.includes(msg.realm)) {
-            triggerSync(db, 'pull');
-            //}
+            if (!persistedSyncState?.realms?.includes(msg.realm)) {
+              await db.cloud.sync({ purpose: 'pull', wait: true });
+              //triggerSync(db, 'pull');
+            }
             break;
           case 'realm-removed':
-            //if (
-            persistedSyncState?.realms?.includes(msg.realm) ||
-              persistedSyncState?.inviteRealms?.includes(msg.realm);
-            //) {
-            triggerSync(db, 'pull');
-            //}
+            if (
+              persistedSyncState?.realms?.includes(msg.realm) ||
+              persistedSyncState?.inviteRealms?.includes(msg.realm)
+            ) {
+              await db.cloud.sync({ purpose: 'pull', wait: true });
+              //triggerSync(db, 'pull');
+            }
             break;
           case 'realms-changed':
-            triggerSync(db, 'pull');
+            //triggerSync(db, 'pull');
+            await db.cloud.sync({ purpose: 'pull', wait: true });
             break;
           case 'changes':
             console.debug('changes');
