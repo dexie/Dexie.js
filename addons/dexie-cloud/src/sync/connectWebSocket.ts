@@ -51,10 +51,11 @@ export function connectWebSocket(db: DexieCloudDB) {
     filter((isReady) => isReady), // When consumer is ready for new messages, produce such a message to inform server about it
     switchMap(() => db.getPersistedSyncState()), // We need the info on which server revision we are at:
     filter((syncState) => syncState && syncState.serverRevision), // We wont send anything to server before inital sync has taken place
-    map<PersistedSyncState, ReadyForChangesMessage>((syncState) => ({
+    switchMap<PersistedSyncState, Promise<ReadyForChangesMessage>>(async (syncState) => ({
       // Produce the message to trigger server to send us new messages to consume:
       type: 'ready',
       rev: syncState.serverRevision,
+      realmSetHash: await computeRealmSetHash(syncState)
     }))
   );
 
