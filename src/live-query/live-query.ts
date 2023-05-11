@@ -127,6 +127,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         (err) => {
           if (!['DatabaseClosedError', 'AbortError'].includes(err?.name)) {
             querying = false;
+            if (closed) return;
             observer.error && observer.error(err);
             subscription.unsubscribe();
           }
