@@ -5,6 +5,7 @@
 
 import Dexie, { IndexableType, Table } from '../../dist/dexie'; // Imports the source Dexie.d.ts file
 import './test-extend-dexie';
+import './test-updatespec';
 
 // constructor overloads:
 {
