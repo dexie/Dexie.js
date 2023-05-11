@@ -19,13 +19,13 @@ import { Observable } from '../classes/observable/observable';
 import { extendObservabilitySet } from './extend-observability-set';
 import { rangesOverlap } from '../helpers/rangeset';
 import { domDeps } from '../classes/dexie/dexie-dom-dependencies';
+import { Transaction } from '../classes/transaction';
 
 export interface LiveQueryContext {
   subscr: ObservabilitySet;
   txs: IDBTransaction[];
-  signal: {
-    readonly aborted: boolean;  
-  }
+  signal: AbortSignal;
+  trans: null;
 }
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
@@ -35,11 +35,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       if (scopeFuncIsAsync) {
         incrementExpectedAwaits();
       }
-      const exec = () => newScope(querier, { ...ctx, trans: null });
-      const rv = PSD.trans
-        ? // Ignore current transaction if active when calling subscribe().
-          usePSD(PSD.transless, exec)
-        : exec();
+      const rv = newScope(querier, ctx);
       if (scopeFuncIsAsync) {
         (rv as Promise<any>).then(
           decrementExpectedAwaits,
@@ -50,13 +46,8 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     }
 
     let closed = false;
-    const ctx: LiveQueryContext = {
-      subscr: {},
-      txs: [],
-      signal: {
-        get aborted() { return closed; }
-      }
-    }
+    let abortController: AbortController;
+    const txs: IDBTransaction[] = [];
 
     let accumMuts: ObservabilitySet = {};
     let currentObs: ObservabilitySet = {};
@@ -67,8 +58,9 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       },
       unsubscribe: () => {
         closed = true;
+        if (abortController) abortController.abort();
         globalEvents.storagemutated.unsubscribe(mutationListener);
-        ctx.txs.forEach(idbtrans => {try {idbtrans.abort();} catch {}});
+        txs.forEach(idbtrans => {try {idbtrans.abort();} catch {}});
       },
     };
 
@@ -93,7 +85,6 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
 
     const doQuery = () => {
       if (
-        querying || // already querying
         closed || // closed - don't run!
         !domDeps.indexedDB) // SSR in sveltekit, nextjs etc
       {
@@ -101,7 +92,24 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       }
       accumMuts = {};
       const subscr: ObservabilitySet = {};
-      ctx.subscr = subscr;
+      // Abort signal fill three purposes:
+      // 1. Abort the query if the observable is unsubscribed.
+      // 2. Abort the query if a new query is made before the previous one has completed.
+      // 3. For cached queries to know if they should remain in memory or could be enqued for being freed up.
+      //    (they will remain in memory for a short time and if noone needs them again, they will eventually be freed up)
+      if (abortController) abortController.abort(); // Cancel previous query. Last query will be cancelled on unsubscribe().
+      abortController = new AbortController();
+      
+      if (txs.length) {
+        txs.forEach(idbtrans => {try {idbtrans.abort();} catch {}});
+        txs.length = 0;
+      }
+      const ctx: LiveQueryContext = {
+        subscr,
+        txs,
+        signal: abortController.signal,
+        trans: null // Make the scope transactionless (don't reuse transaction from outer scope of the caller of subscribe())
+      }
       const ret = execute(ctx);
       if (!startedListening) {
         globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
@@ -111,18 +119,19 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       Promise.resolve(ret).then(
         (result) => {
           querying = false;
-          if (closed) {
+          if (closed || ctx.signal.aborted) {
+            // closed - no subscriber anymore.
+            // signal.aborted - new query was made before this one completed and
+            // the querier might have catched AbortError and return successful result.
+            // If so, we should not rely in that result because we know we have aborted
+            // this run, which means there's another run going on that will handle accumMuts
+            // and we must not base currentObs on the half-baked subscr.
             return;
           }
-          if (shouldNotify()) {
-            // Mutations has happened while we were querying. Redo query.
-            doQuery();
-          } else {
-            accumMuts = {};
-            // Update what we are subscribing for based on this last run:
-            currentObs = subscr;
-            observer.next && observer.next(result);
-          }
+          accumMuts = {};
+          // Update what we are subscribing for based on this last run:
+          currentObs = subscr;
+          observer.next && observer.next(result);
         },
         (err) => {
           if (!['DatabaseClosedError', 'AbortError'].includes(err?.name)) {
