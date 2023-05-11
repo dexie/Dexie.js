@@ -33,7 +33,18 @@ export async function login(
     db.cloud.userInteraction,
     hints
   );
-  await context.save();
+  try {
+    await context.save();
+  } catch (e) {
+    try {
+      if (e.name === 'DataCloneError') {
+        console.debug(`Login context property names:`, Object.keys(context));
+        console.debug(`Login context:`, context);
+        console.debug(`Login context JSON:`, JSON.stringify(context));
+      }
+    } catch {}
+    throw e;
+  }
   await setCurrentUser(db, context);
   // Make sure to resync as the new login will be authorized
   // for new realms.

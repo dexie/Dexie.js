@@ -153,9 +153,18 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
         >;
       },
       getSchema() {
-        return db!.$syncState.get('schema') as Promise<
-          DexieCloudSchema | undefined
-        >;
+        return db!.$syncState.get('schema').then((schema: DexieCloudSchema) => {
+          if (schema) {
+            for (const table of db!.tables) {
+              if (table.schema.primKey && table.schema.primKey.keyPath && schema[table.name]) {
+                schema[table.name].primaryKey = nameFromKeyPath(
+                  table.schema.primKey.keyPath
+                );
+              }
+            }
+          }
+          return schema;
+        }) as Promise<DexieCloudSchema | undefined>;
       },
       getOptions() {
         return db!.$syncState.get('options') as Promise<
@@ -177,4 +186,10 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
     wm.set(dx.cloud, db);
   }
   return db;
+}
+
+function nameFromKeyPath (keyPath?: string | string[]): string {
+  return typeof keyPath === 'string' ?
+    keyPath :
+    keyPath ? ('[' + [].join.call(keyPath, '+') + ']') : "";
 }

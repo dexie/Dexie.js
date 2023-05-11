@@ -5,6 +5,7 @@
 
 import Dexie, { IndexableType, Table } from '../../dist/dexie'; // Imports the source Dexie.d.ts file
 import './test-extend-dexie';
+import './test-updatespec';
 
 // constructor overloads:
 {
@@ -125,6 +126,8 @@ import './test-extend-dexie';
     db.extendedDBMethod();
     // Extended event
     db.on('customEvent2', ()=>{});
+    // Transaction
+    db.transaction('rw', db.friends, ()=>{});
 
     // Table.get
     db.friends.get(1).then(friend => friend && friend.address.city);

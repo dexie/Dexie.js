@@ -3,7 +3,7 @@
  * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/LICENSE-2.0
  */
 import { _global } from '../globals/global';
-import {tryCatch, props, setProp, _global,
+import {tryCatch, props, setProp,
     getPropertyDescriptor, getArrayOf, extend, getProto} from '../functions/utils';
 import {nop, callBoth, mirror} from '../functions/chaining-functions';
 import {debug, prettyStack, getErrorWithStack} from './debug';
@@ -116,16 +116,10 @@ export var globalPSD = {
     global: true,
     ref: 0,
     unhandleds: [],
-    onunhandled: globalError,
+    onunhandled: nop,
     pgp: false,
     env: {},
-    finalize: function () {
-        this.unhandleds.forEach(uh => {
-            try {
-                globalError(uh[0], uh[1]);
-            } catch (e) {}
-        });
-    }
+    finalize: nop
 };
 
 export var PSD = globalPSD;
@@ -137,7 +131,6 @@ export var tickFinalizers = []; // Finalizers to call when there are no more asy
 export default function DexiePromise(fn) {
     if (typeof this !== 'object') throw new TypeError('Promises must be constructed via new');    
     this._listeners = [];
-    this.onuncatched = nop; // Deprecate in next major. Not needed. Better to use global error handler.
     
     // A library may set `promise._lib = true;` after promise is created to make resolve() or reject()
     // execute the microtask engine implicitely within the call to resolve() or reject().
@@ -856,35 +849,6 @@ function getPatchedPromiseThen (origThen, zone) {
             nativeAwaitCompatibleWrap(onResolved, zone),
             nativeAwaitCompatibleWrap(onRejected, zone));
     };
-}
-
-const UNHANDLEDREJECTION = "unhandledrejection";
-
-function globalError(err, promise) {
-    var rv;
-    try {
-        rv = promise.onuncatched(err);
-    } catch (e) {}
-    if (rv !== false) try {
-        var event, eventData = {promise: promise, reason: err};
-        if (_global.document && document.createEvent) {
-            event = document.createEvent('Event');
-            event.initEvent(UNHANDLEDREJECTION, true, true);
-            extend(event, eventData);
-        } else if (_global.CustomEvent) {
-            event = new CustomEvent(UNHANDLEDREJECTION, {detail: eventData});
-            extend(event, eventData);
-        }
-        if (event && _global.dispatchEvent) {
-            dispatchEvent(event);
-            if (!_global.PromiseRejectionEvent && _global.onunhandledrejection)
-                // No native support for PromiseRejectionEvent but user has set window.onunhandledrejection. Manually call it.
-                try {_global.onunhandledrejection(event);} catch (_) {}
-        }
-        if (debug && event && !event.defaultPrevented) {
-            console.warn(`Unhandled rejection: ${err.stack || err}`);
-        }
-    } catch (e) {}
 }
 
 export var rejection = DexiePromise.reject;

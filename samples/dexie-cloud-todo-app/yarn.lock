@@ -3190,9 +3190,9 @@ caniuse-api@^3.0.0:
     lodash.uniq "^4.5.0"
 
 caniuse-lite@^1.0.0, caniuse-lite@^1.0.30000981, caniuse-lite@^1.0.30001109, caniuse-lite@^1.0.30001125, caniuse-lite@^1.0.30001181:
-  version "1.0.30001265"
-  resolved "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001265.tgz"
-  integrity sha512-YzBnspggWV5hep1m9Z6sZVLOt7vrju8xWooFAgN6BA5qvy98qPAPb7vNUzypFaoh2pb3vlfzbDO8tB57UPGbtw==
+  version "1.0.30001465"
+  resolved "https://registry.npmjs.org/caniuse-lite/-/caniuse-lite-1.0.30001465.tgz"
+  integrity sha512-HvjgL3MYAJjceTDCcjRnQGjwUz/5qec9n7JPOzUursUoOTIsYCSDOb1l7RsnZE8mjbxG78zVRCKfrBXyvChBag==
 
 capture-exit@^2.0.0:
   version "2.0.0"
@@ -4156,29 +4156,22 @@ detect-port-alt@1.1.6:
     address "^1.0.1"
     debug "^2.6.0"
 
-dexie-cloud-addon@^4.0.0-beta.17:
-  version "4.0.0-beta.17"
-  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-4.0.0-beta.17.tgz#e251a6d69aef3519e06899251579d2fa422c87d7"
-  integrity sha512-SrZJLK3hduwXL7jMwX+R9r9vAZVHQxiGOK6zUto+BPs5C8yeKkw4cXayFRZT7dPDRLsN5fQSfnMwkH4Tr/l6vw==
+dexie-cloud-addon@^4.0.1-beta.33:
+  version "4.0.1-beta.33"
+  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-4.0.1-beta.33.tgz#ec890fbc5b03913aabfed9526afbb9fa8e33b6d3"
+  integrity sha512-OdKdqEjUtWOAcxwbjhf+fBaI+MPRGlapV8ySvB4zhNZD2BPm2X5kvsxPKDaoGq0QAmSArRZG8WvHHO4jj9Ovog==
   dependencies:
-    dexie-cloud-common "^1.0.23"
-
-dexie-cloud-common@^1.0.23:
-  version "1.0.23"
-  resolved "https://registry.yarnpkg.com/dexie-cloud-common/-/dexie-cloud-common-1.0.23.tgz#7389517bedfe7812d583c38c81a16f3fcb644ee4"
-  integrity sha512-UTIn+ajmGLKh6iLTxsYk4eOP/TbRw98UzKwI/N/q78N8PxkOMos2KFJq8KTvky73KyMH6hNFS04Q2BGbA2E2Eg==
-  dependencies:
-    universal-imports "^1.0.1"
+    rxjs "^7.x"
 
 dexie-react-hooks@^1.1.1:
-  version "1.1.1"
-  resolved "https://registry.yarnpkg.com/dexie-react-hooks/-/dexie-react-hooks-1.1.1.tgz#ff405cc89e5d899ddbac5e40d593f83f9a74106a"
-  integrity sha512-Cam5JP6PxHN564RvWEoe8cqLhosW0O4CAZ9XEVYeGHJBa6KEJlOpd9CUpV3kmU9dm2MrW97/lk7qkf1xpij7gA==
+  version "1.1.3"
+  resolved "https://registry.yarnpkg.com/dexie-react-hooks/-/dexie-react-hooks-1.1.3.tgz#dfcd723d533172605f06335823b205adf7442cc6"
+  integrity sha512-bXXE1gfYtfuVYTNiOlyam+YVaO8KaqacgRuxFuP37YtpS6o/jxT6KOl5h+hhqY36s0UavlHWbL+HWJFMcQumIg==
 
-dexie@^4.0.0-alpha.1:
-  version "4.0.0-alpha.1"
-  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.0-alpha.1.tgz#76c0a7bc20cf0c6fd2634c046c36d9c77dfaf4bf"
-  integrity sha512-/Ft0iWYFNL/U7tRWXLXKVoeMwvegNKIcXdi0Cbd9MYIan+56GY9wVHy9dDFBzxkZrsuKs48j7jEYE4T+T3PGjQ==
+dexie@^4.0.1-alpha.8:
+  version "4.0.1-alpha.8"
+  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.1-alpha.8.tgz#3abd79f0a6bde95dbb12a7a2e6e1776bdf2cdd90"
+  integrity sha512-i47tssYy1en6SCImjKaYS/zd4q11ydVyPQYF5waF8BIQw4aaVaHmPIpVVH1BoNdY0EgJhHzZM4te7VXEEM6wFw==
 
 diff-sequences@^26.6.2:
   version "26.6.2"
@@ -7602,13 +7595,6 @@ no-case@^3.0.4:
     lower-case "^2.0.2"
     tslib "^2.0.3"
 
-node-fetch@^2.6.1:
-  version "2.6.7"
-  resolved "https://registry.yarnpkg.com/node-fetch/-/node-fetch-2.6.7.tgz#24de9fba827e3b4ae44dc8b20256a379160052ad"
-  integrity sha512-ZjMPFEfVx5j+y2yF35Kzx5sF7kDzxuDj6ziH4FFbOp87zKDZNx8yExJIb05OGF4Nlt9IHFIMBkRl41VdvcNdbQ==
-  dependencies:
-    whatwg-url "^5.0.0"
-
 node-forge@^0.10.0:
   version "0.10.0"
   resolved "https://registry.npmjs.org/node-forge/-/node-forge-0.10.0.tgz"
@@ -9854,12 +9840,12 @@ run-queue@^1.0.0, run-queue@^1.0.3:
   dependencies:
     aproba "^1.1.1"
 
-rxjs@^7.4.0:
-  version "7.4.0"
-  resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-7.4.0.tgz#a12a44d7eebf016f5ff2441b87f28c9a51cebc68"
-  integrity sha512-7SQDi7xeTMCJpqViXh8gL/lebcwlp3d831F05+9B44A4B0WfsEwUQHR64gsH1kvJ+Ep/J9K2+n1hVl1CsGN23w==
+rxjs@^7.x:
+  version "7.8.0"
+  resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-7.8.0.tgz#90a938862a82888ff4c7359811a595e14e1e09a4"
+  integrity sha512-F2+gxDshqmIub1KdvZkaEfGDwLNpPvk9Fs6LD/MyQxNgMds/WH9OdDDXOmxUZpME+iSK3rQCctkL0DYyytUqMg==
   dependencies:
-    tslib "~2.1.0"
+    tslib "^2.1.0"
 
 safe-buffer@5.1.2, safe-buffer@~5.1.0, safe-buffer@~5.1.1:
   version "5.1.2"
@@ -10942,11 +10928,6 @@ tr46@^2.0.2:
   dependencies:
     punycode "^2.1.1"
 
-tr46@~0.0.3:
-  version "0.0.3"
-  resolved "https://registry.yarnpkg.com/tr46/-/tr46-0.0.3.tgz#8184fd347dac9cdc185992f3a6622e14b9d9ab6a"
-  integrity sha1-gYT9NH2snNwYWZLzpmIuFLnZq2o=
-
 trim-repeated@^1.0.0:
   version "1.0.0"
   resolved "https://registry.npmjs.org/trim-repeated/-/trim-repeated-1.0.0.tgz"
@@ -10984,7 +10965,7 @@ tslib@^1.8.1, tslib@^1.9.0:
   resolved "https://registry.npmjs.org/tslib/-/tslib-1.14.1.tgz"
   integrity sha512-Xni35NKzjgMrwevysHTCArtLDpPvye8zV/0E4EyYn43P7/7qvQwPh9BGkHewbMulVntbigmcT7rdX3BNo9wRJg==
 
-tslib@^2.0.3, tslib@~2.1.0:
+tslib@^2.0.3:
   version "2.1.0"
   resolved "https://registry.npmjs.org/tslib/-/tslib-2.1.0.tgz"
   integrity sha512-hcVC3wYEziELGGmEEXue7D75zbwIIVUMWAVbHItGPx0ziyXxrOMQx4rQEVEV45Ut/1IotuEvwqPopzIOkDMf0A==
@@ -11165,13 +11146,6 @@ unique-string@^1.0.0:
   integrity sha1-nhBXzKhRq7kzmPizOuGHuZyuwRo=
   dependencies:
     crypto-random-string "^1.0.0"
-
-universal-imports@^1.0.1:
-  version "1.0.3"
-  resolved "https://registry.yarnpkg.com/universal-imports/-/universal-imports-1.0.3.tgz#04e0bfc9f8820ed86c2f44eae5a7c1402d8ec474"
-  integrity sha512-0C3ledn2fe9yMHvT6PSRF0ptlnUk1bT2TLSuYwWeI3F9cRFg3khqWemaXI65TrMznK90iNP4KHPmr5z4G5bo5A==
-  dependencies:
-    node-fetch "^2.6.1"
 
 universalify@^0.1.0:
   version "0.1.2"
@@ -11409,11 +11383,6 @@ web-vitals@^1.0.1:
   resolved "https://registry.npmjs.org/web-vitals/-/web-vitals-1.1.2.tgz"
   integrity sha512-PFMKIY+bRSXlMxVAQ+m2aw9c/ioUYfDgrYot0YUa+/xa0sakubWhSDyxAKwzymvXVdF4CZI71g06W+mqhzu6ig==
 
-webidl-conversions@^3.0.0:
-  version "3.0.1"
-  resolved "https://registry.yarnpkg.com/webidl-conversions/-/webidl-conversions-3.0.1.tgz#24534275e2a7bc6be7bc86611cc16ae0a5654871"
-  integrity sha1-JFNCdeKnvGvnvIZhHMFq4KVlSHE=
-
 webidl-conversions@^5.0.0:
   version "5.0.0"
   resolved "https://registry.npmjs.org/webidl-conversions/-/webidl-conversions-5.0.0.tgz"
@@ -11559,14 +11528,6 @@ whatwg-mimetype@^2.3.0:
   version "2.3.0"
   resolved "https://registry.npmjs.org/whatwg-mimetype/-/whatwg-mimetype-2.3.0.tgz"
   integrity sha512-M4yMwr6mAnQz76TbJm914+gPpB/nCwvZbJU28cUD6dR004SAxDLOOSUaB1JDRqLtaOV/vi0IC5lEAGFgrjGv/g==
-
-whatwg-url@^5.0.0:
-  version "5.0.0"
-  resolved "https://registry.yarnpkg.com/whatwg-url/-/whatwg-url-5.0.0.tgz#966454e8765462e37644d3626f6742ce8b70965d"
-  integrity sha1-lmRU6HZUYuN2RNNib2dCzotwll0=
-  dependencies:
-    tr46 "~0.0.3"
-    webidl-conversions "^3.0.0"
 
 whatwg-url@^8.0.0:
   version "8.4.0"

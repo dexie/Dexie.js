@@ -10,7 +10,7 @@ import { DBCoreTable } from "./dbcore";
 import { Dexie } from "./dexie";
 import { UpdateSpec } from "./update-spec";
 
-export interface Table<T=any, TKey=IndexableType, TInsertType=T> {
+export interface Table<T=any, TKey=any, TInsertType=T> {
   db: Dexie;
   name: string;
   schema: TableSchema;

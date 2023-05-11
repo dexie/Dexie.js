@@ -2,6 +2,9 @@
   This function relies initially on navigator.onLine but then uses online and offline events
   which seem to be more reliable.
 */
-export let isOnline = navigator.onLine;
-self.addEventListener('online', ()=>isOnline = true);
-self.addEventListener('offline', ()=>isOnline = false);
+export let isOnline = false;
+if (typeof self !== 'undefined' && typeof navigator !== 'undefined') {
+  isOnline = navigator.onLine;
+  self.addEventListener('online', ()=>isOnline = true);
+  self.addEventListener('offline', ()=>isOnline = false);
+}
