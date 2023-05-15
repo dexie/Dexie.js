@@ -232,3 +232,4 @@ props(Dexie, {
 });
 
 Dexie.maxKey = getMaxKey(Dexie.dependencies.IDBKeyRange);
+Dexie.cache = {};
