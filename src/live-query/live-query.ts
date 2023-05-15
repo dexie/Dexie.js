@@ -25,7 +25,8 @@ export interface LiveQueryContext {
   subscr: ObservabilitySet;
   txs: IDBTransaction[];
   signal: AbortSignal;
-  trans: null;
+  requery: () => void;
+  trans: null | Transaction;
 }
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
@@ -66,8 +67,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
 
     observer.start && observer.start(subscription); // https://github.com/tc39/proposal-observable
 
-    let querying = false,
-      startedListening = false;
+    let startedListening = false;
 
     function shouldNotify() {
       return keys(currentObs).some(
@@ -108,6 +108,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         subscr,
         txs,
         signal: abortController.signal,
+        requery: doQuery,
         trans: null // Make the scope transactionless (don't reuse transaction from outer scope of the caller of subscribe())
       }
       const ret = execute(ctx);
@@ -115,10 +116,8 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
         startedListening = true;
       }
-      querying = true;
       Promise.resolve(ret).then(
         (result) => {
-          querying = false;
           if (closed || ctx.signal.aborted) {
             // closed - no subscriber anymore.
             // signal.aborted - new query was made before this one completed and
@@ -135,10 +134,8 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         },
         (err) => {
           if (!['DatabaseClosedError', 'AbortError'].includes(err?.name)) {
-            querying = false;
             if (closed) return;
             observer.error && observer.error(err);
-            subscription.unsubscribe();
           }
         }
       );
