@@ -73,20 +73,20 @@ import './test-updatespec';
     }
 
     class Entity2 {
-        oid: string;
-        prop1: Date;
+        oid!: string;
+        prop1!: Date;
     }
 
     class BaseEntity {
-        oid: string;
-        prop2: Date;
+        oid!: string;
+        prop2!: Date;
         foo(): void {
             console.log('foo');
         }
     }
 
     class Entity3 extends BaseEntity {
-        prop1: Date;
+        prop1!: Date;
         foo2(): void {
             console.log('foo');
         }
@@ -97,12 +97,12 @@ import './test-updatespec';
     }
 
     class MyDatabase extends Dexie {
-        friends: Dexie.Table<Friend, number>;
-        table2: Dexie.Table<Entity2, string>;
-        table3: Dexie.Table<Entity3, 'oid'>;
-        table4: Dexie.Table<Entity3, string>;
-        table5: Table;
-        compoundTable: Dexie.Table<CompoundKeyEntity, [string, string]>;
+        friends!: Dexie.Table<Friend, number>;
+        table2!: Dexie.Table<Entity2, string>;
+        table3!: Dexie.Table<Entity3, 'oid'>;
+        table4!: Dexie.Table<Entity3, string>;
+        table5!: Table;
+        compoundTable!: Dexie.Table<CompoundKeyEntity, [string, string]>;
 
         constructor () {
             super ('MyDatabase');
@@ -233,6 +233,20 @@ import './test-updatespec';
     }).catch (err => {
         console.log(`Error: ${err}`);
     });
+
+
+    const takeFriend = (friend: Friend) => {
+        //friend.address = {city: "x"}; // would compile.
+        return friend.address.city;
+    }
+
+    const retrieveFriend = async () => {
+        const friend = await db.friends.get(1);
+        if (!friend) throw "";
+        //friend.address.city = "x"; // wouldn't compile.
+        return takeFriend(friend); // Allowed in TS despite that friend is Readonly<Friend>. This is maybe good. But could be a headache for users if TS changes this.
+    };
+
 }
 
 // Issue 756
