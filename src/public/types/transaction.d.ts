@@ -8,6 +8,7 @@ export interface Transaction {
   mode: IDBTransactionMode;
   //tables: { [type: string]: Table<any, any> }; Deprecated since 2.0. Obsolete from v3.0.
   storeNames: Array<string>;
+  explicit?: boolean;
   parent?: Transaction;
   on: TransactionEvents;
   abort(): void;

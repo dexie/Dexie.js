@@ -326,11 +326,11 @@ export class Table implements ITable<any, IndexableType> {
       const key = getByKeyPath(keyOrObject, this.schema.primKey.keyPath);
       if (key === undefined) return rejection(new exceptions.InvalidArgument(
         "Given object does not contain its primary key"));
-      // object to modify. Also modify given object with the modifications:
+      /*// object to modify. Also modify given object with the modifications:
       // This part should be here for backward compatibility.
       // If ever feeling too bad about mutating given object, please wait to a new major before removing it,
-      // and document the change thoroughly.
-      try {
+      // and document the change thoroughly. TODO: Document this change!
+      if (!Object.isFrozen(keyOrObject)) try {
         if (typeof modifications !== "function") {
           keys(modifications).forEach(keyPath => {
             setByKeyPath(keyOrObject, keyPath, modifications[keyPath]);
@@ -343,7 +343,7 @@ export class Table implements ITable<any, IndexableType> {
       } catch {
         // Maybe given object was frozen.
         // This part is not essential. Just move on as nothing happened...
-      }
+      }*/
       return this.where(":id").equals(key).modify(modifications);
     } else {
       // key to modify
