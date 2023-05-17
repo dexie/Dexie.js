@@ -194,6 +194,8 @@ const intrinsicTypeNames =
 const intrinsicTypes = intrinsicTypeNames.map(t=>_global[t]);
 export const intrinsicTypeNameSet = arrayToObject(intrinsicTypeNames, x=>[x,true]);
 
+//export const deepClone = structuredClone.bind(null); // Dexie 4.0+ expects modern browsers.
+
 let circularRefs: null | WeakMap<any,any> = null;
 export function deepClone<T>(any: T): T {
     circularRefs = typeof WeakMap !== 'undefined' && new WeakMap();
