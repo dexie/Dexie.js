@@ -215,7 +215,8 @@ promisedTest("subscribe and error occur", async ()=> {
   ok(!subscription.closed, "Subscription should not yet be closed");
   let result = await signal.promise;
   equal(result, "error", "The observable's error callback should have been called");
-  ok(subscription.closed, "Subscription should have been closed after error has occurred");
+  //No. Should not close errored subscriptions. What if they did a fetch call in it that failed? SHould keep subscribing.
+  //ok(subscription.closed, "Subscription should have been closed after error has occurred");
   subscription.unsubscribe();
 });
 
