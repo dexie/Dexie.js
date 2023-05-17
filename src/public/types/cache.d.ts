@@ -1,21 +1,46 @@
-import { DBCoreCountRequest, DBCoreGetRequest, DBCoreMutateRequest, DBCoreQueryRequest, DBCoreQueryResponse } from "./dbcore";
+import { ObservabilitySet } from './db-events';
+import {
+  DBCoreCountRequest,
+  DBCoreGetManyRequest,
+  DBCoreGetRequest,
+  DBCoreKeyRange,
+  DBCoreMutateRequest,
+  DBCoreQueryRequest,
+} from './dbcore';
+import { IntervalTree } from './rangeset';
 
 export type GlobalQueryCache = {
   [part: string]: TblQueryCache; // part is `idb://${dbName}/${tableName}`
-}
+};
 
 export interface TblQueryCache {
-  queries: CacheEntry[];
-  ops: OptimisticOperation[];
+  queries: {
+    query: {[indexName: string]: CacheEntry[]};
+    count: {[indexName: string]: CacheEntry[]};
+  },
+  objs: Map<string | number, object>;
+  optimisticOps: DBCoreMutateRequest[];
+  unsignaledParts: ObservabilitySet;
+  signalTimer?: number;
 }
 
-export interface OptimisticOperation {
-  req: DBCoreMutateRequest;
-  tx: IDBTransaction;
+interface CacheEntryCommon {
+  subscribers: Set<() => void>;
+  obsSet: ObservabilitySet;
+  promise: Promise<any>;
+  dirty: boolean;
 }
 
-export interface CacheEntry {
-  req: DBCoreQueryRequest | DBCoreGetRequest | DBCoreCountRequest;
-  res: DBCoreQueryResponse;
-  subscribers: Set<()=>void>;
-}
+export type CacheEntry = CacheEntryCommon &
+  (
+    | {
+        type: 'query';
+        req: DBCoreQueryRequest;
+        res?: readonly any[];
+      }
+    | {
+        type: 'count';
+        req: DBCoreCountRequest;
+        res?: number;
+      }
+  );

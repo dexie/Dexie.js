@@ -20,6 +20,7 @@ import { extendObservabilitySet } from './extend-observability-set';
 import { rangesOverlap } from '../helpers/rangeset';
 import { domDeps } from '../classes/dexie/dexie-dom-dependencies';
 import { Transaction } from '../classes/transaction';
+import { obsSetsOverlap } from './obs-sets-overlap';
 
 export interface LiveQueryContext {
   subscr: ObservabilitySet;
@@ -70,10 +71,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     let startedListening = false;
 
     function shouldNotify() {
-      return keys(currentObs).some(
-        (key) =>
-          accumMuts[key] && rangesOverlap(accumMuts[key], currentObs[key])
-      );
+      return obsSetsOverlap(currentObs, accumMuts);
     }
 
     const mutationListener = (parts: ObservabilitySet) => {

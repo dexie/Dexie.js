@@ -1,5 +1,6 @@
 import { LiveQueryContext } from ".";
 import { getFromTransactionCache } from "../dbcore/cache-existing-values-middleware";
+import { getEffectiveKeys } from "../dbcore/get-effective-keys";
 import { exceptions } from "../errors";
 import { cmp } from "../functions/cmp";
 import { isArray, keys } from "../functions/utils";
@@ -21,10 +22,13 @@ import {
   DBCoreTransaction,
 } from "../public/types/dbcore";
 import { Middleware } from "../public/types/middleware";
+import { isCachableContext } from "./cache/is-cachable";
+import { extendObservabilitySet } from "./extend-observability-set";
 
 export const observabilityMiddleware: Middleware<DBCore> = {
   stack: "dbcore",
   level: 0,
+  name: "Observability",
   create: (core) => {
     const dbName = core.schema.name;
     const FULL_RANGE = new RangeSet(core.MIN_KEY, core.MAX_KEY);
@@ -34,24 +38,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
       transaction: (stores, mode, options) => {
         if (!PSD.subscr) return core.transaction(stores, mode, options);
         if (mode !== 'readonly') throw new exceptions.ReadOnly('write transaction not allowed within liveQueries');
-        const idbtrans = core.transaction(stores, mode, options) as IDBTransaction;
-        // Maintain PSD.txs array of ongoing transactions in case they need to be
-        // aborted in live-query.ts before done.
-        const { txs } = PSD as LiveQueryContext;
-        if (txs) {
-          txs.push(idbtrans);
-          const remove = () => {
-            const idx = txs.indexOf(idbtrans);
-            if (idx > -1) txs.splice(idx, 1);
-            idbtrans.removeEventListener('abort', remove);
-            idbtrans.removeEventListener('complete', remove);
-            idbtrans.removeEventListener('error', remove);
-          };
-          idbtrans.addEventListener('abort', remove);
-          idbtrans.addEventListener('complete', remove);
-          idbtrans.addEventListener('error', remove);
-        }
-        return idbtrans;
+        return core.transaction(stores, mode, options) as IDBTransaction;
       },
       table: (tableName) => {
         const table = core.table(tableName);
@@ -64,8 +51,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
             const trans = req.trans as DBCoreTransaction & {
               mutatedParts?: ObservabilitySet;
             };
-            const mutatedParts =
-              trans.mutatedParts || (trans.mutatedParts = {});
+            const mutatedParts = req.mutatedParts || (req.mutatedParts = {});
             const getRangeSet = (indexName: string) => {
               const part = `idb://${dbName}/${tableName}/${indexName}`;
               return (mutatedParts[part] ||
@@ -81,45 +67,54 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                 : req.type === "delete"
                 ? [req.keys] // keys known already here. newObjs will be undefined.
                 : req.values.length < 50
-                ? [[], req.values] // keys = empty array - will be resolved in mutate().then(...).
+                ? [getEffectiveKeys(primaryKey, req).filter(id => id), req.values] // keys except autoIncremented - but they are future keys not listened to.
                 : []; // keys and newObjs will both be undefined - changeSpec will become true (changed for entire table)
-            const oldCache = req.trans["_cache"];
-            return table.mutate(req).then((res) => {
-              // Add the mutated table and optionally keys to the mutatedTables set on the transaction.
-              // Used by subscribers to txcommit event and for Collection.prototype.subscribe().
-              if (isArray(keys)) {
-                // keys is an array - delete, add or put of less than 50 rows.
-                if (type !== "delete") keys = res.results;
-                // individual keys (add put or delete)
-                pkRangeSet.addKeys(keys);
-                // Only get oldObjs if they have been cached recently
-                // (This applies to Collection.modify() only, but also if updating/deleting hooks have subscribers)
-                const oldObjs = getFromTransactionCache(keys, oldCache);
 
-                // Supply detailed values per index for both old and new objects:
-                if (!oldObjs && type !== "add") {
-                  // delete or put and we don't know old values.
-                  // Indicate this in the ":dels" part, for the sake of count() queries only!
-                  delsRangeSet.addKeys(keys);
-                }
-                if (oldObjs || newObjs) {
-                  // No matter if knowning oldObjs or not, track the indices if it's a put, add or delete.
-                  trackAffectedIndexes(getRangeSet, schema, oldObjs, newObjs);
-                }
-              } else if (keys) {
-                // As we can't know deleted index ranges, mark index-based subscriptions must trigger.
-                const range = { from: keys.lower, to: keys.upper };
-                delsRangeSet.add(range);
-                // deleteRange. keys is a DBCoreKeyRange objects. Transform it to [from,to]-style range.
-                pkRangeSet.add(range);
-              } else {
-                // Too many requests to record the details without slowing down write performance.
-                // Let's just record a generic large range on primary key, the virtual :dels index and
-                // all secondary indices:
-                pkRangeSet.add(FULL_RANGE);
-                delsRangeSet.add(FULL_RANGE);
-                schema.indexes.forEach(idx => getRangeSet(idx.name).add(FULL_RANGE));
+            const oldCache = req.trans["_cache"];
+
+            // Add the mutated table and optionally keys to the mutatedTables set on the transaction.
+            // Used by subscribers to txcommit event and for Collection.prototype.subscribe().
+            if (isArray(keys)) {
+              // keys is an array - delete, add or put of less than 50 rows.
+              // Individual keys (add put or delete)
+              pkRangeSet.addKeys(keys);
+              // Only get oldObjs if they have been cached recently
+              // (This applies to Collection.modify() only, but also if updating/deleting hooks have subscribers)
+              const oldObjs = getFromTransactionCache(keys, oldCache);
+
+              // Supply detailed values per index for both old and new objects:
+              if (!oldObjs && type !== "add") {
+                // delete or put and we don't know old values.
+                // Indicate this in the ":dels" part, for the sake of count() queries only!
+                delsRangeSet.addKeys(keys);
               }
+              if (oldObjs || newObjs) {
+                // No matter if knowning oldObjs or not, track the indices if it's a put, add or delete.
+                trackAffectedIndexes(getRangeSet, schema, oldObjs, newObjs);
+              }
+            } else if (keys) {
+              // keys is a DBCoreKeyRange object. Transform it to [from,to]-style range.
+              // As we can't know deleted index ranges, mark index-based subscriptions must trigger.
+              const range = { from: keys.lower, to: keys.upper };
+              delsRangeSet.add(range);
+              // deleteRange. keys is a DBCoreKeyRange objects. Transform it to [from,to]-style range.
+              pkRangeSet.add(range);
+            } else {
+              // Too many requests to record the details without slowing down write performance.
+              // Let's just record a generic large range on primary key, the virtual :dels index and
+              // all secondary indices:
+              pkRangeSet.add(FULL_RANGE);
+              delsRangeSet.add(FULL_RANGE);
+              schema.indexes.forEach(idx => getRangeSet(idx.name).add(FULL_RANGE));
+            }
+
+            return table.mutate(req).then((res) => {
+              // Merge the mutated parts from the request into the transaction's mutatedParts
+              // now when the request went fine.
+              trans.mutatedParts = extendObservabilitySet (
+                trans.mutatedParts || {},
+                mutatedParts
+              );
               return res;
             });
           },
@@ -155,8 +150,14 @@ export const observabilityMiddleware: Middleware<DBCore> = {
               | DBCoreCountRequest
               | DBCoreOpenCursorRequest
           ) {
-            const { subscr } = PSD;
-            if (subscr) {
+            const { subscr } = PSD as LiveQueryContext;
+            const isLiveQuery = !!subscr;
+            let cachable = isLiveQuery && method === "query" && isCachableContext(PSD as LiveQueryContext, table);
+            const obsSet = cachable
+              ? req.obsSet = {} // Implicit read transaction - track changes for this query only for the request's duration
+              : subscr; // Explicit read transaction - track changes across entire live query
+
+            if (isLiveQuery) {
               // Abort handling
               const { signal } = PSD as LiveQueryContext;
               if (signal && signal.aborted) throw new exceptions.Abort();
@@ -166,8 +167,8 @@ export const observabilityMiddleware: Middleware<DBCore> = {
               // Track what we should be observing:
               const getRangeSet = (indexName: string) => {
                 const part = `idb://${dbName}/${tableName}/${indexName}`;
-                return (subscr[part] ||
-                  (subscr[part] = new RangeSet())) as RangeSet;
+                return (obsSet[part] ||
+                  (obsSet[part] = new RangeSet())) as RangeSet;
               };
               const pkRangeSet = getRangeSet("");
               const delsRangeSet = getRangeSet(":dels");
