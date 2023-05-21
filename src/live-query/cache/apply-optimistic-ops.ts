@@ -16,7 +16,7 @@ export function applyOptimisticOps(
   table: DBCoreTable,
   cacheEntry: CacheEntry,
   immutable: boolean
-) {
+): any[] {
   if (!ops || ops.length === 0) return result;
   const sortIndex = req.query.index;
   const primaryKey = table.schema.primaryKey;
@@ -102,5 +102,5 @@ export function applyOptimisticOps(
       cacheEntry.dirty = true;
     }
   }
-  return immutable ? Object.freeze(finalResult) : finalResult;
+  return immutable ? Object.freeze(finalResult) as any[] : finalResult;
 }

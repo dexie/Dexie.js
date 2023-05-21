@@ -30,7 +30,8 @@ export function findCompatibleQuery(
   const queries = tblCache.queries[type];
   if (!queries) return [null, false, tblCache, null];
   const indexName = req.query ? req.query.index.name : null;
-  const entries = queries[indexName];
+  const entries = queries[indexName || ''];
+  if (!entries) return [null, false, tblCache, null];
 
   switch (type) {
     case 'query':
@@ -45,7 +46,7 @@ export function findCompatibleQuery(
           equalEntry,
           true, // exact match
           tblCache,
-          entries
+          entries,
         ];
       const superEntry = entries.find((entry) => {
         const limit = 'limit' in entry.req ? entry.req.limit : Infinity;
@@ -63,5 +64,3 @@ export function findCompatibleQuery(
       return [countQuery, !!countQuery, tblCache, entries];
   }
 }
-
-

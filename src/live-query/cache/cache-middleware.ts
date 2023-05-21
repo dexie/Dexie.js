@@ -1,14 +1,16 @@
 import { LiveQueryContext } from '..';
 import { getFromTransactionCache } from '../../dbcore/cache-existing-values-middleware';
+import { getEffectiveKeys } from '../../dbcore/get-effective-keys';
 import { exceptions } from '../../errors';
 import { cmp } from '../../functions/cmp';
 import { deepClone, isArray, keys, setByKeyPath } from '../../functions/utils';
 import DexiePromise, { PSD } from '../../helpers/promise';
-import { RangeSet, rangesOverlap } from '../../helpers/rangeset';
-import { CacheEntry, TblQueryCache } from '../../public/types/cache';
+import { RangeSet, getRangeSetIterator, rangesOverlap } from '../../helpers/rangeset';
+import { CacheEntry } from '../../public/types/cache';
 import { ObservabilitySet } from '../../public/types/db-events';
 import {
   DBCore,
+  DBCoreAddRequest,
   DBCoreCountRequest,
   DBCoreCursor,
   DBCoreGetManyRequest,
@@ -16,6 +18,7 @@ import {
   DBCoreIndex,
   DBCoreMutateRequest,
   DBCoreOpenCursorRequest,
+  DBCorePutRequest,
   DBCoreQueryRequest,
   DBCoreQueryResponse,
   DBCoreTable,
@@ -23,12 +26,13 @@ import {
   DBCoreTransaction,
 } from '../../public/types/dbcore';
 import { Middleware } from '../../public/types/middleware';
-import { extendObservabilitySet } from '../extend-observability-set';
 import { obsSetsOverlap } from '../obs-sets-overlap';
 import { applyOptimisticOps } from './apply-optimistic-ops';
 import { cache } from './cache';
 import { findCompatibleQuery } from './find-compatible-query';
-import { isCachableContext } from './is-cachable';
+import { isCachableContext } from './is-cachable-context';
+import { isCachableRequest } from './is-cachable-request';
+import { signalSubscribers } from './signalSubscribers';
 import { subscribeToCacheEntry } from './subscribe-cachentry';
 
 export const cacheMiddleware: Middleware<DBCore> = {
@@ -71,48 +75,76 @@ export const cacheMiddleware: Middleware<DBCore> = {
                   );
                   if (ops.length > 0) {
                     // Remove them from the optimisticOps array
+                    console.log("TRNSCommit: Optimistic updates: ", tblCache.optimisticOps);
                     tblCache.optimisticOps = tblCache.optimisticOps.filter(
                       (op) => op.trans !== idbtrans
                     );
+                    console.log("TRNSCommit: Optimistic updates left: " + tblCache.optimisticOps.length);
+                    console.log("tblCache.queries.query:", deepClone(tblCache.queries.query), "Object.values(tblCache.queries.query)", Object.values(
+                      deepClone(tblCache.queries.query)
+                    ));
                     // Commit or abort the optimistic updates
                     for (const entries of Object.values(
                       tblCache.queries.query
                     )) {
-                      for (const entry of entries) {
+                      for (const entry of entries.slice()) {
                         if (
-                          entry.res && // if entry.promise but not entry.res, we're fine. Query will resume now and get the result.
-                          idbtrans.mutatedParts &&
-                          obsSetsOverlap(entry.obsSet, idbtrans.mutatedParts)
+                          entry.res != null && // if entry.promise but not entry.res, we're fine. Query will resume now and get the result.
+                          idbtrans.mutatedParts/* &&
+                          obsSetsOverlap(entry.obsSet, idbtrans.mutatedParts)*/
                         ) {
                           if (wasCommitted && !entry.dirty) {
                             const freezeResults = Object.isFrozen(entry.res);
                             const modRes = applyOptimisticOps(
-                              entry.res as any,
+                              entry.res as any[],
                               entry.req,
                               ops,
                               table,
                               entry,
                               freezeResults
                             );
-                            if (modRes !== entry.res) {
+                            if (entry.dirty) {
+                              // Found out at this point that the entry is dirty - not to rely on!
+                              console.log("dirty2");
+                              entries.splice(entries.indexOf(entry), 1);
+                              entry.subscribers.forEach((requery) => requery());
+                            } else if (modRes !== entry.res) {
+                              console.log("TRNSCommit ops:", ops, "req:", entry.req.query, "old res:", entry.res, "new res:", modRes);
                               entry.res = modRes;
                               // Update promise
-                              entry.promise = DexiePromise.resolve(modRes);
+                              entry.promise = DexiePromise.resolve({result: modRes} satisfies DBCoreQueryResponse);
+                              
                               // No need to notify subscribers. They already have this value.
                               // We have just updated the value of the cache without having to
                               // requery the database - because we know the result for this
                               // query based on computing the operations and applying them
                               // to the previous result.
+                            } else {
+                              console.log("TRNSCommit: Nothing was changed", ops, "req:", entry.req.query, "old res:", entry.res, "new res:", modRes);
                             }
                           } else {
                             if (entry.dirty) {
+                              console.log("dirty");
                               // If the entry is dirty we need to get rid of it so that
                               // a new entry will be created when the query is run again.
                               entries.splice(entries.indexOf(entry), 1);
                             }
                             // If we're not committing, we need to notify subscribers that the
                             // optimistic updates are no longer valid.
-                            entry.subscribers.forEach((requery) => requery());
+                            entry.subscribers.forEach((requery) => requery()); // TODO: Call signalSubscribers instead somehow (or is the subscriber or obsSet already reset at this point)
+                          }
+                        } else {
+                          const tst = entry.obsSet?.['idb://TestLiveQuery/items/'];
+                          if (tst) {
+                            let it = getRangeSetIterator(tst);
+                            const entryObsSetKeys: any[] = [];
+                            let itVal = it.next();
+                            while (!itVal.done) {
+                              entryObsSetKeys.push(itVal.value.from);
+                              itVal = it.next();
+                            }
+                             //= Array.from(getRangeSetIterator(tst)).map(x => x.from);
+                            console.log("TRNSCommit ops NO change:", deepClone(ops), "entry:", deepClone(entry), 'entry.obsSet keys', entryObsSetKeys); //obsSetsOverlap(entry.obsSet, idbtrans.mutatedParts)
                           }
                         }
                       }
@@ -149,25 +181,46 @@ export const cacheMiddleware: Middleware<DBCore> = {
             }
             // Find the TblQueryCache for this table:
             const tblCache = cache[`idb://${dbName}/${tableName}`];
-            if (tblCache) return downTable.mutate(req);
+            if (!tblCache) return downTable.mutate(req);
 
-            // Enque the operation
-            tblCache.optimisticOps.push(req);
             const promise = downTable.mutate(req);
-            // Signal subscribers that there are mutated parts
-            signalSubscribers(tblCache, req.mutatedParts);
-            promise.catch(()=> {
-              // In case the operation failed, we need to remove it from the optimisticOps array.
-              tblCache.optimisticOps.splice(
-                tblCache.optimisticOps.indexOf(req),
-                1
-              );
-              signalSubscribers(tblCache, req.mutatedParts); // Signal the rolling back of the operation.
-            });
+            if (primKey.autoIncrement && (req.type === 'add' || req.type === 'put') && (req.values.length > 50 || getEffectiveKeys(primKey, req).some(key => key == null))) {
+              // There are some autoIncremented keys not set yet. Need to wait for completion before we can reliably enqueue the operation.
+              // (or there are too many objects so we lazy out to avoid performance bottleneck for large bulk inserts)
+              promise.then((res) => { // We need to extract result keys and generate cloned values with the keys set (so that applyOptimisticOps can work)
+                // But we have a problem! The req.mutatedParts is still not complete so we have to actively add the keys to the unsignaledParts set manually.
+                const reqWithResolvedKeys = {
+                  ...req,
+                  values: req.values.map((value, i) => {
+                    const valueWithKey = {
+                      ...value,
+                    };
+                    setByKeyPath(valueWithKey, primKey.keyPath, res.results[i]);
+                    return valueWithKey;
+                  })
+                };
+                tblCache.optimisticOps.push(reqWithResolvedKeys);
+                // Signal subscribers after the observability middleware has complemented req.mutatedParts with the new keys.
+                queueMicrotask(()=>signalSubscribers(tblCache, req.mutatedParts));
+              });
+            } else {
+              // Enque the operation immediately
+              tblCache.optimisticOps.push(req);
+              // Signal subscribers that there are mutated parts
+              signalSubscribers(tblCache, req.mutatedParts);
+              promise.catch(()=> {
+                // In case the operation failed, we need to remove it from the optimisticOps array.
+                tblCache.optimisticOps.splice(
+                  tblCache.optimisticOps.indexOf(req),
+                  1
+                );
+                signalSubscribers(tblCache, req.mutatedParts); // Signal the rolling back of the operation.
+              });
+            }
             return promise;
           },
           query(req: DBCoreQueryRequest): Promise<DBCoreQueryResponse> {
-            if (!isCachableContext(PSD, downTable)) return downTable.query(req);
+            if (!isCachableContext(PSD, downTable) || !isCachableRequest("query", req)) return downTable.query(req);
             const freezeResults =
               (PSD as LiveQueryContext).trans.db._options.cache === 'immutable';
             const { requery, signal } = PSD as LiveQueryContext;
@@ -215,7 +268,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
               if (container) {
                 container.push(cacheEntry);
               } else {
-                container = [];
+                container = [cacheEntry];
                 if (!tblCache) {
                   tblCache = cache[`idb://${dbName}/${tableName}`] = {
                     queries: {
@@ -227,7 +280,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                     unsignaledParts: {}
                   };
                 }
-                tblCache.queries[req.query.index.name || ''] = container;
+                tblCache.queries.query[req.query.index.name || ''] = container;
               }
             }
             subscribeToCacheEntry(cacheEntry, container, requery, signal);
@@ -250,23 +303,4 @@ export const cacheMiddleware: Middleware<DBCore> = {
   },
 };
 
-function signalSubscribers(tblCache: TblQueryCache, mutatedParts: ObservabilitySet) {
-  extendObservabilitySet(tblCache.unsignaledParts, mutatedParts);
-  if (!tblCache.signalTimer) {
-    tblCache.signalTimer = setTimeout(() => {
-      tblCache.signalTimer = null;
-      signalSubscribersNow(tblCache);
-    }, 0);
-  }
-}
 
-function signalSubscribersNow(tblCache: TblQueryCache) {
-  for (const entries of Object.values(tblCache.queries.query)) {
-    for (const entry of entries) {
-      if (entry.obsSet && obsSetsOverlap(entry.obsSet, tblCache.unsignaledParts)) {
-        entry.subscribers.forEach((requery) => requery()); // try..catch not needed. subscriber is in live-query.ts
-      }
-    }
-  }
-  tblCache.unsignaledParts = {};
-}
