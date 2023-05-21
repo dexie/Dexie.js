@@ -1,4 +1,4 @@
-import { DBCoreTable } from '../../public/types/dbcore';
+import { DBCore, DBCoreTable } from '../../public/types/dbcore';
 import { LiveQueryContext } from '../live-query';
 
 export function isCachableContext(ctx: LiveQueryContext, table: DBCoreTable) {
@@ -10,3 +10,4 @@ export function isCachableContext(ctx: LiveQueryContext, table: DBCoreTable) {
     !table.schema.primaryKey.outbound
   );
 }
+

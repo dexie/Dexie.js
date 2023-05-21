@@ -22,7 +22,8 @@ import {
   DBCoreTransaction,
 } from "../public/types/dbcore";
 import { Middleware } from "../public/types/middleware";
-import { isCachableContext } from "./cache/is-cachable";
+import { isCachableContext } from "./cache/is-cachable-context";
+import { isCachableRequest } from "./cache/is-cachable-request";
 import { extendObservabilitySet } from "./extend-observability-set";
 
 export const observabilityMiddleware: Middleware<DBCore> = {
@@ -111,6 +112,11 @@ export const observabilityMiddleware: Middleware<DBCore> = {
             return table.mutate(req).then((res) => {
               // Merge the mutated parts from the request into the transaction's mutatedParts
               // now when the request went fine.
+              if (keys && primaryKey.autoIncrement && (req.type === 'add' || req.type === 'put')) {
+                // Less than 50 requests (keys truthy) (otherwise we've added full range anyway)
+                // autoincrement means we might not have got all keys until now
+                pkRangeSet.addKeys(res.results);
+              }
               trans.mutatedParts = extendObservabilitySet (
                 trans.mutatedParts || {},
                 mutatedParts
@@ -152,7 +158,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
           ) {
             const { subscr } = PSD as LiveQueryContext;
             const isLiveQuery = !!subscr;
-            let cachable = isLiveQuery && method === "query" && isCachableContext(PSD as LiveQueryContext, table);
+            let cachable = isCachableContext(PSD as LiveQueryContext, table) && isCachableRequest(method, req);
             const obsSet = cachable
               ? req.obsSet = {} // Implicit read transaction - track changes for this query only for the request's duration
               : subscr; // Explicit read transaction - track changes across entire live query
