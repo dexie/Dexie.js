@@ -9,7 +9,10 @@ import {
 } from './dbcore';
 import { IntervalTree } from './rangeset';
 
+
 export type GlobalQueryCache = {
+  // TODO: Change to parts: {[part: string]: TblQueryCache}
+  //       och unsignaledParts: ObservabilitySet;
   [part: string]: TblQueryCache; // part is `idb://${dbName}/${tableName}`
 };
 
@@ -27,6 +30,7 @@ export interface TblQueryCache {
 interface CacheEntryCommon {
   subscribers: Set<() => void>;
   obsSet: ObservabilitySet;
+  //txObsSet: ObservabilitySet;
   promise: Promise<any>;
   dirty: boolean;
 }

@@ -81,7 +81,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
               pkRangeSet.addKeys(keys);
               // Only get oldObjs if they have been cached recently
               // (This applies to Collection.modify() only, but also if updating/deleting hooks have subscribers)
-              const oldObjs = getFromTransactionCache(keys, oldCache);
+              const oldObjs = type === 'delete' || keys.length === newObjs.length ? getFromTransactionCache(keys, oldCache) : null;
 
               // Supply detailed values per index for both old and new objects:
               if (!oldObjs && type !== "add") {
@@ -121,7 +121,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                 trans.mutatedParts || {},
                 mutatedParts
               );
-              return res;
+            return res;
             });
           },
         };
