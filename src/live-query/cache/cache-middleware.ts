@@ -195,6 +195,14 @@ export const cacheMiddleware: Middleware<DBCore> = {
               cacheEntry.obsSet = req.obsSet; // So that optimistic result is monitored.
               // How? - because observability-middleware will track result where optimistic
               // mutations are applied and record it in the cacheEntry.
+              // TODO: CHANGE THIS! The difference is resultKeys only.
+              // Wanted behavior:
+              //  * cacheEntry obsSet should represent the obsSet without optimistic updates (so it can be checked when merging ops in tx commit)
+              //  * cacheEntry optimisticObsSet should represent the obsSet with current optimistic updates. It should be updated when adding an op
+              //    by adding the primary keys of the put/add/delete operation to the set.
+              //  * observability-middleware should stop recording req.obsSet when a cache entry exact match is found because it won't be used anyway.
+              // I'm thinking of merging observability-middleware with cache-middleware into one single middleware because the dependencies are too
+              // tight between them.
             } else {
               // --> TODO here: If not exact match, check if we have a superset to extract
               // the data from.
