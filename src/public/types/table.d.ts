@@ -17,10 +17,10 @@ export interface Table<T=any, TKey=any, TInsertType=T> {
   hook: TableHooks<T, TKey>;
   core: DBCoreTable;
 
-  get(key: TKey): PromiseExtended<Readonly<T> | undefined>;
-  get<R>(key: TKey, thenShortcut: ThenShortcut<Readonly<T> | undefined,R>): PromiseExtended<R>;
-  get(equalityCriterias: {[key:string]:any}): PromiseExtended<Readonly<T> | undefined>;
-  get<R>(equalityCriterias: {[key:string]:any}, thenShortcut: ThenShortcut<Readonly<T> | undefined, R>): PromiseExtended<R>;
+  get(key: TKey): PromiseExtended<T | undefined>;
+  get<R>(key: TKey, thenShortcut: ThenShortcut<T | undefined,R>): PromiseExtended<R>;
+  get(equalityCriterias: {[key:string]:any}): PromiseExtended<T | undefined>;
+  get<R>(equalityCriterias: {[key:string]:any}, thenShortcut: ThenShortcut<T | undefined, R>): PromiseExtended<R>;
   where(index: string | string[]): WhereClause<T, TKey>;
   where(equalityCriterias: {[key:string]:any}): Collection<T, TKey>;
 
@@ -35,8 +35,8 @@ export interface Table<T=any, TKey=any, TInsertType=T> {
 
   each(callback: (obj: T, cursor: {key: any, primaryKey: TKey}) => any): PromiseExtended<void>;
 
-  toArray(): PromiseExtended<ReadonlyArray<Readonly<T>>>;
-  toArray<R>(thenShortcut: ThenShortcut<ReadonlyArray<Readonly<T>>, R>): PromiseExtended<R>;
+  toArray(): PromiseExtended<Array<T>>;
+  toArray<R>(thenShortcut: ThenShortcut<T[], R>): PromiseExtended<R>;
 
   toCollection(): Collection<T, TKey>;
   orderBy(index: string | string[]): Collection<T, TKey>;
@@ -49,7 +49,7 @@ export interface Table<T=any, TKey=any, TInsertType=T> {
   put(item: TInsertType, key?: TKey): PromiseExtended<TKey>;
   delete(key: TKey): PromiseExtended<void>;
   clear(): PromiseExtended<void>;
-  bulkGet(keys: TKey[]): PromiseExtended<ReadonlyArray<Readonly<T> | undefined>>;
+  bulkGet(keys: TKey[]): PromiseExtended<(T | undefined)[]>;
 
   bulkAdd<B extends boolean>(items: readonly TInsertType[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
   bulkAdd<B extends boolean>(items: readonly TInsertType[], options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
