@@ -53,14 +53,14 @@ module.exports = {
       browser: "Safari",
       browser_version: "16",
       os: 'OS X',
-      os_version: 'Big Sur'
+      os_version: 'Ventura'
     },
     bs_safari_latest_supported: {
       base: 'BrowserStack',
       browser: "Safari",
       browser_version: "16",
       os: 'OS X',
-      os_version: 'Big Sur'
+      os_version: 'Ventura'
     },
     bs_iphone7: {
       base: 'BrowserStack',
