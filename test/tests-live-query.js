@@ -6,7 +6,9 @@ import {from} from "rxjs";
 import {map} from "rxjs/operators";
 import { deepClone } from '../src/functions/utils';
 
-const db = new Dexie("TestLiveQuery");
+const db = new Dexie("TestLiveQuery", {
+  cache: 'immutable' // Using immutable cache in tests because it is most likely to fail if not using properly.
+});
 db.version(2).stores({
     items: "id, name",
     foo: "++id",
