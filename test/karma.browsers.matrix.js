@@ -28,7 +28,7 @@ module.exports = {
         // Skipping under 4.0 alpha: 'bs_chrome_oldest_supported', // ...because not tested in CI!
         'bs_chrome_latest_supported', // ...because not tested in CI!
         //'Skipping under 4.0 alpha: bs_firefox_oldest_supported', // ...because not tested in CI!
-        "bs_safari_oldest_supported", // ...because not tested in CI!
+        "bs_safari_latest_supported", // ...because not tested in CI!
     ]
 }
 

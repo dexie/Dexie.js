@@ -51,7 +51,7 @@ module.exports = {
     bs_safari_oldest_supported: {
       base: 'BrowserStack',
       browser: "Safari",
-      browser_version: "14",
+      browser_version: "16",
       os: 'OS X',
       os_version: 'Big Sur'
     },
