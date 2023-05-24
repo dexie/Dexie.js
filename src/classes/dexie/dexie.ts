@@ -44,6 +44,7 @@ import { hooksMiddleware } from '../../hooks/hooks-middleware';
 import { IndexableType } from '../../public';
 import { observabilityMiddleware } from '../../live-query/observability-middleware';
 import { cacheExistingValuesMiddleware } from '../../dbcore/cache-existing-values-middleware';
+import { cacheMiddleware } from "../../live-query/cache/cache-middleware";
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -97,8 +98,9 @@ export class Dexie implements IDexie {
       // Default DOM dependency implementations from static prop.
       indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to browser env.
       IDBKeyRange: deps.IDBKeyRange,  // Backend IDBKeyRange api. Default to browser env.
+      cache: 'cloned', // Default to cloned for backward compatibility. For best performance and least memory consumption use 'immutable'.
       ...options
-    };
+    };  
     this._deps = {
       indexedDB: options.indexedDB as IDBFactory,
       IDBKeyRange: options.IDBKeyRange as typeof IDBKeyRange
@@ -213,6 +215,7 @@ export class Dexie implements IDexie {
     // Default middlewares:
     this.use(virtualIndexMiddleware);
     this.use(hooksMiddleware);
+    this.use(cacheMiddleware);
     this.use(observabilityMiddleware);
     this.use(cacheExistingValuesMiddleware);
 

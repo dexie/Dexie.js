@@ -1,5 +1,6 @@
 // For public interface
 
+import { ObservabilitySet } from "./db-events";
 import {ChromeTransactionDurability} from "./dexie-constructor";
 
 export const enum DBCoreRangeType {
@@ -40,6 +41,7 @@ export interface DBCoreAddRequest {
   trans: DBCoreTransaction;
   values: readonly any[];
   keys?: any[];
+  mutatedParts?: ObservabilitySet
   /** @deprecated Will always get results since 3.1.0-alpha.5 */
   wantResults?: boolean;
 }
@@ -49,6 +51,7 @@ export interface DBCorePutRequest {
   trans: DBCoreTransaction;
   values: readonly any[];
   keys?: any[];
+  mutatedParts?: ObservabilitySet
   criteria?: {
     index: string | null;
     range: DBCoreKeyRange;
@@ -66,6 +69,7 @@ export interface DBCoreDeleteRequest {
   type: 'delete';
   trans: DBCoreTransaction;
   keys: any[];
+  mutatedParts?: ObservabilitySet
   criteria?: {
     index: string | null;
     range: DBCoreKeyRange;
@@ -76,17 +80,20 @@ export interface DBCoreDeleteRangeRequest {
   type: 'deleteRange';
   trans: DBCoreTransaction;
   range: DBCoreKeyRange;
+  mutatedParts?: ObservabilitySet
 }
 
 export interface DBCoreGetManyRequest {
   trans: DBCoreTransaction;
   keys: any[];
   cache?: "immutable" | "clone"
+  obsSet?: ObservabilitySet
 }
 
 export interface DBCoreGetRequest {
   trans: DBCoreTransaction;
-  key: any;  
+  key: any;
+  obsSet?: ObservabilitySet
 }
 
 export interface DBCoreQuery {
@@ -99,6 +106,8 @@ export interface DBCoreQueryRequest {
   values?: boolean;
   limit?: number;
   query: DBCoreQuery;
+  obsSet?: ObservabilitySet
+
 }
 
 export interface DBCoreQueryResponse {
@@ -111,11 +120,13 @@ export interface DBCoreOpenCursorRequest {
   unique?: boolean;
   reverse?: boolean;
   query: DBCoreQuery;
+  obsSet?: ObservabilitySet
 }
 
 export interface DBCoreCountRequest {
   trans: DBCoreTransaction;
   query: DBCoreQuery;
+  obsSet?: ObservabilitySet
 }
 
 export interface DBCoreCursor {

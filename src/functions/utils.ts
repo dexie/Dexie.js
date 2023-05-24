@@ -196,31 +196,36 @@ export const intrinsicTypeNameSet = arrayToObject(intrinsicTypeNames, x=>[x,true
 
 let circularRefs: null | WeakMap<any,any> = null;
 export function deepClone<T>(any: T): T {
-    circularRefs = typeof WeakMap !== 'undefined' && new WeakMap();
+    circularRefs = new WeakMap();
     const rv = innerDeepClone(any);
     circularRefs = null;
     return rv;
 }
 
-function innerDeepClone<T>(any: T): T {
-    if (!any || typeof any !== 'object') return any;
-    let rv = circularRefs && circularRefs.get(any); // Resolve circular references
+function innerDeepClone<T>(x: T): T {
+    if (!x || typeof x !== 'object') return x;
+    let rv = circularRefs.get(x); // Resolve circular references
     if (rv) return rv;
-    if (isArray(any)) {
+    if (isArray(x)) {
         rv = [];
-        circularRefs && circularRefs.set(any, rv);
-        for (var i = 0, l = any.length; i < l; ++i) {
-            rv.push(innerDeepClone(any[i]));
+        circularRefs.set(x, rv);
+        for (var i = 0, l = x.length; i < l; ++i) {
+            rv.push(innerDeepClone(x[i]));
         }
-    } else if (intrinsicTypes.indexOf(any.constructor) >= 0) {
-        rv = any;
+    } else if (intrinsicTypes.indexOf(x.constructor) >= 0) {
+        // For performance, we're less strict than structuredClone - we're only
+        // cloning arrays and custom objects.
+        // Typed arrays, Dates etc are not cloned.
+        rv = x;
     } else {
-        const proto = getProto(any);
+        // We're nicer to custom classes than what structuredClone() is -
+        // we preserve the proto of each object.
+        const proto = getProto(x);
         rv = proto === Object.prototype ? {} : Object.create(proto);
-        circularRefs && circularRefs.set(any, rv);
-        for (var prop in any) {
-            if (hasOwn(any, prop)) {
-                rv[prop] = innerDeepClone(any[prop]);
+        circularRefs.set(x, rv);
+        for (var prop in x) {
+            if (hasOwn(x, prop)) {
+                rv[prop] = innerDeepClone(x[prop]);
             }
         }
     }

@@ -4,6 +4,7 @@ import {resetDatabase, supports, promisedTest, isIE} from './dexie-unittest-util
 import sortedJSON from "sorted-json";
 import {from} from "rxjs";
 import {map} from "rxjs/operators";
+import { deepClone } from '../src/functions/utils';
 
 const db = new Dexie("TestLiveQuery");
 db.version(2).stores({
@@ -36,9 +37,25 @@ function objectify(map) {
 }
 
 export function deepEqual(actual, expected, description) {
+  actual = JSON.parse(JSON.stringify(actual));
+  expected = JSON.parse(JSON.stringify(expected));
   actual = sortedJSON.sortify(actual, {sortArray: false});
   expected = sortedJSON.sortify(expected, {sortArray: false});
   equal(JSON.stringify(actual, null, 2), JSON.stringify(expected, null, 2), description);
+}
+
+function isDeepEqual(actual, expected, allowedExtra, prevActual) {
+  actual = deepClone(actual);
+  expected = deepClone(expected)
+  if (allowedExtra) Array.isArray(allowedExtra) ? allowedExtra.forEach(key => {
+    if (actual[key]) expected[key] = deepClone(prevActual[key]);
+  }) : Object.keys(allowedExtra).forEach(key => {
+    if (actual[key]) expected[key] = deepClone(allowedExtra[key]);
+  });
+
+  actual = sortedJSON.sortify(actual, {sortArray: false});
+  expected = sortedJSON.sortify(expected, {sortArray: false});
+  return JSON.stringify(actual, null, 2) === JSON.stringify(expected, null, 2);
 }
 
 class Signal {
@@ -215,7 +232,8 @@ promisedTest("subscribe and error occur", async ()=> {
   ok(!subscription.closed, "Subscription should not yet be closed");
   let result = await signal.promise;
   equal(result, "error", "The observable's error callback should have been called");
-  ok(subscription.closed, "Subscription should have been closed after error has occurred");
+  //No. Should not close errored subscriptions. What if they did a fetch call in it that failed? SHould keep subscribing.
+  //ok(subscription.closed, "Subscription should have been closed after error has occurred");
   subscription.unsubscribe();
 });
 
@@ -543,7 +561,8 @@ promisedTest("Full use case matrix", async ()=>{
     multiEntry2: []
   }
   let flyingNow = 0;
-  let signal = new Signal();
+  //let signal = new Signal();
+  let eventTarget = new EventTarget();
   const actualResults = objectify(new Map(Object.keys(queries).map(name => [name, undefined])));
   const observables = new Map(Object.keys(queries).map(name => [
     name,
@@ -551,27 +570,51 @@ promisedTest("Full use case matrix", async ()=>{
       ++flyingNow;
       try {
         const res = await queries[name]();
+        console.log(`Setting actual result of ${name} to ${JSON.stringify(res)}`);
         actualResults[name] = res;
         return res;
       } finally {
-        if (--flyingNow === 0) signal.resolve();
+        if (--flyingNow === 0) eventTarget.dispatchEvent(new CustomEvent('zeroflyers'));
       }
     })
   ]));
+
+  function zeroFlyers(abortSignal) {
+    return new Promise((resolve, reject) => {
+      eventTarget.addEventListener('zeroflyers', resolve, {once: true});
+      abortSignal.addEventListener('abort', () => reject(new Error('flyers timeout')), { once: true});
+    });
+  }
+
+  function timeout(ms) {
+    const ac = new AbortController();
+    setTimeout(()=>ac.abort(), ms);
+    return ac.signal;
+  }
+  
+  async function allValuesOk(actual, expected, allowedExtra, prevActual, abortSignal) {
+    while (flyingNow > 0) await zeroFlyers(abortSignal);
+    while (!isDeepEqual(actual, expected, allowedExtra, prevActual)) {
+      await zeroFlyers(abortSignal);
+    }
+  }
 
   const subscriptions = Object.keys(queries).map(name => observables.get(name).subscribe({
     next: res => {},
     error: error => ok(false, ''+error)
   }));
   try {
-    await signal.promise;
+    await zeroFlyers(timeout(200));
     deepEqual(actualResults, expectedInitialResults, "Initial results as expected");
     let prevActual = Dexie.deepClone(actualResults);
     for (const [mut, expects, allowedExtra] of mutsAndExpects()) {
+      console.log(`RUNNING: ${mut.toString()}`);
+      console.log(`---------------------------------`);
       actualResults = {};
-      signal = new Signal();
-      mut();
-      await signal.promise;
+      await mut();
+      try {
+        await allValuesOk(actualResults, expects, allowedExtra, prevActual, timeout(200));
+      } catch {}
       const expected = Dexie.deepClone(expects);
       if (allowedExtra) Array.isArray(allowedExtra) ? allowedExtra.forEach(key => {
         if (actualResults[key]) expected[key] = prevActual[key];

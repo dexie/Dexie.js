@@ -39,6 +39,7 @@ export function enterTransactionScope(
     // Our transaction.
     //return new Promise((resolve, reject) => {
     const trans = db._createTransaction(mode, storeNames, db._dbSchema, parentTransaction);
+    trans.explicit = true;
     // Let the transaction instance be part of a Promise-specific data (PSD) value.
     const zoneProps = {
       trans: trans,
