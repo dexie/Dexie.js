@@ -9,14 +9,14 @@ module.exports = {
     bs_firefox_latest_supported: { 
       base: 'BrowserStack',
       browser: 'firefox',
-      browser_version: '93',
+      browser_version: '113',
       os: 'Windows',
       os_version: 10
     },
     bs_firefox_oldest_supported: {
       base: 'BrowserStack',
       browser: 'firefox',
-      browser_version: '60.0',
+      browser_version: '93',
       os: 'OS X',
       os_version: 'El Capitan'
     },
@@ -37,14 +37,14 @@ module.exports = {
     bs_chrome_oldest_supported: {
       base: 'BrowserStack',
       browser: "Chrome",
-      browser_version: "79",
+      browser_version: "94",
       os: 'OS X',
       os_version: 'Sierra'
     },
     bs_chrome_latest_supported: {      
       base: 'BrowserStack',
       browser: "Chrome",
-      browser_version: "94",
+      browser_version: "112",
       os: 'Windows',
       os_version: 10
     },
@@ -58,7 +58,7 @@ module.exports = {
     bs_safari_latest_supported: {
       base: 'BrowserStack',
       browser: "Safari",
-      browser_version: "14",
+      browser_version: "16",
       os: 'OS X',
       os_version: 'Big Sur'
     },
