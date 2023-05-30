@@ -4,7 +4,8 @@ export interface InteropableObservable<T> {
     onNext: (x: T) => any,
     onError?: (error: any) => any
   ): (() => any) | { unsubscribe(): any };
-  getValue?(): T;
+  getValue?(): T; // For BehaviorSubject
+  hasValue?(): boolean; // For liveQuery observable returning false until a value is available
 }
 
 export function useObservable<T, TDefault>(
@@ -79,7 +80,7 @@ export function useObservable<T, TDefault>(
       if (typeof observable.getValue === 'function') {
         monitor.current.result = observable.getValue();
         monitor.current.hasResult = true;
-      } else {
+      } else if (typeof observable.hasValue !== 'function' || observable.hasValue()) {
         // Find out if the observable has a current value: try get it by subscribing and
         // unsubscribing synchronously
         const subscription = observable.subscribe((val) => {
