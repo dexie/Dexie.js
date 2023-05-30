@@ -31,7 +31,9 @@ export interface LiveQueryContext {
 }
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
-  return new Observable<T>((observer) => {
+  let hasValue = false;
+  let currentValue: T = undefined as any;
+  const observable = new Observable<T>((observer) => {
     const scopeFuncIsAsync = isAsyncFunction(querier);
     function execute(ctx: LiveQueryContext) {
       if (scopeFuncIsAsync) {
@@ -116,6 +118,8 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       }
       Promise.resolve(ret).then(
         (result) => {
+          hasValue = true;
+          currentValue = result;
           if (closed || ctx.signal.aborted) {
             // closed - no subscriber anymore.
             // signal.aborted - new query was made before this one completed and
@@ -131,6 +135,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
           observer.next && observer.next(result);
         },
         (err) => {
+          hasValue = false;
           if (!['DatabaseClosedError', 'AbortError'].includes(err?.name)) {
             if (closed) return;
             observer.error && observer.error(err);
@@ -142,4 +147,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     doQuery();
     return subscription;
   });
+  observable.hasValue = () => hasValue;
+  observable.getValue = () => currentValue;
+  return observable;
 }
