@@ -15,6 +15,8 @@ interface Unsubscribable {
 export interface Observable<T = any> {
   subscribe(observerOrNext?: Observer<T> | ((value: T) => void)): Subscription;
   subscribe(next?: ((value: T) => void) | null, error?: ((error: any) => void) | null, complete?: (() => void) | null): Subscription;
+  getValue?(): T;
+  hasValue?(): boolean;
 
 	[Symbol.observable]: () => Subscribable<T>;
 }
