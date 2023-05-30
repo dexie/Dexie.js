@@ -19,7 +19,7 @@
     "build-tests": [
       "#just-build tests",
       "cd test",
-      "webpack --mode development"
+      "webpack"
     ],
     "dexie": [
       "cd ../..",
