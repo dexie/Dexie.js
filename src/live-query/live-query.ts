@@ -17,7 +17,9 @@ import { extendObservabilitySet } from "./extend-observability-set";
 import { rangesOverlap } from "../helpers/rangeset";
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
-  return new Observable<T>((observer) => {
+  let hasValue = false;
+  let currentValue: T = undefined as any;
+  const observable = new Observable<T>((observer) => {
     const scopeFuncIsAsync = isAsyncFunction(querier);
     function execute(subscr: ObservabilitySet) {
       if (scopeFuncIsAsync) {
@@ -83,6 +85,8 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       querying = true;
       Promise.resolve(ret).then(
         (result) => {
+          hasValue = true;
+          currentValue = result;
           querying = false;
           if (closed) return;
           if (shouldNotify()) {
@@ -97,6 +101,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         },
         (err) => {
           querying = false;
+          hasValue = false;
           observer.error && observer.error(err);
           subscription.unsubscribe();
         }
@@ -106,4 +111,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     doQuery();
     return subscription;
   });
+  observable.hasValue = () => hasValue;
+  observable.getValue = () => currentValue;
+  return observable;
 }
