@@ -17,7 +17,7 @@
       "karma start test/karma.conf.js --single-run"
     ],
     "build-tests": [
-      "#just-build dexie",
+      "#just-build tests",
       "cd test",
       "webpack"
     ],

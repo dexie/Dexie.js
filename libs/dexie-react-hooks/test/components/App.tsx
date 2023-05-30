@@ -9,7 +9,17 @@ export function App() {
   return <ErrorBoundary>
     <div id="list">
       <h2>All items</h2>
-      <ItemListComponent loadItems={()=>db.items.toArray()} />
+      <ItemListComponent loadItems={async ()=> {
+        console.log("Liading items...");
+        try {
+          const items = await db.items.toArray();
+          console.log("got items", items);
+          return items;
+          } catch (ex) {
+          console.error("Error loading items", ex);
+          throw ex;
+        }
+      }} />
     </div>
     <div id="current">
         <h2>Current item</h2>
