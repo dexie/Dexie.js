@@ -1,3 +1,4 @@
+import { delArrayItem } from "../../functions/utils";
 import { CacheEntry } from "../../public/types/cache";
 
 export function subscribeToCacheEntry(cacheEntry: CacheEntry, container: CacheEntry[], requery: ()=>void, signal: AbortSignal) {
@@ -14,8 +15,7 @@ export function subscribeToCacheEntry(cacheEntry: CacheEntry, container: CacheEn
 function enqueForDeletion(cacheEntry: CacheEntry, container: CacheEntry[]) {
   setTimeout(() => {
     if (cacheEntry.subscribers.size === 0) { // Still empty (no new subscribers readded after grace time)
-      const pos = container.indexOf(cacheEntry);
-      if (pos > -1) container.splice(pos, 1);
+      delArrayItem(container, cacheEntry);
     }
   }, 3000);
 }

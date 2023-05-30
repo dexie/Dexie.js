@@ -249,6 +249,12 @@ export const asyncIteratorSymbol = typeof Symbol !== 'undefined'
     ? Symbol.asyncIterator || Symbol.for("Symbol.asyncIterator")
     : '@asyncIterator';
 
+export function delArrayItem(a: any[], x: any) {
+    const i = a.indexOf(x);
+    if (i >= 0) a.splice(i, 1);
+    return i >= 0;
+}
+
 export const NO_CHAR_ARRAY = {};
 // Takes one or several arguments and returns an array based on the following criteras:
 // * If several arguments provided, return arguments converted to an array in a way that
