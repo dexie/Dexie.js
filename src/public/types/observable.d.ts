@@ -5,14 +5,22 @@ declare global {
     readonly observable: symbol;
   }
 }
+
+interface Subscribable<T> {
+  subscribe(observer: Partial<Observer<T>>): Unsubscribable;
+}
+
+interface Unsubscribable {
+  unsubscribe(): void;
+}
+
 export interface Observable<T = any> {
-  subscribe(
-    onNext?: ((value: T) => void) | null,
-    onError?: ((error: any) => void) | null,
-    onComplete?: (() => void) | null
-  ): Subscription;
-  subscribe(observer?: Observer<T> | null): Subscription;
-  [Symbol.observable]: () => Observable<T>;
+  subscribe(observerOrNext?: Observer<T> | ((value: T) => void)): Subscription;
+  subscribe(next?: ((value: T) => void) | null, error?: ((error: any) => void) | null, complete?: (() => void) | null): Subscription;
+  getValue?(): T;
+  hasValue?(): boolean;
+
+	[Symbol.observable]: () => Subscribable<T>;
 }
 
 export interface Subscription {
