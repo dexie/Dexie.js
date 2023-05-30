@@ -64,7 +64,10 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         closed = true;
         if (abortController) abortController.abort();
         globalEvents.storagemutated.unsubscribe(mutationListener);
-        txs.forEach(idbtrans => {try {idbtrans.abort();} catch {}});
+        txs.forEach(idbtrans => {
+          //@ts-ignore
+          idbtrans.aborted = true;
+          try { idbtrans.abort(); } catch {}});
       },
     };
 
@@ -101,7 +104,10 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       abortController = new AbortController();
       
       if (txs.length) {
-        txs.forEach(idbtrans => {try {idbtrans.abort();} catch {}});
+        txs.forEach(idbtrans => {
+          //@ts-ignore
+          idbtrans.aborted = true;
+          try {idbtrans.abort();} catch {}});
         txs.length = 0;
       }
       const ctx: LiveQueryContext = {
