@@ -1,7 +1,7 @@
 import { LiveQueryContext } from '..';
 import { getEffectiveKeys } from '../../dbcore/get-effective-keys';
 import { exceptions } from '../../errors';
-import { deepClone, isArray, keys, setByKeyPath } from '../../functions/utils';
+import { deepClone, delArrayItem, isArray, keys, setByKeyPath } from '../../functions/utils';
 import DexiePromise, { PSD } from '../../helpers/promise';
 import { ObservabilitySet } from '../../public/types/db-events';
 import {
@@ -27,8 +27,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
   name: 'Cache',
   create: (core) => {
     const dbName = core.schema.name;
-
-    return {
+    const coreMW: DBCore = {
       ...core,
       transaction: (stores, mode, options) => {
         const idbtrans = core.transaction(
@@ -45,10 +44,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
           const ac = new AbortController();
           const { signal } = ac;
           const endTransaction = (wasCommitted: boolean) => () => {
-            if (txs) {
-              const idx = txs.indexOf(idbtrans);
-              if (idx > -1) txs.splice(idx, 1);
-            }
+            if (txs) delArrayItem(txs, idbtrans);
             ac.abort();
             if (mode === 'readwrite') {
               for (const storeName of stores) {
@@ -86,7 +82,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                             );
                             if (entry.dirty) {
                               // Found out at this point that the entry is dirty - not to rely on!
-                              entries.splice(entries.indexOf(entry), 1);
+                              delArrayItem(entries, entry);
                               entry.subscribers.forEach((requery) => requery());
                             } else if (modRes !== entry.res) {
                               entry.res = modRes;
@@ -103,7 +99,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                             if (entry.dirty) {
                               // If the entry is dirty we need to get rid of it so that
                               // a new entry will be created when the query is run again.
-                              entries.splice(entries.indexOf(entry), 1);
+                              delArrayItem(entries, entry);
                             }
                             // If we're not committing, we need to notify subscribers that the
                             // optimistic updates are no longer valid.
@@ -132,7 +128,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
       table(tableName: string) {
         const downTable = core.table(tableName);
         const primKey = downTable.schema.primaryKey;
-        return {
+        const tableMW = {
           ...downTable,
           mutate(req) {
             if (
@@ -175,10 +171,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
               signalSubscribers(tblCache, req.mutatedParts);
               promise.catch(()=> {
                 // In case the operation failed, we need to remove it from the optimisticOps array.
-                tblCache.optimisticOps.splice(
-                  tblCache.optimisticOps.indexOf(req),
-                  1
-                );
+                delArrayItem(tblCache.optimisticOps, req);
                 signalSubscribers(tblCache, req.mutatedParts); // Signal the rolling back of the operation.
               });
             }
@@ -229,10 +222,24 @@ export const cacheMiddleware: Middleware<DBCore> = {
                   res.result = deepClone(result);
                 }
                 return res;
+              }).catch(error => {
+                // In case the query operation failed, we need to remove it from the cache
+                // so that subsequent calls does not get the same error but re-evaluate
+                // the query.
+                if (container && cacheEntry) delArrayItem(container, cacheEntry);
+                return Promise.reject(error);
               });
               cacheEntry = {
                 obsSet: req.obsSet,
-                promise,
+                promise: promise.catch(error => {
+                  // In case the query operation failed to to have been aborted, we need
+                  // redo the query (without cache this time and with a brand new transaction)
+                  if ((req.trans as IDBTransaction & {aborted?: boolean}).aborted) {
+                    const trans = coreMW.transaction([tableName], 'readonly');
+                    return tableMW.query({...req, trans});
+                  }
+                  return Promise.reject(error);
+                }),
                 subscribers: new Set(),
                 type: 'query',
                 req,
@@ -271,8 +278,10 @@ export const cacheMiddleware: Middleware<DBCore> = {
             });
           },
         };
+        return tableMW;
       },
     };
+    return coreMW;
   },
 };
 
