@@ -148,7 +148,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
             if (!tblCache) return downTable.mutate(req);
 
             const promise = downTable.mutate(req);
-            if (primKey.autoIncrement && (req.type === 'add' || req.type === 'put') && (req.values.length < 50 || getEffectiveKeys(primKey, req).some(key => key == null))) {
+            if (primKey.autoIncrement && (req.type === 'add' || req.type === 'put') && (req.values.length >= 50 || getEffectiveKeys(primKey, req).some(key => key == null))) {
               // There are some autoIncremented keys not set yet. Need to wait for completion before we can reliably enqueue the operation.
               // (or there are too many objects so we lazy out to avoid performance bottleneck for large bulk inserts)
               promise.then((res) => { // We need to extract result keys and generate cloned values with the keys set (so that applyOptimisticOps can work)
