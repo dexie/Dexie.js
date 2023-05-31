@@ -41,10 +41,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       }
       const rv = newScope(querier, ctx);
       if (scopeFuncIsAsync) {
-        (rv as Promise<any>).then(
-          decrementExpectedAwaits,
-          decrementExpectedAwaits
-        );
+        (rv as Promise<any>).finally(decrementExpectedAwaits);
       }
       return rv;
     }
