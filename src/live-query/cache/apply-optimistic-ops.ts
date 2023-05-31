@@ -68,16 +68,7 @@ export function applyOptimisticOps(
         break;
       case 'deleteRange':
         const range = op.range;
-        const rangeSet = new RangeSet(range.lower, range.upper);
-        modifedResult = result.filter((item) => {
-          const key = primaryKey.extractKey(item);
-          return !(
-            (
-              rangesOverlap(new RangeSet(key), rangeSet) &&
-              isWithinRange(key, range)
-            ) // isWithinRange is needed because RangeSet does not care about openness.
-          );
-        });
+        modifedResult = result.filter((item) => !isWithinRange(extractPrimKey(item), range));
         break;
     }
     return modifedResult;
@@ -93,7 +84,7 @@ export function applyOptimisticOps(
   );
 
   // If we have a limit we need to respect it:
-  if (req.limit) {
+  if (req.limit && req.limit < Infinity) {
     if (finalResult.length > req.limit) {
       finalResult.length = req.limit; // Cut of any extras after sorting correctly.
     } else if (result.length === req.limit && finalResult.length < req.limit) {
