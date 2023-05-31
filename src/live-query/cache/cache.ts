@@ -16,21 +16,24 @@ export function invalidateCachedObservabilitySets (updateParts: ObservabilitySet
 }
 
 function invalidateQueries(tblCache: TblQueryCache, mutatedParts: ObservabilitySet) {
-  const collectedSubscribers = new Set<() => void>();
-  const thingsToRemove:[string, Set<CacheEntry>][] = [];
+  const queriesToSignal = new Set<() => void>();
+  const updatedEntryLists: [string, CacheEntry[]][] = [];
   for (const [indexName, entries] of Object.entries(tblCache.queries.query)) {
-    const entriesToRemove = new Set<CacheEntry>();
+    const filteredEntries: CacheEntry[] = [];
     for (const entry of entries) {
       if (entry.obsSet && obsSetsOverlap(mutatedParts, entry.obsSet)) {
-        entriesToRemove.add(entry);
-        entry.subscribers.forEach((requery) => collectedSubscribers.add(requery));
+        // This query is affected by the mutation. Remove it from cache
+        // and signal all subscribers to requery.
+        entry.subscribers.forEach((requery) => queriesToSignal.add(requery));
+      } else {
+        filteredEntries.push(entry);
       }
     }
-    thingsToRemove.push([indexName, entriesToRemove]);
+    // Collect cache entries to be updated
+    updatedEntryLists.push([indexName, filteredEntries]);
   }
-  for (const [indexName, entriesToRemove] of thingsToRemove) {
-    tblCache.queries.query[indexName] =
-      tblCache.queries.query[indexName].filter(entry => !entriesToRemove.has(entry));
+  for (const [indexName, newEntries] of updatedEntryLists) {
+    tblCache.queries.query[indexName] = newEntries;
   }
-  collectedSubscribers.forEach((requery) => requery());
+  queriesToSignal.forEach((requery) => requery());
 }
