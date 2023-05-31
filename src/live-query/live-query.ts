@@ -32,7 +32,7 @@ export interface LiveQueryContext {
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
   let hasValue = false;
-  let currentValue: T = undefined as any;
+  let currentValue: T;
   const observable = new Observable<T>((observer) => {
     const scopeFuncIsAsync = isAsyncFunction(querier);
     function execute(ctx: LiveQueryContext) {
