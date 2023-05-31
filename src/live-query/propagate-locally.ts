@@ -1,7 +1,7 @@
 import { isIEOrEdge } from '../globals/constants';
 import { globalEvents, DEXIE_STORAGE_MUTATED_EVENT_NAME, STORAGE_MUTATED_DOM_EVENT_NAME } from '../globals/global-events';
 import { ObservabilitySet } from "../public/types/db-events";
-import { invalidateCachedObservabilitySets } from './cache/cache';
+import { invalidateCachedQueries } from './cache/cache';
 
 if (typeof dispatchEvent !== 'undefined' && typeof addEventListener !== 'undefined') {
   globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, updatedParts => {
@@ -27,12 +27,23 @@ if (typeof dispatchEvent !== 'undefined' && typeof addEventListener !== 'undefin
   });
 }
 
+/** Called from listeners to BroadcastChannel and DOM event to
+ * propagate the event locally into dexie's storagemutated event
+ * and invalidate cached queries.
+ * 
+ * This function is only called when the event is not originating
+ * from this same Dexie module - either from another redundant dexie import
+ * or from a foreign tab or worker. That's why we need to invalidate
+ * the cache when this happens.
+ */
 export function propagateLocally(updateParts: ObservabilitySet) {
   let wasMe = propagatingLocally;
   try {
     propagatingLocally = true;
+    // Fire the "storagemutated" event.
     globalEvents.storagemutated.fire(updateParts);
-    invalidateCachedObservabilitySets(updateParts);
+    // Invalidate cached queries
+    invalidateCachedQueries(updateParts);
   } finally {
     propagatingLocally = wasMe;
   }

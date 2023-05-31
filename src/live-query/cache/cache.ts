@@ -4,19 +4,21 @@ import { obsSetsOverlap } from "../obs-sets-overlap";
 
 export const cache: GlobalQueryCache = {}
 
-export function invalidateCachedObservabilitySets (updateParts: ObservabilitySet) {
+export function invalidateCachedQueries (updateParts: ObservabilitySet) {
+  const queriesToSignal = new Set<() => void>();
   for (const key in updateParts) {
     const parts = /^idb\:\/\/(.*)\/(.*)\//.exec(key);
     if (parts) {
       const [, dbName, tableName] = parts;
       const tblCache = cache[`idb://${dbName}/${tableName}`];
-      if (tblCache) invalidateQueries(tblCache, updateParts);
+      if (tblCache) invalidateTableQueries(tblCache, updateParts, queriesToSignal);
     }
   }
+  // Now when affected cache entries are removed, signal collected subscribers to requery.
+  queriesToSignal.forEach((requery) => requery());
 }
 
-function invalidateQueries(tblCache: TblQueryCache, mutatedParts: ObservabilitySet) {
-  const queriesToSignal = new Set<() => void>();
+function invalidateTableQueries(tblCache: TblQueryCache, mutatedParts: ObservabilitySet, queriesToSignal: Set<() => void>) {
   const updatedEntryLists: [string, CacheEntry[]][] = [];
   for (const [indexName, entries] of Object.entries(tblCache.queries.query)) {
     const filteredEntries: CacheEntry[] = [];
@@ -35,5 +37,4 @@ function invalidateQueries(tblCache: TblQueryCache, mutatedParts: ObservabilityS
   for (const [indexName, newEntries] of updatedEntryLists) {
     tblCache.queries.query[indexName] = newEntries;
   }
-  queriesToSignal.forEach((requery) => requery());
 }

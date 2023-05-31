@@ -47,6 +47,10 @@ export const cacheMiddleware: Middleware<DBCore> = {
             if (txs) delArrayItem(txs, idbtrans);
             ac.abort();
             if (mode === 'readwrite') {
+              // Collect which subscribers to notify:
+              const affectedSubscribers = new Set<()=>void>();
+
+              // Go through all tables in transaction and check if they have any optimistic updates
               for (const storeName of stores) {
                 const tblCache = cache[`idb://${dbName}/${storeName}`];
                 const table = core.table(storeName);
@@ -83,7 +87,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                             if (entry.dirty) {
                               // Found out at this point that the entry is dirty - not to rely on!
                               delArrayItem(entries, entry);
-                              entry.subscribers.forEach((requery) => requery());
+                              entry.subscribers.forEach((requery) => affectedSubscribers.add(requery));
                             } else if (modRes !== entry.res) {
                               entry.res = modRes;
                               // Update promise
@@ -103,7 +107,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                             }
                             // If we're not committing, we need to notify subscribers that the
                             // optimistic updates are no longer valid.
-                            entry.subscribers.forEach((requery) => requery()); // TODO: Call signalSubscribers instead somehow (or is the subscriber or obsSet already reset at this point)
+                            entry.subscribers.forEach((requery) => affectedSubscribers.add(requery));
                           }
                         }
                       }
@@ -111,6 +115,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                   }
                 }
               }
+              affectedSubscribers.forEach((requery) => requery());
             }
           };
           idbtrans.addEventListener('abort', endTransaction(false), {
