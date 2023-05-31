@@ -61,9 +61,10 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         return closed;
       },
       unsubscribe: () => {
+        if (closed) return;
         closed = true;
         if (abortController) abortController.abort();
-        globalEvents.storagemutated.unsubscribe(mutationListener);
+        if (startedListening) globalEvents.storagemutated.unsubscribe(mutationListener);
         txs.forEach(idbtrans => {
           //@ts-ignore
           idbtrans.aborted = true;
@@ -118,10 +119,6 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         trans: null // Make the scope transactionless (don't reuse transaction from outer scope of the caller of subscribe())
       }
       const ret = execute(ctx);
-      if (!startedListening) {
-        globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
-        startedListening = true;
-      }
       Promise.resolve(ret).then(
         (result) => {
           hasValue = true;
@@ -138,6 +135,10 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
           accumMuts = {};
           // Update what we are subscribing for based on this last run:
           currentObs = subscr;
+          if (keys(currentObs).length > 0 && !startedListening) {
+            globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
+            startedListening = true;
+          }          
           observer.next && observer.next(result);
         },
         (err) => {
