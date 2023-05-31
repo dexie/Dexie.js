@@ -1,6 +1,7 @@
 import { isIEOrEdge } from '../globals/constants';
 import { globalEvents, DEXIE_STORAGE_MUTATED_EVENT_NAME, STORAGE_MUTATED_DOM_EVENT_NAME } from '../globals/global-events';
 import { ObservabilitySet } from "../public/types/db-events";
+import { invalidateCachedObservabilitySets } from './cache/cache';
 
 if (typeof dispatchEvent !== 'undefined' && typeof addEventListener !== 'undefined') {
   globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, updatedParts => {
@@ -31,6 +32,7 @@ export function propagateLocally(updateParts: ObservabilitySet) {
   try {
     propagatingLocally = true;
     globalEvents.storagemutated.fire(updateParts);
+    invalidateCachedObservabilitySets(updateParts);
   } finally {
     propagatingLocally = wasMe;
   }
