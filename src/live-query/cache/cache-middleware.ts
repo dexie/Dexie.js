@@ -23,7 +23,7 @@ import { subscribeToCacheEntry } from './subscribe-cachentry';
 
 export const cacheMiddleware: Middleware<DBCore> = {
   stack: 'dbcore',
-  level: 0,
+  level: 10,
   name: 'Cache',
   create: (core) => {
     const dbName = core.schema.name;
