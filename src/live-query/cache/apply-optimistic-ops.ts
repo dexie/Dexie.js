@@ -88,7 +88,8 @@ export function applyOptimisticOps(
 
   // Sort the result on sortIndex:
   finalResult.sort((a, b) =>
-    cmp(sortIndex.extractKey(a), sortIndex.extractKey(b))
+    cmp(extractIndex(a), extractIndex(b)) ||
+    cmp(extractPrimKey(a), extractPrimKey(b))
   );
 
   // If we have a limit we need to respect it:
