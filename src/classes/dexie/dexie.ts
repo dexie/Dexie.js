@@ -213,11 +213,11 @@ export class Dexie implements IDexie {
     }
 
     // Default middlewares:
+    this.use(cacheExistingValuesMiddleware);
     this.use(virtualIndexMiddleware);
     this.use(hooksMiddleware);
     this.use(cacheMiddleware);
     this.use(observabilityMiddleware);
-    this.use(cacheExistingValuesMiddleware);
 
     this.vip = Object.create(this, {_vip: {value: true}}) as Dexie;
 
