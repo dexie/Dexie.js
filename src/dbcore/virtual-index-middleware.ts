@@ -54,6 +54,7 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
         const isVirtual = keyTail > 0;
         const virtualIndex = {
           ...lowLevelIndex,
+          lowLevelIndex,
           isVirtual,
           keyTail,
           keyLength,

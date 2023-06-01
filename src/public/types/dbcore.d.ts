@@ -174,6 +174,8 @@ export interface DBCoreIndex {
   readonly multiEntry?: boolean;
   /** Extract (using keyPath) a key from given value (object). Null for outbound primary keys */
   readonly extractKey: ((value: any) => any) | null;
+  /** If this index is a virtual index, lowLevelIndex represents the actual IndexedDB index behind it */
+  readonly lowLevelIndex?: DBCoreIndex;
 }
 export interface DBCore {
   stack: "dbcore";
