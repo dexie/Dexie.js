@@ -3,6 +3,7 @@ import { deepClone } from '../../functions/utils';
 import { RangeSet, rangesOverlap } from '../../helpers/rangeset';
 import { CacheEntry } from '../../public/types/cache';
 import {
+  DBCoreIndex,
   DBCoreMutateRequest,
   DBCoreQueryRequest,
   DBCoreTable,
@@ -18,10 +19,11 @@ export function applyOptimisticOps(
   immutable: boolean
 ): any[] {
   if (!ops || ops.length === 0) return result;
-  const sortIndex = req.query.index;
+  const index = req.query.index;
   const primaryKey = table.schema.primaryKey;
   const extractPrimKey = primaryKey.extractKey;
-  const extractIndex = sortIndex.extractKey;
+  const extractIndex = index.extractKey;
+  const extractLowLevelIndex = (index.lowLevelIndex || index).extractKey;
 
   let finalResult = ops.reduce((result, op) => {
     let modifedResult = result;
@@ -79,7 +81,7 @@ export function applyOptimisticOps(
 
   // Sort the result on sortIndex:
   finalResult.sort((a, b) =>
-    cmp(extractIndex(a), extractIndex(b)) ||
+    cmp(extractLowLevelIndex(a), extractLowLevelIndex(b)) ||
     cmp(extractPrimKey(a), extractPrimKey(b))
   );
 
