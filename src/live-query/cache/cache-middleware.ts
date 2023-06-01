@@ -1,16 +1,11 @@
 import { LiveQueryContext } from '..';
 import { getEffectiveKeys } from '../../dbcore/get-effective-keys';
-import { exceptions } from '../../errors';
-import { deepClone, delArrayItem, isArray, keys, setByKeyPath } from '../../functions/utils';
+import { deepClone, delArrayItem, setByKeyPath } from '../../functions/utils';
 import DexiePromise, { PSD } from '../../helpers/promise';
 import { ObservabilitySet } from '../../public/types/db-events';
 import {
-  DBCore,
-  DBCoreCountRequest,
-  DBCoreGetManyRequest,
-  DBCoreGetRequest,
-  DBCoreQueryRequest,
-  DBCoreQueryResponse,
+  DBCore, DBCoreQueryRequest,
+  DBCoreQueryResponse
 } from '../../public/types/dbcore';
 import { Middleware } from '../../public/types/middleware';
 import { applyOptimisticOps } from './apply-optimistic-ops';
@@ -18,7 +13,7 @@ import { cache } from './cache';
 import { findCompatibleQuery } from './find-compatible-query';
 import { isCachableContext } from './is-cachable-context';
 import { isCachableRequest } from './is-cachable-request';
-import { signalSubscribers } from './signalSubscribers';
+import { signalSubscribersLazily } from './signalSubscribers';
 import { subscribeToCacheEntry } from './subscribe-cachentry';
 
 export const cacheMiddleware: Middleware<DBCore> = {
@@ -167,17 +162,19 @@ export const cacheMiddleware: Middleware<DBCore> = {
                 };
                 tblCache.optimisticOps.push(reqWithResolvedKeys);
                 // Signal subscribers after the observability middleware has complemented req.mutatedParts with the new keys.
-                queueMicrotask(()=>signalSubscribers(tblCache, req.mutatedParts));
+                // We must queue the task so that we get the req.mutatedParts updated by observability middleware first.
+                // If we refactor the dependency between observability middleware and this middleware we might not need to queue the task.
+                queueMicrotask(()=>signalSubscribersLazily(req.mutatedParts)); // Reason for double laziness: in user awaits put and then does another put, signal once.
               });
             } else {
               // Enque the operation immediately
               tblCache.optimisticOps.push(req);
               // Signal subscribers that there are mutated parts
-              signalSubscribers(tblCache, req.mutatedParts);
+              signalSubscribersLazily(req.mutatedParts);
               promise.catch(()=> {
                 // In case the operation failed, we need to remove it from the optimisticOps array.
                 delArrayItem(tblCache.optimisticOps, req);
-                signalSubscribers(tblCache, req.mutatedParts); // Signal the rolling back of the operation.
+                signalSubscribersLazily(req.mutatedParts); // Signal the rolling back of the operation.
               });
             }
             return promise;

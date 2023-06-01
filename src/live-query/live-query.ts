@@ -1,4 +1,4 @@
-import { isAsyncFunction, keys } from '../functions/utils';
+import { isAsyncFunction, keys, objectIsEmpty } from '../functions/utils';
 import {
   globalEvents,
   DEXIE_STORAGE_MUTATED_EVENT_NAME,
@@ -132,7 +132,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
           accumMuts = {};
           // Update what we are subscribing for based on this last run:
           currentObs = subscr;
-          if (keys(currentObs).length > 0 && !startedListening) {
+          if (!objectIsEmpty(currentObs) && !startedListening) {
             globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
             startedListening = true;
           }          

@@ -1,7 +1,7 @@
 import { isIEOrEdge } from '../globals/constants';
 import { globalEvents, DEXIE_STORAGE_MUTATED_EVENT_NAME, STORAGE_MUTATED_DOM_EVENT_NAME } from '../globals/global-events';
 import { ObservabilitySet } from "../public/types/db-events";
-import { invalidateCachedQueries } from './cache/cache';
+import { signalSubscribersNow } from './cache/signalSubscribers';
 
 if (typeof dispatchEvent !== 'undefined' && typeof addEventListener !== 'undefined') {
   globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, updatedParts => {
@@ -42,8 +42,8 @@ export function propagateLocally(updateParts: ObservabilitySet) {
     propagatingLocally = true;
     // Fire the "storagemutated" event.
     globalEvents.storagemutated.fire(updateParts);
-    // Invalidate cached queries
-    invalidateCachedQueries(updateParts);
+    // Invalidate cached queries and signal subscribers to requery.
+    signalSubscribersNow(updateParts, true);
   } finally {
     propagatingLocally = wasMe;
   }
