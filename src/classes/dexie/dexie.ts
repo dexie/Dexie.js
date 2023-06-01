@@ -22,7 +22,7 @@ import { DexieEventSet } from '../../public/types/dexie-event-set';
 import { DexieExceptionClasses } from '../../public/types/errors';
 import { DexieDOMDependencies } from '../../public/types/dexie-dom-dependencies';
 import { nop, promisableChain } from '../../functions/chaining-functions';
-import Promise, { PSD } from '../../helpers/promise';
+import Promise, { PSD, globalPSD } from '../../helpers/promise';
 import { extend, override, keys, hasOwn } from '../../functions/utils';
 import Events from '../../helpers/Events';
 import { maxString, connections, READONLY, READWRITE } from '../../globals/constants';
@@ -285,7 +285,10 @@ export class Dexie implements IDexie {
   }
 
   open() {
-    return dexieOpen(this);
+    return usePSD(
+      globalPSD, // Enforce global scope here since db.open() can be part of a live query or transaction scope
+      () => dexieOpen(this)
+    );
   }
 
   _close(): void {
