@@ -1,4 +1,4 @@
-import { isAsyncFunction, keys } from '../functions/utils';
+import { isAsyncFunction, keys, objectIsEmpty } from '../functions/utils';
 import {
   globalEvents,
   DEXIE_STORAGE_MUTATED_EVENT_NAME,
@@ -32,7 +32,7 @@ export interface LiveQueryContext {
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
   let hasValue = false;
-  let currentValue: T = undefined as any;
+  let currentValue: T;
   const observable = new Observable<T>((observer) => {
     const scopeFuncIsAsync = isAsyncFunction(querier);
     function execute(ctx: LiveQueryContext) {
@@ -41,10 +41,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       }
       const rv = newScope(querier, ctx);
       if (scopeFuncIsAsync) {
-        (rv as Promise<any>).then(
-          decrementExpectedAwaits,
-          decrementExpectedAwaits
-        );
+        (rv as Promise<any>).finally(decrementExpectedAwaits);
       }
       return rv;
     }
@@ -61,9 +58,10 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         return closed;
       },
       unsubscribe: () => {
+        if (closed) return;
         closed = true;
         if (abortController) abortController.abort();
-        globalEvents.storagemutated.unsubscribe(mutationListener);
+        if (startedListening) globalEvents.storagemutated.unsubscribe(mutationListener);
         txs.forEach(idbtrans => {
           //@ts-ignore
           idbtrans.aborted = true;
@@ -118,10 +116,6 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         trans: null // Make the scope transactionless (don't reuse transaction from outer scope of the caller of subscribe())
       }
       const ret = execute(ctx);
-      if (!startedListening) {
-        globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
-        startedListening = true;
-      }
       Promise.resolve(ret).then(
         (result) => {
           hasValue = true;
@@ -138,6 +132,10 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
           accumMuts = {};
           // Update what we are subscribing for based on this last run:
           currentObs = subscr;
+          if (!objectIsEmpty(currentObs) && !startedListening) {
+            globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
+            startedListening = true;
+          }          
           observer.next && observer.next(result);
         },
         (err) => {

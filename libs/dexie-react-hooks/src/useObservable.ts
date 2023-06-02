@@ -77,21 +77,23 @@ export function useObservable<T, TDefault>(
         typeof window !== 'undefined' // Don't do this in SSR
        ) {
       // Optimize for BehaviorSubject and other observables implementing getValue():
-      if (typeof observable.getValue === 'function') {
-        monitor.current.result = observable.getValue();
-        monitor.current.hasResult = true;
-      } else if (typeof observable.hasValue !== 'function' || observable.hasValue()) {
-        // Find out if the observable has a current value: try get it by subscribing and
-        // unsubscribing synchronously
-        const subscription = observable.subscribe((val) => {
-          monitor.current.result = val;
+      if (typeof observable.hasValue !== 'function' || observable.hasValue()) {
+        if (typeof observable.getValue === 'function') {
+          monitor.current.result = observable.getValue();
           monitor.current.hasResult = true;
-        });
-        // Unsubscribe directly. We only needed any synchronous value if it was possible.
-        if (typeof subscription === 'function') {
-          subscription();
         } else {
-          subscription.unsubscribe();
+          // Find out if the observable has a current value: try get it by subscribing and
+          // unsubscribing synchronously
+          const subscription = observable.subscribe((val) => {
+            monitor.current.result = val;
+            monitor.current.hasResult = true;
+          });
+          // Unsubscribe directly. We only needed any synchronous value if it was possible.
+          if (typeof subscription === 'function') {
+            subscription();
+          } else {
+            subscription.unsubscribe();
+          }
         }
       }
     }

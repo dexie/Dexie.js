@@ -28,6 +28,9 @@ interface VirtualIndex extends DBCoreIndex {
   /** Number of popped keypaths from the real index.
    */
   keyTail: number;
+
+  /** LowLevelIndex represents the actual IndexedDB index behind it */
+  lowLevelIndex: DBCoreIndex;
 }
 
 // Move into some util:
@@ -54,6 +57,10 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
         const isVirtual = keyTail > 0;
         const virtualIndex = {
           ...lowLevelIndex,
+          name: isVirtual
+            ? `${keyPathAlias}(virtual-from:${lowLevelIndex.name})`
+            : lowLevelIndex.name,
+          lowLevelIndex,
           isVirtual,
           keyTail,
           keyLength,
@@ -104,7 +111,7 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
         return index.isVirtual ? {
           ...req,
           query: {
-            index,
+            index: index.lowLevelIndex,
             range: translateRange(req.query.range, index.keyTail)
           }
         } : req;

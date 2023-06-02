@@ -3,6 +3,7 @@ import { deepClone } from '../../functions/utils';
 import { RangeSet, rangesOverlap } from '../../helpers/rangeset';
 import { CacheEntry } from '../../public/types/cache';
 import {
+  DBCoreIndex,
   DBCoreMutateRequest,
   DBCoreQueryRequest,
   DBCoreTable,
@@ -18,10 +19,11 @@ export function applyOptimisticOps(
   immutable: boolean
 ): any[] {
   if (!ops || ops.length === 0) return result;
-  const sortIndex = req.query.index;
+  const index = req.query.index;
   const primaryKey = table.schema.primaryKey;
   const extractPrimKey = primaryKey.extractKey;
-  const extractIndex = sortIndex.extractKey;
+  const extractIndex = index.extractKey;
+  const extractLowLevelIndex = (index.lowLevelIndex || index).extractKey;
 
   let finalResult = ops.reduce((result, op) => {
     let modifedResult = result;
@@ -68,16 +70,7 @@ export function applyOptimisticOps(
         break;
       case 'deleteRange':
         const range = op.range;
-        const rangeSet = new RangeSet(range.lower, range.upper);
-        modifedResult = result.filter((item) => {
-          const key = primaryKey.extractKey(item);
-          return !(
-            (
-              rangesOverlap(new RangeSet(key), rangeSet) &&
-              isWithinRange(key, range)
-            ) // isWithinRange is needed because RangeSet does not care about openness.
-          );
-        });
+        modifedResult = result.filter((item) => !isWithinRange(extractPrimKey(item), range));
         break;
     }
     return modifedResult;
@@ -88,11 +81,12 @@ export function applyOptimisticOps(
 
   // Sort the result on sortIndex:
   finalResult.sort((a, b) =>
-    cmp(sortIndex.extractKey(a), sortIndex.extractKey(b))
+    cmp(extractLowLevelIndex(a), extractLowLevelIndex(b)) ||
+    cmp(extractPrimKey(a), extractPrimKey(b))
   );
 
   // If we have a limit we need to respect it:
-  if (req.limit) {
+  if (req.limit && req.limit < Infinity) {
     if (finalResult.length > req.limit) {
       finalResult.length = req.limit; // Cut of any extras after sorting correctly.
     } else if (result.length === req.limit && finalResult.length < req.limit) {

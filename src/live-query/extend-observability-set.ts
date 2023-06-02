@@ -1,4 +1,4 @@
-import { deepClone, keys } from "../functions/utils";
+import { cloneSimpleObjectTree, deepClone, keys, objectIsEmpty } from "../functions/utils";
 import { mergeRanges, RangeSet } from "../helpers/rangeset";
 import { ObservabilitySet } from "../public/types/db-events";
 
@@ -7,8 +7,8 @@ export function extendObservabilitySet(
   newSet: ObservabilitySet
 ): ObservabilitySet {
   keys(newSet).forEach(part => {
-    const rangeSet = target[part] || (target[part] = new RangeSet());
-    mergeRanges(rangeSet, newSet[part]);
+    if (target[part]) mergeRanges(target[part], newSet[part]);
+    else target[part] = cloneSimpleObjectTree(newSet[part]); // Somewhat faster
   });
   return target;
 }

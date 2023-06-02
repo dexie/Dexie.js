@@ -1,16 +1,11 @@
 import { LiveQueryContext } from '..';
 import { getEffectiveKeys } from '../../dbcore/get-effective-keys';
-import { exceptions } from '../../errors';
-import { deepClone, delArrayItem, isArray, keys, setByKeyPath } from '../../functions/utils';
+import { deepClone, delArrayItem, setByKeyPath } from '../../functions/utils';
 import DexiePromise, { PSD } from '../../helpers/promise';
 import { ObservabilitySet } from '../../public/types/db-events';
 import {
-  DBCore,
-  DBCoreCountRequest,
-  DBCoreGetManyRequest,
-  DBCoreGetRequest,
-  DBCoreQueryRequest,
-  DBCoreQueryResponse,
+  DBCore, DBCoreQueryRequest,
+  DBCoreQueryResponse
 } from '../../public/types/dbcore';
 import { Middleware } from '../../public/types/middleware';
 import { applyOptimisticOps } from './apply-optimistic-ops';
@@ -18,12 +13,12 @@ import { cache } from './cache';
 import { findCompatibleQuery } from './find-compatible-query';
 import { isCachableContext } from './is-cachable-context';
 import { isCachableRequest } from './is-cachable-request';
-import { signalSubscribers } from './signalSubscribers';
+import { signalSubscribersLazily } from './signalSubscribers';
 import { subscribeToCacheEntry } from './subscribe-cachentry';
 
 export const cacheMiddleware: Middleware<DBCore> = {
   stack: 'dbcore',
-  level: 0,
+  level: 10,
   name: 'Cache',
   create: (core) => {
     const dbName = core.schema.name;
@@ -47,6 +42,10 @@ export const cacheMiddleware: Middleware<DBCore> = {
             if (txs) delArrayItem(txs, idbtrans);
             ac.abort();
             if (mode === 'readwrite') {
+              // Collect which subscribers to notify:
+              const affectedSubscribers = new Set<()=>void>();
+
+              // Go through all tables in transaction and check if they have any optimistic updates
               for (const storeName of stores) {
                 const tblCache = cache[`idb://${dbName}/${storeName}`];
                 const table = core.table(storeName);
@@ -83,7 +82,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                             if (entry.dirty) {
                               // Found out at this point that the entry is dirty - not to rely on!
                               delArrayItem(entries, entry);
-                              entry.subscribers.forEach((requery) => requery());
+                              entry.subscribers.forEach((requery) => affectedSubscribers.add(requery));
                             } else if (modRes !== entry.res) {
                               entry.res = modRes;
                               // Update promise
@@ -103,7 +102,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                             }
                             // If we're not committing, we need to notify subscribers that the
                             // optimistic updates are no longer valid.
-                            entry.subscribers.forEach((requery) => requery()); // TODO: Call signalSubscribers instead somehow (or is the subscriber or obsSet already reset at this point)
+                            entry.subscribers.forEach((requery) => affectedSubscribers.add(requery));
                           }
                         }
                       }
@@ -111,6 +110,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                   }
                 }
               }
+              affectedSubscribers.forEach((requery) => requery());
             }
           };
           idbtrans.addEventListener('abort', endTransaction(false), {
@@ -143,7 +143,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
             if (!tblCache) return downTable.mutate(req);
 
             const promise = downTable.mutate(req);
-            if (primKey.autoIncrement && (req.type === 'add' || req.type === 'put') && (req.values.length < 50 || getEffectiveKeys(primKey, req).some(key => key == null))) {
+            if (primKey.autoIncrement && (req.type === 'add' || req.type === 'put') && (req.values.length >= 50 || getEffectiveKeys(primKey, req).some(key => key == null))) {
               // There are some autoIncremented keys not set yet. Need to wait for completion before we can reliably enqueue the operation.
               // (or there are too many objects so we lazy out to avoid performance bottleneck for large bulk inserts)
               promise.then((res) => { // We need to extract result keys and generate cloned values with the keys set (so that applyOptimisticOps can work)
@@ -162,17 +162,19 @@ export const cacheMiddleware: Middleware<DBCore> = {
                 };
                 tblCache.optimisticOps.push(reqWithResolvedKeys);
                 // Signal subscribers after the observability middleware has complemented req.mutatedParts with the new keys.
-                queueMicrotask(()=>signalSubscribers(tblCache, req.mutatedParts));
+                // We must queue the task so that we get the req.mutatedParts updated by observability middleware first.
+                // If we refactor the dependency between observability middleware and this middleware we might not need to queue the task.
+                queueMicrotask(()=>signalSubscribersLazily(req.mutatedParts)); // Reason for double laziness: in user awaits put and then does another put, signal once.
               });
             } else {
               // Enque the operation immediately
               tblCache.optimisticOps.push(req);
               // Signal subscribers that there are mutated parts
-              signalSubscribers(tblCache, req.mutatedParts);
+              signalSubscribersLazily(req.mutatedParts);
               promise.catch(()=> {
                 // In case the operation failed, we need to remove it from the optimisticOps array.
                 delArrayItem(tblCache.optimisticOps, req);
-                signalSubscribers(tblCache, req.mutatedParts); // Signal the rolling back of the operation.
+                signalSubscribersLazily(req.mutatedParts); // Signal the rolling back of the operation.
               });
             }
             return promise;
