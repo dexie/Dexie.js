@@ -4156,22 +4156,28 @@ detect-port-alt@1.1.6:
     address "^1.0.1"
     debug "^2.6.0"
 
-dexie-cloud-addon@^4.0.1-beta.33:
-  version "4.0.1-beta.33"
-  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-4.0.1-beta.33.tgz#ec890fbc5b03913aabfed9526afbb9fa8e33b6d3"
-  integrity sha512-OdKdqEjUtWOAcxwbjhf+fBaI+MPRGlapV8ySvB4zhNZD2BPm2X5kvsxPKDaoGq0QAmSArRZG8WvHHO4jj9Ovog==
+dexie-cloud-addon@^4.0.1-beta.40:
+  version "4.0.1-beta.40"
+  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-4.0.1-beta.40.tgz#7e4e360dbbae6b9bd1fde80e8f17db79536f18ab"
+  integrity sha512-vOUtUq+xMBVldRlRbF2xPqJEtq7OqNvobymWD3Ek4ceF6elG/Q9ShFMdJjBb6yjrKkPlPIZ8LJY2sUYULL2yhg==
   dependencies:
+    dexie-cloud-common "^1.0.26"
     rxjs "^7.x"
 
-dexie-react-hooks@^1.1.1:
-  version "1.1.3"
-  resolved "https://registry.yarnpkg.com/dexie-react-hooks/-/dexie-react-hooks-1.1.3.tgz#dfcd723d533172605f06335823b205adf7442cc6"
-  integrity sha512-bXXE1gfYtfuVYTNiOlyam+YVaO8KaqacgRuxFuP37YtpS6o/jxT6KOl5h+hhqY36s0UavlHWbL+HWJFMcQumIg==
+dexie-cloud-common@^1.0.26:
+  version "1.0.26"
+  resolved "https://registry.yarnpkg.com/dexie-cloud-common/-/dexie-cloud-common-1.0.26.tgz#aa20065d3169360c363165aad8de89958dc24c44"
+  integrity sha512-RmS1tltx9GCv8oohI8DAzCifH5ctJTkf+Hz+1fMhKNU3GPfiewZusxEwdVIARnnCQnSNpVtGBEBhGQXQurbYLg==
 
-dexie@^4.0.1-alpha.8:
-  version "4.0.1-alpha.8"
-  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.1-alpha.8.tgz#3abd79f0a6bde95dbb12a7a2e6e1776bdf2cdd90"
-  integrity sha512-i47tssYy1en6SCImjKaYS/zd4q11ydVyPQYF5waF8BIQw4aaVaHmPIpVVH1BoNdY0EgJhHzZM4te7VXEEM6wFw==
+dexie-react-hooks@^1.1.6:
+  version "1.1.6"
+  resolved "https://registry.yarnpkg.com/dexie-react-hooks/-/dexie-react-hooks-1.1.6.tgz#42d4d4d314b049c23e2abe20c8543107ed85b0bd"
+  integrity sha512-xSblWtmPwhafWNWMECsW7zMMmBu8goH3QqTxEfwBNoNG1mgsM0oFclippev7ss9HhKICqBwTjgqpscci5Ed4mA==
+
+dexie@^4.0.1-alpha.16:
+  version "4.0.1-alpha.16"
+  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.1-alpha.16.tgz#314d9a03225b3558b52619c51a31c912fe63fc9b"
+  integrity sha512-BU6LSmIhvovz+eMIW9RYbK0a3szmBE+o1mYOOS29LlErSc6wNuhWytcvh7x1qXmnjkCDuXinKHzB2axEVTj5Qg==
 
 diff-sequences@^26.6.2:
   version "26.6.2"
@@ -11857,6 +11863,11 @@ yargs@^15.4.1:
     which-module "^2.0.0"
     y18n "^4.0.0"
     yargs-parser "^18.1.2"
+
+yarn-upgrade-all@^0.7.2:
+  version "0.7.2"
+  resolved "https://registry.yarnpkg.com/yarn-upgrade-all/-/yarn-upgrade-all-0.7.2.tgz#5d2afa9230661c55f22d3f848f22258db732ae20"
+  integrity sha512-iVxmoBuNdpxeahAIehJ039Pp6S8zQ/qTENQRMV5hp7x/2tLGUzytCODIKZFjfUwcRRKT3boGgHheUEWC7+VlQw==
 
 yocto-queue@^0.1.0:
   version "0.1.0"

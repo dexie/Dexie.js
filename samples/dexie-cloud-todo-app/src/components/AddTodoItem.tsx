@@ -13,7 +13,7 @@ export function AddTodoItem({ todoList }: Props) {
   });
 
   return (
-    <div className="row add-item">
+    <div className="todorow add-item">
       <div className="narrow">
         <input type="checkbox" disabled />
       </div>
