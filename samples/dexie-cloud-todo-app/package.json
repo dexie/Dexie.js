@@ -18,6 +18,7 @@
     "dexie": "4.0.1-alpha.17",
     "dexie-cloud-addon": "4.0.1-beta.40",
     "dexie-react-hooks": "^1.1.6",
+    "postcss-flexbugs-fixes": "^5.0.2",
     "react": "^17.0.2",
     "react-bootstrap": "^2.7.4",
     "react-dom": "^17.0.2",
@@ -59,8 +60,6 @@
     ]
   },
   "devDependencies": {
-    "gh-pages": "^5.0.0",
-    "postcss-flexbugs-fixes": "^5.0.2",
-    "yarn-upgrade-all": "^0.7.2"
+    "gh-pages": "^5.0.0"
   }
 }
