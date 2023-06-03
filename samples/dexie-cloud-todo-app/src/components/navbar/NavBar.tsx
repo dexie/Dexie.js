@@ -21,11 +21,10 @@ export function NavBar() {
       fixed="top"
       sticky="top"
       collapseOnSelect
-      expand="md"
+      expand="lg"
       bg="dark"
       variant="dark"
     >
-      <Container>
         <Navbar.Brand>Dexie Cloud ToDo App</Navbar.Brand>
         <Navbar.Toggle aria-controls="responsive-navbar-nav" />
         <Navbar.Text className="d-inline-flex d-lg-none status-icons-collapsed">
@@ -75,7 +74,6 @@ export function NavBar() {
         {/*<div style={{position: "absolute", top: 0, right: 10}}>
             <SyncStatusIcon />
           </div>*/}
-      </Container>
     </Navbar>
   );
 }

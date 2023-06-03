@@ -11,7 +11,10 @@ export class TodoDB extends Dexie {
   openCloseStates!: Table<boolean, [string, string]>;
 
   constructor() {
-    super('TodoDBCloud2', { addons: [dexieCloud] });
+    super('TodoDBCloud2', {
+      addons: [dexieCloud],
+      cache: "immutable"
+    });
     this.version(14).stores({
       todoLists: `@id`,
       todoItems: `@id, [todoListId+realmId]`,
