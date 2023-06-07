@@ -3147,6 +3147,13 @@
   resolved "https://registry.npmjs.org/@types/stack-utils/-/stack-utils-2.0.0.tgz"
   integrity sha512-RJJrrySY7A8havqpGObOB4W92QXKJo63/jFLLgpvOtsGUqbQZ9Sbgl35KMm1DjC6j7AvmmU2bIno+3IyEaemaw==
 
+"@types/testing-library__jest-dom@^5.14.6":
+  version "5.14.6"
+  resolved "https://registry.yarnpkg.com/@types/testing-library__jest-dom/-/testing-library__jest-dom-5.14.6.tgz#4887f6e1af11215428ab02777873bcede98a53b0"
+  integrity sha512-FkHXCb+ikSoUP4Y4rOslzTdX5sqYwMxfefKh1GmZ8ce1GOkEHntSp6b5cGadmNfp5e4BMEWOMx+WSKd5/MqlDA==
+  dependencies:
+    "@types/jest" "*"
+
 "@types/testing-library__jest-dom@^5.9.1":
   version "5.14.0"
   resolved "https://registry.npmjs.org/@types/testing-library__jest-dom/-/testing-library__jest-dom-5.14.0.tgz"
@@ -4855,7 +4862,7 @@ detect-port-alt@^1.1.6:
     address "^1.0.1"
     debug "^2.6.0"
 
-dexie-cloud-addon@4.0.1-beta.40:
+dexie-cloud-addon@^4.0.1-beta.40:
   version "4.0.1-beta.40"
   resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-4.0.1-beta.40.tgz#7e4e360dbbae6b9bd1fde80e8f17db79536f18ab"
   integrity sha512-vOUtUq+xMBVldRlRbF2xPqJEtq7OqNvobymWD3Ek4ceF6elG/Q9ShFMdJjBb6yjrKkPlPIZ8LJY2sUYULL2yhg==
@@ -4873,10 +4880,10 @@ dexie-react-hooks@^1.1.6:
   resolved "https://registry.yarnpkg.com/dexie-react-hooks/-/dexie-react-hooks-1.1.6.tgz#42d4d4d314b049c23e2abe20c8543107ed85b0bd"
   integrity sha512-xSblWtmPwhafWNWMECsW7zMMmBu8goH3QqTxEfwBNoNG1mgsM0oFclippev7ss9HhKICqBwTjgqpscci5Ed4mA==
 
-dexie@4.0.1-alpha.17:
-  version "4.0.1-alpha.17"
-  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.1-alpha.17.tgz#dfa62fffedccf2f7c565957850c2c74d74bdeb17"
-  integrity sha512-Ag0DcJAHWh2r2v+/5fSkWxP6CbZ+Cjev8S5PA7Pe4nd1hMukQcncbQ9d2ZwBImA+zd7kOFuqblIlnbYjm4RkqA==
+dexie@^4.0.1-alpha.18:
+  version "4.0.1-alpha.19"
+  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.1-alpha.19.tgz#0bd6a0f1d40d1aa83953ecdb938e7329cf6d387b"
+  integrity sha512-YMPMkdRdytPccXRp0qAk6wFtHgBCAUAhmJaQePwfq60RCfENgweF8w0DnSvTJrw+Z/YrH/Wz8wpYAZCQMpV3nA==
 
 didyoumean@^1.2.2:
   version "1.2.2"
@@ -11470,11 +11477,6 @@ yargs@^16.2.0:
     string-width "^4.2.0"
     y18n "^5.0.5"
     yargs-parser "^20.2.2"
-
-yarn-upgrade-all@^0.7.2:
-  version "0.7.2"
-  resolved "https://registry.yarnpkg.com/yarn-upgrade-all/-/yarn-upgrade-all-0.7.2.tgz#5d2afa9230661c55f22d3f848f22258db732ae20"
-  integrity sha512-iVxmoBuNdpxeahAIehJ039Pp6S8zQ/qTENQRMV5hp7x/2tLGUzytCODIKZFjfUwcRRKT3boGgHheUEWC7+VlQw==
 
 yocto-queue@^0.1.0:
   version "0.1.0"
