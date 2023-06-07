@@ -32,7 +32,6 @@
     "./package.json": "./package.json"
   },
   "typings": "dist/dexie.d.ts",
-  "packageManager": "pnpm@7.25.1",
   "jspm": {
     "format": "cjs",
     "ignore": [
