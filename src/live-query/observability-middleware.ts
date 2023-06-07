@@ -68,7 +68,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                 : req.type === "delete"
                 ? [req.keys] // keys known already here. newObjs will be undefined.
                 : req.values.length < 50
-                ? [getEffectiveKeys(primaryKey, req).filter(id => id), req.values] // keys except autoIncremented - but they are future keys not listened to.
+                ? [getEffectiveKeys(primaryKey, req).filter(id => id), req.values] // keys except autoIncremented - they will be added later on.
                 : []; // keys and newObjs will both be undefined - changeSpec will become true (changed for entire table)
 
             const oldCache = req.trans["_cache"];
@@ -112,7 +112,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
             return table.mutate(req).then((res) => {
               // Merge the mutated parts from the request into the transaction's mutatedParts
               // now when the request went fine.
-              if (keys && primaryKey.autoIncrement && (req.type === 'add' || req.type === 'put')) {
+              if (keys && (req.type === 'add' || req.type === 'put')) {
                 // Less than 50 requests (keys truthy) (otherwise we've added full range anyway)
                 // autoincrement means we might not have got all keys until now
                 pkRangeSet.addKeys(res.results);
