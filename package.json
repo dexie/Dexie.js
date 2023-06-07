@@ -1,6 +1,6 @@
 {
   "name": "dexie",
-  "version": "4.0.1-alpha.17",
+  "version": "4.0.1-alpha.19",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "module": "dist/dexie.mjs",
@@ -32,7 +32,6 @@
     "./package.json": "./package.json"
   },
   "typings": "dist/dexie.d.ts",
-  "packageManager": "pnpm@7.25.1",
   "jspm": {
     "format": "cjs",
     "ignore": [
