@@ -11,7 +11,7 @@ db.version(2).stores({
     people: "[name+number],name,number",
     friends: "++id,name,age",
     chart: '[patno+row+col], patno',
-    chaps: "++id,[name+number+shoeSize]",
+    chaps: "++id,[name+number+age]",
     multiMulti: "id,*tags,*categories"
 });
 
@@ -753,7 +753,7 @@ asyncTest("startsWithAnyOfIgnoreCase()", function () {
     }).finally(start);
 });
 
-promisedTest("where({key: value})", async ()=>{
+promisedTest("where({key: value})", async () => {
     let readme = await db.files.where({filename: "README"}).first();
     ok (readme, 'Should get a result for db.files.get({filename: "README"});');
     equal (readme.extension, ".TXT", "Should get README.TXT");
@@ -781,6 +781,26 @@ promisedTest("where({key: value})", async ()=>{
         ok(true, "Got SchemaError because we're not utilizing any index at all: " + e);
     });
 });
+
+promisedTest("where({notIndexed: value}) should not return emtpy result", async () => {
+    await db.chaps.add({name: "Chaplin", number: 1, age: 134, notIndexed: 'foo'});
+    try {
+        let chaplin = await db.chaps.where({name: "Chaplin", notIndexed: "foo"}).first();
+        if (!chaplin) {
+            ok(false, "Got empty result when data exists matching the query. If we're not using an index we should not get an empty result but an error.");
+        } else {
+            ok(chaplin,
+                "Ok, so we got a result even though 'notIndexed' is not indexed at all. "+
+                "This is not expected but ok if the result would be valid"
+            );
+            equal(chaplin.name, "Chaplin", "Got the correct data Chaplin!");
+        }
+    } catch (e) {
+        ok(true, `Got error: "${e}" because 'notIndexed' is not indexed at all. This is also ok.`);
+    }
+});
+
+
 
 promisedTest("orderBy(['idx1','idx2'])", async () => {
     if (!supports("compound")) {
@@ -819,19 +839,19 @@ promisedTest("Virtual Index", async () => {
     await db.chaps.bulkAdd([{
         name: "David",
         number: 2,
-        shoeSize: 43
+        age: 29
     },{
         name: "David",
         number: 3,
-        shoeSize: 44
+        age: 39
     },{
         name: "David",
         number: 1,
-        shoeSize: 45
+        age: 49
     },{
         name: "Mambo",
         number: 5,
-        shoeSize: 46
+        age: 55
     }]);
 
     // Verify that Dexie can use the [name+number] index to query name only:
