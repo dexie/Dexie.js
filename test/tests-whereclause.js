@@ -5,13 +5,13 @@ import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unitte
 const async = Dexie.async;
 
 var db = new Dexie("TestDBWhereClause");
-db.version(1).stores({
+db.version(2).stores({
     folders: "++id,&path",
     files: "++id,filename,extension,[filename+extension],folderId",
     people: "[name+number],name,number",
     friends: "++id,name,age",
     chart: '[patno+row+col], patno',
-    chaps: "++id,[name+number]",
+    chaps: "++id,[name+number+shoeSize]",
     multiMulti: "id,*tags,*categories"
 });
 
@@ -818,21 +818,27 @@ promisedTest("Virtual Index", async () => {
 
     await db.chaps.bulkAdd([{
         name: "David",
-        number: 2
+        number: 2,
+        shoeSize: 43
     },{
         name: "David",
-        number: 3
+        number: 3,
+        shoeSize: 44
     },{
         name: "David",
-        number: 1
+        number: 1,
+        shoeSize: 45
     },{
         name: "Mambo",
-        number: 5
+        number: 5,
+        shoeSize: 46
     }]);
 
     // Verify that Dexie can use the [name+number] index to query name only:
     const davids = await db.chaps.where({name: "David"}).toArray();
     equal(davids.length, 3, "There should be 3 Davids in the result");
+    const mambosNumber5 = await db.chaps.where({name: "Mambo", number: 5}).toArray();
+    equal(mambosNumber5.length, 1, "There should be 1 Mambo no 5 in the result");
     // Verify that equalsIgnoreCase also works:
     const daves = await db.chaps.where('name').equalsIgnoreCase('david').toArray();
     equal(JSON.stringify(daves.map(({name, number}) => ({name, number})), null, 2),
