@@ -28,7 +28,7 @@ import { extendObservabilitySet } from "./extend-observability-set";
 
 export const observabilityMiddleware: Middleware<DBCore> = {
   stack: "dbcore",
-  level: 10,
+  level: 0,
   name: "Observability",
   create: (core) => {
     const dbName = core.schema.name;
