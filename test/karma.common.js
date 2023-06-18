@@ -41,7 +41,7 @@ const karmaCommon = {
     customLaunchers: require('./karma.browserstack.js').customLaunchers
 };
 
-const browserSuiteToUse = process.env.NODE_ENV === 'release' ?
+const browserSuiteToUse = process.env.GH_ACTIONS ? 'ciLocal' : process.env.NODE_ENV === 'release' ?
   "pre_npm_publish" :
   process.env.TRAVIS ?
     isNaN(process.env.TRAVIS_PULL_REQUEST) && process.env.BROWSER_STACK_USERNAME ?
