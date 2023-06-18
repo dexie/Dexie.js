@@ -134,7 +134,7 @@ if (process.env.LAMBDATEST) {
     customLaunchers: require('./karma.browserstack.js').customLaunchers,
   };
 
-  const browserSuiteToUse = process.env.LAMBDATEST
+  browserSuiteToUse = process.env.LAMBDATEST
     ? 'ciLT'
     : process.env.GH_ACTIONS
     ? 'ciLocal'
