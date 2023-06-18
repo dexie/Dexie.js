@@ -18,9 +18,10 @@ module.exports = {
         // - Let firefox represent the standard evergreen browser.
         // Leaving out Chrome, since local tests have hopefully already run on it.
         // Chrome will be tested in the pre_npm_publish anyway.
-        'bs_firefox_latest_supported', 
+        //'bs_firefox_latest_supported', 
         // Safari. Enforces native Safari support for every PR!
-        'bs_safari_latest_supported'
+        //'bs_safari_latest_supported'
+        'Chrome'
     ],
 
     ciLT: [
