@@ -9,7 +9,7 @@ jobs:
       matrix:
         TF: [test]
     services:
-      firefox: "113"
+      firefox: "113.0"
     steps:
       - name: Checkout code
         uses: actions/checkout@v2
