@@ -17,13 +17,13 @@ jobs:
       matrix:
         TF:
           - test
-          - addons/Dexie.Observable/test/unit
-          #- addons/Dexie.Observable/test/integration
-          #- addons/Dexie.Syncable/test/unit
-          #- addons/Dexie.Syncable/test/integration
-          #- addons/dexie-export-import/test
-          #- libs/dexie-react-hooks/test
-          #- test/integrations/test-dexie-relationships
+          - addons/Dexie.Observable/test
+          - addons/Dexie.Syncable/test
+          - addons/dexie-export-import/test
+          - libs/dexie-react-hooks/test
+          - test/integrations/test-dexie-relationships
+      fail-fast: true # If one test fails, abort the rest of the tests
+      max-parallel: 1 # At least for browserstack, this seems to be needed to avoid timeouts
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
