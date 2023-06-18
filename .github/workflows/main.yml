@@ -42,7 +42,6 @@ jobs:
         run: pnpm run build
       - name: Run headless test
         uses: coactions/setup-xvfb@v1
-        run: |
-          cd ${{ matrix.TF }}
-          pwd
-          bash ./gh-actions.sh
+        with:
+          run: bash ./gh-actions.sh
+          working-directory: ${{ matrix.TF }}
