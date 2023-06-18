@@ -118,7 +118,7 @@
   },
   "homepage": "https://dexie.org",
   "devDependencies": {
-    "@lambdatest/node-tunnel": "^3.0.14",
+    "@lambdatest/node-tunnel": "^4.0.1",
     "dts-bundle-generator": "^5.9.0",
     "just-build": "^0.9.24",
     "karma": "^6.1.1",

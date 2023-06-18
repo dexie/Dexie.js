@@ -136,10 +136,12 @@ if (process.env.LAMBDATEST) {
 
 const browserSuiteToUse = process.env.LAMBDATEST
   ? 'ciLT'
-  : process.env.GH_ACTIONS
-  ? 'ciLocal'
   : process.env.NODE_ENV === 'release'
   ? 'pre_npm_publish'
+  : process.env.BROWSER_STACK_USERNAME
+  ? "ci"
+  : process.env.GH_ACTIONS
+  ? "ciLocal"
   : 'local'; // Developer local machine
 
 

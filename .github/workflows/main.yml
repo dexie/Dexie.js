@@ -3,7 +3,8 @@ name: Build and Test
 on: push
 
 env:
-  LAMBDATEST: "true"
+  #LAMBDATEST: "true"
+  GH_ACTIONS: "true"
 
 jobs:
   test:
