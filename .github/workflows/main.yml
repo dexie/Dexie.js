@@ -1,9 +1,14 @@
 name: Build and Test
 
-on: push
+on: [push, workflow_dispatch]
 
 env:
+  #LAMBDATEST: "true"
   GH_ACTIONS: "true"
+  LT_USERNAME: ${{ secrets.LT_USERNAME }}
+  LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+  BROWSER_STACK_USERNAME: ${{ secrets.BROWSER_STACK_USERNAME }}
+  BROWSER_STACK_ACCESS_KEY: ${{ secrets.BROWSER_STACK_ACCESS_KEY }}
 
 jobs:
   test:
@@ -18,9 +23,6 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: 16
-      - name: Setup firefox
-        uses: browser-actions/setup-firefox@v1
-        run: firefox --version
       - name: Install dependencies
         run: |
           curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7

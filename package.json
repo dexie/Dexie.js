@@ -66,7 +66,9 @@
     "test": "pnpm run build && pnpm run test:typings && pnpm run test:unit",
     "test:unit": "karma start test/karma.conf.js --single-run",
     "test:typings": "tsc -p test/typings-test/",
-    "test:debug": "karma start test/karma.conf.js --log-level debug"
+    "test:debug": "karma start test/karma.conf.js --log-level debug",
+    "test:ltcloud": "cross-env LAMBDATEST=true npm run test:ltTunnel & sleep 10 && npm run test:unit",
+    "test:ltTunnel": "node test/lt-local"
   },
   "just-build": {
     "default": [
@@ -116,6 +118,7 @@
   },
   "homepage": "https://dexie.org",
   "devDependencies": {
+    "@lambdatest/node-tunnel": "^4.0.1",
     "dts-bundle-generator": "^5.9.0",
     "just-build": "^0.9.24",
     "karma": "^6.1.1",
@@ -124,6 +127,7 @@
     "karma-firefox-launcher": "^2.1.0",
     "karma-mocha-reporter": "^2.2.5",
     "karma-qunit": "^4.1.1",
+    "karma-webdriver-launcher": "^1.0.8",
     "qunit": "^2.10.0",
     "qunitjs": "^1.23.1",
     "rollup": "^2.40.0",
