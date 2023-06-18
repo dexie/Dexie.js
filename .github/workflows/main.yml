@@ -1,6 +1,6 @@
 name: Build and Test
 
-on: push
+on: [push, workflow_dispatch]
 
 env:
   #LAMBDATEST: "true"
