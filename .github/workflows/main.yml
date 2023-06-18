@@ -17,7 +17,7 @@ jobs:
       matrix:
         TF:
           - test
-          #- addons/Dexie.Observable/test/unit
+          - addons/Dexie.Observable/test/unit
           #- addons/Dexie.Observable/test/integration
           #- addons/Dexie.Syncable/test/unit
           #- addons/Dexie.Syncable/test/integration
