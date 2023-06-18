@@ -18,9 +18,6 @@ jobs:
         uses: actions/setup-node@v2
         with:
           node-version: 16
-      - name: Setup firefox
-        uses: browser-actions/setup-firefox@v1
-      - run: firefox --version
       - name: Install dependencies
         run: |
           curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7
