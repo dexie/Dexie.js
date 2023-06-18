@@ -24,7 +24,6 @@ import { obsSetsOverlap } from './obs-sets-overlap';
 
 export interface LiveQueryContext {
   subscr: ObservabilitySet;
-  txs: IDBTransaction[];
   signal: AbortSignal;
   requery: () => void;
   trans: null | Transaction;
@@ -48,7 +47,6 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
 
     let closed = false;
     let abortController: AbortController;
-    const txs: IDBTransaction[] = [];
 
     let accumMuts: ObservabilitySet = {};
     let currentObs: ObservabilitySet = {};
@@ -62,10 +60,6 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         closed = true;
         if (abortController) abortController.abort();
         if (startedListening) globalEvents.storagemutated.unsubscribe(mutationListener);
-        txs.forEach(idbtrans => {
-          //@ts-ignore
-          idbtrans.aborted = true;
-          try { idbtrans.abort(); } catch {}});
       },
     };
 
@@ -101,16 +95,8 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       if (abortController) abortController.abort(); // Cancel previous query. Last query will be cancelled on unsubscribe().
       abortController = new AbortController();
       
-      if (txs.length) {
-        txs.forEach(idbtrans => {
-          //@ts-ignore
-          idbtrans.aborted = true;
-          try {idbtrans.abort();} catch {}});
-        txs.length = 0;
-      }
       const ctx: LiveQueryContext = {
         subscr,
-        txs,
         signal: abortController.signal,
         requery: doQuery,
         trans: null // Make the scope transactionless (don't reuse transaction from outer scope of the caller of subscribe())

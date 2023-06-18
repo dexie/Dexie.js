@@ -28,7 +28,7 @@ import { extendObservabilitySet } from "./extend-observability-set";
 
 export const observabilityMiddleware: Middleware<DBCore> = {
   stack: "dbcore",
-  level: 10,
+  level: 0,
   name: "Observability",
   create: (core) => {
     const dbName = core.schema.name;
@@ -164,9 +164,6 @@ export const observabilityMiddleware: Middleware<DBCore> = {
               : subscr; // Explicit read transaction - track changes across entire live query
 
             if (isLiveQuery) {
-              // Abort handling
-              const { signal } = PSD as LiveQueryContext;
-              if (signal && signal.aborted) throw new exceptions.Abort();
               // Current zone want's to track all queries so they can be subscribed to.
               // (The query is executed within a "liveQuery" zone)
               // Check whether the query applies to a certain set of ranges:

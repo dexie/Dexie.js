@@ -18,7 +18,7 @@ import { subscribeToCacheEntry } from './subscribe-cachentry';
 
 export const cacheMiddleware: Middleware<DBCore> = {
   stack: 'dbcore',
-  level: 10,
+  level: 0,
   name: 'Cache',
   create: (core) => {
     const dbName = core.schema.name;
@@ -33,13 +33,10 @@ export const cacheMiddleware: Middleware<DBCore> = {
           mutatedParts?: ObservabilitySet;
         };
         // Maintain TblQueryCache.ops array when transactions commit or abort
-        const { txs } = PSD as LiveQueryContext;
-        if (txs || mode === 'readwrite') {
-          if (txs) txs.push(idbtrans);
+        if (mode === 'readwrite') {
           const ac = new AbortController();
           const { signal } = ac;
           const endTransaction = (wasCommitted: boolean) => () => {
-            if (txs) delArrayItem(txs, idbtrans);
             ac.abort();
             if (mode === 'readwrite') {
               // Collect which subscribers to notify:
@@ -233,15 +230,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
               });
               cacheEntry = {
                 obsSet: req.obsSet,
-                promise: promise.catch(error => {
-                  // In case the query operation failed to to have been aborted, we need
-                  // redo the query (without cache this time and with a brand new transaction)
-                  if ((req.trans as IDBTransaction & {aborted?: boolean}).aborted) {
-                    const trans = coreMW.transaction([tableName], 'readonly');
-                    return tableMW.query({...req, trans});
-                  }
-                  return Promise.reject(error);
-                }),
+                promise,
                 subscribers: new Set(),
                 type: 'query',
                 req,

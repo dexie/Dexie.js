@@ -106,17 +106,26 @@ export class Table implements ITable<any, IndexableType> {
     // Multiple criterias.
     // Let's try finding a compound index that matches all keyPaths in
     // arbritary order:
-    const compoundIndex = this.schema.indexes.concat(this.schema.primKey).filter(ix =>
-      ix.compound &&
-      keyPaths.every(keyPath => ix.keyPath.indexOf(keyPath) >= 0) &&
-      (ix.keyPath as string[]).every(keyPath => keyPaths.indexOf(keyPath) >= 0))[0];
-
-    if (compoundIndex && this.db._maxKey !== maxString)
+    const compoundIndex = this.schema.indexes.concat(this.schema.primKey).filter(ix => {
+      if (
+        ix.compound &&
+        keyPaths.every(keyPath => ix.keyPath.indexOf(keyPath) >= 0)) {
+          for (let i=0; i<keyPaths.length; ++i) {
+            if (keyPaths.indexOf(ix.keyPath[i]) === -1) return false;
+          }
+          return true;
+        }
+        return false;
+      }).sort((a,b) => a.keyPath.length - b.keyPath.length)[0];
+            
+    if (compoundIndex && this.db._maxKey !== maxString) {
       // Cool! We found such compound index
       // and this browser supports compound indexes (maxKey !== maxString)!
+      const keyPathsInValidOrder = (compoundIndex.keyPath as string[]).slice(0, keyPaths.length);
       return this
-        .where(compoundIndex.name)
-        .equals((compoundIndex.keyPath as string[]).map(kp => indexOrCrit[kp]));
+        .where(keyPathsInValidOrder)
+        .equals(keyPathsInValidOrder.map(kp => indexOrCrit[kp]));
+    }
 
     if (!compoundIndex && debug) console.warn(
       `The query ${JSON.stringify(indexOrCrit)} on ${this.name} would benefit of a ` +
