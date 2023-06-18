@@ -3,7 +3,7 @@ name: Build and Test
 on: [push, workflow_dispatch]
 
 env:
-  #LAMBDATEST: "true"
+  #LAMBDATEST: "true" # Uncomment this line to run tests on LambdaTest instead of Browserstack
   GH_ACTIONS: "true"
   LT_USERNAME: ${{ secrets.LT_USERNAME }}
   LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
@@ -15,19 +15,25 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        TF: [test]
+        TF:
+          - test
+          #- addons/Dexie.Observable/test/unit
+          #- addons/Dexie.Observable/test/integration
+          #- addons/Dexie.Syncable/test/unit
+          #- addons/Dexie.Syncable/test/integration
+          #- addons/dexie-export-import/test
+          #- libs/dexie-react-hooks/test
+          #- test/integrations/test-dexie-relationships
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
       - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/setup-node@v3
         with:
-          node-version: 16
+          node-version: 18
+          cache: "pnpm"
       - name: Install dependencies
-        run: |
-          curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7
-          pnpm config set store-dir ~/.pnpm-store
-          pnpm install --no-frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
       - name: Build
         run: pnpm run build
       - name: Test
