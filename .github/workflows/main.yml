@@ -27,8 +27,6 @@ jobs:
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
-      - name: Run headless test
-        uses: coactions/setup-xvfb@v1
       - name: Set up pnpm
         uses: pnpm/action-setup@v2
         with:
@@ -42,7 +40,8 @@ jobs:
         run: pnpm install --no-frozen-lockfile
       - name: Build
         run: pnpm run build
-      - name: Test
+      - name: Run headless test
+        uses: coactions/setup-xvfb@v1
         run: |
           cd ${{ matrix.TF }}
           pwd
