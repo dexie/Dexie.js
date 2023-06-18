@@ -3,7 +3,7 @@ name: Build and Test
 on: [push, workflow_dispatch]
 
 env:
-  #LAMBDATEST: "true"
+  #LAMBDATEST: "true" # Uncomment this line to run tests on LambdaTest instead of Browserstack
   GH_ACTIONS: "true"
   LT_USERNAME: ${{ secrets.LT_USERNAME }}
   LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
@@ -15,23 +15,32 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        TF: [test]
+        TF:
+          - test
+          - addons/Dexie.Observable/test
+          - addons/Dexie.Syncable/test
+          - addons/dexie-export-import/test
+          - libs/dexie-react-hooks/test
+      fail-fast: true # If one test fails, abort the rest of the tests
+      max-parallel: 1 # At least for browserstack, this seems to be needed to avoid timeouts
     steps:
       - name: Checkout code
-        uses: actions/checkout@v2
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
+        uses: actions/checkout@v3
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v2
         with:
-          node-version: 16
+          version: 8
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "pnpm"
       - name: Install dependencies
-        run: |
-          curl -f https://get.pnpm.io/v6.16.js | node - add --global pnpm@7
-          pnpm config set store-dir ~/.pnpm-store
-          pnpm install --no-frozen-lockfile
+        run: pnpm install --no-frozen-lockfile
       - name: Build
         run: pnpm run build
-      - name: Test
-        run: |
-          cd ${{ matrix.TF }}
-          pwd
-          bash ./gh-actions.sh
+      - name: Run headless test
+        uses: coactions/setup-xvfb@v1
+        with:
+          run: bash ./gh-actions.sh
+          working-directory: ${{ matrix.TF }}

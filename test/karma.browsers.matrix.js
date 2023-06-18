@@ -11,14 +11,14 @@ module.exports = {
     //local: ['bs_safari_latest_supported'],
 
     // When browserstack cannot be used, use local Firefox.
-    ciLocal: ['Firefox'],
+    ciLocal: ['Chrome'],
     
     // Continous Integration on every push to master
     ci: [
         // - Let firefox represent the standard evergreen browser.
         // Leaving out Chrome, since local tests have hopefully already run on it.
         // Chrome will be tested in the pre_npm_publish anyway.
-        'bs_firefox_latest_supported', 
+        'Firefox', 
         // Safari. Enforces native Safari support for every PR!
         'bs_safari_latest_supported'
     ],
@@ -32,7 +32,7 @@ module.exports = {
         // Skipping under 4.0 alpha: 'bs_chrome_oldest_supported', // ...because not tested in CI!
         'bs_chrome_latest_supported', // ...because not tested in CI!
         //'Skipping under 4.0 alpha: bs_firefox_oldest_supported', // ...because not tested in CI!
-        "bs_safari_latest_supported", // ...because not tested in CI!
+        "bs_firefox_latest_supported", // ...because not tested in CI!
     ]
 }
 
