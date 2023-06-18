@@ -52,7 +52,7 @@ importers:
         version: 5.2.0(rollup@2.58.3)
       rollup-plugin-sourcemaps:
         specifier: ^0.6.3
-        version: 0.6.3(@types/node@18.11.18)(rollup@2.79.0)
+        version: 0.6.3(rollup@2.58.3)
       rxjs:
         specifier: ^6.6.6
         version: 6.6.7
@@ -131,6 +131,9 @@ importers:
       dexie:
         specifier: ^4.0.1-alpha.5
         version: link:../..
+      dexie-cloud-common:
+        specifier: ^1.0.26
+        version: link:../../libs/dexie-cloud-common
       rxjs:
         specifier: ^7.x
         version: 7.5.6
@@ -144,12 +147,12 @@ importers:
       '@types/node':
         specifier: ^18.11.18
         version: 18.11.18
-      dexie-cloud-common:
-        specifier: ^1.0.23
-        version: link:../../libs/dexie-cloud-common
       dreambase-library:
         specifier: ^1.0.19
         version: 1.0.19
+      dts-bundle-generator:
+        specifier: ^8.0.1
+        version: 8.0.1
       just-build:
         specifier: '*'
         version: 0.9.24
@@ -348,7 +351,7 @@ importers:
         version: link:../..
       dexie-cloud-addon:
         specifier: ^4.0.1-beta.40
-        version: 4.0.1-beta.40(dexie@)
+        version: link:../../addons/dexie-cloud
       dexie-react-hooks:
         specifier: ^1.1.6
         version: link:../../libs/dexie-react-hooks
@@ -2773,6 +2776,18 @@ packages:
       typescript: 4.9.4
     dev: true
 
+  /@rollup/pluginutils@3.1.0(rollup@2.58.3):
+    resolution: {integrity: sha512-GksZ6pr6TpIjHm8h9lSQ8pi8BE9VeubNT0OMJ3B5uZJ8pz73NPiqOtCog/x2/QzM1ENChPKxMDhiQuRHsqc+lg==}
+    engines: {node: '>= 8.0.0'}
+    peerDependencies:
+      rollup: ^1.20.0||^2.0.0
+    dependencies:
+      '@types/estree': 0.0.39
+      estree-walker: 1.0.1
+      picomatch: 2.3.1
+      rollup: 2.58.3
+    dev: true
+
   /@rollup/pluginutils@3.1.0(rollup@2.79.0):
     resolution: {integrity: sha512-GksZ6pr6TpIjHm8h9lSQ8pi8BE9VeubNT0OMJ3B5uZJ8pz73NPiqOtCog/x2/QzM1ENChPKxMDhiQuRHsqc+lg==}
     engines: {node: '>= 8.0.0'}
@@ -4556,8 +4571,8 @@ packages:
   /cliui@6.0.0:
     resolution: {integrity: sha512-t6wbgtoCXvAzst7QgXxJYqPt0usEfbgQdftEPbLL/cvv6HPE5VgvqCuAIDR0NgU52ds6rFwqrgakNLrHEjCbrQ==}
     dependencies:
-      string-width: 4.2.2
-      strip-ansi: 6.0.0
+      string-width: 4.2.3
+      strip-ansi: 6.0.1
       wrap-ansi: 6.2.0
     dev: true
 
@@ -4567,6 +4582,15 @@ packages:
       string-width: 4.2.3
       strip-ansi: 6.0.1
       wrap-ansi: 7.0.0
+
+  /cliui@8.0.1:
+    resolution: {integrity: sha512-BSeNnyus75C4//NQ9gQt1/csTXyo/8Sb+afLAkzAptFuMsod9HFokGNudZpi/oQV73hnVK+sR+5PVRMd+Dr7YQ==}
+    engines: {node: '>=12'}
+    dependencies:
+      string-width: 4.2.3
+      strip-ansi: 6.0.1
+      wrap-ansi: 7.0.0
+    dev: true
 
   /clone-deep@4.0.1:
     resolution: {integrity: sha512-neHB9xuzh/wk0dIHweyAXv2aPGZIVk3pLMe+/RNzINf17fe0OG96QroktYAUm7SM1PBnzTabaLboqqxDyMU+SQ==}
@@ -5228,21 +5252,6 @@ packages:
       - supports-color
     dev: false
 
-  /dexie-cloud-addon@4.0.1-beta.40(dexie@):
-    resolution: {integrity: sha512-vOUtUq+xMBVldRlRbF2xPqJEtq7OqNvobymWD3Ek4ceF6elG/Q9ShFMdJjBb6yjrKkPlPIZ8LJY2sUYULL2yhg==}
-    engines: {node: '>=14'}
-    peerDependencies:
-      dexie: ^4.0.1-alpha.5
-    dependencies:
-      dexie: 'link:'
-      dexie-cloud-common: 1.0.26
-      rxjs: 7.5.6
-    dev: false
-
-  /dexie-cloud-common@1.0.26:
-    resolution: {integrity: sha512-RmS1tltx9GCv8oohI8DAzCifH5ctJTkf+Hz+1fMhKNU3GPfiewZusxEwdVIARnnCQnSNpVtGBEBhGQXQurbYLg==}
-    dev: false
-
   /di@0.0.1:
     resolution: {integrity: sha512-uJaamHkagcZtHPqCIHZxnFrXlunQXgBOsZSUOWwFw31QJCAbyTBoHMW75YOTur5ZNx8pIeAKgf6GWIgaqqiLhA==}
     dev: true
@@ -5402,6 +5411,15 @@ packages:
     dependencies:
       typescript: 5.0.4
       yargs: 15.4.1
+    dev: true
+
+  /dts-bundle-generator@8.0.1:
+    resolution: {integrity: sha512-9JVw78/OXdKfq+RUrmpLm6WAUJp+aOUGEHimVqIlOEH2VugRt1I8CVIoQZlirWZko+/SVZkNgpWCyZubUuzzPA==}
+    engines: {node: '>=14.0.0'}
+    hasBin: true
+    dependencies:
+      typescript: 5.0.4
+      yargs: 17.7.2
     dev: true
 
   /duplexer@0.1.2:
@@ -10941,6 +10959,21 @@ packages:
       source-map-resolve: 0.6.0
     dev: true
 
+  /rollup-plugin-sourcemaps@0.6.3(rollup@2.58.3):
+    resolution: {integrity: sha512-paFu+nT1xvuO1tPFYXGe+XnQvg4Hjqv/eIhG8i5EspfYYPBKL57X7iVbfv55aNVASg3dzWvES9dmWsL2KhfByw==}
+    engines: {node: '>=10.0.0'}
+    peerDependencies:
+      '@types/node': '>=10.0.0'
+      rollup: '>=0.31.2'
+    peerDependenciesMeta:
+      '@types/node':
+        optional: true
+    dependencies:
+      '@rollup/pluginutils': 3.1.0(rollup@2.58.3)
+      rollup: 2.58.3
+      source-map-resolve: 0.6.0
+    dev: true
+
   /rollup-plugin-terser@7.0.2(rollup@2.79.1):
     resolution: {integrity: sha512-w3iIaU4OxcF52UUXiZNsNeuXIMDvFrr+ZXK6bFZ0Q60qyVfq4uLptoS4bbq3paG3x216eQllFZX7zt6TIImguQ==}
     deprecated: This package has been deprecated and is no longer maintained. Please use @rollup/plugin-terser
@@ -11653,7 +11686,7 @@ packages:
     dependencies:
       emoji-regex: 8.0.0
       is-fullwidth-code-point: 3.0.0
-      strip-ansi: 6.0.0
+      strip-ansi: 6.0.1
     dev: true
 
   /string-width@4.2.3:
@@ -13064,8 +13097,8 @@ packages:
     engines: {node: '>=8'}
     dependencies:
       ansi-styles: 4.3.0
-      string-width: 4.2.2
-      strip-ansi: 6.0.0
+      string-width: 4.2.3
+      strip-ansi: 6.0.1
     dev: true
 
   /wrap-ansi@7.0.0:
@@ -13179,6 +13212,11 @@ packages:
     resolution: {integrity: sha512-y11nGElTIV+CT3Zv9t7VKl+Q3hTQoT9a1Qzezhhl6Rp21gJ/IVTW7Z3y9EWXhuUBC2Shnf+DX0antecpAwSP8w==}
     engines: {node: '>=10'}
 
+  /yargs-parser@21.1.1:
+    resolution: {integrity: sha512-tVpsJW7DdjecAiFpbIB1e3qxIQsE6NoPc5/eTdrbbIC4h0LVsWhnoa3g+m2HclBIujHzsxZ4VJVA+GUuc2/LBw==}
+    engines: {node: '>=12'}
+    dev: true
+
   /yargs@15.4.1:
     resolution: {integrity: sha512-aePbxDmcYW++PaqBsJ+HYUFwCdv4LVvdnhBy78E57PIor8/OVvhMrADFFEDh8DHDFRv/O9i3lPhsENjO7QX0+A==}
     engines: {node: '>=8'}
@@ -13207,6 +13245,19 @@ packages:
       string-width: 4.2.3
       y18n: 5.0.8
       yargs-parser: 20.2.9
+
+  /yargs@17.7.2:
+    resolution: {integrity: sha512-7dSzzRQ++CKnNI/krKnYRV7JKKPUXMEh61soaHKg9mrWEhzFWhFnxPxGl+69cD1Ou63C13NUPCnmIcrvqCuM6w==}
+    engines: {node: '>=12'}
+    dependencies:
+      cliui: 8.0.1
+      escalade: 3.1.1
+      get-caller-file: 2.0.5
+      require-directory: 2.1.1
+      string-width: 4.2.3
+      y18n: 5.0.8
+      yargs-parser: 21.1.1
+    dev: true
 
   /yocto-queue@0.1.0:
     resolution: {integrity: sha512-rVksvsnNCdJ/ohGc6xgPwyN8eheCxsiLM8mxuE/t/mOVqJewPuO1miLpTHQiRgTKCLexL4MeAFVagts7HmNZ2Q==}

@@ -51,10 +51,11 @@ export function connectWebSocket(db: DexieCloudDB) {
     filter((isReady) => isReady), // When consumer is ready for new messages, produce such a message to inform server about it
     switchMap(() => db.getPersistedSyncState()), // We need the info on which server revision we are at:
     filter((syncState) => syncState && syncState.serverRevision), // We wont send anything to server before inital sync has taken place
-    map<PersistedSyncState, ReadyForChangesMessage>((syncState) => ({
+    switchMap<PersistedSyncState, Promise<ReadyForChangesMessage>>(async (syncState) => ({
       // Produce the message to trigger server to send us new messages to consume:
       type: 'ready',
       rev: syncState.serverRevision,
+      realmSetHash: await computeRealmSetHash(syncState)
     }))
   );
 
@@ -72,6 +73,19 @@ export function connectWebSocket(db: DexieCloudDB) {
           map((isActive) => [isActive ? userLogin : null, syncState] as const)
         )
       ),
+      switchMap(([userLogin, syncState]) => {
+        if (userLogin?.isLoggedIn && !syncState?.realms.includes(userLogin.userId!)) {
+          // We're in an in-between state when user is logged in but the user's realms are not yet synced.
+          // Don't make this change reconnect the websocket just yet. Wait till syncState is updated
+          // to iclude the user's realm.
+          return db.cloud.persistedSyncState.pipe(
+            filter((syncState) => syncState?.realms.includes(userLogin!.userId!) || false),
+            take(1),
+            map((syncState) => [userLogin, syncState] as const)
+          );
+        }
+        return new BehaviorSubject([userLogin, syncState] as const);
+      }),
       switchMap(
         async ([userLogin, syncState]) =>
           [userLogin, await computeRealmSetHash(syncState!)] as const
