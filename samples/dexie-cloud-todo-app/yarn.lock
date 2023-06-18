@@ -4880,10 +4880,10 @@ dexie-react-hooks@^1.1.6:
   resolved "https://registry.yarnpkg.com/dexie-react-hooks/-/dexie-react-hooks-1.1.6.tgz#42d4d4d314b049c23e2abe20c8543107ed85b0bd"
   integrity sha512-xSblWtmPwhafWNWMECsW7zMMmBu8goH3QqTxEfwBNoNG1mgsM0oFclippev7ss9HhKICqBwTjgqpscci5Ed4mA==
 
-dexie@^4.0.1-alpha.18:
-  version "4.0.1-alpha.19"
-  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.1-alpha.19.tgz#0bd6a0f1d40d1aa83953ecdb938e7329cf6d387b"
-  integrity sha512-YMPMkdRdytPccXRp0qAk6wFtHgBCAUAhmJaQePwfq60RCfENgweF8w0DnSvTJrw+Z/YrH/Wz8wpYAZCQMpV3nA==
+dexie@^4.0.1-alpha.22:
+  version "4.0.1-alpha.22"
+  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.1-alpha.22.tgz#0dd6d1b5571e382cce5f8ae4be7c803c1d75d949"
+  integrity sha512-fCAlox70CSS4uSBxnP9PBisK1wx/hQBTZMEQM9VKnOcTFu9SfVVlNu2xZ7rLWSQDIJ4sZjzPhCDGQ2kQW3Lq3A==
 
 didyoumean@^1.2.2:
   version "1.2.2"
