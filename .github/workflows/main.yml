@@ -7,7 +7,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        TF: [test,addons/Dexie.Observable/test/unit,addons/Dexie.Observable/test/integration,addons/Dexie.Syncable/test/unit,addons/Dexie.Syncable/test/integration,addons/dexie-export-import/test,libs/dexie-react-hooks/test,test/integrations/test-dexie-relationships]
+        TF: [test]
     services:
       firefox: "113"
     steps:
