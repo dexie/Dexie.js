@@ -144,7 +144,7 @@ const browserSuiteToUse = process.env.LAMBDATEST
   ? "ciLocal"
   : 'local'; // Developer local machine
 
-if (browserSuiteToUse === 'ciLT') {
+if (browserSuiteToUse === 'ci') {
   console.log('Username length', process.env.BROWSER_STACK_USERNAME.length);
   console.log('Access key length', process.env.BROWSER_STACK_ACCESS_KEY.length);
 }
