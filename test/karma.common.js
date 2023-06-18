@@ -2,7 +2,6 @@
  */
 let karmaCommon;
 const ltBrowsers = require('./karma.lambdatest.js').customLaunchers;
-let browserSuiteToUse;
 
 const webdriverConfig = {
   hostname: 'hub.lambdatest.com',
@@ -133,15 +132,16 @@ if (process.env.LAMBDATEST) {
 
     customLaunchers: require('./karma.browserstack.js').customLaunchers,
   };
-
-  browserSuiteToUse = process.env.LAMBDATEST
-    ? 'ciLT'
-    : process.env.GH_ACTIONS
-    ? 'ciLocal'
-    : process.env.NODE_ENV === 'release'
-    ? 'pre_npm_publish'
-    : 'local'; // Developer local machine
 }
+
+const browserSuiteToUse = process.env.LAMBDATEST
+  ? 'ciLT'
+  : process.env.GH_ACTIONS
+  ? 'ciLocal'
+  : process.env.NODE_ENV === 'release'
+  ? 'pre_npm_publish'
+  : 'local'; // Developer local machine
+
 
 const defaultBrowserMatrix = require('./karma.browsers.matrix');
 
