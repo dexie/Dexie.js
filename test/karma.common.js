@@ -135,7 +135,7 @@ if (process.env.LAMBDATEST) {
   };
 
   const browserSuiteToUse = process.env.LAMBDATEST
-    ? 'liLT'
+    ? 'ciLT'
     : process.env.GH_ACTIONS
     ? 'ciLocal'
     : process.env.NODE_ENV === 'release'
