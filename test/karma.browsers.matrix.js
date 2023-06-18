@@ -23,6 +23,10 @@ module.exports = {
         'bs_safari_latest_supported'
     ],
 
+    ciLT: [
+        'lt_chrome_latest_supported'
+    ],
+
     // Test matrix used before every npm publish.
     pre_npm_publish: [
         // Skipping under 4.0 alpha: 'bs_chrome_oldest_supported', // ...because not tested in CI!
