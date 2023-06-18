@@ -11,6 +11,7 @@ const FAIL_RETRY_WAIT_TIME = 60000;
 export type WSClientToServerMsg = ReadyForChangesMessage;
 export interface ReadyForChangesMessage {
   type: 'ready';
+  realmSetHash: string;
   rev: string;
 }
 

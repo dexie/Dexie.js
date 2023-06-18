@@ -5,13 +5,13 @@ import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unitte
 const async = Dexie.async;
 
 var db = new Dexie("TestDBWhereClause");
-db.version(1).stores({
+db.version(2).stores({
     folders: "++id,&path",
     files: "++id,filename,extension,[filename+extension],folderId",
     people: "[name+number],name,number",
     friends: "++id,name,age",
     chart: '[patno+row+col], patno',
-    chaps: "++id,[name+number]",
+    chaps: "++id,[name+number+age]",
     multiMulti: "id,*tags,*categories"
 });
 
@@ -753,7 +753,7 @@ asyncTest("startsWithAnyOfIgnoreCase()", function () {
     }).finally(start);
 });
 
-promisedTest("where({key: value})", async ()=>{
+promisedTest("where({key: value})", async () => {
     let readme = await db.files.where({filename: "README"}).first();
     ok (readme, 'Should get a result for db.files.get({filename: "README"});');
     equal (readme.extension, ".TXT", "Should get README.TXT");
@@ -781,6 +781,26 @@ promisedTest("where({key: value})", async ()=>{
         ok(true, "Got SchemaError because we're not utilizing any index at all: " + e);
     });
 });
+
+promisedTest("where({notIndexed: value}) should not return emtpy result", async () => {
+    await db.chaps.add({name: "Chaplin", number: 1, age: 134, notIndexed: 'foo'});
+    try {
+        let chaplin = await db.chaps.where({name: "Chaplin", notIndexed: "foo"}).first();
+        if (!chaplin) {
+            ok(false, "Got empty result when data exists matching the query. If we're not using an index we should not get an empty result but an error.");
+        } else {
+            ok(chaplin,
+                "Ok, so we got a result even though 'notIndexed' is not indexed at all. "+
+                "This is not expected but ok if the result would be valid"
+            );
+            equal(chaplin.name, "Chaplin", "Got the correct data Chaplin!");
+        }
+    } catch (e) {
+        ok(true, `Got error: "${e}" because 'notIndexed' is not indexed at all. This is also ok.`);
+    }
+});
+
+
 
 promisedTest("orderBy(['idx1','idx2'])", async () => {
     if (!supports("compound")) {
@@ -818,21 +838,27 @@ promisedTest("Virtual Index", async () => {
 
     await db.chaps.bulkAdd([{
         name: "David",
-        number: 2
+        number: 2,
+        age: 29
     },{
         name: "David",
-        number: 3
+        number: 3,
+        age: 39
     },{
         name: "David",
-        number: 1
+        number: 1,
+        age: 49
     },{
         name: "Mambo",
-        number: 5
+        number: 5,
+        age: 55
     }]);
 
     // Verify that Dexie can use the [name+number] index to query name only:
     const davids = await db.chaps.where({name: "David"}).toArray();
     equal(davids.length, 3, "There should be 3 Davids in the result");
+    const mambosNumber5 = await db.chaps.where({name: "Mambo", number: 5}).toArray();
+    equal(mambosNumber5.length, 1, "There should be 1 Mambo no 5 in the result");
     // Verify that equalsIgnoreCase also works:
     const daves = await db.chaps.where('name').equalsIgnoreCase('david').toArray();
     equal(JSON.stringify(daves.map(({name, number}) => ({name, number})), null, 2),

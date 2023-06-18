@@ -70,7 +70,7 @@ export function sync(
   return _sync
     .apply(this, arguments)
     .then(() => {
-      if (!syncOptions?.justCheckIfNeeded) {
+      if (!syncOptions?.justCheckIfNeeded) { // && syncOptions?.purpose !== 'push') {
         db.syncStateChangedEvent.next({
           phase: 'in-sync',
         });
@@ -197,14 +197,14 @@ async function _sync(
     }
   );
 
-  const syncIsNeeded = clientChangeSet.some((set) =>
+  const pushSyncIsNeeded = clientChangeSet.some((set) =>
     set.muts.some((mut) => mut.keys.length > 0)
   );
   if (justCheckIfNeeded) {
-    console.debug('Sync is needed:', syncIsNeeded);
-    return syncIsNeeded;
+    console.debug('Sync is needed:', pushSyncIsNeeded);
+    return pushSyncIsNeeded;
   }
-  if (purpose === 'push' && !syncIsNeeded) {
+  if (purpose === 'push' && !pushSyncIsNeeded) {
     // The purpose of this request was to push changes
     return false;
   }
@@ -363,6 +363,7 @@ async function _sync(
     return await _sync(db, options, schema, { isInitialSync, cancelToken });
   }
   console.debug('SYNC DONE', { isInitialSync });
+  db.syncCompleteEvent.next();
   return false; // Not needed anymore
 }
 

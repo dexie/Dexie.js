@@ -5,3 +5,5 @@ packages:
   - 'addons/*'
   # all packages in direct subdirs of libs/
   - 'libs/*'
+  # Dexie cloud todo app
+  - 'samples/dexie-cloud-todo-app'

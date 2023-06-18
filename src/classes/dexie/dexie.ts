@@ -22,7 +22,7 @@ import { DexieEventSet } from '../../public/types/dexie-event-set';
 import { DexieExceptionClasses } from '../../public/types/errors';
 import { DexieDOMDependencies } from '../../public/types/dexie-dom-dependencies';
 import { nop, promisableChain } from '../../functions/chaining-functions';
-import Promise, { PSD } from '../../helpers/promise';
+import Promise, { PSD, globalPSD } from '../../helpers/promise';
 import { extend, override, keys, hasOwn } from '../../functions/utils';
 import Events from '../../helpers/Events';
 import { maxString, connections, READONLY, READWRITE } from '../../globals/constants';
@@ -44,6 +44,7 @@ import { hooksMiddleware } from '../../hooks/hooks-middleware';
 import { IndexableType } from '../../public';
 import { observabilityMiddleware } from '../../live-query/observability-middleware';
 import { cacheExistingValuesMiddleware } from '../../dbcore/cache-existing-values-middleware';
+import { cacheMiddleware } from "../../live-query/cache/cache-middleware";
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -97,8 +98,9 @@ export class Dexie implements IDexie {
       // Default DOM dependency implementations from static prop.
       indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to browser env.
       IDBKeyRange: deps.IDBKeyRange,  // Backend IDBKeyRange api. Default to browser env.
+      cache: 'cloned', // Default to cloned for backward compatibility. For best performance and least memory consumption use 'immutable'.
       ...options
-    };
+    };  
     this._deps = {
       indexedDB: options.indexedDB as IDBFactory,
       IDBKeyRange: options.IDBKeyRange as typeof IDBKeyRange
@@ -211,10 +213,11 @@ export class Dexie implements IDexie {
     }
 
     // Default middlewares:
+    this.use(cacheExistingValuesMiddleware);
+    this.use(cacheMiddleware);
+    this.use(observabilityMiddleware);
     this.use(virtualIndexMiddleware);
     this.use(hooksMiddleware);
-    this.use(observabilityMiddleware);
-    this.use(cacheExistingValuesMiddleware);
 
     this.vip = Object.create(this, {_vip: {value: true}}) as Dexie;
 
@@ -282,7 +285,10 @@ export class Dexie implements IDexie {
   }
 
   open() {
-    return dexieOpen(this);
+    return usePSD(
+      globalPSD, // Enforce global scope here since db.open() can be part of a live query or transaction scope
+      () => dexieOpen(this)
+    );
   }
 
   _close(): void {

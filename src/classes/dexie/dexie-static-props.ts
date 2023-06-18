@@ -23,6 +23,7 @@ import { liveQuery } from '../../live-query/live-query';
 import { extendObservabilitySet } from '../../live-query/extend-observability-set';
 import { domDeps } from './dexie-dom-dependencies';
 import { cmp } from '../../functions/cmp';
+import { cache } from '../../live-query/cache/cache';
 
 /* (Dexie) is an instance of DexieConstructor, as defined in public/types/dexie-constructor.d.ts
 *  (new Dexie()) is an instance of Dexie, as defined in public/types/dexie.d.ts
@@ -212,6 +213,7 @@ props(Dexie, {
   // For node.js, you need to require indexeddb-js or similar and then set these deps.
   //
   dependencies: domDeps,
+  cache,
 
   // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
   semVer: DEXIE_VERSION,

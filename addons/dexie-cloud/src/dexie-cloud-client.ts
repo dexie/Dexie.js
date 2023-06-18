@@ -4,7 +4,7 @@ import {
   DBRealmMember,
   getDbNameFromDbUrl,
 } from 'dexie-cloud-common';
-import { BehaviorSubject, combineLatest, from, fromEvent } from 'rxjs';
+import { BehaviorSubject, combineLatest, from, fromEvent, Subject } from 'rxjs';
 import { filter, map, skip, startWith, switchMap, take } from 'rxjs/operators';
 import { login } from './authentication/login';
 import { UNAUTHORIZED_USER } from './authentication/UNAUTHORIZED_USER';
@@ -44,6 +44,7 @@ import { getCurrentUserEmitter } from './currentUserEmitter';
 import { NewIdOptions } from './types/NewIdOptions';
 import { getInvitesObservable } from './getInvitesObservable';
 import { getGlobalRolesObservable } from './getGlobalRolesObservable';
+import { UserLogin } from './db/entities/UserLogin';
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 export {
@@ -97,6 +98,8 @@ export function dexieCloud(dexie: Dexie) {
     currentUserEmitter.next(UNAUTHORIZED_USER);
   });
 
+  const syncComplete = new Subject<void>();
+
   dexie.cloud = {
     version: '{version}',
     options: { ...DEFAULT_OPTIONS } as DexieCloudOptions,
@@ -109,6 +112,11 @@ export function dexieCloud(dexie: Dexie) {
       phase: 'initial',
       status: 'not-started',
     }),
+
+    events: {
+      syncComplete,
+    },
+    
     persistedSyncState: new BehaviorSubject<PersistedSyncState | undefined>(
       undefined
     ),
@@ -233,6 +241,9 @@ export function dexieCloud(dexie: Dexie) {
     if (!db.cloud.isServiceWorkerDB) {
       subscriptions.push(computeSyncState(db).subscribe(dexie.cloud.syncState));
     }
+
+    // Forward db.syncCompleteEvent to be publicly consumable via db.cloud.events.syncComplete:
+    subscriptions.push(db.syncCompleteEvent.subscribe(syncComplete));
 
     //verifyConfig(db.cloud.options); Not needed (yet at least!)
     // Verify the user has allowed version increment.
@@ -367,15 +378,16 @@ export function dexieCloud(dexie: Dexie) {
     }
 
     // HERE: If requireAuth, do athentication now.
+    let changedUser = false;
     if (db.cloud.options?.requireAuth) {
-      await login(db);
+      changedUser = await login(db);
     }
 
     if (localSyncWorker) localSyncWorker.stop();
     localSyncWorker = null;
     throwIfClosed();
     if (db.cloud.usingServiceWorker && db.cloud.options?.databaseUrl) {
-      registerSyncEvent(db, 'push').catch(() => {});
+      registerSyncEvent(db, changedUser ? 'pull' : 'push').catch(() => {});
       registerPeriodicSyncEvent(db).catch(() => {});
     } else if (
       db.cloud.options?.databaseUrl &&
@@ -385,7 +397,7 @@ export function dexieCloud(dexie: Dexie) {
       // There's no SW. Start SyncWorker instead.
       localSyncWorker = LocalSyncWorker(db, db.cloud.options, db.cloud.schema!);
       localSyncWorker.start();
-      triggerSync(db, 'push');
+      triggerSync(db, changedUser ? 'pull' : 'push');
     }
 
     // Listen to online event and do sync.

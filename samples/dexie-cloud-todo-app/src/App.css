@@ -25,7 +25,7 @@ button.large-button {
   font-size: 12pt;
 }
 
-.row {
+.todorow {
   display: inline-flex;
   border: 1px solid #ccc;
   margin: 2px;
@@ -34,7 +34,7 @@ button.large-button {
   width: 100%;
   position: relative;
 }
-.row.add-item {
+.todorow.add-item {
   border-style: dashed;
   border-color: #ccc8;
 }
@@ -90,6 +90,9 @@ button:disabled {
 .todo-item-text {
   width: 50vw;
   padding: 10px;
+  margin: 0;
+  display: contents;
+  float: right;
 }
 
 .todo-item-input {

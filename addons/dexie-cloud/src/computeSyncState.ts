@@ -1,6 +1,6 @@
 import { combineLatest, Observable, of } from 'rxjs';
 import { debounceTime, map, startWith, switchMap } from 'rxjs/operators';
-import { DexieCloudDB } from './db/DexieCloudDB';
+import { DexieCloudDB, SyncStateChangedEventData } from './db/DexieCloudDB';
 import { isOnline } from './sync/isOnline';
 import { SyncState } from './types/SyncState';
 import { userIsActive, userIsReallyActive } from './userIsActive';
@@ -34,7 +34,7 @@ export function computeSyncState(db: DexieCloudDB): Observable<SyncState> {
   );
   return combineLatest([
     lazyWebSocketStatus,
-    db.syncStateChangedEvent.pipe(startWith({ phase: 'initial' } as SyncState)),
+    db.syncStateChangedEvent.pipe(startWith({ phase: 'initial' } as SyncStateChangedEventData)),
     userIsReallyActive
   ]).pipe(
     map(([status, syncState, userIsActive]) => {

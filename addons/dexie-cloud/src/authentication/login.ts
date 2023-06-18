@@ -20,7 +20,7 @@ export async function login(
       }
     }
     // Already authenticated according to given hints.
-    return;
+    return false;
   }
   const context = new AuthPersistedContext(db, {
     claims: {},
@@ -49,4 +49,5 @@ export async function login(
   // Make sure to resync as the new login will be authorized
   // for new realms.
   triggerSync(db, "pull");
+  return true;
 }

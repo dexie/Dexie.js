@@ -1,6 +1,25 @@
 import { Dexie } from 'dexie';
 import { useObservable } from './useObservable';
-import type { KeyPaths, TableProp } from 'dexie';
+//import type { KeyPaths, TableProp } from 'dexie'; // Issue #1725 - not compatible with dexie@3.
+// Workaround: provide these types inline for now. When dexie 4 stable is out, we can use the types from dexie@4.
+export type KeyPaths<T> = {
+  [P in keyof T]: 
+    P extends string 
+      ? T[P] extends Array<infer K>
+        ? K extends object // only drill into the array element if it's an object
+          ? P | `${P}.${number}` | `${P}.${number}.${KeyPaths<K>}` 
+          : P | `${P}.${number}`
+        : T[P] extends (...args: any[]) => any // Method
+           ? never 
+          : T[P] extends object 
+            ? P | `${P}.${KeyPaths<T[P]>}` 
+            : P 
+      : never;
+}[keyof T];
+export type TableProp<DX extends Dexie> = {
+  [K in keyof DX]: DX[K] extends {schema: any, get: any, put: any, add: any, where: any} ? K : never;
+}[keyof DX] & string;
+
 
 interface DexieCloudEntity {
   table(): string;

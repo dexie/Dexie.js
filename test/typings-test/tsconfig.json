@@ -1,9 +1,9 @@
 {
     "compilerOptions": {
         "module": "es6",
-        "target": "es5",
+        "target": "ES2015",
         "noImplicitAny": true,
-        "strictFunctionTypes": true,
+        "strict": true,
         "strictNullChecks": true,
         "noImplicitThis": true,
         "outDir": "../../tools/tmp/test-typings",

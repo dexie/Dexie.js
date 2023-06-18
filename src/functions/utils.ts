@@ -187,40 +187,79 @@ export function flatten<T> (a: (T | T[])[]) : T[] {
 
 //https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Structured_clone_algorithm
 const intrinsicTypeNames =
-    "Boolean,String,Date,RegExp,Blob,File,FileList,FileSystemFileHandle,FileSystemDirectoryHandle,ArrayBuffer,DataView,Uint8ClampedArray,ImageBitmap,ImageData,Map,Set,CryptoKey"
+    "Array,Boolean,String,Date,RegExp,Blob,File,FileList,FileSystemFileHandle,FileSystemDirectoryHandle,ArrayBuffer,DataView,Uint8ClampedArray,ImageBitmap,ImageData,Map,Set,CryptoKey"
     .split(',').concat(
         flatten([8,16,32,64].map(num=>["Int","Uint","Float"].map(t=>t+num+"Array")))
     ).filter(t=>_global[t]);
-const intrinsicTypes = intrinsicTypeNames.map(t=>_global[t]);
-export const intrinsicTypeNameSet = arrayToObject(intrinsicTypeNames, x=>[x,true]);
+const intrinsicTypes = new Set(intrinsicTypeNames.map(t=>_global[t]));
+
+/** Deep clone a simple object tree.
+ * 
+ * Copies object tree deeply, but does not deep-copy arrays,
+ * typed arrays, Dates or other intrinsic types.
+ * 
+ * Does not check for cyclic references.
+ * 
+ * This function is 6 times faster than structuredClone() on chromium 111.
+ * 
+ * This function can safely be used for cloning ObservabilitySets and RangeSets.
+ * 
+ * @param o Object to clone
+ * @returns Cloned object
+ */
+export function cloneSimpleObjectTree<T extends object>(o: T): T {
+    const rv = {} as T;
+    for (const k in o) if (hasOwn(o, k)) {
+        const v = o[k];
+        rv[k] = !v || typeof v !== 'object' || intrinsicTypes.has(v.constructor) ? v : cloneSimpleObjectTree(v);
+    }
+    return rv;
+}
+
+export function objectIsEmpty(o: object) {
+    for (const k in o) if (hasOwn(o, k)) return false;
+    return true;
+}
 
 let circularRefs: null | WeakMap<any,any> = null;
+
+/** Deep clone an object or array.
+ * 
+ * 
+ * @param any 
+ * @returns 
+ */
 export function deepClone<T>(any: T): T {
-    circularRefs = typeof WeakMap !== 'undefined' && new WeakMap();
+    circularRefs = new WeakMap();
     const rv = innerDeepClone(any);
     circularRefs = null;
     return rv;
 }
 
-function innerDeepClone<T>(any: T): T {
-    if (!any || typeof any !== 'object') return any;
-    let rv = circularRefs && circularRefs.get(any); // Resolve circular references
+function innerDeepClone<T>(x: T): T {
+    if (!x || typeof x !== 'object') return x;
+    let rv = circularRefs.get(x); // Resolve circular references
     if (rv) return rv;
-    if (isArray(any)) {
+    if (isArray(x)) {
         rv = [];
-        circularRefs && circularRefs.set(any, rv);
-        for (var i = 0, l = any.length; i < l; ++i) {
-            rv.push(innerDeepClone(any[i]));
+        circularRefs.set(x, rv);
+        for (var i = 0, l = x.length; i < l; ++i) {
+            rv.push(innerDeepClone(x[i]));
         }
-    } else if (intrinsicTypes.indexOf(any.constructor) >= 0) {
-        rv = any;
+    } else if (intrinsicTypes.has(x.constructor)) {
+        // For performance, we're less strict than structuredClone - we're only
+        // cloning arrays and custom objects.
+        // Typed arrays, Dates etc are not cloned.
+        rv = x;
     } else {
-        const proto = getProto(any);
+        // We're nicer to custom classes than what structuredClone() is -
+        // we preserve the proto of each object.
+        const proto = getProto(x);
         rv = proto === Object.prototype ? {} : Object.create(proto);
-        circularRefs && circularRefs.set(any, rv);
-        for (var prop in any) {
-            if (hasOwn(any, prop)) {
-                rv[prop] = innerDeepClone(any[prop]);
+        circularRefs.set(x, rv);
+        for (var prop in x) {
+            if (hasOwn(x, prop)) {
+                rv[prop] = innerDeepClone(x[prop]);
             }
         }
     }
@@ -243,6 +282,12 @@ export const getIteratorOf = typeof iteratorSymbol === "symbol" ? function(x) {
 export const asyncIteratorSymbol = typeof Symbol !== 'undefined'
     ? Symbol.asyncIterator || Symbol.for("Symbol.asyncIterator")
     : '@asyncIterator';
+
+export function delArrayItem(a: any[], x: any) {
+    const i = a.indexOf(x);
+    if (i >= 0) a.splice(i, 1);
+    return i >= 0;
+}
 
 export const NO_CHAR_ARRAY = {};
 // Takes one or several arguments and returns an array based on the following criteras:
