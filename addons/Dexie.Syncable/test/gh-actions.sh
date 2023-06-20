@@ -12,4 +12,4 @@ pnpm run build
 
 pnpm run test:typings
 pnpm run test:ltcloud
-pnpm run test:integration
+pnpm run test:ltcloud:integration
