@@ -5,6 +5,8 @@
  * karma.browserstack.js
  */
 
+console.log("Current RUNNER_OS: " + process.env.RUNNER_OS);
+
 module.exports = {
     // On developers machines, Chrome is most likely to be installed.
     local: ['Chrome'],

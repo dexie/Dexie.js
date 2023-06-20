@@ -9,6 +9,7 @@ env:
   LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
   BROWSER_STACK_USERNAME: ${{ secrets.BROWSER_STACK_USERNAME }}
   BROWSER_STACK_ACCESS_KEY: ${{ secrets.BROWSER_STACK_ACCESS_KEY }}
+  RUNNER_OS: ${{ vars.RUNNER_OS }}
 
 jobs:
   test:
