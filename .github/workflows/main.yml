@@ -7,7 +7,7 @@ env:
   GH_ACTIONS: "true"
   LT_USERNAME: ${{ secrets.LT_USERNAME }}
   LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
-  LT_TUNNEL_NAME: $(date +'%m-%dT%H:%M:%S')
+  LT_TUNNEL_NAME: "dexietests-${{ github.run_number }}-${{ github.run_attempt }}}"
   BROWSER_STACK_USERNAME: ${{ secrets.BROWSER_STACK_USERNAME }}
   BROWSER_STACK_ACCESS_KEY: ${{ secrets.BROWSER_STACK_ACCESS_KEY }}
 
