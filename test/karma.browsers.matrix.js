@@ -29,7 +29,7 @@ module.exports = {
         // Chrome will be tested in the pre_npm_publish anyway.
         'Firefox',
         // Safari. Enforces native Safari support for every PR!
-        'lt_safari_latest_supported'
+        'lt_chrome_latest_supported'
     ],
 
     // Test matrix used before every npm publish.
