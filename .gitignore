@@ -188,3 +188,4 @@ libs/dexie-cloud-common/tsconfig.tsbuildinfo
 
 #lambdatest tunnel binary
 .lambdatest
+tunnel.pid

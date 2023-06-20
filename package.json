@@ -67,7 +67,7 @@
     "test:unit": "karma start test/karma.conf.js --single-run",
     "test:typings": "tsc -p test/typings-test/",
     "test:debug": "karma start test/karma.conf.js --log-level debug",
-    "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test:unit && exit",
+    "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test:unit && (kill $(cat tunnel.pid) || exit 0)",
     "test:ltTunnel": "node test/lt-local"
   },
   "just-build": {
