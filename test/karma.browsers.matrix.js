@@ -20,11 +20,16 @@ module.exports = {
         // Chrome will be tested in the pre_npm_publish anyway.
         'Firefox',
         // Safari. Enforces native Safari support for every PR!
-        'lt_safari_latest_supported'
+        'bs_safari_latest_supported'
     ],
 
     ciLT: [
-        'lt_chrome_latest_supported'
+        // - Let firefox represent the standard evergreen browser.
+        // Leaving out Chrome, since local tests have hopefully already run on it.
+        // Chrome will be tested in the pre_npm_publish anyway.
+        'Firefox',
+        // Safari. Enforces native Safari support for every PR!
+        'lt_safari_latest_supported'
     ],
 
     // Test matrix used before every npm publish.
