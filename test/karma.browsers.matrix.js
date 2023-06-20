@@ -12,6 +12,10 @@ module.exports = {
 
     // When browserstack cannot be used, use local Firefox.
     ciLocal: ['Firefox'],
+
+    // On Github Actions, use Firefox and Chrome local browsers (this is specific to master-3 since
+    // we've unistalled travis and want to try out github actions locally)
+    ciGHActions: ['Firefox', 'Chrome'],
     
     // Continous Integration on every push to master
     ci: [
