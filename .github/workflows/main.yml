@@ -7,7 +7,6 @@ env:
   GH_ACTIONS: "true"
   LT_USERNAME: ${{ secrets.LT_USERNAME }}
   LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
-  LT_TUNNEL_NAME: $(($RANDOM))
   BROWSER_STACK_USERNAME: ${{ secrets.BROWSER_STACK_USERNAME }}
   BROWSER_STACK_ACCESS_KEY: ${{ secrets.BROWSER_STACK_ACCESS_KEY }}
 
@@ -38,6 +37,8 @@ jobs:
           cache: "pnpm"
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
+      - name: Set LT_TUNNEL_NAME
+        run: echo "LT_TUNNEL_NAME=$(echo $RANDOM)" >> $GITHUB_ENV
       - name: Build
         run: pnpm run build
       - name: Run headless test
