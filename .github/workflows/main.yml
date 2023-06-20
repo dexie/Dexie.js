@@ -23,7 +23,7 @@ jobs:
           - addons/dexie-export-import/test
           - libs/dexie-react-hooks/test
       fail-fast: true # If one test fails, abort the rest of the tests
-      max-parallel: 1 # At least for browserstack, this seems to be needed to avoid timeouts
+      #max-parallel: 1 # At least for browserstack, this seems to be needed to avoid timeouts
     steps:
       - name: Checkout code
         uses: actions/checkout@v3
