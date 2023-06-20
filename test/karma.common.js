@@ -26,6 +26,7 @@ const karmaCommon = {
       'karma-chrome-launcher',
       'karma-firefox-launcher',
       'karma-browserstack-launcher',
+      'karma-safari-launcher',
     ],
 
     files: [
