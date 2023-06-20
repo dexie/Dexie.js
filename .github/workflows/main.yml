@@ -38,7 +38,7 @@ jobs:
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
       - name: Set LT_TUNNEL_NAME
-        run: echo "LT_TUNNEL_NAME=$(echo $RANDOM)" >> $GITHUB_ENV
+        run: echo "LT_TUNNEL_NAME=${{ matrix.TF }}-${{ github.run_id }}-${{ github.run_attempt }}" >> $GITHUB_ENV
       - name: Build
         run: pnpm run build
       - name: Run headless test
