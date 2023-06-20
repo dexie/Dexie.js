@@ -12,15 +12,15 @@ module.exports = {
 
     // When browserstack cannot be used, use local Firefox.
     ciLocal: ['Chrome'],
-    
+
     // Continous Integration on every push to master
     ci: [
         // - Let firefox represent the standard evergreen browser.
         // Leaving out Chrome, since local tests have hopefully already run on it.
         // Chrome will be tested in the pre_npm_publish anyway.
-        'Firefox', 
+        'Firefox',
         // Safari. Enforces native Safari support for every PR!
-        'bs_safari_latest_supported'
+        'lt_safari_latest_supported'
     ],
 
     ciLT: [
