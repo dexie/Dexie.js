@@ -3,7 +3,7 @@ name: Build and Test
 on: [push, workflow_dispatch]
 
 env:
-  LAMBDATEST: "true"
+  #LAMBDATEST: "true"
   GH_ACTIONS: "true"
   LT_USERNAME: ${{ secrets.LT_USERNAME }}
   LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}

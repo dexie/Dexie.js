@@ -30,9 +30,9 @@ module.exports = {
     remote_safari: {
       base: 'BrowserStack',
       browser: "Safari",
-      browser_version: "16",
+      browser_version: "15",
       os: 'OS X',
-      os_version: 'Ventura'
+      os_version: 'Monterey'
     }
   }
 }
