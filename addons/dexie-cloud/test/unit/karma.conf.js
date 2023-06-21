@@ -4,11 +4,11 @@ const {karmaCommon, getKarmaConfig, defaultBrowserMatrix} = require('../../../..
 module.exports = function (config) {
   const browserMatrixOverrides = {
     // Be fine with testing on local travis firefox + browserstack chrome, latest supported.
-    ci: ["bs_chrome_latest_supported"],
+    ci: ["Chrome"],
     // Safari fails to reply on browserstack. Need to not have it here.
     // Just complement with old chrome browser that is not part of CI test suite.
     pre_npm_publish: [
-      "bs_chrome_oldest_supported",
+      "Chrome",
     ]
   };
 

@@ -10,34 +10,22 @@ module.exports = {
     local: ['Chrome'],
     //local: ['bs_safari_latest_supported'],
 
-    // When browserstack cannot be used, use local Firefox.
-    ciLocal: ['Chrome'],
+    // When Lambdatest credentials aren't available, use Chrome and Firefox on Github Actions:
+    ciLocal: ['Crhome', 'Firefox'],
 
-    // Continous Integration on every push to master
+    // Continous Integration on every push
     ci: [
-        // - Let firefox represent the standard evergreen browser.
-        // Leaving out Chrome, since local tests have hopefully already run on it.
-        // Chrome will be tested in the pre_npm_publish anyway.
-        'Firefox',
-        // Safari. Enforces native Safari support for every PR!
-        'bs_safari_latest_supported'
-    ],
-
-    ciLT: [
-        // - Let firefox represent the standard evergreen browser.
-        // Leaving out Chrome, since local tests have hopefully already run on it.
-        // Chrome will be tested in the pre_npm_publish anyway.
-        'Firefox',
-        // Safari. Enforces native Safari support for every PR!
-        'lt_chrome_latest_supported'
+        'lt_chrome',
+        'lt_safari',
+        'lt_firefox'
     ],
 
     // Test matrix used before every npm publish.
     pre_npm_publish: [
-        // Skipping under 4.0 alpha: 'bs_chrome_oldest_supported', // ...because not tested in CI!
-        'bs_chrome_latest_supported', // ...because not tested in CI!
-        //'Skipping under 4.0 alpha: bs_firefox_oldest_supported', // ...because not tested in CI!
-        "bs_firefox_latest_supported", // ...because not tested in CI!
+        'lt_chrome',
+        'lt_edge',
+        'lt_safari',
+        'lt_firefox'
     ]
 }
 
