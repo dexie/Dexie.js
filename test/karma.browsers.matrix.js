@@ -16,7 +16,7 @@ module.exports = {
     // Continous Integration on every push
     ci: [
         'lt_chrome',
-        'lt_safari',
+        'bs_safari_latest_supported',
         'lt_firefox'
     ],
 
