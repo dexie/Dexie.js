@@ -98,7 +98,7 @@ export class Dexie implements IDexie {
       // Default DOM dependency implementations from static prop.
       indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to browser env.
       IDBKeyRange: deps.IDBKeyRange,  // Backend IDBKeyRange api. Default to browser env.
-      cache: 'disabled', // Default to cloned for backward compatibility. For best performance and least memory consumption use 'immutable'.
+      cache: 'cloned', // Default to cloned for backward compatibility. For best performance and least memory consumption use 'immutable'.
       ...options
     };  
     this._deps = {
