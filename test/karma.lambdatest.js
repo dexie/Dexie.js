@@ -25,7 +25,7 @@ module.exports = {
       browserName: "Safari",
       browserVersion: "16",
       'LT:Options': {
-        platformName: 'MacOS Ventura'
+        platformName: 'MacOS Monterey'
       }
     }
   }
