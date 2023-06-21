@@ -11,21 +11,21 @@ module.exports = {
     //local: ['bs_safari_latest_supported'],
 
     // When Lambdatest credentials aren't available, use Chrome and Firefox on Github Actions:
-    ciLocal: ['Crhome', 'Firefox'],
+    ciLocal: ['Chrome', 'Firefox'],
 
     // Continous Integration on every push
     ci: [
-        'lt_chrome',
-        'bs_safari_latest_supported',
-        'lt_firefox'
+        'remote_chrome',
+        'remote_safari',
+        'remote_firefox'
     ],
 
     // Test matrix used before every npm publish.
     pre_npm_publish: [
-        'lt_chrome',
-        'lt_edge',
-        'lt_safari',
-        'lt_firefox'
+        'remote_chrome',
+        'remote_edge',
+        'remote_safari',
+        'remote_firefox'
     ]
 }
 
