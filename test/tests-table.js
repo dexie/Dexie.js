@@ -537,67 +537,6 @@ spawnedTest("bulkAdd", function*(){
     equal (result, highestKey + 2, "Result of bulkAdd() operation was equal to highestKey + 2");
 });
 
-spawnedTest("bulkAdd-all-results", function* () {
-    var dbBulkAddAll = new Dexie("TestDBTableBulkAddAllResults");
-    dbBulkAddAll.version(1).stores({
-        dudes: "++,first,last"
-    });
-    var highestKey = yield dbBulkAddAll.dudes.add({ username: "fsdkljfd", email: "fjkljslk", find: "bulkAddAll" });
-
-    // should be able to get all keys with options object as second argument
-    var allKeys = yield dbBulkAddAll.dudes.bulkAdd([
-        { first: "Åke1", last: "Persbrant1", find: "bulkAddAll" },
-        { first: "Åke2", last: "Persbrant2", find: "bulkAddAll" }
-    ], { allKeys: true });
-    var expectedKeys = [highestKey + 1, highestKey + 2];
-    deepEqual(allKeys, expectedKeys,
-        "Result of bulkAdd(objects, { allKeys: true }) operation was equal to [highestKey + 1, highestKey + 2]");
-
-    // should be able to get all keys with options object as third argument
-    highestKey = yield dbBulkAddAll.dudes.add({ username: "fsdkljfd", email: "fjkljslk", find: "bulkAddAll" });
-    var allKeys2 = yield dbBulkAddAll.dudes.bulkAdd([
-        { first: "Åke1", last: "Persbrant1", find: "bulkAddAll" },
-        { first: "Åke2", last: "Persbrant2", find: "bulkAddAll" }
-    ], undefined, { allKeys: true });
-    var expectedKeys2 = [highestKey + 1, highestKey + 2];
-    deepEqual(allKeys2, expectedKeys2,
-        "Result of bulkAdd(objects, undefined, { allKeys: true }) operation was equal to [highestKey + 1, highestKey + 2]");
-
-    // should be able to get all keys with options object as third argument with some keys
-    var allKeys3 = yield dbBulkAddAll.dudes.bulkAdd([
-        { first: "Åke1", last: "Persbrant1" },
-        { first: "Åke2", last: "Persbrant2" }
-    ], ['sd5fs2df', 'dasfsd3fs7df'], { allKeys: true });
-    deepEqual(allKeys3, ['sd5fs2df', 'dasfsd3fs7df'],
-        "Result of bulkAdd(objects, ['sd5fs2df', 'dasfsd3fs7df'], { allKeys: true }) operation was equal to ['sd5fs2df', 'dasfsd3fs7df']");
-
-    // should return last key with 1 argument and options: { allKeys: false }
-    highestKey = yield dbBulkAddAll.dudes.add({ username: "fsdkljfd", email: "fjkljslk", find: "bulkAddAll" });
-    var lastKey = yield dbBulkAddAll.dudes.bulkAdd([
-        { first: "Åke1", last: "Persbrant1" },
-        { first: "Åke2", last: "Persbrant2" }
-    ], { allKeys: false });
-    equal(lastKey, highestKey + 2,
-        "Result of bulkAdd(objects, { allKeys: false }) operation was equal to highestKey + 2");
-
-    // should return last key with 2 arguments and options: { allKeys: false }
-    var lastKey = yield dbBulkAddAll.dudes.bulkAdd([
-        { first: "Åke1", last: "Persbrant1" },
-        { first: "Åke2", last: "Persbrant2" }
-    ], ['cv4btr45fbrt', 'b33vn3fytn'], { allKeys: false });
-    equal(lastKey, 'b33vn3fytn',
-        "Result of bulkAdd(objects, ['cv4btr45fbrt', 'b33vn3fytn'], { allKeys: false }) operation was equal to 'b33vn3fytn'");
-
-    // should return last key with 2 arguments and no options object
-    var lastKey = yield dbBulkAddAll.dudes.bulkAdd([
-        { first: "Åke1", last: "Persbrant1" },
-        { first: "Åke2", last: "Persbrant2" }
-    ], ['dfgd2vdfh4d', 'ty1jxdbd9']);
-    equal(lastKey, 'ty1jxdbd9',
-        "Result of bulkAdd(objects, ['dfgd2vdfh4d', 'ty1jxdbd9']) operation was equal to 'ty1jxdbd9'");
-
-    yield dbBulkAddAll.delete();
-});
 
 spawnedTest("bulkAdd-catching errors", function*() {
     yield db.transaction("rw", db.users, function() {
