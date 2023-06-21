@@ -23,7 +23,7 @@ module.exports = {
     },
     remote_safari: {
       browserName: "Safari",
-      browserVersion: "16",
+      browserVersion: "15",
       'LT:Options': {
         platformName: 'MacOS Monterey'
       }
