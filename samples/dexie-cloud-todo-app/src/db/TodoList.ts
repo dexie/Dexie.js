@@ -164,9 +164,14 @@ export class TodoList extends Entity<TodoDB> {
         // Delete the list
         db.todoLists.delete(this.id!);
 
-        // Delete any tied realm and related access:
+        // Delete any tied realm and related access.
+        // If it wasn't shared, this is a no-op but do
+        // it anyway to make this operation consistent
+        // in case it was shared by other offline
+        // client and then syncs.
+        // No need to delete members - they will be deleted
+        // automatically when the realm is deleted.
         const tiedRealmId = getTiedRealmId(this.id);
-        db.members.where({ realmId: tiedRealmId }).delete();
         db.realms.delete(tiedRealmId);
       }
     );
