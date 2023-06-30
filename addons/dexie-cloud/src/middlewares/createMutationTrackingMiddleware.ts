@@ -78,6 +78,7 @@ export function createMutationTrackingMiddleware({
           if (mode === 'readwrite') {
             // Give each transaction a globally unique id.
             tx.txid = randomString(16);
+            tx.opCount = 0;
             // Introduce the concept of current user that lasts through the entire transaction.
             // This is important because the tracked mutations must be connected to the user.
             tx.currentUser = currentUserObservable.value;
@@ -197,6 +198,7 @@ export function createMutationTrackingMiddleware({
               currentUser: { userId }
             } = trans;
             const { type } = req;
+            const opNo = ++trans.opCount;
 
             return table.mutate(req).then((res) => {
               const { numFailures: hasFailures, failures } = res;
@@ -214,6 +216,7 @@ export function createMutationTrackingMiddleware({
                   ? {
                       type: 'delete',
                       ts,
+                      opNo,
                       keys,
                       criteria: req.criteria,
                       txid,

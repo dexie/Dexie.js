@@ -9,4 +9,5 @@ export interface TXExpandos {
   disableChangeTracking?: boolean;
   disableAccessControl?: boolean;
   mutationsAdded?: boolean;
+  opCount: number;
 }
