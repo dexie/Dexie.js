@@ -138,7 +138,7 @@ importers:
         specifier: ^4.0.1-alpha.5
         version: link:../..
       dexie-cloud-common:
-        specifier: ^1.0.26
+        specifier: ^1.0.27
         version: link:../../libs/dexie-cloud-common
       rxjs:
         specifier: ^7.x
