@@ -36,7 +36,10 @@ export async function listClientChanges(
   );
 
   // Sort by time to get a true order of the operations (between tables)
-  const sorted = flatten(allMutsOnTables).sort((a, b) => a.mut.ts! - b.mut.ts!);
+  const sorted = flatten(allMutsOnTables).sort((a, b) => a.mut.txid === b.mut.txid
+    ? a.mut.opNo! - b.mut.opNo! // Within same transaction, sort by opNo
+    : a.mut.ts! - b.mut.ts! // Different transactions - sort by timestamp when mutation resolved
+  );
   const result: DBOperationsSet = [];
   let currentEntry: {
     table: string;
