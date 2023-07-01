@@ -226,6 +226,7 @@ export function createMutationTrackingMiddleware({
                   ? {
                       type: 'insert',
                       ts,
+                      opNo,
                       keys,
                       txid,
                       userId,
@@ -236,6 +237,7 @@ export function createMutationTrackingMiddleware({
                       // Common changeSpec for all keys
                       type: 'modify',
                       ts,
+                      opNo,
                       keys,
                       criteria: req.criteria,
                       changeSpec: req.changeSpec,
@@ -247,6 +249,7 @@ export function createMutationTrackingMiddleware({
                       // One changeSpec per key
                       type: 'update',
                       ts,
+                      opNo,
                       keys: updates.keys,
                       changeSpecs: updates.changeSpecs,
                       txid,
@@ -255,6 +258,7 @@ export function createMutationTrackingMiddleware({
                   : {
                       type: 'upsert',
                       ts,
+                      opNo,
                       keys,
                       values,
                       txid,
