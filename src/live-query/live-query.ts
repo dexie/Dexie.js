@@ -27,6 +27,7 @@ export interface LiveQueryContext {
   signal: AbortSignal;
   requery: () => void;
   trans: null | Transaction;
+  querier: Function; // For debugging purposes and Error messages
 }
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
@@ -99,6 +100,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         subscr,
         signal: abortController.signal,
         requery: doQuery,
+        querier,
         trans: null // Make the scope transactionless (don't reuse transaction from outer scope of the caller of subscribe())
       }
       const ret = execute(ctx);

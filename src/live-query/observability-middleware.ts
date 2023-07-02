@@ -37,9 +37,10 @@ export const observabilityMiddleware: Middleware<DBCore> = {
     return {
       ...core,
       transaction: (stores, mode, options) => {
-        if (!PSD.subscr) return core.transaction(stores, mode, options);
-        if (mode !== 'readonly') throw new exceptions.ReadOnly('write transaction not allowed within liveQueries');
-        return core.transaction(stores, mode, options) as IDBTransaction;
+        if (PSD.subscr && mode !== 'readonly') {
+          throw new exceptions.ReadOnly(`Readwrite transaction in liveQuery context. Querier source: ${(PSD as LiveQueryContext).querier}`);
+        }
+        return core.transaction(stores, mode, options);
       },
       table: (tableName) => {
         const table = core.table(tableName);
