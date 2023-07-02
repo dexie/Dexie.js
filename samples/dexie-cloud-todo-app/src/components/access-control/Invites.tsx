@@ -1,3 +1,5 @@
+import { faTrash } from '@fortawesome/free-solid-svg-icons';
+import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { useObservable } from 'react-use';
 import { db } from '../../db';
 
@@ -13,26 +15,40 @@ export function Invites() {
           <th></th>
           <th>Name of list</th>
           <th>Invited by</th>
+          <th></th>
         </tr>
-        {invites.map((i) => (
-          <tr key={i.id}>
+        {invites.map((invite) => (
+          <tr key={invite.id}>
             <td>
-              {i.accepted ? (
-                '✓'
-              ) : i.email === currentUser?.email ? (
-                <button
-                  onClick={() =>
-                    db.members.update(i.id!, { accepted: new Date() })
-                  }
-                >
-                  Accept
-                </button>
-              ) : (
-                ''
-              )}
+              <button
+                onClick={() => {
+                  invite.accept();
+                }}
+                disabled={!!invite.accepted}
+              >
+                {invite.accepted ? 'Accepted' : 'Accept'}
+              </button>
+              <button
+                onClick={() => {
+                  invite.reject();
+                }}
+                disabled={!!invite.rejected}
+              >
+                {invite.rejected ? 'Rejected' : 'Reject'}
+              </button>
             </td>
-            <td>{i.realm?.name}</td>
-            <td>{i.invitedBy?.name}</td>
+            <td>{invite.realm?.name}</td>
+            <td>{invite.invitedBy?.name}</td>
+            <td>
+              {' '}
+              <a style={{cursor: 'pointer',}}
+                onClick={() => {
+                  db.members.delete(invite.id!);
+                }}
+              >
+                <FontAwesomeIcon icon={faTrash} />
+              </a>
+            </td>
           </tr>
         ))}
       </table>
