@@ -9,7 +9,7 @@ export function ResetDatabaseButton() {
       className="large-button"
       onClick={async () => {
         await db.delete();
-        window.location.reload();
+        await db.open();
       }}
     >
       <FontAwesomeIcon icon={faDatabase} /> Factory reset client
