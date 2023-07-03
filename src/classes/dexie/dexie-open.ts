@@ -13,6 +13,10 @@ import { promisableChain, nop } from '../../functions/chaining-functions';
 import { generateMiddlewareStacks } from './generate-middleware-stacks';
 import { slice } from '../../functions/utils';
 import safari14Workaround from 'safari-14-idb-fix';
+import { type ObservabilitySet } from '../../public/types/db-events';
+import { RangeSet } from '../../helpers/rangeset';
+import { DEXIE_STORAGE_MUTATED_EVENT_NAME, globalEvents } from '../../globals/global-events';
+import { signalSubscribersNow } from '../../live-query/cache/signalSubscribers';
 
 export function dexieOpen (db: Dexie) {
   const state = db._state;
@@ -137,11 +141,11 @@ export function dexieOpen (db: Dexie) {
           }
       });
   }).finally(()=>{
-      state.onReadyBeingFired = null;
-      state.isBeingOpened = false;
-  }).then(()=>{
-      // Resolve the db.open() with the db instance.
-      return db;
+      if (state.openCanceller === openCanceller) {
+        // Only modify state if not cancelled in the mean time.
+        state.onReadyBeingFired = null;
+        state.isBeingOpened = false;
+      }
   }).catch(err => {
       state.dbOpenError = err; // Record the error. It will be used to reject further promises of db operations.
       try {
@@ -155,7 +159,29 @@ export function dexieOpen (db: Dexie) {
       }
       return rejection (err);
   }).finally(()=>{
-      state.openComplete = true;
-      resolveDbReady(); // dbReadyPromise is resolved no matter if open() rejects or resolved. It's just to wake up waiters.
+      if (state.openCanceller === openCanceller) {
+        // Our openCanceller is the same as the one that was set when calling db.open().
+        // This means that we weren't cancelled.
+        state.openComplete = true;
+        resolveDbReady(); // dbReadyPromise is resolved no matter if open() rejects or resolved. It's just to wake up waiters.
+      }
+  }).then(()=>{
+    if (wasCreated) {
+      // Propagate full range on primary keys and indexes on all tables now that the DB is ready and opened,
+      // and all upgraders and on('ready') subscribers have run.
+      const everything: ObservabilitySet = {};
+      db.tables.forEach(table => {
+        table.schema.indexes.forEach(idx => {
+          if (idx.name) everything[`idb://${db.name}/${table.name}/${idx.name}`] = new RangeSet(-Infinity, [[[]]]);
+        });
+        everything[`idb://${db.name}/${table.name}/`] = everything[`idb://${db.name}/${table.name}/:dels`] = new RangeSet(-Infinity, [[[]]]);
+      });
+      // Database was created. If another tab had it open when it was deleted and reopened, that tab must be updated now.
+      globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME).fire(everything);
+      // Wipe the cache and trigger optimistic queries:
+      signalSubscribersNow(everything, true);
+    }
+    // Resolve the db.open() with the db instance.
+    return db;
   });
 }
