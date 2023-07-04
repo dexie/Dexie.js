@@ -356,7 +356,7 @@ importers:
         specifier: ^4.0.1-alpha.22
         version: link:../..
       dexie-cloud-addon:
-        specifier: ^4.0.1-beta.40
+        specifier: ^4.0.1-beta.44
         version: link:../../addons/dexie-cloud
       dexie-react-hooks:
         specifier: ^1.1.6
