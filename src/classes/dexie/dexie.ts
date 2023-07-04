@@ -181,7 +181,7 @@ export class Dexie implements IDexie {
         console.warn(`Another connection wants to upgrade database '${this.name}'. Closing db now to resume the upgrade.`);
       else
         console.warn(`Another connection wants to delete database '${this.name}'. Closing db now to resume the delete request.`);
-      this._close();
+      this.close({disableAutoOpen: false});
       this._state.openComplete = false;
       // In many web applications, it would be recommended to force window.reload()
       // when this event occurs. To do that, subscribe to the versionchange event
@@ -307,13 +307,12 @@ export class Dexie implements IDexie {
     state.openCanceller = new Promise((_, reject) => {
       state.cancelOpen = reject;
     });
-    state.dbOpenError = null;
   }
 
-  close(): void {
+  close({disableAutoOpen} = {disableAutoOpen: true}): void {
     this._close();
     const state = this._state;
-    this._options.autoOpen = false;
+    if (disableAutoOpen) this._options.autoOpen = false;
     state.dbOpenError = new exceptions.DatabaseClosed();
     if (state.isBeingOpened)
       state.cancelOpen(state.dbOpenError);
@@ -324,7 +323,7 @@ export class Dexie implements IDexie {
     const state = this._state;
     return new Promise((resolve, reject) => {
       const doDelete = () => {
-        this._close();
+        this.close({disableAutoOpen: false});
         var req = this._deps.indexedDB.deleteDatabase(this.name);
         req.onsuccess = wrap(() => {
           _onDatabaseDeleted(this._deps, this.name);

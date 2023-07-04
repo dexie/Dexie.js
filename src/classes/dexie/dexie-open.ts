@@ -159,12 +159,8 @@ export function dexieOpen (db: Dexie) {
       }
       return rejection (err);
   }).finally(()=>{
-      if (state.openCanceller === openCanceller) {
-        // Our openCanceller is the same as the one that was set when calling db.open().
-        // This means that we weren't cancelled.
-        state.openComplete = true;
-        resolveDbReady(); // dbReadyPromise is resolved no matter if open() rejects or resolved. It's just to wake up waiters.
-      }
+    state.openComplete = true;
+    resolveDbReady(); // dbReadyPromise is resolved no matter if open() rejects or resolved. It's just to wake up waiters.
   }).then(()=>{
     if (wasCreated) {
       // Propagate full range on primary keys and indexes on all tables now that the DB is ready and opened,
