@@ -4,7 +4,9 @@ import {
   DEXIE_STORAGE_MUTATED_EVENT_NAME,
 } from '../globals/global-events';
 import {
+  beginMicroTickScope,
   decrementExpectedAwaits,
+  endMicroTickScope,
   incrementExpectedAwaits,
   newScope,
   PSD,
@@ -36,14 +38,19 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
   const observable = new Observable<T>((observer) => {
     const scopeFuncIsAsync = isAsyncFunction(querier);
     function execute(ctx: LiveQueryContext) {
-      if (scopeFuncIsAsync) {
-        incrementExpectedAwaits();
+      const wasRootExec = beginMicroTickScope(); // Performance: Avoid starting a new microtick scope within the async context.
+      try {
+        if (scopeFuncIsAsync) {
+          incrementExpectedAwaits();
+        }
+        const rv = newScope(querier, ctx);
+        if (scopeFuncIsAsync) {
+          (rv as Promise<any>).finally(decrementExpectedAwaits);
+        }
+        return rv;
+      } finally {
+        wasRootExec && endMicroTickScope(); // Given that we created the microtick scope, we must also end it.
       }
-      const rv = newScope(querier, ctx);
-      if (scopeFuncIsAsync) {
-        (rv as Promise<any>).finally(decrementExpectedAwaits);
-      }
-      return rv;
     }
 
     let closed = false;

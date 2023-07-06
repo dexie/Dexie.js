@@ -1,4 +1,4 @@
-import Dexie from 'dexie';
+import Dexie, { liveQuery } from 'dexie';
 import {module, stop, start, asyncTest, equal, deepEqual, ok} from 'QUnit';
 import {resetDatabase, spawnedTest, promisedTest, supports, isIE, isEdge} from './dexie-unittest-utils';
 
@@ -420,4 +420,58 @@ promisedTest("Issue #1333 - uniqueKeys on virtual index should produce unique re
     await db.metrics.add({ id: "id3", name: "a", time: 3 });
     const result = await db.metrics.orderBy("name").uniqueKeys();
     ok(result.length === 2, `Unexpected array length ${result.length} from uniqueKeys on virtual index, expected 2. Got ${result.join(',')}`);
+});
+
+/** Try to reproduce customer issue where ReadonlyError was thrown when using liveQuery.
+ * This repro is not good enough though as it doesn't fail in dexie@4.0.1-alpha.23.
+ * Probably need to reproduce it in a more complex scenario with
+ * multiple liveQueries and transactions running in parallel.
+ * However, the issue is fixed with this same commit which will be
+ * dexie@4.0.1-alpha.24. It is verified with customer application.
+ * 
+ * Keeping the test in case there will be time to try to improve it later.
+ */
+promisedTest("Issue - ReadonlyError thrown in liveQuery despite user did not do write transactions", async () => {
+    // Encapsulating the code in a string to avoid transpilation. We need native await here to trigger bug.
+    ok(!Promise.PSD, "Must not be within async context when starting");
+    ok(db.isOpen(), "DB must be open when starting");
+    await new Promise(resolve => setTimeout(resolve, 10));
+    const F = new Function('ok', 'equal', 'Dexie', 'db', 'liveQuery', `
+        ok(true, "Got here");
+        return (async ()=>{
+            let physicalTickScheduled = false;
+            const observable = liveQuery(async () => {
+                console.debug("liveQuery executing");
+                //debugger;
+                const result = db.transaction('r', 'metrics', async () => db.metrics.toArray());
+                physicalTickScheduled = true;
+                console.debug("physicalTick executed by toArray");
+                return await result;
+            });
+            const subscription = observable.subscribe({
+                next: function (result) {
+                    ok(true, "Got next result from observable");
+                }
+            });
+            ok(!!physicalTickScheduled, "physicalTick is scheduled at this point");
+            console.debug("liveQuery subscribed. Now doing transaction immediately - it will push to microtickQueue");
+            try {
+                //debugger;
+                //db.transaction('rw', db.metrics, () => {
+                //    const x = Promise.PSD;
+                    await db.metrics.add({ id: "id1", name: "a", time: 1 }).then(() => {
+                        //debugger;
+                        return db.metrics.update("id1", {name: "b"});
+                    });
+                //});
+                console.debug("Transaction succeeded");
+                ok(true, "Successfully executed transaction");
+            } catch (error) {
+                console.debug("Transaction failed");
+                ok(false, 'Failed to execute transaction due to ' + error);
+            }
+            subscription.unsubscribe();
+        })();
+    `);
+    return F(ok, equal, Dexie, db, liveQuery).catch(err => ok(false, 'final catch: '+err));
 });

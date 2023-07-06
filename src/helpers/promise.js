@@ -70,26 +70,9 @@ var stack_being_generated = false;
    db.ready().then() for every operation to make sure the indexedDB event is started in an
    indexedDB-compatible emulated micro task loop.
 */
-var schedulePhysicalTick = resolvedGlobalPromise ?
-    () => {resolvedGlobalPromise.then(physicalTick);}
-    :
-    _global.setImmediate ? 
-        // setImmediate supported. Those modern platforms also supports Function.bind().
-        setImmediate.bind(null, physicalTick) :
-        _global.MutationObserver ?
-            // MutationObserver supported
-            () => {
-                var hiddenDiv = document.createElement("div");
-                (new MutationObserver(() => {
-                    physicalTick();
-                    hiddenDiv = null;
-                })).observe(hiddenDiv, { attributes: true });
-                hiddenDiv.setAttribute('i', '1');
-            } :
-            // No support for setImmediate or MutationObserver. No worry, setTimeout is only called
-            // once time. Every tick that follows will be our emulated micro tick.
-            // Could have uses setTimeout.bind(null, 0, physicalTick) if it wasnt for that FF13 and below has a bug 
-            ()=>{setTimeout(physicalTick,0);};
+function schedulePhysicalTick() {
+    queueMicrotask(physicalTick);
+}
 
 // Configurable through Promise.scheduler.
 // Don't export because it would be unsafe to let unknown
@@ -543,11 +526,15 @@ function linkToPreviousPromise(promise, prev) {
     }
 }
 
-/* The callback to schedule with setImmediate() or setTimeout().
+/* The callback to schedule with queueMicrotask().
    It runs a virtual microtick and executes any callback registered in microtickQueue.
  */
 function physicalTick() {
-    beginMicroTickScope() && endMicroTickScope();
+    usePSD(globalPSD, ()=>{
+        // Make sure to reset the async context to globalPSD before
+        // executing any of the microtick subscribers.
+        beginMicroTickScope() && endMicroTickScope();
+    });
 }
 
 export function beginMicroTickScope() {
@@ -758,7 +745,7 @@ function switchToZone (targetZone, bEnteringZone) {
     if (bEnteringZone ? task.echoes && (!zoneEchoes++ || targetZone !== PSD) : zoneEchoes && (!--zoneEchoes || targetZone !== PSD)) {
         // Enter or leave zone asynchronically as well, so that tasks initiated during current tick
         // will be surrounded by the zone when they are invoked.
-        enqueueNativeMicroTask(bEnteringZone ? zoneEnterEcho.bind(null, targetZone) : zoneLeaveEcho);
+        queueMicrotask(bEnteringZone ? zoneEnterEcho.bind(null, targetZone) : zoneLeaveEcho);
     }
     if (targetZone === PSD) return;
 
@@ -822,13 +809,6 @@ export function usePSD (psd, fn, a1, a2, a3) {
     }
 }
 
-function enqueueNativeMicroTask (job) {
-    //
-    // Precondition: nativePromiseThen !== undefined
-    //
-    nativePromiseThen.call(resolvedNativePromise, job);
-}
-
 function nativeAwaitCompatibleWrap(fn, zone, possibleAwait, cleanup) {
     return typeof fn !== 'function' ? fn : function () {
         var outerZone = PSD;
@@ -838,7 +818,7 @@ function nativeAwaitCompatibleWrap(fn, zone, possibleAwait, cleanup) {
             return fn.apply(this, arguments);
         } finally {
             switchToZone(outerZone, false);
-            if (cleanup) enqueueNativeMicroTask(decrementExpectedAwaits);
+            if (cleanup) queueMicrotask(decrementExpectedAwaits);
         }
     };
 }
