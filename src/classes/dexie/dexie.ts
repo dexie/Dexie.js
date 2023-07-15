@@ -200,11 +200,11 @@ export class Dexie implements IDexie {
 
     this._maxKey = getMaxKey(options.IDBKeyRange as typeof IDBKeyRange);
 
-    this._createTransaction = function (
+    this._createTransaction = (
       mode: IDBTransactionMode,
       storeNames: string[],
       dbschema: DbSchema,
-      parentTransaction?: Transaction) { return new this.Transaction(mode, storeNames, dbschema, this._options.chromeTransactionDurability, parentTransaction) };
+      parentTransaction?: Transaction) => new this.Transaction(mode, storeNames, dbschema, this._options.chromeTransactionDurability, parentTransaction);
 
     this._fireOnBlocked = ev => {
       this.on("blocked").fire(ev);
