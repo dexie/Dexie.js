@@ -92,10 +92,11 @@ export function enterTransactionScope(
     }, zoneProps);
     return (returnValue && typeof returnValue.then === 'function' ?
       // Promise returned. User uses promise-style transactions.
-      Promise.resolve(returnValue).then(x => trans.active ?
-        x // Transaction still active. Continue.
-        : rejection(new exceptions.PrematureCommit(
-          "Transaction committed too early. See http://bit.ly/2kdckMn")))
+      Promise.resolve(returnValue).then(x => {
+        if (trans.active) return x; // Transaction still active. Continue.
+        throw new exceptions.PrematureCommit(
+          "Transaction committed too early. See http://bit.ly/2kdckMn");
+      })
       // No promise returned. Wait for all outstanding promises before continuing. 
       : promiseFollowed.then(() => returnValue)
     ).then(x => {
