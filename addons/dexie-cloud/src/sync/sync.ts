@@ -108,7 +108,7 @@ export function sync(
       });
       db.syncStateChangedEvent.next({
         phase: isOnline ? 'error' : 'offline',
-        error,
+        error: new Error('' + error?.message || error),
       });
       return Promise.reject(error);
     });
