@@ -4881,9 +4881,9 @@ dexie-react-hooks@^1.1.6:
   integrity sha512-xSblWtmPwhafWNWMECsW7zMMmBu8goH3QqTxEfwBNoNG1mgsM0oFclippev7ss9HhKICqBwTjgqpscci5Ed4mA==
 
 dexie@^4.0.1-alpha.22:
-  version "4.0.1-alpha.23"
-  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.1-alpha.23.tgz#3d9cca4385459364535dc4e4c5fcbdb5bf58657b"
-  integrity sha512-zSK0TqDjXtXixYYCOStIdCqz0NFxj0Ioe+dbqMz1W8iG2esIrmRvOC5I/uZkwskmxpPAmZ2nKZcszKJHmDHEtw==
+  version "4.0.1-alpha.25"
+  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.1-alpha.25.tgz#e3bb44db249382c3d546b6f04f6fe1005836e672"
+  integrity sha512-udAExYYfJaC6IzVC+ygHdlWYoYxhwYHtiITkthGgSH7dh2FBk3qqDGkJ/Mn2lfxsmATcq9qJDUjyO7yWOo/ZPA==
 
 didyoumean@^1.2.2:
   version "1.2.2"
