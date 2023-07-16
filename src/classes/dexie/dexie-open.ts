@@ -79,7 +79,7 @@ export function dexieOpen (db: Dexie) {
               upgradeTransaction.onerror = eventRejectHandler(reject);
               var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
               wasCreated = oldVer < 1;
-              db._novip.idbdb = req.result;// db._novip is because db can be an Object.create(origDb).
+              db.idbdb = req.result;
               runUpgraders(db, oldVer / 10, upgradeTransaction, reject);
           }
       }, reject);
@@ -87,7 +87,7 @@ export function dexieOpen (db: Dexie) {
       req.onsuccess = wrap (() => {
           // Core opening procedure complete. Now let's just record some stuff.
           upgradeTransaction = null;
-          const idbdb = db._novip.idbdb = req.result; // db._novip is because db can be an Object.create(origDb).
+          const idbdb = db.idbdb = req.result;
 
           const objectStoreNames = slice(idbdb.objectStoreNames);
           if (objectStoreNames.length > 0) try {

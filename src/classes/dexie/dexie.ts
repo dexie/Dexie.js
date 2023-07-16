@@ -45,6 +45,7 @@ import { IndexableType } from '../../public';
 import { observabilityMiddleware } from '../../live-query/observability-middleware';
 import { cacheExistingValuesMiddleware } from '../../dbcore/cache-existing-values-middleware';
 import { cacheMiddleware } from "../../live-query/cache/cache-middleware";
+import { vipify } from "../../helpers/vipify";
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -220,7 +221,21 @@ export class Dexie implements IDexie {
     this.use(virtualIndexMiddleware);
     this.use(hooksMiddleware);
 
-    this.vip = Object.create(this, {_vip: {value: true}}) as Dexie;
+    const vipDB = new Proxy(this, {
+      get: (_, prop, receiver) => {
+        if (prop === '_vip') return true;
+        if (prop === 'table') return (tableName: string) => vipify(this.table(tableName), vipDB);
+        const rv = Reflect.get(_, prop, receiver);
+        if (rv instanceof Table) return vipify(rv, vipDB);
+        if (prop === 'tables') return (rv as Table[]).map(t => vipify(t, vipDB));
+        if (prop === '_createTransaction') return function() {
+          const tx: Transaction = (rv as typeof this._createTransaction).apply(this, arguments);
+          return vipify(tx, vipDB);
+        }
+        return rv;
+      }
+    });
+    this.vip = vipDB;
 
     // Call each addon:
     addons.forEach(addon => addon(this));
@@ -298,7 +313,7 @@ export class Dexie implements IDexie {
     if (idx >= 0) connections.splice(idx, 1);
     if (this.idbdb) {
       try { this.idbdb.close(); } catch (e) { }
-      this._novip.idbdb = null; // db._novip is because db can be an Object.create(origDb).
+      this.idbdb = null;
     }    
     // Reset dbReadyPromise promise:
     state.dbReadyPromise = new Promise(resolve => {
