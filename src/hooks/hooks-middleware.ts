@@ -71,7 +71,7 @@ export const hooksMiddleware: Middleware<DBCore>  = {
                 if (req.type === 'delete') {
                   // delete operation
                   deleting.fire.call(ctx, key, existingValue, dxTrans);
-                } else if (req.type === 'add' || existingValue === undefined) {
+                } else if (req.type === 'add' || existingValue == undefined) {
                   // The add() or put() resulted in a create
                   const generatedPrimaryKey = creating.fire.call(ctx, key, req.values[i], dxTrans);
                   if (key == null && generatedPrimaryKey != null) {

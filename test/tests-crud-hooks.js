@@ -849,3 +849,19 @@ promisedTest("issue #1270 Modification object in updating hook not correct when 
         await db.table1.put({id:1, author: {buf: buffer2}});
     }));
 });
+
+promisedTest("issue #1734 Cannot convert undefined or null to object in hooksMiddleware", async ()=>{
+    // Test recovering from null object
+    await expect([{
+        op: "create",
+        key: 1,
+        value: null
+    },{
+        op: "create",
+        key: 1,
+        value: {}
+    }], () => db.transaction('rw', db.table5, async ()=>{
+        await db.table5.put(null, 1);
+        await db.table5.put({}, 1);
+    }));
+});
