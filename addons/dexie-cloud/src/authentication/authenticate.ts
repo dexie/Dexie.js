@@ -118,6 +118,17 @@ export async function refreshAccessToken(
   login.accessTokenExpiration = response.accessTokenExpiration
     ? new Date(response.accessTokenExpiration)
     : undefined;
+  login.claims = response.claims;
+  login.license = {
+    type: response.userType,
+    status: response.claims.license,
+  }
+  if (response.evalDaysLeft != null) {
+    login.license.evalDaysLeft = response.evalDaysLeft;
+  }
+  if (response.userValidUntil != null) {
+    login.license.validUntil = new Date(response.userValidUntil);
+  }
   return login;
 }
 
@@ -174,6 +185,16 @@ async function userAuthenticate(
     context.email = response2.claims.email;
     context.name = response2.claims.name;
     context.claims = response2.claims;
+    context.license = {
+      type: response2.userType,
+      status: response2.claims.license,
+    }
+    if (response2.evalDaysLeft != null) {
+      context.license.evalDaysLeft = response2.evalDaysLeft;
+    }
+    if (response2.userValidUntil != null) {
+      context.license.validUntil = new Date(response2.userValidUntil);
+    }
 
     if (response2.alerts && response2.alerts.length > 0) {
       await interactWithUser(userInteraction, {

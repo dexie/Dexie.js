@@ -50,12 +50,16 @@ export interface TokenFinalResponse {
   type: 'tokens';
   claims: {
     sub: string;
+    license: 'ok' | 'expired' | 'deactivated';
     [claimName: string]: any;
   };
   accessToken: string;
   accessTokenExpiration: number;
   refreshToken?: string;
   refreshTokenExpiration?: number | null;
+  userType: 'demo' | 'eval' | 'prod';
+  evalDaysLeft?: number;
+  userValidUntil?: number;
   alerts?: {
     type: 'warning' | 'info';
     messageCode: string;
