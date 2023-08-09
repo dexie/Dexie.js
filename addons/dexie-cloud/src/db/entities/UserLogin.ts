@@ -7,7 +7,7 @@ export interface UserLogin {
   claims: {
     [claimName: string]: any;
   }
-  license: {
+  license?: {
     type: 'demo' | 'eval' | 'prod';
     status: 'ok' | 'expired' | 'deactivated';
     validUntil?: Date;
