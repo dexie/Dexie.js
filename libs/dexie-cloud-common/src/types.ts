@@ -50,14 +50,14 @@ export interface TokenFinalResponse {
   type: 'tokens';
   claims: {
     sub: string;
-    license: 'ok' | 'expired' | 'deactivated';
+    license?: 'ok' | 'expired' | 'deactivated';
     [claimName: string]: any;
   };
   accessToken: string;
   accessTokenExpiration: number;
   refreshToken?: string;
   refreshTokenExpiration?: number | null;
-  userType: 'demo' | 'eval' | 'prod';
+  userType: 'demo' | 'eval' | 'prod' | 'client';
   evalDaysLeft?: number;
   userValidUntil?: number;
   alerts?: {
