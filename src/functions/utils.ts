@@ -113,7 +113,7 @@ export function tryCatch(fn: (...args: any[])=>void, onerror, args?) : void {
 
 export function getByKeyPath(obj, keyPath) {
     // http://www.w3.org/TR/IndexedDB/#steps-for-extracting-a-key-from-a-value-using-a-key-path
-    if (hasOwn(obj, keyPath)) return obj[keyPath]; // This line is moved from last to first for optimization purpose.
+    if (typeof keyPath === 'string' && hasOwn(obj, keyPath)) return obj[keyPath]; // This line is moved from last to first for optimization purpose.
     if (!keyPath) return obj;
     if (typeof keyPath !== 'string') {
         var rv = [];
