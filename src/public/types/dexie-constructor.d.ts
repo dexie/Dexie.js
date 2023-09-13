@@ -55,7 +55,7 @@ export interface DexieConstructor extends DexieExceptionClasses {
   dependencies: DexieDOMDependencies;
   default: Dexie; // Work-around for different build tools handling default imports differently.
   cache: GlobalQueryCache;
-  debug: boolean | 'dexie';
+  debug: false | true | 'dexie';
 
   Promise: PromiseExtendedConstructor;
   //TableSchema: {}; // Deprecate!
