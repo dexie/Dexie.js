@@ -68,13 +68,13 @@
       "just-build dexie-cloud service-worker",
       "#dts-bundle-generator --external-inlines=dexie-cloud-common --external-imports=rxjs dexie --project src/tsconfig.json -o dist/types/dexie-cloud-addon.d.ts tools/tmp/modern/dexie-cloud-client.d.ts",
       "# Minify modern bundle",
-      "terser --comments false --compress --mangle --module --source-map url=dexie-cloud-addon.min.js.map -o dist/modern/dexie-cloud-addon.min.js -- dist/modern/dexie-cloud-addon.js",
+      "terser --comments false --module --config-file tools/build-configs/terser-config.json --source-map url=dexie-cloud-addon.min.js.map -o dist/modern/dexie-cloud-addon.min.js -- dist/modern/dexie-cloud-addon.js",
       "# Minify umd bundle",
-      "terser --comments false --compress --mangle --source-map url=dexie-cloud-addon.min.js.map -o dist/umd/dexie-cloud-addon.min.js -- dist/umd/dexie-cloud-addon.js",
+      "terser --comments false --config-file tools/build-configs/terser-config.json --source-map url=dexie-cloud-addon.min.js.map -o dist/umd/dexie-cloud-addon.min.js -- dist/umd/dexie-cloud-addon.js",
       "# Minify modern service-worker",
-      "terser --comments false --compress --mangle --module --source-map url=service-worker.min.js.map -o dist/modern/service-worker.min.js -- dist/modern/service-worker.js",
+      "terser --comments false --module --config-file tools/build-configs/terser-config.json --source-map url=service-worker.min.js.map -o dist/modern/service-worker.min.js -- dist/modern/service-worker.js",
       "# Minify umd service-worker",
-      "terser --comments false --compress --mangle --source-map url=service-worker.min.js.map -o dist/umd/service-worker.min.js -- dist/umd/service-worker.js"
+      "terser --comments false --config-file tools/build-configs/terser-config.json --source-map url=service-worker.min.js.map -o dist/umd/service-worker.min.js -- dist/umd/service-worker.js"
     ],
     "src": [
       "# Build the entire typescript source into modern JS",
@@ -121,6 +121,7 @@
     "rollup-plugin-dts": "^4.0.1",
     "rollup-plugin-node-resolve": "*",
     "rollup-plugin-sourcemaps": "*",
+    "terser": "^5.20.0",
     "tslib": "*",
     "typescript": "^4.9.4"
   },
