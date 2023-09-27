@@ -51,7 +51,7 @@ export async function loadAccessToken(
   await db.table('$logins').update(claims.sub, {
     accessToken: refreshedLogin.accessToken,
     accessTokenExpiration: refreshedLogin.accessTokenExpiration,
-    license: refreshedLogin.license
+    license: refreshedLogin.license,
   });
   return refreshedLogin;
 }
