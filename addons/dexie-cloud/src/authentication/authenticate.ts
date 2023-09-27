@@ -1,5 +1,7 @@
+import Dexie from 'dexie';
 import type {
   RefreshTokenRequest,
+  TokenErrorResponse,
   TokenFinalResponse,
 } from 'dexie-cloud-common';
 import { b64encode } from 'dreambase-library/dist/common/base64';
@@ -11,12 +13,13 @@ import {
   DXCMessageAlert,
   DXCUserInteraction,
 } from '../types/DXCUserInteraction';
+import { TokenErrorResponseError } from './TokenErrorResponseError';
 import { alertUser, interactWithUser } from './interactWithUser';
 
 export type FetchTokenCallback = (tokenParams: {
   public_key: string;
   hints?: { userId?: string; email?: string; grant_type?: string };
-}) => Promise<TokenFinalResponse>;
+}) => Promise<TokenFinalResponse | TokenErrorResponse>;
 
 export async function loadAccessToken(
   db: DexieCloudDB
@@ -121,7 +124,7 @@ export async function refreshAccessToken(
   login.claims = response.claims;
   login.license = {
     type: response.userType,
-    status: response.claims.license,
+    status: response.claims.license || 'ok'
   }
   if (response.evalDaysLeft != null) {
     login.license.evalDaysLeft = response.evalDaysLeft;
@@ -168,9 +171,13 @@ async function userAuthenticate(
       hints,
     });
 
+    if (response2.type === 'error') {
+      throw new TokenErrorResponseError(response2);
+    }
+
     if (response2.type !== 'tokens')
       throw new Error(
-        `Unexpected response type from token endpoint: ${response2.type}`
+        `Unexpected response type from token endpoint: ${(response2 as any).type}`
       );
 
     context.accessToken = response2.accessToken;
@@ -187,7 +194,7 @@ async function userAuthenticate(
     context.claims = response2.claims;
     context.license = {
       type: response2.userType,
-      status: response2.claims.license,
+      status: response2.claims.license || 'ok',
     }
     if (response2.evalDaysLeft != null) {
       context.license.evalDaysLeft = response2.evalDaysLeft;
@@ -206,10 +213,33 @@ async function userAuthenticate(
     }
     return context;
   } catch (error) {
+    if (error instanceof TokenErrorResponseError) {
+      await alertUser(userInteraction, error.title, {
+        type: 'error',
+        messageCode: error.messageCode,
+        message: error.message,
+        messageParams: {},
+      });
+      throw error;
+    }
+    let message = `We're having a problem authenticating right now.`;
+    console.error (`Error authenticating`, error);
+    if (error instanceof TypeError) {
+      const isOffline = typeof navigator !== undefined && !navigator.onLine;
+      if (isOffline) {
+        message = `You seem to be offline. Please connect to the internet and try again.`;
+      } else if (Dexie.debug || (typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1'))) {
+        // The audience is most likely the developer. Suggest to whitelist the localhost origin:
+        message = `Could not connect to server. Please verify that your origin '${location.origin}' is whitelisted using \`npx dexie-cloud whitelist\``;
+      } else {
+        message = `Could not connect to server. Please verify the connection.`;
+      }
+    }
+
     await alertUser(userInteraction, 'Authentication Failed', {
       type: 'error',
       messageCode: 'GENERIC_ERROR',
-      message: `We're having a problem authenticating right now.`,
+      message,
       messageParams: {},
     }).catch(() => {});
     throw error;

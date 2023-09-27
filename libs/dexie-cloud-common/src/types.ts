@@ -73,6 +73,18 @@ export interface TokenOtpSentResponse {
   otp_id: string;
 }
 
+export interface TokenErrorResponse {
+  type: 'error';
+  title: string;
+  messageCode:
+    | 'INVALID_OTP'
+    | 'INVALID_EMAIL'
+    | 'LICENSE_LIMIT_REACHED'
+    | 'GENERIC_ERROR';
+  message: string;
+  messageParams?: { [param: string]: string };
+}
+
 /** Can be returned when grant_type="refresh_token" if the given time_stamp differs too much
  * from server time. Will happen if the client's clock differs too much from the server.
  * Client should then retry the token request using grant_type="refresh_token" again but
@@ -87,6 +99,7 @@ export interface TokenResponseInvalidTimestamp {
 export type TokenResponse =
   | TokenFinalResponse
   | TokenOtpSentResponse
+  | TokenErrorResponse
   | TokenResponseInvalidTimestamp;
 export interface CreateDbResponse {
   url: string;

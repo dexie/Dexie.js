@@ -8,7 +8,7 @@ export interface UserLogin {
     [claimName: string]: any;
   }
   license?: {
-    type: 'demo' | 'eval' | 'prod';
+    type: 'demo' | 'eval' | 'prod' | 'client';
     status: 'ok' | 'expired' | 'deactivated';
     validUntil?: Date;
     evalDaysLeft?: number;

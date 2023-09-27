@@ -26,7 +26,7 @@ export interface DXCEmailPrompt {
       placeholder: string;
     };
   };
-  onSubmit: (params: { email: string }) => void;
+  onSubmit: (params: { email: string } | { [paramName: string]: string }) => void;
   onCancel: () => void;
 }
 
@@ -38,9 +38,9 @@ export interface DXCOTPPrompt {
     otp: {
       type: 'text';
       label: string;
-    };
+    }
   };
-  onSubmit: (params: { otp: string }) => void;
+  onSubmit: (params: { otp: string } | { [paramName: string]: string }) => void;
   onCancel: () => void;
 }
 
@@ -48,7 +48,9 @@ export interface DXCMessageAlert {
   type: 'message-alert';
   title: string;
   alerts: DXCAlert[];
-  fields: {};
+  fields: {
+    [name: string]: DXCInputField;
+  };
   onSubmit: (params: { [paramName: string]: string }) => void;
   onCancel: () => void;
 }

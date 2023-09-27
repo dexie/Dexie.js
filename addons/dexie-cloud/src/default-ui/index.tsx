@@ -1,12 +1,9 @@
 import Dexie from "dexie";
 import "../extend-dexie-interface";
 import { h, Component } from "preact";
-import { from, Observer, Subscription } from "rxjs";
+import { from, Subscription } from "rxjs";
 import { LoginDialog } from './LoginDialog';
-import { Styles } from "./Styles";
-import { DXCGenericUserInteraction, DXCUserInteraction } from "../types/DXCUserInteraction";
-import { DXCInputField } from "../types/DXCInputField";
-import { DexieCloudDB } from "../db/DexieCloudDB";
+import { DXCUserInteraction } from "../types/DXCUserInteraction";
 import * as preact from "preact";
 
 export interface Props {
@@ -40,7 +37,7 @@ export default class LoginGui extends Component<Props, State> {
   render(props: Props, {userInteraction}: State) {
     if (!userInteraction) return null;
     //if (props.db.cloud.userInteraction.observers.length > 1) return null; // Someone else subscribes.
-    return <LoginDialog {...userInteraction as DXCGenericUserInteraction<string, {[name: string]: DXCInputField}>} />;
+    return <LoginDialog {...userInteraction} />;
   }
 }
 
@@ -70,9 +67,3 @@ export function setupDefaultGUI(db: Dexie) {
     }
   }
 }
-
-// TODO:
-/*
-    * Gjort klart allt kring user interaction förutom att mounta default-ui på ett element.
-    * Också att kolla först om nån annan subscribar och i så fall inte göra nåt.
-*/

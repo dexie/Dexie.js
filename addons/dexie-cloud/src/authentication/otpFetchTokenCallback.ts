@@ -1,4 +1,5 @@
 import {
+  TokenErrorResponse,
   TokenFinalResponse,
   TokenRequest,
   TokenResponse,
@@ -55,8 +56,9 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       throw new HttpError(res1, errMsg);
     }
     const response: TokenResponse = await res1.json();
-    if (response.type === 'tokens') {
+    if (response.type === 'tokens' || response.type === 'error') {
       // Demo user request can get a "tokens" response right away
+      // Error can also be returned right away.
       return response;
     } else if (tokenRequest.grant_type === 'otp') {
       if (response.type !== 'otp-sent')
@@ -96,7 +98,7 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         }).catch(()=>{});
         throw new HttpError(res2, errMsg);
       }
-      const response2: TokenFinalResponse = await res2.json();
+      const response2: TokenFinalResponse | TokenErrorResponse = await res2.json();
       return response2;
     } else {
       throw new Error(`Unexpected response from ${url}/token`);
