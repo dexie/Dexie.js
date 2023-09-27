@@ -32,7 +32,18 @@ export async function syncWithServer(
     Accept: 'application/json, application/x-bison, application/x-bison-stream',
     'Content-Type': 'application/tson'
   };
-  const accessToken = await loadAccessToken(db);
+  const updatedUser = await loadAccessToken(db);
+  if (updatedUser) {
+    if (updatedUser.license && updatedUser.license.status === 'expired') {
+      throw new Error(
+        `License has expired`
+      );
+    }
+    if (updatedUser.license && updatedUser.license.status === 'deactivated') {
+      throw new Error(`License deactivated`);
+    }
+  }
+  const accessToken = updatedUser?.accessToken;
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }

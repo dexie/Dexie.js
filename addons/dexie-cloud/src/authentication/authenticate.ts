@@ -23,7 +23,7 @@ export type FetchTokenCallback = (tokenParams: {
 
 export async function loadAccessToken(
   db: DexieCloudDB
-): Promise<string | undefined> {
+): Promise<UserLogin | null> {
   const currentUser = await db.getCurrentUser();
   const {
     accessToken,
@@ -32,10 +32,10 @@ export async function loadAccessToken(
     refreshTokenExpiration,
     claims,
   } = currentUser;
-  if (!accessToken) return;
+  if (!accessToken) return null;
   const expTime = accessTokenExpiration?.getTime() ?? Infinity;
   if (expTime > Date.now()) {
-    return accessToken;
+    return currentUser;
   }
   if (!refreshToken) {
     throw new Error(`Refresh token missing`);
@@ -51,8 +51,9 @@ export async function loadAccessToken(
   await db.table('$logins').update(claims.sub, {
     accessToken: refreshedLogin.accessToken,
     accessTokenExpiration: refreshedLogin.accessTokenExpiration,
+    license: refreshedLogin.license
   });
-  return refreshedLogin.accessToken;
+  return refreshedLogin;
 }
 
 export async function authenticate(
@@ -116,7 +117,10 @@ export async function refreshAccessToken(
   });
   if (res.status !== 200)
     throw new Error(`RefreshToken: Status ${res.status} from ${url}/token`);
-  const response: TokenFinalResponse = await res.json();
+  const response: TokenFinalResponse | TokenErrorResponse = await res.json();
+  if (response.type === 'error') {
+    throw new TokenErrorResponseError(response);
+  }
   login.accessToken = response.accessToken;
   login.accessTokenExpiration = response.accessTokenExpiration
     ? new Date(response.accessTokenExpiration)
@@ -124,7 +128,7 @@ export async function refreshAccessToken(
   login.claims = response.claims;
   login.license = {
     type: response.userType,
-    status: response.claims.license || 'ok'
+    status: response.claims.license || 'ok',
   }
   if (response.evalDaysLeft != null) {
     login.license.evalDaysLeft = response.evalDaysLeft;
