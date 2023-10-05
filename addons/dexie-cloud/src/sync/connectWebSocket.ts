@@ -24,7 +24,7 @@ import {
   WSConnectionMsg,
   WSObservable,
 } from '../WSObservable';
-import { InvalidLicenseError } from './InvalidLicenseError';
+import { InvalidLicenseError } from '../InvalidLicenseError';
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -70,9 +70,9 @@ export function connectWebSocket(db: DexieCloudDB) {
         )
       ),
       switchMap(([userLogin, syncState]) => {
-        if (userLogin.license?.status && userLogin.license.status !== 'ok') {
+        /*if (userLogin.license?.status && userLogin.license.status !== 'ok') {
           throw new InvalidLicenseError();
-        }
+        }*/
         return userIsReallyActive.pipe(
           map((isActive) => [isActive ? userLogin : null, syncState] as const)
         );
@@ -130,6 +130,8 @@ export function connectWebSocket(db: DexieCloudDB) {
               await db.table('$logins').update(user.userId, {
                 accessToken: refreshedLogin.accessToken,
                 accessTokenExpiration: refreshedLogin.accessTokenExpiration,
+                claims: refreshedLogin.claims,
+                license: refreshedLogin.license,
               });
             }),
             switchMap(() => createObservable())

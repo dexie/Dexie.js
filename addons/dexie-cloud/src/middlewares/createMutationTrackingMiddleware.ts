@@ -6,7 +6,7 @@ import {
   DBCorePutRequest,
   DBCoreTable,
   DBCoreTransaction,
-  Middleware
+  Middleware,
 } from 'dexie';
 import { DBOperation } from 'dexie-cloud-common';
 import { BehaviorSubject } from 'rxjs';
@@ -35,7 +35,7 @@ export interface MutationTrackingMiddlewareArgs {
  */
 export function createMutationTrackingMiddleware({
   currentUserObservable,
-  db
+  db,
 }: MutationTrackingMiddlewareArgs): Middleware<DBCore> {
   return {
     stack: 'dbcore',
@@ -50,7 +50,7 @@ export function createMutationTrackingMiddleware({
         mutTableMap = new Map(
           ordinaryTables.map((tbl) => [
             tbl.name,
-            core.table(`$${tbl.name}_mutations`)
+            core.table(`$${tbl.name}_mutations`),
           ])
         );
       } catch {
@@ -92,12 +92,16 @@ export function createMutationTrackingMiddleware({
               outstandingTransactions.next(outstandingTransactions.value);
             };
             const txComplete = () => {
-              if (tx.mutationsAdded && db.cloud.options?.databaseUrl) {
+              if (
+                tx.mutationsAdded &&
+                db.cloud.options?.databaseUrl &&
+                (db.cloud.currentUser.value.license?.status || 'ok') === 'ok'
+              ) {
                 if (db.cloud.usingServiceWorker) {
                   console.debug('registering sync event');
-                  registerSyncEvent(db, "push");
+                  registerSyncEvent(db, 'push');
                 } else {
-                  db.localSyncEvent.next({purpose: "push"});
+                  db.localSyncEvent.next({ purpose: 'push' });
                 }
               }
               removeTransaction();
@@ -125,7 +129,7 @@ export function createMutationTrackingMiddleware({
                     ).mutationsAdded = true;
                   }
                   return table.mutate(req);
-                }
+                },
               };
             } else if (tableName === '$logins') {
               return {
@@ -146,7 +150,7 @@ export function createMutationTrackingMiddleware({
                       console.debug('Failed mutation $logins', err);
                       return Promise.reject(err);
                     });
-                }
+                },
               };
             } else {
               return table;
@@ -160,7 +164,8 @@ export function createMutationTrackingMiddleware({
               const trans = req.trans as DBCoreTransaction & TXExpandos;
               if (!trans.txid) return table.mutate(req); // Upgrade transactions not guarded by us.
               if (trans.disableChangeTracking) return table.mutate(req);
-              if (!db.cloud.schema?.[tableName]?.markedForSync) return table.mutate(req);
+              if (!db.cloud.schema?.[tableName]?.markedForSync)
+                return table.mutate(req);
               if (!trans.currentUser?.isLoggedIn) {
                 // Unauthorized user should not log mutations.
                 // Instead, after login all local data should be logged at once.
@@ -173,7 +178,7 @@ export function createMutationTrackingMiddleware({
                     .query({
                       query: { range: req.range, index: schema.primaryKey },
                       trans: req.trans,
-                      values: false
+                      values: false,
                     })
                     // Do a delete request instead, but keep the criteria info for the server to execute
                     .then((res) => {
@@ -181,11 +186,11 @@ export function createMutationTrackingMiddleware({
                         type: 'delete',
                         keys: res.result,
                         trans: req.trans,
-                        criteria: { index: null, range: req.range }
+                        criteria: { index: null, range: req.range },
                       });
                     })
                 : mutateAndLog(req);
-            }
+            },
           });
 
           function mutateAndLog(
@@ -195,7 +200,7 @@ export function createMutationTrackingMiddleware({
             trans.mutationsAdded = true;
             const {
               txid,
-              currentUser: { userId }
+              currentUser: { userId },
             } = trans;
             const { type } = req;
             const opNo = ++trans.opCount;
@@ -220,7 +225,7 @@ export function createMutationTrackingMiddleware({
                       keys,
                       criteria: req.criteria,
                       txid,
-                      userId
+                      userId,
                     }
                   : req.type === 'add'
                   ? {
@@ -230,7 +235,7 @@ export function createMutationTrackingMiddleware({
                       keys,
                       txid,
                       userId,
-                      values
+                      values,
                     }
                   : req.criteria && req.changeSpec
                   ? {
@@ -242,7 +247,7 @@ export function createMutationTrackingMiddleware({
                       criteria: req.criteria,
                       changeSpec: req.changeSpec,
                       txid,
-                      userId
+                      userId,
                     }
                   : updates
                   ? {
@@ -253,7 +258,7 @@ export function createMutationTrackingMiddleware({
                       keys: updates.keys,
                       changeSpecs: updates.changeSpecs,
                       txid,
-                      userId
+                      userId,
                     }
                   : {
                       type: 'upsert',
@@ -262,7 +267,7 @@ export function createMutationTrackingMiddleware({
                       keys,
                       values,
                       txid,
-                      userId
+                      userId,
                     };
               return keys.length > 0 || ('criteria' in req && req.criteria)
                 ? mutsTable
@@ -271,8 +276,8 @@ export function createMutationTrackingMiddleware({
                 : res;
             });
           }
-        }
+        },
       };
-    }
+    },
   };
 }

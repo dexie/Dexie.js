@@ -10,30 +10,28 @@ export interface DXCUserInteractionRequest {
   type: DXCUserInteraction['type'];
   title: string;
   alerts: DXCAlert[];
+  submitLabel?: string;
+  cancelLabel?: string | null;
   fields: { [name: string]: DXCInputField };
 }
 
 export function interactWithUser<T extends DXCUserInteractionRequest>(
   userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
   req: T
-): Promise<
-  {
-    [P in keyof T['fields']]: string;
-  }
-> {
+): Promise<{
+  [P in keyof T['fields']]: string;
+}> {
   let done = false;
-  return new Promise<
-    {
-      [P in keyof T['fields']]: string;
-    }
-  >((resolve, reject) => {
+  return new Promise<{
+    [P in keyof T['fields']]: string;
+  }>((resolve, reject) => {
     const interactionProps = {
+      submitLabel: 'Submit',
+      cancelLabel: 'Cancel',
       ...req,
-      onSubmit: (
-        res: {
-          [P in keyof T['fields']]: string;
-        }
-      ) => {
+      onSubmit: (res: {
+        [P in keyof T['fields']]: string;
+      }) => {
         userInteraction.next(undefined);
         done = true;
         resolve(res);
@@ -41,7 +39,7 @@ export function interactWithUser<T extends DXCUserInteractionRequest>(
       onCancel: () => {
         userInteraction.next(undefined);
         done = true;
-        reject(new Dexie.AbortError("User cancelled"));
+        reject(new Dexie.AbortError('User cancelled'));
       },
     } as DXCUserInteraction;
     userInteraction.next(interactionProps);
@@ -66,7 +64,9 @@ export function alertUser(
     type: 'message-alert',
     title,
     alerts,
-    fields: {}
+    fields: {},
+    submitLabel: 'OK',
+    cancelLabel: null,
   });
 }
 
@@ -132,4 +132,33 @@ export async function promptForOTP(
     },
   });
   return otp;
+}
+
+export async function confirmLogout(
+  userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
+  currentUserId: string,
+  numUnsyncedChanges: number
+) {
+  const alerts: DXCAlert[] = [
+    {
+      type: 'warning',
+      messageCode: 'LOGOUT_CONFIRMATION',
+      message: `{numUnsyncedChanges} unsynced changes will get lost!
+                Logout anyway?`,
+      messageParams: {
+        currentUserId,
+        numUnsyncedChanges: numUnsyncedChanges.toString(),
+      }
+    },
+  ];
+  return await interactWithUser(userInteraction, {
+    type: 'logout-confirmation',
+    title: 'Confirm Logout',
+    alerts,
+    fields: {},
+    submitLabel: 'Confirm logout',
+    cancelLabel: 'Cancel'
+  })
+    .then(() => true)
+    .catch(() => false);
 }

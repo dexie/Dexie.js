@@ -90,12 +90,6 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       }
       if (res2.status !== 200) {
         const errMsg = await res2.text();
-        await alertUser(userInteraction, "OTP Authentication Failed", {
-          type: 'error',
-          messageCode: 'GENERIC_ERROR',
-          message: errMsg,
-          messageParams: {}
-        }).catch(()=>{});
         throw new HttpError(res2, errMsg);
       }
       const response2: TokenFinalResponse | TokenErrorResponse = await res2.json();

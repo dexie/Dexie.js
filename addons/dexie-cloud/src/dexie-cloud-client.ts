@@ -45,6 +45,9 @@ import { NewIdOptions } from './types/NewIdOptions';
 import { getInvitesObservable } from './getInvitesObservable';
 import { getGlobalRolesObservable } from './getGlobalRolesObservable';
 import { UserLogin } from './db/entities/UserLogin';
+import { InvalidLicenseError } from './InvalidLicenseError';
+import { logout, _logout } from './authentication/logout';
+import { loadAccessToken } from './authentication/authenticate';
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 export {
@@ -55,6 +58,7 @@ export {
   DBPermissionSet,
 } from 'dexie-cloud-common';
 export { Invite } from './Invite';
+export { UserLogin };
 
 const DEFAULT_OPTIONS: Partial<DexieCloudOptions> = {
   nameSuffix: true,
@@ -116,7 +120,7 @@ export function dexieCloud(dexie: Dexie) {
     events: {
       syncComplete,
     },
-    
+
     persistedSyncState: new BehaviorSubject<PersistedSyncState | undefined>(
       undefined
     ),
@@ -143,11 +147,21 @@ export function dexieCloud(dexie: Dexie) {
       }
       updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
     },
+    async logout({ force } = {}) {
+      force
+        ? await _logout(DexieCloudDB(dexie), { deleteUnsyncedData: true })
+        : await logout(DexieCloudDB(dexie));
+    },
     async sync(
       { wait, purpose }: DexieCloudSyncOptions = { wait: true, purpose: 'push' }
     ) {
       if (wait === undefined) wait = true;
       const db = DexieCloudDB(dexie);
+      const licenseStatus = db.cloud.currentUser.value.license?.status || 'ok';
+      if (licenseStatus !== 'ok') {
+        // Refresh access token to check for updated license
+        await loadAccessToken(db);
+      }
       if (purpose === 'pull') {
         const syncState = db.cloud.persistedSyncState.value;
         triggerSync(db, purpose);
@@ -277,7 +291,7 @@ export function dexieCloud(dexie: Dexie) {
           // Update persisted options:
           if (!options) throw new Error(`Internal error`); // options cannot be null if configuredProgramatically is set.
           const newPersistedOptions: DexieCloudOptions = {
-            ...options
+            ...options,
           };
           delete newPersistedOptions.fetchTokens;
           await db.$syncState.put(newPersistedOptions, 'options');

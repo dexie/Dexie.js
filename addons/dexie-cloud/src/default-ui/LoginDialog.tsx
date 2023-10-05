@@ -2,9 +2,7 @@ import { Dialog } from './Dialog';
 import { Styles } from './Styles';
 import { h, Fragment } from 'preact';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
-import {
-  DXCUserInteraction,
-} from '../types/DXCUserInteraction';
+import { DXCUserInteraction } from '../types/DXCUserInteraction';
 import { resolveText } from '../helpers/resolveText';
 import { DXCInputField } from '../types/DXCInputField';
 
@@ -15,6 +13,8 @@ export function LoginDialog({
   type,
   alerts,
   fields,
+  submitLabel,
+  cancelLabel,
   onCancel,
   onSubmit,
 }: DXCUserInteraction) {
@@ -38,7 +38,7 @@ export function LoginDialog({
         >
           {(Object.entries(fields) as [string, DXCInputField][]).map(
             ([fieldName, { type, label, placeholder }], idx) => (
-              <label style={Styles.Label}>
+              <label style={Styles.Label} key={idx}>
                 {label ? `${label}: ` : ''}
                 <input
                   ref={idx === 0 ? firstFieldRef : undefined}
@@ -55,7 +55,7 @@ export function LoginDialog({
                       ...params,
                       [fieldName]: value,
                     };
-                    setParams(updatedParams)
+                    setParams(updatedParams);
                     if (type === 'otp' && value?.trim().length === OTP_LENGTH) {
                       // Auto-submit when OTP is filled in.
                       onSubmit(updatedParams);
@@ -68,30 +68,20 @@ export function LoginDialog({
         </form>
       </>
       <div style={Styles.ButtonsDiv}>
-        {type === 'email' || type === 'generic' || type === 'otp' ? (
-          <>
-            <button
-              type="submit"
-              style={Styles.Button}
-              onClick={() => onSubmit(params)}
-            >
-              Submit
-            </button>
+        <>
+          <button
+            type="submit"
+            style={Styles.Button}
+            onClick={() => onSubmit(params)}
+          >
+            {submitLabel}
+          </button>
+          {cancelLabel && (
             <button style={Styles.Button} onClick={onCancel}>
-              Cancel
+              {cancelLabel}
             </button>
-          </>
-        ) : (
-          <>
-            <button
-              type="submit"
-              style={Styles.Button}
-              onClick={() => onSubmit(params)}
-            >
-              Ok
-            </button>
-          </>
-        )}
+          )}
+        </>
       </div>
     </Dialog>
   );

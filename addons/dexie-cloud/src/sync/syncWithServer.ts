@@ -9,7 +9,7 @@ import {
   DBOperationsSet,
   DexieCloudSchema,
   SyncRequest,
-  SyncResponse
+  SyncResponse,
 } from 'dexie-cloud-common';
 import { encodeIdsForServer } from './encodeIdsForServer';
 import { UserLogin } from '../db/entities/UserLogin';
@@ -30,18 +30,16 @@ export async function syncWithServer(
   //
   const headers: HeadersInit = {
     Accept: 'application/json, application/x-bison, application/x-bison-stream',
-    'Content-Type': 'application/tson'
+    'Content-Type': 'application/tson',
   };
   const updatedUser = await loadAccessToken(db);
-  if (updatedUser) {
-    if (updatedUser.license && updatedUser.license.status === 'expired') {
-      throw new Error(
-        `License has expired`
-      );
+  if (updatedUser?.license && changes.length > 0) {
+    /*if (updatedUser.license.status === 'expired') {
+      throw new Error(`License has expired`);
     }
-    if (updatedUser.license && updatedUser.license.status === 'deactivated') {
+    if (updatedUser.license.status === 'deactivated') {
       throw new Error(`License deactivated`);
-    }
+    }*/
   }
   const accessToken = updatedUser?.accessToken;
   if (accessToken) {
@@ -49,30 +47,32 @@ export async function syncWithServer(
   }
 
   const syncRequest: SyncRequest = {
-    v:2,
+    v: 2,
     dbID: syncState?.remoteDbId,
     clientIdentity,
     schema: schema || {},
-    lastPull: syncState ? {
-      serverRevision: syncState.serverRevision!,
-      realms: syncState.realms,
-      inviteRealms: syncState.inviteRealms
-    } : undefined,
+    lastPull: syncState
+      ? {
+          serverRevision: syncState.serverRevision!,
+          realms: syncState.realms,
+          inviteRealms: syncState.inviteRealms,
+        }
+      : undefined,
     baseRevs,
-    changes: encodeIdsForServer(db.dx.core.schema, currentUser, changes)
+    changes: encodeIdsForServer(db.dx.core.schema, currentUser, changes),
   };
-  console.debug("Sync request", syncRequest);
+  console.debug('Sync request', syncRequest);
   db.syncStateChangedEvent.next({
     phase: 'pushing',
   });
   const res = await fetch(`${databaseUrl}/sync`, {
     method: 'post',
     headers,
-    body: TSON.stringify(syncRequest)
+    body: TSON.stringify(syncRequest),
   });
   //const contentLength = Number(res.headers.get('content-length'));
   db.syncStateChangedEvent.next({
-    phase: 'pulling'
+    phase: 'pulling',
   });
 
   if (!res.ok) {

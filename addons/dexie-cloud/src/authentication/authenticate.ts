@@ -15,6 +15,7 @@ import {
 } from '../types/DXCUserInteraction';
 import { TokenErrorResponseError } from './TokenErrorResponseError';
 import { alertUser, interactWithUser } from './interactWithUser';
+import { InvalidLicenseError } from '../InvalidLicenseError';
 
 export type FetchTokenCallback = (tokenParams: {
   public_key: string;
@@ -34,7 +35,7 @@ export async function loadAccessToken(
   } = currentUser;
   if (!accessToken) return null;
   const expTime = accessTokenExpiration?.getTime() ?? Infinity;
-  if (expTime > Date.now()) {
+  if (expTime > Date.now() && (currentUser.license?.status || 'ok') === 'ok') {
     return currentUser;
   }
   if (!refreshToken) {
@@ -51,6 +52,7 @@ export async function loadAccessToken(
   await db.table('$logins').update(claims.sub, {
     accessToken: refreshedLogin.accessToken,
     accessTokenExpiration: refreshedLogin.accessTokenExpiration,
+    claims: refreshedLogin.claims,
     license: refreshedLogin.license,
   });
   return refreshedLogin;
@@ -184,6 +186,11 @@ async function userAuthenticate(
         `Unexpected response type from token endpoint: ${(response2 as any).type}`
       );
 
+    /*const licenseStatus = response2.claims.license || 'ok';
+    if (licenseStatus !== 'ok') {
+      throw new InvalidLicenseError(licenseStatus);
+    }*/
+
     context.accessToken = response2.accessToken;
     context.accessTokenExpiration = new Date(response2.accessTokenExpiration);
     context.refreshToken = response2.refreshToken;
@@ -238,14 +245,14 @@ async function userAuthenticate(
       } else {
         message = `Could not connect to server. Please verify the connection.`;
       }
+      await alertUser(userInteraction, 'Authentication Failed', {
+        type: 'error',
+        messageCode: 'GENERIC_ERROR',
+        message,
+        messageParams: {},
+      }).catch(() => {});  
     }
 
-    await alertUser(userInteraction, 'Authentication Failed', {
-      type: 'error',
-      messageCode: 'GENERIC_ERROR',
-      message,
-      messageParams: {},
-    }).catch(() => {});
     throw error;
   }
 }
