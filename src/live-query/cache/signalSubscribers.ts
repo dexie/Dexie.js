@@ -11,12 +11,12 @@ export function signalSubscribersLazily(part: ObservabilitySet) {
   extendObservabilitySet(unsignaledParts, part);
   if (!isTaskEnqueued) {
     isTaskEnqueued = true;
-    queueMicrotask(() => {
+    setTimeout(() => {
       isTaskEnqueued = false;
       const parts = unsignaledParts;
       unsignaledParts = {};
       signalSubscribersNow(parts);
-    });
+    }, 0);
   }
 }
 
