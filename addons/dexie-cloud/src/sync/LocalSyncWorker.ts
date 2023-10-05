@@ -16,26 +16,41 @@ export function LocalSyncWorker(
   //let periodicSyncHandler: ((event: Event) => void) | null = null;
   let cancelToken = { cancelled: false };
 
+  let retryHandle: any = null;
+  let retryPurpose: 'pull' | 'push' | null = null; // "pull" is superset of "push"
+
   function syncAndRetry(purpose: 'pull' | 'push', retryNum = 1) {
     // Use setTimeout() to get onto a clean stack and
     // break free from possible active transaction:
     setTimeout(() => {
+      if (retryHandle) clearTimeout(retryHandle);
+      const combPurpose = retryPurpose === 'pull' ? 'pull' : purpose;
+      retryHandle = null;
+      retryPurpose = null;
       syncIfPossible(db, cloudOptions, cloudSchema, {
         cancelToken,
         retryImmediatelyOnFetchError: true, // workaround for "net::ERR_NETWORK_CHANGED" in chrome.
-        purpose,
+        purpose: combPurpose,
       }).catch((e) => {
         console.error('error in syncIfPossible()', e);
         if (cancelToken.cancelled) {
           stop();
         } else if (retryNum < 3) {
+
           // Mimic service worker sync event: retry 3 times
           // * first retry after 5 minutes
           // * second retry 15 minutes later
-          setTimeout(
-            () => syncAndRetry(purpose, retryNum + 1),
+          const combinedPurpose = retryPurpose && retryPurpose === 'pull' ? 'pull' : purpose;
+
+          const handle = setTimeout(
+            () => syncAndRetry(combinedPurpose, retryNum + 1),
             [0, 5, 15][retryNum] * MINUTES
           );
+
+          // Cancel the previous retryHandle if it exists to avoid scheduling loads of retries.
+          if (retryHandle) clearTimeout(retryHandle);
+          retryHandle = handle;
+          retryPurpose = combinedPurpose;
         }
       });
     }, 0);
