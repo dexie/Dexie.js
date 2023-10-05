@@ -19,6 +19,7 @@ import { guardedTable } from '../middleware-helpers/guardedTable';
 import { registerSyncEvent } from '../sync/registerSyncEvent';
 import { TXExpandos } from '../types/TXExpandos';
 import { outstandingTransactions } from './outstandingTransaction';
+import { isEagerSyncDisabled } from '../isEagerSyncDisabled';
 
 export interface MutationTrackingMiddlewareArgs {
   currentUserObservable: BehaviorSubject<UserLogin>;
@@ -94,15 +95,9 @@ export function createMutationTrackingMiddleware({
             const txComplete = () => {
               if (
                 tx.mutationsAdded &&
-                db.cloud.options?.databaseUrl &&
-                (db.cloud.currentUser.value.license?.status || 'ok') === 'ok'
+                !isEagerSyncDisabled(db)
               ) {
-                if (db.cloud.usingServiceWorker) {
-                  console.debug('registering sync event');
-                  registerSyncEvent(db, 'push');
-                } else {
-                  db.localSyncEvent.next({ purpose: 'push' });
-                }
+                registerSyncEvent(db, 'push');
               }
               removeTransaction();
             };

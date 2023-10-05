@@ -42,6 +42,9 @@ export interface DexieCloudOptions {
   // Disable websocket connection
   disableWebSocket?: boolean;
 
+  // Disable automatic sync on changes
+  disableEagerSync?: boolean;
+
   // Provides a custom way of fetching the JWT tokens. This option
   // can be used when integrating with custom authentication.
   // See https://dexie.org/cloud/docs/db.cloud.configure()#fetchtoken

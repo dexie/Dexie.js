@@ -48,6 +48,7 @@ import { UserLogin } from './db/entities/UserLogin';
 import { InvalidLicenseError } from './InvalidLicenseError';
 import { logout, _logout } from './authentication/logout';
 import { loadAccessToken } from './authentication/authenticate';
+import { isEagerSyncDisabled } from './isEagerSyncDisabled';
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 export {
@@ -423,7 +424,9 @@ export function dexieCloud(dexie: Dexie) {
           db.syncStateChangedEvent.next({
             phase: 'not-in-sync',
           });
-          triggerSync(db, 'push');
+          if (!isEagerSyncDisabled(db)) {
+            triggerSync(db, 'push');
+          }
         }),
         fromEvent(self, 'offline').subscribe(() => {
           console.debug('offline!');
