@@ -69,12 +69,13 @@ export function sync(
 ): Promise<boolean> {
   return _sync
     .apply(this, arguments)
-    .then(() => {
+    .then((result) => {
       if (!syncOptions?.justCheckIfNeeded) { // && syncOptions?.purpose !== 'push') {
         db.syncStateChangedEvent.next({
           phase: 'in-sync',
         });
       }
+      return result;
     })
     .catch(async (error: any) => {
       if (syncOptions?.justCheckIfNeeded) return Promise.reject(error); // Just rethrow.
