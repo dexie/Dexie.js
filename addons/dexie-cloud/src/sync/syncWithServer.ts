@@ -13,6 +13,7 @@ import {
 } from 'dexie-cloud-common';
 import { encodeIdsForServer } from './encodeIdsForServer';
 import { UserLogin } from '../db/entities/UserLogin';
+import { updateSyncRateLimitDelays } from './ratelimit';
 //import {BisonWebStreamReader} from "dreambase-library/dist/typeson-simplified/BisonWebStreamReader";
 
 export async function syncWithServer(
@@ -33,14 +34,16 @@ export async function syncWithServer(
     'Content-Type': 'application/tson',
   };
   const updatedUser = await loadAccessToken(db);
+  /*
   if (updatedUser?.license && changes.length > 0) {
-    /*if (updatedUser.license.status === 'expired') {
+    if (updatedUser.license.status === 'expired') {
       throw new Error(`License has expired`);
     }
     if (updatedUser.license.status === 'deactivated') {
       throw new Error(`License deactivated`);
-    }*/
+    }
   }
+  */
   const accessToken = updatedUser?.accessToken;
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
@@ -74,6 +77,8 @@ export async function syncWithServer(
   db.syncStateChangedEvent.next({
     phase: 'pulling',
   });
+
+  updateSyncRateLimitDelays(db, res);
 
   if (!res.ok) {
     throw new HttpError(res);

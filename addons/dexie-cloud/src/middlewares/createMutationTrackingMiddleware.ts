@@ -20,6 +20,7 @@ import { registerSyncEvent } from '../sync/registerSyncEvent';
 import { TXExpandos } from '../types/TXExpandos';
 import { outstandingTransactions } from './outstandingTransaction';
 import { isEagerSyncDisabled } from '../isEagerSyncDisabled';
+import { triggerSync } from '../sync/triggerSync';
 
 export interface MutationTrackingMiddlewareArgs {
   currentUserObservable: BehaviorSubject<UserLogin>;
@@ -97,7 +98,7 @@ export function createMutationTrackingMiddleware({
                 tx.mutationsAdded &&
                 !isEagerSyncDisabled(db)
               ) {
-                registerSyncEvent(db, 'push');
+                triggerSync(db, 'push');
               }
               removeTransaction();
             };

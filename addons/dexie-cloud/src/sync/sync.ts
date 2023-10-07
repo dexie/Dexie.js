@@ -25,33 +25,9 @@ import { isOnline } from './isOnline';
 import { updateBaseRevs } from './updateBaseRevs';
 import { getLatestRevisionsPerTable } from './getLatestRevisionsPerTable';
 import { applyServerChanges } from './applyServerChanges';
+import { checkSyncRateLimitDelay } from './ratelimit';
 
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
-
-export let numberOfSyncRequests = 0;
-
-/*
-  TODO:
-    1. V: Rätta flödet och gör det persistent mellan transaktioner
-    2. Sync-requestet ska autenticera sig med nuvarande användare.
-       MEN:
-        Vissa medskickade operationer kan vara gjorda av annan användare.
-        Därför: Om några av client-changes är andra användare, så måste de användarnas
-        tokens följa med som extra parameter till fetch-requestet.
-        Servern skall då validera och genomföra dessa operationer baserat på alternativt token.
-        Kanske kan vi skita i det flödet just nu och hindra att det uppstår istället.
-        Hur? Jo, genom:
-          1. Användare är ANONYMOUS
-          2. Data laddas ned.
-          3. Data modifieras.
-          4. Användare loggar in.
-          5. Sync: Några inledande requests är ANONYMOUS men autenticeras som användaren.
-
-    X: Se till att vi förhandlar initialt sync state eller uppdaterat sync state (tabell aliases etc)
-
-    Y: Använd Bison hjälpare för streamad BISON?
-
-*/
 
 export interface SyncOptions {
   isInitialSync?: boolean;
@@ -361,6 +337,7 @@ async function _sync(
   });
   if (!done) {
     console.debug('MORE SYNC NEEDED. Go for it again!');
+    await checkSyncRateLimitDelay(db);
     return await _sync(db, options, schema, { isInitialSync, cancelToken });
   }
   console.debug('SYNC DONE', { isInitialSync });
