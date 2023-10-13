@@ -71,6 +71,7 @@ export async function syncWithServer(
   const res = await fetch(`${databaseUrl}/sync`, {
     method: 'post',
     headers,
+    credentials: 'include', // For Arr Affinity cookie only, for better Rate-Limit counting only.
     body: TSON.stringify(syncRequest),
   });
   //const contentLength = Number(res.headers.get('content-length'));
