@@ -1,4 +1,4 @@
-import { arrayToObject, derive } from './utils';
+import { derive } from './utils';
 
 
 export function makeClassConstructor<TConstructor> (prototype: Object, constructor: Function) {

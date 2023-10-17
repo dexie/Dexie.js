@@ -1,6 +1,5 @@
 import { IndexSpec } from '../public/types/index-spec';
 import { TableSchema } from '../public/types/table-schema';
-import { createIndexSpec } from './index-spec';
 import { arrayToObject } from '../functions/utils';
 
 export function createTableSchema (

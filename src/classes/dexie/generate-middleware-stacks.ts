@@ -3,7 +3,6 @@ import { createDBCore } from '../../dbcore/dbcore-indexeddb';
 import { DBCore } from '../../public/types/dbcore';
 import { DexieDOMDependencies } from '../../public/types/dexie-dom-dependencies';
 import { DexieStacks, Middleware } from '../../public/types/middleware';
-import { exceptions } from '../../errors';
 
 function createMiddlewareStack<TStack extends {stack: string}>(
   stackImpl: {stack: string},

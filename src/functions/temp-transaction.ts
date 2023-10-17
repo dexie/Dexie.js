@@ -1,5 +1,4 @@
 import { PSD, rejection, newScope } from "../helpers/promise";
-import { DexieOptions } from "../public/types/dexie-constructor";
 import { errnames, exceptions } from "../errors";
 import { nop } from "./chaining-functions";
 import { Transaction } from "../classes/transaction";

@@ -1,5 +1,5 @@
 import { cloneSimpleObjectTree, deepClone, keys, objectIsEmpty } from "../functions/utils";
-import { mergeRanges, RangeSet } from "../helpers/rangeset";
+import { mergeRanges } from "../helpers/rangeset";
 import { ObservabilitySet } from "../public/types/db-events";
 
 export function extendObservabilitySet(

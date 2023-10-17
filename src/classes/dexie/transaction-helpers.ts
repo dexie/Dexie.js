@@ -6,7 +6,6 @@ import { Transaction } from '../transaction';
 import { awaitIterator } from '../../helpers/yield-support';
 import Promise, {
   PSD,
-  NativePromise,
   decrementExpectedAwaits,
   rejection,
   incrementExpectedAwaits

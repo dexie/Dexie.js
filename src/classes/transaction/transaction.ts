@@ -5,10 +5,8 @@ import { assert, hasOwn } from '../../functions/utils';
 import { PSD, usePSD } from '../../helpers/promise';
 import { Dexie } from '../dexie';
 import { exceptions } from '../../errors';
-import { safariMultiStoreFix } from '../../functions/quirks';
 import { preventDefault } from '../../functions/event-wrappers';
 import { newScope } from '../../helpers/promise';
-import * as Debug from '../../helpers/debug';
 import { Table } from '../table';
 import { globalEvents } from '../../globals/global-events';
 

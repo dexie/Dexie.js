@@ -1,4 +1,4 @@
-import { deepClone, delByKeyPath, getByKeyPath } from './utils';
+import { deepClone } from './utils';
 
 // This workaround is needed since obj could be a custom-class instance with an
 // uninitialized keyPath. See the following comment for more context:

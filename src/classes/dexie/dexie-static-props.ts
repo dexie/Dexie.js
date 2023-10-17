@@ -7,7 +7,6 @@ import { DexieConstructor } from '../../public/types/dexie-constructor';
 import { getDatabaseNames } from '../../helpers/database-enumerator';
 import { PSD } from '../../helpers/promise';
 import { usePSD } from '../../helpers/promise';
-import { newScope } from '../../helpers/promise';
 import { rejection } from '../../helpers/promise';
 import { awaitIterator } from '../../helpers/yield-support';
 import Promise from '../../helpers/promise';

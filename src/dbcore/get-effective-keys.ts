@@ -3,7 +3,6 @@ import {
   DBCorePutRequest,
   DBCoreDeleteRequest,
   DBCoreIndex,
-  DBCoreTable,
 } from "../public/types/dbcore";
 
 export function getEffectiveKeys (

@@ -9,8 +9,7 @@ import { DbSchema } from '../../public/types/db-schema';
 
 // Internal imports
 import { Table, TableConstructor, createTableConstructor } from "../table";
-import { Collection, CollectionConstructor, createCollectionConstructor } from '../collection';
-import { WhereClause } from '../where-clause/where-clause';
+import { CollectionConstructor, createCollectionConstructor } from '../collection';
 import { WhereClauseConstructor, createWhereClauseConstructor } from '../where-clause/where-clause-constructor';
 import { Transaction } from '../transaction';
 import { TransactionConstructor, createTransactionConstructor } from '../transaction/transaction-constructor';
@@ -18,14 +17,12 @@ import { Version } from "../version/version";
 import { VersionConstructor, createVersionConstructor } from '../version/version-constructor';
 
 // Other imports...
-import { DexieEventSet } from '../../public/types/dexie-event-set';
-import { DexieExceptionClasses } from '../../public/types/errors';
 import { DexieDOMDependencies } from '../../public/types/dexie-dom-dependencies';
 import { nop, promisableChain } from '../../functions/chaining-functions';
 import Promise, { PSD, globalPSD } from '../../helpers/promise';
-import { extend, override, keys, hasOwn } from '../../functions/utils';
+import { override, keys, hasOwn } from '../../functions/utils';
 import Events from '../../helpers/Events';
-import { maxString, connections, READONLY, READWRITE } from '../../globals/constants';
+import { connections, READONLY, READWRITE } from '../../globals/constants';
 import { getMaxKey } from '../../functions/quirks';
 import { exceptions } from '../../errors';
 import { lowerVersionFirst } from '../version/schema-helpers';

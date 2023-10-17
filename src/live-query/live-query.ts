@@ -1,4 +1,4 @@
-import { isAsyncFunction, keys, objectIsEmpty } from '../functions/utils';
+import { isAsyncFunction, objectIsEmpty } from '../functions/utils';
 import {
   globalEvents,
   DEXIE_STORAGE_MUTATED_EVENT_NAME,
@@ -9,8 +9,6 @@ import {
   endMicroTickScope,
   incrementExpectedAwaits,
   newScope,
-  PSD,
-  usePSD,
 } from '../helpers/promise';
 import { ObservabilitySet } from '../public/types/db-events';
 import {
@@ -19,7 +17,6 @@ import {
 } from '../public/types/observable';
 import { Observable } from '../classes/observable/observable';
 import { extendObservabilitySet } from './extend-observability-set';
-import { rangesOverlap } from '../helpers/rangeset';
 import { domDeps } from '../classes/dexie/dexie-dom-dependencies';
 import { Transaction } from '../classes/transaction';
 import { obsSetsOverlap } from './obs-sets-overlap';

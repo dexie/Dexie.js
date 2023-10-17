@@ -3,7 +3,6 @@ import { deepClone } from '../../functions/utils';
 import { RangeSet, rangesOverlap } from '../../helpers/rangeset';
 import { CacheEntry } from '../../public/types/cache';
 import {
-  DBCoreIndex,
   DBCoreMutateRequest,
   DBCoreQueryRequest,
   DBCoreTable,
