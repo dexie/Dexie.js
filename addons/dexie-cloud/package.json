@@ -77,7 +77,7 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^11.1.5",
     "@types/node": "^18.11.18",
-    "dreambase-library": "^1.0.19",
+    "dreambase-library": "^1.0.21",
     "just-build": "*",
     "karma": "*",
     "karma-browserstack-launcher": "*",

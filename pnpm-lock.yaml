@@ -160,8 +160,8 @@ importers:
         specifier: ^18.11.18
         version: 18.11.18
       dreambase-library:
-        specifier: ^1.0.19
-        version: 1.0.19
+        specifier: ^1.0.21
+        version: 1.0.21
       just-build:
         specifier: '*'
         version: 0.9.24
@@ -5703,8 +5703,8 @@ packages:
     engines: {node: '>=10'}
     dev: false
 
-  /dreambase-library@1.0.19:
-    resolution: {integrity: sha512-JKfBctx4ukDybIrA3EKeNwBjISDK4ldPSnUF8NlCIEBCuzVQ/mwb2XhNxrPtYklNUM16T2QPoYi6o4P6xTf+nQ==}
+  /dreambase-library@1.0.21:
+    resolution: {integrity: sha512-zBoMI8UedAg+UTLZZcOJF+In1is4B9ZfIjtEMj65gbOSropMtkhz0GmOiwOn1L1YpVH+uzwqcAgzW87ToWlQgA==}
     engines: {node: '>=14.8.0'}
     dev: true
 
