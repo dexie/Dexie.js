@@ -1,5 +1,7 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
+import { prodLog } from '../prodLog';
 import { AuthPersistedContext } from './AuthPersistedContext';
+import { waitUntil } from './waitUntil';
 
 /** This function changes or sets the current user as requested.
  *
@@ -31,42 +33,22 @@ export async function setCurrentUser(
     );
     user.isLoggedIn = true;
     user.lastLogin = new Date();
-    await user.save();
+    try {
+      await user.save();
+    } catch (e) {
+      try {
+        if (e.name === 'DataCloneError') {
+          // We've seen this buggy behavior in some browsers and in case it happens
+          // again we really need to collect the details to understand what's going on.
+          prodLog('debug', `Login context property names:`, Object.keys(user));
+          prodLog('debug', `Login context property names:`, Object.keys(user));
+          prodLog('debug', `Login context:`, user);
+          prodLog('debug', `Login context JSON:`, JSON.stringify(user));
+        }
+      } catch {}
+      throw e;
+    }  
     console.debug('Saved new user', user.email);
   });
-  await new Promise((resolve) => {
-    if (db.cloud.currentUserId === user.userId) {
-      resolve(null);
-    } else {
-      const subscription = db.cloud.currentUser.subscribe((currentUser) => {
-        if (currentUser.userId === user.userId) {
-          subscription.unsubscribe();
-          resolve(null);
-        }
-      });
-    }
-  });
-
-  // TANKAR!!!!
-  // V: Service workern kommer inte ha tillgång till currentUserObservable om den inte istället härrör från ett liveQuery.
-  // V: Samma med andra windows.
-  // V: Så kanske göra om den till att häröra från liveQuery som läser $logins.orderBy('lastLogin').last().
-  // V: Då bara vara medveten om:
-  //    V: En sån observable börjar hämta data vid första subscribe
-  //    V: Vi har inget "inital value" men kan emulera det till att vara ANONYMOUS_USER
-  //    V: Om requireAuth är true, så borde db.on(ready) hålla databasen stängd för alla utom denna observable.
-  //    V: Om inte så behöver den inte blocka.
-
-  // Andra tankar:
-  //    * Man kan inte byta användare när man är offline. Skulle gå att flytta realms till undanstuff-tabell vid user-change.
-  //      men troligen inte värt det.
-  //    * Istället: sälj inte inte switch-user funktionalitet utan tala enbart om inloggat vs icke inloggat läge.
-  //    * populate $logins med ANONYMOUS så att en påbörjad inloggning inte räknas, alternativt ha en boolean prop!
-  //      Kanske bäst ha en boolean prop!
-  //    * Alternativ switch-user funktionalitet:
-  //      * DBCore gömmer data från realms man inte har tillgång till.
-  //      * Cursor impl behövs också då.
-  //      * Då blir det snabba user switch.
-  //      * claims-settet som skickas till servern blir summan av alla claims. Då måste servern stödja multipla tokens eller
-  //        att ens token är ett samlad.
+  await waitUntil(db.cloud.currentUser, (currentUser) => currentUser.userId === user.userId);
 }

@@ -1,6 +1,7 @@
 import { db } from "./db";
 
-export async function logout() {
-  await db.delete();
-  await db.open();
+export function logout() {
+  return db.cloud.logout().catch(e => {
+    console.log("Logout cancelled", e);
+  });
 }

@@ -4,10 +4,12 @@ export const Styles: { [styleAlias: string]: Partial<CSSStyleDeclaration> | any}
   },
   Alert: {
     error: {
-      color: "red"
+      color: "red",
+      fontWeight: "bold"
     },
     warning: {
-      color: "yellow"
+      color: "#f80",
+      fontWeight: "bold"
     },
     info: {
       color: "black"
@@ -48,7 +50,8 @@ export const Styles: { [styleAlias: string]: Partial<CSSStyleDeclaration> | any}
     border: "3px solid #3d3d5d",
     borderRadius: "8px",
     boxShadow: "0 0 80px 10px #666",
-    width: "auto"
+    width: "auto",
+    fontFamily: "sans-serif",
   },
   Input: {
     height: "35px",

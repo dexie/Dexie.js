@@ -4,6 +4,7 @@ import { DexieCloudDB } from '../db/DexieCloudDB';
 import { sync, CURRENT_SYNC_WORKER, SyncOptions } from './sync';
 import { DexieCloudOptions } from '../DexieCloudOptions';
 import { assert, DexieCloudSchema } from 'dexie-cloud-common';
+import { checkSyncRateLimitDelay } from './ratelimit';
 
 const ongoingSyncs = new WeakMap<
   DexieCloudDB,
@@ -61,19 +62,24 @@ export function syncIfPossible(
       );
     }
   }
+
   const promise = _syncIfPossible();
   ongoingSyncs.set(db, { promise, pull: options?.purpose !== 'push' });
   return promise;
 
   async function _syncIfPossible() {
     try {
+      // Check if should delay sync due to ratelimit:
+      await checkSyncRateLimitDelay(db);
+      
+      // Check if we need to lock the sync job. Not needed if we are the service worker.
       if (db.cloud.isServiceWorkerDB) {
         // We are the dedicated sync SW:
         await sync(db, cloudOptions, cloudSchema, options);
       } else if (!db.cloud.usingServiceWorker) {
         // We use a flow that is better suited for the case when multiple workers want to
         // do the same thing.
-        await performGuardedJob(db, CURRENT_SYNC_WORKER, '$jobs', () =>
+        await performGuardedJob(db, CURRENT_SYNC_WORKER, () =>
           sync(db, cloudOptions, cloudSchema, options)
         );
       } else {

@@ -13,7 +13,7 @@ export interface DXCErrorAlert {
 
 export interface DXCWarningAlert {
   type: 'warning';
-  messageCode: 'GENERIC_WARNING';
+  messageCode: 'GENERIC_WARNING' | 'LOGOUT_CONFIRMATION';
   message: string;
   messageParams: { [paramName: string]: string; };
 }

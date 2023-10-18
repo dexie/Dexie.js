@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "4.0.1-beta.46",
+  "version": "4.0.1-beta.48",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/umd/dexie-cloud-addon.js",
   "type": "module",
@@ -42,7 +42,7 @@
       }
     }
   },
-  "types": "dist/types/dexie-cloud-client.d.ts",
+  "types": "dist/modern/dexie-cloud-client.d.ts",
   "engines": {
     "node": ">=14"
   },
@@ -53,44 +53,13 @@
   "scripts": {
     "test": "just-build test && pnpm run test-unit",
     "test-unit": "karma start test/unit/karma.conf.js --single-run",
-    "build": "just-build && bash ./copydts.sh",
-    "watch": "just-build --watch",
-    "clean": "rm -rf tools/tmp dist test/unit/bundle.*",
-    "copydts": "bash ./copydts.sh"
+    "build": "rollup -c tools/build-configs/rollup.config.mjs",
+    "watch": "rollup -c tools/build-configs/rollup.config.mjs --watch",
+    "clean": "rm -rf tools/tmp dist test/unit/bundle.*"
   },
   "just-build": {
     "default": [
-      "just-build release test"
-    ],
-    "release": [
-      "# Build outputs",
-      "just-build src",
-      "just-build dexie-cloud service-worker",
-      "#dts-bundle-generator --external-inlines=dexie-cloud-common --external-imports=rxjs dexie --project src/tsconfig.json -o dist/types/dexie-cloud-addon.d.ts tools/tmp/modern/dexie-cloud-client.d.ts",
-      "# Minify modern bundle",
-      "terser --comments false --compress --mangle --module --source-map url=dexie-cloud-addon.min.js.map -o dist/modern/dexie-cloud-addon.min.js -- dist/modern/dexie-cloud-addon.js",
-      "# Minify umd bundle",
-      "terser --comments false --compress --mangle --source-map url=dexie-cloud-addon.min.js.map -o dist/umd/dexie-cloud-addon.min.js -- dist/umd/dexie-cloud-addon.js",
-      "# Minify modern service-worker",
-      "terser --comments false --compress --mangle --module --source-map url=service-worker.min.js.map -o dist/modern/service-worker.min.js -- dist/modern/service-worker.js",
-      "# Minify umd service-worker",
-      "terser --comments false --compress --mangle --source-map url=service-worker.min.js.map -o dist/umd/service-worker.min.js -- dist/umd/service-worker.js"
-    ],
-    "src": [
-      "# Build the entire typescript source into modern JS",
-      "tsc -p src -t es2016 --outDir tools/tmp/modern [--watch 'Watching for file changes.']"
-    ],
-    "dexie-cloud": [
-      "# Create a modern bundle in dist/modern",
-      "rollup -c tools/build-configs/rollup.modern.config.js",
-      "# Replace {version} and {date} in output files",
-      "node tools/replaceVersionAndDate.cjs dist/umd/dexie-cloud-addon.js dist/modern/dexie-cloud-addon.js"
-    ],
-    "service-worker": [
-      "# Create a modern bundle in dist/modern",
-      "rollup -c tools/build-configs/rollup.sw.modern.config.js",
-      "# Replace {version} and {date} in output files",
-      "node tools/replaceVersionAndDate.cjs dist/umd/service-worker.js dist/modern/service-worker.js"
+      "rollup -c tools/build-configs/rollup.config.mjs"
     ],
     "test": [
       "just-build test-unit"
@@ -103,11 +72,12 @@
   "author": "david.fahlander@gmail.com",
   "license": "Apache-2.0",
   "devDependencies": {
-    "@rollup/plugin-commonjs": "^18.0.0",
-    "@rollup/plugin-node-resolve": "^11.2.1",
+    "@rollup/plugin-commonjs": "^25.0.7",
+    "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-terser": "^0.4.4",
+    "@rollup/plugin-typescript": "^11.1.5",
     "@types/node": "^18.11.18",
-    "dreambase-library": "^1.0.19",
-    "dts-bundle-generator": "^8.0.1",
+    "dreambase-library": "^1.0.21",
     "just-build": "*",
     "karma": "*",
     "karma-browserstack-launcher": "*",
@@ -115,17 +85,13 @@
     "karma-firefox-launcher": "*",
     "karma-qunit": "*",
     "preact": "*",
-    "rollup": "^2.45.2",
-    "rollup-plugin-alias": "*",
-    "rollup-plugin-commonjs": "*",
-    "rollup-plugin-dts": "^4.0.1",
-    "rollup-plugin-node-resolve": "*",
-    "rollup-plugin-sourcemaps": "*",
+    "rollup": "^4.1.4",
+    "terser": "^5.20.0",
     "tslib": "*",
     "typescript": "^4.9.4"
   },
   "dependencies": {
-    "dexie-cloud-common": "^1.0.27",
+    "dexie-cloud-common": "^1.0.31",
     "rxjs": "^7.x"
   },
   "peerDependencies": {

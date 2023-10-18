@@ -60,7 +60,7 @@ export class Table implements ITable<any, IndexableType> {
     // in native engine.
     const wasRootExec = beginMicroTickScope();
     try {
-      return trans && trans.db === this.db ?
+      return trans && trans.db._novip === this.db._novip ?
         trans === PSD.trans ?
           trans._promise(mode, checkTableInTransaction, writeLocked) :
           newScope(() => trans._promise(mode, checkTableInTransaction, writeLocked), { trans: trans, transless: PSD.transless || PSD }) :
