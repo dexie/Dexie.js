@@ -3,10 +3,7 @@ export type DXCAlert = DXCErrorAlert | DXCWarningAlert | DXCInfoAlert;
 
 export interface DXCErrorAlert {
   type: 'error';
-  messageCode: 'INVALID_OTP' |
-  'INVALID_EMAIL' |
-  'LICENSE_LIMIT_REACHED' |
-  'GENERIC_ERROR';
+  messageCode: 'INVALID_OTP' | 'INVALID_EMAIL' | 'LICENSE_LIMIT_REACHED' | 'GENERIC_ERROR';
   message: string;
   messageParams: { [paramName: string]: string; };
 }
