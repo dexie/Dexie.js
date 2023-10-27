@@ -58,8 +58,14 @@ export {
   DBSyncedObject,
   DBPermissionSet,
 } from 'dexie-cloud-common';
+export { resolveText } from './helpers/resolveText';
 export { Invite } from './Invite';
-export { UserLogin };
+export type { UserLogin, DXCWebSocketStatus, SyncState };
+export type { DexieCloudSyncOptions };
+export type { DexieCloudOptions, PeriodicSyncOptions } from './DexieCloudOptions';
+export * from './types/DXCAlert';
+export * from './types/DXCInputField';
+export * from './types/DXCUserInteraction';
 
 const DEFAULT_OPTIONS: Partial<DexieCloudOptions> = {
   nameSuffix: true,
