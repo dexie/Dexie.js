@@ -75,6 +75,7 @@ export function createRollupConfig(entry, outputName) {
           target: 'es2016',
         },
         declarationDir: 'dist/',
+        sourceMap: false, // Required (see https://stackoverflow.com/questions/63218218/rollup-is-not-generating-typescript-sourcemap)
       }),
       //sourcemaps(),
       nodeResolve({
