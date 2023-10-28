@@ -112,7 +112,8 @@ export function dexieCloud(dexie: Dexie) {
   const syncComplete = new Subject<void>();
 
   dexie.cloud = {
-    version: '{version}',
+    // @ts-ignore
+    version: __VERSION__,
     options: { ...DEFAULT_OPTIONS } as DexieCloudOptions,
     schema: null,
     get currentUserId() {
@@ -454,7 +455,8 @@ export function dexieCloud(dexie: Dexie) {
   }
 }
 
-dexieCloud.version = '{version}';
+// @ts-ignore
+dexieCloud.version = __VERSION__;
 
 Dexie.Cloud = dexieCloud;
 

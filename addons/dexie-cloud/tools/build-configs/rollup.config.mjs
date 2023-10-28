@@ -5,6 +5,7 @@ import nodeResolve from '@rollup/plugin-node-resolve';
 import { readFileSync, writeFileSync } from 'fs';
 import typescript from '@rollup/plugin-typescript';
 import terser from '@rollup/plugin-terser';
+import replace from '@rollup/plugin-replace'
 import pkg from '../../package.json' assert { type: 'json' };
 import fs from 'fs';
 
@@ -75,7 +76,8 @@ export function createRollupConfig(entry, outputName) {
           target: 'es2016',
         },
         declarationDir: 'dist/',
-        sourceMap: false, // Required (see https://stackoverflow.com/questions/63218218/rollup-is-not-generating-typescript-sourcemap)
+        //sourceMap: false, // Required (see https://stackoverflow.com/questions/63218218/rollup-is-not-generating-typescript-sourcemap)
+        inlineSources: true, // But this was even better because then we get the real source code in the sourcemap!
       }),
       //sourcemaps(),
       nodeResolve({
@@ -83,6 +85,12 @@ export function createRollupConfig(entry, outputName) {
         preferBuiltins: false,
       }),
       commonjs(),
+      replace({
+        preventAssignment: true,
+        values: {
+          "__VERSION__": JSON.stringify(pkg.version),
+        },
+      }),
     ],
   };
 }

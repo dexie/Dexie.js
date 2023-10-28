@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "4.0.1-beta.49",
+  "version": "4.0.1-beta.50",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/umd/dexie-cloud-addon.js",
   "type": "module",
@@ -74,6 +74,7 @@
   "devDependencies": {
     "@rollup/plugin-commonjs": "^25.0.7",
     "@rollup/plugin-node-resolve": "^15.2.3",
+    "@rollup/plugin-replace": "^5.0.4",
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^11.1.5",
     "@types/node": "^18.11.18",
