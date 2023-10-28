@@ -67,6 +67,32 @@ export function createRollupConfig(entry, outputName) {
         sourcemap: true,
         exports: 'named',
       },
+      {
+        file: `dist/umd/${outputName}.min.js`,
+        format: 'umd',
+        globals: {
+          dexie: 'Dexie',
+          rxjs: 'rxjs',
+          'rxjs/operators': 'rxjs.operators',
+        },
+        name: 'DexieCloud',
+        banner: readFileSync('tools/tmp/banner.txt', 'utf-8'),
+        sourcemap: true,
+        exports: 'named',
+        plugins: [
+          terser({
+            compress: {
+              drop_console: true,
+              drop_debugger: true,
+            },
+            mangle: true,
+            sourceMap: true,
+            output: {
+              comments: false,
+            },
+          }),
+        ],
+      },
     ],
     external: ['dexie', 'rxjs'],
     plugins: [
