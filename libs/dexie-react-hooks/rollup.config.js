@@ -11,7 +11,7 @@ const ERRORS_TO_IGNORE = [
 ];
 
 export default {
-  input: './src/index.ts',
+  input: './src/dexie-react-hooks.ts',
   output: [{
     file: 'dist/dexie-react-hooks.js',
     format: 'umd',
