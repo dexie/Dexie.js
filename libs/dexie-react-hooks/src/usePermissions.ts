@@ -41,7 +41,7 @@ export function usePermissions<T extends DexieCloudEntity>(
 >;
 export function usePermissions<
   TDB extends Dexie,
-  T extends { realmId: string; owner: string }
+  T
 >(db: TDB, table: TableProp<TDB>, obj: T): PermissionChecker<T, TableProp<TDB>>;
 export function usePermissions(
   firstArg:
