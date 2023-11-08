@@ -1,12 +1,17 @@
 {
   "name": "dexie-react-hooks",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "React hooks for reactive data fetching using Dexie.js",
   "main": "dist/dexie-react-hooks.js",
-  "typings": "dist/index.d.ts",
+  "typings": "dist/dexie-react-hooks.d.ts",
   "scripts": {
     "test": "just-build build-tests && just-build run-tests",
     "build": "just-build"
+  },
+  "exports": {
+    "import": "./dist/dexie-react-hooks.mjs",
+    "require": "./dist/dexie-react-hooks.js",
+    "default": "./dist/dexie-react-hooks.js"
   },
   "just-build": {
     "default": [

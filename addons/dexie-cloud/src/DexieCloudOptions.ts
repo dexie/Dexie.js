@@ -32,7 +32,7 @@ export interface DexieCloudOptions {
   // By default Dexie Cloud will suffix the cloud DB ID to your IndexedDB database name
   // in order to ensure that the local database is uniquely tied to the remote one and
   // will use another local database if databaseURL is changed or if dexieCloud addon
-  // is not being used anymoore.
+  // is not being used anymore.
   //
   // By setting this value to `false`, no suffix will be added to the database name and
   // instead, it will use the exact name that is specified in the Dexie constructor, 
@@ -41,6 +41,9 @@ export interface DexieCloudOptions {
 
   // Disable websocket connection
   disableWebSocket?: boolean;
+
+  // Disable automatic sync on changes
+  disableEagerSync?: boolean;
 
   // Provides a custom way of fetching the JWT tokens. This option
   // can be used when integrating with custom authentication.

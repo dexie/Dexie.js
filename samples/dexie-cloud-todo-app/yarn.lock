@@ -4862,28 +4862,28 @@ detect-port-alt@^1.1.6:
     address "^1.0.1"
     debug "^2.6.0"
 
-dexie-cloud-addon@^4.0.1-beta.44:
-  version "4.0.1-beta.45"
-  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-4.0.1-beta.45.tgz#1a9965298769b9c53f1afb7da98412a477671ac2"
-  integrity sha512-i9wMKMTISEusiVFVSyek5Gfe7S5M8nhaQhqjM96IYTYc18ICedB81PddKyJ4mrXya80pywB1vK4qc6CcjJAs1g==
+dexie-cloud-addon@^4.0.1-beta.48:
+  version "4.0.1-beta.48"
+  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-4.0.1-beta.48.tgz#7f1d595cf7a8559dae086ec55cba6f3948f43b22"
+  integrity sha512-gb4812HgiKkoAGvnxdD/CYH5Fj5A1dWjDM5wEpPC7NWghEe85hzLBMYphztE0nbidtsHXkkqr0OffpQXnlfOMQ==
   dependencies:
-    dexie-cloud-common "^1.0.27"
+    dexie-cloud-common "^1.0.31"
     rxjs "^7.x"
 
-dexie-cloud-common@^1.0.27:
-  version "1.0.27"
-  resolved "https://registry.yarnpkg.com/dexie-cloud-common/-/dexie-cloud-common-1.0.27.tgz#2e38f35f41c708c35926f8de800bd1f06860bd11"
-  integrity sha512-xwhmCrS+3W224I6qd9wrf5kiXnrgl9arWH0CHR6Srsg5TJe/D23Qyvx/UdktSjnv3XSecnhC+veuS5s3se3nyg==
+dexie-cloud-common@^1.0.31:
+  version "1.0.31"
+  resolved "https://registry.yarnpkg.com/dexie-cloud-common/-/dexie-cloud-common-1.0.31.tgz#f450cdd0f65c99b91d602ef141ce6c59d6947335"
+  integrity sha512-94Ag7YPcr3qkpljIQAU9xJq202SUQ7R2L6fg+tw7CZqRDCw+igz2mDppQEseimjPHHuaHpIKcQMYt/SQiohQJg==
 
 dexie-react-hooks@^1.1.6:
   version "1.1.6"
   resolved "https://registry.yarnpkg.com/dexie-react-hooks/-/dexie-react-hooks-1.1.6.tgz#42d4d4d314b049c23e2abe20c8543107ed85b0bd"
   integrity sha512-xSblWtmPwhafWNWMECsW7zMMmBu8goH3QqTxEfwBNoNG1mgsM0oFclippev7ss9HhKICqBwTjgqpscci5Ed4mA==
 
-dexie@^4.0.1-alpha.22:
-  version "4.0.1-alpha.23"
-  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.1-alpha.23.tgz#3d9cca4385459364535dc4e4c5fcbdb5bf58657b"
-  integrity sha512-zSK0TqDjXtXixYYCOStIdCqz0NFxj0Ioe+dbqMz1W8iG2esIrmRvOC5I/uZkwskmxpPAmZ2nKZcszKJHmDHEtw==
+dexie@^4.0.1-alpha.27:
+  version "4.0.1-alpha.27"
+  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.1-alpha.27.tgz#45c1c04539df57b33aac9e1e27d246af9bb2e924"
+  integrity sha512-IeuY5z3cLCowddBGRaFUnyH2q3/z/uVauXdQjGhAgRJ5D69NrDrOT/lBV/X4VsvZF8Cnnk30RXqA+yMJ7X3W9Q==
 
 didyoumean@^1.2.2:
   version "1.2.2"

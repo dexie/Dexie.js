@@ -50,12 +50,16 @@ export interface TokenFinalResponse {
   type: 'tokens';
   claims: {
     sub: string;
+    license?: 'ok' | 'expired' | 'deactivated';
     [claimName: string]: any;
   };
   accessToken: string;
   accessTokenExpiration: number;
   refreshToken?: string;
   refreshTokenExpiration?: number | null;
+  userType: 'demo' | 'eval' | 'prod' | 'client';
+  evalDaysLeft?: number;
+  userValidUntil?: number;
   alerts?: {
     type: 'warning' | 'info';
     messageCode: string;
@@ -67,6 +71,18 @@ export interface TokenFinalResponse {
 export interface TokenOtpSentResponse {
   type: 'otp-sent';
   otp_id: string;
+}
+
+export interface TokenErrorResponse {
+  type: 'error';
+  title: string;
+  messageCode:
+    | 'INVALID_OTP'
+    | 'INVALID_EMAIL'
+    | 'LICENSE_LIMIT_REACHED'
+    | 'GENERIC_ERROR';
+  message: string;
+  messageParams?: { [param: string]: string };
 }
 
 /** Can be returned when grant_type="refresh_token" if the given time_stamp differs too much
@@ -83,6 +99,7 @@ export interface TokenResponseInvalidTimestamp {
 export type TokenResponse =
   | TokenFinalResponse
   | TokenOtpSentResponse
+  | TokenErrorResponse
   | TokenResponseInvalidTimestamp;
 export interface CreateDbResponse {
   url: string;

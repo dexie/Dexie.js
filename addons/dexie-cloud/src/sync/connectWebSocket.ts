@@ -24,6 +24,7 @@ import {
   WSConnectionMsg,
   WSObservable,
 } from '../WSObservable';
+import { InvalidLicenseError } from '../InvalidLicenseError';
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -68,11 +69,14 @@ export function connectWebSocket(db: DexieCloudDB) {
           map((userLogin) => [userLogin, syncState] as const)
         )
       ),
-      switchMap(([userLogin, syncState]) =>
-        userIsReallyActive.pipe(
+      switchMap(([userLogin, syncState]) => {
+        /*if (userLogin.license?.status && userLogin.license.status !== 'ok') {
+          throw new InvalidLicenseError();
+        }*/
+        return userIsReallyActive.pipe(
           map((isActive) => [isActive ? userLogin : null, syncState] as const)
-        )
-      ),
+        );
+      }),
       switchMap(([userLogin, syncState]) => {
         if (userLogin?.isLoggedIn && !syncState?.realms.includes(userLogin.userId!)) {
           // We're in an in-between state when user is logged in but the user's realms are not yet synced.
@@ -126,16 +130,22 @@ export function connectWebSocket(db: DexieCloudDB) {
               await db.table('$logins').update(user.userId, {
                 accessToken: refreshedLogin.accessToken,
                 accessTokenExpiration: refreshedLogin.accessTokenExpiration,
+                claims: refreshedLogin.claims,
+                license: refreshedLogin.license,
               });
             }),
             switchMap(() => createObservable())
           );
         } else {
-          return throwError(error);
+          return throwError(()=>error);
         }
       }),
       catchError((error) => {
         db.cloud.webSocketStatus.next("error");
+        if (error instanceof InvalidLicenseError) {
+          // Don't retry. Just throw and don't try connect again.
+          return throwError(() => error);
+        }
         return from(waitAndReconnectWhenUserDoesSomething(error)).pipe(
           switchMap(() => createObservable())
         );

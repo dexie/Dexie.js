@@ -73,6 +73,8 @@ export interface DexieCloudAPI {
     grant_type?: 'demo' | 'otp';
   }): Promise<void>;
 
+  logout(options?: {force?: boolean}): Promise<void>;
+
   /**
    * Connect to given URL
    */

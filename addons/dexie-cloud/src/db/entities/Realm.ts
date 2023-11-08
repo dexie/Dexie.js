@@ -10,9 +10,7 @@ export interface Realm {
   name?: string;
 
   /** Contains the user-ID of the owner. An owner has implicit full write-access to the realm
-   * and all obejcts connected to it. Ownership does not imply read (sync) access though,
-   * so realm owners still needs to add themself as a member if they are going to use the realm
-   * themselves.
+   * and all obejcts connected to it.
    */
   owner?: string;
 }
