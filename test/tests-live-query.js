@@ -239,6 +239,27 @@ promisedTest("subscribe and error occur", async ()=> {
   subscription.unsubscribe();
 });
 
+promisedTest("optimistic updates that eventually fail must be reverted (Issue #1823)", async ()=>{
+  const log = [];
+  let subscription = liveQuery(
+    ()=>db.items.toArray()
+  ).subscribe({
+    next: result => {
+      log.push(result);
+      console.log("optimistic result (from #1823 test)", result);
+    },
+  });
+
+  await db.transaction('rw', db.items, async ()=>{
+    await db.items.add({id: 1, iWillFail: true}).catch(()=>{});
+  });
+  // Wait for a successful readonly transaction to complete after the write transaction.
+  // This will make sure that the liveQuery has been updated with the final result.
+  await db.transaction('r', db.items, ()=>db.items.toArray());
+  subscription.unsubscribe();
+  deepEqual(log.at(-1), [{id: 1},{id:2},{id:3}], "Last log entry contains the correct result. There might be optimistic updates before though.");
+});
+
 /* Use cases to cover:
 
   Queries
