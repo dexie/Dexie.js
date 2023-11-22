@@ -251,13 +251,21 @@ promisedTest("optimistic updates that eventually fail must be reverted (Issue #1
   });
 
   await db.transaction('rw', db.items, async ()=>{
-    await db.items.add({id: 1, iWillFail: true}).catch(()=>{});
+    // Simple test a catched failing operation
+    await db.items.add(
+      {id: 1, iWillFail: true} // Contraint error (key 1 already exists)
+    ).catch(()=>{});
+    // Test another code path in adjustOptimisticFromFailures() where some operations succeed and some not.
+    await db.items.bulkAdd([
+      {id: 2, iWillFail: true}, // Constraint error (key 2 already exists)
+      {id: 99, iWillSucceed: true}
+    ]).catch(()=>{});
   });
   // Wait for a successful readonly transaction to complete after the write transaction.
   // This will make sure that the liveQuery has been updated with the final result.
   await db.transaction('r', db.items, ()=>db.items.toArray());
   subscription.unsubscribe();
-  deepEqual(log.at(-1), [{id: 1},{id:2},{id:3}], "Last log entry contains the correct result. There might be optimistic updates before though.");
+  deepEqual(log.at(-1), [{id: 1},{id:2},{id:3},{id: 99, iWillSucceed: true}], "Last log entry contains the correct result. There might be optimistic updates before though.");
 });
 
 /* Use cases to cover:
