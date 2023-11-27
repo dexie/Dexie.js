@@ -212,11 +212,9 @@ props(DexiePromise.prototype, {
 
     finally: function (onFinally) {
         return this.then(value => {
-            onFinally();
-            return value;
+            return DexiePromise.resolve(onFinally()).then(()=>value);
         }, err => {
-            onFinally();
-            return PromiseReject(err);
+            return DexiePromise.resolve(onFinally()).then(()=>PromiseReject(err));
         });
     },
     
