@@ -8,6 +8,7 @@ import {
   decrementExpectedAwaits,
   endMicroTickScope,
   incrementExpectedAwaits,
+  NativePromise,
   newScope,
   PSD,
   usePSD,
@@ -43,11 +44,22 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         if (scopeFuncIsAsync) {
           incrementExpectedAwaits();
         }
-        const rv = newScope(querier, ctx);
+        let rv = newScope(querier, ctx);
         if (scopeFuncIsAsync) {
-          (rv as Promise<any>).finally(decrementExpectedAwaits);
+          // Make sure to set rv = rv.finally in order to wait to after decrementExpectedAwaits() has been called.
+          // This fixes zone leaking issue that the liveQuery zone can leak to observer's next microtask.
+          rv = (rv as Promise<any>).finally(decrementExpectedAwaits);
         }
-        return rv;
+        return Promise.resolve(rv).finally(()=>{
+          if (PSD.subscr === ctx.subscr) {
+            // Querier did not await all code paths. We must wait for the next macrotask to run in order to
+            // escape from zone echoing. Warn to console so that app code can be corrected. liveQuery callbacks
+            // shall be pure functions and should never spawn side effects - so there is never a need to call
+            // other async functions or generated promises without awaiting them.
+            console.warn(`Dexie liveQuery()'s querier callback did'nt await all of its spawned promises. Querier source: ${querier}`);
+            return new NativePromise(resolve => setTimeout(resolve, 0)); // Wait for the next macrotask to run.
+          }
+        });
       } finally {
         wasRootExec && endMicroTickScope(); // Given that we created the microtick scope, we must also end it.
       }
@@ -130,7 +142,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
           if (!objectIsEmpty(currentObs) && !startedListening) {
             globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
             startedListening = true;
-          }          
+          }
           observer.next && observer.next(result);
         },
         (err) => {
