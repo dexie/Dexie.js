@@ -422,6 +422,42 @@ promisedTest("Issue #1333 - uniqueKeys on virtual index should produce unique re
     ok(result.length === 2, `Unexpected array length ${result.length} from uniqueKeys on virtual index, expected 2. Got ${result.join(',')}`);
 });
 
+/** Reproduce customer issue where ReadonlyError was thrown when using liveQuery.
+ */
+promisedTest("Issue - ReadonlyError thrown in liveQuery despite user did not do write transactions", async () => {
+    // Encapsulating the code in a string to avoid transpilation. We need native await here to trigger bug.
+    ok(!Promise.PSD, "Must not be within async context when starting");
+    ok(db.isOpen(), "DB must be open when starting");
+    await new Promise(resolve => setTimeout(resolve, 10));
+    const F = new Function('ok', 'equal', 'Dexie', 'db', 'liveQuery', `
+        ok(true, "Got here");
+        return (async ()=>{
+            equal(Dexie.Promise.PSD.id, 'global', "PSD is the global PSD");
+            const observable = liveQuery(async () => {
+                console.debug("liveQuery executing");
+                const result = db.metrics.toArray();
+                console.debug("physicalTick executed by toArray");
+                return await result;
+            });
+            
+            equal(Dexie.Promise.PSD.id, 'global', "PSD is the global PSD");
+            ok(true, "Now awaiting promise subscribing to liveQuery observable");
+            console.log("before await in global");
+            await new Promise(resolve => {
+                const o = observable.subscribe(val => {
+                    o.unsubscribe();
+                    resolve(val);
+                });
+            });
+            console.log("after await in global");
+            console.log("Got result from observable");
+            equal(Dexie.Promise.PSD.id, "global", "PSD is still the global PSD");
+            await db.transaction('rw', db.metrics, () => {}); // Fails if we're in a liveQuery zone
+        })();
+    `);
+    return F(ok, equal, Dexie, db, liveQuery).catch(err => ok(false, 'final catch: '+err));
+});
+
 /** Try to reproduce customer issue where ReadonlyError was thrown when using liveQuery.
  * This repro is not good enough though as it doesn't fail in dexie@4.0.1-alpha.23.
  * Probably need to reproduce it in a more complex scenario with
