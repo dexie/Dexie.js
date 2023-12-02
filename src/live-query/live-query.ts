@@ -58,6 +58,11 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
             // other async functions or generated promises without awaiting them.
             console.warn(`Dexie liveQuery()'s querier callback did'nt await all of its spawned promises. Querier source: ${querier}`);
             return new NativePromise(resolve => setTimeout(resolve, 0)); // Wait for the next macrotask to run.
+            // @ts-ignore
+          } else if (Promise.PSD) {
+            // Still in async context (zone echoing) from another task. Wait for the next macrotask to run.
+            // @ts-ignore
+            return new NativePromise(resolve => setTimeout(resolve, 0)); // Wait for the next macrotask to run.
           }
         });
       } finally {
@@ -98,7 +103,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       }
     };
 
-    const doQuery = () => {
+    const _doQuery = () => {
       if (
         closed || // closed - don't run!
         !domDeps.indexedDB) // SSR in sveltekit, nextjs etc
@@ -154,6 +159,12 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         }
       );
     };
+
+    const doQuery = () => {
+      // @ts-ignore
+      if (PSD.global && !Promise.PSD) _doQuery();
+      else setTimeout(_doQuery, 0);
+    }
 
     doQuery();
     return subscription;
