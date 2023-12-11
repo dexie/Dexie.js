@@ -662,7 +662,7 @@ export function newScope (fn, props, a1, a2) {
         allSettled: DexiePromise.allSettled,
         any: DexiePromise.any,
         resolve: DexiePromise.resolve,
-        reject: DexiePromise.reject
+        reject: DexiePromise.reject,
     } : {};
     if (props) extend(psd, props);
     
