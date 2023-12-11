@@ -1,14 +1,19 @@
 {
   "name": "dexie-react-hooks",
-  "version": "1.1.6",
+  "version": "1.1.7",
   "description": "React hooks for reactive data fetching using Dexie.js",
   "main": "dist/dexie-react-hooks.js",
-  "typings": "dist/index.d.ts",
+  "typings": "dist/dexie-react-hooks.d.ts",
   "scripts": {
     "test": "just-build build-tests && just-build run-tests",
     "build": "just-build",
     "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test; UNIT_STATUS=$?; kill $(cat tunnel.pid); exit $UNIT_STATUS",
     "test:ltTunnel": "node ../../test/lt-local"
+  },
+  "exports": {
+    "import": "./dist/dexie-react-hooks.mjs",
+    "require": "./dist/dexie-react-hooks.js",
+    "default": "./dist/dexie-react-hooks.js"
   },
   "just-build": {
     "default": [

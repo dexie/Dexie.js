@@ -4862,28 +4862,28 @@ detect-port-alt@^1.1.6:
     address "^1.0.1"
     debug "^2.6.0"
 
-dexie-cloud-addon@^4.0.1-beta.40:
-  version "4.0.1-beta.40"
-  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-4.0.1-beta.40.tgz#7e4e360dbbae6b9bd1fde80e8f17db79536f18ab"
-  integrity sha512-vOUtUq+xMBVldRlRbF2xPqJEtq7OqNvobymWD3Ek4ceF6elG/Q9ShFMdJjBb6yjrKkPlPIZ8LJY2sUYULL2yhg==
+dexie-cloud-addon@^4.0.1-beta.48:
+  version "4.0.1-beta.48"
+  resolved "https://registry.yarnpkg.com/dexie-cloud-addon/-/dexie-cloud-addon-4.0.1-beta.48.tgz#7f1d595cf7a8559dae086ec55cba6f3948f43b22"
+  integrity sha512-gb4812HgiKkoAGvnxdD/CYH5Fj5A1dWjDM5wEpPC7NWghEe85hzLBMYphztE0nbidtsHXkkqr0OffpQXnlfOMQ==
   dependencies:
-    dexie-cloud-common "^1.0.26"
+    dexie-cloud-common "^1.0.31"
     rxjs "^7.x"
 
-dexie-cloud-common@^1.0.26:
-  version "1.0.26"
-  resolved "https://registry.yarnpkg.com/dexie-cloud-common/-/dexie-cloud-common-1.0.26.tgz#aa20065d3169360c363165aad8de89958dc24c44"
-  integrity sha512-RmS1tltx9GCv8oohI8DAzCifH5ctJTkf+Hz+1fMhKNU3GPfiewZusxEwdVIARnnCQnSNpVtGBEBhGQXQurbYLg==
+dexie-cloud-common@^1.0.31:
+  version "1.0.31"
+  resolved "https://registry.yarnpkg.com/dexie-cloud-common/-/dexie-cloud-common-1.0.31.tgz#f450cdd0f65c99b91d602ef141ce6c59d6947335"
+  integrity sha512-94Ag7YPcr3qkpljIQAU9xJq202SUQ7R2L6fg+tw7CZqRDCw+igz2mDppQEseimjPHHuaHpIKcQMYt/SQiohQJg==
 
 dexie-react-hooks@^1.1.6:
   version "1.1.6"
   resolved "https://registry.yarnpkg.com/dexie-react-hooks/-/dexie-react-hooks-1.1.6.tgz#42d4d4d314b049c23e2abe20c8543107ed85b0bd"
   integrity sha512-xSblWtmPwhafWNWMECsW7zMMmBu8goH3QqTxEfwBNoNG1mgsM0oFclippev7ss9HhKICqBwTjgqpscci5Ed4mA==
 
-dexie@^4.0.1-alpha.22:
-  version "4.0.1-alpha.22"
-  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.1-alpha.22.tgz#0dd6d1b5571e382cce5f8ae4be7c803c1d75d949"
-  integrity sha512-fCAlox70CSS4uSBxnP9PBisK1wx/hQBTZMEQM9VKnOcTFu9SfVVlNu2xZ7rLWSQDIJ4sZjzPhCDGQ2kQW3Lq3A==
+dexie@^4.0.1-alpha.27:
+  version "4.0.1-alpha.27"
+  resolved "https://registry.yarnpkg.com/dexie/-/dexie-4.0.1-alpha.27.tgz#45c1c04539df57b33aac9e1e27d246af9bb2e924"
+  integrity sha512-IeuY5z3cLCowddBGRaFUnyH2q3/z/uVauXdQjGhAgRJ5D69NrDrOT/lBV/X4VsvZF8Cnnk30RXqA+yMJ7X3W9Q==
 
 didyoumean@^1.2.2:
   version "1.2.2"
@@ -9646,9 +9646,9 @@ run-parallel@^1.1.9:
     queue-microtask "^1.2.2"
 
 rxjs@^7.x:
-  version "7.8.0"
-  resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-7.8.0.tgz#90a938862a82888ff4c7359811a595e14e1e09a4"
-  integrity sha512-F2+gxDshqmIub1KdvZkaEfGDwLNpPvk9Fs6LD/MyQxNgMds/WH9OdDDXOmxUZpME+iSK3rQCctkL0DYyytUqMg==
+  version "7.8.1"
+  resolved "https://registry.yarnpkg.com/rxjs/-/rxjs-7.8.1.tgz#6f6f3d99ea8044291efd92e7c7fcf562c4057543"
+  integrity sha512-AA3TVj+0A2iuIoQkWEK/tqFjBq2j+6PO6Y0zJcvzLAFhEFIO3HL0vls9hWLncZbAAbK0mar7oZ4V079I/qPMxg==
   dependencies:
     tslib "^2.1.0"
 
@@ -10589,9 +10589,9 @@ tslib@^2.0.3:
   integrity sha512-hcVC3wYEziELGGmEEXue7D75zbwIIVUMWAVbHItGPx0ziyXxrOMQx4rQEVEV45Ut/1IotuEvwqPopzIOkDMf0A==
 
 tslib@^2.1.0:
-  version "2.3.0"
-  resolved "https://registry.npmjs.org/tslib/-/tslib-2.3.0.tgz"
-  integrity sha512-N82ooyxVNm6h1riLCoyS9e3fuJ3AMG2zIZs2Gd1ATcSFjSA23Q0fzjjZeh0jbJvWVDZ0cJT8yaNNaaXHzueNjg==
+  version "2.6.0"
+  resolved "https://registry.yarnpkg.com/tslib/-/tslib-2.6.0.tgz#b295854684dbda164e181d259a22cd779dcd7bc3"
+  integrity sha512-7At1WUettjcSRHXCyYtTselblcHl9PJFFVKiCAy/bY97+BPZXSQ2wbq0P9s8tK2G7dFQfNnlJnPAiArVBVBsfA==
 
 tslib@^2.4.0:
   version "2.5.3"

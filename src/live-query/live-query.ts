@@ -1,11 +1,15 @@
-import { isAsyncFunction, keys, objectIsEmpty } from '../functions/utils';
+import { _global, isAsyncFunction, keys, objectIsEmpty } from '../functions/utils';
 import {
   globalEvents,
   DEXIE_STORAGE_MUTATED_EVENT_NAME,
 } from '../globals/global-events';
 import {
+  beginMicroTickScope,
   decrementExpectedAwaits,
+  endMicroTickScope,
+  execInGlobalContext,
   incrementExpectedAwaits,
+  NativePromise,
   newScope,
   PSD,
   usePSD,
@@ -27,6 +31,7 @@ export interface LiveQueryContext {
   signal: AbortSignal;
   requery: () => void;
   trans: null | Transaction;
+  querier: Function; // For debugging purposes and Error messages
 }
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
@@ -35,14 +40,21 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
   const observable = new Observable<T>((observer) => {
     const scopeFuncIsAsync = isAsyncFunction(querier);
     function execute(ctx: LiveQueryContext) {
-      if (scopeFuncIsAsync) {
-        incrementExpectedAwaits();
+      const wasRootExec = beginMicroTickScope(); // Performance: Avoid starting a new microtick scope within the async context.
+      try {
+        if (scopeFuncIsAsync) {
+          incrementExpectedAwaits();
+        }
+        let rv = newScope(querier, ctx);
+        if (scopeFuncIsAsync) {
+          // Make sure to set rv = rv.finally in order to wait to after decrementExpectedAwaits() has been called.
+          // This fixes zone leaking issue that the liveQuery zone can leak to observer's next microtask.
+          rv = (rv as Promise<any>).finally(decrementExpectedAwaits);
+        }
+        return rv;
+      } finally {
+        wasRootExec && endMicroTickScope(); // Given that we created the microtick scope, we must also end it.
       }
-      const rv = newScope(querier, ctx);
-      if (scopeFuncIsAsync) {
-        (rv as Promise<any>).finally(decrementExpectedAwaits);
-      }
-      return rv;
     }
 
     let closed = false;
@@ -67,6 +79,8 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
 
     let startedListening = false;
 
+    const doQuery = () => execInGlobalContext(_doQuery);
+
     function shouldNotify() {
       return obsSetsOverlap(currentObs, accumMuts);
     }
@@ -78,7 +92,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       }
     };
 
-    const doQuery = () => {
+    const _doQuery = () => {
       if (
         closed || // closed - don't run!
         !domDeps.indexedDB) // SSR in sveltekit, nextjs etc
@@ -99,6 +113,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         subscr,
         signal: abortController.signal,
         requery: doQuery,
+        querier,
         trans: null // Make the scope transactionless (don't reuse transaction from outer scope of the caller of subscribe())
       }
       const ret = execute(ctx);
@@ -106,7 +121,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         (result) => {
           hasValue = true;
           currentValue = result;
-          if (closed || ctx.signal.aborted) {
+          if (closed || ctx.signal.aborted) {
             // closed - no subscriber anymore.
             // signal.aborted - new query was made before this one completed and
             // the querier might have catched AbortError and return successful result.
@@ -121,20 +136,30 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
           if (!objectIsEmpty(currentObs) && !startedListening) {
             globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
             startedListening = true;
-          }          
-          observer.next && observer.next(result);
+          }
+          execInGlobalContext(()=>!closed && observer.next && observer.next(result));
         },
         (err) => {
           hasValue = false;
           if (!['DatabaseClosedError', 'AbortError'].includes(err?.name)) {
-            if (closed) return;
-            observer.error && observer.error(err);
+            if (!closed) execInGlobalContext(()=>{
+              if (closed) return;
+              observer.error && observer.error(err);
+            });
           }
         }
       );
     };
 
-    doQuery();
+    // Use setTimeot here to guarantee execution in a private macro task before and
+    // after. The helper executeInGlobalContext(_doQuery) is not enough here because
+    // caller of `subscribe()` could be anything, such as a frontend framework that will
+    // continue in the same tick after subscribe() is called and call other
+    // eftects, that could involve dexie operations such as writing to the DB.
+    // If that happens, the private zone echoes from a live query tast started here
+    // could still be ongoing when the other operations start and make them inherit
+    // the async context from a live query.
+    setTimeout(doQuery, 0);
     return subscription;
   });
   observable.hasValue = () => hasValue;

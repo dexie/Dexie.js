@@ -1,26 +1,30 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { triggerSync } from '../sync/triggerSync';
-import { authenticate } from './authenticate';
+import { authenticate, loadAccessToken } from './authenticate';
 import { AuthPersistedContext } from './AuthPersistedContext';
+import { logout } from './logout';
 import { otpFetchTokenCallback } from './otpFetchTokenCallback';
 import { setCurrentUser } from './setCurrentUser';
+import { UNAUTHORIZED_USER } from './UNAUTHORIZED_USER';
 
 export async function login(
   db: DexieCloudDB,
   hints?: { email?: string; userId?: string; grant_type?: string }
 ) {
   const currentUser = await db.getCurrentUser();
-  if (currentUser.isLoggedIn) {
-    if (hints) {
-      if (hints.email && db.cloud.currentUser.value.email !== hints.email) {
-        throw new Error(`Must logout before changing user`);
-      }
-      if (hints.userId && db.cloud.currentUserId !== hints.userId) {
-        throw new Error(`Must logout before changing user`);
-      }
+  const origUserId = currentUser.userId;
+  if (currentUser.isLoggedIn && (!hints || (!hints.email && !hints.userId))) {
+    const licenseStatus = currentUser.license?.status || 'ok';
+    if (licenseStatus === 'ok' && currentUser.accessToken && (!currentUser.accessTokenExpiration || currentUser.accessTokenExpiration.getTime() > Date.now())) {
+      // Already authenticated according to given hints. And license is valid.
+      return false;
     }
-    // Already authenticated according to given hints.
-    return false;
+    if (currentUser.refreshToken && (!currentUser.refreshTokenExpiration || currentUser.refreshTokenExpiration.getTime() > Date.now())) {
+      // Refresh the token
+      await loadAccessToken(db);
+      return false;
+    }
+    // No refresh token - must re-authenticate:
   }
   const context = new AuthPersistedContext(db, {
     claims: {},
@@ -33,7 +37,12 @@ export async function login(
     db.cloud.userInteraction,
     hints
   );
-  try {
+  if (origUserId !== UNAUTHORIZED_USER.userId && context.userId !== origUserId) {
+    // User was logged in before, but now logged in as another user.
+    await logout(db);
+  }
+
+  /*try {
     await context.save();
   } catch (e) {
     try {
@@ -44,10 +53,11 @@ export async function login(
       }
     } catch {}
     throw e;
-  }
+  }*/
   await setCurrentUser(db, context);
   // Make sure to resync as the new login will be authorized
   // for new realms.
   triggerSync(db, "pull");
-  return true;
+  return context.userId !== origUserId;
 }
+

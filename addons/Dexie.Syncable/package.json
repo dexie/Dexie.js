@@ -58,6 +58,7 @@
       "rollup -c tools/build-configs/rollup.config.js",
       "rollup -c tools/build-configs/rollup.tests.config.js",
       "node tools/replaceVersionAndDate.js dist/dexie-syncable.js",
+      "node tools/replaceVersionAndDate.js test/unit/bundle.js",
       "# eslint ",
       "eslint src --cache"
     ],

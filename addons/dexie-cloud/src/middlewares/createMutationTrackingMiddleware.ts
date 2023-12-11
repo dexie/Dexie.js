@@ -6,7 +6,7 @@ import {
   DBCorePutRequest,
   DBCoreTable,
   DBCoreTransaction,
-  Middleware
+  Middleware,
 } from 'dexie';
 import { DBOperation } from 'dexie-cloud-common';
 import { BehaviorSubject } from 'rxjs';
@@ -19,6 +19,8 @@ import { guardedTable } from '../middleware-helpers/guardedTable';
 import { registerSyncEvent } from '../sync/registerSyncEvent';
 import { TXExpandos } from '../types/TXExpandos';
 import { outstandingTransactions } from './outstandingTransaction';
+import { isEagerSyncDisabled } from '../isEagerSyncDisabled';
+import { triggerSync } from '../sync/triggerSync';
 
 export interface MutationTrackingMiddlewareArgs {
   currentUserObservable: BehaviorSubject<UserLogin>;
@@ -35,7 +37,7 @@ export interface MutationTrackingMiddlewareArgs {
  */
 export function createMutationTrackingMiddleware({
   currentUserObservable,
-  db
+  db,
 }: MutationTrackingMiddlewareArgs): Middleware<DBCore> {
   return {
     stack: 'dbcore',
@@ -50,7 +52,7 @@ export function createMutationTrackingMiddleware({
         mutTableMap = new Map(
           ordinaryTables.map((tbl) => [
             tbl.name,
-            core.table(`$${tbl.name}_mutations`)
+            core.table(`$${tbl.name}_mutations`),
           ])
         );
       } catch {
@@ -78,6 +80,7 @@ export function createMutationTrackingMiddleware({
           if (mode === 'readwrite') {
             // Give each transaction a globally unique id.
             tx.txid = randomString(16);
+            tx.opCount = 0;
             // Introduce the concept of current user that lasts through the entire transaction.
             // This is important because the tracked mutations must be connected to the user.
             tx.currentUser = currentUserObservable.value;
@@ -91,13 +94,11 @@ export function createMutationTrackingMiddleware({
               outstandingTransactions.next(outstandingTransactions.value);
             };
             const txComplete = () => {
-              if (tx.mutationsAdded && db.cloud.options?.databaseUrl) {
-                if (db.cloud.usingServiceWorker) {
-                  console.debug('registering sync event');
-                  registerSyncEvent(db, "push");
-                } else {
-                  db.localSyncEvent.next({purpose: "push"});
-                }
+              if (
+                tx.mutationsAdded &&
+                !isEagerSyncDisabled(db)
+              ) {
+                triggerSync(db, 'push');
               }
               removeTransaction();
             };
@@ -124,7 +125,7 @@ export function createMutationTrackingMiddleware({
                     ).mutationsAdded = true;
                   }
                   return table.mutate(req);
-                }
+                },
               };
             } else if (tableName === '$logins') {
               return {
@@ -145,7 +146,7 @@ export function createMutationTrackingMiddleware({
                       console.debug('Failed mutation $logins', err);
                       return Promise.reject(err);
                     });
-                }
+                },
               };
             } else {
               return table;
@@ -159,7 +160,8 @@ export function createMutationTrackingMiddleware({
               const trans = req.trans as DBCoreTransaction & TXExpandos;
               if (!trans.txid) return table.mutate(req); // Upgrade transactions not guarded by us.
               if (trans.disableChangeTracking) return table.mutate(req);
-              if (!db.cloud.schema?.[tableName]?.markedForSync) return table.mutate(req);
+              if (!db.cloud.schema?.[tableName]?.markedForSync)
+                return table.mutate(req);
               if (!trans.currentUser?.isLoggedIn) {
                 // Unauthorized user should not log mutations.
                 // Instead, after login all local data should be logged at once.
@@ -172,7 +174,7 @@ export function createMutationTrackingMiddleware({
                     .query({
                       query: { range: req.range, index: schema.primaryKey },
                       trans: req.trans,
-                      values: false
+                      values: false,
                     })
                     // Do a delete request instead, but keep the criteria info for the server to execute
                     .then((res) => {
@@ -180,11 +182,11 @@ export function createMutationTrackingMiddleware({
                         type: 'delete',
                         keys: res.result,
                         trans: req.trans,
-                        criteria: { index: null, range: req.range }
+                        criteria: { index: null, range: req.range },
                       });
                     })
                 : mutateAndLog(req);
-            }
+            },
           });
 
           function mutateAndLog(
@@ -194,9 +196,10 @@ export function createMutationTrackingMiddleware({
             trans.mutationsAdded = true;
             const {
               txid,
-              currentUser: { userId }
+              currentUser: { userId },
             } = trans;
             const { type } = req;
+            const opNo = ++trans.opCount;
 
             return table.mutate(req).then((res) => {
               const { numFailures: hasFailures, failures } = res;
@@ -214,48 +217,53 @@ export function createMutationTrackingMiddleware({
                   ? {
                       type: 'delete',
                       ts,
+                      opNo,
                       keys,
                       criteria: req.criteria,
                       txid,
-                      userId
+                      userId,
                     }
                   : req.type === 'add'
                   ? {
                       type: 'insert',
                       ts,
+                      opNo,
                       keys,
                       txid,
                       userId,
-                      values
+                      values,
                     }
                   : req.criteria && req.changeSpec
                   ? {
                       // Common changeSpec for all keys
                       type: 'modify',
                       ts,
+                      opNo,
                       keys,
                       criteria: req.criteria,
                       changeSpec: req.changeSpec,
                       txid,
-                      userId
+                      userId,
                     }
                   : updates
                   ? {
                       // One changeSpec per key
                       type: 'update',
                       ts,
+                      opNo,
                       keys: updates.keys,
                       changeSpecs: updates.changeSpecs,
                       txid,
-                      userId
+                      userId,
                     }
                   : {
                       type: 'upsert',
                       ts,
+                      opNo,
                       keys,
                       values,
                       txid,
-                      userId
+                      userId,
                     };
               return keys.length > 0 || ('criteria' in req && req.criteria)
                 ? mutsTable
@@ -264,8 +272,8 @@ export function createMutationTrackingMiddleware({
                 : res;
             });
           }
-        }
+        },
       };
-    }
+    },
   };
 }

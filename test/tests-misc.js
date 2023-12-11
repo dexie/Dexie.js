@@ -1,4 +1,4 @@
-import Dexie from 'dexie';
+import Dexie, { liveQuery } from 'dexie';
 import {module, stop, start, asyncTest, equal, deepEqual, ok} from 'QUnit';
 import {resetDatabase, spawnedTest, promisedTest, supports, isIE, isEdge} from './dexie-unittest-utils';
 
@@ -420,4 +420,49 @@ promisedTest("Issue #1333 - uniqueKeys on virtual index should produce unique re
     await db.metrics.add({ id: "id3", name: "a", time: 3 });
     const result = await db.metrics.orderBy("name").uniqueKeys();
     ok(result.length === 2, `Unexpected array length ${result.length} from uniqueKeys on virtual index, expected 2. Got ${result.join(',')}`);
+});
+
+/** Reproduce customer issue where ReadonlyError was thrown when using liveQuery.
+ */
+promisedTest("Issue - ReadonlyError thrown in liveQuery despite user did not do write transactions", async () => {
+    // Encapsulating the code in a string to avoid transpilation. We need native await here to trigger bug.
+    ok(!Promise.PSD, "Must not be within async context when starting");
+    ok(db.isOpen(), "DB must be open when starting");
+    await new Promise(resolve => setTimeout(resolve, 10));
+    const F = new Function('ok', 'equal', 'Dexie', 'db', 'liveQuery', `
+        ok(true, "Got here");
+        return (async ()=>{
+            equal(Dexie.Promise.PSD.id, 'global', "PSD is the global PSD");
+            const observable = liveQuery(async () => {
+                console.debug("liveQuery executing");
+                const result = await db.metrics.toArray();
+                //await 3;
+                async function foo() {
+                    console.log("qm PSD.id = " + Dexie.Promise.PSD?.id);
+                    await db.metrics.toArray();
+                    console.log("qm PSD.id = " + Dexie.Promise.PSD?.id);
+                }
+                foo(); // Be naughty and spawn promises that we don't await.
+                // Verify that we handle this situation and escape from zone echoing before
+                // we return the result.
+                return result;
+            });
+            
+            equal(Dexie.Promise.PSD.id, 'global', "PSD is the global PSD");
+            ok(true, "Now awaiting promise subscribing to liveQuery observable");
+            console.log("before await in global");
+            await new Promise(resolve => {
+                const o = observable.subscribe(val => {
+                    o.unsubscribe();
+                    console.log("PSD.id = " + Dexie.Promise.PSD?.id);
+                    resolve(val);
+                });
+            });
+            console.log("after await in global");
+            console.log("Got result from observable");
+            equal(Dexie.Promise.PSD.id, "global", "PSD is still the global PSD");
+            await db.transaction('rw', db.metrics, () => {}); // Fails if we're in a liveQuery zone
+        })();
+    `);
+    return F(ok, equal, Dexie, db, liveQuery).catch(err => ok(false, 'final catch: '+err));
 });

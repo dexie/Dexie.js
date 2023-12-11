@@ -67,6 +67,8 @@ function changeAccess(
       db.members
         .where({ realmId, userId: todoList.owner })
         .modify({ roles: ['manager'] });
+      // Change owner of all members in the realm:
+      db.members.where({ realmId }).modify({ owner: member.userId });
       // Change owner of the todo list:
       db.todoLists.update(todoList, { owner: member.userId });
       // Change owner of realm:

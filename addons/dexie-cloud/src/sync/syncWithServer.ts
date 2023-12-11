@@ -9,10 +9,11 @@ import {
   DBOperationsSet,
   DexieCloudSchema,
   SyncRequest,
-  SyncResponse
+  SyncResponse,
 } from 'dexie-cloud-common';
 import { encodeIdsForServer } from './encodeIdsForServer';
 import { UserLogin } from '../db/entities/UserLogin';
+import { updateSyncRateLimitDelays } from './ratelimit';
 //import {BisonWebStreamReader} from "dreambase-library/dist/typeson-simplified/BisonWebStreamReader";
 
 export async function syncWithServer(
@@ -30,39 +31,55 @@ export async function syncWithServer(
   //
   const headers: HeadersInit = {
     Accept: 'application/json, application/x-bison, application/x-bison-stream',
-    'Content-Type': 'application/tson'
+    'Content-Type': 'application/tson',
   };
-  const accessToken = await loadAccessToken(db);
+  const updatedUser = await loadAccessToken(db);
+  /*
+  if (updatedUser?.license && changes.length > 0) {
+    if (updatedUser.license.status === 'expired') {
+      throw new Error(`License has expired`);
+    }
+    if (updatedUser.license.status === 'deactivated') {
+      throw new Error(`License deactivated`);
+    }
+  }
+  */
+  const accessToken = updatedUser?.accessToken;
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
   const syncRequest: SyncRequest = {
-    v:2,
+    v: 2,
     dbID: syncState?.remoteDbId,
     clientIdentity,
     schema: schema || {},
-    lastPull: syncState ? {
-      serverRevision: syncState.serverRevision!,
-      realms: syncState.realms,
-      inviteRealms: syncState.inviteRealms
-    } : undefined,
+    lastPull: syncState
+      ? {
+          serverRevision: syncState.serverRevision!,
+          realms: syncState.realms,
+          inviteRealms: syncState.inviteRealms,
+        }
+      : undefined,
     baseRevs,
-    changes: encodeIdsForServer(db.dx.core.schema, currentUser, changes)
+    changes: encodeIdsForServer(db.dx.core.schema, currentUser, changes),
   };
-  console.debug("Sync request", syncRequest);
+  console.debug('Sync request', syncRequest);
   db.syncStateChangedEvent.next({
     phase: 'pushing',
   });
   const res = await fetch(`${databaseUrl}/sync`, {
     method: 'post',
     headers,
-    body: TSON.stringify(syncRequest)
+    credentials: 'include', // For Arr Affinity cookie only, for better Rate-Limit counting only.
+    body: TSON.stringify(syncRequest),
   });
   //const contentLength = Number(res.headers.get('content-length'));
   db.syncStateChangedEvent.next({
-    phase: 'pulling'
+    phase: 'pulling',
   });
+
+  updateSyncRateLimitDelays(db, res);
 
   if (!res.ok) {
     throw new HttpError(res);

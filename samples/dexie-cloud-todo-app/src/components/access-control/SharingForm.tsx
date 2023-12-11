@@ -125,7 +125,7 @@ function MemberRow({
   if (isMe) memberText += ' (me)';
 
   return (
-    <tr>
+    <tr style={member.accepted ? {} : {opacity: 0.5}}>
       <td style={{ paddingRight: 12 }}>{memberText}</td>
       <td>
         <EditMember member={member} todoList={todoList} />
@@ -137,6 +137,8 @@ function MemberRow({
               className="button"
               onClick={() => todoList.unshareWith(member)}
             >
+              {!!member.rejected && <span style={{fontStyle: 'italic'}}>Rejected </span>}
+              {!member.rejected && !member.accepted && <span style={{fontStyle: 'italic'}}>Pending invite </span>}
               <FontAwesomeIcon icon={faTrash} />
             </button>
           </div>

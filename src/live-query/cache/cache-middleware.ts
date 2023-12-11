@@ -4,10 +4,11 @@ import { deepClone, delArrayItem, setByKeyPath } from '../../functions/utils';
 import DexiePromise, { PSD } from '../../helpers/promise';
 import { ObservabilitySet } from '../../public/types/db-events';
 import {
-  DBCore, DBCoreQueryRequest,
+  DBCore, DBCoreMutateRequest, DBCoreMutateResponse, DBCoreQueryRequest,
   DBCoreQueryResponse
 } from '../../public/types/dbcore';
 import { Middleware } from '../../public/types/middleware';
+import { adjustOptimisticFromFailures } from './adjust-optimistic-request-from-failures';
 import { applyOptimisticOps } from './apply-optimistic-ops';
 import { cache } from './cache';
 import { findCompatibleQuery } from './find-compatible-query';
@@ -127,7 +128,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
         const primKey = downTable.schema.primaryKey;
         const tableMW = {
           ...downTable,
-          mutate(req) {
+          mutate(req: DBCoreMutateRequest): Promise<DBCoreMutateResponse> {
             if (
               primKey.outbound || // Non-inbound tables are harded to apply optimistic updates on because we can't know primary key of results
               PSD.trans.db._options.cache === 'disabled' // User has opted-out from caching
@@ -157,7 +158,8 @@ export const cacheMiddleware: Middleware<DBCore> = {
                     return valueWithKey;
                   })
                 };
-                tblCache.optimisticOps.push(reqWithResolvedKeys);
+                const adjustedReq = adjustOptimisticFromFailures(tblCache, reqWithResolvedKeys, res);
+                tblCache.optimisticOps.push(adjustedReq);
                 // Signal subscribers after the observability middleware has complemented req.mutatedParts with the new keys.
                 // We must queue the task so that we get the req.mutatedParts updated by observability middleware first.
                 // If we refactor the dependency between observability middleware and this middleware we might not need to queue the task.
@@ -168,6 +170,17 @@ export const cacheMiddleware: Middleware<DBCore> = {
               tblCache.optimisticOps.push(req);
               // Signal subscribers that there are mutated parts
               signalSubscribersLazily(req.mutatedParts);
+              promise.then((res) => {
+                if (res.numFailures > 0) {
+                  // In case the operation failed, we need to remove it from the optimisticOps array.
+                  delArrayItem(tblCache.optimisticOps, req);
+                  const adjustedReq = adjustOptimisticFromFailures(tblCache, req, res);
+                  if (adjustedReq) {
+                    tblCache.optimisticOps.push(adjustedReq);
+                  }
+                  signalSubscribersLazily(req.mutatedParts); // Signal the rolling back of the operation.
+                }
+              });
               promise.catch(()=> {
                 // In case the operation failed, we need to remove it from the optimisticOps array.
                 delArrayItem(tblCache.optimisticOps, req);

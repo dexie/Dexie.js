@@ -95,7 +95,7 @@ export interface Dexie {
     scope: (trans: TXWithTables<this>) => PromiseLike<U> | U
   ): PromiseExtended<U>;
   
-  close(): void;
+  close(closeOptions?: {disableAutoOpen: boolean}): void;
 
   delete(): PromiseExtended<void>;
 

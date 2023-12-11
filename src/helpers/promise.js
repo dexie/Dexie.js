@@ -70,26 +70,9 @@ var stack_being_generated = false;
    db.ready().then() for every operation to make sure the indexedDB event is started in an
    indexedDB-compatible emulated micro task loop.
 */
-var schedulePhysicalTick = resolvedGlobalPromise ?
-    () => {resolvedGlobalPromise.then(physicalTick);}
-    :
-    _global.setImmediate ? 
-        // setImmediate supported. Those modern platforms also supports Function.bind().
-        setImmediate.bind(null, physicalTick) :
-        _global.MutationObserver ?
-            // MutationObserver supported
-            () => {
-                var hiddenDiv = document.createElement("div");
-                (new MutationObserver(() => {
-                    physicalTick();
-                    hiddenDiv = null;
-                })).observe(hiddenDiv, { attributes: true });
-                hiddenDiv.setAttribute('i', '1');
-            } :
-            // No support for setImmediate or MutationObserver. No worry, setTimeout is only called
-            // once time. Every tick that follows will be our emulated micro tick.
-            // Could have uses setTimeout.bind(null, 0, physicalTick) if it wasnt for that FF13 and below has a bug 
-            ()=>{setTimeout(physicalTick,0);};
+function schedulePhysicalTick() {
+    queueMicrotask(physicalTick);
+}
 
 // Configurable through Promise.scheduler.
 // Don't export because it would be unsafe to let unknown
@@ -229,11 +212,9 @@ props(DexiePromise.prototype, {
 
     finally: function (onFinally) {
         return this.then(value => {
-            onFinally();
-            return value;
+            return DexiePromise.resolve(onFinally()).then(()=>value);
         }, err => {
-            onFinally();
-            return PromiseReject(err);
+            return DexiePromise.resolve(onFinally()).then(()=>PromiseReject(err));
         });
     },
     
@@ -543,11 +524,15 @@ function linkToPreviousPromise(promise, prev) {
     }
 }
 
-/* The callback to schedule with setImmediate() or setTimeout().
+/* The callback to schedule with queueMicrotask().
    It runs a virtual microtick and executes any callback registered in microtickQueue.
  */
 function physicalTick() {
-    beginMicroTickScope() && endMicroTickScope();
+    usePSD(globalPSD, ()=>{
+        // Make sure to reset the async context to globalPSD before
+        // executing any of the microtick subscribers.
+        beginMicroTickScope() && endMicroTickScope();
+    });
 }
 
 export function beginMicroTickScope() {
@@ -655,7 +640,7 @@ export function wrap (fn, errorCatcher) {
 const task = { awaits: 0, echoes: 0, id: 0}; // The ongoing macro-task when using zone-echoing.
 var taskCounter = 0; // ID counter for macro tasks.
 var zoneStack = []; // Stack of left zones to restore asynchronically.
-var zoneEchoes = 0; // zoneEchoes is a must in order to persist zones between native await expressions.
+var zoneEchoes = 0; // When > 0, zoneLeaveEcho is queued. When 0 and task.echoes is also 0, nothing is queued.
 var totalEchoes = 0; // ID counter for micro-tasks. Used to detect possible native await in our Promise.prototype.then.
 
 
@@ -739,8 +724,9 @@ export function onPossibleParallellAsync (possiblePromise) {
 function zoneEnterEcho(targetZone) {
     ++totalEchoes;
     //console.log("Total echoes ", totalEchoes);
+    //if (task.echoes === 1) console.warn("Cancelling echoing of async context.");
     if (!task.echoes || --task.echoes === 0) {
-        task.echoes = task.id = 0; // Cancel zone echoing.
+        task.echoes = task.awaits = task.id = 0; // Cancel echoing.
     }
 
     zoneStack.push(PSD);
@@ -758,7 +744,7 @@ function switchToZone (targetZone, bEnteringZone) {
     if (bEnteringZone ? task.echoes && (!zoneEchoes++ || targetZone !== PSD) : zoneEchoes && (!--zoneEchoes || targetZone !== PSD)) {
         // Enter or leave zone asynchronically as well, so that tasks initiated during current tick
         // will be surrounded by the zone when they are invoked.
-        enqueueNativeMicroTask(bEnteringZone ? zoneEnterEcho.bind(null, targetZone) : zoneLeaveEcho);
+        queueMicrotask(bEnteringZone ? zoneEnterEcho.bind(null, targetZone) : zoneLeaveEcho);
     }
     if (targetZone === PSD) return;
 
@@ -822,13 +808,6 @@ export function usePSD (psd, fn, a1, a2, a3) {
     }
 }
 
-function enqueueNativeMicroTask (job) {
-    //
-    // Precondition: nativePromiseThen !== undefined
-    //
-    nativePromiseThen.call(resolvedNativePromise, job);
-}
-
 function nativeAwaitCompatibleWrap(fn, zone, possibleAwait, cleanup) {
     return typeof fn !== 'function' ? fn : function () {
         var outerZone = PSD;
@@ -838,7 +817,7 @@ function nativeAwaitCompatibleWrap(fn, zone, possibleAwait, cleanup) {
             return fn.apply(this, arguments);
         } finally {
             switchToZone(outerZone, false);
-            if (cleanup) enqueueNativeMicroTask(decrementExpectedAwaits);
+            if (cleanup) queueMicrotask(decrementExpectedAwaits);
         }
     };
 }
@@ -849,6 +828,19 @@ function getPatchedPromiseThen (origThen, zone) {
             nativeAwaitCompatibleWrap(onResolved, zone),
             nativeAwaitCompatibleWrap(onRejected, zone));
     };
+}
+
+/** Execute callback in global context */
+export function execInGlobalContext(cb) {
+    if (Promise === NativePromise && task.echoes === 0) {
+        if (zoneEchoes === 0) {
+            cb();
+        } else {
+            enqueueNativeMicroTask(cb);
+        }
+    } else {
+        setTimeout(cb, 0);
+    }
 }
 
 export var rejection = DexiePromise.reject;
