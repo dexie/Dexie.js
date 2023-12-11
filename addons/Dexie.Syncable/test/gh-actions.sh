@@ -11,5 +11,5 @@ echo "Building dexie-syncable"
 pnpm run build
 
 pnpm run test:typings
-pnpm run test:unit
-pnpm run test:integration
+pnpm run test:ltcloud
+pnpm run test:ltcloud:integration

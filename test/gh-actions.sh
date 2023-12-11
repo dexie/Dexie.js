@@ -1,3 +1,7 @@
 #!/bin/bash -e
 pnpm run test:typings
-pnpm run test:unit
+if [ "$LAMBDATEST" == "true" ]; then
+  pnpm run test:ltcloud
+else
+  pnpm run test:unit
+fi

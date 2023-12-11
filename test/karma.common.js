@@ -1,19 +1,62 @@
 /* Base karma configurations to require and extend from other karma.conf.js
  */
-let karmaCommon;
-const ltBrowsers = require('./karma.lambdatest.js').customLaunchers;
+const karmaCommon = {
+  hostname: 'localhost.lambdatest.com',
+  frameworks: ['qunit'],
 
-const webdriverConfig = {
-  hostname: 'hub.lambdatest.com',
-  port: 80,
-};
+  reporters: ['mocha'],
 
-const webdriverConfigMobile = {
-  hostname: 'mobile-hub.lambdatest.com',
-  port: 80,
+  client: {
+    captureConsole: false,
+  },
+
+  colors: true,
+
+  browserNoActivityTimeout: 2 * 60 * 1000,
+  browserDisconnectTimeout: 10000,
+  processKillTimeout: 10000,
+  browserSocketTimeout: 20000,
+
+  plugins: [
+    'karma-qunit',
+    'karma-mocha-reporter',
+    'karma-chrome-launcher',
+    'karma-firefox-launcher',
+    'karma-webdriver-launcher'
+  ],
+
+  files: [
+    'test/babel-polyfill/polyfill.min.js',
+    'node_modules/qunitjs/qunit/qunit.js',
+    'test/karma-env.js',
+    {
+      pattern: 'test/worker.js',
+      watched: true,
+      included: false,
+      served: true,
+    },
+    {
+      pattern: '!(node_modules|tmp)*/*.map',
+      watched: false,
+      included: false,
+      served: true,
+    },
+  ],
 };
 
 if (process.env.LAMBDATEST) {
+  const ltBrowsers = require('./karma.lambdatest.js').customLaunchers;
+
+  const webdriverConfig = {
+    hostname: 'hub.lambdatest.com',
+    port: 80,
+  };
+  
+  const webdriverConfigMobile = {
+    hostname: 'mobile-hub.lambdatest.com',
+    port: 80,
+  };
+  
   for (const key of Object.keys(ltBrowsers)) {
     ltBrowsers[key].base = 'WebDriver';
     if (ltBrowsers[key].isRealMobile) {
@@ -40,114 +83,23 @@ if (process.env.LAMBDATEST) {
     ltBrowsers[key].retryLimit = 2;
   }
 
-  karmaCommon = {
-    hostname: 'localhost.lambdatest.com',
-    frameworks: ['qunit'],
-
-    reporters: ['mocha'],
-
-    client: {
-      captureConsole: false,
-    },
-
-    colors: true,
-
-    browserNoActivityTimeout: 2 * 60 * 1000,
-    browserDisconnectTimeout: 15000,
-    processKillTimeout: 15000,
-    browserSocketTimeout: 20000,
-
-    plugins: [
-      'karma-qunit',
-      'karma-mocha-reporter',
-      'karma-chrome-launcher',
-      'karma-firefox-launcher',
-      'karma-webdriver-launcher',
-    ],
-
-    files: [
-      'test/babel-polyfill/polyfill.min.js',
-      'node_modules/qunitjs/qunit/qunit.js',
-      'test/karma-env.js',
-      {
-        pattern: 'test/worker.js',
-        watched: true,
-        included: false,
-        served: true,
-      },
-      {
-        pattern: '!(node_modules|tmp)*/*.map',
-        watched: false,
-        included: false,
-        served: true,
-      },
-    ],
-
-    customLaunchers: ltBrowsers,
-  };
-} else {
-  karmaCommon = {
-    frameworks: ['qunit'],
-
-    reporters: ['mocha'],
-
-    client: {
-      captureConsole: false,
-    },
-
-    colors: true,
-
-    browserNoActivityTimeout: 2 * 60 * 1000,
-    browserDisconnectTimeout: 10000,
-    processKillTimeout: 10000,
-    browserSocketTimeout: 20000,
-
-    plugins: [
-      'karma-qunit',
-      'karma-mocha-reporter',
-      'karma-chrome-launcher',
-      'karma-firefox-launcher',
-      'karma-browserstack-launcher',
-    ],
-
-    files: [
-      'test/babel-polyfill/polyfill.min.js',
-      'node_modules/qunitjs/qunit/qunit.js',
-      'test/karma-env.js',
-      {
-        pattern: 'test/worker.js',
-        watched: true,
-        included: false,
-        served: true,
-      },
-      {
-        pattern: '!(node_modules|tmp)*/*.map',
-        watched: false,
-        included: false,
-        served: true,
-      },
-    ],
-
-    browserStack: require('./karma.browserstack.js').browserStack,
-
-    customLaunchers: require('./karma.browserstack.js').customLaunchers,
+  karmaCommon.hostname = 'localhost.lambdatest.com';
+  karmaCommon.customLaunchers = {
+    ...karmaCommon.customLaunchers,
+    ...ltBrowsers
   };
 }
 
-const browserSuiteToUse = process.env.LAMBDATEST
-  ? 'ciLT'
-  : process.env.NODE_ENV === 'release'
-  ? 'pre_npm_publish'
-  : process.env.BROWSER_STACK_USERNAME
-  ? "ci"
+
+const browserSuiteToUse = process.env.NODE_ENV === 'release'
+  ? 'pre_npm_publish' // When run by tools/release.sh
+  : process.env.LT_USERNAME
+  ? "ci" // Automated CI
   : process.env.GH_ACTIONS
-  ? "ciLocal"
+  ? "ciLocal" // "ci" when not having the credentials (= forks of the dexie repo)
   : 'local'; // Developer local machine
 
-if (browserSuiteToUse === 'ci') {
-  console.log('Username length', process.env.BROWSER_STACK_USERNAME.length);
-  console.log('Access key length', process.env.BROWSER_STACK_ACCESS_KEY.length);
-}
+console.log('LT_TUNNEL_NAME', process.env.LT_TUNNEL_NAME);
 
 const defaultBrowserMatrix = require('./karma.browsers.matrix');
 
