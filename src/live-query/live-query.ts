@@ -34,8 +34,6 @@ export interface LiveQueryContext {
   querier: Function; // For debugging purposes and Error messages
 }
 
-let liveQueryCounter = 0;
-
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
   let hasValue = false;
   let currentValue: T;
@@ -44,7 +42,6 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     function execute(ctx: LiveQueryContext) {
       const wasRootExec = beginMicroTickScope(); // Performance: Avoid starting a new microtick scope within the async context.
       try {
-        console.log("LiveQuery ID: " + ++liveQueryCounter);
         if (scopeFuncIsAsync) {
           incrementExpectedAwaits();
         }
