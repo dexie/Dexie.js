@@ -1,19 +1,21 @@
 {
   "name": "dexie-export-import",
-  "version": "1.0.0",
+  "version": "4.0.7",
   "description": "Dexie addon that adds export and import capabilities",
   "main": "dist/dexie-export-import.js",
   "module": "dist/dexie-export-import.mjs",
   "typings": "dist/dexie-export-import.d.ts",
   "repository": {
     "type": "git",
-    "url": "https://github.com/dfahlander/Dexie.js.git"
+    "url": "https://github.com/dexie/Dexie.js.git"
   },
   "scripts": {
     "test": "just-build test && npx karma start test/karma.conf.js --single-run",
     "build": "just-build",
     "watch": "just-build --watch",
-    "clean": "rm -rf tools/tmp dist/*.js dist/*.mjs dist/*.map dist/*.d.ts test/bundle.*"
+    "clean": "rm -rf tools/tmp dist/*.js dist/*.mjs dist/*.map dist/*.d.ts test/bundle.*",
+    "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test; UNIT_STATUS=$?; kill $(cat tunnel.pid); exit $UNIT_STATUS",
+    "test:ltTunnel": "node ../../test/lt-local"
   },
   "just-build": {
     "default": [
@@ -34,15 +36,16 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@rollup/plugin-alias": "^3.1.2",
-    "@types/node": "^13.5.1",
+    "@types/node": "^18.11.18",
     "base64-arraybuffer-es6": "*",
     "clarinet": "dfahlander/clarinet",
-    "just-build": "^0.9.19",
+    "just-build": "^0.9.24",
     "rollup-plugin-alias": "^2.2.0",
+    "typescript": "4.9.4",
     "typeson": "^5.8.2",
     "typeson-registry": "^1.0.0-alpha.21"
   },
-  "dependencies": {
-    "dexie": "^3.0.0-alpha.5 || ^2.0.4"
+  "peerDependencies": {
+    "dexie": "workspace:^2.0.4 || ^3.0.0 || ^4.0.1-alpha.5"
   }
 }

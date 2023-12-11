@@ -1,4 +1,4 @@
-import { _global } from '../../functions/utils';
+import { _global } from '../../globals/global';
 import { DexieDOMDependencies } from '../../public/types/dexie-dom-dependencies';
 
 export let domDeps: DexieDOMDependencies

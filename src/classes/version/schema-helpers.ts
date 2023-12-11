@@ -1,6 +1,7 @@
 import { Dexie } from '../dexie';
 import { DbSchema } from '../../public/types/db-schema';
-import { setProp, keys, slice, _global, isArray, shallowClone, isAsyncFunction, defineProperty, getPropertyDescriptor } from '../../functions/utils';
+import { _global } from "../../globals/global";
+import { setProp, keys, slice, isArray, shallowClone, isAsyncFunction, defineProperty, getPropertyDescriptor } from '../../functions/utils';
 import { Transaction } from '../transaction';
 import { Version } from './version';
 import Promise, { PSD, newScope, NativePromise, decrementExpectedAwaits, incrementExpectedAwaits } from '../../helpers/promise';
@@ -8,7 +9,6 @@ import { exceptions } from '../../errors';
 import { TableSchema } from '../../public/types/table-schema';
 import { IndexSpec } from '../../public/types/index-spec';
 import { hasIEDeleteObjectStoreBug, isIEOrEdge } from '../../globals/constants';
-import { safariMultiStoreFix } from '../../functions/quirks';
 import { createIndexSpec, nameFromKeyPath } from '../../helpers/index-spec';
 import { createTableSchema } from '../../helpers/table-schema';
 import { generateMiddlewareStacks } from '../dexie/generate-middleware-stacks';
@@ -291,12 +291,8 @@ export function createMissingTables(newSchema: DbSchema, idbtrans: IDBTransactio
 }
 
 export function deleteRemovedTables(newSchema: DbSchema, idbtrans: IDBTransaction) {
-  for (var i = 0; i < idbtrans.db.objectStoreNames.length; ++i) {
-    var storeName = idbtrans.db.objectStoreNames[i];
-    if (newSchema[storeName] == null) {
-      idbtrans.db.deleteObjectStore(storeName);
-    }
-  }
+  [].slice.call(idbtrans.db.objectStoreNames).forEach(storeName =>
+    newSchema[storeName] == null && idbtrans.db.deleteObjectStore(storeName));
 }
 
 export function addIndex(store: IDBObjectStore, idx: IndexSpec) {

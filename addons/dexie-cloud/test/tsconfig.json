@@ -1,0 +1,27 @@
+{
+  "compilerOptions": {
+    "module": "es2015",
+    "target": "ES5",
+    "declaration": true,
+    "importHelpers": true,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "noImplicitReturns": true,
+    "moduleResolution": "node",
+    "lib": ["ES2018", "DOM"],
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true,
+    "rootDir": "..",
+    "jsx": "react",
+    "jsxFactory": "h",
+    "jsxFragmentFactory": "Fragment",
+    "downlevelIteration": true,
+    "outDir": "../tools/tmp/",
+  },
+  "include": [
+    "../src/",
+    "./unit/",
+    "./*.ts",
+    "./qunit.d.ts"
+  ]
+}

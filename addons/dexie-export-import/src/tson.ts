@@ -39,7 +39,6 @@ TSON.register([
               type: b.type,
               data: {start: blobsToAwaitPos, end: blobsToAwaitPos + b.size}
             }
-            console.log("b.size: " + b.size);
             blobsToAwaitPos += b.size;
             return result;
           }

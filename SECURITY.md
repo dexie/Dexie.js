@@ -4,14 +4,15 @@
 
 | Version | Supported          | Branch
 | ------- | ------------------ | --------
-| 3.0.x   | :white_check_mark: | master
-| 2.0.x   | :white_check_mark: | master-2
-| 1.5.x   | :thinking: | master-1
+| 4.x     | :white_check_mark: | master
+| 3.x     | :white_check_mark: | master-3
+| 2.0.x   | :thinking: | master-2
+| 1.5.x   | :x: | master-1
 | < 1.5.1 | :x:                |
 
 ## Reporting a Vulnerability
 
-To report a security vulnerability in Dexie.js, just file an issue in this repo.
+To report a security vulnerability in Dexie.js, please send an email to code@dexie.org describing the vulnerability and how to reproduce it.
 
 If we find an issue to be regarded as a security vulnerability, we will patch and release a new version in all the supported versions as soon as possible.
 Keep in mind though that this is an uncommercial open source project which means that sometimes you might have to be the one that

@@ -10,7 +10,8 @@ import {
   DBCoreKeyRange
 } from "../public/types/dbcore";
 import { nop } from '../functions/chaining-functions';
-import { getObjectDiff, hasOwn, setByKeyPath } from '../functions/utils';
+import { hasOwn, setByKeyPath } from '../functions/utils';
+import { getObjectDiff } from "../functions/get-object-diff";
 import { PSD } from '../helpers/promise';
 //import { LockableTableMiddleware } from '../dbcore/lockable-table-middleware';
 import { getEffectiveKeys } from '../dbcore/get-effective-keys';

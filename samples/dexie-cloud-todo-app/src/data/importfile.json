@@ -1,0 +1,34 @@
+{
+  "demoUsers": {
+    "alice@demo.local": {},
+    "bob@demo.local": {},
+    "foo@demo.local": {},
+    "bar@demo.local": {}
+  },
+  "roles": {
+    "manager": {
+      "displayName": "Manager",
+      "description": "Members with this role gains full permissions within the realm pointed out by the member entry",
+      "sortOrder": 1,
+      "permissions": { "manage": "*" }
+    },
+    "doer": {
+      "displayName": "Doer",
+      "description": "Members with this role can add todoItems, manage own todoItems and mark other todoItems as done or undone",
+      "sortOrder": 2,
+      "permissions": {
+        "add": ["todoItems"],
+        "update": {
+          "todoItems": ["done"]
+        }
+      }
+    },
+    "readonly": {
+      "displayName": "ReadOnly",
+      "description": "Members with this role have no permissions to change any data",
+      "sortOrder": 3,
+      "permissions": {}
+    }
+  },
+  "data": {}
+}

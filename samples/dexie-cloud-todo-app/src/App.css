@@ -1,0 +1,159 @@
+h1,
+p {
+  font-family: Lato;
+}
+
+div.box {
+  padding: 10px;
+  border: 1px solid #ddd;
+  margin: 5px 0 5px 0;
+  position: relative;
+}
+div.box > h2 {
+  margin: 0 0 10px 0;
+}
+
+.grid-row {
+  display: inline-flex;
+  width: 100%;
+  position: relative;
+}
+
+button.large-button {
+  padding: 10px;
+  margin: 5px 5px 5px 0;
+  font-size: 12pt;
+}
+
+.todorow {
+  display: inline-flex;
+  border: 1px solid #ccc;
+  margin: 2px;
+  transition-duration: 100ms;
+  font-size: 20pt;
+  width: 100%;
+  position: relative;
+}
+.todorow.add-item {
+  border-style: dashed;
+  border-color: #ccc8;
+}
+
+.done {
+  background-color: #ccf;
+}
+
+.narrow {
+  padding: 10px;
+}
+
+.todo-list-trash {
+  padding: 0.6em 1em;
+  font-size: 12pt;
+}
+
+.todo-list-trash > button {
+  padding: 0;
+  border: none;
+  background: none;
+  opacity: 0.3;
+}
+
+.todo-list-trash > button:not(:disabled):hover {
+  opacity: 1;
+}
+
+button {
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: not-allowed;
+}
+
+.todo-item-trash {
+  position: absolute;
+  right: 15px;
+  top: 9px;
+}
+
+.todo-item-trash > button {
+  padding: 0;
+  border: none;
+  background: none;
+  opacity: 0.3;
+}
+.todo-item-trash > button:not(:disabled):hover {
+  opacity: 1;
+}
+
+.todo-item-text {
+  width: 50vw;
+  padding: 10px;
+  margin: 0;
+  display: contents;
+  float: right;
+}
+
+.todo-item-input {
+  width: 70vw;
+  margin: 10px;
+  outline: none;
+  padding-right: 10%;
+  font-size: 8pt;
+}
+
+input[type="checkbox"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 25px;
+  width: 25px;
+  border: 1px solid #ccf;
+  outline: none;
+  transition-duration: 0.3s;
+  cursor: pointer;
+}
+
+input[type="checkbox"]:checked {
+  border: 1px solid #41b883;
+  background-color: #fff;
+}
+
+input[type="checkbox"]:checked::after {
+  content: "\2713";
+  display: block;
+  font-size: 25px;
+  text-align: center;
+  color: #ccf;
+  position: relative;
+  left: 0;
+  top: -3px;
+}
+
+input[type="checkbox"]:disabled {
+  border-color: #ccf4;
+}
+input[type="text"], input[type="email"] {
+  border-color: #ccf4;
+  height: 35px;
+  width: 100%;
+  outline: none;
+  font-size: 17pt;
+  padding: 8px;
+}
+
+input::placeholder {
+  color: #ddd;
+  font-style: italic;
+  font-weight: normal;
+}
+
+fieldset {
+  padding: 0;
+  margin: 0;
+}
+legend {
+  font-size: 9pt;
+  padding: 0 5px;
+  margin: 0;
+}

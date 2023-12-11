@@ -2,11 +2,12 @@ import { ThenShortcut } from "./then-shortcut";
 import { IndexableTypeArray } from "./indexable-type";
 import { WhereClause } from "./where-clause";
 import { PromiseExtended } from "./promise-extended";
-import { Database } from "./database";
 import { IndexableType } from "./indexable-type";
+import { Dexie } from "./dexie";
+import { UpdateSpec } from "./update-spec";
 
 export interface Collection<T=any, TKey=IndexableType> {
-  //db: Database;
+  db: Dexie;
   and(filter: (x: T) => boolean): Collection<T, TKey>;
   clone(props?: Object): Collection<T, TKey>;
   count(): PromiseExtended<number>;
@@ -16,6 +17,7 @@ export interface Collection<T=any, TKey=IndexableType> {
   eachKey(callback: (key: IndexableType, cursor: {key: IndexableType, primaryKey: TKey}) => any): PromiseExtended<void>;
   eachPrimaryKey(callback: (key: TKey, cursor: {key: IndexableType, primaryKey: TKey}) => any): PromiseExtended<void>;
   eachUniqueKey(callback: (key: IndexableType, cursor: {key: IndexableType, primaryKey: TKey}) => any): PromiseExtended<void>;
+  filter<S extends T>(filter: (x: T) => x is S): Collection<S, TKey>;
   filter(filter: (x: T) => boolean): Collection<T, TKey>;
   first(): PromiseExtended<T | undefined>;
   first<R>(thenShortcut: ThenShortcut<T | undefined, R>): PromiseExtended<R>;
@@ -40,5 +42,5 @@ export interface Collection<T=any, TKey=IndexableType> {
   // Mutating methods
   delete(): PromiseExtended<number>;
   modify(changeCallback: (obj: T, ctx:{value: T}) => void | boolean): PromiseExtended<number>;
-  modify(changes: { [keyPath: string]: any } ): PromiseExtended<number>;
+  modify(changes: UpdateSpec<T>): PromiseExtended<number>;
 }

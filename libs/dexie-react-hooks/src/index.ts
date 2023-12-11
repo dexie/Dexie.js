@@ -1,1 +1,1 @@
-export * from "./dexie-react-hooks";
+export * from './dexie-react-hooks';

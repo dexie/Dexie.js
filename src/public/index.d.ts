@@ -24,6 +24,12 @@ import { Collection } from './types/collection';
 import { PromiseExtended } from './types/promise-extended';
 import { Observable } from './types/observable';
 import { IntervalTree, RangeSetConstructor } from './types/rangeset';
+import { Dexie, TableProp } from './types/dexie';
+export type { TableProp };
+export * from './types/entity';
+export * from './types/entity-table';
+export { UpdateSpec } from './types/update-spec';
+export * from './types/insert-type';
 
 // Alias of Table and Collection in order to be able to refer them from module below...
 interface _Table<T, TKey> extends Table<T, TKey> {}
@@ -55,6 +61,8 @@ export function rangesOverlap(
   rangeSet2: IntervalTree
 ): boolean;
 declare var RangeSet: RangeSetConstructor;
+export function cmp(a: any, b: any): number;
+
 /** Exporting 'Dexie' as the default export.
  **/
 export default Dexie;

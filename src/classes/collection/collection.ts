@@ -12,10 +12,11 @@ import { hangsOnDeleteLargeKeyRange } from "../../globals/constants";
 import { ThenShortcut } from "../../public/types/then-shortcut";
 import { Transaction } from '../transaction';
 import { DBCoreCursor, DBCoreTransaction, DBCoreRangeType, DBCoreMutateResponse, DBCoreKeyRange } from '../../public/types/dbcore';
+import { cmp } from "../../functions/cmp";
 
 /** class Collection
  * 
- * http://dexie.org/docs/Collection/Collection
+ * https://dexie.org/docs/Collection/Collection
  */
 export class Collection implements ICollection {
   db: Dexie;
@@ -69,7 +70,7 @@ export class Collection implements ICollection {
 
   /** Collection.clone()
    * 
-   * http://dexie.org/docs/Collection/Collection.clone()
+   * https://dexie.org/docs/Collection/Collection.clone()
    * 
    **/
   clone(props?) {
@@ -82,7 +83,7 @@ export class Collection implements ICollection {
 
   /** Collection.raw()
    * 
-   * http://dexie.org/docs/Collection/Collection.raw()
+   * https://dexie.org/docs/Collection/Collection.raw()
    * 
    **/
   raw() {
@@ -92,7 +93,7 @@ export class Collection implements ICollection {
 
   /** Collection.each()
    * 
-   * http://dexie.org/docs/Collection/Collection.each()
+   * https://dexie.org/docs/Collection/Collection.each()
    * 
    **/
   each(fn: (obj, cursor: DBCoreCursor) => any): PromiseExtended<void> {
@@ -103,7 +104,7 @@ export class Collection implements ICollection {
 
   /** Collection.count()
    * 
-   * http://dexie.org/docs/Collection/Collection.count()
+   * https://dexie.org/docs/Collection/Collection.count()
    * 
    **/
   count(cb?) {
@@ -130,7 +131,7 @@ export class Collection implements ICollection {
 
   /** Collection.sortBy()
    * 
-   * http://dexie.org/docs/Collection/Collection.sortBy()
+   * https://dexie.org/docs/Collection/Collection.sortBy()
    * 
    **/
   sortBy(keyPath: string): PromiseExtended<any[]>;
@@ -157,7 +158,7 @@ export class Collection implements ICollection {
 
   /** Collection.toArray()
    * 
-   * http://dexie.org/docs/Collection/Collection.toArray()
+   * https://dexie.org/docs/Collection/Collection.toArray()
    * 
    **/
   toArray(cb?): PromiseExtended<any[]> {
@@ -187,7 +188,7 @@ export class Collection implements ICollection {
 
   /** Collection.offset()
    * 
-   * http://dexie.org/docs/Collection/Collection.offset()
+   * https://dexie.org/docs/Collection/Collection.offset()
    * 
    **/
   offset(offset: number) : Collection{
@@ -218,7 +219,7 @@ export class Collection implements ICollection {
 
   /** Collection.limit()
    * 
-   * http://dexie.org/docs/Collection/Collection.limit()
+   * https://dexie.org/docs/Collection/Collection.limit()
    * 
    **/
   limit(numRows: number) : Collection {
@@ -235,7 +236,7 @@ export class Collection implements ICollection {
 
   /** Collection.until()
    * 
-   * http://dexie.org/docs/Collection/Collection.until()
+   * https://dexie.org/docs/Collection/Collection.until()
    * 
    **/
   until(filterFunction: (x) => boolean, bIncludeStopEntry?) {
@@ -252,7 +253,7 @@ export class Collection implements ICollection {
 
   /** Collection.first()
    * 
-   * http://dexie.org/docs/Collection/Collection.first()
+   * https://dexie.org/docs/Collection/Collection.first()
    * 
    **/
   first(cb?) {
@@ -261,7 +262,7 @@ export class Collection implements ICollection {
 
   /** Collection.last()
    * 
-   * http://dexie.org/docs/Collection/Collection.last()
+   * https://dexie.org/docs/Collection/Collection.last()
    * 
    **/
   last(cb?) {
@@ -270,7 +271,7 @@ export class Collection implements ICollection {
 
   /** Collection.filter()
    * 
-   * http://dexie.org/docs/Collection/Collection.filter()
+   * https://dexie.org/docs/Collection/Collection.filter()
    * 
    **/
   filter(filterFunction: (x) => boolean): Collection {
@@ -286,7 +287,7 @@ export class Collection implements ICollection {
 
   /** Collection.and()
    * 
-   * http://dexie.org/docs/Collection/Collection.and()
+   * https://dexie.org/docs/Collection/Collection.and()
    * 
    **/
   and(filter: (x) => boolean) {
@@ -295,7 +296,7 @@ export class Collection implements ICollection {
 
   /** Collection.or()
    * 
-   * http://dexie.org/docs/Collection/Collection.or()
+   * https://dexie.org/docs/Collection/Collection.or()
    * 
    **/
   or(indexName: string) {
@@ -304,7 +305,7 @@ export class Collection implements ICollection {
 
   /** Collection.reverse()
    * 
-   * http://dexie.org/docs/Collection/Collection.reverse()
+   * https://dexie.org/docs/Collection/Collection.reverse()
    * 
    **/
   reverse() {
@@ -315,7 +316,7 @@ export class Collection implements ICollection {
 
   /** Collection.desc()
    * 
-   * http://dexie.org/docs/Collection/Collection.desc()
+   * https://dexie.org/docs/Collection/Collection.desc()
    * 
    **/
   desc() {
@@ -324,7 +325,7 @@ export class Collection implements ICollection {
 
   /** Collection.eachKey()
    * 
-   * http://dexie.org/docs/Collection/Collection.eachKey()
+   * https://dexie.org/docs/Collection/Collection.eachKey()
    * 
    **/
   eachKey(cb?) {
@@ -335,7 +336,7 @@ export class Collection implements ICollection {
 
   /** Collection.eachUniqueKey()
    * 
-   * http://dexie.org/docs/Collection/Collection.eachUniqueKey()
+   * https://dexie.org/docs/Collection/Collection.eachUniqueKey()
    * 
    **/
   eachUniqueKey(cb?) {
@@ -345,7 +346,7 @@ export class Collection implements ICollection {
 
   /** Collection.eachPrimaryKey()
    * 
-   * http://dexie.org/docs/Collection/Collection.eachPrimaryKey()
+   * https://dexie.org/docs/Collection/Collection.eachPrimaryKey()
    * 
    **/
   eachPrimaryKey(cb?) {
@@ -356,7 +357,7 @@ export class Collection implements ICollection {
 
   /** Collection.keys()
    * 
-   * http://dexie.org/docs/Collection/Collection.keys()
+   * https://dexie.org/docs/Collection/Collection.keys()
    * 
    **/
   keys(cb?) {
@@ -372,7 +373,7 @@ export class Collection implements ICollection {
 
   /** Collection.primaryKeys()
    * 
-   * http://dexie.org/docs/Collection/Collection.primaryKeys()
+   * https://dexie.org/docs/Collection/Collection.primaryKeys()
    * 
    **/
   primaryKeys(cb?) : PromiseExtended<IndexableType[]> {
@@ -403,7 +404,7 @@ export class Collection implements ICollection {
 
   /** Collection.uniqueKeys()
    * 
-   * http://dexie.org/docs/Collection/Collection.uniqueKeys()
+   * https://dexie.org/docs/Collection/Collection.uniqueKeys()
    * 
    **/
   uniqueKeys(cb?) {
@@ -413,7 +414,7 @@ export class Collection implements ICollection {
 
   /** Collection.firstKey()
    * 
-   * http://dexie.org/docs/Collection/Collection.firstKey()
+   * https://dexie.org/docs/Collection/Collection.firstKey()
    * 
    **/
   firstKey(cb?) {
@@ -422,7 +423,7 @@ export class Collection implements ICollection {
 
   /** Collection.lastKey()
    * 
-   * http://dexie.org/docs/Collection/Collection.lastKey()
+   * https://dexie.org/docs/Collection/Collection.lastKey()
    * 
    **/
   lastKey(cb?) {
@@ -431,7 +432,7 @@ export class Collection implements ICollection {
 
   /** Collection.distinct()
    * 
-   * http://dexie.org/docs/Collection/Collection.distinct()
+   * https://dexie.org/docs/Collection/Collection.distinct()
    * 
    **/
   distinct() {
@@ -454,7 +455,7 @@ export class Collection implements ICollection {
 
   /** Collection.modify()
    * 
-   * http://dexie.org/docs/Collection/Collection.modify()
+   * https://dexie.org/docs/Collection/Collection.modify()
    * 
    **/
   modify(changes: { [keyPath: string]: any }) : PromiseExtended<number>
@@ -485,7 +486,6 @@ export class Collection implements ICollection {
       const coreTable = ctx.table.core;
       const {outbound, extractKey} = coreTable.schema.primaryKey;
       const limit = this.db._options.modifyChunkSize || 200;
-      const {cmp} = this.db.core;
       const totalFailures = [];
       let successCount = 0;
       const failedKeys: IndexableType[] = [];
@@ -533,7 +533,13 @@ export class Collection implements ICollection {
                 }
               }
             }
-            
+            const criteria = isPlainKeyRange(ctx) &&
+              ctx.limit === Infinity &&
+              (typeof changes !== 'function' || changes === deleteCallback) && {
+                index: ctx.index,
+                range: ctx.range
+              };
+
             return Promise.resolve(addValues.length > 0 &&
               coreTable.mutate({trans, type: 'add', values: addValues})
                 .then(res => {
@@ -543,12 +549,23 @@ export class Collection implements ICollection {
                   }
                   applyMutateResult(addValues.length, res);
                 })
-            ).then(()=>putValues.length > 0 &&
-                coreTable.mutate({trans, type: 'put', keys: putKeys, values: putValues})
-                  .then(res=>applyMutateResult(putValues.length, res))
-            ).then(()=>deleteKeys.length > 0 &&
-                coreTable.mutate({trans, type: 'delete', keys: deleteKeys})
-                  .then(res=>applyMutateResult(deleteKeys.length, res))
+            ).then(()=>(putValues.length > 0 || (criteria && typeof changes === 'object')) &&
+                coreTable.mutate({
+                  trans,
+                  type: 'put',
+                  keys: putKeys,
+                  values: putValues,
+                  criteria,
+                  changeSpec: typeof changes !== 'function'
+                    && changes
+                }).then(res=>applyMutateResult(putValues.length, res))
+            ).then(()=>(deleteKeys.length > 0 || (criteria && changes === deleteCallback)) &&
+                coreTable.mutate({
+                  trans,
+                  type: 'delete',
+                  keys: deleteKeys,
+                  criteria
+                }).then(res=>applyMutateResult(deleteKeys.length, res))
             ).then(()=>{
               return keys.length > offset + count && nextChunk(offset + limit);
             });
@@ -568,7 +585,7 @@ export class Collection implements ICollection {
 
   /** Collection.delete()
    * 
-   * http://dexie.org/docs/Collection/Collection.delete()
+   * https://dexie.org/docs/Collection/Collection.delete()
    * 
    **/
   delete() : PromiseExtended<number> {
@@ -599,8 +616,8 @@ export class Collection implements ICollection {
       });
     }
 
-    return this.modify((value, ctx) => ctx.value = null);
+    return this.modify(deleteCallback);
   }
 }
 
-
+const deleteCallback = (value, ctx) => ctx.value = null;

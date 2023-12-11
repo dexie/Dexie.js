@@ -1,5 +1,7 @@
 import { Dexie as _Dexie } from './dexie';
-import { props, derive, extend, override, getByKeyPath, setByKeyPath, delByKeyPath, shallowClone, deepClone, getObjectDiff, asap, _global } from '../../functions/utils';
+import { _global } from '../../globals/global';
+import { props, derive, extend, override, getByKeyPath, setByKeyPath, delByKeyPath, shallowClone, deepClone, asap } from '../../functions/utils';
+import { getObjectDiff } from "../../functions/get-object-diff";
 import { fullNameExceptions } from '../../errors';
 import { DexieConstructor } from '../../public/types/dexie-constructor';
 import { getDatabaseNames } from '../../helpers/database-enumerator';
@@ -20,6 +22,8 @@ import { globalEvents } from '../../globals/global-events';
 import { liveQuery } from '../../live-query/live-query';
 import { extendObservabilitySet } from '../../live-query/extend-observability-set';
 import { domDeps } from './dexie-dom-dependencies';
+import { cmp } from '../../functions/cmp';
+import { cache } from '../../live-query/cache/cache';
 
 /* (Dexie) is an instance of DexieConstructor, as defined in public/types/dexie-constructor.d.ts
 *  (new Dexie()) is an instance of Dexie, as defined in public/types/dexie.d.ts
@@ -47,7 +51,7 @@ props(Dexie, {
   // Static delete() method.
   //
   delete(databaseName: string) {
-    const db = new Dexie(databaseName);
+    const db = new Dexie(databaseName, {addons: []});
     return db.delete();
   },
 
@@ -184,6 +188,7 @@ props(Dexie, {
   shallowClone: shallowClone,
   deepClone: deepClone,
   getObjectDiff: getObjectDiff,
+  cmp,
   asap: asap,
   //maxKey: new Dexie('',{addons:[]})._maxKey,
   minKey: minKey,
@@ -208,6 +213,7 @@ props(Dexie, {
   // For node.js, you need to require indexeddb-js or similar and then set these deps.
   //
   dependencies: domDeps,
+  cache,
 
   // API Version Number: Type Number, make sure to always set a version number that can be comparable correctly. Example: 0.9, 0.91, 0.92, 1.0, 1.01, 1.1, 1.2, 1.21, etc.
   semVer: DEXIE_VERSION,

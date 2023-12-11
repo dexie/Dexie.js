@@ -2,12 +2,12 @@ import { BulkError, exceptions } from '../../errors';
 import { Table as ITable } from '../../public/types/table';
 import { TableSchema } from '../../public/types/table-schema';
 import { TableHooks } from '../../public/types/table-hooks';
-import { DexiePromise as Promise, PSD, newScope, wrap, rejection, beginMicroTickScope, endMicroTickScope } from '../../helpers/promise';
+import { DexiePromise as Promise, PSD, newScope, rejection, beginMicroTickScope, endMicroTickScope } from '../../helpers/promise';
 import { Transaction } from '../transaction';
 import { Dexie } from '../dexie';
 import { tempTransaction } from '../../functions/temp-transaction';
 import { Collection } from '../collection';
-import { isArray, keys, getByKeyPath, hasOwn, setByKeyPath, deepClone, tryCatch, arrayToObject, extend } from '../../functions/utils';
+import { isArray, keys, getByKeyPath, setByKeyPath, extend, getProto } from '../../functions/utils';
 import { maxString } from '../../globals/constants';
 import { combine } from '../../functions/combine';
 import { PromiseExtended } from "../../public/types/promise-extended";
@@ -16,10 +16,13 @@ import { debug } from '../../helpers/debug';
 import { DBCoreTable } from '../../public/types/dbcore';
 import { AnyRange } from '../../dbcore/keyrange';
 import { workaroundForUndefinedPrimKey } from '../../functions/workaround-undefined-primkey';
+import { Entity } from '../entity/Entity';
+import { UpdateSpec } from '../../public';
+import { cmp } from '../../functions/cmp';
 
 /** class Table
  * 
- * http://dexie.org/docs/Table/Table
+ * https://dexie.org/docs/Table/Table
  */
 export class Table implements ITable<any, IndexableType> {
   db: Dexie;
@@ -57,7 +60,7 @@ export class Table implements ITable<any, IndexableType> {
     // in native engine.
     const wasRootExec = beginMicroTickScope();
     try {
-      return trans && trans.db === this.db ?
+      return trans && trans.db._novip === this.db._novip ?
         trans === PSD.trans ?
           trans._promise(mode, checkTableInTransaction, writeLocked) :
           newScope(() => trans._promise(mode, checkTableInTransaction, writeLocked), { trans: trans, transless: PSD.transless || PSD }) :
@@ -69,7 +72,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.get()
    * 
-   * http://dexie.org/docs/Table/Table.get()
+   * https://dexie.org/docs/Table/Table.get()
    * 
    **/
   get(keyOrCrit, cb?) {
@@ -84,7 +87,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.where()
    * 
-   * http://dexie.org/docs/Table/Table.where()
+   * https://dexie.org/docs/Table/Table.where()
    * 
    **/
   where(indexOrCrit: string | string[] | { [key: string]: IndexableType }) {
@@ -103,17 +106,26 @@ export class Table implements ITable<any, IndexableType> {
     // Multiple criterias.
     // Let's try finding a compound index that matches all keyPaths in
     // arbritary order:
-    const compoundIndex = this.schema.indexes.concat(this.schema.primKey).filter(ix =>
-      ix.compound &&
-      keyPaths.every(keyPath => ix.keyPath.indexOf(keyPath) >= 0) &&
-      (ix.keyPath as string[]).every(keyPath => keyPaths.indexOf(keyPath) >= 0))[0];
-
-    if (compoundIndex && this.db._maxKey !== maxString)
+    const compoundIndex = this.schema.indexes.concat(this.schema.primKey).filter(ix => {
+      if (
+        ix.compound &&
+        keyPaths.every(keyPath => ix.keyPath.indexOf(keyPath) >= 0)) {
+          for (let i=0; i<keyPaths.length; ++i) {
+            if (keyPaths.indexOf(ix.keyPath[i]) === -1) return false;
+          }
+          return true;
+        }
+        return false;
+      }).sort((a,b) => a.keyPath.length - b.keyPath.length)[0];
+            
+    if (compoundIndex && this.db._maxKey !== maxString) {
       // Cool! We found such compound index
       // and this browser supports compound indexes (maxKey !== maxString)!
+      const keyPathsInValidOrder = (compoundIndex.keyPath as string[]).slice(0, keyPaths.length);
       return this
-        .where(compoundIndex.name)
-        .equals((compoundIndex.keyPath as string[]).map(kp => indexOrCrit[kp]));
+        .where(keyPathsInValidOrder)
+        .equals(keyPathsInValidOrder.map(kp => indexOrCrit[kp]));
+    }
 
     if (!compoundIndex && debug) console.warn(
       `The query ${JSON.stringify(indexOrCrit)} on ${this.name} would benefit of a ` +
@@ -125,11 +137,7 @@ export class Table implements ITable<any, IndexableType> {
     const idb = this.db._deps.indexedDB;
 
     function equals (a, b) {
-      try {
-        return idb.cmp(a,b) === 0; // Works with all indexable types including binary keys.
-      } catch (e) {
-        return false;
-      }
+      return idb.cmp(a,b) === 0; // Works with all indexable types including binary keys.
     }
 
     const [idx, filterFunction] = keyPaths.reduce(([prevIndex, prevFilterFn], keyPath) => {
@@ -159,7 +167,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.filter()
    * 
-   * http://dexie.org/docs/Table/Table.filter()
+   * https://dexie.org/docs/Table/Table.filter()
    * 
    **/
   filter(filterFunction: (obj: any) => boolean) {
@@ -168,7 +176,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.count()
    * 
-   * http://dexie.org/docs/Table/Table.count()
+   * https://dexie.org/docs/Table/Table.count()
    * 
    **/
   count(thenShortcut?: any) {
@@ -177,7 +185,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.offset()
    * 
-   * http://dexie.org/docs/Table/Table.offset()
+   * https://dexie.org/docs/Table/Table.offset()
    * 
    **/
   offset(offset: number) {
@@ -186,7 +194,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.limit()
    * 
-   * http://dexie.org/docs/Table/Table.limit()
+   * https://dexie.org/docs/Table/Table.limit()
    * 
    **/
   limit(numRows: number) {
@@ -195,7 +203,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.each()
    * 
-   * http://dexie.org/docs/Table/Table.each()
+   * https://dexie.org/docs/Table/Table.each()
    * 
    **/
   each(callback: (obj: any, cursor: { key: IndexableType, primaryKey: IndexableType }) => any) {
@@ -204,7 +212,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.toArray()
    * 
-   * http://dexie.org/docs/Table/Table.toArray()
+   * https://dexie.org/docs/Table/Table.toArray()
    * 
    **/
   toArray(thenShortcut?: any) {
@@ -213,7 +221,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.toCollection()
    * 
-   * http://dexie.org/docs/Table/Table.toCollection()
+   * https://dexie.org/docs/Table/Table.toCollection()
    * 
    **/
   toCollection() {
@@ -222,7 +230,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.orderBy()
    * 
-   * http://dexie.org/docs/Table/Table.orderBy()
+   * https://dexie.org/docs/Table/Table.orderBy()
    * 
    **/
   orderBy(index: string | string[]) {
@@ -234,7 +242,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.reverse()
    * 
-   * http://dexie.org/docs/Table/Table.reverse()
+   * https://dexie.org/docs/Table/Table.reverse()
    * 
    **/
   reverse(): Collection {
@@ -243,19 +251,36 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.mapToClass()
    * 
-   * http://dexie.org/docs/Table/Table.mapToClass()
+   * https://dexie.org/docs/Table/Table.mapToClass()
    * 
    **/
   mapToClass(constructor: Function) {
+    const {db, name: tableName} = this;
     this.schema.mappedClass = constructor;
+    if (constructor.prototype instanceof Entity) {
+      constructor = class extends (constructor as any) {
+        get db () { return db; }
+        table() { return tableName; }
+      }
+    }
+    // Collect all inherited property names (including method names) by
+    // walking the prototype chain. This is to avoid overwriting them from
+    // database data - so application code can rely on inherited props never
+    // becoming shadowed by database object props.
+    const inheritedProps = new Set<string>();
+    for (let proto = constructor.prototype; proto; proto = getProto(proto)) {
+      Object.getOwnPropertyNames(proto).forEach(propName => inheritedProps.add(propName));
+    }
+  
     // Now, subscribe to the when("reading") event to make all objects that come out from this table inherit from given class
     // no matter which method to use for reading (Table.get() or Table.where(...)... )
-    const readHook = obj => {
-      if (!obj) return obj; // No valid object. (Value is null). Return as is.
+    const readHook = (obj: Object) => {
+      if (!obj) return obj; // No valid object. (Value is null or undefined). Return as is.
       // Create a new object that derives from constructor:
       const res = Object.create(constructor.prototype);
-      // Clone members:
-      for (var m in obj) if (hasOwn(obj, m)) try { res[m] = obj[m]; } catch (_) { }
+      // Clone members (but never those that collide with a property in the prototype
+      // hierchary (MUST BE ABLE TO RELY ON Entity methods and props!)):
+      for (let m in obj) if (!inheritedProps.has(m)) try { res[m] = obj[m]; } catch (_) { }
       return res;
     };
 
@@ -277,7 +302,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.add()
    * 
-   * http://dexie.org/docs/Table/Table.add()
+   * https://dexie.org/docs/Table/Table.add()
    * 
    **/
   add(obj, key?: IndexableType): PromiseExtended<IndexableType> {
@@ -302,7 +327,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.update()
    * 
-   * http://dexie.org/docs/Table/Table.update()
+   * https://dexie.org/docs/Table/Table.update()
    * 
    **/
   update(keyOrObject, modifications: { [keyPath: string]: any; } | ((obj: any, ctx:{value: any, primKey: IndexableType}) => void | boolean)): PromiseExtended<number> {
@@ -310,11 +335,11 @@ export class Table implements ITable<any, IndexableType> {
       const key = getByKeyPath(keyOrObject, this.schema.primKey.keyPath);
       if (key === undefined) return rejection(new exceptions.InvalidArgument(
         "Given object does not contain its primary key"));
-      // object to modify. Also modify given object with the modifications:
+      /*// object to modify. Also modify given object with the modifications:
       // This part should be here for backward compatibility.
       // If ever feeling too bad about mutating given object, please wait to a new major before removing it,
-      // and document the change thoroughly.
-      try {
+      // and document the change thoroughly. TODO: Document this change!
+      if (!Object.isFrozen(keyOrObject)) try {
         if (typeof modifications !== "function") {
           keys(modifications).forEach(keyPath => {
             setByKeyPath(keyOrObject, keyPath, modifications[keyPath]);
@@ -327,7 +352,7 @@ export class Table implements ITable<any, IndexableType> {
       } catch {
         // Maybe given object was frozen.
         // This part is not essential. Just move on as nothing happened...
-      }
+      }*/
       return this.where(":id").equals(key).modify(modifications);
     } else {
       // key to modify
@@ -337,7 +362,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.put()
    * 
-   * http://dexie.org/docs/Table/Table.put()
+   * https://dexie.org/docs/Table/Table.put()
    * 
    **/
   put(obj, key?: IndexableType): PromiseExtended<IndexableType> {
@@ -363,7 +388,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.delete()
    * 
-   * http://dexie.org/docs/Table/Table.delete()
+   * https://dexie.org/docs/Table/Table.delete()
    * 
    **/
   delete(key: IndexableType): PromiseExtended<void> {
@@ -374,7 +399,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.clear()
    * 
-   * http://dexie.org/docs/Table/Table.clear()
+   * https://dexie.org/docs/Table/Table.clear()
    * 
    **/
   clear() {
@@ -385,7 +410,7 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.bulkGet()
    * 
-   * http://dexie.org/docs/Table/Table.bulkGet()
+   * https://dexie.org/docs/Table/Table.bulkGet()
    * 
    * @param keys 
    */
@@ -400,11 +425,11 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.bulkAdd()
    * 
-   * http://dexie.org/docs/Table/Table.bulkAdd()
+   * https://dexie.org/docs/Table/Table.bulkAdd()
    * 
    **/
   bulkAdd(
-    objects: any[],
+    objects: readonly any[],
     keysOrOptions?: ReadonlyArray<IndexableType> | { allKeys?: boolean },
     options?: { allKeys?: boolean }
   ) {    
@@ -437,11 +462,11 @@ export class Table implements ITable<any, IndexableType> {
 
   /** Table.bulkPut()
    * 
-   * http://dexie.org/docs/Table/Table.bulkPut()
+   * https://dexie.org/docs/Table/Table.bulkPut()
    * 
    **/
   bulkPut(
-    objects: any[],
+    objects: readonly any[],
     keysOrOptions?: ReadonlyArray<IndexableType> | { allKeys?: boolean },
     options?: { allKeys?: boolean }
   ) {   
@@ -473,9 +498,77 @@ export class Table implements ITable<any, IndexableType> {
     });
   }
 
+  /** Table.bulkUpdate()
+   *
+   * https://dexie.org/docs/Table.Table.bulkUpdate()
+   */
+   bulkUpdate(
+    keysAndChanges: readonly { key: any; changes: UpdateSpec<any> }[]
+  ): PromiseExtended<number> {
+    const coreTable = this.core;
+    const keys = keysAndChanges.map((entry) => entry.key);
+    const changeSpecs = keysAndChanges.map((entry) => entry.changes);
+    const offsetMap: number[] = [];
+    return this._trans('readwrite', (trans) => {
+      return coreTable.getMany({ trans, keys, cache: 'clone' }).then((objs) => {
+        const resultKeys: any[] = [];
+        const resultObjs: any[] = [];
+        keysAndChanges.forEach(({ key, changes }, idx) => {
+          const obj = objs[idx];
+          if (obj) {
+            for (const keyPath of Object.keys(changes)) {
+              const value = changes[keyPath];
+              if (keyPath === this.schema.primKey.keyPath) {
+                if (cmp(value, key) !== 0) {
+                  throw new exceptions.Constraint(
+                    `Cannot update primary key in bulkUpdate()`
+                  );
+                }
+              } else {
+                setByKeyPath(obj, keyPath, value);
+              }
+            }
+            offsetMap.push(idx);
+            resultKeys.push(key);
+            resultObjs.push(obj);
+          }
+        });
+        const numEntries = resultKeys.length;
+        return coreTable
+          .mutate({
+            trans,
+            type: 'put',
+            keys: resultKeys,
+            values: resultObjs,
+            updates: {
+              keys,
+              changeSpecs
+            }
+          })
+          .then(({ numFailures, failures }) => {
+            if (numFailures === 0) return numEntries;
+            // Failure. bulkPut() may have a subset of keys
+            // so we must translate returned 'failutes' into the offsets of given argument:
+            for (const offset of Object.keys(failures)) {
+              const mappedOffset = offsetMap[Number(offset)];
+              if (mappedOffset != null) {
+                const failure = failures[offset];
+                delete failures[offset];
+                failures[mappedOffset] = failure;
+              }
+            }
+            throw new BulkError(
+              `${this.name}.bulkUpdate(): ${numFailures} of ${numEntries} operations failed`,
+              failures
+            );
+          });
+      });
+    });
+  }
+
   /** Table.bulkDelete()
    * 
-   * http://dexie.org/docs/Table/Table.bulkDelete()
+   * https://dexie.org/docs/Table/Table.bulkDelete()
    * 
    **/
   bulkDelete(keys: ReadonlyArray<IndexableType>): PromiseExtended<void> {

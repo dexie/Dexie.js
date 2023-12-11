@@ -1,5 +1,8 @@
 // For public interface
 
+import { ObservabilitySet } from "./db-events";
+import {ChromeTransactionDurability} from "./dexie-constructor";
+
 export const enum DBCoreRangeType {
   Equal = 1,
   Range = 2,
@@ -20,9 +23,8 @@ export interface DBCoreTransaction {
   abort(): void;
 }
 
-export interface DBCoreTransactionRequest {
-  tables: string[];
-  mode: 'readonly' | 'readwrite';
+interface DbCoreTransactionOptions {
+  durability: ChromeTransactionDurability
 }
 
 export type DBCoreMutateRequest = DBCoreAddRequest | DBCorePutRequest | DBCoreDeleteRequest | DBCoreDeleteRangeRequest;
@@ -37,8 +39,9 @@ export interface DBCoreMutateResponse {
 export interface DBCoreAddRequest {
   type: 'add';
   trans: DBCoreTransaction;
-  values: any[];
+  values: readonly any[];
   keys?: any[];
+  mutatedParts?: ObservabilitySet
   /** @deprecated Will always get results since 3.1.0-alpha.5 */
   wantResults?: boolean;
 }
@@ -46,8 +49,18 @@ export interface DBCoreAddRequest {
 export interface DBCorePutRequest {
   type: 'put';
   trans: DBCoreTransaction;
-  values: any[];
+  values: readonly any[];
   keys?: any[];
+  mutatedParts?: ObservabilitySet
+  criteria?: {
+    index: string | null;
+    range: DBCoreKeyRange;
+  };
+  changeSpec?: {[keyPath: string]: any}; // Common changeSpec for each key
+  updates?: {
+    keys: any[],
+    changeSpecs: {[keyPath: string]: any}[]; // changeSpec per key.  
+  },
   /** @deprecated Will always get results since 3.1.0-alpha.5 */
   wantResults?: boolean;
 }
@@ -56,23 +69,31 @@ export interface DBCoreDeleteRequest {
   type: 'delete';
   trans: DBCoreTransaction;
   keys: any[];
+  mutatedParts?: ObservabilitySet
+  criteria?: {
+    index: string | null;
+    range: DBCoreKeyRange;
+  };
 }
 
 export interface DBCoreDeleteRangeRequest {
   type: 'deleteRange';
   trans: DBCoreTransaction;
   range: DBCoreKeyRange;
+  mutatedParts?: ObservabilitySet
 }
 
 export interface DBCoreGetManyRequest {
   trans: DBCoreTransaction;
   keys: any[];
   cache?: "immutable" | "clone"
+  obsSet?: ObservabilitySet
 }
 
 export interface DBCoreGetRequest {
   trans: DBCoreTransaction;
-  key: any;  
+  key: any;
+  obsSet?: ObservabilitySet
 }
 
 export interface DBCoreQuery {
@@ -85,6 +106,8 @@ export interface DBCoreQueryRequest {
   values?: boolean;
   limit?: number;
   query: DBCoreQuery;
+  obsSet?: ObservabilitySet
+
 }
 
 export interface DBCoreQueryResponse {
@@ -97,11 +120,13 @@ export interface DBCoreOpenCursorRequest {
   unique?: boolean;
   reverse?: boolean;
   query: DBCoreQuery;
+  obsSet?: ObservabilitySet
 }
 
 export interface DBCoreCountRequest {
   trans: DBCoreTransaction;
   query: DBCoreQuery;
+  obsSet?: ObservabilitySet
 }
 
 export interface DBCoreCursor {
@@ -135,9 +160,9 @@ export interface DBCoreIndex {
   readonly name: string | null;
   /** True if this index represents the primary key */
   readonly isPrimaryKey?: boolean;
-  /** True if this index represents the primary key and is not inbound (http://dexie.org/docs/inbound) */
+  /** True if this index represents the primary key and is not inbound (https://dexie.org/docs/inbound) */
   readonly outbound?: boolean; 
-  /** True if and only if keyPath is an array (http://dexie.org/docs/Compound-Index) */
+  /** True if and only if keyPath is an array (https://dexie.org/docs/Compound-Index) */
   readonly compound?: boolean;
   /** keyPath, null for primary key, string for single-property indexes, Array<string> for compound indexes */
   readonly keyPath: null | string | string[];
@@ -149,15 +174,15 @@ export interface DBCoreIndex {
   readonly multiEntry?: boolean;
   /** Extract (using keyPath) a key from given value (object). Null for outbound primary keys */
   readonly extractKey: ((value: any) => any) | null;
+  /** If this index is a virtual index, lowLevelIndex represents the actual IndexedDB index behind it */
+  readonly lowLevelIndex?: DBCoreIndex;
 }
-
 export interface DBCore {
   stack: "dbcore";
   // Transaction and Object Store
-  transaction(req: DBCoreTransactionRequest): DBCoreTransaction;
+  transaction(stores: string[], mode: 'readonly' | 'readwrite', options?: DbCoreTransactionOptions): DBCoreTransaction;
 
   // Utility methods
-  cmp(a: any, b: any) : number;
   readonly MIN_KEY: any;
   readonly MAX_KEY: any;
   readonly schema: DBCoreSchema;

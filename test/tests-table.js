@@ -1,11 +1,12 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unittest-utils';
+import {resetDatabase, supports, spawnedTest, promisedTest, isSafari, isSafariPrivateMode} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBTable");
 db.version(1).stores({
     users: "++id,first,last,&username,*&email,*pets",
     folks: "++,first,last",
+    items: "id",
     schema: "" // Test issue #1039
 });
 
@@ -94,6 +95,13 @@ promisedTest("Issue #966 - put() with dotted field in update hook", async () => 
     equal(obj.nested, undefined, "obj.nested field should have remained undefined");
 
     db.folks.hook("updating").unsubscribe(updateAssertions);
+});
+
+promisedTest("update array property", async () => {
+    const id = await db.items.put({id: 1, foo: [{bar: 123}]});
+    await db.items.update(1, {foo: [{bar: 222}]});
+    const obj = await db.items.get(1);
+    equal(JSON.stringify(obj.foo), JSON.stringify([{bar: 222}]), "foo har been updated to the new array");
 });
 
 promisedTest("Verify #1130 doesn't break contract of hook('updating')", async ()=>{
@@ -325,6 +333,178 @@ asyncTest("put-no-transaction", function () {
     }).finally(start);
 });
 
+promisedTest("bulkUpdate", async ()=>{
+    await db.items.bulkAdd([
+        {id: 1, foo: {bar: 1}},
+        {id: 2, foo: {bar: 2}},
+        {id: 3, foo: {bar: 3}}
+    ]);
+    await db.items.bulkUpdate([
+        {key: 1, changes: {"foo.bar": 101}},
+        {key: 2, changes: {"foo.bar": 102, "foo.baz": "x"}},
+        {key: 4, changes: {"foo.bar": 104}},
+    ]);
+    const allItems = await db.items.toArray();
+    const expected = [
+        {id: 1, foo: {bar: 101}},
+        {id: 2, foo: {bar: 102, baz: "x"}},
+        {id: 3, foo: {bar: 3}}
+    ];
+    deepEqual(allItems, expected, "2 items updated as expected. nonexisting item not updated.");
+});
+
+promisedTest("bulkUpdate without actual changes (check it doesn't bail out)", async ()=>{
+  const dbCoreMutateCalls = [];
+  db.use({
+    stack: 'dbcore',
+    name: 'temp-logger',
+    create: (downDb) => ({
+      ...downDb,
+      table: (tableName) => {
+        const downTable = downDb.table(tableName);
+        return {
+          ...downTable,
+          mutate(req) {
+            if (tableName === 'items') {
+                dbCoreMutateCalls.push(req);
+            }
+            return downTable.mutate(req);
+          }
+        };
+      }
+    })
+  });
+  db.close();
+  await db.open(); // Apply the middleware
+
+  try {
+    // Clear the log (in case another middleware or addon did something in db ready in integration tests)
+    dbCoreMutateCalls.splice(0, dbCoreMutateCalls.length);
+    equal(dbCoreMutateCalls.length, 0, 'No mutate calls yet');
+    await db.items.bulkUpdate([
+      { key: 'nonexist1', changes: { 'foo.bar': 101 } },
+      { key: 'nonexist2', changes: { 'foo.bar': 102 } },
+      { key: 'nonexist3', changes: { 'foo.bar': 103 } }
+    ]);
+    equal(dbCoreMutateCalls.length, 1, 'One mutate call has taken place');
+    deepEqualPartial(
+      dbCoreMutateCalls,
+      [
+        {
+          type: 'put',
+          values: [],
+          criteria: undefined,
+          changeSpec: undefined,
+          updates: {
+            keys: ['nonexist1', 'nonexist2', 'nonexist3'],
+            changeSpecs: [
+              { 'foo.bar': 101 },
+              { 'foo.bar': 102 },
+              { 'foo.bar': 103 }
+            ],
+          },
+        },
+      ],
+      'The mutate call was a put call and contained the intended updates for consistent sync addons to consume'
+    );
+
+    const allItems = await db.items.toArray();
+    const expected = [];
+    deepEqual(allItems, expected, 'Nonexisting item not updated.');
+  } finally {
+    // Cleanup temporary middleware:
+    db.unuse({ stack: 'dbcore', name: 'temp-logger' });
+    db.close();
+    await db.open();
+  }
+});
+
+
+promisedTest("bulkUpdate with failure", async ()=>{
+    if (isSafari) {
+        // Avoid bug https://bugs.webkit.org/show_bug.cgi?id=247053
+        ok(true, "Avoiding Safari issue https://bugs.webkit.org/show_bug.cgi?id=247053");
+        return;
+    }
+    try {
+        const users = await db.users.toArray();
+        deepEqualPartial(users, [
+            {first: "David", username: "dfahlander"},
+            {first: "Karl", username: "kceder" }
+        ], "We have the expected users to begin with");
+        await db.users.bulkUpdate([
+            {key: "nonexisting", changes: {username: "xyz"}}, // Shall be ignored
+            {key: idOfFirstUser, changes: {username: "kceder"}}, // Shall fail (unique index)
+            {key: idOfFirstUser + 1, changes: {first: "Baz"}} // Shall succeed
+        ]);
+        throw new Error("Should not have succeeded");
+    } catch (error) {
+        equal(error.failures.length, 1, "Should be 1 failure");
+        const failurePositions = Object.keys(error.failuresByPos);
+        equal(failurePositions.length, 1, "failuresByPos should have one key only (array with holes)");
+        const failurePosition = failurePositions[0];
+        equal(failurePosition, 1, "The failure should have occurred at position 1");
+        const failure = error.failuresByPos[failurePosition];
+        ok(failure != null, "There was a failure");
+    }
+    const allItems = await db.users.toArray();
+    const expected = [
+        {first: "David", username: "dfahlander" },
+        {first: "Baz", username: "kceder" }
+    ];
+    deepEqualPartial(allItems, expected, "The end result in a non-transactional bulkUpdate() should be that non-failing entries succeeded to update");
+});
+
+promisedTest("bulkUpdate with failure (transactional)", async ()=>{
+    try {
+        await db.transaction('rw', db.users, async () => {
+            await db.users.bulkUpdate([
+                {key: "nonexisting", changes: {username: "xyz"}}, // Shall be ignored
+                {key: idOfFirstUser, changes: {username: "kceder"}}, // Shall fail (unique index)
+                {key: idOfFirstUser + 1, changes: {"foo.bar": 102}} // Shall succeed
+            ]);
+        });
+        throw new Error("Should not have succeeded");
+    } catch (error) {
+        equal(error.failures.length, 1, "Should be 1 failure");
+        const failurePositions = Object.keys(error.failuresByPos);
+        equal(failurePositions.length, 1, "failuresByPos should have one key only (array with holes)");
+        const failurePosition = failurePositions[0];
+        equal(failurePosition, 1, "The failure should have occurred at position 1");
+        const failure = error.failuresByPos[failurePosition];
+        ok(failure != null && failure instanceof Error, "There was a failure and it was an error");
+    }
+    const allItems = await db.users.toArray();
+    const expected = [
+        {first: "David", username: "dfahlander" },
+        {first: "Karl", username: "kceder" }
+    ];
+    deepEqualPartial(allItems, expected, "The end result in a transactional bulkUpdate() should be that no entries succeeeded to update if not catching error within transaction");
+});
+
+promisedTest("bulkUpdate with failure (transactional with catch)", async ()=>{
+    if (isSafari) {
+        // Avoid bug https://bugs.webkit.org/show_bug.cgi?id=247053
+        ok(true, "Avoiding Safari issue https://bugs.webkit.org/show_bug.cgi?id=247053");
+        return;
+    }
+
+    await db.transaction('rw', db.users, async () => {
+        try {
+            await db.users.bulkUpdate([
+                {key: "nonexisting", changes: {username: "xyz"}}, // Shall be ignored
+                {key: idOfFirstUser, changes: {username: "kceder"}}, // Shall fail (unique index)
+                {key: idOfFirstUser + 1, changes: {"foo.bar": 102}} // Shall succeed
+            ]);
+        } catch {}
+    });
+    const allItems = await db.users.toArray();
+    const expected = [
+        {first: "David", last: "Fahlander", username: "dfahlander" },
+        {first: "Karl", last: "Faadersköld", username: "kceder", foo: {bar: 102} }
+    ];
+    deepEqualPartial(allItems, expected, "The end result in a transactional bulkUpdate() (with catch inside transaction) should be that non-failing entries succeeded to update");
+});
 
 asyncTest("add", function () {
     db.transaction("rw", db.users, function () {
@@ -464,8 +644,9 @@ spawnedTest("bulkAdd-catching errors", function*() {
     yield db.users.bulkAdd(newUsersX).catch(e => {
         ok(true, "Got error. Catching it should make the successors work.")
     });
-
-    equal(yield db.users.where('username').startsWith('xper').count(), 3, "3 users! Good - means that previous operation catched and therefore committed");
+    if (!isSafariPrivateMode) {
+        equal(yield db.users.where('username').startsWith('xper').count(), 3, "3 users! Good - means that previous operation catched and therefore committed");
+    }
 
     var newUsersY = [
         {first: "Yke1", last: "Persbrant1", username: "yper1", email: ["yper1@persbrant.net"]},
@@ -480,7 +661,9 @@ spawnedTest("bulkAdd-catching errors", function*() {
     } catch (e) {
         ok(true, "Got: " + e);
     }
-    equal(yield db.users.where('username').startsWith('yper').count(), 3, "3 users! Good - means that previous operation catched (via try..yield..catch this time, and therefore committed");
+    if (!isSafariPrivateMode) {
+        equal(yield db.users.where('username').startsWith('yper').count(), 3, "3 users! Good - means that previous operation catched (via try..yield..catch this time, and therefore committed");
+    }
 
     // Now check that catching and rethrowing should indeed make it fail
     var newUsersZ = [
@@ -544,7 +727,7 @@ spawnedTest("Issue #1280 - add() with auto-incrementing ID and CryptoKey", funct
     var generatedKey = yield self.crypto.subtle.generateKey(
         {
             name: "RSA-OAEP",
-            modulusLength: 4096,
+            modulusLength: 1024,
             publicExponent: new Uint8Array([1, 0, 1]),
             hash: "SHA-256",
         },
@@ -552,18 +735,24 @@ spawnedTest("Issue #1280 - add() with auto-incrementing ID and CryptoKey", funct
         ["encrypt", "decrypt"],
     );
 
+    yield Dexie.delete("MyDatabaseToStoreCryptoKeys");
     var db = new Dexie("MyDatabaseToStoreCryptoKeys");
     db.version(1).stores({
         keys: "++id",
     });
     var objToAdd = { key: generatedKey.privateKey };
-    ok(generatedKey.privateKey instanceof CryptoKey, "The CryptoKey object was not generated correctly");
+    ok(generatedKey.privateKey instanceof CryptoKey, "The CryptoKey object was generated correctly");
 
     var id = yield db.keys.add(objToAdd);
-    ok(id != null, "Got unexpectedly nullish id");
+    ok(id != null, "The id we got was not nullish");
 
     var storedObj = yield db.keys.get(id);
-    ok(storedObj.key instanceof CryptoKey, "The CryptoKey object was destroyed in storage");
+    ok(storedObj.key instanceof CryptoKey, "The CryptoKey object exists in storage");
+
+    // Verify that update works
+    yield db.keys.update(id, {someOtherProp: 'x'});
+    storedObj = yield db.keys.get(id);
+    ok(storedObj.key instanceof CryptoKey, "The CryptoKey object is still a CryptoKey");
 });
 
 spawnedTest("bulkPut", function*(){
@@ -942,8 +1131,30 @@ asyncTest("failNotIncludedStoreTrans", () => {
 });
 
 // Must use this rather than QUnit's deepEqual() because that one fails on Safari when run via karma-browserstack-launcher
-export function deepEqual(a, b, description) {
-    equal(JSON.stringify(a, null, 2), JSON.stringify(b, null, 2), description);
+export function deepEqual(actual, expected, description) {
+    equal(JSON.stringify(actual, null, 2), JSON.stringify(expected, null, 2), description);
+}
+
+function stripObj(obj, props) {
+    const rv = {};
+    for (const key of props.slice().sort()) {
+        rv[key] = obj[key];
+    }
+    return rv;
+}
+
+function sortObj(obj) {
+    return stripObj(obj, Object.keys(obj));
+}
+
+export function deepEqualPartial(actual, expected, description) {
+    if (Array.isArray(actual)) {
+        return deepEqual(
+            actual.map((a, idx) => stripObj(a, Object.keys(expected[idx]))),
+            expected.map(sortObj),
+            description);
+    }
+    return deepEqual(stripObj(actual, Object.keys(expected)), sortObj(expected), description);
 }
   
 promisedTest("bulkGet()", async () => {

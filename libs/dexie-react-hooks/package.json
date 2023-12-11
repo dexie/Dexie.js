@@ -1,16 +1,22 @@
 {
   "name": "dexie-react-hooks",
-  "version": "1.0.6",
+  "version": "1.1.7",
   "description": "React hooks for reactive data fetching using Dexie.js",
   "main": "dist/dexie-react-hooks.js",
-  "typings": "dist/index.d.ts",
+  "typings": "dist/dexie-react-hooks.d.ts",
   "scripts": {
     "test": "just-build build-tests && just-build run-tests",
-    "build": "just-build"
+    "build": "just-build",
+    "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test; UNIT_STATUS=$?; kill $(cat tunnel.pid); exit $UNIT_STATUS",
+    "test:ltTunnel": "node ../../test/lt-local"
+  },
+  "exports": {
+    "import": "./dist/dexie-react-hooks.mjs",
+    "require": "./dist/dexie-react-hooks.js",
+    "default": "./dist/dexie-react-hooks.js"
   },
   "just-build": {
     "default": [
-      "just-build dexie",
       "rollup -c rollup.config.js",
       "tsc --emitDeclarationOnly"
     ],
@@ -18,18 +24,18 @@
       "karma start test/karma.conf.js --single-run"
     ],
     "build-tests": [
-      "just-build dexie",
+      "#just-build tests",
       "cd test",
       "webpack"
     ],
     "dexie": [
       "cd ../..",
-      "npm run build"
+      "pnpm run build"
     ]
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dfahlander/Dexie.js.git"
+    "url": "git+https://github.com/dexie/Dexie.js.git"
   },
   "keywords": [
     "react",
@@ -44,12 +50,12 @@
   "author": "David Fahlander <https://github.com/dfahlander>",
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/dfahlander/Dexie.js/issues"
+    "url": "https://github.com/dexie/Dexie.js/issues"
   },
-  "homepage": "https://github.com/dfahlander/Dexie.js#readme",
+  "homepage": "https://dexie.org",
   "peerDependencies": {
     "@types/react": ">=16",
-    "dexie": ">=3.1.0-alpha.1",
+    "dexie": "^3.2 || ^4.0.1-alpha",
     "react": ">=16"
   },
   "devDependencies": {
@@ -59,12 +65,19 @@
     "@types/qunit": "^2.9.6",
     "@types/react": "^17.0.0",
     "@types/react-dom": "^17.0.0",
-    "dexie": "file:../..",
-    "just-build": "^0.9.19",
+    "dexie": "^3.2 || ^4.0.1-alpha",
+    "just-build": "^0.9.24",
     "qunit": "^2.12.0",
     "react": "^17.0.1",
     "react-dom": "^17.0.1",
+    "rollup": "^2.40.0",
+    "rollup-plugin-cleanup": "^3.2.1",
+    "rollup-plugin-commonjs": "^10.1.0",
+    "rollup-plugin-node-resolve": "^5.2.0",
+    "rollup-plugin-sourcemaps": "^0.6.3",
     "ts-loader": "^8.0.17",
+    "typescript": "4.9.4",
+    "webpack": "^5.74.0",
     "webpack-cli": "^4.5.0"
   }
 }

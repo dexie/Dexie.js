@@ -11,7 +11,7 @@
  *
  * Version {version}, {date}
  *
- * http://dexie.org
+ * https://dexie.org
  *
  * Apache License Version 2.0, January 2004, http://www.apache.org/licenses/
  * 
@@ -37,12 +37,12 @@ var override = Dexie.override,
  * @param {Dexie} db 
  */
 function Syncable (db) {
-    if (!/^3\./.test(Dexie.version))
-        throw new Error(`Missing dexie version 3.x`);
-    if (!db.observable || (db.observable.version !== "{version}" && !/^3\./.test(db.observable.version)))
-        throw new Error(`Missing dexie-observable version 3.x`);
+    if (!/^(3|4)\./.test(Dexie.version))
+        throw new Error(`Missing dexie version 3.x or 4.x`);
+    if (!db.observable || (db.observable.version !== "{version}" && !/^(3|4)\./.test(db.observable.version)))
+        throw new Error(`Missing dexie-observable version 3.x or 4.x`);
     if (db.syncable) {
-        if (db.syncable.version !== "{version}") throw new Error(`Mixed versions of dexie-syncable`);
+        if (db.syncable.version !== "{version}") throw new Error(`Mixed versions of dexie-syncable: "{version}" vs "${db.syncable.version}"`);
         return; // Addon already active.
     }
 
@@ -279,7 +279,7 @@ Syncable.registerSyncProtocol = function(name, protocolInstance) {
 
 if (Dexie.Syncable) {
     if (Dexie.Syncable.version !== "{version}") {
-        throw new Error (`Mixed versions of dexie-syncable`);
+        throw new Error (`Mixed versions of dexie-syncable: "{version}" vs "${Dexie.Syncable.version}"`);
     }
 } else {
     // Register addon in Dexie:

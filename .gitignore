@@ -7,6 +7,11 @@ dist/*.map
 dist/*.ts
 dist/*.gz
 dist/*.mjs
+dist/**/*.js
+dist/**/*.map
+dist/**/*.ts
+dist/**/*.gz
+dist/**/*.mjs
 
 # Other ignores
 tmp/
@@ -179,3 +184,8 @@ samples/typescript/utils.js.map
 
 /.ntvs_analysis.dat
 /*.njsproj
+libs/dexie-cloud-common/tsconfig.tsbuildinfo
+
+#lambdatest tunnel binary
+.lambdatest
+tunnel.pid

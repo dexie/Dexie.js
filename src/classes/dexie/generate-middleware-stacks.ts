@@ -18,7 +18,7 @@ function createMiddlewareStacks(
   tmpTrans: IDBTransaction): {[StackName in keyof DexieStacks]?: DexieStacks[StackName]}
 {
   const dbcore = createMiddlewareStack<DBCore>(
-    createDBCore(idbdb, indexedDB, IDBKeyRange, tmpTrans),
+    createDBCore(idbdb, IDBKeyRange, tmpTrans),
     middlewares.dbcore);
   
   // TODO: Create other stacks the same way as above. They might be dependant on the result

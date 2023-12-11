@@ -1,10 +1,33 @@
 {
   "name": "dexie",
-  "version": "3.1.0-alpha.10",
+  "version": "4.0.1-beta.5",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "module": "dist/dexie.mjs",
   "jsnext:main": "dist/dexie.mjs",
+  "exports": {
+    ".": {
+      "production": {
+        "module": "./import-wrapper-prod.mjs",
+        "import": "./import-wrapper-prod.mjs",
+        "require": "./dist/dexie.min.js",
+        "default": "./dist/dexie.min.js"
+      },
+      "development": {
+        "module": "./import-wrapper.mjs",
+        "import": "./import-wrapper.mjs",
+        "require": "./dist/dexie.js",
+        "default": "./dist/dexie.js"
+      },
+      "default": {
+        "module": "./import-wrapper.mjs",
+        "import": "./import-wrapper.mjs",
+        "require": "./dist/dexie.js",
+        "default": "./dist/dexie.js"
+      }
+    },
+    "./package.json": "./package.json"
+  },
   "typings": "dist/dexie.d.ts",
   "jspm": {
     "format": "cjs",
@@ -14,7 +37,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dfahlander/Dexie.js.git"
+    "url": "https://github.com/dexie/Dexie.js.git"
   },
   "keywords": [
     "indexeddb",
@@ -31,16 +54,18 @@
   ],
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/dfahlander/Dexie.js/issues"
+    "url": "https://github.com/dexie/Dexie.js/issues"
   },
   "scripts": {
     "build": "just-build",
     "watch": "just-build --watch",
     "clean": "rm -rf tools/tmp && rm dist/*.js && rm dist/*.map && rm dist/*.ts && rm dist/*.mjs",
-    "test": "npm run build && npm run test:typings && npm run test:unit",
+    "test": "pnpm run build && pnpm run test:typings && pnpm run test:unit",
     "test:unit": "karma start test/karma.conf.js --single-run",
     "test:typings": "tsc -p test/typings-test/",
-    "test:debug": "karma start test/karma.conf.js --log-level debug"
+    "test:debug": "karma start test/karma.conf.js --log-level debug",
+    "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test:unit; UNIT_STATUS=$?; kill $(cat tunnel.pid); exit $UNIT_STATUS",
+    "test:ltTunnel": "node test/lt-local"
   },
   "just-build": {
     "default": [
@@ -51,11 +76,14 @@
       "# Build dist/dexie.js, dist/dexie.mjs and dist/dexie.d.ts",
       "cd src",
       "tsc [--watch 'Watching for file changes']",
+      "tsc --target es2018 --outdir ../tools/tmp/modern/src/",
       "rollup -c ../tools/build-configs/rollup.config.js",
       "rollup -c ../tools/build-configs/rollup.umd.config.js",
+      "rollup -c ../tools/build-configs/rollup.modern.config.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.js",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.mjs",
-      "dts-bundle-generator --inline-declare-externals -o ../dist/dexie.d.ts public/index.d.ts",
+      "node ../tools/replaceVersionAndDate.js ../dist/modern/dexie.mjs",
+      "dts-bundle-generator --inline-declare-global --inline-declare-externals -o ../dist/dexie.d.ts public/index.d.ts",
       "node ../tools/prepend.js ../dist/dexie.d.ts ../tools/build-configs/banner.txt",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.d.ts"
     ],
@@ -65,7 +93,10 @@
       "node tools/replaceVersionAndDate.js dist/dexie.d.ts",
       "# Minify the default ES5 UMD module",
       "cd dist",
-      "uglifyjs dexie.js -m -c negate_iife=0 -o dexie.min.js --source-map"
+      "uglifyjs dexie.js -m -c negate_iife=0 -o dexie.min.js --source-map url=dexie.min.js.map",
+      "# Minify modern bundle",
+      "cd modern",
+      "terser --comments false --compress --mangle --module --source-map url=dexie.min.mjs.map -o dexie.min.mjs -- dexie.mjs"
     ],
     "dev": [
       "# Build ES5 module and the tests",
@@ -82,19 +113,18 @@
       "rollup -c ../tools/build-configs/rollup.tests.config.js"
     ]
   },
-  "engines": {
-    "node": ">=6.0"
-  },
   "homepage": "https://dexie.org",
   "devDependencies": {
-    "dts-bundle-generator": "^5.7.0",
-    "just-build": "^0.9.19",
+    "@lambdatest/node-tunnel": "^4.0.1",
+    "cross-env": "^7.0.3",
+    "dts-bundle-generator": "^5.9.0",
+    "just-build": "^0.9.24",
     "karma": "^6.1.1",
-    "karma-browserstack-launcher": "^1.5.2",
     "karma-chrome-launcher": "^3.1.0",
     "karma-firefox-launcher": "^2.1.0",
     "karma-mocha-reporter": "^2.2.5",
     "karma-qunit": "^4.1.1",
+    "karma-webdriver-launcher": "^1.0.8",
     "qunit": "^2.10.0",
     "qunitjs": "^1.23.1",
     "rollup": "^2.40.0",
@@ -103,10 +133,12 @@
     "rollup-plugin-node-resolve": "^5.2.0",
     "rollup-plugin-sourcemaps": "^0.6.3",
     "rxjs": "^6.6.6",
+    "safari-14-idb-fix": "^3.0.0",
     "serve-static": "^1.14.1",
     "sorted-json": "^0.2.6",
+    "terser": "^5.3.1",
     "tslib": "^2.1.0",
-    "typescript": "^4.2.2",
+    "typescript": "^5.0.4",
     "uglify-js": "^3.9.2"
   }
 }

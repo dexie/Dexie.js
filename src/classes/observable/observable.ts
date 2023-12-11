@@ -4,26 +4,29 @@ import {
   Subscription,
 } from "../../public/types/observable";
 
-const symbolObservable =
+const symbolObservable: typeof Symbol.observable =
   typeof Symbol !== "undefined" && "observable" in Symbol
-    ? Symbol["observable"]
-    : "@@observable";
+    ? Symbol.observable
+    : "@@observable" as any;
 
 export class Observable<T> implements IObservable<T> {
   private _subscribe: (observer: Observer<T>) => Subscription;
+  hasValue?: ()=>boolean;
+  getValue?: ()=>T;
+
   constructor(subscribe: (observer: Observer<T>) => Subscription) {
     this._subscribe = subscribe;
   }
 
   subscribe(
-    onNext: (value: T) => void,
-    onError?: (error: any) => void,
-    onComplete?: () => void
+    onNext?: ((value: T) => void) | null,
+    onError?: ((error: any) => void) | null,
+    onComplete?: (() => void) | null
   ): Subscription;
-  subscribe(observer: Observer<T>): Subscription;
-  subscribe(x: any, error?: any, complete?: any): Subscription {
+  subscribe(observer?: Observer<T> | null): Subscription;
+  subscribe(x?: any, error?: any, complete?: any): Subscription {
     return this._subscribe(
-      typeof x === "function" ? { next: x, error, complete } : x
+      !x || typeof x === "function" ? { next: x, error, complete } : x
     );
   }
 

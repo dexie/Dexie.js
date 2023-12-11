@@ -1,0 +1,66 @@
+{
+  "name": "dexie-cloud-todo-app",
+  "version": "0.4.2",
+  "private": true,
+  "dependencies": {
+    "@fortawesome/fontawesome-free": "^6.4.0",
+    "@fortawesome/fontawesome-svg-core": "^6.4.0",
+    "@fortawesome/free-solid-svg-icons": "^6.4.0",
+    "@fortawesome/react-fontawesome": "^0.2.0",
+    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/react": "^12.1.5",
+    "@testing-library/user-event": "^14.4.3",
+    "@types/jest": "^29.5.2",
+    "@types/node": "^20.2.5",
+    "@types/react": "^18.2.8",
+    "@types/react-dom": "^18.2.4",
+    "@types/testing-library__jest-dom": "^5.14.6",
+    "bootstrap": "5.3.0",
+    "dexie": "^4.0.1-alpha.27",
+    "dexie-cloud-addon": "^4.0.1-beta.48",
+    "dexie-react-hooks": "^1.1.6",
+    "postcss-flexbugs-fixes": "^5.0.2",
+    "react": "^17.0.2",
+    "react-bootstrap": "^2.7.4",
+    "react-dom": "^17.0.2",
+    "react-scripts": "5.0.1",
+    "react-use": "^17.4.0",
+    "typescript": "^4.9.4",
+    "web-vitals": "^3.3.2",
+    "workbox-background-sync": "^7.0.0",
+    "workbox-broadcast-update": "^7.0.0",
+    "workbox-cacheable-response": "^7.0.0",
+    "workbox-core": "^7.0.0",
+    "workbox-expiration": "^7.0.0",
+    "workbox-google-analytics": "^7.0.0",
+    "workbox-navigation-preload": "^7.0.0",
+    "workbox-precaching": "^7.0.0",
+    "workbox-range-requests": "^7.0.0",
+    "workbox-routing": "^7.0.0",
+    "workbox-strategies": "^7.0.0",
+    "workbox-streams": "^7.0.0"
+  },
+  "scripts": {
+    "start": "react-scripts start",
+    "build": "react-scripts build",
+    "predeploy": "PUBLIC_URL=. REACT_APP_BUILD_TIME=$(date +%s) yarn build",
+    "deploy": "gh-pages -d build -e dexie-cloud-todo-app",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "devDependencies": {
+    "gh-pages": "^5.0.0"
+  }
+}

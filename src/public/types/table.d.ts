@@ -5,12 +5,13 @@ import { Collection } from "./collection";
 import { ThenShortcut } from "./then-shortcut";
 import { WhereClause } from "./where-clause";
 import { PromiseExtended } from "./promise-extended";
-import { Database } from "./database";
 import { IndexableType } from "./indexable-type";
 import { DBCoreTable } from "./dbcore";
+import { Dexie } from "./dexie";
+import { UpdateSpec } from "./update-spec";
 
-export interface Table<T=any, TKey=IndexableType> {
-  db: Database;
+export interface Table<T=any, TKey=any, TInsertType=T> {
+  db: Dexie;
   name: string;
   schema: TableSchema;
   hook: TableHooks<T, TKey>;
@@ -41,20 +42,24 @@ export interface Table<T=any, TKey=IndexableType> {
   orderBy(index: string | string[]): Collection<T, TKey>;
   reverse(): Collection<T, TKey>;
   mapToClass(constructor: Function): Function;
-  add(item: T, key?: TKey): PromiseExtended<TKey>;
-  update(key: TKey | T, changes: { [keyPath: string]: any }): PromiseExtended<number>;
-  put(item: T, key?: TKey): PromiseExtended<TKey>;
+  add(item: TInsertType, key?: TKey): PromiseExtended<TKey>;
+  update(
+    key: TKey | T,
+    changes: UpdateSpec<T> | ((obj: T, ctx:{value: any, primKey: IndexableType}) => void | boolean)): PromiseExtended<number>;
+  put(item: TInsertType, key?: TKey): PromiseExtended<TKey>;
   delete(key: TKey): PromiseExtended<void>;
   clear(): PromiseExtended<void>;
   bulkGet(keys: TKey[]): PromiseExtended<(T | undefined)[]>;
 
-  bulkAdd<B extends boolean>(items: readonly T[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
-  bulkAdd<B extends boolean>(items: readonly T[], options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
-  bulkAdd(items: readonly T[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): PromiseExtended<TKey>;
+  bulkAdd<B extends boolean>(items: readonly TInsertType[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
+  bulkAdd<B extends boolean>(items: readonly TInsertType[], options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
+  bulkAdd(items: readonly TInsertType[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): PromiseExtended<TKey>;
 
-  bulkPut<B extends boolean>(items: readonly T[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
-  bulkPut<B extends boolean>(items: readonly T[], options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
-  bulkPut(items: readonly T[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): PromiseExtended<TKey>;
+  bulkPut<B extends boolean>(items: readonly TInsertType[], keys: IndexableTypeArrayReadonly, options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
+  bulkPut<B extends boolean>(items: readonly TInsertType[], options: { allKeys: B }): PromiseExtended<B extends true ? TKey[] : TKey>;
+  bulkPut(items: readonly TInsertType[], keys?: IndexableTypeArrayReadonly, options?: { allKeys: boolean }): PromiseExtended<TKey>;
 
-  bulkDelete(keys: IndexableTypeArrayReadonly): PromiseExtended<void>;
+  bulkUpdate(keysAndChanges: ReadonlyArray<{key: TKey, changes: UpdateSpec<T>}>): PromiseExtended<number>;
+
+  bulkDelete(keys: TKey[]): PromiseExtended<void>;
 }

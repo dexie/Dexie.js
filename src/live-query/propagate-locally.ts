@@ -1,37 +1,52 @@
-import { globalEvents } from '../globals/global-events';
+import { isIEOrEdge } from '../globals/constants';
+import { globalEvents, DEXIE_STORAGE_MUTATED_EVENT_NAME, STORAGE_MUTATED_DOM_EVENT_NAME } from '../globals/global-events';
 import { ObservabilitySet } from "../public/types/db-events";
-import { extendObservabilitySet } from './extend-observability-set';
+import { signalSubscribersNow } from './cache/signalSubscribers';
 
-function fireLocally(updateParts: ObservabilitySet) {
+if (typeof dispatchEvent !== 'undefined' && typeof addEventListener !== 'undefined') {
+  globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, updatedParts => {
+    if (!propagatingLocally) {
+      let event: CustomEvent<ObservabilitySet>;
+      if (isIEOrEdge) {
+        event = document.createEvent('CustomEvent');
+        event.initCustomEvent(STORAGE_MUTATED_DOM_EVENT_NAME, true, true, updatedParts);
+      } else {
+        event = new CustomEvent(STORAGE_MUTATED_DOM_EVENT_NAME, {
+          detail: updatedParts
+        });
+      }
+      propagatingLocally = true;
+      dispatchEvent(event);
+      propagatingLocally = false;
+    }
+  });
+  addEventListener(STORAGE_MUTATED_DOM_EVENT_NAME, ({detail}: CustomEvent<ObservabilitySet>) => {
+    if (!propagatingLocally) {
+      propagateLocally(detail);
+    }
+  });
+}
+
+/** Called from listeners to BroadcastChannel and DOM event to
+ * propagate the event locally into dexie's storagemutated event
+ * and invalidate cached queries.
+ * 
+ * This function is only called when the event is not originating
+ * from this same Dexie module - either from another redundant dexie import
+ * or from a foreign tab or worker. That's why we need to invalidate
+ * the cache when this happens.
+ */
+export function propagateLocally(updateParts: ObservabilitySet) {
   let wasMe = propagatingLocally;
   try {
     propagatingLocally = true;
-    globalEvents.txcommitted.fire(updateParts);
+    // Fire the "storagemutated" event.
+    globalEvents.storagemutated.fire(updateParts);
+    // Invalidate cached queries and signal subscribers to requery.
+    signalSubscribersNow(updateParts, true);
   } finally {
     propagatingLocally = wasMe;
   }
 }
 
-export let propagateLocally = fireLocally;
 export let propagatingLocally = false;
-let accumulatedParts: ObservabilitySet = {};
-
-if (typeof document !== 'undefined' && document.addEventListener) {
-  // If our tab becomes open, trigger all the collected changes
-  const fireIfVisible = () => {
-    // Only trigger the event if our tab is open:
-    if (document.visibilityState === "visible") {
-      if (Object.keys(accumulatedParts).length > 0) {
-        fireLocally(accumulatedParts);
-      }
-      accumulatedParts = {};
-    }
-  };
-  
-  document.addEventListener("visibilitychange", fireIfVisible);
-
-  propagateLocally = (changedParts: ObservabilitySet) => {
-    extendObservabilitySet(accumulatedParts, changedParts);
-    fireIfVisible();
-  }
-}

@@ -1,6 +1,6 @@
 {
   "name": "dexie-observable",
-  "version": "3.0.0-beta.10",
+  "version": "4.0.1-beta.13",
   "description": "Addon to Dexie that makes it possible to observe database changes no matter if they occur on other db instance or other window.",
   "main": "dist/dexie-observable.js",
   "module": "dist/dexie-observable.es.js",
@@ -14,7 +14,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/dfahlander/Dexie.js.git"
+    "url": "https://github.com/dexie/Dexie.js.git"
   },
   "keywords": [
     "indexeddb",
@@ -31,17 +31,20 @@
   ],
   "license": "Apache-2.0",
   "bugs": {
-    "url": "https://github.com/dfahlander/Dexie.js/issues"
+    "url": "https://github.com/dexie/Dexie.js/issues"
   },
   "scripts": {
     "build": "just-build",
     "watch": "just-build --watch",
-    "test": "npm run build && npm run test:typings && npm run test:unit && npm run test:integration",
+    "test": "pnpm run build && pnpm run test:typings && pnpm run test:unit && pnpm run test:integration",
     "test:unit": "karma start test/unit/karma.conf.js --single-run",
     "test:integration": "karma start test/integration/karma.conf.js --single-run",
     "test:typings": "just-build test-typings",
     "test:unit:debug": "karma start test/unit/karma.conf.js --log-level debug",
-    "test:integration:debug": "karma start test/integrations/karma.conf.js --log-level debug"
+    "test:integration:debug": "karma start test/integrations/karma.conf.js --log-level debug",
+    "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test:unit; UNIT_STATUS=$?; exit $UNIT_STATUS",
+    "test:ltTunnel": "node ../../test/lt-local",
+    "test:ltcloud:integration": "cross-env LAMBDATEST=true pnpm run test:integration; UNIT_STATUS=$?; kill $(cat tunnel.pid); exit $UNIT_STATUS"
   },
   "just-build": {
     "default": [
@@ -69,23 +72,24 @@
     ],
     "test": [
       "# Build the unit tests (integration tests need no build)",
-      "tsc --allowJs --moduleResolution node --lib es2015,dom -t es5 -m es2015 --outDir tools/tmp/es5/test --rootDir ../.. --sourceMap test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
-      "rollup -c tools/build-configs/rollup.tests.config.js",
-      "eslint test/unit --cache --ignore-pattern bundle.js"
+      "tsc --allowJs --moduleResolution node --lib es2018,dom -t es5 -m es2015 --outDir tools/tmp/es5/test --rootDir ../.. --sourceMap test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
+      "rollup -c tools/build-configs/rollup.tests.config.js"
     ],
     "test-typings": [
       "tsc -p test/typings/"
     ]
   },
-  "homepage": "http://dexie.org",
+  "homepage": "https://dexie.org",
   "peerDependencies": {
-    "dexie": "^3.0.2"
+    "dexie": "workspace:^3.0.2 || ^4.0.1-alpha.5"
   },
   "devDependencies": {
-    "dexie": "^3.0.2",
-    "eslint": "^5.16.0",
-    "just-build": "^0.9.19",
+    "@types/node": "^18.11.18",
+    "dexie": "workspace:^3.0.2 || ^4.0.1-alpha.5",
+    "eslint": "^7.27.0",
+    "just-build": "^0.9.24",
     "qunit": "^2.9.2",
+    "typescript": "4.9.4",
     "uglify-js": "^3.5.6"
   }
 }

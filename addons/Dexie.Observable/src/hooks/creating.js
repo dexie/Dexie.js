@@ -1,14 +1,13 @@
 import Dexie from 'dexie';
 
 import {CREATE} from '../change_types';
-import {createUUID} from '../utils';
 
 export default function initCreatingHook(db, table) {
   return function creatingHook(primKey, obj, trans) {
     /// <param name="trans" type="db.Transaction"></param>
     var rv = undefined;
     if (primKey === undefined && table.schema.primKey.uuid) {
-      primKey = rv = createUUID();
+      primKey = rv = Dexie.Observable.createUUID();
       if (table.schema.primKey.keyPath) {
         Dexie.setByKeyPath(obj, table.schema.primKey.keyPath, primKey);
       }

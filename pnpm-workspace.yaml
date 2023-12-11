@@ -1,0 +1,9 @@
+packages:
+  # The "dexie" package in the root
+  - '.'
+  # all packages in direct subdirs of addons/
+  - 'addons/*'
+  # all packages in direct subdirs of libs/
+  - 'libs/*'
+  # Dexie cloud todo app
+  - 'samples/dexie-cloud-todo-app'

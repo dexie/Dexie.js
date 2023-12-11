@@ -1,6 +1,6 @@
 import { PSD, rejection, newScope } from "../helpers/promise";
 import { DexieOptions } from "../public/types/dexie-constructor";
-import { exceptions } from "../errors";
+import { errnames, exceptions } from "../errors";
 import { nop } from "./chaining-functions";
 import { Transaction } from "../classes/transaction";
 import { Dexie } from '../classes/dexie';
@@ -14,7 +14,12 @@ export function tempTransaction (
   fn: (resolve, reject, trans: Transaction) => any)
   // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
 {
-  if (!db._state.openComplete && (!PSD.letThrough)) {
+  if (!db.idbdb || (!db._state.openComplete && (!PSD.letThrough && !db._vip))) {
+    if (db._state.openComplete) {
+      // db.idbdb is falsy but openComplete is true. Must have been an exception durin open.
+      // Don't wait for openComplete as it would lead to infinite loop.
+      return rejection(new exceptions.DatabaseClosed(db._state.dbOpenError));
+    }
     if (!db._state.isBeingOpened) {
       if (!db._options.autoOpen)
         return rejection(new exceptions.DatabaseClosed());
@@ -23,7 +28,17 @@ export function tempTransaction (
     return db._state.dbReadyPromise.then(() => tempTransaction(db, mode, storeNames, fn));
   } else {
     var trans = db._createTransaction(mode, storeNames, db._dbSchema);
-    try { trans.create(); } catch (ex) { return rejection(ex); }
+    try {
+      trans.create();
+      db._state.PR1398_maxLoop = 3;
+    } catch (ex) {
+      if (ex.name === errnames.InvalidState && db.isOpen() && --db._state.PR1398_maxLoop > 0) {
+        console.warn('Dexie: Need to reopen db');
+        db._close();
+        return db.open().then(()=>tempTransaction(db, mode, storeNames, fn));
+      }
+      return rejection(ex);
+    }
     return trans._promise(mode, (resolve, reject) => {
       return newScope(() => { // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
         PSD.trans = trans;
@@ -40,7 +55,8 @@ export function tempTransaction (
       //       });
       //   });
       //
-      return trans._completion.then(() => result);
+      if (mode === 'readwrite') try {trans.idbtrans.commit();} catch {}
+      return mode === 'readonly' ? result : trans._completion.then(() => result);
     });/*.catch(err => { // Don't do this as of now. If would affect bulk- and modify methods in a way that could be more intuitive. But wait! Maybe change in next major.
           trans._reject(err);
           return rejection(err);

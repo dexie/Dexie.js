@@ -1,0 +1,14 @@
+.status-icons-collapsed {
+  position: absolute;
+  top: 0;
+  right: 80px;
+}
+
+.status-icons-not-collapsed {
+  margin-top: -15px;
+}
+
+#basic-nav-dropdown {
+  color: white;
+  font-weight: bold;
+}

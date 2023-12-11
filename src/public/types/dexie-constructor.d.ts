@@ -9,14 +9,19 @@ import { DexieEventSet } from "./dexie-event-set";
 import { DexieDOMDependencies } from "./dexie-dom-dependencies";
 import { GlobalDexieEvents, ObservabilitySet } from "./db-events";
 import { Observable } from "./observable";
+import { GlobalQueryCache } from "./cache";
+
+export type ChromeTransactionDurability = 'default' | 'strict' | 'relaxed'
 
 export interface DexieOptions {
-  addons?: Array<(db: Dexie) => void>,
-  autoOpen?: boolean,
-  indexedDB?: {open: Function},
-  IDBKeyRange?: {bound: Function, lowerBound: Function, upperBound: Function},
+  addons?: Array<(db: Dexie) => void>;
+  autoOpen?: boolean;
+  indexedDB?: {open: Function};
+  IDBKeyRange?: {bound: Function, lowerBound: Function, upperBound: Function};
   allowEmptyDB?: boolean;
-  modifyChunkSize?: number
+  modifyChunkSize?: number;
+  chromeTransactionDurability?: ChromeTransactionDurability;
+  cache?: 'immutable' | 'cloned' | 'disabled';
 }
 
 export interface DexieConstructor extends DexieExceptionClasses {
@@ -37,9 +42,9 @@ export interface DexieConstructor extends DexieExceptionClasses {
   liveQuery<T>(fn: () => T | Promise<T>): Observable<T>;
   extendObservabilitySet (target: ObservabilitySet, newSet: ObservabilitySet): ObservabilitySet;
   override<F> (origFunc:F, overridedFactory: (fn:any)=>any) : F; // ?
-  getByKeyPath(obj: Object, keyPath: string): any;
-  setByKeyPath(obj: Object, keyPath: string, value: any): void;
-  delByKeyPath(obj: Object, keyPath: string): void;
+  getByKeyPath(obj: Object, keyPath: string | string[]): any;
+  setByKeyPath(obj: Object, keyPath: string | string[], value: any): void;
+  delByKeyPath(obj: Object, keyPath: string | string[]): void;
   shallowClone<T> (obj: T): T;
   deepClone<T>(obj: T): T;
   asap(fn: Function) : void; //?
@@ -49,6 +54,8 @@ export interface DexieConstructor extends DexieExceptionClasses {
   delete(dbName: string): Promise<void>;
   dependencies: DexieDOMDependencies;
   default: Dexie; // Work-around for different build tools handling default imports differently.
+  cache: GlobalQueryCache;
+  debug: false | true | 'dexie';
 
   Promise: PromiseExtendedConstructor;
   //TableSchema: {}; // Deprecate!

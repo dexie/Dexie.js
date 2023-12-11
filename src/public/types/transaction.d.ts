@@ -1,13 +1,14 @@
 import { Table } from "./table";
-import { Database } from "./database";
+import { Dexie } from "./dexie";
 import { TransactionEvents } from "./transaction-events";
 
 export interface Transaction {
-  db: Database;
+  db: Dexie;
   active: boolean;
   mode: IDBTransactionMode;
   //tables: { [type: string]: Table<any, any> }; Deprecated since 2.0. Obsolete from v3.0.
   storeNames: Array<string>;
+  explicit?: boolean;
   parent?: Transaction;
   on: TransactionEvents;
   abort(): void;
