@@ -630,10 +630,22 @@ promisedTest("Full use case matrix", async ()=>{
     }
   }
 
-  const subscriptions = Object.keys(queries).map(name => observables.get(name).subscribe({
-    next: res => {},
-    error: error => ok(false, ''+error)
-  }));
+  const subscriptions = Object.keys(queries).map(name => {
+    let gotAnyData = false;
+    ++flyingNow;
+    const subscription = observables.get(name).subscribe({
+      next: res => {
+        if (!gotAnyData) {
+          gotAnyData = true;
+          if (--flyingNow === 0) eventTarget.dispatchEvent(new CustomEvent('zeroflyers'));
+        }
+      },
+      error: error => {
+        ok(false, ''+error)
+      }
+    });
+    return subscription;
+  });
   try {
     await zeroFlyers(timeout(200));
     deepEqual(actualResults, expectedInitialResults, "Initial results as expected");
