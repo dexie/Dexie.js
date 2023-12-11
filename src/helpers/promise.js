@@ -785,7 +785,7 @@ function snapShot () {
         allSettled: GlobalPromise.allSettled,
         any: GlobalPromise.any,
         resolve: GlobalPromise.resolve,
-        reject: GlobalPromise.reject
+        reject: GlobalPromise.reject,
     } : {};
 }
 
