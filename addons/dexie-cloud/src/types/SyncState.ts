@@ -5,4 +5,5 @@ export interface SyncState {
   phase: SyncStatePhase;
   progress?: number; // 0..100
   error?: Error; // If phase === "error"
+  license?: 'ok' | 'expired' | 'deactivated';
 }

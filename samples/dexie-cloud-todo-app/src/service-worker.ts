@@ -1,13 +1,8 @@
 /// <reference lib="webworker" />
 /* eslint-disable no-restricted-globals */
 
-// Log build date and time of the service worker.
-const buildDate = process.env.REACT_APP_BUILD_TIME;
-console.debug('Service worker build on', new Date(parseInt(buildDate + "000")));
-
 // Import Dexie Cloud Service Worker
-import "dexie-cloud-addon/dist/umd/service-worker";
-
+import "dexie-cloud-addon/service-worker";
 // This service worker can be customized!
 // See https://developers.google.com/web/tools/workbox/modules
 // for the list of available Workbox modules, or add any other
@@ -20,6 +15,13 @@ import { ExpirationPlugin } from 'workbox-expiration';
 import { precacheAndRoute, createHandlerBoundToURL } from 'workbox-precaching';
 import { registerRoute } from 'workbox-routing';
 import { StaleWhileRevalidate } from 'workbox-strategies';
+
+
+// Log build date and time of the service worker.
+const buildDate = process.env.REACT_APP_BUILD_TIME;
+console.debug('Service worker build on', new Date(parseInt(buildDate + "000")));
+
+
 
 declare const self: ServiceWorkerGlobalScope;
 

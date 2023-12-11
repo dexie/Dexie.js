@@ -1,8 +1,8 @@
 /** This module comprises the list of browsers
  * to run tests on depending on environment.
  *
- * Browsers listed here must also be defined in
- * karma.browserstack.js
+ * "remote..." browsers listed here must also be defined in
+ * karma.lambdatest.js
  */
 
 module.exports = {
@@ -10,25 +10,22 @@ module.exports = {
     local: ['Chrome'],
     //local: ['bs_safari_latest_supported'],
 
-    // When browserstack cannot be used, use local Firefox.
-    ciLocal: ['Firefox'],
-    
-    // Continous Integration on every push to master
+    // When Lambdatest credentials aren't available, use Chrome and Firefox on Github Actions:
+    ciLocal: ['Chrome', 'Firefox'],
+
+    // Continous Integration on every push
     ci: [
-        // - Let firefox represent the standard evergreen browser.
-        // Leaving out Chrome, since local tests have hopefully already run on it.
-        // Chrome will be tested in the pre_npm_publish anyway.
-        'bs_firefox_latest_supported', 
-        // Safari. Enforces native Safari support for every PR!
-        'bs_safari_latest_supported'
+        //'remote_chrome',
+        'remote_safari',
+        //'remote_firefox'
     ],
 
     // Test matrix used before every npm publish.
     pre_npm_publish: [
-        'bs_chrome_oldest_supported', // ...because not tested in CI!
-        'bs_chrome_latest_supported', // ...because not tested in CI!
-        'bs_firefox_oldest_supported', // ...because not tested in CI!
-        "bs_safari_oldest_supported", // ...because not tested in CI!
+        'remote_chrome',
+        'remote_edge',
+        'remote_safari',
+        'remote_firefox'
     ]
 }
 

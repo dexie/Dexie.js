@@ -1,5 +1,5 @@
 #!/bin/bash -e
-cd ../../../Dexie.Observable
+cd ../../Dexie.Observable
 echo "Installing dependencies for dexie-observable"
 pnpm install >/dev/null
 echo "Building dexie-observable"
@@ -11,4 +11,5 @@ echo "Building dexie-syncable"
 pnpm run build
 
 pnpm run test:typings
-pnpm run test:unit
+pnpm run test:ltcloud
+pnpm run test:ltcloud:integration

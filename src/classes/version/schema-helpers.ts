@@ -9,12 +9,11 @@ import { exceptions } from '../../errors';
 import { TableSchema } from '../../public/types/table-schema';
 import { IndexSpec } from '../../public/types/index-spec';
 import { hasIEDeleteObjectStoreBug, isIEOrEdge } from '../../globals/constants';
-import { safariMultiStoreFix } from '../../functions/quirks';
 import { createIndexSpec, nameFromKeyPath } from '../../helpers/index-spec';
 import { createTableSchema } from '../../helpers/table-schema';
 import { generateMiddlewareStacks } from '../dexie/generate-middleware-stacks';
 
-export function setApiOnPlace({_novip: db}: Dexie, objs: Object[], tableNames: string[], dbschema: DbSchema) {
+export function setApiOnPlace(db: Dexie, objs: Object[], tableNames: string[], dbschema: DbSchema) {
   tableNames.forEach(tableName => {
     const schema = dbschema[tableName];
     objs.forEach(obj => {
@@ -41,7 +40,7 @@ export function setApiOnPlace({_novip: db}: Dexie, objs: Object[], tableNames: s
   });
 }
 
-export function removeTablesApi({_novip: db}: Dexie, objs: Object[]) {
+export function removeTablesApi(db: Dexie, objs: Object[]) {
   objs.forEach(obj => {
     for (let key in obj) {
       if (obj[key] instanceof db.Table) delete obj[key];
@@ -78,7 +77,7 @@ export function runUpgraders(db: Dexie, oldVersion: number, idbUpgradeTrans: IDB
 export type UpgradeQueueItem = (idbtrans: IDBTransaction) => PromiseLike<any> | void;
 
 export function updateTablesAndIndexes(
-  {_novip: db}: Dexie,
+  db: Dexie,
   oldVersion: number,
   trans: Transaction,
   idbUpgradeTrans: IDBTransaction)
@@ -339,7 +338,7 @@ function buildGlobalSchema(
   return globalSchema;
 }
 
-export function readGlobalSchema({_novip: db}: Dexie, idbdb: IDBDatabase, tmpTrans: IDBTransaction) {
+export function readGlobalSchema(db: Dexie, idbdb: IDBDatabase, tmpTrans: IDBTransaction) {
   db.verno = idbdb.version / 10;
   const globalSchema = db._dbSchema = buildGlobalSchema(db, idbdb, tmpTrans);
   db._storeNames = slice(idbdb.objectStoreNames, 0);
@@ -352,7 +351,7 @@ export function verifyInstalledSchema(db: Dexie, tmpTrans: IDBTransaction): bool
   return !(diff.add.length || diff.change.some(ch => ch.add.length || ch.change.length));
 }
 
-export function adjustToExistingIndexNames({_novip: db}: Dexie, schema: DbSchema, idbtrans: IDBTransaction) {
+export function adjustToExistingIndexNames(db: Dexie, schema: DbSchema, idbtrans: IDBTransaction) {
   // Issue #30 Problem with existing db - adjust to existing index names when migrating from non-dexie db
   const storeNames = idbtrans.db.objectStoreNames;
 

@@ -33,6 +33,7 @@ export interface DBOperationCommon<PK=DBOpPrimaryKey> {
   keys: PK[]; // Needed also in delete and update operations when criteria is specificied: for server->client rollback operation
   txid?: string | null;
   userId?: string | null;
+  opNo?: number;
 }
 export interface DBInsertOperation<PK=DBOpPrimaryKey> extends DBOperationCommon<PK> {
   type: "insert";

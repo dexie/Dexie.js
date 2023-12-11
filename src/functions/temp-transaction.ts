@@ -55,7 +55,8 @@ export function tempTransaction (
       //       });
       //   });
       //
-      return trans._completion.then(() => result);
+      if (mode === 'readwrite') try {trans.idbtrans.commit();} catch {}
+      return mode === 'readonly' ? result : trans._completion.then(() => result);
     });/*.catch(err => { // Don't do this as of now. If would affect bulk- and modify methods in a way that could be more intuitive. But wait! Maybe change in next major.
           trans._reject(err);
           return rejection(err);

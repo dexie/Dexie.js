@@ -34,13 +34,19 @@ export function encodeIdsForServer(
           const mutClone = changeClone.muts[mutIndex];
           const rewrittenKey = JSON.stringify(key);
           mutClone.keys[keyIndex] = rewrittenKey;
-          if (rewriteValues) {
+          /* Bug (#1777)
+            We should not rewrite values. It will fail because the key is array and the value is string.
+            Only the keys should be rewritten and it's already done on the server.
+            We should take another round of revieweing how key transformations are being done between
+            client and server and let the server do the key transformations entirely instead now that
+            we have the primary key schema on the server making it possible to do so.
+            if (rewriteValues) {
             Dexie.setByKeyPath(
               (mutClone as DBInsertOperation).values[keyIndex],
               primaryKey.keyPath!,
               rewrittenKey
             );
-          }
+          }*/
         } else if (key[0] === '#') {
           // Private ID - translate!
           if (changeClone === change)
@@ -72,11 +78,18 @@ function cloneChange(change: DBOperationsSet[number], rewriteValues: boolean) {
   return {
     ...change,
     muts: rewriteValues
-      ? change.muts.map((m) => ({
-          ...m,
-          keys: m.keys.slice(),
-          values: (m as DBInsertOperation).values.slice(),
-        }))
+      ? change.muts.map((m) => {
+          return (m.type === 'insert' || m.type === 'upsert') && m.values
+            ? {
+                ...m,
+                keys: m.keys.slice(),
+                values: m.values.slice(),
+              }
+            : {
+                ...m,
+                keys: m.keys.slice(),
+              };
+        })
       : change.muts.map((m) => ({ ...m, keys: m.keys.slice() })),
   };
 }

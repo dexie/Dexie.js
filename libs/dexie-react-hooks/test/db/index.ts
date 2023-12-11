@@ -5,7 +5,7 @@ export class TestUseLiveQueryDB extends Dexie {
   items!: Table<Item, number>;
 
   constructor() {
-    super("TestUseLiveQuery");
+    super("TestUseLiveQuery", {cache: 'immutable'});
     this.version(1).stores({
       items: "id"
     });

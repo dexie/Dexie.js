@@ -7,7 +7,7 @@ n=1
 until [ $n -ge 4 ]
 do
   echo "Retry $n of 3"
-  pnpm test && exit 0
+  pnpm test:ltcloud && exit 0
   n=$[$n+1]
 done
 exit 1

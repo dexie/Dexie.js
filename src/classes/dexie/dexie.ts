@@ -22,7 +22,7 @@ import { DexieEventSet } from '../../public/types/dexie-event-set';
 import { DexieExceptionClasses } from '../../public/types/errors';
 import { DexieDOMDependencies } from '../../public/types/dexie-dom-dependencies';
 import { nop, promisableChain } from '../../functions/chaining-functions';
-import Promise, { PSD } from '../../helpers/promise';
+import Promise, { PSD, globalPSD } from '../../helpers/promise';
 import { extend, override, keys, hasOwn } from '../../functions/utils';
 import Events from '../../helpers/Events';
 import { maxString, connections, READONLY, READWRITE } from '../../globals/constants';
@@ -44,6 +44,8 @@ import { hooksMiddleware } from '../../hooks/hooks-middleware';
 import { IndexableType } from '../../public';
 import { observabilityMiddleware } from '../../live-query/observability-middleware';
 import { cacheExistingValuesMiddleware } from '../../dbcore/cache-existing-values-middleware';
+import { cacheMiddleware } from "../../live-query/cache/cache-middleware";
+import { vipify } from "../../helpers/vipify";
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -97,8 +99,9 @@ export class Dexie implements IDexie {
       // Default DOM dependency implementations from static prop.
       indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to browser env.
       IDBKeyRange: deps.IDBKeyRange,  // Backend IDBKeyRange api. Default to browser env.
+      cache: 'cloned', // Default to cloned for backward compatibility. For best performance and least memory consumption use 'immutable'.
       ...options
-    };
+    };  
     this._deps = {
       indexedDB: options.indexedDB as IDBFactory,
       IDBKeyRange: options.IDBKeyRange as typeof IDBKeyRange
@@ -179,7 +182,8 @@ export class Dexie implements IDexie {
         console.warn(`Another connection wants to upgrade database '${this.name}'. Closing db now to resume the upgrade.`);
       else
         console.warn(`Another connection wants to delete database '${this.name}'. Closing db now to resume the delete request.`);
-      this.close();
+      this.close({disableAutoOpen: false});
+      this._state.openComplete = false;
       // In many web applications, it would be recommended to force window.reload()
       // when this event occurs. To do that, subscribe to the versionchange event
       // and call window.location.reload(true) if ev.newVersion > 0 (not a deletion)
@@ -211,12 +215,27 @@ export class Dexie implements IDexie {
     }
 
     // Default middlewares:
+    this.use(cacheExistingValuesMiddleware);
+    this.use(cacheMiddleware);
+    this.use(observabilityMiddleware);
     this.use(virtualIndexMiddleware);
     this.use(hooksMiddleware);
-    this.use(observabilityMiddleware);
-    this.use(cacheExistingValuesMiddleware);
 
-    this.vip = Object.create(this, {_vip: {value: true}}) as Dexie;
+    const vipDB = new Proxy(this, {
+      get: (_, prop, receiver) => {
+        if (prop === '_vip') return true;
+        if (prop === 'table') return (tableName: string) => vipify(this.table(tableName), vipDB);
+        const rv = Reflect.get(_, prop, receiver);
+        if (rv instanceof Table) return vipify(rv, vipDB);
+        if (prop === 'tables') return (rv as Table[]).map(t => vipify(t, vipDB));
+        if (prop === '_createTransaction') return function() {
+          const tx: Transaction = (rv as typeof this._createTransaction).apply(this, arguments);
+          return vipify(tx, vipDB);
+        }
+        return rv;
+      }
+    });
+    this.vip = vipDB;
 
     // Call each addon:
     addons.forEach(addon => addon(this));
@@ -282,7 +301,10 @@ export class Dexie implements IDexie {
   }
 
   open() {
-    return dexieOpen(this);
+    return usePSD(
+      globalPSD, // Enforce global scope here since db.open() can be part of a live query or transaction scope
+      () => dexieOpen(this)
+    );
   }
 
   _close(): void {
@@ -291,7 +313,7 @@ export class Dexie implements IDexie {
     if (idx >= 0) connections.splice(idx, 1);
     if (this.idbdb) {
       try { this.idbdb.close(); } catch (e) { }
-      this._novip.idbdb = null; // db._novip is because db can be an Object.create(origDb).
+      this.idbdb = null;
     }    
     // Reset dbReadyPromise promise:
     state.dbReadyPromise = new Promise(resolve => {
@@ -302,10 +324,10 @@ export class Dexie implements IDexie {
     });
   }
 
-  close(): void {
+  close({disableAutoOpen} = {disableAutoOpen: true}): void {
     this._close();
     const state = this._state;
-    this._options.autoOpen = false;
+    if (disableAutoOpen) this._options.autoOpen = false;
     state.dbOpenError = new exceptions.DatabaseClosed();
     if (state.isBeingOpened)
       state.cancelOpen(state.dbOpenError);
@@ -316,7 +338,7 @@ export class Dexie implements IDexie {
     const state = this._state;
     return new Promise((resolve, reject) => {
       const doDelete = () => {
-        this.close();
+        this.close({disableAutoOpen: false});
         var req = this._deps.indexedDB.deleteDatabase(this.name);
         req.onsuccess = wrap(() => {
           _onDatabaseDeleted(this._deps, this.name);

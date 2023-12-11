@@ -7,6 +7,12 @@ export interface UserLogin {
   claims: {
     [claimName: string]: any;
   }
+  license?: {
+    type: 'demo' | 'eval' | 'prod' | 'client';
+    status: 'ok' | 'expired' | 'deactivated';
+    validUntil?: Date;
+    evalDaysLeft?: number;
+  }
   lastLogin: Date;
   accessToken?: string;
   accessTokenExpiration?: Date;

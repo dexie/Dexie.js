@@ -1,6 +1,7 @@
 import { combineLatest, Observable, of } from 'rxjs';
 import { debounceTime, map, startWith, switchMap } from 'rxjs/operators';
-import { DexieCloudDB } from './db/DexieCloudDB';
+import { getCurrentUserEmitter } from './currentUserEmitter';
+import { DexieCloudDB, SyncStateChangedEventData } from './db/DexieCloudDB';
 import { isOnline } from './sync/isOnline';
 import { SyncState } from './types/SyncState';
 import { userIsActive, userIsReallyActive } from './userIsActive';
@@ -34,10 +35,18 @@ export function computeSyncState(db: DexieCloudDB): Observable<SyncState> {
   );
   return combineLatest([
     lazyWebSocketStatus,
-    db.syncStateChangedEvent.pipe(startWith({ phase: 'initial' } as SyncState)),
+    db.syncStateChangedEvent.pipe(startWith({ phase: 'initial' } as SyncStateChangedEventData)),
+    getCurrentUserEmitter(db.dx._novip),
     userIsReallyActive
   ]).pipe(
-    map(([status, syncState, userIsActive]) => {
+    map(([status, syncState, user, userIsActive]) => {
+      if (user.license?.status && user.license.status !== 'ok') {
+        return {
+          phase: 'offline',
+          status: 'offline',
+          license: user.license.status
+        } satisfies SyncState;
+      }
       let { phase, error, progress } = syncState;
       let adjustedStatus = status;
       if (phase === 'error') {
@@ -72,6 +81,7 @@ export function computeSyncState(db: DexieCloudDB): Observable<SyncState> {
         error,
         progress,
         status: isOnline ? adjustedStatus : 'offline',
+        license: 'ok'
       };
 
       return retState;

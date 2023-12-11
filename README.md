@@ -1,7 +1,7 @@
 Dexie.js
 ========
 
-[![NPM Version][npm-image]][npm-url] [![Build Status](https://travis-ci.com/dexie/Dexie.js.svg?branch=master)](https://travis-ci.com/dexie/Dexie.js)
+[![NPM Version][npm-image]][npm-url] ![Build Status](https://github.com/dexie/Dexie.js/actions/workflows/main.yml/badge.svg)
 
 Dexie.js is a wrapper library for indexedDB - the standard database in the browser. https://dexie.org
 

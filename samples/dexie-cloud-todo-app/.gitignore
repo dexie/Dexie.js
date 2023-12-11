@@ -22,6 +22,8 @@ npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
 
+/dummytests/
+
 # dexie-cloud
 dexie-cloud.json
 dexie-cloud.key

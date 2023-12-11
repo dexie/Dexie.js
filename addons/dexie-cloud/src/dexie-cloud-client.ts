@@ -4,7 +4,7 @@ import {
   DBRealmMember,
   getDbNameFromDbUrl,
 } from 'dexie-cloud-common';
-import { BehaviorSubject, combineLatest, from, fromEvent } from 'rxjs';
+import { BehaviorSubject, combineLatest, from, fromEvent, Subject } from 'rxjs';
 import { filter, map, skip, startWith, switchMap, take } from 'rxjs/operators';
 import { login } from './authentication/login';
 import { UNAUTHORIZED_USER } from './authentication/UNAUTHORIZED_USER';
@@ -44,6 +44,11 @@ import { getCurrentUserEmitter } from './currentUserEmitter';
 import { NewIdOptions } from './types/NewIdOptions';
 import { getInvitesObservable } from './getInvitesObservable';
 import { getGlobalRolesObservable } from './getGlobalRolesObservable';
+import { UserLogin } from './db/entities/UserLogin';
+import { InvalidLicenseError } from './InvalidLicenseError';
+import { logout, _logout } from './authentication/logout';
+import { loadAccessToken } from './authentication/authenticate';
+import { isEagerSyncDisabled } from './isEagerSyncDisabled';
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 export {
@@ -53,7 +58,14 @@ export {
   DBSyncedObject,
   DBPermissionSet,
 } from 'dexie-cloud-common';
+export { resolveText } from './helpers/resolveText';
 export { Invite } from './Invite';
+export type { UserLogin, DXCWebSocketStatus, SyncState };
+export type { DexieCloudSyncOptions };
+export type { DexieCloudOptions, PeriodicSyncOptions } from './DexieCloudOptions';
+export * from './types/DXCAlert';
+export * from './types/DXCInputField';
+export * from './types/DXCUserInteraction';
 
 const DEFAULT_OPTIONS: Partial<DexieCloudOptions> = {
   nameSuffix: true,
@@ -97,8 +109,11 @@ export function dexieCloud(dexie: Dexie) {
     currentUserEmitter.next(UNAUTHORIZED_USER);
   });
 
+  const syncComplete = new Subject<void>();
+
   dexie.cloud = {
-    version: '{version}',
+    // @ts-ignore
+    version: __VERSION__,
     options: { ...DEFAULT_OPTIONS } as DexieCloudOptions,
     schema: null,
     get currentUserId() {
@@ -109,6 +124,11 @@ export function dexieCloud(dexie: Dexie) {
       phase: 'initial',
       status: 'not-started',
     }),
+
+    events: {
+      syncComplete,
+    },
+
     persistedSyncState: new BehaviorSubject<PersistedSyncState | undefined>(
       undefined
     ),
@@ -135,11 +155,21 @@ export function dexieCloud(dexie: Dexie) {
       }
       updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
     },
+    async logout({ force } = {}) {
+      force
+        ? await _logout(DexieCloudDB(dexie), { deleteUnsyncedData: true })
+        : await logout(DexieCloudDB(dexie));
+    },
     async sync(
       { wait, purpose }: DexieCloudSyncOptions = { wait: true, purpose: 'push' }
     ) {
       if (wait === undefined) wait = true;
       const db = DexieCloudDB(dexie);
+      const licenseStatus = db.cloud.currentUser.value.license?.status || 'ok';
+      if (licenseStatus !== 'ok') {
+        // Refresh access token to check for updated license
+        await loadAccessToken(db);
+      }
       if (purpose === 'pull') {
         const syncState = db.cloud.persistedSyncState.value;
         triggerSync(db, purpose);
@@ -234,6 +264,9 @@ export function dexieCloud(dexie: Dexie) {
       subscriptions.push(computeSyncState(db).subscribe(dexie.cloud.syncState));
     }
 
+    // Forward db.syncCompleteEvent to be publicly consumable via db.cloud.events.syncComplete:
+    subscriptions.push(db.syncCompleteEvent.subscribe(syncComplete));
+
     //verifyConfig(db.cloud.options); Not needed (yet at least!)
     // Verify the user has allowed version increment.
     if (!db.tables.every((table) => table.core)) {
@@ -266,7 +299,7 @@ export function dexieCloud(dexie: Dexie) {
           // Update persisted options:
           if (!options) throw new Error(`Internal error`); // options cannot be null if configuredProgramatically is set.
           const newPersistedOptions: DexieCloudOptions = {
-            ...options
+            ...options,
           };
           delete newPersistedOptions.fetchTokens;
           await db.$syncState.put(newPersistedOptions, 'options');
@@ -367,15 +400,16 @@ export function dexieCloud(dexie: Dexie) {
     }
 
     // HERE: If requireAuth, do athentication now.
+    let changedUser = false;
     if (db.cloud.options?.requireAuth) {
-      await login(db);
+      changedUser = await login(db);
     }
 
     if (localSyncWorker) localSyncWorker.stop();
     localSyncWorker = null;
     throwIfClosed();
     if (db.cloud.usingServiceWorker && db.cloud.options?.databaseUrl) {
-      registerSyncEvent(db, 'push').catch(() => {});
+      registerSyncEvent(db, changedUser ? 'pull' : 'push').catch(() => {});
       registerPeriodicSyncEvent(db).catch(() => {});
     } else if (
       db.cloud.options?.databaseUrl &&
@@ -385,7 +419,7 @@ export function dexieCloud(dexie: Dexie) {
       // There's no SW. Start SyncWorker instead.
       localSyncWorker = LocalSyncWorker(db, db.cloud.options, db.cloud.schema!);
       localSyncWorker.start();
-      triggerSync(db, 'push');
+      triggerSync(db, changedUser ? 'pull' : 'push');
     }
 
     // Listen to online event and do sync.
@@ -397,7 +431,9 @@ export function dexieCloud(dexie: Dexie) {
           db.syncStateChangedEvent.next({
             phase: 'not-in-sync',
           });
-          triggerSync(db, 'push');
+          if (!isEagerSyncDisabled(db)) {
+            triggerSync(db, 'push');
+          }
         }),
         fromEvent(self, 'offline').subscribe(() => {
           console.debug('offline!');
@@ -419,7 +455,8 @@ export function dexieCloud(dexie: Dexie) {
   }
 }
 
-dexieCloud.version = '{version}';
+// @ts-ignore
+dexieCloud.version = __VERSION__;
 
 Dexie.Cloud = dexieCloud;
 

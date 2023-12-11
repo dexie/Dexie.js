@@ -33,9 +33,9 @@ export const getInvitesObservable = associate((db: Dexie) => {
           emailMembersById
         );
         return Object.values(membersById)
-          .filter((invite) => !invite.accepted && !invite.rejected)
+          .filter((invite: DBRealmMember) => !invite.accepted)
           .map(
-            (invite) =>
+            (invite: DBRealmMember) =>
               ({
                 ...invite,
                 async accept() {
@@ -44,7 +44,7 @@ export const getInvitesObservable = associate((db: Dexie) => {
                 async reject() {
                   await db.members.update(invite.id!, { rejected: new Date() });
                 },
-              } as Invite)
+              } satisfies Invite)
           );
       })
     ),

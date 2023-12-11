@@ -24,6 +24,7 @@ export class Transaction implements ITransaction {
   chromeTransactionDurability: ChromeTransactionDurability;
   idbtrans: IDBTransaction;
   storeNames: string[];
+  explicit?: boolean;
   on: any;
   parent?: Transaction;
   schema: DbSchema;

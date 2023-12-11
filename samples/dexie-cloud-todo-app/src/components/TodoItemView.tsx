@@ -12,7 +12,7 @@ interface Props {
 export function TodoItemView({ item }: Props) {
   const can = usePermissions(db, 'todoItems', item);
   return (
-    <div className={'row ' + (item.done ? 'done' : '')}>
+    <div className={'todorow ' + (item.done ? 'done' : '')}>
       <div className="narrow">
         <input
           type="checkbox"
