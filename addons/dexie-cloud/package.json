@@ -81,7 +81,6 @@
     "dreambase-library": "^1.0.21",
     "just-build": "*",
     "karma": "*",
-    "karma-browserstack-launcher": "*",
     "karma-chrome-launcher": "*",
     "karma-firefox-launcher": "*",
     "karma-qunit": "*",

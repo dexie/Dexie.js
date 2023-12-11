@@ -1,8 +1,8 @@
 /** This module comprises the list of browsers
  * to run tests on depending on environment.
  *
- * Browsers listed here must also be defined in
- * karma.browserstack.js
+ * "remote..." browsers listed here must also be defined in
+ * karma.lambdatest.js
  */
 
 module.exports = {

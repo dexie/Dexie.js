@@ -22,7 +22,6 @@ const karmaCommon = {
     'karma-mocha-reporter',
     'karma-chrome-launcher',
     'karma-firefox-launcher',
-    'karma-browserstack-launcher',
     'karma-webdriver-launcher'
   ],
 
@@ -43,10 +42,6 @@ const karmaCommon = {
       served: true,
     },
   ],
-
-  browserStack: require('./karma.browserstack.js').browserStack,
-
-  customLaunchers: {...require('./karma.browserstack.js').customLaunchers}
 };
 
 if (process.env.LAMBDATEST) {
@@ -98,7 +93,7 @@ if (process.env.LAMBDATEST) {
 
 const browserSuiteToUse = process.env.NODE_ENV === 'release'
   ? 'pre_npm_publish' // When run by tools/release.sh
-  : process.env.BROWSER_STACK_USERNAME || process.env.LT_USERNAME
+  : process.env.LT_USERNAME
   ? "ci" // Automated CI
   : process.env.GH_ACTIONS
   ? "ciLocal" // "ci" when not having the credentials (= forks of the dexie repo)
