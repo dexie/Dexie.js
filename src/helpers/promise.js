@@ -653,9 +653,7 @@ export function newScope (fn, props, a1, a2) {
     psd.global = false;
     psd.id = ++zone_id_counter;
     // Prepare for promise patching (done in usePSD):
-    var globalEnv = globalPSD.env;
     psd.env = patchGlobalPromise ? {
-        Promise: DexiePromise, // Changing window.Promise could be omitted for Chrome and Edge, where IDB+Promise plays well!
         PromiseProp: {value: DexiePromise, configurable: true, writable: true},
     } : {};
     if (props) extend(psd, props);
@@ -759,9 +757,7 @@ function switchToZone (targetZone, bEnteringZone) {
 }
 
 function snapShot () {
-    var GlobalPromise = _global.Promise;
     return patchGlobalPromise ? {
-        Promise: GlobalPromise,
         PromiseProp: Object.getOwnPropertyDescriptor(_global, "Promise"),
     } : {};
 }
