@@ -8,6 +8,7 @@ export interface StaticImportOptions {
   noTransaction?: boolean;
   chunkSizeBytes?: number; // Default: DEFAULT_KILOBYTES_PER_CHUNK ( 1MB )
   filter?: (table: string, value: any, key?: any) => boolean;
+  transform?: (table: string, value: any, key?: any) => ({value: any, key?: any});
   progressCallback?: (progress: ImportProgress) => boolean;
 }
 
@@ -21,6 +22,7 @@ export interface ImportOptions extends StaticImportOptions {
   noTransaction?: boolean;
   chunkSizeBytes?: number; // Default: DEFAULT_KILOBYTES_PER_CHUNK ( 1MB )
   filter?: (table: string, value: any, key?: any) => boolean;
+  transform?: (table: string, value: any, key?: any) => ({value: any, key?: any});
   progressCallback?: (progress: ImportProgress) => boolean;
 }
 
@@ -138,11 +140,21 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
         }
 
         const filter = options!.filter;
-        const filteredRows = filter ?
+        const transform = options!.transform;
+
+        let filteredRows = filter ?
           tableExport.inbound ?
             rows.filter(value => filter(tableName, value)) :
             rows.filter(([key, value]) => filter(tableName, value, key)) :
           rows;
+        if (transform) {
+          filteredRows = filteredRows.map(tableExport.inbound ?
+            value => transform(tableName, value).value :
+            ([key, value]) => {
+              const res = transform(tableName, value, key)
+              return [res.key, res.value];
+            });
+        }
         const [keys, values] = tableExport.inbound ?
           [undefined, filteredRows] :
           [filteredRows.map(row=>row[0]), rows.map(row=>row[1])];

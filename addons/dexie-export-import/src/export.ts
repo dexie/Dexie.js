@@ -9,6 +9,7 @@ export interface ExportOptions {
   numRowsPerChunk?: number;
   prettyJson?: boolean;
   filter?: (table: string, value: any, key?: any) => boolean;
+  transform?: (table: string, value: any, key?: any) => ({value: any, key?: any});
   progressCallback?: (progress: ExportProgress) => boolean;
 }
 
@@ -76,6 +77,7 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
     slices.push(firstJsonSlice);
 
     const filter = options!.filter;
+    const transform = options!.transform;
 
     for (const {name: tableName} of tables) {
       const table = db.table(tableName);
@@ -138,7 +140,11 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
             values.filter(value => filter(tableName, value)) :
             values;
 
-          const tsonValues = filteredValues.map(value => TSON.encapsulate(value));
+          const transformedValues = transform ?
+            filteredValues.map(value => transform(tableName, value).value) :
+            filteredValues;
+
+          const tsonValues = transformedValues.map(value => TSON.encapsulate(value));
           if (TSON.mustFinalize()) {
             await Dexie.waitFor(TSON.finalize(tsonValues));
           }
@@ -149,7 +155,7 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
           // By generating a blob here, we give web platform the opportunity to store the contents
           // on disk and release RAM.
           slices.push(new Blob([json.substring(1, json.length - 1)]));
-          lastNumRows = filteredValues.length;
+          lastNumRows = transformedValues.length;
           lastKey = values.length > 0 ?
             Dexie.getByKeyPath(values[values.length -1], primKey.keyPath as string) :
             null;
@@ -157,6 +163,10 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
           const keys = await chunkedCollection.primaryKeys();
           let keyvals = keys.map((key, i) => [key, values[i]]);
           if (filter) keyvals = keyvals.filter(([key, value]) => filter(tableName, value, key));
+          if (transform) keyvals = keyvals.map(([key, value]) => {
+            const transformResult = transform(tableName, value, key);
+            return [transformResult.key, transformResult.value];
+          });
 
           const tsonTuples = keyvals.map(tuple => TSON.encapsulate(tuple));
           if (TSON.mustFinalize()) {
