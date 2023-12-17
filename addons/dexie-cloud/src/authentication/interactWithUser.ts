@@ -76,7 +76,7 @@ export async function promptForEmail(
   emailHint?: string
 ) {
   let email = emailHint || '';
-  while (!email || !/^[\w-\.]+@([\w-]+\.)+[\w-]{2,10}$/.test(email)) {
+  while (!email || !/^[\w-+.]+@([\w-]+\.)+[\w-]{2,10}$/.test(email)) {
     email = (
       await interactWithUser(userInteraction, {
         type: 'email',
