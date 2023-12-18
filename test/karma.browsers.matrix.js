@@ -17,7 +17,7 @@ module.exports = {
     ci: [
         'remote_chrome',
         'remote_safari',
-        //'remote_firefox'
+        'remote_firefox'
     ],
 
     // Test matrix used before every npm publish.

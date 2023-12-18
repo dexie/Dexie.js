@@ -1,7 +1,12 @@
 name: Build and Test
 
-on: [push, workflow_dispatch]
-
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master # Add also master-4 when dexie@4 is stable and master will represent dexie@5. dexie@3 has its own workflow.
+  pull_request:
+      types: [opened, synchronize, reopened]
 env:
   LAMBDATEST: "true"
   GH_ACTIONS: "true"
