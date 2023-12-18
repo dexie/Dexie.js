@@ -8,7 +8,7 @@ module.exports = function (config) {
     // Safari fails to reply on browserstack. Need to not have it here.
     // Just complement with old chrome browser that is not part of CI test suite.
     pre_npm_publish: [
-      "remote_chrome",
+      "Chrome",
     ]
   };
 

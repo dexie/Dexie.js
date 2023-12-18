@@ -6,7 +6,7 @@ module.exports = function (config) {
     // Be fine with testing on local travis firefox for both pull requests and pushs.
     ci: ["remote_chrome"],
     // Be fine with chrome for this particular integration test.
-    pre_npm_publish: ['remote_chrome']
+    pre_npm_publish: ['Chrome']
   };
 
   const cfg = getKarmaConfig(browserMatrixOverrides, {
