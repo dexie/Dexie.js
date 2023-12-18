@@ -15,7 +15,7 @@ module.exports = {
 
     // Continous Integration on every push
     ci: [
-        //'remote_chrome',
+        'remote_chrome',
         'remote_safari',
         //'remote_firefox'
     ],
