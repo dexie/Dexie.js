@@ -8,7 +8,6 @@
 module.exports = {
     // On developers machines, Chrome is most likely to be installed.
     local: ['Chrome'],
-    //local: ['bs_safari_latest_supported'],
 
     // When Lambdatest credentials aren't available, use Chrome and Firefox on Github Actions:
     ciLocal: ['Chrome', 'Firefox'],
@@ -21,11 +20,13 @@ module.exports = {
     ],
 
     // Test matrix used before every npm publish.
+    // Note: The script tools/release.sh will run the tests
+    // locally on Chrome and Firefox. However, this is just an
+    // extra safety check as all tests must anyway have been successful
+    // on the CI that tests on all configured browsers in Lambdatest.
     pre_npm_publish: [
-        'remote_chrome',
-        'remote_edge',
-        'remote_safari',
-        'remote_firefox'
+        'Chrome',
+        'Firefox'
     ]
 }
 
