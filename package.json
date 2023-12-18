@@ -115,7 +115,7 @@
   },
   "homepage": "https://dexie.org",
   "devDependencies": {
-    "@lambdatest/node-tunnel": "^4.0.1",
+    "@lambdatest/node-tunnel": "^4.0.7",
     "cross-env": "^7.0.3",
     "dts-bundle-generator": "^5.9.0",
     "just-build": "^0.9.24",
