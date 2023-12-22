@@ -25,6 +25,21 @@ export function createImplicitPropSetterMiddleware(
               const trans = req.trans as DBCoreTransaction & TXExpandos;
               if (db.cloud.schema?.[tableName]?.markedForSync) {
                 if (req.type === 'add' || req.type === 'put') {
+                  if (tableName === 'members') {
+                    for (const member of req.values) {
+                      if (typeof member.email === 'string') {
+                        // Resolve https://github.com/dexie/dexie-cloud/issues/4
+                        // If adding a member, make sure email is lowercase and trimmed.
+                        // This is to avoid issues where the APP does not check this
+                        // and just allows the user to enter an email address that might
+                        // have been pasted by the user from a source that had a trailing
+                        // space or was in uppercase. We want to avoid that the user
+                        // creates a new member with a different email address than
+                        // the one he/she intended to create.
+                        member.email = member.email.trim().toLowerCase();
+                      }
+                    }
+                  }
                   // No matter if user is logged in or not, make sure "owner" and "realmId" props are set properly.
                   // If not logged in, this will be changed upon syncification of the tables (next sync after login),
                   // however, application code will work better if we can always rely on that the properties realmId

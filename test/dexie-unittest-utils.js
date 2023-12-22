@@ -134,6 +134,14 @@ export const isSafari = typeof navigator !== 'undefined' &&
     /Safari\//.test(navigator.userAgent) &&
     !/Chrom(e|ium)\/|Edge\//.test(navigator.userAgent);
 
+// Safari private mode are being used on LambdaTest's servers and even if Safari does a good job to
+// support IndexedDB in private mode, it comes with some issues. One of them is that it doesn't
+// seem to respect when doing preventDefault() on IDB request error events, which dexie does in order
+// to override the default cancelling of transactions on error events in case they were catched explicitely.
+// We use this vars to omit certain unit tests from the suite so that they don't fail for Safari private mode
+// which is being used in LambdaTest's servers.
+export const isSafariPrivateMode = isSafari; // Sorry there's no way to distinguish private mode from non-private in modern Safari. Still keep it as separate variable for exposing the purpose where it's being used.
+
 export function supports (features) {
     return features.split('+').reduce((result,feature)=>{
         switch (feature.toLowerCase()) {

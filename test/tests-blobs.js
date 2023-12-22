@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, promisedTest} from './dexie-unittest-utils';
+import {resetDatabase, promisedTest, isSafariPrivateMode} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBBinary");
 db.version(1).stores({
@@ -38,6 +38,10 @@ function arraysAreEqual (a1, a2) {
 }
 
 promisedTest (`Test blobs`, async ()=>{
+    if (isSafariPrivateMode) {
+        ok(true, "Safari private mode does not support Blobs");
+        return;
+    }
     let binaryData = new Uint8Array([1,2,3,4]);
     let blob = new Blob([binaryData], {type: 'application/octet-binary'});
     await db.items.add ({id: 1, blob: blob });
@@ -48,6 +52,10 @@ promisedTest (`Test blobs`, async ()=>{
 });
 
 promisedTest (`Test blob with creating hook applied`, async ()=>{
+    if (isSafariPrivateMode) {
+        ok(true, "Safari private mode does not support Blobs");
+        return;
+    }
     function updatingHook (modifications, primKey, obj, trans) {
         ok (modifications.blob instanceof Blob, "When hook is called, the modifications should point to a Blob object");
     }

@@ -13,7 +13,9 @@
     "test": "just-build test && npx karma start test/karma.conf.js --single-run",
     "build": "just-build",
     "watch": "just-build --watch",
-    "clean": "rm -rf tools/tmp dist/*.js dist/*.mjs dist/*.map dist/*.d.ts test/bundle.*"
+    "clean": "rm -rf tools/tmp dist/*.js dist/*.mjs dist/*.map dist/*.d.ts test/bundle.*",
+    "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test; UNIT_STATUS=$?; kill $(cat tunnel.pid); exit $UNIT_STATUS",
+    "test:ltTunnel": "node ../../test/lt-local"
   },
   "just-build": {
     "default": [
