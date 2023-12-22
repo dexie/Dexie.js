@@ -32,6 +32,7 @@ export function incrementExpectedAwaits(): number;
 export function decrementExpectedAwaits(sourceTaskId?: number): void;
 export function beginMicroTickScope(): boolean;
 export function endMicroTickScope(): void;
+export function execInGlobalContext(cb: Function): void;
 export declare var DexiePromise : DexiePromiseConstructor;
 
 export default DexiePromise;

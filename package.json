@@ -1,6 +1,6 @@
 {
   "name": "dexie",
-  "version": "4.0.1-beta.4",
+  "version": "4.0.1-beta.6",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "module": "dist/dexie.mjs",
@@ -8,22 +8,19 @@
   "exports": {
     ".": {
       "production": {
-        "browser": "./dist/modern/dexie.min.mjs",
-        "module": "./dist/modern/dexie.min.mjs",
+        "module": "./import-wrapper-prod.mjs",
         "import": "./import-wrapper-prod.mjs",
         "require": "./dist/dexie.min.js",
         "default": "./dist/dexie.min.js"
       },
       "development": {
-        "browser": "./dist/modern/dexie.mjs",
-        "module": "./dist/modern/dexie.mjs",
+        "module": "./import-wrapper.mjs",
         "import": "./import-wrapper.mjs",
         "require": "./dist/dexie.js",
         "default": "./dist/dexie.js"
       },
       "default": {
-        "browser": "./dist/modern/dexie.mjs",
-        "module": "./dist/modern/dexie.mjs",
+        "module": "./import-wrapper.mjs",
         "import": "./import-wrapper.mjs",
         "require": "./dist/dexie.js",
         "default": "./dist/dexie.js"
@@ -67,7 +64,7 @@
     "test:unit": "karma start test/karma.conf.js --single-run",
     "test:typings": "tsc -p test/typings-test/",
     "test:debug": "karma start test/karma.conf.js --log-level debug",
-    "test:ltcloud": "cross-env LAMBDATEST=true npm run test:ltTunnel & sleep 10 && npm run test:unit",
+    "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test:unit; UNIT_STATUS=$?; kill $(cat tunnel.pid); exit $UNIT_STATUS",
     "test:ltTunnel": "node test/lt-local"
   },
   "just-build": {
@@ -118,11 +115,11 @@
   },
   "homepage": "https://dexie.org",
   "devDependencies": {
-    "@lambdatest/node-tunnel": "^4.0.1",
+    "@lambdatest/node-tunnel": "^4.0.7",
+    "cross-env": "^7.0.3",
     "dts-bundle-generator": "^5.9.0",
     "just-build": "^0.9.24",
     "karma": "^6.1.1",
-    "karma-browserstack-launcher": "^1.5.2",
     "karma-chrome-launcher": "^3.1.0",
     "karma-firefox-launcher": "^2.1.0",
     "karma-mocha-reporter": "^2.2.5",

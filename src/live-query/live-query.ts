@@ -1,4 +1,4 @@
-import { isAsyncFunction, keys, objectIsEmpty } from '../functions/utils';
+import { _global, isAsyncFunction, keys, objectIsEmpty } from '../functions/utils';
 import {
   globalEvents,
   DEXIE_STORAGE_MUTATED_EVENT_NAME,
@@ -7,6 +7,7 @@ import {
   beginMicroTickScope,
   decrementExpectedAwaits,
   endMicroTickScope,
+  execInGlobalContext,
   incrementExpectedAwaits,
   NativePromise,
   newScope,
@@ -50,21 +51,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
           // This fixes zone leaking issue that the liveQuery zone can leak to observer's next microtask.
           rv = (rv as Promise<any>).finally(decrementExpectedAwaits);
         }
-        return Promise.resolve(rv).finally(()=>{
-          if (PSD.subscr === ctx.subscr) {
-            // Querier did not await all code paths. We must wait for the next macrotask to run in order to
-            // escape from zone echoing. Warn to console so that app code can be corrected. liveQuery callbacks
-            // shall be pure functions and should never spawn side effects - so there is never a need to call
-            // other async functions or generated promises without awaiting them.
-            console.warn(`Dexie liveQuery()'s querier callback did'nt await all of its spawned promises. Querier source: ${querier}`);
-            return new NativePromise(resolve => setTimeout(resolve, 0)); // Wait for the next macrotask to run.
-            // @ts-ignore
-          } else if (Promise.PSD) {
-            // Still in async context (zone echoing) from another task. Wait for the next macrotask to run.
-            // @ts-ignore
-            return new NativePromise(resolve => setTimeout(resolve, 0)); // Wait for the next macrotask to run.
-          }
-        });
+        return rv;
       } finally {
         wasRootExec && endMicroTickScope(); // Given that we created the microtick scope, we must also end it.
       }
@@ -91,6 +78,8 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     observer.start && observer.start(subscription); // https://github.com/tc39/proposal-observable
 
     let startedListening = false;
+
+    const doQuery = () => execInGlobalContext(_doQuery);
 
     function shouldNotify() {
       return obsSetsOverlap(currentObs, accumMuts);
@@ -132,7 +121,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         (result) => {
           hasValue = true;
           currentValue = result;
-          if (closed || ctx.signal.aborted) {
+          if (closed || ctx.signal.aborted) {
             // closed - no subscriber anymore.
             // signal.aborted - new query was made before this one completed and
             // the querier might have catched AbortError and return successful result.
@@ -148,25 +137,29 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
             globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
             startedListening = true;
           }
-          observer.next && observer.next(result);
+          execInGlobalContext(()=>!closed && observer.next && observer.next(result));
         },
         (err) => {
           hasValue = false;
           if (!['DatabaseClosedError', 'AbortError'].includes(err?.name)) {
-            if (closed) return;
-            observer.error && observer.error(err);
+            if (!closed) execInGlobalContext(()=>{
+              if (closed) return;
+              observer.error && observer.error(err);
+            });
           }
         }
       );
     };
 
-    const doQuery = () => {
-      // @ts-ignore
-      if (PSD.global && !Promise.PSD) _doQuery();
-      else setTimeout(_doQuery, 0);
-    }
-
-    doQuery();
+    // Use setTimeot here to guarantee execution in a private macro task before and
+    // after. The helper executeInGlobalContext(_doQuery) is not enough here because
+    // caller of `subscribe()` could be anything, such as a frontend framework that will
+    // continue in the same tick after subscribe() is called and call other
+    // eftects, that could involve dexie operations such as writing to the DB.
+    // If that happens, the private zone echoes from a live query tast started here
+    // could still be ongoing when the other operations start and make them inherit
+    // the async context from a live query.
+    setTimeout(doQuery, 0);
     return subscription;
   });
   observable.hasValue = () => hasValue;

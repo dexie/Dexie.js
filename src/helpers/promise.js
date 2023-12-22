@@ -640,7 +640,7 @@ export function wrap (fn, errorCatcher) {
 const task = { awaits: 0, echoes: 0, id: 0}; // The ongoing macro-task when using zone-echoing.
 var taskCounter = 0; // ID counter for macro tasks.
 var zoneStack = []; // Stack of left zones to restore asynchronically.
-var zoneEchoes = 0; // zoneEchoes is a must in order to persist zones between native await expressions.
+var zoneEchoes = 0; // When > 0, zoneLeaveEcho is queued. When 0 and task.echoes is also 0, nothing is queued.
 var totalEchoes = 0; // ID counter for micro-tasks. Used to detect possible native await in our Promise.prototype.then.
 
 
@@ -663,8 +663,6 @@ export function newScope (fn, props, a1, a2) {
         any: DexiePromise.any,
         resolve: DexiePromise.resolve,
         reject: DexiePromise.reject,
-        nthen: getPatchedPromiseThen (globalEnv.nthen, psd), // native then
-        gthen: getPatchedPromiseThen (globalEnv.gthen, psd) // global then
     } : {};
     if (props) extend(psd, props);
     
@@ -724,8 +722,9 @@ export function onPossibleParallellAsync (possiblePromise) {
 function zoneEnterEcho(targetZone) {
     ++totalEchoes;
     //console.log("Total echoes ", totalEchoes);
+    //if (task.echoes === 1) console.warn("Cancelling echoing of async context.");
     if (!task.echoes || --task.echoes === 0) {
-        task.echoes = task.id = 0; // Cancel zone echoing.
+        task.echoes = task.awaits = task.id = 0; // Cancel echoing.
     }
 
     zoneStack.push(PSD);
@@ -758,11 +757,6 @@ function switchToZone (targetZone, bEnteringZone) {
         // Swich environments (may be PSD-zone or the global zone. Both apply.)
         var targetEnv = targetZone.env;
 
-        // Change Promise.prototype.then for native and global Promise (they MAY differ on polyfilled environments, but both can be accessed)
-        // Must be done on each zone change because the patched method contains targetZone in its closure.
-        nativePromiseProto.then = targetEnv.nthen;
-        GlobalPromise.prototype.then = targetEnv.gthen;
-
         if (currentZone.global || targetZone.global) {
             // Leaving or entering global zone. It's time to patch / restore global Promise.
 
@@ -792,8 +786,6 @@ function snapShot () {
         any: GlobalPromise.any,
         resolve: GlobalPromise.resolve,
         reject: GlobalPromise.reject,
-        nthen: nativePromiseProto.then,
-        gthen: GlobalPromise.prototype.then
     } : {};
 }
 
@@ -827,6 +819,19 @@ function getPatchedPromiseThen (origThen, zone) {
             nativeAwaitCompatibleWrap(onResolved, zone),
             nativeAwaitCompatibleWrap(onRejected, zone));
     };
+}
+
+/** Execute callback in global context */
+export function execInGlobalContext(cb) {
+    if (Promise === NativePromise && task.echoes === 0) {
+        if (zoneEchoes === 0) {
+            cb();
+        } else {
+            enqueueNativeMicroTask(cb);
+        }
+    } else {
+        setTimeout(cb, 0);
+    }
 }
 
 export var rejection = DexiePromise.reject;

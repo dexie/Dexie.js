@@ -250,6 +250,9 @@ Watch
 pnpm run watch
 ```
 
+<br/>
+
+[![Browser testing via LAMDBATEST](https://dexie.org/assets/images/lambdatest2.png)](https://www.lambdatest.com/)
 
 [npm-image]: https://img.shields.io/npm/v/dexie.svg?style=flat
 [npm-url]: https://npmjs.org/package/dexie
