@@ -76,7 +76,28 @@ export async function promptForEmail(
   emailHint?: string
 ) {
   let email = emailHint || '';
-  while (!email || !/^[\w-+.]+@([\w-]+\.)+[\w-]{2,10}$/.test(email)) {
+  // Regular expression for email validation
+  // ^[\w-+.]+@([\w-]+\.)+[\w-]{2,10}(\sas\s[\w-+.]+@([\w-]+\.)+[\w-]{2,10})?$
+  //
+  // ^[\w-+.]+ : Matches the start of the string. Allows one or more word characters
+  // (a-z, A-Z, 0-9, and underscore), hyphen, plus, or dot.
+  //
+  // @ : Matches the @ symbol.
+  // ([\w-]+\.)+ : Matches one or more word characters or hyphens followed by a dot.
+  //   The plus sign outside the parentheses means this pattern can repeat one or more times,
+  //   allowing for subdomains.
+  // [\w-]{2,10} : Matches between 2 and 10 word characters or hyphens. This is typically for
+  //   the domain extension like .com, .net, etc.
+  // (\sas\s[\w-+.]+@([\w-]+\.)+[\w-]{2,10})?$ : This part is optional (due to the ? at the end).
+  //   If present, it matches " as " followed by another valid email address. This allows for the
+  //   input to be either a single email address or two email addresses separated by " as ". 
+  //
+  // The use case for "<email1> as <email2>"" is for when a database owner with full access to the
+  // database needs to impersonate another user in the database in order to troubleshoot. This
+  // format will only be possible to use when email1 is the owner of an API client with GLOBAL_READ
+  // and GLOBAL_WRITE permissions on the database. The email will be checked on the server before
+  // allowing it and giving out a token for email2, using the OTP sent to email1.
+  while (!email || !/^[\w-+.]+@([\w-]+\.)+[\w-]{2,10}(\sas\s[\w-+.]+@([\w-]+\.)+[\w-]{2,10})?$/.test(email)) {
     email = (
       await interactWithUser(userInteraction, {
         type: 'email',
