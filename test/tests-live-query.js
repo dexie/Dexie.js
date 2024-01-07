@@ -528,7 +528,8 @@ const mutsAndExpects = () => [
     ]),
     {
       multiEntry1: [2],
-      multiEntry2: [3]
+      multiEntry2: [3],
+      multiEntry3: [{id: 2, tags: ["Apa", "x", "y"]}]
     }
   ]
 ]
@@ -564,7 +565,8 @@ promisedTest("Full use case matrix", async ()=>{
     friendsOver18: () => db.friends.where('age').above(18).toArray(),
 
     multiEntry1: () => db.multiEntry.where('tags').startsWith('A').primaryKeys(),
-    multiEntry2: () => db.multiEntry.where({tags: "fooTag"}).primaryKeys()
+    multiEntry2: () => db.multiEntry.where({tags: "fooTag"}).primaryKeys(),
+    multiEntry3: () => db.multiEntry.where({tags: "x"}).toArray(),
   };
   const expectedInitialResults = {
     itemsToArray: [{id: 1}, {id: 2}, {id: 3}],
@@ -589,7 +591,8 @@ promisedTest("Full use case matrix", async ()=>{
     friendsOver18: [],
 
     multiEntry1: [],
-    multiEntry2: []
+    multiEntry2: [],
+    multiEntry3: []
   }
   let flyingNow = 0;
   //let signal = new Signal();
