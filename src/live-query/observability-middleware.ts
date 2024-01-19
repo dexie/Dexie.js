@@ -122,7 +122,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                 trans.mutatedParts || {},
                 mutatedParts
               );
-            return res;
+              return res;
             });
           },
         };

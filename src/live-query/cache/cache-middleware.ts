@@ -46,8 +46,8 @@ export const cacheMiddleware: Middleware<DBCore> = {
               // Go through all tables in transaction and check if they have any optimistic updates
               for (const storeName of stores) {
                 const tblCache = cache[`idb://${dbName}/${storeName}`];
-                const table = core.table(storeName);
                 if (tblCache) {
+                  const table = core.table(storeName);
                   // Pick optimistic ops that are part of this transaction
                   const ops = tblCache.optimisticOps.filter(
                     (op) => op.trans === idbtrans

@@ -7,7 +7,7 @@ import { cache } from './cache';
 let unsignaledParts: ObservabilitySet = {};
 let isTaskEnqueued = false;
 
-export function signalSubscribersLazily(part: ObservabilitySet) {
+export function signalSubscribersLazily(part: ObservabilitySet, optimistic = false) {
   extendObservabilitySet(unsignaledParts, part);
   if (!isTaskEnqueued) {
     isTaskEnqueued = true;
@@ -15,14 +15,15 @@ export function signalSubscribersLazily(part: ObservabilitySet) {
       isTaskEnqueued = false;
       const parts = unsignaledParts;
       unsignaledParts = {};
-      signalSubscribersNow(parts);
+      signalSubscribersNow(parts, false, optimistic);
     }, 0);
   }
 }
 
 export function signalSubscribersNow(
   updatedParts: ObservabilitySet,
-  deleteAffectedCacheEntries = false
+  deleteAffectedCacheEntries = false,
+  optimistic = false
 ) {
   const queriesToSignal = new Set<() => void>();
   for (const key in updatedParts) {
@@ -31,7 +32,7 @@ export function signalSubscribersNow(
       const [, dbName, tableName] = parts;
       const tblCache = cache[`idb://${dbName}/${tableName}`];
       if (tblCache)
-        signalTableSubscribersNow(
+        collectTableSubscribers(
           tblCache,
           updatedParts,
           queriesToSignal,
@@ -43,7 +44,7 @@ export function signalSubscribersNow(
   queriesToSignal.forEach((requery) => requery());
 }
 
-function signalTableSubscribersNow(
+function collectTableSubscribers(
   tblCache: TblQueryCache,
   updatedParts: ObservabilitySet,
   outQueriesToSignal: Set<() => void>,
