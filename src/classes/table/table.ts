@@ -128,7 +128,7 @@ export class Table implements ITable<any, IndexableType> {
     }
 
     if (!compoundIndex && debug) console.warn(
-      `The query ${JSON.stringify(indexOrCrit)} on ${this.name} would benefit of a ` +
+      `The query ${JSON.stringify(indexOrCrit)} on ${this.name} would benefit from a ` +
       `compound index [${keyPaths.join('+')}]`);
 
     // Ok, now let's fallback to finding at least one matching index

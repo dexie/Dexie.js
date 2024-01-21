@@ -1,5 +1,5 @@
 import { cmp } from '../../functions/cmp';
-import { deepClone } from '../../functions/utils';
+import { deepClone, isArray } from '../../functions/utils';
 import { RangeSet, rangesOverlap } from '../../helpers/rangeset';
 import { CacheEntry } from '../../public/types/cache';
 import {
@@ -20,6 +20,8 @@ export function applyOptimisticOps(
 ): any[] {
   if (!ops || ops.length === 0) return result;
   const index = req.query.index;
+  const { multiEntry } = index;
+  const queryRange = req.query.range;
   const primaryKey = table.schema.primaryKey;
   const extractPrimKey = primaryKey.extractKey;
   const extractIndex = index.extractKey;
@@ -29,13 +31,16 @@ export function applyOptimisticOps(
     let modifedResult = result;
     const includedValues =
       op.type === 'add' || op.type === 'put'
-        ? op.values.filter((v) =>
-            isWithinRange(extractIndex(v), req.query.range)
-          ).map(v => {
-            v = deepClone(v);// v might come from user so we can't just freeze it.
-            if (immutable) Object.freeze(v);
-            return v;
-          }) 
+        ? op.values.filter((v) => {
+              const key = extractIndex(v);
+              return multiEntry && isArray(key) // multiEntry index work like plain index unless key is array
+                ? key.some((k) => isWithinRange(k, queryRange)) // multiEntry and array key
+                : isWithinRange(key, queryRange); // multiEntry but not array key
+            }).map(v => {
+              v = deepClone(v);// v might come from user so we can't just freeze it.
+              if (immutable) Object.freeze(v);
+              return v;
+            })
         : [];
     switch (op.type) {
       case 'add':

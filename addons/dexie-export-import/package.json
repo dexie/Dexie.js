@@ -1,6 +1,6 @@
 {
   "name": "dexie-export-import",
-  "version": "4.0.7",
+  "version": "4.1.0",
   "description": "Dexie addon that adds export and import capabilities",
   "main": "dist/dexie-export-import.js",
   "module": "dist/dexie-export-import.mjs",
@@ -13,7 +13,9 @@
     "test": "just-build test && npx karma start test/karma.conf.js --single-run",
     "build": "just-build",
     "watch": "just-build --watch",
-    "clean": "rm -rf tools/tmp dist/*.js dist/*.mjs dist/*.map dist/*.d.ts test/bundle.*"
+    "clean": "rm -rf tools/tmp dist/*.js dist/*.mjs dist/*.map dist/*.d.ts test/bundle.*",
+    "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test; UNIT_STATUS=$?; kill $(cat tunnel.pid); exit $UNIT_STATUS",
+    "test:ltTunnel": "node ../../test/lt-local"
   },
   "just-build": {
     "default": [

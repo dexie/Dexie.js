@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "4.0.1-beta.52",
+  "version": "4.0.1-beta.55",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/umd/dexie-cloud-addon.js",
   "type": "module",
@@ -81,7 +81,6 @@
     "dreambase-library": "^1.0.21",
     "just-build": "*",
     "karma": "*",
-    "karma-browserstack-launcher": "*",
     "karma-chrome-launcher": "*",
     "karma-firefox-launcher": "*",
     "karma-qunit": "*",

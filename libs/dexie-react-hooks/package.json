@@ -6,7 +6,9 @@
   "typings": "dist/dexie-react-hooks.d.ts",
   "scripts": {
     "test": "just-build build-tests && just-build run-tests",
-    "build": "just-build"
+    "build": "just-build",
+    "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test; UNIT_STATUS=$?; kill $(cat tunnel.pid); exit $UNIT_STATUS",
+    "test:ltTunnel": "node ../../test/lt-local"
   },
   "exports": {
     "import": "./dist/dexie-react-hooks.mjs",

@@ -312,7 +312,7 @@ function buildGlobalSchema(
     const primKey = createIndexSpec(
       nameFromKeyPath(keyPath),
       keyPath || "",
-      false,
+      true,
       false,
       !!store.autoIncrement,
       keyPath && typeof keyPath !== "string",

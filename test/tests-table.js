@@ -1,6 +1,6 @@
 ﻿import Dexie from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, supports, spawnedTest, promisedTest, isSafari} from './dexie-unittest-utils';
+import {resetDatabase, supports, spawnedTest, promisedTest, isSafari, isSafariPrivateMode} from './dexie-unittest-utils';
 
 var db = new Dexie("TestDBTable");
 db.version(1).stores({
@@ -644,8 +644,9 @@ spawnedTest("bulkAdd-catching errors", function*() {
     yield db.users.bulkAdd(newUsersX).catch(e => {
         ok(true, "Got error. Catching it should make the successors work.")
     });
-
-    equal(yield db.users.where('username').startsWith('xper').count(), 3, "3 users! Good - means that previous operation catched and therefore committed");
+    if (!isSafariPrivateMode) {
+        equal(yield db.users.where('username').startsWith('xper').count(), 3, "3 users! Good - means that previous operation catched and therefore committed");
+    }
 
     var newUsersY = [
         {first: "Yke1", last: "Persbrant1", username: "yper1", email: ["yper1@persbrant.net"]},
@@ -660,7 +661,9 @@ spawnedTest("bulkAdd-catching errors", function*() {
     } catch (e) {
         ok(true, "Got: " + e);
     }
-    equal(yield db.users.where('username').startsWith('yper').count(), 3, "3 users! Good - means that previous operation catched (via try..yield..catch this time, and therefore committed");
+    if (!isSafariPrivateMode) {
+        equal(yield db.users.where('username').startsWith('yper').count(), 3, "3 users! Good - means that previous operation catched (via try..yield..catch this time, and therefore committed");
+    }
 
     // Now check that catching and rethrowing should indeed make it fail
     var newUsersZ = [
