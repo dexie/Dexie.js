@@ -40,7 +40,10 @@
     "test:integration": "karma start test/integration/karma.conf.js --single-run",
     "test:typings": "tsc -p test/test-typings/",
     "test:unit:debug": "karma start test/unit/karma.conf.js --log-level debug",
-    "test:integration:debug": "karma start test/integrations/karma.conf.js --log-level debug"
+    "test:integration:debug": "karma start test/integrations/karma.conf.js --log-level debug",
+    "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test:unit; UNIT_STATUS=$?; exit $UNIT_STATUS",
+    "test:ltTunnel": "node ../../test/lt-local",
+    "test:ltcloud:integration": "cross-env LAMBDATEST=true pnpm run test:integration; UNIT_STATUS=$?; kill $(cat tunnel.pid); exit $UNIT_STATUS"
   },
   "just-build": {
     "default": [

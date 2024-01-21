@@ -30,7 +30,7 @@ function readLock<TReq extends { trans: DBCoreTransaction }, TRes>(
     const promise = (numWriters > 0
       ? writers[numWriters - 1].then(() => fn(req), () => fn(req))
       : fn(req)
-    ).finally(() => readers.splice(readers.indexOf(promise)));
+    ).finally(() => {readers.splice(readers.indexOf(promise))});
     readers.push(promise);
     return promise;
   };
@@ -51,7 +51,7 @@ function writeLock<TReq extends { trans: DBCoreTransaction }, TRes>(
       : readers.length > 0
       ? allSettled(readers).then(() => fn(req))
       : fn(req)
-    ).finally(() => writers.shift());
+    ).finally(() => {writers.shift();});
     writers.push(promise);
     return promise;
   };

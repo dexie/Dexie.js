@@ -32,7 +32,7 @@ export { UpdateSpec } from './types/update-spec';
 export * from './types/insert-type';
 
 // Alias of Table and Collection in order to be able to refer them from module below...
-interface _Table<T, TKey> extends Table<T, TKey> {}
+interface _Table<T, TKey, TInsertType> extends Table<T, TKey, TInsertType> {}
 interface _Collection<T,TKey> extends Collection<T,TKey> {}
 
 // Besides being the only exported value, let Dexie also be
@@ -41,7 +41,7 @@ declare module Dexie {
   // The "Dexie.Promise" type.
   type Promise<T=any> = PromiseExtended<T> // Because many samples have been Dexie.Promise.
   // The "Dexie.Table" interface. Same as named exported interface Table.
-  interface Table<T=any,Key=any> extends _Table<T,Key> {} // Because all samples have been Dexie.Table<...>
+  interface Table<T=any,Key=any,TInsertType=T> extends _Table<T,Key,TInsertType> {} // Because all samples have been Dexie.Table<...>
   // The "Dexie.Collection" interface. Same as named exported interface Collection.
   interface Collection<T=any,Key=any> extends _Collection<T, Key> {} // Because app-code may declare it.
 }

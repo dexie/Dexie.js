@@ -4,9 +4,9 @@ const {karmaCommon, getKarmaConfig, defaultBrowserMatrix} = require('../../karma
 module.exports = function (config) {
   const browserMatrixOverrides = {
     // Be fine with testing on local travis firefox for both pull requests and pushs.
-    ci: ["bs_chrome_latest_supported"],
+    ci: ["remote_chrome"],
     // Be fine with chrome for this particular integration test.
-    pre_npm_publish: ['bs_chrome_latest_supported']
+    pre_npm_publish: ['Chrome']
   };
 
   const cfg = getKarmaConfig(browserMatrixOverrides, {
