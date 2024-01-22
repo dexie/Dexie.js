@@ -977,4 +977,52 @@ promisedTest(
     }
 );
 
-Dexie.debug = true;
+promisedTest("Dexie 4: An attached upgrader on version 2 and 3 shall run even if version 1 was reused for schema manipulation more than 20 times", async ()=>{
+    const DBNAME = "attachedUpgrader";
+    const NUM_SCHEMA_CHANGES = 31; // 10 works but 11 fails unless we work around it in Dexie with a meta table.
+
+    await Dexie.delete(DBNAME);
+    let db = new Dexie(DBNAME);
+    for (let i=1; i<=NUM_SCHEMA_CHANGES; ++i) {
+        db.version(1) // Yes, reuse version 1. We're testing that reusing version for schema changes is ok.
+            .stores({
+            friends: "id",
+            ["table"+i]: "id"
+        });
+        await db.open();
+        db.close();
+    }
+    ok(true, `Could change schema a ${NUM_SCHEMA_CHANGES} times while still being on version 1, without error`);
+    await db.open();
+    equal(db.verno, 1, "The database should be at version 1");
+    await db.table("table1").add({id: 1, name: "Foo 123"});
+    ok(true, `Could add things to table1`);
+    await db.table("table" + NUM_SCHEMA_CHANGES).add({id: 1, name: "Foo 123"});
+    ok(true, `Could add things to table${NUM_SCHEMA_CHANGES}`);
+    db.close();
+    db = new Dexie(DBNAME);
+    db.version(2).stores({
+        version2Table: "id",
+    }).upgrade(async tx => {
+        await tx.version2Table.add({id: 1, foo: "bar"});
+    });
+    await db.open();
+    ok(true, "Could open v2");
+    const objFromUpgrader = await db.version2Table.get(1);
+    ok(!!objFromUpgrader, "The upgrader of version 2 have run");
+    db.close();
+
+    db.version(3).stores({
+        version3Table: "id",
+    }).upgrade(async tx => {
+        await tx.version3Table.add({id: 1, foo: "bar"});
+    });
+    await db.open().catch(err => {
+        ok(false, "Failed to upgrade to version 3: " + err); // Would fail here if version 2 was rerun a second time (ConstraintError)
+        throw err;
+    });
+    ok(true, "Could open v3");
+    const objFromUpgrader3 = await db.version3Table.get(1);
+    ok (!!objFromUpgrader3, "The upgrader of version 3 have run");
+    await Dexie.delete(DBNAME);
+});

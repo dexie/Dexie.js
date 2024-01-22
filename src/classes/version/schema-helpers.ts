@@ -13,6 +13,7 @@ import { createIndexSpec, nameFromKeyPath } from '../../helpers/index-spec';
 import { createTableSchema } from '../../helpers/table-schema';
 import { generateMiddlewareStacks } from '../dexie/generate-middleware-stacks';
 import { debug } from '../../helpers/debug';
+import { PromiseExtended } from '../../public/types/promise-extended';
 
 export function setApiOnPlace(db: Dexie, objs: Object[], tableNames: string[], dbschema: DbSchema) {
   tableNames.forEach(tableName => {
@@ -55,6 +56,10 @@ export function lowerVersionFirst(a: Version, b: Version) {
 
 export function runUpgraders(db: Dexie, oldVersion: number, idbUpgradeTrans: IDBTransaction, reject) {
   const globalSchema = db._dbSchema;
+  if (idbUpgradeTrans.objectStoreNames.contains('$meta') && !globalSchema.$meta) {
+    globalSchema.$meta = createTableSchema("$meta", parseIndexSyntax("")[0], []);
+    db._storeNames.push('$meta');
+  }
   const trans = db._createTransaction('readwrite', db._storeNames, globalSchema);
   trans.create(idbUpgradeTrans);
   trans._completion.catch(reject);
@@ -70,8 +75,12 @@ export function runUpgraders(db: Dexie, oldVersion: number, idbUpgradeTrans: IDB
       });
       generateMiddlewareStacks(db, idbUpgradeTrans);
       Promise.follow(() => db.on.populate.fire(trans)).catch(rejectTransaction);
-    } else
-      updateTablesAndIndexes(db, oldVersion, trans, idbUpgradeTrans).catch(rejectTransaction);
+    } else {
+      generateMiddlewareStacks(db, idbUpgradeTrans);
+      return getExistingVersion(db, trans, oldVersion)
+        .then(oldVersion => updateTablesAndIndexes(db, oldVersion, trans, idbUpgradeTrans))
+        .catch(rejectTransaction);
+    }
   });
 }
 
@@ -79,6 +88,13 @@ export type UpgradeQueueItem = (idbtrans: IDBTransaction) => PromiseLike<any> | 
 
 export function patchCurrentVersion(db: Dexie, idbUpgradeTrans: IDBTransaction) {
   createMissingTables(db._dbSchema, idbUpgradeTrans);
+  if (idbUpgradeTrans.db.version % 10 === 0 && !idbUpgradeTrans.objectStoreNames.contains('$meta')) {
+    // Rolled over to the next 10-ies due to many schema upgrades without bumping version.
+    // No problem! We pin the database to its expected version by adding the $meta table so that next
+    // time the programmer bumps the version and attaches, an upgrader, that upgrader will indeed run,
+    // as well any further upgraders coming after that.
+    idbUpgradeTrans.db.createObjectStore('$meta').add(Math.ceil((idbUpgradeTrans.db.version / 10) - 1), 'version');
+  }
   const globalSchema = buildGlobalSchema(db, db.idbdb, idbUpgradeTrans);
   adjustToExistingIndexNames(db, db._dbSchema, idbUpgradeTrans);
   const diff = getSchemaDiff(globalSchema, db._dbSchema);
@@ -95,7 +111,22 @@ export function patchCurrentVersion(db: Dexie, idbUpgradeTrans: IDBTransaction) 
   }
 }
 
-export function updateTablesAndIndexes(
+function getExistingVersion(db: Dexie, trans: Transaction, oldVersion: number): PromiseExtended<number> {
+  // In normal case, existing version is the native installed version divided by 10.
+  // However, in case more than 10 schema changes have been made on the same version (such as while
+  // developing an app), the native version may have passed beyond a multiple of 10 within the same version.
+  // When that happens, a table $meta will have been created, containing a single entry with key "version"
+  // and the value of the real old version to use when running upgraders going forward.
+  if (trans.storeNames.includes('$meta')) {
+    return trans.table('$meta').get('version').then(metaVersion => {
+      return metaVersion != null ? metaVersion : oldVersion
+    })
+  } else {
+    return Promise.resolve(oldVersion);
+  }
+}
+
+function updateTablesAndIndexes(
   db: Dexie,
   oldVersion: number,
   trans: Transaction,
@@ -107,8 +138,21 @@ export function updateTablesAndIndexes(
   const versions = db._versions;
   let globalSchema = db._dbSchema = buildGlobalSchema(db, db.idbdb, idbUpgradeTrans);
   let anyContentUpgraderHasRun = false;
-
+  
   const versToRun = versions.filter(v => v._cfg.version >= oldVersion);
+  if (versToRun.length === 0) {
+    // Important not to continue at this point.
+    // Coming here means we've already patched schema in patchCurrentVersion() after having
+    // incremented native version to a value above the declared highest version.
+    // When being in this mode, it means that there might be different versions the db competing
+    // about it with different version of the schema. Therefore, we must avoid deleting tables
+    // or indexes here so that both versions can co-exist until the application has been upgraded to
+    // a version that declares no lower than the native version.
+    // If after that, a downgrade happens again, we'll end up here again, accepting both versions
+    // And we'll stay in this state until app developer releases a new declared version.
+    return Promise.resolve(); 
+  }
+  
   versToRun.forEach(version => {
     queue.push(() => {
       const oldSchema = globalSchema;
@@ -197,6 +241,21 @@ export function updateTablesAndIndexes(
       setApiOnPlace(db, [db.Transaction.prototype], db._storeNames, db._dbSchema);
       trans.schema = db._dbSchema;
     });
+    // Maintain the $meta table after this version's tables and indexes has been created and content upgraders have run.
+    queue.push(idbtrans => {
+      if (db.idbdb.objectStoreNames.contains('$meta')) {
+        if (Math.ceil(db.idbdb.version / 10) === version._cfg.version) {
+          // Remove $meta table if it's no more needed - we are in line with the native version
+          db.idbdb.deleteObjectStore('$meta');
+          delete db._dbSchema.$meta;
+          db._storeNames = db._storeNames.filter(name => name !== '$meta');
+        } else {
+          // We're still not in line with the native version. Make sure to update the virtual version
+          // to the successfully run version
+          idbtrans.objectStore('$meta').put(version._cfg.version, 'version');
+        }
+      }
+    }); 
   });
 
   // Now, create a queue execution engine

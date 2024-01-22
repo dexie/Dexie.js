@@ -78,9 +78,8 @@ export function dexieOpen (db: Dexie) {
             db.idbdb = req.result;
             if (schemaPatchMode) {
               patchCurrentVersion(db, upgradeTransaction);
-            } else {
-              runUpgraders(db, oldVer / 10, upgradeTransaction, reject);
             }
+            runUpgraders(db, oldVer / 10, upgradeTransaction, reject);
         }
     }, reject);
     
