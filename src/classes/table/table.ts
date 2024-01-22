@@ -78,6 +78,7 @@ export class Table implements ITable<any, IndexableType> {
   get(keyOrCrit, cb?) {
     if (keyOrCrit && keyOrCrit.constructor === Object)
       return this.where(keyOrCrit as { [key: string]: IndexableType }).first(cb);
+    if (keyOrCrit == null) return rejection(new exceptions.Type(`Invalid argument to Table.get()`));
 
     return this._trans('readonly', (trans) => {
       return this.core.get({trans, key: keyOrCrit})
