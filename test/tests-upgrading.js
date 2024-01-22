@@ -931,6 +931,10 @@ promisedTest(
 promisedTest(
     "Dexie 4: It should work having two versions of the DB opened at the same time as long as they have a compatible schema",
     async ()=>{
+        if (typeof Dexie.Observable?.version === 'string') {
+            ok(true, "Skipping this test - Dexie.Observable bails out when opening two versions of the same database");
+            return;
+        }
         const DBNAME = "competingDBs";
 
         await Dexie.delete(DBNAME);
@@ -978,7 +982,11 @@ promisedTest(
 );
 
 promisedTest("Dexie 4: An attached upgrader on version 2 and 3 shall run even if version 1 was reused for schema manipulation more than 20 times", async ()=>{
-    const DBNAME = "attachedUpgrader";
+    if (typeof Dexie.Observable?.version === 'string') {
+        ok(true, "Skipping this test - Dexie.Observable bails out when database reopen in background");
+        return;
+    }
+const DBNAME = "attachedUpgrader";
     const NUM_SCHEMA_CHANGES = 31; // 10 works but 11 fails unless we work around it in Dexie with a meta table.
 
     await Dexie.delete(DBNAME);
