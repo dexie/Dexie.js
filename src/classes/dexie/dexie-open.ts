@@ -25,7 +25,6 @@ export function dexieOpen (db: Dexie) {
       return state.dbReadyPromise.then<Dexie>(() => state.dbOpenError ?
         rejection (state.dbOpenError) :
         db);
-  Debug.debug && (state.openCanceller._stackHolder = Debug.getErrorWithStack()); // Let stacks point to when open() was called rather than where new Dexie() was called.
   state.isBeingOpened = true;
   state.dbOpenError = null;
   state.openComplete = false;
