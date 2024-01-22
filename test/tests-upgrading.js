@@ -926,3 +926,55 @@ promisedTest(
         db.close();
     }
 );
+
+
+promisedTest(
+    "Dexie 4: It should work having two versions of the DB opened at the same time as long as they have a compatible schema",
+    async ()=>{
+        const DBNAME = "competingDBs";
+
+        await Dexie.delete(DBNAME);
+        let db1 = new Dexie(DBNAME);
+        db1.version(1).stores({
+            friends: "id"
+        });
+        
+        let db2 = new Dexie(DBNAME);
+        db2.version(2).stores({
+            friends: "id, name, age",
+            pets: 'id, friendId, kind'
+        })
+        await Promise.all(db1.open(), db2.open());
+        await db1.friends.add({id: 1, name: "Foo 123"});
+        let foo = await db2.friends.where('name').startsWith('Foo').first();
+        ok(true, "We could use the 'name' index only declared on db2");
+        foo.age = 23;
+        await db2.friends.put(foo);
+        foo = await db1.friends.get(1);
+        equal(foo.age, 23, "We could get the data using db1");
+
+        db1.close();
+        db2.close();
+        await db1.open();
+        await db2.open();
+
+        db1.close();
+        db2.close();
+        db1.version(1).stores({
+            friends: "id, name, age, [name+age]",
+            cars: 'id, name'
+        });
+        await db2.open();
+        await db1.open();
+        foo = await db1.friends.where('[name+age]').equals(["Foo 123", 23]).first(); // Should be able to use the new index
+        equal(foo.age, 23, "We could get the data using db1 and the added index 'name+age' still in v1");
+        foo = await db2.friends.get({age: 23}); // Be able to use the age index that db2 declares.
+        equal(foo.age, 23, "We could get the data using db2 and the 'name' index");
+        const db = await new Dexie(DBNAME).open();
+        ok(db.verno < 3, "The database should be at version 2 (or exactly: " + db.verno + ")");
+
+        await Dexie.delete(DBNAME);
+    }
+);
+
+Dexie.debug = true;

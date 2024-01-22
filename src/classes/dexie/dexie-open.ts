@@ -98,7 +98,7 @@ export function dexieOpen (db: Dexie) {
               if (!verifyInstalledSchema(db, tmpTrans) && !schemaPatchMode) {
                 console.warn(`Dexie SchemaDiff: Schema was extended without increasing the number passed to db.version(). Dexie will add missing parts and increment native version number to workaround this.`);
                 idbdb.close();
-                ++nativeVerToOpen;
+                nativeVerToOpen = idbdb.version + 1;
                 schemaPatchMode = true;
                 return resolve (tryOpenDB()); // Try again with new version (nativeVerToOpen
               }
