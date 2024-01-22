@@ -868,3 +868,61 @@ promisedTest(
     }
   );
     
+  promisedTest(
+    "Dexie 4: Should not throw VersionError on downgrade",
+    async ()=>{
+        const DBNAME = "downgradedDB";
+
+        await Dexie.delete(DBNAME);
+        let db = new Dexie(DBNAME);
+        db.version(2).stores({
+            friends: "id, name"
+        });
+        await db.friends.get(undefined).catch(e => {});
+        await db.open();
+        ok(true, "Could open v2");
+        await db.friends.add({id: 1, name: "Foo 959"});
+        db.close();
+        db = new Dexie(DBNAME);
+        db.version(1).stores({
+            friends: "id, age"
+        });
+        await db.open();
+        ok(true, "Could open v1 even though installed version is at verion 2.");
+        const friends = await db.friends.toArray();
+        equal(friends.length, 1, "Could use the database for querying");
+        await db.delete();
+    }
+);
+
+promisedTest(
+    "Dexie 4: It should add indexes and tables also when not incrementing version number",
+    async ()=>{
+        const DBNAME = "forgettingVerNoIncrease";
+
+        await Dexie.delete(DBNAME);
+        let db = new Dexie(DBNAME);
+        db.version(1).stores({
+            friends: "id"
+        });
+        await db.open();
+        ok(true, "Could open v1 with {friends: 'id'}");
+        await db.friends.add({id: 1, name: "Foo 123"});
+        db.close();
+        db = new Dexie(DBNAME);
+        db.version(1).stores({
+            friends: "id, name, age",
+            pets: 'id, friendId, kind'
+        });
+        await db.open();
+        ok(true, "Could open v1 even though we have added some indexes and a table.");
+        await db.friends.add({id: 2, name: "Bar 123", age: 25});
+        await db.pets.add({id: 1, friendId: 2, kind: "dog"});
+        ok(true, "Could add pets to the new table");
+        const pets = await db.pets.toArray();
+        const friends = await db.friends.toArray();
+        equal(friends.length, 2, "Got the two friends");
+        equal(pets.length, 1, "Got the one pet");
+        db.close();
+    }
+);

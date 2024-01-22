@@ -12,6 +12,7 @@ import { hasIEDeleteObjectStoreBug, isIEOrEdge } from '../../globals/constants';
 import { createIndexSpec, nameFromKeyPath } from '../../helpers/index-spec';
 import { createTableSchema } from '../../helpers/table-schema';
 import { generateMiddlewareStacks } from '../dexie/generate-middleware-stacks';
+import { debug } from '../../helpers/debug';
 
 export function setApiOnPlace(db: Dexie, objs: Object[], tableNames: string[], dbschema: DbSchema) {
   tableNames.forEach(tableName => {
@@ -75,6 +76,24 @@ export function runUpgraders(db: Dexie, oldVersion: number, idbUpgradeTrans: IDB
 }
 
 export type UpgradeQueueItem = (idbtrans: IDBTransaction) => PromiseLike<any> | void;
+
+export function patchCurrentVersion(db: Dexie, idbUpgradeTrans: IDBTransaction) {
+  createMissingTables(db._dbSchema, idbUpgradeTrans);
+  const globalSchema = buildGlobalSchema(db, db.idbdb, idbUpgradeTrans);
+  adjustToExistingIndexNames(db, db._dbSchema, idbUpgradeTrans);
+  const diff = getSchemaDiff(globalSchema, db._dbSchema);
+  for (const tableChange of diff.change) {
+    if (tableChange.change.length || tableChange.recreate) {
+      console.warn(`Unable to patch indexes of table ${tableChange.name} because it has changes on the type of index or primary key.`);
+      return;
+    }
+    const store = idbUpgradeTrans.objectStore(tableChange.name);
+    tableChange.add.forEach(idx => {
+      if (debug) console.debug(`Dexie upgrade patch: Creating missing index ${tableChange.name}.${idx.src}`);
+      addIndex(store, idx);
+    });
+  }
+}
 
 export function updateTablesAndIndexes(
   db: Dexie,
@@ -285,6 +304,7 @@ export function createTable(
 export function createMissingTables(newSchema: DbSchema, idbtrans: IDBTransaction) {
   keys(newSchema).forEach(tableName => {
     if (!idbtrans.db.objectStoreNames.contains(tableName)) {
+      if (debug) console.debug('Dexie: Creating missing table', tableName);
       createTable(idbtrans, tableName, newSchema[tableName].primKey, newSchema[tableName].indexes);
     }
   });
