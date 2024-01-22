@@ -986,7 +986,7 @@ promisedTest("Dexie 4: An attached upgrader on version 2 and 3 shall run even if
         ok(true, "Skipping this test - Dexie.Observable bails out when database reopen in background");
         return;
     }
-const DBNAME = "attachedUpgrader";
+    const DBNAME = "attachedUpgrader";
     const NUM_SCHEMA_CHANGES = 31; // 10 works but 11 fails unless we work around it in Dexie with a meta table.
 
     await Dexie.delete(DBNAME);
