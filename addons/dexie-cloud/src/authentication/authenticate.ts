@@ -16,10 +16,11 @@ import {
 import { TokenErrorResponseError } from './TokenErrorResponseError';
 import { alertUser, interactWithUser } from './interactWithUser';
 import { InvalidLicenseError } from '../InvalidLicenseError';
+import { LoginHints } from '../DexieCloudAPI';
 
 export type FetchTokenCallback = (tokenParams: {
   public_key: string;
-  hints?: { userId?: string; email?: string; grant_type?: string };
+  hints?: LoginHints;
 }) => Promise<TokenFinalResponse | TokenErrorResponse>;
 
 export async function loadAccessToken(
@@ -63,7 +64,7 @@ export async function authenticate(
   context: UserLogin,
   fetchToken: FetchTokenCallback,
   userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
-  hints?: { userId?: string; email?: string; grant_type?: string }
+  hints?: LoginHints
 ): Promise<UserLogin> {
   if (
     context.accessToken &&
@@ -145,7 +146,7 @@ async function userAuthenticate(
   context: UserLogin,
   fetchToken: FetchTokenCallback,
   userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
-  hints?: { userId?: string; email?: string; grant_type?: string }
+  hints?: LoginHints
 ) {
   if (!crypto.subtle) {
     if (typeof location !== 'undefined' && location.protocol === 'http:') {
