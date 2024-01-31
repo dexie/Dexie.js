@@ -9,6 +9,7 @@ import { dexieStackFrameFilter } from './globals/constants';
 // (implement interface DexieConstructor):
 import './classes/dexie/dexie-static-props';
 import './live-query/enable-broadcast';
+import './support-bfcache';
 import { liveQuery } from './live-query/live-query';
 import { Entity } from './classes/entity/Entity';
 import { cmp } from './functions/cmp';

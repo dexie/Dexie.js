@@ -25,18 +25,30 @@ export function signalSubscribersNow(
   deleteAffectedCacheEntries = false
 ) {
   const queriesToSignal = new Set<() => void>();
-  for (const key in updatedParts) {
-    const parts = /^idb\:\/\/(.*)\/(.*)\//.exec(key);
-    if (parts) {
-      const [, dbName, tableName] = parts;
-      const tblCache = cache[`idb://${dbName}/${tableName}`];
-      if (tblCache)
-        signalTableSubscribersNow(
-          tblCache,
-          updatedParts,
-          queriesToSignal,
-          deleteAffectedCacheEntries
-        );
+  if (updatedParts.all) {
+    // Signal all subscribers to requery.
+    for (const tblCache of Object.values(cache)) {
+      signalTableSubscribersNow(
+        tblCache,
+        updatedParts,
+        queriesToSignal,
+        deleteAffectedCacheEntries
+      );
+    }
+  } else {
+    for (const key in updatedParts) {
+      const parts = /^idb\:\/\/(.*)\/(.*)\//.exec(key);
+      if (parts) {
+        const [, dbName, tableName] = parts;
+        const tblCache = cache[`idb://${dbName}/${tableName}`];
+        if (tblCache)
+          signalTableSubscribersNow(
+            tblCache,
+            updatedParts,
+            queriesToSignal,
+            deleteAffectedCacheEntries
+          );
+      }
     }
   }
   // Now when affected cache entries are removed, signal collected subscribers to requery.
