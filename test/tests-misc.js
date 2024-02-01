@@ -474,7 +474,6 @@ promisedTest("Issue #1890 - BigInt64Array getting corrupted after an update", as
         return;
     }
 
-    debugger;
     await db.foo.put({
         id: 1,
         updated: Date.now(),
