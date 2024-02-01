@@ -466,3 +466,27 @@ promisedTest("Issue - ReadonlyError thrown in liveQuery despite user did not do 
     `);
     return F(ok, equal, Dexie, db, liveQuery).catch(err => ok(false, 'final catch: '+err));
 });
+
+
+promisedTest("Issue #1890 - BigInt64Array getting corrupted after an update", async () => {
+    if (typeof BigInt64Array === 'undefined') {
+        ok(true, "BigInt64Array not supported in browser");
+        return;
+    }
+
+    debugger;
+    await db.foo.put({
+        id: 1,
+        updated: Date.now(),
+        cols: [{
+          values: new BigInt64Array([1n, 2n])
+        }]
+    });
+    let val = await db.foo.get(1);
+    ok(val.cols[0].values instanceof BigInt64Array, "cols[0].values is a BigInt64Array");
+    await db.foo.update(1, {
+        updated: Date.now()
+    });
+    val = await db.foo.get(1);
+    ok(val.cols[0].values instanceof BigInt64Array, "cols[0].values is still a BigInt64Array after update");
+});
