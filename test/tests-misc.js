@@ -473,6 +473,10 @@ promisedTest("Issue #1890 - BigInt64Array getting corrupted after an update", as
         ok(true, "BigInt64Array not supported in browser");
         return;
     }
+    if (typeof Dexie.Observable?.version === 'string') {
+        ok(true, "Skipping this test - Dexie.Observable bails out from BigInts");
+        return;
+    }
 
     await db.foo.put({
         id: 1,
