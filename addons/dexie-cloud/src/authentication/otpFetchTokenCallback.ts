@@ -1,4 +1,7 @@
 import {
+  DemoTokenRequest,
+  OTPTokenRequest1,
+  OTPTokenRequest2,
   TokenErrorResponse,
   TokenFinalResponse,
   TokenRequest,
@@ -25,8 +28,20 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         demo_user,
         grant_type: 'demo',
         scopes: ['ACCESS_DB'],
+        public_key
+      } satisfies DemoTokenRequest;
+    } else if (hints?.otpId && hints.otp) {
+      // User provided OTP ID and OTP code. This means that the OTP email
+      // has already gone out and the user may have clicked a magic link
+      // in the email with otp and otpId in query and the app has picked
+      // up those values and passed them to db.cloud.login().
+      tokenRequest = {
+        grant_type: 'otp',
+        otp_id: hints.otpId,
+        otp: hints.otp,
+        scopes: ['ACCESS_DB'],
         public_key,
-      };
+      } satisfies OTPTokenRequest2;
     } else {
       const email = await promptForEmail(
         userInteraction,
@@ -37,8 +52,7 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         email,
         grant_type: 'otp',
         scopes: ['ACCESS_DB'],
-        public_key,
-      };
+      } satisfies OTPTokenRequest1;
     }
     const res1 = await fetch(`${url}/token`, {
       body: JSON.stringify(tokenRequest),
@@ -60,29 +74,32 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       // Demo user request can get a "tokens" response right away
       // Error can also be returned right away.
       return response;
-    } else if (tokenRequest.grant_type === 'otp') {
+    } else if (tokenRequest.grant_type === 'otp' && 'email' in tokenRequest) {
       if (response.type !== 'otp-sent')
         throw new Error(`Unexpected response from ${url}/token`);
       const otp = await promptForOTP(userInteraction, tokenRequest.email);
-      tokenRequest.otp = otp || '';
-      tokenRequest.otp_id = response.otp_id;
+      const tokenRequest2 = {
+        ...tokenRequest,
+        otp: otp || '',
+        otp_id: response.otp_id,
+      } satisfies OTPTokenRequest2;
 
       let res2 = await fetch(`${url}/token`, {
-        body: JSON.stringify(tokenRequest),
+        body: JSON.stringify(tokenRequest2),
         method: 'post',
         headers: { 'Content-Type': 'application/json' },
         mode: 'cors',
       });
       while (res2.status === 401) {
         const errorText = await res2.text();
-        tokenRequest.otp = await promptForOTP(userInteraction, tokenRequest.email, {
+        tokenRequest2.otp = await promptForOTP(userInteraction, tokenRequest.email, {
           type: 'error',
           messageCode: 'INVALID_OTP',
           message: errorText,
           messageParams: {}
         });
         res2 = await fetch(`${url}/token`, {
-          body: JSON.stringify(tokenRequest),
+          body: JSON.stringify(tokenRequest2),
           method: 'post',
           headers: { 'Content-Type': 'application/json' },
           mode: 'cors',
