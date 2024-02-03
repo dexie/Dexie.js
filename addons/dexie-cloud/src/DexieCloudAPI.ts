@@ -12,6 +12,15 @@ import { BehaviorSubject, Observable } from 'rxjs';
 
 /** The API of db.cloud, where `db` is an instance of Dexie with dexie-cloud-addon active.
  */
+
+export interface LoginHints {
+  email?: string;
+  userId?: string;
+  grant_type?: 'demo' | 'otp';
+  otpId?: string;
+  otp?: string;
+}
+
 export interface DexieCloudAPI {
   // Version of dexie-cloud-addon
   version: string;
@@ -67,11 +76,7 @@ export interface DexieCloudAPI {
    * @param userId Optional userId to authenticate
    * @param grant_type requested grant type
    */
-  login(hint?: {
-    email?: string;
-    userId?: string;
-    grant_type?: 'demo' | 'otp';
-  }): Promise<void>;
+  login(hint?: LoginHints): Promise<void>;
 
   logout(options?: {force?: boolean}): Promise<void>;
 

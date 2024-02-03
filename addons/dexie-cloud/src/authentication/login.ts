@@ -1,4 +1,5 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
+import { LoginHints } from '../DexieCloudAPI';
 import { triggerSync } from '../sync/triggerSync';
 import { authenticate, loadAccessToken } from './authenticate';
 import { AuthPersistedContext } from './AuthPersistedContext';
@@ -9,7 +10,7 @@ import { UNAUTHORIZED_USER } from './UNAUTHORIZED_USER';
 
 export async function login(
   db: DexieCloudDB,
-  hints?: { email?: string; userId?: string; grant_type?: string }
+  hints?: LoginHints
 ) {
   const currentUser = await db.getCurrentUser();
   const origUserId = currentUser.userId;

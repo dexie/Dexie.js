@@ -1,16 +1,23 @@
 export type TokenRequest =
-  | OTPTokenRequest
+  | OTPTokenRequest1
+  | OTPTokenRequest2
   | ClientCredentialsTokenRequest
   | RefreshTokenRequest
   | DemoTokenRequest;
 
-export interface OTPTokenRequest {
+export type OTPTokenRequest = OTPTokenRequest1 | OTPTokenRequest2;
+export interface OTPTokenRequest1 {
   grant_type: 'otp';
-  public_key?: string; // If a refresh token is requested. Clients own the keypair and sign refresh_token requests using it.
   email: string;
   scopes: string[]; // TODO use CLIENT_SCOPE type.
-  otp_id?: string;
-  otp?: string;
+}
+
+export interface OTPTokenRequest2 {
+  grant_type: 'otp';
+  public_key?: string;
+  scopes: string[]; // TODO use CLIENT_SCOPE type.
+  otp_id: string;
+  otp: string;
 }
 
 export interface ClientCredentialsTokenRequest {
