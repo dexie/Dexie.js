@@ -5,6 +5,7 @@ import { DexieExportedTable, DexieExportJsonStructure } from './json-structure';
 import { TSON } from './tson';
 
 export interface ExportOptions {
+  skipTables?: string[],
   noTransaction?: boolean;
   numRowsPerChunk?: number;
   prettyJson?: boolean;
@@ -25,8 +26,10 @@ const DEFAULT_ROWS_PER_CHUNK = 2000;
 
 export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob> {
   options = options || {};
+  const skipTables = options.skipTables? options.skipTables: []
+  const targetTables = db.tables.filter((x)=> !skipTables.includes(x.name))
   const slices: (string | Blob)[] = [];
-  const tables = db.tables.map(table => ({
+  const tables = targetTables.map(table => ({
     name: table.name,
     schema: getSchemaString(table),
     rowCount: 0
@@ -49,7 +52,7 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
     completedRows: 0,
     completedTables: 0,
     totalRows: NaN,
-    totalTables: db.tables.length
+    totalTables: tables.length
   };
 
   try {
@@ -66,7 +69,7 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
 
   async function exportAll() {
     // Count rows:
-    const tablesRowCounts = await Promise.all(db.tables.map(table => table.count()));
+    const tablesRowCounts = await Promise.all(targetTables.map(table => table.count()));
     tablesRowCounts.forEach((rowCount, i) => tables[i].rowCount = rowCount);
     progress.totalRows = tablesRowCounts.reduce((p,c)=>p+c);
 
