@@ -50,7 +50,7 @@ configureLambdaTest(karmaCommon);
 
 const browserSuiteToUse = process.env.NODE_ENV === 'release'
   ? 'pre_npm_publish' // When run by tools/release.sh
-  : process.env.LT_USERNAME
+  : process.env.LT_USERNAME && process.env.GH_ACTIONS
   ? "ci" // Automated CI
   : process.env.GH_ACTIONS
   ? "ciLocal" // "ci" when not having the credentials (= forks of the dexie repo)
