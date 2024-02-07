@@ -17,16 +17,7 @@ config.urlConfig.push(/*{
     id: "dontoptimize",
     label: "Dont optimize tests",
     tooltip: "Always delete and recreate the DB between each test"
-}, {
-    id: "longstacks",
-    label: "Long async stacks",
-    tooltip: "Set Dexie.debug=true, turning on long async stacks on all" +
-    " errors (Actually we use Dexie.debug='dexie' so that frames from" +
-    " dexie.js are also included)"
- });
-
-Dexie.debug = window.location.search.indexOf('longstacks') !== -1 ? 'dexie' : false;
-if (window.location.search.indexOf('longstacks=tests') !== -1) Dexie.debug = true; // Don't include stuff from dexie.js.
+});
 
 var no_optimize = window.no_optimize || window.location.search.indexOf('dontoptimize') !== -1;
 

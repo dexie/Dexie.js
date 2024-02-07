@@ -26,18 +26,30 @@ export function signalSubscribersNow(
   optimistic = false
 ) {
   const queriesToSignal = new Set<() => void>();
-  for (const key in updatedParts) {
-    const parts = /^idb\:\/\/(.*)\/(.*)\//.exec(key);
-    if (parts) {
-      const [, dbName, tableName] = parts;
-      const tblCache = cache[`idb://${dbName}/${tableName}`];
-      if (tblCache)
-        collectTableSubscribers(
-          tblCache,
-          updatedParts,
-          queriesToSignal,
-          deleteAffectedCacheEntries
-        );
+  if (updatedParts.all) {
+    // Signal all subscribers to requery.
+    for (const tblCache of Object.values(cache)) {
+      collectTableSubscribers(
+        tblCache,
+        updatedParts,
+        queriesToSignal,
+        deleteAffectedCacheEntries
+      );
+    }
+  } else {
+    for (const key in updatedParts) {
+      const parts = /^idb\:\/\/(.*)\/(.*)\//.exec(key);
+      if (parts) {
+        const [, dbName, tableName] = parts;
+        const tblCache = cache[`idb://${dbName}/${tableName}`];
+        if (tblCache)
+          collectTableSubscribers(
+            tblCache,
+            updatedParts,
+            queriesToSignal,
+            deleteAffectedCacheEntries
+          );
+      }
     }
   }
   // Now when affected cache entries are removed, signal collected subscribers to requery.
@@ -50,10 +62,9 @@ function collectTableSubscribers(
   outQueriesToSignal: Set<() => void>,
   deleteAffectedCacheEntries: boolean
 ) {
-  const updatedEntryLists: [string, CacheEntry[]][] =
-    deleteAffectedCacheEntries && [];
+  const updatedEntryLists: [string, CacheEntry[]][] = [];
   for (const [indexName, entries] of Object.entries(tblCache.queries.query)) {
-    const filteredEntries: CacheEntry[] = deleteAffectedCacheEntries && [];
+    const filteredEntries: CacheEntry[] = [];
     for (const entry of entries) {
       if (entry.obsSet && obsSetsOverlap(updatedParts, entry.obsSet)) {
         // This query is affected by the mutation. Remove it from cache

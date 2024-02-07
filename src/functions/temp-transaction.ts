@@ -21,7 +21,7 @@ export function tempTransaction (
       return rejection(new exceptions.DatabaseClosed(db._state.dbOpenError));
     }
     if (!db._state.isBeingOpened) {
-      if (!db._options.autoOpen)
+      if (!db._state.autoOpen)
         return rejection(new exceptions.DatabaseClosed());
       db.open().catch(nop); // Open in background. If if fails, it will be catched by the final promise anyway.
     }

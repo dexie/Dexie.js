@@ -6,46 +6,11 @@ export var debug = typeof location !== 'undefined' &&
 
 export function setDebug(value, filter) {
     debug = value;
-    libraryFilter = filter;
 }
 
-export var libraryFilter = () => true;
-
-export const NEEDS_THROW_FOR_STACK = !new Error("").stack;
-
-export function getErrorWithStack() {
-    "use strict";
-    if (NEEDS_THROW_FOR_STACK) try {
-        // Doing something naughty in strict mode here to trigger a specific error
-        // that can be explicitely ignored in debugger's exception settings.
-        // If we'd just throw new Error() here, IE's debugger's exception settings
-        // will just consider it as "exception thrown by javascript code" which is
-        // something you wouldn't want it to ignore.
-        getErrorWithStack.arguments;
-        throw new Error(); // Fallback if above line don't throw.
-    } catch(e) {
-        return e;
-    }
-    return new Error();
-}
-
-export function prettyStack(exception, numIgnoredFrames) {
-    var stack = exception.stack;
-    if (!stack) return "";
-    numIgnoredFrames = (numIgnoredFrames || 0);
-    if (stack.indexOf(exception.name) === 0)
-        numIgnoredFrames += (exception.name + exception.message).split('\n').length;
-    return stack.split('\n')
-        .slice(numIgnoredFrames)
-        .filter(libraryFilter)
-        .map(frame => "\n" + frame)
-        .join('');
-}
-
-// TODO: Replace this in favor of a decorator instead.
 export function deprecated<T> (what: string, fn: (...args)=>T) {
     return function () {
-        console.warn(`${what} is deprecated. See https://dexie.org/docs/Deprecations. ${prettyStack(getErrorWithStack(), 1)}`);
+        console.warn(`${what} is deprecated. See https://dexie.org/docs/Deprecations}`);
         return fn.apply(this, arguments);
     } as (...args)=>T
 }

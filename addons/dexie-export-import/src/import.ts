@@ -19,6 +19,7 @@ export interface ImportOptions extends StaticImportOptions {
   acceptChangedPrimaryKey?: boolean;
   overwriteValues?: boolean;
   clearTablesBeforeImport?: boolean;
+  skipTables?: string[],
   noTransaction?: boolean;
   chunkSizeBytes?: number; // Default: DEFAULT_KILOBYTES_PER_CHUNK ( 1MB )
   filter?: (table: string, value: any, key?: any) => boolean;
@@ -68,6 +69,7 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
   const readBlobsSynchronously = 'FileReaderSync' in self; // true in workers only.
 
   const dbExport = dbExportFile.data!;
+  const skipTables = options.skipTables? options.skipTables: []
 
   if (!options!.acceptNameDiff && db.name !== dbExport.databaseName)
     throw new Error(`Name differs. Current database name is ${db.name} but export is ${dbExport.databaseName}`);
@@ -91,6 +93,7 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
 
   if (options!.clearTablesBeforeImport) {
     for (const table of db.tables) {
+      if(skipTables.includes(table.name) ) continue;
       await table.clear();
     }
   }
@@ -104,6 +107,7 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
   async function importAll () {
     do {
       for (const tableExport of dbExport.data) {
+        if(skipTables.includes(tableExport.tableName)) continue;
         if (!tableExport.rows) break; // Need to pull more!
         if (!(tableExport.rows as any).incomplete && tableExport.rows.length === 0)
           continue;
