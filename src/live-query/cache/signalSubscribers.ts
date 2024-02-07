@@ -15,15 +15,14 @@ export function signalSubscribersLazily(part: ObservabilitySet, optimistic = fal
       isTaskEnqueued = false;
       const parts = unsignaledParts;
       unsignaledParts = {};
-      signalSubscribersNow(parts, false, optimistic);
+      signalSubscribersNow(parts, false);
     }, 0);
   }
 }
 
 export function signalSubscribersNow(
   updatedParts: ObservabilitySet,
-  deleteAffectedCacheEntries = false,
-  optimistic = false
+  deleteAffectedCacheEntries = false
 ) {
   const queriesToSignal = new Set<() => void>();
   if (updatedParts.all) {
@@ -66,7 +65,7 @@ function collectTableSubscribers(
   for (const [indexName, entries] of Object.entries(tblCache.queries.query)) {
     const filteredEntries: CacheEntry[] = [];
     for (const entry of entries) {
-      if (entry.obsSet && obsSetsOverlap(updatedParts, entry.obsSet)) {
+      if (obsSetsOverlap(updatedParts, entry.obsSet)) {
         // This query is affected by the mutation. Remove it from cache
         // and signal all subscribers to requery.
         entry.subscribers.forEach((requery) => outQueriesToSignal.add(requery));
