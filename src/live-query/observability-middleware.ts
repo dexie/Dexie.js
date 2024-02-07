@@ -85,9 +85,9 @@ export const observabilityMiddleware: Middleware<DBCore> = {
               const oldObjs = type === 'delete' || keys.length === newObjs.length ? getFromTransactionCache(keys, oldCache) : null;
 
               // Supply detailed values per index for both old and new objects:
-              if (!oldObjs && type !== "add") {
-                // delete or put and we don't know old values.
-                // Indicate this in the ":dels" part, for the sake of count() queries only!
+              if (!oldObjs) {
+                // add, delete or put and we don't know old values.
+                // Indicate this in the ":dels" part, for the sake of count() and primaryKeys() queries only!
                 delsRangeSet.addKeys(keys);
               }
               if (oldObjs || newObjs) {
@@ -148,7 +148,7 @@ export const observabilityMiddleware: Middleware<DBCore> = {
           openCursor: getRange,
         }
 
-        keys(readSubscribers).forEach(method => {
+        keys(readSubscribers).forEach((method: 'get' | 'getMany' | 'count' | 'query' | 'openCursor') => {
           tableClone[method] = function (
             req:
               | DBCoreGetRequest
@@ -178,7 +178,12 @@ export const observabilityMiddleware: Middleware<DBCore> = {
               const delsRangeSet = getRangeSet(":dels");
               const [queriedIndex, queriedRanges] = readSubscribers[method](req);
               // A generic rule here: queried ranges should always be subscribed to.
-              getRangeSet(queriedIndex.name || "").add(queriedRanges);
+              if (method === 'query' && queriedIndex.isPrimaryKey && !(req as DBCoreQueryRequest).values) {
+                // A pure primay-key based Collection where only .primaryKeys() is requested. Don't wakeup on other changes than added or deleted primary keys within queried range.
+                delsRangeSet.add(queriedRanges);
+              } else {
+                getRangeSet(queriedIndex.name || "").add(queriedRanges);
+              }
               if (!queriedIndex.isPrimaryKey) {
                 // Only count(), query() and openCursor() operates on secondary indices.
                 // Since put(), delete() and deleteRange() mutations may happen without knowing oldObjs,
