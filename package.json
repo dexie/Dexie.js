@@ -138,7 +138,7 @@
     "sorted-json": "^0.2.6",
     "terser": "^5.3.1",
     "tslib": "^2.1.0",
-    "typescript": "^5.0.4",
+    "typescript": "^5.3.3",
     "uglify-js": "^3.9.2"
   }
 }
