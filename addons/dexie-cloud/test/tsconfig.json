@@ -8,7 +8,7 @@
     "noImplicitAny": false,
     "noImplicitReturns": true,
     "moduleResolution": "node",
-    "lib": ["ES2018", "DOM"],
+    "lib": ["ES2020", "DOM"],
     "forceConsistentCasingInFileNames": true,
     "sourceMap": true,
     "rootDir": "..",

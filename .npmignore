@@ -9,3 +9,5 @@ test/
 tools/
 bower.json
 src/
+.lambdatest
+tunnel.pid

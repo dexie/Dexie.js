@@ -527,3 +527,31 @@ promisedTest("Should be possible to open a vip DB", async ()=>{
     await db.vip.table('foobar').toArray();
     ok(true, "Could query dynamically opened viped db");
 });
+
+promisedTest("#1842 - Should set the unique flag for primKey to true", async () => {
+    // First test if flag is correctly set when creating new store
+    // version.ts, _parseStoresSpec()
+    await Dexie.delete("PrimKey1842");
+    let db = new Dexie("PrimKey1842");
+    db.version(1).stores({ foo: "++id, name"});
+    await db.open();
+    ok(true, "Could open new db");
+    const primKey = db.foo.schema.primKey.unique;
+    ok(primKey, "primKey should be unique");
+
+    // Closing and reopening db, to test if flag is correctly set when opening existing store
+    // schema-helpers.ts, buildGlobalSchema()
+    await db.close();
+    db = new Dexie("PrimKey1842");
+    await db.open();
+    ok(true, "Could open db after close");
+    const fooTable = await db.table("foo");
+    const primKeyAfterCloseOpen = fooTable.schema.primKey.unique;
+    ok(primKeyAfterCloseOpen, "primKey should be unique after close and then open");
+
+    // Cleanup
+    db.close();
+    await Dexie.delete("PrimKey1842");
+    const databases = await Dexie.getDatabaseNames();
+    ok(!databases.includes("PrimKey1842"), "'PrimKey1842' should NOT be in the list of database names");
+})

@@ -78,7 +78,9 @@ type BinaryType =
   | Uint32Array
   | Int32Array
   | Float32Array
-  | Float64Array;
+  | Float64Array
+  | BigInt64Array 
+  | BigUint64Array;
 
 function getUint8Array(a: BinaryType): Uint8Array {
   if (a instanceof Uint8Array) return a;

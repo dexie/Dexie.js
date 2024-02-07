@@ -27,6 +27,7 @@ export class Version implements IVersion {
       if (stores[tableName] !== null) {
           var indexes = parseIndexSyntax(stores[tableName]);
           var primKey = indexes.shift();
+          primKey.unique = true;
           if (primKey.multi) throw new exceptions.Schema("Primary key cannot be multi-valued");
           indexes.forEach(idx => {
               if (idx.auto) throw new exceptions.Schema("Only primary key can be marked as autoIncrement (++)");

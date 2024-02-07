@@ -1,5 +1,4 @@
 import { derive, setProp } from '../functions/utils';
-import { getErrorWithStack, prettyStack } from '../helpers/debug';
 
 var dexieErrorNames = [
     'Modify',
@@ -56,18 +55,11 @@ export function DexieError (name, msg) {
     // 2. It doesn't give us much in this case.
     // 3. It would require sub classes to call super(), which
     //    is not needed when deriving from Error.
-    this._e = getErrorWithStack();
     this.name = name;
     this.message = msg;
 }
 
 derive(DexieError).from(Error).extend({
-    stack: {
-        get: function() {
-            return this._stack ||
-                (this._stack = this.name + ": " + this.message + prettyStack(this._e, 2));
-        }
-    },
     toString: function(){ return this.name + ": " + this.message; }
 });
 
@@ -83,7 +75,6 @@ function getMultiErrorMessage (msg, failures) {
 // Specific constructor because it contains members failures and failedKeys.
 //
 export function ModifyError (msg, failures, successCount, failedKeys) {
-    this._e = getErrorWithStack();
     this.failures = failures;
     this.failedKeys = failedKeys;
     this.successCount = successCount;
@@ -92,7 +83,6 @@ export function ModifyError (msg, failures, successCount, failedKeys) {
 derive(ModifyError).from(DexieError);
 
 export function BulkError (msg, failures) {
-    this._e = getErrorWithStack();
     this.name = "BulkError";
     this.failures = Object.keys(failures).map(pos => failures[pos]);
     this.failuresByPos = failures;
@@ -122,7 +112,6 @@ export var exceptions = errorList.reduce((obj,name)=>{
     // 'eval-evil'.
     var fullName = name + "Error";
     function DexieError (msgOrInner, inner){
-        this._e = getErrorWithStack();
         this.name = fullName;
         if (!msgOrInner) {
             this.message = defaultTexts[name] || fullName;

@@ -8,6 +8,7 @@ export interface StaticImportOptions {
   noTransaction?: boolean;
   chunkSizeBytes?: number; // Default: DEFAULT_KILOBYTES_PER_CHUNK ( 1MB )
   filter?: (table: string, value: any, key?: any) => boolean;
+  transform?: (table: string, value: any, key?: any) => ({value: any, key?: any});
   progressCallback?: (progress: ImportProgress) => boolean;
 }
 
@@ -18,9 +19,11 @@ export interface ImportOptions extends StaticImportOptions {
   acceptChangedPrimaryKey?: boolean;
   overwriteValues?: boolean;
   clearTablesBeforeImport?: boolean;
+  skipTables?: string[],
   noTransaction?: boolean;
   chunkSizeBytes?: number; // Default: DEFAULT_KILOBYTES_PER_CHUNK ( 1MB )
   filter?: (table: string, value: any, key?: any) => boolean;
+  transform?: (table: string, value: any, key?: any) => ({value: any, key?: any});
   progressCallback?: (progress: ImportProgress) => boolean;
 }
 
@@ -66,6 +69,7 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
   const readBlobsSynchronously = 'FileReaderSync' in self; // true in workers only.
 
   const dbExport = dbExportFile.data!;
+  const skipTables = options.skipTables? options.skipTables: []
 
   if (!options!.acceptNameDiff && db.name !== dbExport.databaseName)
     throw new Error(`Name differs. Current database name is ${db.name} but export is ${dbExport.databaseName}`);
@@ -89,6 +93,7 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
 
   if (options!.clearTablesBeforeImport) {
     for (const table of db.tables) {
+      if(skipTables.includes(table.name) ) continue;
       await table.clear();
     }
   }
@@ -102,6 +107,7 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
   async function importAll () {
     do {
       for (const tableExport of dbExport.data) {
+        if(skipTables.includes(tableExport.tableName)) continue;
         if (!tableExport.rows) break; // Need to pull more!
         if (!(tableExport.rows as any).incomplete && tableExport.rows.length === 0)
           continue;
@@ -138,11 +144,21 @@ export async function importInto(db: Dexie, exportedData: Blob | JsonStream<Dexi
         }
 
         const filter = options!.filter;
-        const filteredRows = filter ?
+        const transform = options!.transform;
+
+        let filteredRows = filter ?
           tableExport.inbound ?
             rows.filter(value => filter(tableName, value)) :
             rows.filter(([key, value]) => filter(tableName, value, key)) :
           rows;
+        if (transform) {
+          filteredRows = filteredRows.map(tableExport.inbound ?
+            value => transform(tableName, value).value :
+            ([key, value]) => {
+              const res = transform(tableName, value, key)
+              return [res.key, res.value];
+            });
+        }
         const [keys, values] = tableExport.inbound ?
           [undefined, filteredRows] :
           [filteredRows.map(row=>row[0]), rows.map(row=>row[1])];

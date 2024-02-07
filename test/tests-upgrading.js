@@ -868,3 +868,169 @@ promisedTest(
     }
   );
     
+  promisedTest(
+    "Dexie 4: Should not throw VersionError on downgrade",
+    async ()=>{
+        const DBNAME = "downgradedDB";
+
+        await Dexie.delete(DBNAME);
+        let db = new Dexie(DBNAME);
+        db.version(2).stores({
+            friends: "id, name"
+        });
+        await db.friends.get(undefined).catch(e => {});
+        await db.open();
+        ok(true, "Could open v2");
+        await db.friends.add({id: 1, name: "Foo 959"});
+        db.close();
+        db = new Dexie(DBNAME);
+        db.version(1).stores({
+            friends: "id, age"
+        });
+        await db.open();
+        ok(true, "Could open v1 even though installed version is at verion 2.");
+        const friends = await db.friends.toArray();
+        equal(friends.length, 1, "Could use the database for querying");
+        await db.delete();
+    }
+);
+
+promisedTest(
+    "Dexie 4: It should add indexes and tables also when not incrementing version number",
+    async ()=>{
+        const DBNAME = "forgettingVerNoIncrease";
+
+        await Dexie.delete(DBNAME);
+        let db = new Dexie(DBNAME);
+        db.version(1).stores({
+            friends: "id"
+        });
+        await db.open();
+        ok(true, "Could open v1 with {friends: 'id'}");
+        await db.friends.add({id: 1, name: "Foo 123"});
+        db.close();
+        db = new Dexie(DBNAME);
+        db.version(1).stores({
+            friends: "id, name, age",
+            pets: 'id, friendId, kind'
+        });
+        await db.open();
+        ok(true, "Could open v1 even though we have added some indexes and a table.");
+        await db.friends.add({id: 2, name: "Bar 123", age: 25});
+        await db.pets.add({id: 1, friendId: 2, kind: "dog"});
+        ok(true, "Could add pets to the new table");
+        const pets = await db.pets.toArray();
+        const friends = await db.friends.toArray();
+        equal(friends.length, 2, "Got the two friends");
+        equal(pets.length, 1, "Got the one pet");
+        db.close();
+    }
+);
+
+
+promisedTest(
+    "Dexie 4: It should work having two versions of the DB opened at the same time as long as they have a compatible schema",
+    async ()=>{
+        if (typeof Dexie.Observable?.version === 'string') {
+            ok(true, "Skipping this test - Dexie.Observable bails out when opening two versions of the same database");
+            return;
+        }
+        const DBNAME = "competingDBs";
+
+        await Dexie.delete(DBNAME);
+        let db1 = new Dexie(DBNAME);
+        db1.version(1).stores({
+            friends: "id"
+        });
+        
+        let db2 = new Dexie(DBNAME);
+        db2.version(2).stores({
+            friends: "id, name, age",
+            pets: 'id, friendId, kind'
+        })
+        await Promise.all(db1.open(), db2.open());
+        await db1.friends.add({id: 1, name: "Foo 123"});
+        let foo = await db2.friends.where('name').startsWith('Foo').first();
+        ok(true, "We could use the 'name' index only declared on db2");
+        foo.age = 23;
+        await db2.friends.put(foo);
+        foo = await db1.friends.get(1);
+        equal(foo.age, 23, "We could get the data using db1");
+
+        db1.close();
+        db2.close();
+        await db1.open();
+        await db2.open();
+
+        db1.close();
+        db2.close();
+        db1.version(1).stores({
+            friends: "id, name, age, [name+age]",
+            cars: 'id, name'
+        });
+        await db2.open();
+        await db1.open();
+        foo = await db1.friends.where('[name+age]').equals(["Foo 123", 23]).first(); // Should be able to use the new index
+        equal(foo.age, 23, "We could get the data using db1 and the added index 'name+age' still in v1");
+        foo = await db2.friends.get({age: 23}); // Be able to use the age index that db2 declares.
+        equal(foo.age, 23, "We could get the data using db2 and the 'name' index");
+        const db = await new Dexie(DBNAME).open();
+        ok(db.verno < 3, "The database should be at version 2 (or exactly: " + db.verno + ")");
+
+        await Dexie.delete(DBNAME);
+    }
+);
+
+promisedTest("Dexie 4: An attached upgrader on version 2 and 3 shall run even if version 1 was reused for schema manipulation more than 20 times", async ()=>{
+    if (typeof Dexie.Observable?.version === 'string') {
+        ok(true, "Skipping this test - Dexie.Observable bails out when database reopen in background");
+        return;
+    }
+    const DBNAME = "attachedUpgrader";
+    const NUM_SCHEMA_CHANGES = 31; // 10 works but 11 fails unless we work around it in Dexie with a meta table.
+
+    await Dexie.delete(DBNAME);
+    let db = new Dexie(DBNAME);
+    for (let i=1; i<=NUM_SCHEMA_CHANGES; ++i) {
+        db.version(1) // Yes, reuse version 1. We're testing that reusing version for schema changes is ok.
+            .stores({
+            friends: "id",
+            ["table"+i]: "id"
+        });
+        await db.open();
+        db.close();
+    }
+    ok(true, `Could change schema a ${NUM_SCHEMA_CHANGES} times while still being on version 1, without error`);
+    await db.open();
+    equal(db.verno, 1, "The database should be at version 1");
+    await db.table("table1").add({id: 1, name: "Foo 123"});
+    ok(true, `Could add things to table1`);
+    await db.table("table" + NUM_SCHEMA_CHANGES).add({id: 1, name: "Foo 123"});
+    ok(true, `Could add things to table${NUM_SCHEMA_CHANGES}`);
+    db.close();
+    db = new Dexie(DBNAME);
+    db.version(2).stores({
+        version2Table: "id",
+    }).upgrade(async tx => {
+        await tx.version2Table.add({id: 1, foo: "bar"});
+    });
+    await db.open();
+    ok(true, "Could open v2");
+    const objFromUpgrader = await db.version2Table.get(1);
+    ok(!!objFromUpgrader, "The upgrader of version 2 have run");
+    db.close();
+
+    db.version(3).stores({
+        version3Table: "id",
+    }).upgrade(async tx => {
+        await tx.version3Table.add({id: 1, foo: "bar"});
+    });
+    await db.open().catch(err => {
+        ok(false, "Failed to upgrade to version 3: " + err); // Would fail here if version 2 was rerun a second time (ConstraintError)
+        throw err;
+    });
+    ok(true, "Could open v3");
+    const objFromUpgrader3 = await db.version3Table.get(1);
+    ok (!!objFromUpgrader3, "The upgrader of version 3 have run");
+    await Dexie.delete(DBNAME);
+});
