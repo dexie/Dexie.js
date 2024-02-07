@@ -1,14 +1,14 @@
 {
   "compilerOptions": {
     "module": "es2015",
-    "target": "es2018",
+    "target": "es2020",
     "declaration": true,
     "importHelpers": true,
     "strictNullChecks": true,
     "noImplicitAny": false,
     "noImplicitReturns": true,
     "moduleResolution": "node",
-    "lib": ["ES2018", "DOM"],
+    "lib": ["ES2020", "DOM"],
     "forceConsistentCasingInFileNames": true,
     "sourceMap": true,
     "rootDir": ".",

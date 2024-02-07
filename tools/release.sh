@@ -108,23 +108,23 @@ rm -rf addons/*/dist/*
 pnpm run build
    
 # test
-printf "Testing on browserstack (will retry up to 4 times)\n"
+printf "Testing (will retry up to 4 times)\n"
 n=0
 until [ $n -ge 4 ]
 do
   pnpm run test && break
   n=$[$n+1]
-  printf "Browserstack tests failed.\n"
+  printf "Tests failed.\n"
   if [ $n -lt 4 ]; then
     printf "Retrying (this will be retry no ${n})..."
   fi
 done
 if  [ $n -ge 4 ]; then
-  printf "Browserstack failed 3 times. Quitting!"
+  printf "Tests failed 3 times. Quitting!"
   git reset --hard $previous_commit
   exit 1
 fi
-printf "Browserstack tests for Dexie.js passed.\n"
+printf "Tests for Dexie.js passed.\n"
 
 #
 # Addons
@@ -143,14 +143,14 @@ do
     printf "Installing dependencies for ${addonNpmName}"
     pnpm install
 
-    printf "Building and testing ${addon} on browserstack (will retry up to 4 times)\n"
+    printf "Building and testing ${addon} (will retry up to 4 times)\n"
 
     n=0
     until [ $n -ge 4 ]
     do
       pnpm run test && break
       n=$[$n+1]
-      printf "${addon} Browserstack tests failed\n"
+      printf "${addon} Tests failed\n"
       if [ $n -lt 4 ]; then
         printf "Retrying (this will be retry no ${n})..."
       fi
@@ -161,7 +161,7 @@ do
       exit 1
     fi
 
-    printf "${addon} Browserstack tests passed.\n"
+    printf "${addon} Tests passed.\n"
     
     if [ "${autoPublishAddons}" = "Y" ]; then
       if ! [ "${addonPublishedVersion}" = "${addonLocalVersion}" ]; then

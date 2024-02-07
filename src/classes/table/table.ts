@@ -39,11 +39,13 @@ export class Table implements ITable<any, IndexableType> {
   {
     const trans: Transaction = this._tx || PSD.trans;
     const tableName = this.name;
+    // @ts-ignore: Use Chrome's Async Stack Tagging API to allow tracing and simplify debugging for dexie users.
+    const task = debug && typeof console !== 'undefined' && console.createTask && console.createTask(`Dexie: ${mode === 'readonly' ? 'read' : 'write' } ${this.name}`);
     
     function checkTableInTransaction(resolve, reject, trans: Transaction) {
       if (!trans.schema[tableName])
         throw new exceptions.NotFound("Table " + tableName + " not part of transaction");
-      return fn(trans.idbtrans, trans);
+      return fn(trans.idbtrans, trans) as Promise<any>;
     }
     // Surround all in a microtick scope.
     // Reason: Browsers (modern Safari + older others)
@@ -60,11 +62,19 @@ export class Table implements ITable<any, IndexableType> {
     // in native engine.
     const wasRootExec = beginMicroTickScope();
     try {
-      return trans && trans.db._novip === this.db._novip ?
+      let p = trans && trans.db._novip === this.db._novip ?
         trans === PSD.trans ?
           trans._promise(mode, checkTableInTransaction, writeLocked) :
           newScope(() => trans._promise(mode, checkTableInTransaction, writeLocked), { trans: trans, transless: PSD.transless || PSD }) :
         tempTransaction(this.db, mode, [this.name], checkTableInTransaction);
+      if (task) { // Dexie.debug = true so we trace errors
+        p._consoleTask = task;
+        p = p.catch(err => {
+          console.trace(err);
+          return rejection(err);
+        });
+      }
+      return p;  
     } finally {
       if (wasRootExec) endMicroTickScope();
     }
@@ -78,6 +88,7 @@ export class Table implements ITable<any, IndexableType> {
   get(keyOrCrit, cb?) {
     if (keyOrCrit && keyOrCrit.constructor === Object)
       return this.where(keyOrCrit as { [key: string]: IndexableType }).first(cb);
+    if (keyOrCrit == null) return rejection(new exceptions.Type(`Invalid argument to Table.get()`));
 
     return this._trans('readonly', (trans) => {
       return this.core.get({trans, key: keyOrCrit})
