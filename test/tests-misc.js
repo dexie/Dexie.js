@@ -328,9 +328,13 @@ asyncTest("PR #1108", async ()=>{
     }
     const origConsoleWarn = console.warn;
     const warnings = [];
-    console.warn = function(msg){warnings.push(msg); return origConsoleWarn.apply(this, arguments)};
+    console.warn = function(msg){
+        warnings.push(msg);
+        return origConsoleWarn.apply(this, arguments)
+    };
     try {
         const DBNAME = "PR1108";
+        await Dexie.delete(DBNAME);
         let db = new Dexie(DBNAME);
         db.version(1).stores({
             foo: "id"

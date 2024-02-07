@@ -5,7 +5,7 @@ import { exceptions } from '../../errors';
 import { eventRejectHandler, preventDefault } from '../../functions/event-wrappers';
 import Promise, { wrap } from '../../helpers/promise';
 import { connections } from '../../globals/constants';
-import { runUpgraders, readGlobalSchema, adjustToExistingIndexNames, verifyInstalledSchema } from '../version/schema-helpers';
+import { runUpgraders, readGlobalSchema, adjustToExistingIndexNames, verifyInstalledSchema, patchCurrentVersion } from '../version/schema-helpers';
 import { safariMultiStoreFix } from '../../functions/quirks';
 import { _onDatabaseCreated } from '../../helpers/database-enumerator';
 import { vip } from './vip';
@@ -30,6 +30,8 @@ export function dexieOpen (db: Dexie) {
   state.dbOpenError = null;
   state.openComplete = false;
   const openCanceller = state.openCanceller;
+  let nativeVerToOpen = Math.round(db.verno * 10);
+  let schemaPatchMode = false;
 
   function throwIfCancelled() {
     // If state.openCanceller object reference is replaced, it means db.close() has been called,
@@ -44,19 +46,14 @@ export function dexieOpen (db: Dexie) {
       wasCreated = false;
 
   const tryOpenDB = () => new Promise((resolve, reject) => {
-    // Multiply db.verno with 10 will be needed to workaround upgrading bug in IE:
-    // IE fails when deleting objectStore after reading from it.
-    // A future version of Dexie.js will stopover an intermediate version to workaround this.
-    // At that point, we want to be backward compatible. Could have been multiplied with 2, but by using 10, it is easier to map the number to the real version number.
-    
     throwIfCancelled();
     // If no API, throw!
     if (!indexedDB) throw new exceptions.MissingAPI();
     const dbName = db.name;
     
-    const req = state.autoSchema ?
+    const req = state.autoSchema || !nativeVerToOpen ?
       indexedDB.open(dbName) :
-      indexedDB.open(dbName, Math.round(db.verno * 10));
+      indexedDB.open(dbName, nativeVerToOpen);
     if (!req) throw new exceptions.MissingAPI(); // May happen in Safari private mode, see https://github.com/dfahlander/Dexie.js/issues/134
     req.onerror = eventRejectHandler(reject);
     req.onblocked = wrap(db._fireOnBlocked);
@@ -76,9 +73,12 @@ export function dexieOpen (db: Dexie) {
             });
         } else {
             upgradeTransaction.onerror = eventRejectHandler(reject);
-            var oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
+            const oldVer = e.oldVersion > Math.pow(2, 62) ? 0 : e.oldVersion; // Safari 8 fix.
             wasCreated = oldVer < 1;
             db.idbdb = req.result;
+            if (schemaPatchMode) {
+              patchCurrentVersion(db, upgradeTransaction);
+            }
             runUpgraders(db, oldVer / 10, upgradeTransaction, reject);
         }
     }, reject);
@@ -94,8 +94,12 @@ export function dexieOpen (db: Dexie) {
           if (state.autoSchema) readGlobalSchema(db, idbdb, tmpTrans);
           else {
               adjustToExistingIndexNames(db, db._dbSchema, tmpTrans);
-              if (!verifyInstalledSchema(db, tmpTrans)) {
-                  console.warn(`Dexie SchemaDiff: Schema was extended without increasing the number passed to db.version(). Some queries may fail.`);
+              if (!verifyInstalledSchema(db, tmpTrans) && !schemaPatchMode) {
+                console.warn(`Dexie SchemaDiff: Schema was extended without increasing the number passed to db.version(). Dexie will add missing parts and increment native version number to workaround this.`);
+                idbdb.close();
+                nativeVerToOpen = idbdb.version + 1;
+                schemaPatchMode = true;
+                return resolve (tryOpenDB()); // Try again with new version (nativeVerToOpen
               }
           }
           generateMiddlewareStacks(db, tmpTrans);
@@ -125,15 +129,24 @@ export function dexieOpen (db: Dexie) {
 
     }, reject);
   }).catch(err => {
-    if (err && err.name === 'UnknownError' && state.PR1398_maxLoop > 0) {
-      // Bug in Chrome after clearing site data
-      // https://github.com/dexie/Dexie.js/issues/543#issuecomment-1795736695
-      state.PR1398_maxLoop--;
-      console.warn('Dexie: Workaround for Chrome UnknownError on open()');
-      return tryOpenDB();
-    } else {
-      return Promise.reject(err);
+    switch (err?.name) {
+      case "UnknownError":
+        if (state.PR1398_maxLoop > 0) {
+          // Bug in Chrome after clearing site data
+          // https://github.com/dexie/Dexie.js/issues/543#issuecomment-1795736695
+          state.PR1398_maxLoop--;
+          console.warn('Dexie: Workaround for Chrome UnknownError on open()');
+          return tryOpenDB();
+        }
+        break;
+      case "VersionError":
+        if (nativeVerToOpen > 0) {
+          nativeVerToOpen = 0;
+          return tryOpenDB();
+        }
+        break;
     }
+    return Promise.reject(err);
   });
   
   // safari14Workaround = Workaround by jakearchibald for new nasty bug in safari 14.

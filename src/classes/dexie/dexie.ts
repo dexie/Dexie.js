@@ -59,6 +59,7 @@ export interface DbReadyState {
   autoSchema: boolean;
   vcFired?: boolean;
   PR1398_maxLoop?: number;
+  autoOpen?: boolean;
 }
 
 export class Dexie implements IDexie {
@@ -125,7 +126,8 @@ export class Dexie implements IDexie {
       cancelOpen: nop,
       openCanceller: null as Promise,
       autoSchema: true,
-      PR1398_maxLoop: 3
+      PR1398_maxLoop: 3,
+      autoOpen: options.autoOpen,
     };
     state.dbReadyPromise = new Promise(resolve => {
       state.dbReadyResolve = resolve;
@@ -268,7 +270,7 @@ export class Dexie implements IDexie {
         return reject(new exceptions.DatabaseClosed(this._state.dbOpenError));
       }
       if (!this._state.isBeingOpened) {
-        if (!this._options.autoOpen) {
+        if (!this._state.autoOpen) {
           reject(new exceptions.DatabaseClosed());
           return;
         }
@@ -325,9 +327,13 @@ export class Dexie implements IDexie {
   }
 
   close({disableAutoOpen} = {disableAutoOpen: true}): void {
+    const wasOpen = this.isOpen();
     this._close();
     const state = this._state;
-    if (disableAutoOpen) this._options.autoOpen = false;
+    if (disableAutoOpen) this._state.autoOpen = false;
+    else if (wasOpen && this._options.autoOpen) {
+      this._state.autoOpen = true;
+    }
     state.dbOpenError = new exceptions.DatabaseClosed();
     if (state.isBeingOpened)
       state.cancelOpen(state.dbOpenError);
