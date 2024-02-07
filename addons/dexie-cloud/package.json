@@ -88,7 +88,7 @@
     "rollup": "^4.1.4",
     "terser": "^5.20.0",
     "tslib": "*",
-    "typescript": "^4.9.4"
+    "typescript": "^5.3.3"
   },
   "dependencies": {
     "dexie-cloud-common": "^1.0.31",
