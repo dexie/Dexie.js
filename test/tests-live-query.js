@@ -725,3 +725,27 @@ promisedTest("Isolation: Explicit rw transactions do not affect live queries bef
   equal(log.length, 2, "No new emit should have been made");
   subscription.unsubscribe();
 });
+
+promisedTest("Issue 1821: liveQuery containing primaryKeys should not emit when content on one element is changed", async ()=>{
+  let log = [];
+  let signal = new Signal();
+  let subscription = liveQuery(()=>db.items.orderBy('id').primaryKeys()).subscribe(result => {
+    log.push({type: "emit", result});
+    signal.resolve(result);
+  });
+  let result = await signal.promise;
+  deepEqual(result, [1, 2, 3], "First callback should give initally populated content");
+  deepEqual(log, [{type: "emit", result: [1, 2, 3]}], "First callback should give initally populated content");
+  await db.items.update(1, {name: "A"}); // This should not emit anything since the primary key is not changed.
+  equal(log.length, 1, "No new emit should have been made");
+  await new Promise(resolve => setTimeout(resolve, 25));
+  signal = new Signal();
+  await db.items.add({id: 4}); // This should emit though.
+  await signal.promise;
+  equal(log.length, 2, "Only one extra emit should have been made");
+  deepEqual(log, [
+    {type: "emit", result: [1, 2, 3]},
+    {type: "emit", result: [1, 2, 3, 4]}
+  ], "No new emit should have been made");
+  subscription.unsubscribe();
+});
