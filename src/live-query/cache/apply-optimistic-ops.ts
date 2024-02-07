@@ -23,9 +23,9 @@ export function applyOptimisticOps(
   const { multiEntry } = index;
   const queryRange = req.query.range;
   const primaryKey = table.schema.primaryKey;
-  const extractPrimKey = primaryKey.extractKey;
-  const extractIndex = index.extractKey;
-  const extractLowLevelIndex = (index.lowLevelIndex || index).extractKey;
+  const extractPrimKey = primaryKey.extractKey!;
+  const extractIndex = index.extractKey!;
+  const extractLowLevelIndex = (index.lowLevelIndex || index).extractKey!;
 
   let finalResult = ops.reduce((result, op) => {
     let modifedResult = result;

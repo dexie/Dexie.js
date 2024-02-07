@@ -24,7 +24,6 @@ export interface TblQueryCache {
   objs: Map<string | number, object>;
   optimisticOps: DBCoreMutateRequest[];
   unsignaledParts: ObservabilitySet;
-  signalTimer?: number;
 }
 
 interface CacheEntryCommon {

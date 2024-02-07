@@ -692,3 +692,36 @@ promisedTest("RxJS compability", async ()=>{
   deepEqual(res2, [1, 2, 3, 4], "We should have get an updated mapped result");
   s.unsubscribe();
 });
+
+promisedTest("Isolation: Explicit rw transactions do not affect live queries before committed", async ()=> {
+  let log = [];
+  let signal = new Signal();
+  let subscription = liveQuery(()=>db.items.toArray()).subscribe(result => {
+    log.push({type: "emit", result});
+    signal.resolve(result);
+  });
+  let result = await signal.promise;
+  deepEqual(result, [{id:1},{id:2},{id:3}], "First callback should give initally populated content");
+  deepEqual(log, [{type: "emit", result: [{id:1},{id:2},{id:3}]}], "First callback should give initally populated content");
+  signal = new Signal();
+  await db.transaction('rw', db.items, async ()=>{
+    await db.items.add({id: 4});
+    await db.items.update(4, {name: "A"});
+    await db.items.toArray(); // Make some additional work in the transaction
+    await db.items.count(); // Make some additional work in the transaction
+    equal(log.length, 1, "No new emit should have been made yet");
+  });
+  await signal.promise;
+  deepEqual(log, [
+    {type: "emit", result: [{id:1},{id:2},{id:3}]},
+    {type: "emit", result: [{id:1},{id:2},{id:3},{id:4, name: "A"}]}
+  ], "The committed transaction should now have been made");
+  //signal = new Signal();
+  await db.transaction('rw', db.items, async (tx)=>{
+    await db.items.add({id: 5});
+    equal(log.length, 2, "No new emit should have been made");
+    tx.abort(); // Aborting the transaction should make no new emit
+  }).catch(()=>{});
+  equal(log.length, 2, "No new emit should have been made");
+  subscription.unsubscribe();
+});
