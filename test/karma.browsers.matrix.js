@@ -5,6 +5,8 @@
  * karma.browserstack.js
  */
 
+console.log("Current RUNNER_OS: " + process.env.RUNNER_OS);
+
 module.exports = {
     // On developers machines, Chrome is most likely to be installed.
     local: ['Chrome'],
@@ -12,6 +14,12 @@ module.exports = {
 
     // When browserstack cannot be used, use local Firefox.
     ciLocal: ['Firefox'],
+
+    // On Github Actions, use Firefox and Chrome local browsers (this is specific to master-3 since
+    // we've unistalled travis and want to try out github actions locally)
+    ciGHActions: process.env.RUNNER_OS === 'macOS'
+        ? ['Safari']
+        : ['Firefox', 'Chrome'],
     
     // Continous Integration on every push to master
     ci: [

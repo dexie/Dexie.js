@@ -1,0 +1,46 @@
+name: Build and Test 3x
+
+on: [push, workflow_dispatch]
+
+env:
+  #LAMBDATEST: "true" # Uncomment this line to run tests on LambdaTest instead of Browserstack
+  GH_ACTIONS: "true"
+  LT_USERNAME: ${{ secrets.LT_USERNAME }}
+  LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
+  BROWSER_STACK_USERNAME: ${{ secrets.BROWSER_STACK_USERNAME }}
+  BROWSER_STACK_ACCESS_KEY: ${{ secrets.BROWSER_STACK_ACCESS_KEY }}
+  RUNNER_OS: ${{ vars.RUNNER_OS }}
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: [ubuntu-22.04] # [ubuntu-22.04, macos-13] # macos doesnt succeed to run safari
+        TF:
+          - test
+          - addons/Dexie.Observable/test/unit
+          - addons/Dexie.Observable/test/integration
+          - addons/Dexie.Syncable/test/unit
+          - addons/Dexie.Syncable/test/integration
+          - addons/dexie-export-import/test
+          - libs/dexie-react-hooks/test
+      fail-fast: true # If one test fails, abort the rest of the tests
+      #max-parallel: 1 # At least for browserstack, this seems to be needed to avoid timeouts
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 16
+          cache: "npm"
+      - name: Install dependencies
+        run: npm install
+      - name: Build
+        run: npm run build
+      - name: Run headless test
+        uses: coactions/setup-xvfb@v1
+        with:
+          run: bash ./travis.sh
+          working-directory: ${{ matrix.TF }}

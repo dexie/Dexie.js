@@ -142,5 +142,8 @@
     "tslib": "^2.1.0",
     "typescript": "^4.3.4",
     "uglify-js": "^3.9.2"
+  },
+  "dependencies": {
+    "karma-safari-launcher": "^1.0.0"
   }
 }
