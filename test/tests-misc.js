@@ -436,7 +436,7 @@ promisedTest("Issue #1890 - BigInt64Array getting corrupted after an update", as
         id: 1,
         updated: Date.now(),
         cols: [{
-          values: new BigInt64Array([1n, 2n])
+          values: new BigInt64Array([BigInt(1), BigInt(2)])
         }]
     });
     let val = await db.foo.get(1);
