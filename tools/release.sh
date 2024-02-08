@@ -148,6 +148,7 @@ do
     n=0
     until [ $n -ge 4 ]
     do
+      pnpm build
       pnpm run test && break
       n=$[$n+1]
       printf "${addon} Tests failed\n"
