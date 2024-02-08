@@ -1,4 +1,5 @@
 import { LiveQueryContext } from '..';
+import type { Transaction } from '../../classes/transaction';
 import { getEffectiveKeys } from '../../dbcore/get-effective-keys';
 import { deepClone, delArrayItem, setByKeyPath } from '../../functions/utils';
 import DexiePromise, { PSD } from '../../helpers/promise';
@@ -8,6 +9,7 @@ import {
   DBCoreQueryResponse
 } from '../../public/types/dbcore';
 import { Middleware } from '../../public/types/middleware';
+import { obsSetsOverlap } from '../obs-sets-overlap';
 import { adjustOptimisticFromFailures } from './adjust-optimistic-request-from-failures';
 import { applyOptimisticOps } from './apply-optimistic-ops';
 import { cache } from './cache';
@@ -32,6 +34,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
           options
         ) as IDBTransaction & {
           mutatedParts?: ObservabilitySet;
+          _explicit?: boolean;
         };
         // Maintain TblQueryCache.ops array when transactions commit or abort
         if (mode === 'readwrite') {
@@ -46,13 +49,26 @@ export const cacheMiddleware: Middleware<DBCore> = {
               // Go through all tables in transaction and check if they have any optimistic updates
               for (const storeName of stores) {
                 const tblCache = cache[`idb://${dbName}/${storeName}`];
-                const table = core.table(storeName);
                 if (tblCache) {
+                  const table = core.table(storeName);
                   // Pick optimistic ops that are part of this transaction
                   const ops = tblCache.optimisticOps.filter(
                     (op) => op.trans === idbtrans
                   );
-                  if (ops.length > 0) {
+                  // Transaction was marked as _explicit in enterTransactionScope(), transaction-helpers.ts.
+                  if (idbtrans._explicit && wasCommitted && idbtrans.mutatedParts) {
+                    // Invalidate all queries that overlap with the mutated parts and signal their subscribers
+                    for (const entries of Object.values(
+                      tblCache.queries.query
+                    )) {
+                      for (const entry of entries.slice()) {
+                        if (obsSetsOverlap(entry.obsSet, idbtrans.mutatedParts)) {
+                          delArrayItem(entries, entry); // Remove the entry from the cache so it can be refreshed
+                          entry.subscribers.forEach((requery) => affectedSubscribers.add(requery));
+                        }
+                      }
+                    }
+                  } else if (ops.length > 0) {
                     // Remove them from the optimisticOps array
                     tblCache.optimisticOps = tblCache.optimisticOps.filter(
                       (op) => op.trans !== idbtrans
@@ -129,9 +145,11 @@ export const cacheMiddleware: Middleware<DBCore> = {
         const tableMW = {
           ...downTable,
           mutate(req: DBCoreMutateRequest): Promise<DBCoreMutateResponse> {
+            const trans = PSD.trans as Transaction;
             if (
               primKey.outbound || // Non-inbound tables are harded to apply optimistic updates on because we can't know primary key of results
-              PSD.trans.db._options.cache === 'disabled' // User has opted-out from caching
+              trans.db._options.cache === 'disabled' || // User has opted-out from caching
+              trans.explicit // It's an explicit write transaction being made. Don't affect cache until transaction commits.
             ) {
               // Just forward the request to the core.
               return downTable.mutate(req);
@@ -149,12 +167,12 @@ export const cacheMiddleware: Middleware<DBCore> = {
                 const reqWithResolvedKeys = {
                   ...req,
                   values: req.values.map((value, i) => {
-                    const valueWithKey = primKey.keyPath.includes('.')
+                    const valueWithKey = primKey.keyPath?.includes('.')
                       ? deepClone(value)
                       : {
                         ...value,
                       };
-                    setByKeyPath(valueWithKey, primKey.keyPath, res.results[i]);
+                    setByKeyPath(valueWithKey, primKey.keyPath, res.results![i]);
                     return valueWithKey;
                   })
                 };
@@ -163,13 +181,13 @@ export const cacheMiddleware: Middleware<DBCore> = {
                 // Signal subscribers after the observability middleware has complemented req.mutatedParts with the new keys.
                 // We must queue the task so that we get the req.mutatedParts updated by observability middleware first.
                 // If we refactor the dependency between observability middleware and this middleware we might not need to queue the task.
-                queueMicrotask(()=>signalSubscribersLazily(req.mutatedParts)); // Reason for double laziness: in user awaits put and then does another put, signal once.
+                queueMicrotask(()=>req.mutatedParts && signalSubscribersLazily(req.mutatedParts)); // Reason for double laziness: in user awaits put and then does another put, signal once.
               });
             } else {
               // Enque the operation immediately
               tblCache.optimisticOps.push(req);
               // Signal subscribers that there are mutated parts
-              signalSubscribersLazily(req.mutatedParts);
+              req.mutatedParts && signalSubscribersLazily(req.mutatedParts);
               promise.then((res) => {
                 if (res.numFailures > 0) {
                   // In case the operation failed, we need to remove it from the optimisticOps array.
@@ -178,13 +196,13 @@ export const cacheMiddleware: Middleware<DBCore> = {
                   if (adjustedReq) {
                     tblCache.optimisticOps.push(adjustedReq);
                   }
-                  signalSubscribersLazily(req.mutatedParts); // Signal the rolling back of the operation.
+                  req.mutatedParts && signalSubscribersLazily(req.mutatedParts); // Signal the rolling back of the operation.
                 }
               });
               promise.catch(()=> {
                 // In case the operation failed, we need to remove it from the optimisticOps array.
                 delArrayItem(tblCache.optimisticOps, req);
-                signalSubscribersLazily(req.mutatedParts); // Signal the rolling back of the operation.
+                req.mutatedParts && signalSubscribersLazily(req.mutatedParts); // Signal the rolling back of the operation.
               });
             }
             return promise;
@@ -192,12 +210,12 @@ export const cacheMiddleware: Middleware<DBCore> = {
           query(req: DBCoreQueryRequest): Promise<DBCoreQueryResponse> {
             if (!isCachableContext(PSD, downTable) || !isCachableRequest("query", req)) return downTable.query(req);
             const freezeResults =
-              (PSD as LiveQueryContext).trans.db._options.cache === 'immutable';
+              (PSD as LiveQueryContext).trans?.db._options.cache === 'immutable';
             const { requery, signal } = PSD as LiveQueryContext;
             let [cacheEntry, exactMatch, tblCache, container] =
               findCompatibleQuery(dbName, tableName, 'query', req);
             if (cacheEntry && exactMatch) {
-              cacheEntry.obsSet = req.obsSet; // So that optimistic result is monitored.
+              cacheEntry.obsSet = req.obsSet!; // So that optimistic result is monitored.
               // How? - because observability-middleware will track result where optimistic
               // mutations are applied and record it in the cacheEntry.
               // TODO: CHANGE THIS! The difference is resultKeys only.
@@ -216,7 +234,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
               const promise = downTable.query(req).then((res) => {
                 // Freeze or clone results
                 const result = res.result;
-                cacheEntry.res = result;
+                if (cacheEntry) cacheEntry.res = result;
                 if (freezeResults) {
                   // For performance reasons don't deep freeze.
                   // Only freeze the top-level array and its items.
@@ -242,7 +260,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                 return Promise.reject(error);
               });
               cacheEntry = {
-                obsSet: req.obsSet,
+                obsSet: req.obsSet!,
                 promise,
                 subscribers: new Set(),
                 type: 'query',
@@ -267,7 +285,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                 tblCache.queries.query[req.query.index.name || ''] = container;
               }
             }
-            subscribeToCacheEntry(cacheEntry, container, requery, signal);
+            subscribeToCacheEntry(cacheEntry, container!, requery, signal);
             return cacheEntry.promise.then((res: DBCoreQueryResponse) => {
               return {
                 result: applyOptimisticOps(
@@ -275,7 +293,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                   req,
                   tblCache?.optimisticOps,
                   downTable,
-                  cacheEntry,
+                  cacheEntry!,
                   freezeResults
                 ) as any[], // readonly any[]
               };

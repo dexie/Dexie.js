@@ -7,7 +7,7 @@ import { cache } from './cache';
 let unsignaledParts: ObservabilitySet = {};
 let isTaskEnqueued = false;
 
-export function signalSubscribersLazily(part: ObservabilitySet) {
+export function signalSubscribersLazily(part: ObservabilitySet, optimistic = false) {
   extendObservabilitySet(unsignaledParts, part);
   if (!isTaskEnqueued) {
     isTaskEnqueued = true;
@@ -15,7 +15,7 @@ export function signalSubscribersLazily(part: ObservabilitySet) {
       isTaskEnqueued = false;
       const parts = unsignaledParts;
       unsignaledParts = {};
-      signalSubscribersNow(parts);
+      signalSubscribersNow(parts, false);
     }, 0);
   }
 }
@@ -28,7 +28,7 @@ export function signalSubscribersNow(
   if (updatedParts.all) {
     // Signal all subscribers to requery.
     for (const tblCache of Object.values(cache)) {
-      signalTableSubscribersNow(
+      collectTableSubscribers(
         tblCache,
         updatedParts,
         queriesToSignal,
@@ -42,7 +42,7 @@ export function signalSubscribersNow(
         const [, dbName, tableName] = parts;
         const tblCache = cache[`idb://${dbName}/${tableName}`];
         if (tblCache)
-          signalTableSubscribersNow(
+          collectTableSubscribers(
             tblCache,
             updatedParts,
             queriesToSignal,
@@ -55,18 +55,17 @@ export function signalSubscribersNow(
   queriesToSignal.forEach((requery) => requery());
 }
 
-function signalTableSubscribersNow(
+function collectTableSubscribers(
   tblCache: TblQueryCache,
   updatedParts: ObservabilitySet,
   outQueriesToSignal: Set<() => void>,
   deleteAffectedCacheEntries: boolean
 ) {
-  const updatedEntryLists: [string, CacheEntry[]][] =
-    deleteAffectedCacheEntries && [];
+  const updatedEntryLists: [string, CacheEntry[]][] = [];
   for (const [indexName, entries] of Object.entries(tblCache.queries.query)) {
-    const filteredEntries: CacheEntry[] = deleteAffectedCacheEntries && [];
+    const filteredEntries: CacheEntry[] = [];
     for (const entry of entries) {
-      if (entry.obsSet && obsSetsOverlap(updatedParts, entry.obsSet)) {
+      if (obsSetsOverlap(updatedParts, entry.obsSet)) {
         // This query is affected by the mutation. Remove it from cache
         // and signal all subscribers to requery.
         entry.subscribers.forEach((requery) => outQueriesToSignal.add(requery));

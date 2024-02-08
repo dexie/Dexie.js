@@ -1,6 +1,6 @@
 {
   "name": "dexie",
-  "version": "4.0.1-beta.8",
+  "version": "4.0.1-beta.9",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "module": "dist/dexie.mjs",
@@ -76,7 +76,7 @@
       "# Build dist/dexie.js, dist/dexie.mjs and dist/dexie.d.ts",
       "cd src",
       "tsc [--watch 'Watching for file changes']",
-      "tsc --target es2018 --outdir ../tools/tmp/modern/src/",
+      "tsc --target es2020 --outdir ../tools/tmp/modern/src/",
       "rollup -c ../tools/build-configs/rollup.config.js",
       "rollup -c ../tools/build-configs/rollup.umd.config.js",
       "rollup -c ../tools/build-configs/rollup.modern.config.js",
