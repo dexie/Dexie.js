@@ -34,7 +34,7 @@ export function tempTransaction (
     } catch (ex) {
       if (ex.name === errnames.InvalidState && db.isOpen() && --db._state.PR1398_maxLoop > 0) {
         console.warn('Dexie: Need to reopen db');
-        db._close();
+        db.close({disableAutoOpen: false});
         return db.open().then(()=>tempTransaction(db, mode, storeNames, fn));
       }
       return rejection(ex);

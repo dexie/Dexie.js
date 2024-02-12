@@ -185,7 +185,6 @@ export class Dexie implements IDexie {
       else
         console.warn(`Another connection wants to delete database '${this.name}'. Closing db now to resume the delete request.`);
       this.close({disableAutoOpen: false});
-      this._state.openComplete = false;
       // In many web applications, it would be recommended to force window.reload()
       // when this event occurs. To do that, subscribe to the versionchange event
       // and call window.location.reload(true) if ev.newVersion > 0 (not a deletion)
@@ -318,25 +317,36 @@ export class Dexie implements IDexie {
       this.idbdb = null;
     }    
     // Reset dbReadyPromise promise:
-    state.dbReadyPromise = new Promise(resolve => {
-      state.dbReadyResolve = resolve;
-    });
-    state.openCanceller = new Promise((_, reject) => {
-      state.cancelOpen = reject;
-    });
+    if (!state.isBeingOpened) {
+      // Only if not being opened, reset these promises.
+      // Otherwise, keep them so existing promise consumers will resolve when db
+      // db is reopened later on, in case closing for purpose reopening, using {disableAutoOpen: false}.
+      state.dbReadyPromise = new Promise(resolve => {
+        state.dbReadyResolve = resolve;
+      });
+      state.openCanceller = new Promise((_, reject) => {
+        state.cancelOpen = reject;
+      });
+    }
   }
 
   close({disableAutoOpen} = {disableAutoOpen: true}): void {
-    const wasOpen = this.isOpen();
-    this._close();
     const state = this._state;
-    if (disableAutoOpen) this._state.autoOpen = false;
-    else if (wasOpen && this._options.autoOpen) {
-      this._state.autoOpen = true;
+    if (disableAutoOpen) {
+      if (state.isBeingOpened) {
+        // cancel before the call to this._close() because this._close() will recreate dbReadyPromise and openCanceller.
+        state.cancelOpen(new exceptions.DatabaseClosed());
+      }
+      this._close();
+      state.autoOpen = false;
+      state.dbOpenError = new exceptions.DatabaseClosed();
+    } else {
+      this._close();
+      state.autoOpen = this._options.autoOpen ||
+        state.isBeingOpened; // If an open call is ongoing, that same promise will resolve when db is reopend.
+      state.openComplete = false;
+      state.dbOpenError = null;
     }
-    state.dbOpenError = new exceptions.DatabaseClosed();
-    if (state.isBeingOpened)
-      state.cancelOpen(state.dbOpenError);
   }
 
   delete(): Promise<void> {
