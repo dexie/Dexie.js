@@ -126,7 +126,7 @@ export function getByKeyPath(obj, keyPath) {
     var period = keyPath.indexOf('.');
     if (period !== -1) {
         var innerObj = obj[keyPath.substr(0, period)];
-        return innerObj === undefined ? undefined : getByKeyPath(innerObj, keyPath.substr(period + 1));
+        return innerObj == null ? undefined : getByKeyPath(innerObj, keyPath.substr(period + 1));
     }
     return undefined;
 }
