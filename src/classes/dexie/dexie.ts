@@ -349,12 +349,12 @@ export class Dexie implements IDexie {
     }
   }
 
-  delete(): Promise<void> {
+  delete(closeOptions = {disableAutoOpen: true}): Promise<void> {
     const hasArguments = arguments.length > 0;
     const state = this._state;
     return new Promise((resolve, reject) => {
       const doDelete = () => {
-        this.close({disableAutoOpen: false});
+        this.close(closeOptions);
         var req = this._deps.indexedDB.deleteDatabase(this.name);
         req.onsuccess = wrap(() => {
           _onDatabaseDeleted(this._deps, this.name);
