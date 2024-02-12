@@ -90,6 +90,7 @@ export class Dexie implements IDexie {
   Collection: CollectionConstructor;
   Version: VersionConstructor;
   Transaction: TransactionConstructor;
+  static disableBfCache?: boolean;
 
   constructor(name: string, options?: DexieOptions) {
     const deps = (Dexie as any as DexieConstructor).dependencies;
