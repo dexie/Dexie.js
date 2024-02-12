@@ -8,7 +8,6 @@ import { rejection } from "../../helpers/promise";
 import { combine } from "../../functions/combine";
 import { extend, hasOwn, deepClone, keys, setByKeyPath, getByKeyPath } from "../../functions/utils";
 import { ModifyError } from "../../errors";
-import { hangsOnDeleteLargeKeyRange } from "../../globals/constants";
 import { ThenShortcut } from "../../public/types/then-shortcut";
 import { Transaction } from '../transaction';
 import { DBCoreCursor, DBCoreTransaction, DBCoreRangeType, DBCoreMutateResponse, DBCoreKeyRange } from '../../public/types/dbcore';
@@ -594,7 +593,7 @@ export class Collection implements ICollection {
       //deletingHook = ctx.table.hook.deleting.fire,
       //hasDeleteHook = deletingHook !== nop;
     if (isPlainKeyRange(ctx) &&
-      ((ctx.isPrimKey && !hangsOnDeleteLargeKeyRange) || range.type === DBCoreRangeType.Any)) // if no range, we'll use clear().
+      (ctx.isPrimKey || range.type === DBCoreRangeType.Any)) // if no range, we'll use clear().
     {
       // May use IDBObjectStore.delete(IDBKeyRange) in this case (Issue #208)
       // For chromium, this is the way most optimized version.
