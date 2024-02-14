@@ -82,6 +82,7 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         ...tokenRequest,
         otp: otp || '',
         otp_id: response.otp_id,
+        public_key
       } satisfies OTPTokenRequest2;
 
       let res2 = await fetch(`${url}/token`, {
