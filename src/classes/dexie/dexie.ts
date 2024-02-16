@@ -351,7 +351,8 @@ export class Dexie implements IDexie {
   }
 
   delete(closeOptions = {disableAutoOpen: true}): Promise<void> {
-    const hasArguments = arguments.length > 0;
+    // Prevent accidentially doing db.delete(1) when intention was to do db.[table].delete(1).
+    const hasInvalidArguments = arguments.length > 0 && typeof arguments[0] !== 'object'; 
     const state = this._state;
     return new Promise((resolve, reject) => {
       const doDelete = () => {
@@ -364,8 +365,8 @@ export class Dexie implements IDexie {
         req.onerror = eventRejectHandler(reject);
         req.onblocked = this._fireOnBlocked;
       }
-
-      if (hasArguments) throw new exceptions.InvalidArgument("Arguments not allowed in db.delete()");
+      // Prevent accidentially doing db.delete(1) when intention was to do db.[table].delete(1).
+      if (hasInvalidArguments) throw new exceptions.InvalidArgument("Invalid closeOptions argument to db.delete()");
       if (state.isBeingOpened) {
         state.dbReadyPromise.then(doDelete);
       } else {
