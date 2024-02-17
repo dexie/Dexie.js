@@ -97,7 +97,7 @@ export interface Dexie {
   
   close(closeOptions?: {disableAutoOpen: boolean}): void;
 
-  delete(): PromiseExtended<void>;
+  delete(closeOptions?: {disableAutoOpen: boolean}): PromiseExtended<void>;
 
   isOpen(): boolean;
 

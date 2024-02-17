@@ -1,4 +1,3 @@
-import { isIEOrEdge } from '../globals/constants';
 import { globalEvents, DEXIE_STORAGE_MUTATED_EVENT_NAME, STORAGE_MUTATED_DOM_EVENT_NAME } from '../globals/global-events';
 import { ObservabilitySet } from "../public/types/db-events";
 import { signalSubscribersNow } from './cache/signalSubscribers';
@@ -7,14 +6,9 @@ if (typeof dispatchEvent !== 'undefined' && typeof addEventListener !== 'undefin
   globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, updatedParts => {
     if (!propagatingLocally) {
       let event: CustomEvent<ObservabilitySet>;
-      if (isIEOrEdge) {
-        event = document.createEvent('CustomEvent');
-        event.initCustomEvent(STORAGE_MUTATED_DOM_EVENT_NAME, true, true, updatedParts);
-      } else {
-        event = new CustomEvent(STORAGE_MUTATED_DOM_EVENT_NAME, {
-          detail: updatedParts
-        });
-      }
+      event = new CustomEvent(STORAGE_MUTATED_DOM_EVENT_NAME, {
+        detail: updatedParts
+      });
       propagatingLocally = true;
       dispatchEvent(event);
       propagatingLocally = false;

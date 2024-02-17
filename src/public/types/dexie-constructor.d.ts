@@ -39,6 +39,7 @@ export interface DexieConstructor extends DexieExceptionClasses {
 
   vip<U>(scopeFunction: () => U): U;
   ignoreTransaction<U>(fn: ()=> U) : U;
+  disableBfCache?: boolean;
   liveQuery<T>(fn: () => T | Promise<T>): Observable<T>;
   extendObservabilitySet (target: ObservabilitySet, newSet: ObservabilitySet): ObservabilitySet;
   override<F> (origFunc:F, overridedFactory: (fn:any)=>any) : F; // ?

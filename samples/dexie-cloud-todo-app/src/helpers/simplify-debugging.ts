@@ -20,3 +20,4 @@ import Dexie from "dexie";
 
 //@ts-ignore
 window.Dexie = Dexie; 
+Dexie.debug = true;
