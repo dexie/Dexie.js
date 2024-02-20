@@ -16,11 +16,20 @@ export async function login(
   const origUserId = currentUser.userId;
   if (currentUser.isLoggedIn && (!hints || (!hints.email && !hints.userId))) {
     const licenseStatus = currentUser.license?.status || 'ok';
-    if (licenseStatus === 'ok' && currentUser.accessToken && (!currentUser.accessTokenExpiration || currentUser.accessTokenExpiration.getTime() > Date.now())) {
+    if (
+      licenseStatus === 'ok' &&
+      currentUser.accessToken &&
+      (!currentUser.accessTokenExpiration ||
+        currentUser.accessTokenExpiration.getTime() > Date.now())
+    ) {
       // Already authenticated according to given hints. And license is valid.
       return false;
     }
-    if (currentUser.refreshToken && (!currentUser.refreshTokenExpiration || currentUser.refreshTokenExpiration.getTime() > Date.now())) {
+    if (
+      currentUser.refreshToken &&
+      (!currentUser.refreshTokenExpiration ||
+        currentUser.refreshTokenExpiration.getTime() > Date.now())
+    ) {
       // Refresh the token
       await loadAccessToken(db);
       return false;
@@ -38,7 +47,10 @@ export async function login(
     db.cloud.userInteraction,
     hints
   );
-  if (origUserId !== UNAUTHORIZED_USER.userId && context.userId !== origUserId) {
+  if (
+    origUserId !== UNAUTHORIZED_USER.userId &&
+    context.userId !== origUserId
+  ) {
     // User was logged in before, but now logged in as another user.
     await logout(db);
   }
@@ -58,7 +70,6 @@ export async function login(
   await setCurrentUser(db, context);
   // Make sure to resync as the new login will be authorized
   // for new realms.
-  triggerSync(db, "pull");
+  triggerSync(db, 'pull');
   return context.userId !== origUserId;
 }
-
