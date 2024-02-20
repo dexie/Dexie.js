@@ -402,7 +402,10 @@ export function dexieCloud(dexie: Dexie) {
     // HERE: If requireAuth, do athentication now.
     let changedUser = false;
     if (db.cloud.options?.requireAuth) {
-      changedUser = await login(db);
+      const user = await db.getCurrentUser();
+      if (!user.isLoggedIn) {
+        changedUser = await login(db);
+      }
     }
 
     if (localSyncWorker) localSyncWorker.stop();
