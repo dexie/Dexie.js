@@ -484,7 +484,15 @@ export class Collection implements ICollection {
 
       const coreTable = ctx.table.core;
       const {outbound, extractKey} = coreTable.schema.primaryKey;
-      const limit = this.db._options.modifyChunkSize || 200;
+      let limit = 200;
+      const modifyChunkSize = this.db._options.modifyChunkSize;
+      if (modifyChunkSize) {
+        if (typeof modifyChunkSize == 'object') {
+          limit = modifyChunkSize[coreTable.name] || modifyChunkSize['*'] || 200;
+        } else {
+          limit = modifyChunkSize;
+        }
+      }
       const totalFailures = [];
       let successCount = 0;
       const failedKeys: IndexableType[] = [];
