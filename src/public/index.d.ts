@@ -26,6 +26,8 @@ import { Observable } from './types/observable';
 import { IntervalTree, RangeSetConstructor } from './types/rangeset';
 import { Dexie, TableProp } from './types/dexie';
 export type { TableProp };
+import { PropModification, PropModSpec, PropModSymbol } from './types/prop-modification';
+export { PropModification, PropModSpec, PropModSymbol };
 export * from './types/entity';
 export * from './types/entity-table';
 export { UpdateSpec } from './types/update-spec';
@@ -62,6 +64,7 @@ export function rangesOverlap(
 ): boolean;
 declare var RangeSet: RangeSetConstructor;
 export function cmp(a: any, b: any): number;
+export function replacePrefix(a: string, b: string): PropModification;
 
 /** Exporting 'Dexie' as the default export.
  **/
