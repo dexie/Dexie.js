@@ -16,6 +16,6 @@
     "downlevelIteration": true
   },
   "files": [
-    "tests-all.js"
+    "tests-all.js", "./deepEqual.js"
   ]
 }

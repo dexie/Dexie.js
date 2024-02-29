@@ -1,9 +1,10 @@
-﻿import Dexie from 'dexie';
+﻿import Dexie, {replacePrefix} from 'dexie';
 import {module, stop, start, test, asyncTest, equal, ok} from 'QUnit';
 import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unittest-utils';
+import { deepEqual } from './deepEqual';
 
 var db = new Dexie("TestDBCollection");
-db.version(1).stores({ users: "id,first,last,[foo+bar],&username,*&email,*pets" });
+db.version(1).stores({ users: "id,first,last,[foo+bar],&username,*&email,*pets,parentPath" });
 
 var User = db.users.defineClass({
     id:         Number,
@@ -633,4 +634,39 @@ promisedTest("Issue 1381: Collection.filter().primaryKeys() on virtual index", a
     const ids = await db.users.where({foo: "A"}).filter(x => true).primaryKeys();
     ok(ids.length === 1, "Theres one id there");
     equal(ids[0], 1000, "The ID is 1000");
+});
+
+promisedTest("Collection.modify() with replace", async () => {
+    await db.users.bulkAdd([
+        {id: 1000, foo: "A", parentPath: "A/B/C"},
+        {id: 1001, foo: "B", parentPath: "A/B/C"},
+        {id: 1002, foo: "C", parentPath: "A/B"}
+    ]);
+    await db.users.where('parentPath').startsWith("A/B").modify({
+        parentPath: replacePrefix("A/B", "X")
+    });
+    let users = await db.users.where('id').between(1000, 1003).toArray();
+    deepEqual(users, [
+        {id: 1000, foo: "A", parentPath: "X/C"},
+        {id: 1001, foo: "B", parentPath: "X/C"},
+        {id: 1002, foo: "C", parentPath: "X"}
+    ], "All three have moved from A/B to X");
+    await db.users.where('parentPath').startsWith("X/C").modify({
+        parentPath: replacePrefix("X/C", "Y")
+    });
+    users = await db.users.where('id').between(1000, 1003).toArray();
+    deepEqual(users, [
+        {id: 1000, foo: "A", parentPath: "Y"},
+        {id: 1001, foo: "B", parentPath: "Y"},
+        {id: 1002, foo: "C", parentPath: "X"}
+    ], "The first two have moved from X/C to Y");
+    await db.users.toCollection().modify({
+        parentPath: replacePrefix("X", "Z")
+    });
+    users = await db.users.where('id').between(1000, 1003).toArray();
+    deepEqual(users, [
+        {id: 1000, foo: "A", parentPath: "Y"},
+        {id: 1001, foo: "B", parentPath: "Y"},
+        {id: 1002, foo: "C", parentPath: "Z"}
+    ], "Omitting where-criteria will still check the prefix before replacing");
 });

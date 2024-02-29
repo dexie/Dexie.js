@@ -13,6 +13,9 @@ import './support-bfcache';
 import { liveQuery } from './live-query/live-query';
 import { Entity } from './classes/entity/Entity';
 import { cmp } from './functions/cmp';
+import { PropModification, PropModSymbol } from './helpers/prop-modification';
+import { replacePrefix } from './functions/replace-prefix';
+
 
 // Set rejectionMapper of DexiePromise so that it generally tries to map
 // DOMErrors and DOMExceptions to a DexieError instance with same name but with
@@ -27,4 +30,5 @@ export { RangeSet, mergeRanges, rangesOverlap } from "./helpers/rangeset";
 export { Dexie, liveQuery }; // Comply with public/index.d.ts.
 export { Entity };
 export { cmp };
+export { PropModSymbol, PropModification, replacePrefix };
 export default Dexie;

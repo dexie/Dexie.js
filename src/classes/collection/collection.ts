@@ -12,6 +12,8 @@ import { ThenShortcut } from "../../public/types/then-shortcut";
 import { Transaction } from '../transaction';
 import { DBCoreCursor, DBCoreTransaction, DBCoreRangeType, DBCoreMutateResponse, DBCoreKeyRange } from '../../public/types/dbcore';
 import { cmp } from "../../functions/cmp";
+import { PropModification } from "../../helpers/prop-modification";
+import { UpdateSpec } from "../../public/types/update-spec";
 
 /** class Collection
  * 
@@ -457,23 +459,28 @@ export class Collection implements ICollection {
    * https://dexie.org/docs/Collection/Collection.modify()
    * 
    **/
-  modify(changes: { [keyPath: string]: any }) : PromiseExtended<number>
-  modify(changes: (obj: any, ctx:{value: any, primKey: IndexableType}) => void | boolean): PromiseExtended<number> {
+  modify(changes: UpdateSpec<any> | ((obj: any, ctx:{value: any, primKey: IndexableType}) => void | boolean)): PromiseExtended<number> {
     var ctx = this._ctx;
     return this._write(trans => {
       var modifyer: (obj: any, ctx:{value: any, primKey: IndexableType}) => void | boolean
       if (typeof changes === 'function') {
         // Changes is a function that may update, add or delete propterties or even require a deletion the object itself (delete this.item)
-        modifyer = changes;
+        modifyer = changes as (obj: any, ctx:{value: any, primKey: IndexableType}) => void | boolean;
       } else {
         // changes is a set of {keyPath: value} and no one is listening to the updating hook.
         var keyPaths = keys(changes);
         var numKeys = keyPaths.length;
         modifyer = function (item) {
-          var anythingModified = false;
-          for (var i = 0; i < numKeys; ++i) {
-            var keyPath = keyPaths[i], val = changes[keyPath];
-            if (getByKeyPath(item, keyPath) !== val) {
+          let anythingModified = false;
+          for (let i = 0; i < numKeys; ++i) {
+            let keyPath = keyPaths[i];
+            let val = changes[keyPath];
+            let origVal = getByKeyPath(item, keyPath);
+
+            if (val instanceof PropModification) {
+              setByKeyPath(item, keyPath, val.execute(origVal));
+              anythingModified = true;
+            } else if (origVal !== val) {
               setByKeyPath(item, keyPath, val); // Adding {keyPath: undefined} means that the keyPath should be deleted. Handled by setByKeyPath
               anythingModified = true;
             }
