@@ -8,5 +8,7 @@ export class PropModification implements PropModSpec {
   [PropModSymbol]?: true;
   replacePrefix?: [string, string];
 
+  execute<T>(value: T): T;
+
   constructor(spec: PropModSpec);
 }
