@@ -7,6 +7,6 @@ const Dexie = globalThis[DexieSymbol] || (globalThis[DexieSymbol] = _Dexie);
 if (_Dexie.semVer !== Dexie.semVer) {
     throw new Error(`Two different versions of Dexie loaded in the same app: ${_Dexie.semVer} and ${Dexie.semVer}`);
 }
-const { liveQuery, mergeRanges, rangesOverlap, RangeSet, cmp, Entity } = Dexie;
-export { liveQuery, mergeRanges, rangesOverlap, RangeSet, cmp, Dexie, Entity };
+const { liveQuery, mergeRanges, rangesOverlap, RangeSet, cmp, Entity, PropModSymbol, PropModification, replacePrefix } = Dexie;
+export { liveQuery, mergeRanges, rangesOverlap, RangeSet, cmp, Dexie, Entity, PropModSymbol, PropModification, replacePrefix };
 export default Dexie;

@@ -3,6 +3,7 @@ import { Bison } from "dreambase-library/dist/typeson-simplified/Bison";
 import undefinedDef from 'dreambase-library/dist/typeson-simplified/types/undefined.js';
 import tsonBuiltinDefs from 'dreambase-library/dist/typeson-simplified/presets/builtin.js';
 import { TypeDefSet } from 'dreambase-library/dist/typeson-simplified/TypeDefSet';
+import { PropModSpec, PropModification } from 'dexie';
 
 // Since server revisions are stored in bigints, we need to handle clients without
 // bigint support to not fail when serverRevision is passed over to client.
@@ -67,7 +68,22 @@ const defs: TypeDefSet = {
             v: string;
           }) => new FakeBigInt(v) as any as bigint
         }
-      })
+      }),
+      PropModification: {
+        test: (val: any) => val instanceof PropModification,
+        replace: (propModification: any) => {
+          return {
+            $t: 'PropModification',
+            ...propModification
+          };
+        },
+        revive: ({
+          $t,
+          ...propModification
+        }: {
+          $t: 'PropModification';
+        } & PropModSpec) => new PropModification(propModification)
+      }
 };
 
 export const TSON = TypesonSimplified(tsonBuiltinDefs, defs);

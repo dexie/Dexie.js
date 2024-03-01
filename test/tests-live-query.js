@@ -1,10 +1,9 @@
 import Dexie, {liveQuery} from 'dexie';
 import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
 import {resetDatabase, supports, promisedTest, isIE} from './dexie-unittest-utils';
-import sortedJSON from "sorted-json";
 import {from} from "rxjs";
 import {map} from "rxjs/operators";
-import { deepClone } from '../src/functions/utils';
+import { deepEqual, isDeepEqual } from './deepEqual';
 
 const db = new Dexie("TestLiveQuery", {
   cache: 'immutable' // Using immutable cache in tests because it is most likely to fail if not using properly.
@@ -36,28 +35,6 @@ function objectify(map) {
     rv[name] = value;
   });
   return rv;
-}
-
-export function deepEqual(actual, expected, description) {
-  actual = JSON.parse(JSON.stringify(actual));
-  expected = JSON.parse(JSON.stringify(expected));
-  actual = sortedJSON.sortify(actual, {sortArray: false});
-  expected = sortedJSON.sortify(expected, {sortArray: false});
-  equal(JSON.stringify(actual, null, 2), JSON.stringify(expected, null, 2), description);
-}
-
-function isDeepEqual(actual, expected, allowedExtra, prevActual) {
-  actual = deepClone(actual);
-  expected = deepClone(expected)
-  if (allowedExtra) Array.isArray(allowedExtra) ? allowedExtra.forEach(key => {
-    if (actual[key]) expected[key] = deepClone(prevActual[key]);
-  }) : Object.keys(allowedExtra).forEach(key => {
-    if (actual[key]) expected[key] = deepClone(allowedExtra[key]);
-  });
-
-  actual = sortedJSON.sortify(actual, {sortArray: false});
-  expected = sortedJSON.sortify(expected, {sortArray: false});
-  return JSON.stringify(actual, null, 2) === JSON.stringify(expected, null, 2);
 }
 
 class Signal {
