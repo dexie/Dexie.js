@@ -127,6 +127,7 @@
     "karma-firefox-launcher": "^2.1.0",
     "karma-mocha-reporter": "^2.2.5",
     "karma-qunit": "^4.1.1",
+    "karma-safari-launcher": "^1.0.0",
     "qunit": "^2.10.0",
     "qunitjs": "^1.23.1",
     "rollup": "^2.40.0",
@@ -142,8 +143,5 @@
     "tslib": "^2.1.0",
     "typescript": "^4.3.4",
     "uglify-js": "^3.9.2"
-  },
-  "dependencies": {
-    "karma-safari-launcher": "^1.0.0"
   }
 }
