@@ -99,7 +99,7 @@ export function connectWebSocket(db: DexieCloudDB) {
         // Let server end query changes from last entry of same client-ID and forward.
         // If no new entries, server won't bother the client. If new entries, server sends only those
         // and the baseRev of the last from same client-ID.
-        if (userLogin) {
+        if (userLogin && db.cloud.persistedSyncState?.value) {
           return new WSObservable(
               db.cloud.options!.databaseUrl,
               db.cloud.persistedSyncState!.value!.serverRevision,
@@ -110,8 +110,8 @@ export function connectWebSocket(db: DexieCloudDB) {
               userLogin.accessToken,
               userLogin.accessTokenExpiration
             );
-          } else {
-            return from([] as WSConnectionMsg[]);
+        } else {
+          return from([] as WSConnectionMsg[]);
         }}),
       catchError((error) => {
         if (error?.name === 'TokenExpiredError') {
