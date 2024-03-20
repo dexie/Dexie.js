@@ -96,10 +96,14 @@ export function connectWebSocket(db: DexieCloudDB) {
       ),
       distinctUntilChanged(([prevUser, prevHash], [currUser, currHash]) => prevUser === currUser && prevHash === currHash ),
       switchMap(([userLogin, realmSetHash]) => {
+        if (!db.cloud.persistedSyncState?.value) {
+          // Restart the flow if persistedSyncState is not yet available.
+          return createObservable();
+        }
         // Let server end query changes from last entry of same client-ID and forward.
         // If no new entries, server won't bother the client. If new entries, server sends only those
         // and the baseRev of the last from same client-ID.
-        if (userLogin && db.cloud.persistedSyncState?.value) {
+        if (userLogin) {
           return new WSObservable(
               db.cloud.options!.databaseUrl,
               db.cloud.persistedSyncState!.value!.serverRevision,
