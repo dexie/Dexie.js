@@ -96,6 +96,10 @@ export function connectWebSocket(db: DexieCloudDB) {
       ),
       distinctUntilChanged(([prevUser, prevHash], [currUser, currHash]) => prevUser === currUser && prevHash === currHash ),
       switchMap(([userLogin, realmSetHash]) => {
+        if (!db.cloud.persistedSyncState?.value) {
+          // Restart the flow if persistedSyncState is not yet available.
+          return createObservable();
+        }
         // Let server end query changes from last entry of same client-ID and forward.
         // If no new entries, server won't bother the client. If new entries, server sends only those
         // and the baseRev of the last from same client-ID.
@@ -110,8 +114,8 @@ export function connectWebSocket(db: DexieCloudDB) {
               userLogin.accessToken,
               userLogin.accessTokenExpiration
             );
-          } else {
-            return from([] as WSConnectionMsg[]);
+        } else {
+          return from([] as WSConnectionMsg[]);
         }}),
       catchError((error) => {
         if (error?.name === 'TokenExpiredError') {
