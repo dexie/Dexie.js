@@ -14,7 +14,7 @@ import { liveQuery } from './live-query/live-query';
 import { Entity } from './classes/entity/Entity';
 import { cmp } from './functions/cmp';
 import { PropModification, PropModSymbol } from './helpers/prop-modification';
-import { replacePrefix } from './functions/replace-prefix';
+import { replacePrefix, add, remove } from './functions/propmods';
 
 
 // Set rejectionMapper of DexiePromise so that it generally tries to map
@@ -29,6 +29,6 @@ Debug.setDebug(Debug.debug, dexieStackFrameFilter);
 export { RangeSet, mergeRanges, rangesOverlap } from "./helpers/rangeset";
 export { Dexie, liveQuery }; // Comply with public/index.d.ts.
 export { Entity };
-export { cmp };
-export { PropModSymbol, PropModification, replacePrefix };
+export { cmp };
+export { PropModSymbol, PropModification, replacePrefix, add, remove };
 export default Dexie;

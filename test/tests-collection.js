@@ -1,4 +1,4 @@
-﻿import Dexie, {replacePrefix} from 'dexie';
+﻿import Dexie, {replacePrefix, add, remove} from 'dexie';
 import {module, stop, start, test, asyncTest, equal, ok} from 'QUnit';
 import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unittest-utils';
 import { deepEqual } from './deepEqual';
@@ -670,3 +670,49 @@ promisedTest("Collection.modify() with replace", async () => {
         {id: 1002, foo: "C", parentPath: "Z"}
     ], "Omitting where-criteria will still check the prefix before replacing");
 });
+
+promisedTest("Collection.modify() with add / remove", async () => {
+    await db.users.bulkAdd([
+        {id: 1100, foo: "A", age: 18, pets: ["dog", "cat"], balance: 100},
+        {id: 1101, foo: "A", age: 18, pets: ["cat", "dog"], balance: 100},
+    ]);
+
+    // Mathematical add:
+    db.users.update(1100, {
+        age: add(1)
+    });
+    await db.users.update(1100, {
+        age: add(1)
+    });
+    let user = await db.users.get(1100);
+    equal(user.age, 20, "Both add operations have taken place");
+
+    // Money transaction
+    await db.transaction('rw', db.users, ()=> {
+        db.users.update(1100, {balance: add(100)});
+        db.users.update(1101, {balance: add(-100)});
+    });
+    let [user1, user2] = await db.users.bulkGet([1100, 1101]);
+    equal(user1.balance, 200, "User 1 has 200 after transaction");
+    equal(user2.balance, 0, "User 2 has 0 after transaction");
+
+    // Add to set
+    await db.users.update(1100, { pets: add(["elephant"])});
+    user = await db.users.get(1100);
+    deepEqual(user.pets, ["cat", "dog", "elephant"], "Elephant was added and pets where sorted");
+    await db.users.update(1100, { pets: remove(["dog"])});
+    user = await db.users.get(1100);
+    deepEqual(user.pets, ["cat", "elephant"], "Dog was removed");
+
+    // Multiple operations
+    await db.users.update(1100, {
+        pets: add(["rabbit", "cow"]),
+        age: remove(1),
+        balance: add(1_000_000)
+    });
+    user = await db.users.get(1100);
+    deepEqual(user.pets, ["cat", "cow", "elephant", "rabbit"], "rabbit and cow where added");
+    equal(user.age, 19, "Age was decremented from 20 to 19");
+    equal(user.balance, 1_000_200, "Balance was increased with a million");
+});
+
