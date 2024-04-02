@@ -517,7 +517,32 @@ const mutsAndExpects = () => [
       compoundOrderBy: [{name: "A", age: 20, id: 1}],
       compoundOrderByWithAutoIncKey: [{name: "A", age: 20, id: 1}]
     }
-  ]
+  ],
+  // Check that the order is valid in the 1946-case:
+  [
+    () => db.issue1946.bulkAdd([
+      {name: "A", age: 19},
+      {name: "A", age: 19, mark: "x"},
+      {name: "C", age: 18},
+      {name: "A", age: 20, id: -1} // Override auto-increment
+    ]),
+    {
+      compoundOrderBy: [
+        {name: "A", age: 19, id: 2},
+        {name: "A", age: 19, mark: "x", id: 3}, // Even if cmp(["A",19],["A",19]) === 0, IDB orders implicitly by id.
+        {name: "A", age: 20, id: -1}, // Same here: order should implicitly be by PK last.
+        {name: "A", age: 20, id: 1},
+        {name: "C", age: 18, id: 4},
+      ],
+      compoundOrderByWithAutoIncKey: [
+        {name: "A", age: 19, id: 2},
+        {name: "A", age: 19, mark: "x", id: 3}, // Even if cmp(["A",19],["A",19]) === 0, IDB orders implicitly by id.
+        {name: "A", age: 20, id: -1}, // Same here: order should implicitly be by PK last.
+        {name: "A", age: 20, id: 1},
+        {name: "C", age: 18, id: 4},
+      ]
+    }
+  ],
 ]
 
 promisedTest("Full use case matrix", async ()=>{
