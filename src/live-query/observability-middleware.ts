@@ -45,8 +45,11 @@ export const observabilityMiddleware: Middleware<DBCore> = {
       table: (tableName) => {
         const table = core.table(tableName);
         const { schema } = table;
-        const { primaryKey } = schema;
+        const { primaryKey, indexes } = schema;
         const { extractKey, outbound } = primaryKey;
+        const indexesWithAutoIncPK = primaryKey.autoIncrement && indexes.filter(
+          (index) => index.compound && (index.keyPath as string[]).includes(primaryKey.keyPath as string)
+        );
         const tableClone: DBCoreTable = {
           ...table,
           mutate: (req) => {
@@ -117,6 +120,22 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                 // Less than 50 requests (keys truthy) (otherwise we've added full range anyway)
                 // autoincrement means we might not have got all keys until now
                 pkRangeSet.addKeys(res.results);
+                if (indexesWithAutoIncPK) {
+                  // Dexie Issue 1946:
+                  // If an auto-incremented primary key is part of a compound index,
+                  // we need to compute the resulting value of that index after inserting
+                  // the rows.
+                  indexesWithAutoIncPK.forEach(idx => {
+                    // Extract values of this compound index where primary key is not yet set:
+                    const idxVals = req.values.map(v => idx.extractKey(v));
+                    // Find the position of the primary key in the index:
+                    const pkPos = (idx.keyPath as string[]).findIndex(prop => prop === primaryKey.keyPath);
+                    // Update idxVals with the resulting primary keys to complete the index value:
+                    res.results!.forEach(pk => idxVals[pkPos] = pk);
+                    // Add the updated index to the rangeset:
+                    getRangeSet(idx.name).addKeys(idxVals);
+                  });
+                }
               }
               trans.mutatedParts = extendObservabilitySet (
                 trans.mutatedParts || {},
