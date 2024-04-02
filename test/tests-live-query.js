@@ -536,8 +536,8 @@ const mutsAndExpects = () => [
       ],
       compoundOrderByWithAutoIncKey: [
         {name: "A", age: 19, id: 2},
-        {name: "A", age: 19, mark: "x", id: 3}, // Even if cmp(["A",19],["A",19]) === 0, IDB orders implicitly by id.
-        {name: "A", age: 20, id: -1}, // Same here: order should implicitly be by PK last.
+        {name: "A", age: 19, mark: "x", id: 3},
+        {name: "A", age: 20, id: -1},
         {name: "A", age: 20, id: 1},
         {name: "C", age: 18, id: 4},
       ]
