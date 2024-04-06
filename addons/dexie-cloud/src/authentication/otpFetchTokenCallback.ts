@@ -48,11 +48,20 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         'Enter email address',
         hints?.email
       );
-      tokenRequest = {
-        email,
-        grant_type: 'otp',
-        scopes: ['ACCESS_DB'],
-      } satisfies OTPTokenRequest1;
+      if (/@demo.local$/.test(email)) {
+        tokenRequest = {
+          demo_user: email,
+          grant_type: 'demo',
+          scopes: ['ACCESS_DB'],
+          public_key
+        } satisfies DemoTokenRequest;
+      } else {
+        tokenRequest = {
+          email,
+          grant_type: 'otp',
+          scopes: ['ACCESS_DB'],
+        } satisfies OTPTokenRequest1;
+      }
     }
     const res1 = await fetch(`${url}/token`, {
       body: JSON.stringify(tokenRequest),
