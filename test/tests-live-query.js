@@ -13,7 +13,8 @@ db.version(2).stores({
     foo: "++id",
     outbound: "++,name",
     friends: "++id, name, age",
-    multiEntry: "id, *tags"
+    multiEntry: "id, *tags",
+    issue1946: "++id, [name+age], [name+age+id]"
 });
 
 db.on('populate', ()=> {
@@ -508,7 +509,40 @@ const mutsAndExpects = () => [
       multiEntry2: [3],
       multiEntry3: [{id: 2, tags: ["Apa", "x", "y"]}]
     }
-  ]
+  ],
+  // Issue https://github.com/dexie/Dexie.js/issues/1946
+  [
+    () => db.issue1946.add({name: "A", age: 20}),
+    {
+      compoundOrderBy: [{name: "A", age: 20, id: 1}],
+      compoundOrderByWithAutoIncKey: [{name: "A", age: 20, id: 1}]
+    }
+  ],
+  // Check that the order is valid in the 1946-case:
+  [
+    () => db.issue1946.bulkAdd([
+      {name: "A", age: 19},
+      {name: "A", age: 19, mark: "x"},
+      {name: "C", age: 18},
+      {name: "A", age: 20, id: -1} // Override auto-increment
+    ]),
+    {
+      compoundOrderBy: [
+        {name: "A", age: 19, id: 2},
+        {name: "A", age: 19, mark: "x", id: 3}, // Even if cmp(["A",19],["A",19]) === 0, IDB orders implicitly by id.
+        {name: "A", age: 20, id: -1}, // Same here: order should implicitly be by PK last.
+        {name: "A", age: 20, id: 1},
+        {name: "C", age: 18, id: 4},
+      ],
+      compoundOrderByWithAutoIncKey: [
+        {name: "A", age: 19, id: 2},
+        {name: "A", age: 19, mark: "x", id: 3},
+        {name: "A", age: 20, id: -1},
+        {name: "A", age: 20, id: 1},
+        {name: "C", age: 18, id: 4},
+      ]
+    }
+  ],
 ]
 
 promisedTest("Full use case matrix", async ()=>{
@@ -544,6 +578,10 @@ promisedTest("Full use case matrix", async ()=>{
     multiEntry1: () => db.multiEntry.where('tags').startsWith('A').primaryKeys(),
     multiEntry2: () => db.multiEntry.where({tags: "fooTag"}).primaryKeys(),
     multiEntry3: () => db.multiEntry.where({tags: "x"}).toArray(),
+
+    // Issue https://github.com/dexie/Dexie.js/issues/1946
+    compoundOrderBy: () => db.issue1946.orderBy('[name+age]').toArray(),
+    compoundOrderByWithAutoIncKey: () => db.issue1946.orderBy('[name+age+id]').toArray(),
   };
   const expectedInitialResults = {
     itemsToArray: [{id: 1}, {id: 2}, {id: 3}],
@@ -569,7 +607,11 @@ promisedTest("Full use case matrix", async ()=>{
 
     multiEntry1: [],
     multiEntry2: [],
-    multiEntry3: []
+    multiEntry3: [],
+
+    // Issue https://github.com/dexie/Dexie.js/issues/1946
+    compoundOrderBy: [],
+    compoundOrderByWithAutoIncKey: []
   }
   let flyingNow = 0;
   //let signal = new Signal();
