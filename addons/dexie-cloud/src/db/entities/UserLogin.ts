@@ -21,4 +21,5 @@ export interface UserLogin {
   nonExportablePrivateKey?: CryptoKey;
   publicKey?: CryptoKey;
   isLoggedIn?: boolean;
+  data?: any; // From user data
 }

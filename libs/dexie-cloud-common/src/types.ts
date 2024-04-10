@@ -73,6 +73,7 @@ export interface TokenFinalResponse {
     message: string;
     messageParams?: { [param: string]: string };
   }[];
+  data?: any;
 }
 
 export interface TokenOtpSentResponse {
