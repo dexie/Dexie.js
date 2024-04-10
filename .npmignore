@@ -11,5 +11,5 @@ bower.json
 src/
 .lambdatest
 tunnel.pid
-./tsconfig.json
-./pnpm-workspace.yaml
+tsconfig.json
+pnpm-workspace.yaml
