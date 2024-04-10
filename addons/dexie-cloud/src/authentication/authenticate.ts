@@ -139,6 +139,9 @@ export async function refreshAccessToken(
   if (response.userValidUntil != null) {
     login.license.validUntil = new Date(response.userValidUntil);
   }
+  if (response.data) {
+    login.data = response.data;
+  }
   return login;
 }
 
@@ -208,6 +211,7 @@ async function userAuthenticate(
       type: response2.userType,
       status: response2.claims.license || 'ok',
     }
+    context.data = response2.data;
     if (response2.evalDaysLeft != null) {
       context.license.evalDaysLeft = response2.evalDaysLeft;
     }
