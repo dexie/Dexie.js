@@ -100,6 +100,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
               accessTokenExpiration: refreshedLogin.accessTokenExpiration,
               claims: refreshedLogin.claims,
               license: refreshedLogin.license,
+              data: refreshedLogin.data,
             });
             // Updating $logins will trigger emission of db.cloud.currentUser observable, which
             // in turn will lead to that connectWebSocket.ts will reconnect the socket with the

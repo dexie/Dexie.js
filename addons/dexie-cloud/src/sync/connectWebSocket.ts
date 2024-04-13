@@ -136,6 +136,7 @@ export function connectWebSocket(db: DexieCloudDB) {
                 accessTokenExpiration: refreshedLogin.accessTokenExpiration,
                 claims: refreshedLogin.claims,
                 license: refreshedLogin.license,
+                data: refreshedLogin.data
               });
             }),
             switchMap(() => createObservable())
