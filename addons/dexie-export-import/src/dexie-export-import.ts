@@ -1,9 +1,9 @@
 import Dexie from 'dexie';
-import { ExportOptions, exportDB } from './export';
+import { ExportOptions, ExportProgress, exportDB } from './export';
 import { importDB, peakImportFile, ImportOptions, importInto, StaticImportOptions } from './import';
 import { DexieExportJsonMeta } from './json-structure';
 
-export { exportDB, ExportOptions};
+export { exportDB, ExportOptions, ExportProgress};
 export { importDB, importInto, peakImportFile, ImportOptions, DexieExportJsonMeta};
 
 //
