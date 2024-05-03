@@ -277,7 +277,7 @@ export function dexieCloud(dexie: Dexie) {
         ? await navigator.serviceWorker.getRegistrations()
         : [];
 
-    const initiallySynced = await db.transaction(
+    const [initiallySynced, lastSyncedRealms] = await db.transaction(
       'rw',
       db.$syncState,
       async () => {
@@ -362,7 +362,7 @@ export function dexieCloud(dexie: Dexie) {
           // Let's assign all props as the newPersistedSchems should be what we should be working with.
           Object.assign(schema, newPersistedSchema);
         }
-        return persistedSyncState?.initiallySynced;
+        return [persistedSyncState?.initiallySynced, persistedSyncState?.realms];
       }
     );
 
@@ -401,11 +401,19 @@ export function dexieCloud(dexie: Dexie) {
 
     // HERE: If requireAuth, do athentication now.
     let changedUser = false;
+    const user = await db.getCurrentUser();
     if (db.cloud.options?.requireAuth) {
-      const user = await db.getCurrentUser();
       if (!user.isLoggedIn) {
         changedUser = await login(db);
       }
+    }
+    if (user.isLoggedIn && (!lastSyncedRealms || !lastSyncedRealms.includes(user.userId!))) {
+      // User has been logged in but this is not reflected in the sync state.
+      // This can happen if page is reloaded after login but before the sync call following
+      // the login was complete.
+      // The user is to be viewed as changed becuase current syncState does not reflect the presence
+      // of the logged-in user.
+      changedUser = true; // Set changedUser to true to trigger a pull-sync later down.
     }
 
     if (localSyncWorker) localSyncWorker.stop();
