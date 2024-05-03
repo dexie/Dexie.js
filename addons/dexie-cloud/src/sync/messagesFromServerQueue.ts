@@ -1,4 +1,4 @@
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, firstValueFrom } from 'rxjs';
 import { filter, take } from 'rxjs/operators';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { WSConnectionMsg } from '../WSObservable';
@@ -73,12 +73,11 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
         // If the sync worker or service worker is syncing, wait 'til thei're done.
         // It's no need to have two channels at the same time - even though it wouldnt
         // be a problem - this is an optimization.
-        await db.cloud.syncState
-          .pipe(
-            filter(({ phase }) => phase === 'in-sync' || phase === 'error'),
-            take(1)
+        await firstValueFrom(
+          db.cloud.syncState.pipe(
+            filter(({ phase }) => phase === 'in-sync' || phase === 'error')
           )
-          .toPromise();
+        );
         console.debug('processing msg', msg);
         const persistedSyncState = db.cloud.persistedSyncState.value;
         //syncState.

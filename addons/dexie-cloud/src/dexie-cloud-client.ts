@@ -4,7 +4,7 @@ import {
   DBRealmMember,
   getDbNameFromDbUrl,
 } from 'dexie-cloud-common';
-import { BehaviorSubject, combineLatest, from, fromEvent, Subject } from 'rxjs';
+import { BehaviorSubject, combineLatest, firstValueFrom, from, fromEvent, Subject } from 'rxjs';
 import { filter, map, skip, startWith, switchMap, take } from 'rxjs/operators';
 import { login } from './authentication/login';
 import { UNAUTHORIZED_USER } from './authentication/UNAUTHORIZED_USER';
@@ -174,16 +174,15 @@ export function dexieCloud(dexie: Dexie) {
         const syncState = db.cloud.persistedSyncState.value;
         triggerSync(db, purpose);
         if (wait) {
-          const newSyncState = await db.cloud.persistedSyncState
-            .pipe(
+          const newSyncState = await firstValueFrom(
+            db.cloud.persistedSyncState.pipe(
               filter(
                 (newSyncState) =>
                   newSyncState?.timestamp != null &&
                   (!syncState || newSyncState.timestamp > syncState.timestamp!)
-              ),
-              take(1)
+              )
             )
-            .toPromise();
+          );
           if (newSyncState?.error) {
             throw new Error(`Sync error: ` + newSyncState.error);
           }
@@ -193,23 +192,20 @@ export function dexieCloud(dexie: Dexie) {
         triggerSync(db, purpose);
         if (wait) {
           console.debug('db.cloud.login() is waiting for sync completion...');
-          await from(
-            liveQuery(async () => {
-              const syncNeeded = await isSyncNeeded(db);
-              const newSyncState = await db.getPersistedSyncState();
-              if (
-                newSyncState?.timestamp !== syncState?.timestamp &&
-                newSyncState?.error
-              )
-                throw new Error(`Sync error: ` + newSyncState.error);
-              return syncNeeded;
-            })
-          )
-            .pipe(
-              filter((isNeeded) => !isNeeded),
-              take(1)
-            )
-            .toPromise();
+          await firstValueFrom(
+            from(
+              liveQuery(async () => {
+                const syncNeeded = await isSyncNeeded(db);
+                const newSyncState = await db.getPersistedSyncState();
+                if (
+                  newSyncState?.timestamp !== syncState?.timestamp &&
+                  newSyncState?.error
+                )
+                  throw new Error(`Sync error: ` + newSyncState.error);
+                return syncNeeded;
+              })
+            ).pipe(filter((isNeeded) => !isNeeded))
+          );
           console.debug(
             'Done waiting for sync completion because we have nothing to push anymore'
           );
@@ -393,10 +389,10 @@ export function dexieCloud(dexie: Dexie) {
       // with things from the database and not just the default values.
       // This is so that when db.open() completes, user should be safe
       // to subscribe to these observables and get actual data.
-      await combineLatest([
+      await firstValueFrom(combineLatest([
         currentUserEmitter.pipe(skip(1), take(1)),
         db.cloud.persistedSyncState.pipe(skip(1), take(1)),
-      ]).toPromise();
+      ]));
     }
 
     // HERE: If requireAuth, do athentication now.
