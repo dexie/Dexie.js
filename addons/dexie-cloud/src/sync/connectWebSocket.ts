@@ -1,4 +1,4 @@
-import { BehaviorSubject, from, Observable, of, throwError } from 'rxjs';
+import { BehaviorSubject, firstValueFrom, from, Observable, of, throwError } from 'rxjs';
 import {
   catchError,
   debounceTime,
@@ -39,7 +39,7 @@ async function waitAndReconnectWhenUserDoesSomething(error: Error) {
   await sleep(3000);
   // Wait til user does something (move mouse, tap, scroll, click etc)
   console.debug('waiting for someone to do something');
-  await userDoesSomething.pipe(take(1)).toPromise();
+  await firstValueFrom(userDoesSomething);
   console.debug('someone did something!');
 }
 
