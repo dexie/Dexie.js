@@ -6,6 +6,7 @@ export interface Transaction {
   db: Dexie;
   active: boolean;
   mode: IDBTransactionMode;
+  idbtrans: IDBTransaction;
   //tables: { [type: string]: Table<any, any> }; Deprecated since 2.0. Obsolete from v3.0.
   storeNames: Array<string>;
   explicit?: boolean;
