@@ -26,7 +26,8 @@
         "default": "./dist/dexie.js"
       }
     },
-    "./package.json": "./package.json"
+    "./package.json": "./package.json",
+    "./dist/dexie.mjs": "./dist/dexie.mjs"
   },
   "typings": "dist/dexie.d.ts",
   "jspm": {
