@@ -6,7 +6,7 @@
         "strictNullChecks": true,
         "outDir": "../../tools/tmp/test-typings",
         "moduleResolution": "node",
-        "lib": ["dom", "es2015"]
+        "lib": ["dom", "es2020"]
     },
     "files": [
         "test-typings.ts"
