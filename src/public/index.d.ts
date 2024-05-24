@@ -65,6 +65,8 @@ export function rangesOverlap(
 declare var RangeSet: RangeSetConstructor;
 export function cmp(a: any, b: any): number;
 export function replacePrefix(a: string, b: string): PropModification;
+export function add(num: number | bigint | any[]): PropModification;
+export function remove(num: number | bigint | any[]): PropModification;
 
 /** Exporting 'Dexie' as the default export.
  **/
