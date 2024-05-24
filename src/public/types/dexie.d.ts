@@ -50,7 +50,7 @@ export interface Dexie {
 
   open(): PromiseExtended<Dexie>;
 
-  table<T = any, TKey = IndexableType>(tableName: string): Table<T, TKey>;
+  table<T = any, TKey = IndexableType, TInsertType=T>(tableName: string): Table<T, TKey, TInsertType>;
 
   transaction<U>(
     mode: TransactionMode,

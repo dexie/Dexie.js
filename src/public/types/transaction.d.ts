@@ -16,4 +16,5 @@ export interface Transaction {
   table(tableName: string): Table<any, any>;
   table<T>(tableName: string): Table<T, any>;
   table<T, Key>(tableName: string): Table<T, Key>;
+  table<T, Key, TInsertType>(tableName: string): Table<T, Key, TInsertType>;
 }
