@@ -3,7 +3,7 @@
  * It tests Dexie.d.ts.
  */
 
-import Dexie, { IndexableType, Table, replacePrefix } from '../../dist/dexie'; // Imports the source Dexie.d.ts file
+import Dexie, { EntityTable, IndexableType, Table, replacePrefix } from '../../dist/dexie'; // Imports the source Dexie.d.ts file
 import './test-extend-dexie';
 import './test-updatespec';
 
@@ -274,4 +274,24 @@ import './test-updatespec';
     let db = new Dexie('dbname') as Dexie & {friends: Table<Friend, number>};
     
     db.friends.where({name: 'Kalle'}).modify({name: replacePrefix('K', 'C')});
+}
+
+
+{
+    // Typings for tables in both Dexie and Transaction
+    interface Friend {
+        id: number;
+        name: string;
+        age: number;
+    }
+
+    const db = new Dexie('dbname') as Dexie & {
+        friends: EntityTable<Friend, 'id'>;
+        items: Table<{id: number, name: string}, number>;
+    }
+
+    db.friends.add({name: "Foo", age: 22});
+    db.transaction('rw', db.friends, tx => {
+        tx.friends.add({name: "Bar", age: 33});
+    })
 }
