@@ -40,8 +40,15 @@ export class PropModification implements PropModSpec {
         return [...(isArray(value) ? value : []), ...term].sort();
       }
       // Mathematical addition:
-      if (typeof term === 'number') return Number(value) + term;
-      if (typeof term === 'bigint') return BigInt(value) + term;
+      if (typeof term === 'number') return (Number(value) || 0) + term; // if value is not convertible to number, return 0 + term
+      if (typeof term === 'bigint') {
+        try {
+          return BigInt(value) + term;
+        } catch {
+          return BigInt(0) + term; // Unlike Number(value) that can return NaN, BigInt(value) throws if value is not BigInt, Number or numeric string
+        }
+      }
+      throw new TypeError(`Invalid term ${term}`);
     }
 
     // remove (mathematical or set-wise)
@@ -53,7 +60,14 @@ export class PropModification implements PropModSpec {
       }        
       // Mathematical addition:
       if (typeof subtrahend === 'number') return Number(value) - subtrahend;
-      if (typeof subtrahend === 'bigint') return BigInt(value) - subtrahend;
+      if (typeof subtrahend === 'bigint') {
+        try {
+          return BigInt(value) - subtrahend;
+        } catch {
+          return BigInt(0) - subtrahend; // Unlike Number(value) that can return NaN, BigInt(value) throws if value is not BigInt, Number or numeric string
+        }
+      }
+      throw new TypeError(`Invalid subtrahend ${subtrahend}`);
     }
 
     // Replace a prefix:
