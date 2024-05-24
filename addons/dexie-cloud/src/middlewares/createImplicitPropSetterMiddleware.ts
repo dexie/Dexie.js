@@ -1,4 +1,4 @@
-import { DBCore, DBCoreTransaction, Middleware } from 'dexie';
+import Dexie, { DBCore, DBCoreTransaction, Middleware } from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { TXExpandos } from '../types/TXExpandos';
 
@@ -22,8 +22,12 @@ export function createImplicitPropSetterMiddleware(
                 return table.mutate(req);
               }
 
-              const trans = req.trans as DBCoreTransaction & TXExpandos;
+              const trans = req.trans as DBCoreTransaction & TXExpandos & IDBTransaction;
               if (db.cloud.schema?.[tableName]?.markedForSync) {
+                if (trans.mode === 'versionchange') {
+                  // Don't mutate tables marked for sync in versionchange transactions.
+                  return Promise.reject(new Dexie.UpgradeError(`Dexie Cloud Addon: Cannot upgrade or populate synced table "${tableName}". See https://dexie.org/cloud/docs/best-practices`));
+                }
                 if (req.type === 'add' || req.type === 'put') {
                   if (tableName === 'members') {
                     for (const member of req.values) {
