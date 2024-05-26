@@ -504,11 +504,11 @@ export class Collection implements ICollection {
       }
       return this.clone().primaryKeys().then(keys => {
         const criteria = isPlainKeyRange(ctx) &&
-        ctx.limit === Infinity &&
-        (typeof changes !== 'function' || changes === deleteCallback) && {
-          index: ctx.index,
-          range: ctx.range
-        };
+          ctx.limit === Infinity &&
+          (typeof changes !== 'function' || changes === deleteCallback) && {
+            index: ctx.index,
+            range: ctx.range
+          };
 
         const nextChunk = (offset: number) => {
           const count = Math.min(limit, keys.length - offset);
