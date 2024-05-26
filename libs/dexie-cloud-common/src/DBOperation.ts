@@ -34,6 +34,7 @@ export interface DBOperationCommon<PK=DBOpPrimaryKey> {
   txid?: string | null;
   userId?: string | null;
   opNo?: number;
+  isAdditionalChunk?: boolean;
 }
 export interface DBInsertOperation<PK=DBOpPrimaryKey> extends DBOperationCommon<PK> {
   type: "insert";

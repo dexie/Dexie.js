@@ -265,6 +265,10 @@ export function createMutationTrackingMiddleware({
                       txid,
                       userId,
                     };
+
+              if ('isAdditionalChunk' in req && req.isAdditionalChunk) {
+                mut.isAdditionalChunk = true;
+              }
               return keys.length > 0 || ('criteria' in req && req.criteria)
                 ? mutsTable
                     .mutate({ type: 'add', trans, values: [mut] }) // Log entry
