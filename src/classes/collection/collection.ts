@@ -74,7 +74,7 @@ export class Collection implements ICollection {
    * https://dexie.org/docs/Collection/Collection.clone()
    * 
    **/
-  clone(props?) {
+  clone(props?): this {
     var rv = Object.create(this.constructor.prototype),
       ctx = Object.create(this._ctx);
     if (props) extend(ctx, props);
@@ -87,7 +87,7 @@ export class Collection implements ICollection {
    * https://dexie.org/docs/Collection/Collection.raw()
    * 
    **/
-  raw() {
+  raw(): this {
     this._ctx.valueMapper = null;
     return this;
   }
@@ -503,6 +503,12 @@ export class Collection implements ICollection {
         }
       }
       return this.clone().primaryKeys().then(keys => {
+        const criteria = isPlainKeyRange(ctx) &&
+        ctx.limit === Infinity &&
+        (typeof changes !== 'function' || changes === deleteCallback) && {
+          index: ctx.index,
+          range: ctx.range
+        };
 
         const nextChunk = (offset: number) => {
           const count = Math.min(limit, keys.length - offset);
@@ -539,12 +545,6 @@ export class Collection implements ICollection {
                 }
               }
             }
-            const criteria = isPlainKeyRange(ctx) &&
-              ctx.limit === Infinity &&
-              (typeof changes !== 'function' || changes === deleteCallback) && {
-                index: ctx.index,
-                range: ctx.range
-              };
 
             return Promise.resolve(addValues.length > 0 &&
               coreTable.mutate({trans, type: 'add', values: addValues})
@@ -563,14 +563,16 @@ export class Collection implements ICollection {
                   values: putValues,
                   criteria,
                   changeSpec: typeof changes !== 'function'
-                    && changes
+                    && changes,
+                  isAdditionalChunk: offset > 0
                 }).then(res=>applyMutateResult(putValues.length, res))
             ).then(()=>(deleteKeys.length > 0 || (criteria && changes === deleteCallback)) &&
                 coreTable.mutate({
                   trans,
                   type: 'delete',
                   keys: deleteKeys,
-                  criteria
+                  criteria,
+                  isAdditionalChunk: offset > 0
                 }).then(res=>applyMutateResult(deleteKeys.length, res))
             ).then(()=>{
               return keys.length > offset + count && nextChunk(offset + limit);

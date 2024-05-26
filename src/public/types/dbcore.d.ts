@@ -57,6 +57,7 @@ export interface DBCorePutRequest {
     range: DBCoreKeyRange;
   };
   changeSpec?: {[keyPath: string]: any}; // Common changeSpec for each key
+  isAdditionalChunk?: boolean;
   updates?: {
     keys: any[],
     changeSpecs: {[keyPath: string]: any}[]; // changeSpec per key.  
@@ -74,6 +75,7 @@ export interface DBCoreDeleteRequest {
     index: string | null;
     range: DBCoreKeyRange;
   };
+  isAdditionalChunk?: boolean;
 }
 
 export interface DBCoreDeleteRangeRequest {
