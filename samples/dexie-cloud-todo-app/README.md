@@ -21,7 +21,7 @@ If you want to build and play with it locally, follow these steps:
 The steps above will:
 
 1. Install yarn (if you haven't already)
-2. Create a new database in the cloud *(Currently only for beta testers. You can apply for the waitlist if you're not in it already. See [Dexie Cloud page](https://dexie.org/cloud/))*.
+2. Create a new database in the cloud
 3. Install dependencies
 4. Import demo-users to your database and create a .env file that connects the ToDo app to your database.
 5. Build and start the application in local dev-mode (without a service worker).
@@ -30,11 +30,9 @@ The steps above will:
 
 Service worker is automatically disabled in dev-mode (the default for create-react-app). To enable it, the easiest way is to deploy the app:
 
-1. Fork Dexie.js (if you haven't already)
-2. Follow the instructions for using the app (see earlier in this README)
-3. `yarn deploy` (will publish the app to your gh-pages branch of the Dexie.js fork)
-4. `npx dexie-cloud whitelist https://your-github-username.github.io` (replace `your-github-username`)
-5. Voila: Go to https://your-github-username.github.io/Dexie.js/dexie-cloud-todo-app/ from your browser. This is a full installable PWA that you can add to your start screen on a mobile phone.
+1. `yarn deploy` (will publish the app to your gh-pages branch of your Dexie.js fork)
+2. `npx dexie-cloud whitelist https://your-github-username.github.io` (replace `your-github-username`)
+3. Voila: Go to https://your-github-username.github.io/Dexie.js/dexie-cloud-todo-app/ from your browser. This is a full installable PWA that you can add to your start screen on a mobile phone.
 
 You can also [follow these instructions from create-react-app](https://create-react-app.dev/docs/making-a-progressive-web-app/#offline-first-considerations) to enable service worker in dev mode.
 
