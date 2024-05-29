@@ -15,6 +15,10 @@ import { updateBaseRevs } from './updateBaseRevs';
 import { getLatestRevisionsPerTable } from './getLatestRevisionsPerTable';
 import { refreshAccessToken } from '../authentication/authenticate';
 
+const LIMIT_NUM_MESSAGES_PER_TIME = 10; // Allow a maximum of 10 messages per...
+const TIME_WINDOW = 10_000;             // ...10 seconds.
+const PAUSE_PERIOD = 1_000;             // Pause for 1 second if reached
+
 export type MessagesFromServerConsumer = ReturnType<
   typeof MessagesFromServerConsumer
 >;
@@ -25,8 +29,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
   const event = new BehaviorSubject(null);
   let isWorking = false;
 
-  let loopWarning = 0;
-  let loopDetection = [0, 0, 0, 0, 0, 0, 0, 0, 0, Date.now()];
+  let loopDetection = new Array(LIMIT_NUM_MESSAGES_PER_TIME).fill(0);
 
   event.subscribe(async () => {
     if (isWorking) return;
@@ -40,20 +43,12 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
       } finally {
         if (
           loopDetection[loopDetection.length - 1] - loopDetection[0] <
-          10000
+          TIME_WINDOW
         ) {
           // Ten loops within 10 seconds. Slow down!
-          if (Date.now() - loopWarning < 5000) {
-            // Last time we did this, we ended up here too. Wait for a minute.
-            console.warn(`Slowing down websocket loop for one minute`);
-            loopWarning = Date.now() + 60000;
-            await new Promise((resolve) => setTimeout(resolve, 60000));
-          } else {
-            // This is a one-time event. Just pause 10 seconds.
-            console.warn(`Slowing down websocket loop for 10 seconds`);
-            loopWarning = Date.now() + 10000;
-            await new Promise((resolve) => setTimeout(resolve, 10000));
-          }
+          // This is a one-time event. Just pause 10 seconds.
+          console.warn(`Slowing down websocket loop for ${PAUSE_PERIOD} milliseconds`);
+          await new Promise((resolve) => setTimeout(resolve, PAUSE_PERIOD));
         }
         isWorking = false;
         readyToServe.next(true);
