@@ -27,7 +27,7 @@
       }
     },
     "./package.json": "./package.json",
-    "./dist/dexie.mjs": "./dist/dexie.mjs"
+    "./dist/*": "./dist/*"
   },
   "typings": "dist/dexie.d.ts",
   "jspm": {
