@@ -1,5 +1,5 @@
-import Dexie, { Collection, Table } from 'dexie';
-import { TokenFinalResponse } from 'dexie-cloud-common';
+import type { TokenFinalResponse } from 'dexie-cloud-common';
+import type { LoginHints } from './DexieCloudAPI';
 
 export interface PeriodicSyncOptions {
   // The minimum interval time, in milliseconds, at which the service-worker's
@@ -11,7 +11,7 @@ export interface DexieCloudOptions {
   databaseUrl: string;
 
   // Whether to require authentication or opt-in to it using db.cloud.login()
-  requireAuth?: boolean;
+  requireAuth?: boolean | LoginHints
 
   // Whether to use service worker. Combine with registering your own service
   // worker and import "dexie-cloud-addon/dist/modern/service-worker.min.js" from it.
