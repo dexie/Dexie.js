@@ -398,8 +398,20 @@ export function dexieCloud(dexie: Dexie) {
     // HERE: If requireAuth, do athentication now.
     let changedUser = false;
     const user = await db.getCurrentUser();
-    if (db.cloud.options?.requireAuth) {
-      if (!user.isLoggedIn) {
+    const requireAuth = db.cloud.options?.requireAuth;
+    if (requireAuth) {
+      if (typeof requireAuth === 'object') {
+        // requireAuth contains login hints. Check if we already fulfil it:
+        if (
+          !user.isLoggedIn ||
+          (requireAuth.userId && user.userId !== requireAuth.userId) ||
+          (requireAuth.email && user.email !== requireAuth.email)
+        ) {
+          // If not, login the configured user:
+          changedUser = await login(db, requireAuth);
+        }
+      } else if (!user.isLoggedIn) {
+        // requireAuth is true and user is not logged in
         changedUser = await login(db);
       }
     }
