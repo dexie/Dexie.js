@@ -59,8 +59,12 @@ promisedTest('Test DexieYProvider', async () => {
   /* @type {Y.Doc} */
   let doc = row.content;
   let provider = new DexieYProvider(doc);
-  doc.getArray('arr').insert(0, ['a', 'b', 'c']);
-  await provider.whenLoaded;
+  // Await the transaction of doc manipulation to not
+  // bring down the database before it has been stored.
+  await db.transaction('rw', db.docs, () => {
+    doc.getArray('arr').insert(0, ['a', 'b', 'c']);
+  });
+  //await provider.whenLoaded;
   doc.destroy();
   db.close({disableAutoOpen: false});
   await db.open();
