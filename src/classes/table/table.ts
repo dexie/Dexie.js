@@ -20,6 +20,7 @@ import { Entity } from '../entity/Entity';
 import { UpdateSpec } from '../../public';
 import { cmp } from '../../functions/cmp';
 import { createYDocProperty } from '../../yjs/createYDocProperty';
+import { builtInDeletionTrigger } from './table-helpers';
 
 /** class Table
  * 
@@ -413,8 +414,10 @@ export class Table implements ITable<any, IndexableType> {
    **/
   delete(key: IndexableType): PromiseExtended<void> {
     return this._trans('readwrite',
-      trans => this.core.mutate({trans, type: 'delete', keys: [key]}))
-    .then(res => res.numFailures ? Promise.reject(res.failures[0]) : undefined);
+      trans => this.core.mutate({trans, type: 'delete', keys: [key]})
+        .then(res => builtInDeletionTrigger(this, [key], res))
+        .then(res => res.numFailures ? Promise.reject(res.failures[0]) : undefined));
+    ;
   }
 
   /** Table.clear()
@@ -424,8 +427,9 @@ export class Table implements ITable<any, IndexableType> {
    **/
   clear() {
     return this._trans('readwrite',
-      trans => this.core.mutate({trans, type: 'deleteRange', range: AnyRange}))
-        .then(res => res.numFailures ? Promise.reject(res.failures[0]) : undefined);
+      trans => this.core.mutate({trans, type: 'deleteRange', range: AnyRange})
+        .then(res => builtInDeletionTrigger(this, null, res)))
+      .then(res => res.numFailures ? Promise.reject(res.failures[0]) : undefined);
   }
 
   /** Table.bulkGet()
@@ -594,7 +598,8 @@ export class Table implements ITable<any, IndexableType> {
   bulkDelete(keys: ReadonlyArray<IndexableType>): PromiseExtended<void> {
     const numKeys = keys.length;
     return this._trans('readwrite', trans => {
-      return this.core.mutate({trans, type: 'delete', keys: keys as IndexableType[]});
+      return this.core.mutate({trans, type: 'delete', keys: keys as IndexableType[]})
+        .then(res => builtInDeletionTrigger(this, keys, res));
     }).then(({numFailures, lastResult, failures}) => {
       if (numFailures === 0) return lastResult;
       throw new BulkError(

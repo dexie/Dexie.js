@@ -14,6 +14,7 @@ import { DBCoreCursor, DBCoreTransaction, DBCoreRangeType, DBCoreMutateResponse,
 import { cmp } from "../../functions/cmp";
 import { PropModification } from "../../helpers/prop-modification";
 import { UpdateSpec } from "../../public/types/update-spec";
+import { builtInDeletionTrigger } from "../table/table-helpers";
 
 /** class Collection
  * 
@@ -575,19 +576,9 @@ export class Collection implements ICollection {
                   keys: deleteKeys,
                   criteria,
                   isAdditionalChunk: offset > 0
-                }).then(res=>applyMutateResult(deleteKeys.length, res))
+                }).then(res => builtInDeletionTrigger(ctx.table, deleteKeys, res))
+                .then(res => applyMutateResult(deleteKeys.length, res))
             ).then(()=>{
-              if (ctx.table.schema.yProps) {
-                // Delete related document updates. Otherwise, if a row with same ID is created
-                // again, its document would not be empty.
-                // Document providers will get notified on the main table's row deletion and destroy
-                // document. Sync of this action is outside of the Y.js scope but will be handled
-                // by the dexie cloud sync layer or equivalent sync layer.
-                return Promise.all(ctx.table.schema.yProps.map(prop => {
-                  return this.db.table(prop.updTable).where('k').anyOf(keysInChunk).delete();
-                }));
-              }
-            }).then(()=>{
               return keys.length > offset + count && nextChunk(offset + limit);
             });
           });

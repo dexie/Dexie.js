@@ -71,6 +71,9 @@ promisedTest('Test DexieYProvider', async () => {
   // Verify that we got the same data:
   deepEqual(doc.getArray('arr').toJSON(), ['a', 'b', 'c'], "Array is correct after reload");
   // Verify we have updates in the update table (this part can be deleted if implementation is changed)
-  const updates = await db.table('$docs.content_updates').toArray();
+  let updates = await db.table('$docs.content_updates').toArray();
   ok(updates.length > 0, "Got updates in update table");
+  await db.docs.clear();
+  updates = await db.table('$docs.content_updates').toArray();
+  equal(updates.length, 0, "No updates in update table after deleting document");
 });
