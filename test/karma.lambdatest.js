@@ -2,7 +2,7 @@
 const ltBrowsers = {
   remote_firefox: {
     browserName: 'firefox',
-    browserVersion: '120',
+    browserVersion: '126',
     'LT:Options': {
       platformName: 'Windows 10'
     }
