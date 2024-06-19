@@ -1,10 +1,11 @@
+import Events from '../helpers/Events';
+import { DexieEventSet } from '../public/types/dexie-event-set';
 import type {
   DexieYProvider,
   DucktypedYDoc,
-  DucktypedYObservable,
 } from '../public/types/yjs-related';
 import { throwIfDestroyed } from './docCache';
-import { observeUpdates } from './observeUpdates';
+import { observeYDocUpdates } from './observeYDocUpdates';
 
 export function DexieYProvider (doc: DucktypedYDoc): DexieYProvider {
   const { guid, collectionid: updatesTable, meta: { db, table }} =
@@ -17,24 +18,29 @@ export function DexieYProvider (doc: DucktypedYDoc): DexieYProvider {
   throwIfDestroyed(doc);
   const Y = db._options.Y;
   if (!Y) throw new Error('Y library not supplied to Dexie constructor');
-
-  const provider: DexieYProvider = new class extends (Y.Observable as new()=>DucktypedYObservable) {
-    doc = doc;
-    whenLoaded = new Promise((resolve, reject) => {
-      this.once('load', resolve);
-      this.once('error', reject);
-    });
-    whenSynced = new Promise((resolve, reject) => {
-      this.once('sync', resolve);
-      this.once('error', reject);
-    });
+  function createEvents() {
+    return Events(null, "load", "sync", "error") as DexieYProvider["on"];
+  }
+  let on = createEvents();
+  const provider = {
+    doc,
+    on,
+    off (name: string, f: Function) { on[name]?.unsubscribe(f)},
+    whenLoaded: new Promise((resolve, reject) => {
+      on('load', resolve);
+      on('error', reject);
+    }),
+    whenSynced: new Promise((resolve, reject) => {
+      on('sync', resolve);
+      on('error', reject);
+    }),
     destroy() {
       stopObserving();
-      super.destroy();
+      on = this.on = createEvents(); // Releases listeners for GC
     }
-  }
-  const stopObserving = observeUpdates(provider, doc, db, table, updatesTable, guid, Y);
+  };
+  const stopObserving = observeYDocUpdates(provider, doc, db, table, updatesTable, guid, Y);
   db.on.y.fire(provider, Y); // Allow for addons to invoke their sync- and awareness providers here.
 
   return provider;
-}  
+}

@@ -9,7 +9,7 @@ import type { EntityTable } from '../public/types/entity-table';
 import { throwIfDestroyed } from './docCache';
 import { liveQuery } from '../live-query';
 
-export function observeUpdates(
+export function observeYDocUpdates(
   provider: DexieYProvider,
   doc: DucktypedYDoc,
   db: Dexie,
@@ -50,12 +50,12 @@ export function observeUpdates(
       );
       if (initial) {
         initial = false;
-        provider.emit('load', [provider]);
+        provider.on('load').fire(provider);
         doc.emit('load', [doc]);
       }
     },
     (error) => {
-      provider.emit('error', [error]);
+      provider.on('error').fire(error);
     }
   );
 
@@ -75,7 +75,7 @@ export function observeUpdates(
         if (i === lastUpdateId - 1) ++lastUpdateId;
       })
       .catch((error) => {
-        provider.emit('error', [error]);
+        provider.on('error').fire(error);
       });
   };
 

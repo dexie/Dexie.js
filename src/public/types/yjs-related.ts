@@ -7,6 +7,8 @@
  */
 
 import { Dexie } from "./dexie";
+import { DexieEvent } from "./dexie-event";
+import { DexieEventSet } from "./dexie-event-set";
 import { EntityTable } from "./entity-table";
 import { IndexableType } from "./indexable-type";
 import { Table } from "./table";
@@ -85,9 +87,10 @@ export interface DexieYProvider<YDoc=any> {
   doc: YDoc;
   awareness?: any;
 
-  on (name: string, f: (...args: any[]) => any): void;
+  whenLoaded: Promise<any>;
+  whenSynced: Promise<any>;
+
+  on: DexieEventSet & ((name: string, f: (...args: any[]) => any) => void);
   off (name: string, f: (...args: any[]) => any): void;
-  once (name: string, f: (...args: any[]) => any): void;
-  emit (name: string, args: any[]): void;
   destroy(): void;
 }
