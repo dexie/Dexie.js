@@ -75,12 +75,13 @@ export class Version implements IVersion {
             //   u is the update data from Y.js
             //   f is a flag indicating if the update comes from this client or another.
             // Index use cases:
-            //   * Load entire document: Use index k (part of [k+i] )
-            //   * After object load, observe updates on a certain document since a given revision: Use index [k+i]
-            //   * After initial sync, observe flagged updates since a given revision: Use index [f+i]. Local updates are flagged
-            //     while remote updates are not.
+            //   * Load entire document: Use index k
+            //   * After object load, observe updates on a certain document since a given revision: Use index k or i since [k+i] is not supported before Firefox 126.
+            //   * After initial sync, observe flagged updates since a given revision: Use index i and ignore unflagged.
+            //     Could be using an index [f+i] but that wouldn't gain too much and Firefox before 126 doesnt support it.
+            //     Local updates are flagged while remote updates are not.
             //      
-            { [yProp.updTable]: '++i,[k+i],[f+i]' },
+            { [yProp.updTable]: '++i,k' },
             outSchema
           );
         }
