@@ -27,6 +27,7 @@ import { IntervalTree, RangeSetConstructor } from './types/rangeset';
 import { Dexie, TableProp } from './types/dexie';
 export type { TableProp };
 import { PropModification, PropModSpec, PropModSymbol } from './types/prop-modification';
+import { DexieYProvider, DucktypedYDoc } from './types/yjs-related';
 export { PropModification, PropModSpec, PropModSymbol };
 export * from './types/entity';
 export * from './types/entity-table';
@@ -67,6 +68,10 @@ export function cmp(a: any, b: any): number;
 export function replacePrefix(a: string, b: string): PropModification;
 export function add(num: number | bigint | any[]): PropModification;
 export function remove(num: number | bigint | any[]): PropModification;
+declare var DexieYProvider: {
+  (doc: DucktypedYDoc): DexieYProvider;
+  new (doc: DucktypedYDoc): DexieYProvider;
+}
 
 /** Exporting 'Dexie' as the default export.
  **/

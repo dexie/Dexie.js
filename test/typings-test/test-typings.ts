@@ -6,6 +6,7 @@
 import Dexie, { EntityTable, IndexableType, Table, replacePrefix } from '../../dist/dexie'; // Imports the source Dexie.d.ts file
 import './test-extend-dexie';
 import './test-updatespec';
+import * as Y from 'yjs';
 
 // constructor overloads:
 {
@@ -294,4 +295,34 @@ import './test-updatespec';
     db.transaction('rw', db.friends, tx => {
         tx.friends.add({name: "Bar", age: 33});
     })
+}
+
+{
+    // Typings for Y.Doc
+    interface TodoItem {
+        id: string;
+        title: string;
+        done: number;
+        text: Y.Doc;
+    }
+
+    const db = new Dexie('dbname', { Y }) as Dexie & {
+        todos: EntityTable<TodoItem, 'id'>;
+    };
+
+    db.version(1).stores({
+        todos: 'id, title, done, text:Y'
+    });
+
+    db.todos.add({title: "Foo", done: 0}); // Verify that Y.Doc prop is not allowed here
+
+    db.todos.get('some-id').then(item => {
+        if (!item) return;
+        // Verify that Y.Doc prop is retrieved here:
+        item.text.get('some-prop');
+
+        // Verify we can change things and put it back:
+        item.done = 1;
+        db.todos.put(item); // Yes, we could put it back despite having more props than in the InsertType.
+    });
 }

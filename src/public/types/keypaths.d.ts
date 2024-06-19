@@ -1,3 +1,5 @@
+import { DucktypedYDoc } from "./yjs-related";
+
 export type KeyPaths<T> = {
   [P in keyof T]: 
     P extends string 
@@ -6,7 +8,9 @@ export type KeyPaths<T> = {
           ? P | `${P}.${number}` | `${P}.${number}.${KeyPaths<K>}` 
           : P | `${P}.${number}`
         : T[P] extends (...args: any[]) => any // Method
-           ? never 
+          ? never
+          : T[P] extends DucktypedYDoc // circular reference + not valid in update spec or where clause
+          ? never
           : T[P] extends object 
             ? P | `${P}.${KeyPaths<T[P]>}` 
             : P 

@@ -32,6 +32,21 @@ export function createTransactionConstructor(db: Dexie) {
       chromeTransactionDurability: ChromeTransactionDurability,
       parent?: Transaction)
     {
+      let cloned = false;
+      if (mode !== 'readonly') storeNames.forEach(storeName => {
+        // Uncollapse storeName to include Y update tables in case deletion of a record - then we must also delete its Y updates.
+        const yProps = dbschema[storeName]?.yProps;
+        if (yProps) {
+          if (!cloned) {
+            storeNames = storeNames.slice(0); // Clone storeNames
+            cloned = true;
+          }
+          yProps.forEach(yProp => {
+            storeNames.push(`$${storeName}.${yProp}_updates`);
+          });
+        }
+      });
+
       this.db = db;
       this.mode = mode;
       this.storeNames = storeNames;

@@ -6,8 +6,7 @@ import { Transaction } from './transaction';
 import { WhereClause } from './where-clause';
 import { Collection } from './collection';
 import { DbSchema } from './db-schema';
-import { TableSchema } from './table-schema';
-import { DexieConstructor } from './dexie-constructor';
+import { DexieOptions } from './dexie-constructor';
 import { PromiseExtended } from './promise-extended';
 import { IndexableType } from './indexable-type';
 import { DBCore } from './dbcore';
@@ -29,6 +28,7 @@ export interface Dexie {
   readonly vip: Dexie;
 
   readonly _allTables: { [name: string]: Table<any, IndexableType> };
+  readonly _options: DexieOptions;
 
   readonly core: DBCore;
 
