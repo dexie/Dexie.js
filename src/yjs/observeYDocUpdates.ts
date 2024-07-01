@@ -80,7 +80,7 @@ export function observeYDocUpdates(
       .add({
         k: id,
         u: update,
-        f: 1, // Flag as local update (not yet synced)
+        f: 1, // Flag as local update (to be included when syncing)
       })
       .then((i: number) => {
         // Optimization (not critical): Don't query for this update to put it back into the doc.
