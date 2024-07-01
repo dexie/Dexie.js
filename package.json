@@ -77,7 +77,7 @@
       "# Build dist/dexie.js, dist/dexie.mjs and dist/dexie.d.ts",
       "cd src",
       "tsc [--watch 'Watching for file changes']",
-      "tsc --target es2020 --outdir ../tools/tmp/modern/src/",
+      "tsc --target es2021 --outdir ../tools/tmp/modern/src/",
       "rollup -c ../tools/build-configs/rollup.config.js",
       "rollup -c ../tools/build-configs/rollup.umd.config.js",
       "rollup -c ../tools/build-configs/rollup.modern.config.js",
@@ -140,6 +140,7 @@
     "terser": "^5.3.1",
     "tslib": "^2.1.0",
     "typescript": "^5.3.3",
-    "uglify-js": "^3.9.2"
+    "uglify-js": "^3.9.2",
+    "yjs": "^13.6.16"
   }
 }

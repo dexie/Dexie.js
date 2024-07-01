@@ -7,7 +7,8 @@ export function createIndexSpec(
   multi: boolean,
   auto: boolean,
   compound: boolean,
-  isPrimKey: boolean
+  isPrimKey: boolean,
+  type?: string
 ): IndexSpec {
   return {
     name,
@@ -16,7 +17,8 @@ export function createIndexSpec(
     multi,
     auto,
     compound,
-    src: (unique && !isPrimKey ? '&' : '') + (multi ? '*' : '') + (auto ? "++" : "") + nameFromKeyPath(keyPath)
+    src: (unique && !isPrimKey ? '&' : '') + (multi ? '*' : '') + (auto ? "++" : "") + nameFromKeyPath(keyPath),
+    type
   }
 }
 
