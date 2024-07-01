@@ -28,8 +28,8 @@ export const PropModSymbol: unique symbol = Symbol();
 export class PropModification implements PropModSpec {
   [PropModSymbol]?: true;
   replacePrefix?: [string, string];
-  add?: number | BigInt | Array<string | number>;
-  remove?: number | BigInt | Array<string | number>;
+  add?: number | bigint | Array<string | number>;
+  remove?: number | bigint | Array<string | number>;
 
   execute(value: any): any {
     // add (mathematical or set-wise)

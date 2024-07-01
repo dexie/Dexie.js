@@ -269,12 +269,17 @@ import * as Y from 'yjs';
         isGoodFriend: boolean;
         address: {
             city: string;
-        }
+        },
+        matrix: number[][]; // Trigger issue #2026
     }
 
     let db = new Dexie('dbname') as Dexie & {friends: Table<Friend, number>};
     
     db.friends.where({name: 'Kalle'}).modify({name: replacePrefix('K', 'C')});
+
+    // Issue #2026
+    db.friends.update(1, {"address.city": "New York"});
+    db.friends.update(2, {matrix: [[1,2]]});
 }
 
 
