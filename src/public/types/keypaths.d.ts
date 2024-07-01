@@ -28,4 +28,4 @@ export type KeyPathValue<T, PATH> = PATH extends `${infer R}.${infer S}`
     : void
   : PATH extends keyof T
   ? T[PATH]
-  : void;
+  : any;
