@@ -19,7 +19,7 @@ export interface DexieOptions {
   indexedDB?: {open: Function};
   IDBKeyRange?: {bound: Function, lowerBound: Function, upperBound: Function};
   allowEmptyDB?: boolean;
-  modifyChunkSize?: number;
+  modifyChunkSize?: number | { [key: string]: number };
   chromeTransactionDurability?: ChromeTransactionDurability;
   cache?: 'immutable' | 'cloned' | 'disabled';
 }
