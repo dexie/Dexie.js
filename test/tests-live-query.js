@@ -271,7 +271,6 @@ promisedTest("optimistic updates that eventually fail must be reverted (Issue #1
 let abbaKey = 0;
 let lastFriendId = 0;
 let barbarFriendId = 0;
-let fruitCount = 0; // A bug in Safari <= 13.1 makes it unable to count on the name index (adds 1 extra)
 const bulkFriends = [];
 for (let i=0; i<51; ++i) {
   bulkFriends.push({name: `name${i}`, age: i});
@@ -294,7 +293,7 @@ const mutsAndExpects = () => [
       itemsStartsWithAPrimKeys: [-1],
       itemsStartsWithAOffset3: [],
       itemsStartsWithAKeys: ["A"],
-      itemsStartsWithACount: fruitCount + 1
+      itemsStartsWithACount: 1
     }
   ],
   // addAuto
@@ -342,7 +341,7 @@ const mutsAndExpects = () => [
       itemsStartsWithAPrimKeys: [],
       itemsStartsWithAOffset3: [],
       itemsStartsWithAKeys: [],
-      itemsStartsWithACount: fruitCount
+      itemsStartsWithACount: 0
     }
   ],
   [
@@ -355,7 +354,7 @@ const mutsAndExpects = () => [
       itemsStartsWithAPrimKeys: [-1],
       itemsStartsWithAOffset3: [],
       itemsStartsWithAKeys: ["A"],
-      itemsStartsWithACount: fruitCount + 1
+      itemsStartsWithACount: 1
     }
   ],
   // add again
@@ -367,7 +366,7 @@ const mutsAndExpects = () => [
       itemsStartsWithAPrimKeys: [-1, 4, 6, 5],
       itemsStartsWithAOffset3: [{id: 5, name: "Assot"}], // offset 3
       itemsStartsWithAKeys: ["A", "Abbot", "Ambros", "Assot"],
-      itemsStartsWithACount: fruitCount + 4
+      itemsStartsWithACount: 4
     }
   ],
   // delete:
@@ -381,7 +380,7 @@ const mutsAndExpects = () => [
       itemsStartsWithA: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}, {id: 5, name: "Assot"}],
       itemsStartsWithAPrimKeys: [4, 6, 5],
       itemsStartsWithAKeys: ["Abbot", "Ambros", "Assot"],
-      itemsStartsWithACount: fruitCount + 3
+      itemsStartsWithACount: 3
     },
     // Allowed extras:
     // If hooks is listened to we'll get an even more correct update of the itemsStartsWithAOffset3 query
@@ -400,7 +399,7 @@ const mutsAndExpects = () => [
     }, {
       // Things that optionally can be matched in result (if no hooks specified):
       itemsStartsWithAPrimKeys: [4, 6, 5], 
-      itemsStartsWithACount: fruitCount + 3,
+      itemsStartsWithACount: 3,
       itemsStartsWithAOffset3: []
     }
   ],
@@ -413,7 +412,7 @@ const mutsAndExpects = () => [
       itemsStartsWithA: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}],
       itemsStartsWithAPrimKeys: [4, 6],
       itemsStartsWithAKeys: ["Abbot", "Ambros"],
-      itemsStartsWithACount: fruitCount + 2
+      itemsStartsWithACount: 2
     }, {
       itemsStartsWithAOffset3: [] // This is
     }
@@ -543,20 +542,24 @@ const mutsAndExpects = () => [
       ]
     }
   ],
+  // Issue 2011 / 2012
+  [
+    () => db.items.bulkPut([
+      {id: 6, name: "One"},
+      {id: 6, name: "Two"},
+      {id: 6, name: "Three"}
+    ]),
+    {
+      itemsToArray: [{id:1},{id:2},{id:3},{id:4,name:"Abbot"},{id:6,name:"Three"}],
+      itemsStartsWithA: [{id: 4, name: "Abbot"}],
+      itemsStartsWithAPrimKeys: [4],
+      itemsStartsWithAKeys: ["Abbot"],
+      itemsStartsWithACount: 1
+    }
+  ],
 ]
 
 promisedTest("Full use case matrix", async ()=>{
-  // A bug in Safari <= 13.1 makes it unable to count on the name index (adds 1 extra)
-  fruitCount = await db.items.where('name').startsWith('A').count();
-  if (fruitCount > 0) console.log("fruitCount: " + fruitCount);
-
-  if (isIE) {
-    // The IE implementation becomes shaky here.
-    // Maybe becuase we launch several parallel queries to IDB.
-    ok(true, "Skipping this test for IE - too shaky for the CI");
-    return;
-  }
-  
   const queries = {
     itemsToArray: () => db.items.toArray(),
     itemsGet1And2: () => Promise.all(db.items.get(1), db.items.get(-1)),
@@ -591,7 +594,7 @@ promisedTest("Full use case matrix", async ()=>{
     itemsStartsWithAPrimKeys: [],
     itemsStartsWithAOffset3: [],
     itemsStartsWithAKeys: [],
-    itemsStartsWithACount: fruitCount,
+    itemsStartsWithACount: 0,
 
     outboundToArray: [
       {num: 1, name: "A"},
