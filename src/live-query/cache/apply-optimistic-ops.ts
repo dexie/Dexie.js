@@ -1,9 +1,8 @@
 import { cmp } from '../../functions/cmp';
-import { deepClone, isArray } from '../../functions/utils';
-import { RangeSet, rangesOverlap } from '../../helpers/rangeset';
+import { isArray } from '../../functions/utils';
+import { RangeSet } from '../../helpers/rangeset';
 import { CacheEntry } from '../../public/types/cache';
 import {
-  DBCoreIndex,
   DBCoreMutateRequest,
   DBCoreQueryRequest,
   DBCoreTable,
@@ -29,19 +28,25 @@ export function applyOptimisticOps(
 
   let finalResult = ops.reduce((result, op) => {
     let modifedResult = result;
-    const includedValues =
-      op.type === 'add' || op.type === 'put'
-        ? op.values.filter((v) => {
-              const key = extractIndex(v);
-              return multiEntry && isArray(key) // multiEntry index work like plain index unless key is array
-                ? key.some((k) => isWithinRange(k, queryRange)) // multiEntry and array key
-                : isWithinRange(key, queryRange); // multiEntry but not array key
-            }).map(v => {
-              v = deepClone(v);// v might come from user so we can't just freeze it.
-              if (immutable) Object.freeze(v);
-              return v;
-            })
-        : [];
+    const includedValues: any[] = [];
+    if (op.type === 'add' || op.type === 'put') {
+      const includedPKs = new RangeSet(); // For ignoring duplicates
+      for (let i = op.values.length - 1; i >= 0; --i) {
+        // backwards to prioritize last value of same PK
+        const value = op.values[i];
+        const pk = extractPrimKey(value);
+        if (includedPKs.hasKey(pk)) continue;
+        const key = extractIndex(value);
+        if (
+          multiEntry && isArray(key)
+            ? key.some((k) => isWithinRange(k, queryRange))
+            : isWithinRange(key, queryRange)
+        ) {
+          includedPKs.addKey(pk);
+          includedValues.push(value);
+        }
+      }
+    }
     switch (op.type) {
       case 'add':
         modifedResult = result.concat(
@@ -55,11 +60,12 @@ export function applyOptimisticOps(
           op.values.map((v) => extractPrimKey(v))
         );
         modifedResult = result
-          .filter((item) => {
-            const key = req.values ? extractPrimKey(item) : item;
-            return !rangesOverlap(new RangeSet(key), keySet);
-          })
+          .filter(
+            // Remove all items that are being replaced
+            (item) => !keySet.hasKey(req.values ? extractPrimKey(item) : item)
+          )
           .concat(
+            // Add all items that are being put (sorting will be done later)
             req.values
               ? includedValues
               : includedValues.map((v) => extractPrimKey(v))
@@ -67,10 +73,9 @@ export function applyOptimisticOps(
         break;
       case 'delete':
         const keysToDelete = new RangeSet().addKeys(op.keys);
-        modifedResult = result.filter((item) => {
-          const key = req.values ? extractPrimKey(item) : item;
-          return !rangesOverlap(new RangeSet(key), keysToDelete);
-        });
+        modifedResult = result.filter(
+          (item) => !keysToDelete.hasKey(req.values ? extractPrimKey(item) : item)
+        );
 
         break;
       case 'deleteRange':
