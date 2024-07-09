@@ -555,7 +555,9 @@ const mutsAndExpects = () => [
       itemsStartsWithAPrimKeys: [4],
       itemsStartsWithAKeys: ["Abbot"],
       itemsStartsWithACount: 1
-    }
+    },[
+      "itemsStartsWithAOffset3" // Should not be updated but need to be ignored because otherwise it fails in dexie-syncable's integration tests that expects it to update to another empty array
+    ]
   ],
 ]
 
