@@ -90,7 +90,7 @@ importers:
         specifier: ^18.11.18
         version: 18.11.18
       dexie:
-        specifier: workspace:^3.0.2 || ^4.0.1-alpha.5
+        specifier: workspace:^3.0.2 || ^4.0.1
         version: link:../..
       eslint:
         specifier: ^7.27.0
@@ -111,7 +111,7 @@ importers:
   addons/Dexie.Syncable:
     devDependencies:
       dexie:
-        specifier: workspace:^3.0.2 || ^4.0.1-alpha.5
+        specifier: workspace:^3.0.2 || ^4.0.1
         version: link:../..
       dexie-observable:
         specifier: workspace:^
@@ -135,7 +135,7 @@ importers:
   addons/dexie-cloud:
     dependencies:
       dexie:
-        specifier: ^4.0.1-alpha.5
+        specifier: ^4.0.1
         version: link:../..
       dexie-cloud-common:
         specifier: ^1.0.31
@@ -199,7 +199,7 @@ importers:
   addons/dexie-export-import:
     dependencies:
       dexie:
-        specifier: workspace:^2.0.4 || ^3.0.0 || ^4.0.1-alpha.5
+        specifier: workspace:^2.0.4 || ^3.0.0 || ^4.0.1
         version: link:../..
     devDependencies:
       '@rollup/plugin-alias':
@@ -260,7 +260,7 @@ importers:
         specifier: ^17.0.0
         version: 17.0.17
       dexie:
-        specifier: ^3.2 || ^4.0.1-alpha
+        specifier: ^3.2 || ^4.0.1
         version: link:../..
       just-build:
         specifier: ^0.9.24
@@ -344,10 +344,10 @@ importers:
         specifier: 5.3.0
         version: 5.3.0(@popperjs/core@2.11.8)
       dexie:
-        specifier: ^4.0.1-alpha.27
+        specifier: ^4.0.7
         version: link:../..
       dexie-cloud-addon:
-        specifier: ^4.0.1-beta.48
+        specifier: ^4.0.7
         version: link:../../addons/dexie-cloud
       dexie-react-hooks:
         specifier: ^1.1.6
@@ -2313,6 +2313,7 @@ packages:
   /@humanwhocodes/config-array@0.11.13:
     resolution: {integrity: sha512-JSBDMiDKSzQVngfRjOdFXgFfklaXI4K9nLF49Auh21lmBWRLIK3+xTErTWD4KU54pb6coM6ESE7Awz/FNU3zgQ==}
     engines: {node: '>=10.10.0'}
+    deprecated: Use @eslint/config-array instead
     dependencies:
       '@humanwhocodes/object-schema': 2.0.1
       debug: 4.3.4
@@ -2343,6 +2344,7 @@ packages:
 
   /@humanwhocodes/object-schema@2.0.1:
     resolution: {integrity: sha512-dvuCeX5fC9dXgJn9t+X5atfmgQAzUOWqS1254Gh0m6i8wKd10ebXkfNKiRK+1GWi/yTvvLDHpoxLr0xxxeslWw==}
+    deprecated: Use @eslint/object-schema instead
     dev: false
 
   /@istanbuljs/load-nyc-config@1.1.0:
