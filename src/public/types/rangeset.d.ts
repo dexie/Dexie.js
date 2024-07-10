@@ -4,8 +4,8 @@ export type IntervalTree = IntervalTreeNode | EmptyRange;
 export interface IntervalTreeNode {
   from: IndexableType; // lower bound
   to: IndexableType; // upper bound
-  l: IntervalTreeNode | null; // left
-  r: IntervalTreeNode | null; // right
+  l?: IntervalTreeNode | null; // left
+  r?: IntervalTreeNode | null; // right
   d: number; // depth
 }
 export interface EmptyRange {
@@ -16,6 +16,7 @@ export interface RangeSetPrototype {
   add(rangeSet: IntervalTree | {from: IndexableType, to: IndexableType}): RangeSet;
   addKey(key: IndexableType): RangeSet;
   addKeys(keys: IndexableType[]): RangeSet;
+  hasKey(key: IndexableType): boolean;
   [Symbol.iterator](): Iterator<IntervalTreeNode, undefined, IndexableType | undefined>;
 }
 

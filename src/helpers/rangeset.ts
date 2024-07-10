@@ -48,6 +48,10 @@ props(RangeSet.prototype, {
     keys.forEach(key => addRange(this, key, key));
     return this;
   },
+  hasKey(key: IndexableType) {
+    const node = getRangeSetIterator(this).next(key).value;
+    return node && cmp(node.from, key) <= 0 && cmp(node.to, key) >= 0;
+  },
 
   [iteratorSymbol](): Iterator<IntervalTreeNode, undefined, IndexableType | undefined> {
     return getRangeSetIterator(this);
