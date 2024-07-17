@@ -149,7 +149,8 @@ export const cacheMiddleware: Middleware<DBCore> = {
             if (
               primKey.outbound || // Non-inbound tables are harded to apply optimistic updates on because we can't know primary key of results
               trans.db._options.cache === 'disabled' || // User has opted-out from caching
-              trans.explicit // It's an explicit write transaction being made. Don't affect cache until transaction commits.
+              trans.explicit || // It's an explicit write transaction being made. Don't affect cache until transaction commits.
+              trans.idbtrans.mode !== 'readwrite' // We only handle 'readwrite' in our transaction override. 'versionchange' transactions don't use cache (from populate or upgraders).
             ) {
               // Just forward the request to the core.
               return downTable.mutate(req);
