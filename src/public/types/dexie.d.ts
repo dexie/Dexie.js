@@ -114,6 +114,8 @@ export interface Dexie {
   unuse({ stack, create }: Middleware<{ stack: keyof DexieStacks }>): this;
   unuse({ stack, name }: { stack: keyof DexieStacks; name: string }): this;
 
+  gc(): Promise<void>;
+
   // Make it possible to touch physical class constructors where they reside - as properties on db instance.
   // For example, checking if (x instanceof db.Table). Can't do (x instanceof Dexie.Table because it's just a virtual interface)
   Table: { prototype: Table };

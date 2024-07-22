@@ -21,6 +21,7 @@ import { UpdateSpec } from '../../public';
 import { cmp } from '../../functions/cmp';
 import { createYDocProperty } from '../../yjs/createYDocProperty';
 import { builtInDeletionTrigger } from './table-helpers';
+import { getYLibrary } from '../../yjs/getYLibrary';
 
 /** class Table
  * 
@@ -277,8 +278,7 @@ export class Table implements ITable<any, IndexableType> {
       }
     }
     if (this.schema.yProps) {
-      const { Y } = db._options;
-      if (!Y) throw new exceptions.MissingAPI('Y library not supplied to Dexie constructor');
+      const Y = getYLibrary(db);
       constructor = class extends (constructor as any) {};
       this.schema.yProps.forEach(({prop, updTable}) => {
         Object.defineProperty(constructor.prototype, prop, createYDocProperty(db, Y, this, prop, updTable));

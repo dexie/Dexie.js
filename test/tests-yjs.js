@@ -81,3 +81,85 @@ promisedTest('Test DexieYProvider', async () => {
   updates = await db.table('$docs.content_updates').toArray();
   equal(updates.length, 0, "No updates in update table after deleting document");
 });
+
+
+promisedTest('Test Y document compression', async () => {
+  await db.docs.put({
+    id: 'doc1',
+    title: 'Hello',
+  });
+  let row = await db.docs.get('doc1');
+  let doc = row.content;
+  let provider = new DexieYProvider(doc);
+
+  // Verify there are no updates in the updates table initially:
+  const updateTable = db.docs.schema.yProps.find(
+    (p) => p.prop === 'content'
+  ).updTable;
+  equal(await db.table(updateTable).count(), 0, 'No docs stored yet');
+
+  // Create three updates:
+  await db.transaction('rw', db.docs, () => {
+    doc.getArray('arr').insert(0, ['a', 'b', 'c']);
+    doc.getArray('arr').insert(0, ['1', '2', '3']);
+    doc.getArray('arr').insert(0, ['x', 'y', 'z']);
+  });
+  // Verify we have 3 updates:
+  equal(await db.table(updateTable).count(), 3, 'Three updates stored');
+  // Run the GC:
+  await db.gc();
+  // Verify we have 1 (compressed) update:
+  equal(await db.table(updateTable).count(), 1, 'One update stored after gc');
+  // Verify the provider is still alive:
+  ok(!provider.destroyed, "Provider is not destroyed");
+  // Now clear the docs table, which should implicitly clear the updates as well as destroying connected providers:
+  await db.docs.clear();
+  // Verify there are no updates now:
+  equal(
+    await db.table(updateTable).count(),
+    0,
+    'Zero update stored after clearing docs'
+  );
+  // Verify the provider has been destroyed:
+  ok(provider.destroyed, "Provider was destroyed when document was deleted");
+});
+
+
+promisedTest('Test that syncers prohibit GC from compressing unsynced updates', async () => {
+  await db.docs.put({
+    id: 'doc1',
+    title: 'Hello',
+  });
+  let row = await db.docs.get('doc1');
+  let doc = row.content;
+  let provider = new DexieYProvider(doc);
+
+  // Verify there are no updates in the updates table initially:
+  const updateTable = db.docs.schema.yProps.find(
+    (p) => p.prop === 'content'
+  ).updTable;
+  equal(await db.table(updateTable).count(), 0, 'No docs stored yet');
+
+  // Create three updates:
+  await db.transaction('rw', db.docs, () => {
+    doc.getArray('arr').insert(0, ['a', 'b', 'c']);
+    doc.getArray('arr').insert(0, ['1', '2', '3']);
+    doc.getArray('arr').insert(0, ['x', 'y', 'z']);
+  });
+  // Verify we have 3 updates:
+  equal(await db.table(updateTable).count(), 3, 'Three updates stored');
+
+  // Put a syncer in place that will not sync the updates:
+  await db.table(updateTable).put({
+    i: "MySyncer",
+    unsentFrom: await db.table(updateTable).orderBy('i').lastKey(), // Keep the last update and updates after that from being compressed
+  });
+
+  await db.gc();
+  // Verify we have 2 updates (the first 2 was compressed but the last one was not):
+  equal(await db.table(updateTable).where('i').between(1, Infinity).count(), 2, '2 updates stored');
+  await db.docs.delete(row.id);
+  // Verify we have 0 updates after deleting the row holding our Y.Doc property:
+  equal(await db.table(updateTable).where('i').between(1, Infinity).count(), 0, '0 updates stored');
+  ok(provider.destroyed, "Provider was destroyed when our document was deleted");
+});

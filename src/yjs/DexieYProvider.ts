@@ -5,6 +5,7 @@ import type {
   DucktypedYDoc,
 } from '../public/types/yjs-related';
 import { throwIfDestroyed } from './docCache';
+import { getYLibrary } from './getYLibrary';
 import { observeYDocUpdates } from './observeYDocUpdates';
 
 export function DexieYProvider (doc: DucktypedYDoc): DexieYProvider {
@@ -16,13 +17,13 @@ export function DexieYProvider (doc: DucktypedYDoc): DexieYProvider {
     throw new Error(`Table ${table} or ${updatesTable} not found in db`);
   }
   throwIfDestroyed(doc);
-  const Y = db._options.Y;
-  if (!Y) throw new Error('Y library not supplied to Dexie constructor');
+  const Y = getYLibrary(db);
   function createEvents() {
     return Events(null, "load", "sync", "error") as DexieYProvider["on"];
   }
   let on = createEvents();
   const provider = {
+    destroyed: false,
     doc,
     on,
     off (name: string, f: Function) { on[name]?.unsubscribe(f)},
@@ -35,11 +36,13 @@ export function DexieYProvider (doc: DucktypedYDoc): DexieYProvider {
       on('error', reject);
     }),
     destroy() {
+      this.destroyed = true;
       stopObserving();
       on = this.on = createEvents(); // Releases listeners for GC
     }
   };
   const stopObserving = observeYDocUpdates(provider, doc, db, table, updatesTable, guid, Y);
+  doc.on('destroy', provider.destroy.bind(provider));
   db.on.y.fire(provider, Y); // Allow for addons to invoke their sync- and awareness providers here.
 
   return provider;

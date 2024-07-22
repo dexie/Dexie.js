@@ -83,8 +83,13 @@ export interface YUpdateRow {
   f?: number;
 }
 
+export interface YSyncer {
+  i: string;
+  unsentFrom: number;
+}
+
 export interface DexieYProvider<YDoc=any> {
-  doc: YDoc;
+  readonly doc: YDoc;
   awareness?: any;
 
   whenLoaded: Promise<any>;
@@ -93,4 +98,5 @@ export interface DexieYProvider<YDoc=any> {
   on: DexieEventSet & ((name: string, f: (...args: any[]) => any) => void);
   off (name: string, f: (...args: any[]) => any): void;
   destroy(): void;
+  readonly destroyed: boolean;
 }
