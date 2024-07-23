@@ -1,6 +1,7 @@
 import { BaseRevisionMapEntry } from './BaseRevisionMapEntry.js';
 import { DBOperationsSet } from './DBOperationsSet.js';
 import { DexieCloudSchema } from './DexieCloudSchema.js';
+import { YClientMessage } from './YMessage.js';
 
 export interface SyncRequest {
   v?: number;
@@ -14,5 +15,6 @@ export interface SyncRequest {
   };
   baseRevs: BaseRevisionMapEntry[];
   changes: DBOperationsSet;
+  y?: YClientMessage[];
   //invites: {[inviteId: string]: "accept" | "reject"}
 }

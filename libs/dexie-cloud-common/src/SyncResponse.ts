@@ -1,5 +1,6 @@
 import { DBOperationsSet } from './DBOperationsSet.js';
 import { DexieCloudSchema } from './DexieCloudSchema.js';
+import { YServerMessage } from './YMessage.js';
 
 export interface SyncResponse {
   serverRevision: string | bigint; // string "[1,\"2823\"]" in protocol version 2. bigint in version 1.
@@ -9,5 +10,6 @@ export interface SyncResponse {
   schema: DexieCloudSchema;
   changes: DBOperationsSet<string>;
   rejections: { name: string; message: string; txid: string }[];
+  yMessages: YServerMessage[];
   //invites: DBInvite[];
 }

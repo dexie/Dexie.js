@@ -26,6 +26,8 @@ import { updateBaseRevs } from './updateBaseRevs';
 import { getLatestRevisionsPerTable } from './getLatestRevisionsPerTable';
 import { applyServerChanges } from './applyServerChanges';
 import { checkSyncRateLimitDelay } from './ratelimit';
+import { listYClientMessages } from './listYClientMessages';
+import { applyYServerMessages } from './applyYMessages';
 
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 
@@ -147,13 +149,14 @@ async function _sync(
   //
   // List changes to sync
   //
-  const [clientChangeSet, syncState, baseRevs] = await db.transaction(
+  const [clientChangeSet, syncState, baseRevs, yMessages] = await db.transaction(
     'r',
     db.tables,
     async () => {
       const syncState = await db.getPersistedSyncState();
       const baseRevs = await db.$baseRevs.toArray();
       let clientChanges = await listClientChanges(mutationTables, db);
+      const yMessages = await listYClientMessages(db);
       throwIfCancelled(cancelToken);
       if (doSyncify) {
         const alreadySyncedRealms = [
@@ -168,15 +171,15 @@ async function _sync(
         );
         throwIfCancelled(cancelToken);
         clientChanges = clientChanges.concat(syncificationInserts);
-        return [clientChanges, syncState, baseRevs];
+        return [clientChanges, syncState, baseRevs, yMessages];
       }
-      return [clientChanges, syncState, baseRevs];
+      return [clientChanges, syncState, baseRevs, yMessages];
     }
   );
 
   const pushSyncIsNeeded = clientChangeSet.some((set) =>
     set.muts.some((mut) => mut.keys.length > 0)
-  );
+  ) || yMessages.length > 0;
   if (justCheckIfNeeded) {
     console.debug('Sync is needed:', pushSyncIsNeeded);
     return pushSyncIsNeeded;
@@ -199,6 +202,7 @@ async function _sync(
   throwIfCancelled(cancelToken);
   const res = await syncWithServer(
     clientChangeSet,
+    yMessages,
     syncState,
     baseRevs,
     db,
@@ -327,6 +331,11 @@ async function _sync(
     // apply server changes
     //
     await applyServerChanges(filteredChanges, db);
+
+    //
+    // apply yMessages
+    //
+    await applyYServerMessages(res.yMessages, db);
 
     //
     // Update syncState

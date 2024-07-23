@@ -27,12 +27,13 @@ import { IntervalTree, RangeSetConstructor } from './types/rangeset';
 import { Dexie, TableProp } from './types/dexie';
 export type { TableProp };
 import { PropModification, PropModSpec, PropModSymbol } from './types/prop-modification';
-import { DexieYProvider, DucktypedYDoc } from './types/yjs-related';
+import { DexieYProvider, DucktypedYDoc, YSyncer, YUpdateRow, YLastCompressed, DexieYDocMeta } from './types/yjs-related';
 export { PropModification, PropModSpec, PropModSymbol };
 export * from './types/entity';
 export * from './types/entity-table';
 export { UpdateSpec } from './types/update-spec';
 export * from './types/insert-type';
+export type { YSyncer, YUpdateRow, YLastCompressed, DexieYDocMeta };
 
 // Alias of Table and Collection in order to be able to refer them from module below...
 interface _Table<T, TKey, TInsertType> extends Table<T, TKey, TInsertType> {}
