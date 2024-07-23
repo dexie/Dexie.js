@@ -77,15 +77,37 @@ export interface DucktypedAwareness extends DucktypedYObservable {
 
 
 export interface YUpdateRow {
+  /** The primary key in the update-table
+   * 
+   */
   i: number;
+
+  /** The primary key of the row in related table holding the document property.
+   * 
+   */
   k: IndexableType;
+
+  /** The Y update
+   * 
+   */
   u: Uint8Array;
-  f?: number;
+
+  /** Optional flag
+   * 
+   * 1 = LOCAL_CHANGE_MAYBE_UNSYNCED
+   * 
+   */
+  f?: number; 
 }
 
 export interface YSyncer {
   i: string;
   unsentFrom: number;
+}
+
+export interface YLastCompressed {
+  i: 0;
+  compressedUntil: number;
 }
 
 export interface DexieYProvider<YDoc=any> {

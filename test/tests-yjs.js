@@ -105,18 +105,44 @@ promisedTest('Test Y document compression', async () => {
     doc.getArray('arr').insert(0, ['x', 'y', 'z']);
   });
   // Verify we have 3 updates:
-  equal(await db.table(updateTable).count(), 3, 'Three updates stored');
+  equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 3, 'Three updates stored');
   // Run the GC:
+  console.debug('Running GC', await db.table(updateTable).toArray());
   await db.gc();
+  console.debug('After running GC', await db.table(updateTable).toArray());
   // Verify we have 1 (compressed) update:
-  equal(await db.table(updateTable).count(), 1, 'One update stored after gc');
+  equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 1, 'One update stored after gc');
   // Verify the provider is still alive:
   ok(!provider.destroyed, "Provider is not destroyed");
+  await db.transaction('rw', db.docs, () => {
+    doc.getArray('arr').insert(0, ['a', 'b', 'c']);
+    doc.getArray('arr').insert(0, ['1', '2', '3']);
+    doc.getArray('arr').insert(0, ['x', 'y', 'z']);
+  });
+  equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 4, 'Four updates stored after additional inserts');
+  await db.gc();
+  equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 1, 'One update stored after gc');
+  await db.docs.put({
+    id: 'doc2',
+    title: 'Hello2',
+  });
+  let row2 = await db.docs.get('doc2');
+  let doc2 = row2.content;
+  await new DexieYProvider(doc2).whenLoaded;
+  await db.transaction('rw', db.docs, async () => {    
+    doc2.getArray('arr2').insert(0, ['a', 'b', 'c']);
+    doc2.getArray('arr2').insert(0, ['1', '2', '3']);
+    doc2.getArray('arr2').insert(0, ['x', 'y', 'z']);
+  });
+  equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 4, 'Four updates stored after additional inserts');
+  await db.gc();
+  equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 2, 'Two updates stored after gc (2 different docs)');
+
   // Now clear the docs table, which should implicitly clear the updates as well as destroying connected providers:
   await db.docs.clear();
   // Verify there are no updates now:
   equal(
-    await db.table(updateTable).count(),
+    await db.table(updateTable).where('i').between(1,Infinity).count(),
     0,
     'Zero update stored after clearing docs'
   );
@@ -138,7 +164,7 @@ promisedTest('Test that syncers prohibit GC from compressing unsynced updates', 
   const updateTable = db.docs.schema.yProps.find(
     (p) => p.prop === 'content'
   ).updTable;
-  equal(await db.table(updateTable).count(), 0, 'No docs stored yet');
+  equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 0, 'No docs stored yet');
 
   // Create three updates:
   await db.transaction('rw', db.docs, () => {
@@ -147,7 +173,7 @@ promisedTest('Test that syncers prohibit GC from compressing unsynced updates', 
     doc.getArray('arr').insert(0, ['x', 'y', 'z']);
   });
   // Verify we have 3 updates:
-  equal(await db.table(updateTable).count(), 3, 'Three updates stored');
+  equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 3, 'Three updates stored');
 
   // Put a syncer in place that will not sync the updates:
   await db.table(updateTable).put({
@@ -155,7 +181,9 @@ promisedTest('Test that syncers prohibit GC from compressing unsynced updates', 
     unsentFrom: await db.table(updateTable).orderBy('i').lastKey(), // Keep the last update and updates after that from being compressed
   });
 
+  console.debug('Running GC');
   await db.gc();
+  console.debug('After running GC');
   // Verify we have 2 updates (the first 2 was compressed but the last one was not):
   equal(await db.table(updateTable).where('i').between(1, Infinity).count(), 2, '2 updates stored');
   await db.docs.delete(row.id);
