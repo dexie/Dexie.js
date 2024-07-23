@@ -76,6 +76,9 @@ export interface DucktypedAwareness extends DucktypedYObservable {
 }
 
 
+/** Stored in the updates table with auto-incremented number as primary key
+ * 
+ */
 export interface YUpdateRow {
   /** The primary key in the update-table
    * 
@@ -100,14 +103,26 @@ export interface YUpdateRow {
   f?: number; 
 }
 
+/** Stored in update tables along with YUpdateRows but with a string representing the syncing enging, as primary key
+ * A syncing engine can create an YSyncer row with an unsentFrom value set to the a number representing primary key (i)
+ * of updates that has not been sent to server or peer yet. Dexie will spare all updates that occur after the least
+ * unsentFrom value in the updates table from being compressed and garbage collected into the main update.
+*/
 export interface YSyncer {
   i: string;
   unsentFrom: number;
 }
 
+/** A stamp of the last compressed and garbage collected update in the update table.
+ * The garbage collection process will find out which documents have got new updates since the last compressed update
+ * and compress them into their corresponding main update.
+ * 
+ * The id of this row is always 0 - which is a reserved id for this purpose.
+*/
 export interface YLastCompressed {
   i: 0;
-  compressedUntil: number;
+  lastCompressed: number;
+  lastRun?: Date;
 }
 
 export interface DexieYProvider<YDoc=any> {

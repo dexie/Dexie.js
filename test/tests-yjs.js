@@ -120,7 +120,9 @@ promisedTest('Test Y document compression', async () => {
     doc.getArray('arr').insert(0, ['x', 'y', 'z']);
   });
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 4, 'Four updates stored after additional inserts');
+  console.debug('Running GC', await db.table(updateTable).toArray());
   await db.gc();
+  console.debug('After running GC', await db.table(updateTable).toArray());
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 1, 'One update stored after gc');
   await db.docs.put({
     id: 'doc2',
@@ -134,12 +136,15 @@ promisedTest('Test Y document compression', async () => {
     doc2.getArray('arr2').insert(0, ['1', '2', '3']);
     doc2.getArray('arr2').insert(0, ['x', 'y', 'z']);
   });
-  equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 4, 'Four updates stored after additional inserts');
+  console.debug('After adding thigns to other doc', await db.table(updateTable).toArray());
+  equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 4, 'Four updates stored after additional inserts on other doc');
   await db.gc();
+  console.debug('After GC where we have 2 docs', await db.table(updateTable).toArray());
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 2, 'Two updates stored after gc (2 different docs)');
 
   // Now clear the docs table, which should implicitly clear the updates as well as destroying connected providers:
   await db.docs.clear();
+  console.debug('After db.docs.clear()', await db.table(updateTable).toArray());
   // Verify there are no updates now:
   equal(
     await db.table(updateTable).where('i').between(1,Infinity).count(),

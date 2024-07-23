@@ -1,14 +1,10 @@
 import { Dexie } from '../public/types/dexie';
-//import Promise from '../helpers/promise';
-import type { Table } from '../public/types/table';
 import type {
   YLastCompressed,
   YSyncer,
   YUpdateRow,
 } from '../public/types/yjs-related';
-import { PromiseExtended } from '../public/types/promise-extended';
 import { getYLibrary } from './getYLibrary';
-import { RangeSet, getRangeSetIterator } from '../helpers/rangeset';
 import { cmp } from '../functions/cmp';
 
 /** Go through all Y.Doc tables in the entire local db and compress updates
@@ -16,23 +12,21 @@ import { cmp } from '../functions/cmp';
  * @param db Dexie
  * @returns
  */
-export function compressYDocs(db: Dexie) {
-  return db.tables.reduce(
-    (promise, table) =>
-      promise.then(() =>
-        table.schema.yProps?.reduce(
-          (prom2, yProp) => prom2.then(() => compressYDocsTable(db, yProp)),
-          Promise.resolve()
-        )
-      ),
-    Promise.resolve()
-  ) as PromiseExtended<void>;
+export function compressYDocs(db: Dexie, interval?: number) {
+  let p: Promise<any> = Promise.resolve();
+  for (const table of db.tables) {
+    for (const yProp of table.schema.yProps || []) {
+      p = p.then(() => compressYDocsTable(db, yProp, interval));
+    }
+  }
+  return p;
 }
 
 /** Compress an individual Y.Doc table */
 function compressYDocsTable(
   db: Dexie,
-  { updTable }: { prop: string; updTable: string }
+  { updTable }: { prop: string; updTable: string },
+  skipIfRunnedSince?: number // milliseconds
 ) {
   const updTbl = db.table(updTable);
   return Promise.all([
@@ -41,13 +35,34 @@ function compressYDocsTable(
       .where('i')
       .startsWith('') // Syncers have string primary keys while updates have auto-incremented numbers.
       .toArray(),
+
     // lastCompressed (pointer to the last compressed update)
-    updTbl.get(0),
-  ]).then(([syncers, lastCompressed]: [YSyncer[], YLastCompressed]) => {
+    db.transaction('rw', updTable, () =>
+      updTbl.get(0).then((lastCompressed: YLastCompressed | undefined) => {
+        if (
+          lastCompressed &&
+          skipIfRunnedSince &&
+          lastCompressed.lastRun.getTime() > Date.now() - skipIfRunnedSince
+        ) {
+          // Skip it. It's still running.
+          return null;
+        }
+        // isRunning might be true but we don't respect it if started before skipIfRunningSince.
+        lastCompressed = lastCompressed || { i: 0, lastCompressed: 0 };
+        return updTbl
+          .put({
+            ...lastCompressed,
+            lastRun: new Date(),
+          })
+          .then(() => lastCompressed);
+      })
+    ),
+  ]).then(([syncers, stamp]: [YSyncer[], YLastCompressed]) => {
+    if (!stamp) return; // Skip. Already running.
+    const lastCompressedUpdate = stamp.lastCompressed;
     const unsentFrom = Math.min(
       ...syncers.map((s) => s.unsentFrom || Infinity)
     );
-    const compressedUntil = lastCompressed?.compressedUntil || 0;
     // Per updates-table:
     // 1. Find all updates after lastCompressedId. Run toArray() on them.
     // 2. IF there are any "mine" (flagged) updates AFTER unsentFrom, skip all from including this entry, else include all regardless of unsentFrom.
@@ -57,48 +72,40 @@ function compressYDocsTable(
     // 6. Update lastCompressedId to the i of the latest compressed entry.
     return updTbl
       .where('i')
-      .between(compressedUntil, Infinity, false, false)
-      .toArray()
-      .then((addedUpdates: YUpdateRow[]) => {
+      .between(lastCompressedUpdate, Infinity, false, false)
+      .toArray((addedUpdates: YUpdateRow[]) => {
         if (addedUpdates.length <= 1) return; // For sure no updates to compress if there would be only 1.
-        const docIdsToCompress = new RangeSet();
-        let lastUpdateToCompress = compressedUntil + 1;
+        const docsToCompress: { docId: any; updates: YUpdateRow[] }[] = [];
+        let lastUpdateToCompress = lastCompressedUpdate + 1;
         for (let j = 0; j < addedUpdates.length; ++j) {
-          const { i, f, k } = addedUpdates[j];
-          if (i >= unsentFrom) if (f) break; // An update that need to be synced was found. Stop here and let dontCompressFrom stay.
-          docIdsToCompress.addKey(k);
+          const updateRow = addedUpdates[j];
+          const { i, f, k } = updateRow;
+          if (i >= unsentFrom && f & 0x01) break; // An update that need to be synced was found. Stop here and let dontCompressFrom stay.
+          const entry = docsToCompress.find(
+            (entry) => cmp(entry.docId, k) === 0
+          );
+          if (entry) entry.updates.push(updateRow);
+          else docsToCompress.push({ docId: k, updates: [updateRow] });
           lastUpdateToCompress = i;
         }
-        let promise = Promise.resolve();
-        let iter = getRangeSetIterator(docIdsToCompress);
-        for (
-          let keyIterRes = iter.next();
-          !keyIterRes.done;
-          keyIterRes = iter.next()
-        ) {
-          const key = keyIterRes.value.from; // or keyIterRes.to - they are same.
-          const addedUpdatesForDoc = addedUpdates.filter(
-            (update) => cmp(update.k, key) === 0
-          );
-          if (addedUpdatesForDoc.length > 0) {
-            promise = promise.then(() =>
-              compressUpdatesForDoc(db, updTable, key, addedUpdatesForDoc)
-            );
-          }
+        let p = Promise.resolve();
+        for (const { docId, updates } of docsToCompress) {
+          p = p.then(() => compressUpdatesForDoc(db, updTable, docId, updates));
         }
-        return promise.then(() => {
+        return p.then(() => {
           // Update lastCompressed atomically to the value we computed.
           // Do it with respect to the case when another job was done in parallel
           // that maybe compressed one or more extra updates and updated lastCompressed
           // before us.
           return db.transaction('rw', updTbl, () =>
-            updTbl.get(0).then(
-              (current) =>
-                lastUpdateToCompress > current.compressedUntil &&
-                updTbl.put({
-                  i: 0,
-                  compressedUntil: lastUpdateToCompress,
-                })
+            updTbl.get(0).then((current: YLastCompressed) =>
+              updTbl.put({
+                ...current,
+                lastCompressed: Math.max(
+                  lastUpdateToCompress,
+                  current?.lastCompressed || 0
+                ),
+              })
             )
           );
         });
@@ -131,7 +138,7 @@ export function compressUpdatesForDoc(
         .put({
           i: lastUpdate.i,
           k: docRowId,
-          u: compressedUpdate
+          u: compressedUpdate,
         })
         .then(() => updTbl.bulkDelete(updates.map((update) => update.i)));
     });

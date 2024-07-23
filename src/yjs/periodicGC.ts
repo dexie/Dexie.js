@@ -11,7 +11,7 @@ export function periodicGC(db: Dexie) {
       if (db.tables.some(tbl => tbl.schema.yProps)) {
         const gc = () => {
           if (!db.isOpen()) return;
-          compressYDocs(db).catch(err => {
+          compressYDocs(db, INTERVAL).catch(err => {
             console.debug('Error during periodic GC', err);
           }).then(() => {
             timer = setTimeout(gc, INTERVAL);
