@@ -5,6 +5,7 @@ import {
   promisedTest,
 } from './dexie-unittest-utils';
 import * as Y from 'yjs';
+import * as awareness from 'y-protocols/awareness';
 
 const db = new Dexie('TestYjs', { Y });
 db.version(1).stores({
@@ -95,7 +96,7 @@ promisedTest('Test Y document compression', async () => {
   // Verify there are no updates in the updates table initially:
   const updateTable = db.docs.schema.yProps.find(
     (p) => p.prop === 'content'
-  ).updTable;
+  ).updatesTable;
   equal(await db.table(updateTable).count(), 0, 'No docs stored yet');
 
   // Create three updates:
@@ -168,14 +169,16 @@ promisedTest('Test that syncers prohibit GC from compressing unsynced updates', 
   // Verify there are no updates in the updates table initially:
   const updateTable = db.docs.schema.yProps.find(
     (p) => p.prop === 'content'
-  ).updTable;
+  ).updatesTable;
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 0, 'No docs stored yet');
 
   // Create three updates:
   await db.transaction('rw', db.docs, () => {
+    //Y.transact(doc, () => {
     doc.getArray('arr').insert(0, ['a', 'b', 'c']);
     doc.getArray('arr').insert(0, ['1', '2', '3']);
     doc.getArray('arr').insert(0, ['x', 'y', 'z']);
+    //});
   });
   // Verify we have 3 updates:
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 3, 'Three updates stored');
@@ -196,3 +199,13 @@ promisedTest('Test that syncers prohibit GC from compressing unsynced updates', 
   equal(await db.table(updateTable).where('i').between(1, Infinity).count(), 0, '0 updates stored');
   ok(provider.destroyed, "Provider was destroyed when our document was deleted");
 });
+
+
+/*promisedTest('Test awareness', async () => {
+  const doc = new Y.Doc();
+  const aw = new awareness.Awareness(doc);
+  console.log(Array.from(aw.getStates().keys()));
+  const update = awareness.encodeAwarenessUpdate(aw, Array.from(aw.getStates().keys()));
+  console.log("Update length", update.length);
+});
+*/
