@@ -52,4 +52,6 @@ export interface DexieCloudOptions {
     public_key: string;
     hints?: { userId?: string; email?: string };
   }) => Promise<TokenFinalResponse>;
+
+  awarenessProtocol?: typeof import('y-protocols/awareness');
 }

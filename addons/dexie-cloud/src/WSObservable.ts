@@ -3,12 +3,18 @@ import { BehaviorSubject, Observable, Subscriber, Subscription } from 'rxjs';
 import { TokenExpiredError } from './authentication/TokenExpiredError';
 import { DXCWebSocketStatus } from './DXCWebSocketStatus';
 import { TSON } from './TSON';
+import { YClientMessage, YServerMessage } from 'dexie-cloud-common/src/YMessage';
+import { DexieCloudDB } from './db/DexieCloudDB';
+import { createYClientUpdateObservable } from './createYClientUpdateObservable';
+import { applyYServerMessages } from './sync/applyYMessages';
+import { DexieYProvider } from 'dexie';
+import { getAwarenessLibrary, getDocAwareness } from './y-manager';
 
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;
 const FAIL_RETRY_WAIT_TIME = 60000;
 
-export type WSClientToServerMsg = ReadyForChangesMessage;
+export type WSClientToServerMsg = ReadyForChangesMessage | YClientMessage;
 export interface ReadyForChangesMessage {
   type: 'ready';
   realmSetHash: string;
@@ -73,7 +79,7 @@ export interface TokenExpiredMessage {
 
 export class WSObservable extends Observable<WSConnectionMsg> {
   constructor(
-    databaseUrl: string,
+    db: DexieCloudDB,
     rev: string,
     realmSetHash: string,
     clientIdentity: string,
@@ -85,7 +91,7 @@ export class WSObservable extends Observable<WSConnectionMsg> {
     super(
       (subscriber) =>
         new WSConnection(
-          databaseUrl,
+          db,
           rev,
           realmSetHash,
           clientIdentity,
@@ -102,6 +108,7 @@ export class WSObservable extends Observable<WSConnectionMsg> {
 let counter = 0;
 
 export class WSConnection extends Subscription {
+  db: DexieCloudDB;
   ws: WebSocket | null;
   lastServerActivity: Date;
   lastUserActivity: Date;
@@ -119,10 +126,10 @@ export class WSConnection extends Subscription {
   id = ++counter;
 
   private pinger: any;
-  private messageProducerSubscription: null | Subscription;
+  private subscriptions: Set<Subscription> = new Set();
 
   constructor(
-    databaseUrl: string,
+    db: DexieCloudDB,
     rev: string,
     realmSetHash: string,
     clientIdentity: string,
@@ -138,7 +145,8 @@ export class WSConnection extends Subscription {
       this.id,
       token ? 'authorized' : 'unauthorized'
     );
-    this.databaseUrl = databaseUrl;
+    this.db = db;
+    this.databaseUrl = db.cloud.options!.databaseUrl;
     this.rev = rev;
     this.realmSetHash = realmSetHash;
     this.clientIdentity = clientIdentity;
@@ -147,7 +155,6 @@ export class WSConnection extends Subscription {
     this.subscriber = subscriber;
     this.lastUserActivity = new Date();
     this.messageProducer = messageProducer;
-    this.messageProducerSubscription = null;
     this.webSocketStatus = webSocketStatus;
     this.connect();
   }
@@ -169,10 +176,10 @@ export class WSConnection extends Subscription {
       } catch {}
     }
     this.ws = null;
-    if (this.messageProducerSubscription) {
-      this.messageProducerSubscription.unsubscribe();
-      this.messageProducerSubscription = null;
+    for (const sub of this.subscriptions) {
+      sub.unsubscribe();
     }
+    this.subscriptions.clear();
   }
 
   reconnecting = false;
@@ -290,14 +297,29 @@ export class WSConnection extends Subscription {
         const msg = TSON.parse(event.data) as
           | WSConnectionMsg
           | PongMessage
-          | ErrorMessage;
+          | ErrorMessage
+          | YServerMessage;
         if (msg.type === 'error') {
           throw new Error(`Error message from dexie-cloud: ${msg.error}`);
-        }
-        if (msg.type === 'rev') {
+        } else if (msg.type === 'rev') {
           this.rev = msg.rev; // No meaning but seems reasonable.
-        }
-        if (msg.type !== 'pong') {
+        } else if (msg.type === 'aware') {
+          const docCache = DexieYProvider.getDocCache(this.db.dx);
+          const doc = docCache.find(msg.utbl, msg.k);
+          if (doc) {
+            const awareness = getDocAwareness(doc);
+            if (awareness) {
+              const awap = getAwarenessLibrary(this.db);
+              awap.applyAwarenessUpdate(
+                awareness,
+                msg.u,
+                'server',
+              );
+            }
+          }
+        } else  if (msg.type === 'u-ack' || msg.type === 'u-reject' || msg.type === 'u-s') {
+          applyYServerMessages([msg], this.db);
+        } else if (msg.type !== 'pong') {
           this.subscriber.next(msg);
         }
       } catch (e) {
@@ -324,7 +346,7 @@ export class WSConnection extends Subscription {
           }
         };
       });
-      this.messageProducerSubscription = this.messageProducer.subscribe(
+      this.subscriptions.add(this.messageProducer.subscribe(
         (msg) => {
           if (!this.closed) {
             if (
@@ -336,9 +358,15 @@ export class WSConnection extends Subscription {
             this.ws?.send(TSON.stringify(msg));
           }
         }
+      ));
+      this.subscriptions.add(
+        createYClientUpdateObservable(this.db).subscribe(
+          this.db.messageProducer
+        )
       );
     } catch (error) {
       this.pauseUntil = new Date(Date.now() + FAIL_RETRY_WAIT_TIME);
     }
   }
 }
+

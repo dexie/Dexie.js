@@ -23,7 +23,7 @@ export async function applyYServerMessages(
             | undefined;
           await tx.table(m.utbl).put(DEXIE_CLOUD_SYNCER_ID, {
             ...(syncer || { i: DEXIE_CLOUD_SYNCER_ID }),
-            unsentFrom: Math.max(syncer?.unsentFrom || 0, m.i + 1),
+            unsentFrom: Math.max(syncer?.unsentFrom || 1, m.i + 1),
           } as YSyncer);
         });
         break;

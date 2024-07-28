@@ -14,7 +14,6 @@ import { DexieCloudOptions } from './DexieCloudOptions';
 import { DISABLE_SERVICEWORKER_STRATEGY } from './DISABLE_SERVICEWORKER_STRATEGY';
 import './extend-dexie-interface';
 import { DexieCloudSyncOptions } from './DexieCloudSyncOptions';
-import { dbOnClosed } from './helpers/dbOnClosed';
 import { IS_SERVICE_WORKER } from './helpers/IS_SERVICE_WORKER';
 import { throwVersionIncrementNeeded } from './helpers/throwVersionIncrementNeeded';
 import { createIdGenerationMiddleware } from './middlewares/createIdGenerationMiddleware';
@@ -49,6 +48,7 @@ import { InvalidLicenseError } from './InvalidLicenseError';
 import { logout, _logout } from './authentication/logout';
 import { loadAccessToken } from './authentication/authenticate';
 import { isEagerSyncDisabled } from './isEagerSyncDisabled';
+import { createYHandler } from './y-manager';
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 export {
@@ -101,8 +101,9 @@ export function dexieCloud(dexie: Dexie) {
     if (closed) throw new Dexie.DatabaseClosedError();
   }
 
-  dbOnClosed(dexie, () => {
+  dexie.once('close', () => {
     subscriptions.forEach((subscription) => subscription.unsubscribe());
+    subscriptions.splice(0, subscriptions.length);
     closed = true;
     localSyncWorker && localSyncWorker.stop();
     localSyncWorker = null;
@@ -298,6 +299,7 @@ export function dexieCloud(dexie: Dexie) {
             ...options,
           };
           delete newPersistedOptions.fetchTokens;
+          delete newPersistedOptions.awarenessProtocol;
           await db.$syncState.put(newPersistedOptions, 'options');
         }
         if (
@@ -393,6 +395,12 @@ export function dexieCloud(dexie: Dexie) {
         currentUserEmitter.pipe(skip(1), take(1)),
         db.cloud.persistedSyncState.pipe(skip(1), take(1)),
       ]));
+
+      const yHandler = createYHandler(db);
+      db.dx.on('y', yHandler);
+      db.dx.once('close', () => {
+        db.dx.on.y?.unsubscribe(yHandler);
+      });
     }
 
     // HERE: If requireAuth, do athentication now.
