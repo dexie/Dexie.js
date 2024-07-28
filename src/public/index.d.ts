@@ -73,7 +73,6 @@ declare var DexieYProvider: {
   (doc: DucktypedYDoc): DexieYProvider;
   new (doc: DucktypedYDoc): DexieYProvider;
   getDocCache: (db: Dexie) => {
-    cache: { [key: string]: WeakRef<DucktypedYDoc> };
     readonly size: number;
     find: (updatesTable: string, parentId: any) => DucktypedYDoc | undefined;
     add: (doc: DucktypedYDoc) => void;
