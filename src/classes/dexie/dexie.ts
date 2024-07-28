@@ -1,7 +1,7 @@
 // Import types from the public API
 import { Dexie as IDexie } from "../../public/types/dexie";
 import { DexieOptions, DexieConstructor } from "../../public/types/dexie-constructor";
-import { DbEvents } from "../../public/types/db-events";
+import { DbEvents, DbEventFns } from "../../public/types/db-events";
 //import { PromiseExtended, PromiseExtendedConstructor } from '../../public/types/promise-extended';
 import { Table as ITable } from '../../public/types/table';
 import { TableSchema } from "../../public/types/table-schema";
@@ -86,6 +86,7 @@ export class Dexie implements IDexie {
   idbdb: IDBDatabase | null;
   vip: Dexie;
   on: DbEvents;
+  once: DbEventFns;
 
   Table: TableConstructor;
   WhereClause: WhereClauseConstructor;
@@ -148,6 +149,13 @@ export class Dexie implements IDexie {
       "y",
       { ready: [promisableChain, nop] }
     ) as DbEvents;
+    this.once = (event: any, callback: any) => {
+      const fn = (...args: any[]) => {
+        this.on(event).unsubscribe(fn);
+        callback.apply(this, args);
+      };
+      return this.on(event as any, fn);
+    };
     this.on.ready.subscribe = override(this.on.ready.subscribe, subscribe => {
       return (subscriber, bSticky) => {
         (Dexie as any as DexieConstructor).vip(() => {

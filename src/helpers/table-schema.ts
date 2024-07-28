@@ -15,7 +15,7 @@ export function createTableSchema(
     mappedClass: null,
     yProps: yProps?.map((prop) => ({
       prop,
-      updTable: `$${name}.${prop}_updates`,
+      updatesTable: `$${name}.${prop}_updates`,
     })),
     idxByName: arrayToObject(indexes, (index) => [index.name, index]),
   };

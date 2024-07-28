@@ -35,13 +35,15 @@ export interface DexieYEvent {
   fire(provider: DexieYProvider, Y: any): void;
 }
 
-export interface DbEvents extends DexieEventSet {
-  (eventName: 'ready', subscriber: (vipDb: Dexie) => any, bSticky?: boolean): void;
+export interface DbEventFns {
   (eventName: 'populate', subscriber: (trans: Transaction) => any): void;
   (eventName: 'blocked', subscriber: (event: IDBVersionChangeEvent) => any): void;
   (eventName: 'versionchange', subscriber: (event: IDBVersionChangeEvent) => any): void;
   (eventName: 'close', subscriber: (event: Event) => any): void;
   (eventName: 'y', subscriber: (provider: DexieYProvider, Y: any) => void): void;
+}
+export interface DbEvents extends DbEventFns, DexieEventSet {
+  (eventName: 'ready', subscriber: (vipDb: Dexie) => any, bSticky?: boolean): void;
   ready: DexieOnReadyEvent;
   populate: DexiePopulateEvent;
   blocked: DexieEvent;

@@ -1,6 +1,6 @@
 import { Table } from './table';
 import { Version } from './version';
-import { DbEvents } from './db-events';
+import { DbEvents, DbEventFns } from './db-events';
 import { TransactionMode } from './transaction-mode';
 import { Transaction } from './transaction';
 import { WhereClause } from './where-clause';
@@ -47,6 +47,8 @@ export interface Dexie {
   version(versionNumber: number): Version;
 
   on: DbEvents;
+
+  once: DbEventFns;
 
   open(): PromiseExtended<Dexie>;
 
