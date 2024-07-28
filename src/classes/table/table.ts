@@ -280,8 +280,8 @@ export class Table implements ITable<any, IndexableType> {
     if (this.schema.yProps) {
       const Y = getYLibrary(db);
       constructor = class extends (constructor as any) {};
-      this.schema.yProps.forEach(({prop, updTable}) => {
-        Object.defineProperty(constructor.prototype, prop, createYDocProperty(db, Y, this, prop, updTable));
+      this.schema.yProps.forEach(({prop, updatesTable}) => {
+        Object.defineProperty(constructor.prototype, prop, createYDocProperty(db, Y, this, updatesTable));
       });
     }
     // Collect all inherited property names (including method names) by

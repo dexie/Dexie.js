@@ -11,9 +11,9 @@ export function builtInDeletionTrigger (table: Table, keys: null | readonly any[
   const { yProps } = table.schema;
   if (!yProps) return res;
   if (keys && res.numFailures > 0) keys = keys.filter((_, i) => !res.failures[i]);
-  return Promise.all(yProps.map(({updTable}) => 
+  return Promise.all(yProps.map(({updatesTable}) => 
     keys
-    ? table.db.table(updTable).where('k').anyOf(keys).delete()
-    : table.db.table(updTable).clear()
+    ? table.db.table(updatesTable).where('k').anyOf(keys).delete()
+    : table.db.table(updatesTable).clear()
   )).then(() => res);
 }

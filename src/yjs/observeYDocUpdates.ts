@@ -16,7 +16,7 @@ export function observeYDocUpdates(
   db: Dexie,
   parentTableName: string,
   updatesTableName: string,
-  id: any,
+  parentId: any,
   Y: DucktypedY
 ): () => void {
   let lastUpdateId = 0;
@@ -34,14 +34,14 @@ export function observeYDocUpdates(
             .between(lastUpdateId, Infinity, false)
             .toArray()
             .then((updates) =>
-              updates.filter((update) => cmp(update.k, id) === 0)
+              updates.filter((update) => cmp(update.k, parentId) === 0)
             )
-        : updatesTable.where({ k: id }).toArray()
+        : updatesTable.where({ k: parentId }).toArray()
       ).then((updates) => {
         if (updates.length > 0) lastUpdateId = updates[updates.length - 1].i;
         return updates;
       }),
-      db.table(parentTableName).where(':id').equals(id).toArray(), // Why not just count() or get()? Because of cache only works with toArray() currently (optimization)
+      db.table(parentTableName).where(':id').equals(parentId).toArray(), // Why not just count() or get()? Because of cache only works with toArray() currently (optimization)
     ]);
   }).subscribe(
     ([updates, parentRow]) => {
@@ -59,7 +59,7 @@ export function observeYDocUpdates(
               Y.applyUpdateV2(doc, update.u);
             });
           },
-          subscription,
+          provider,
           false
         );
       }
@@ -75,10 +75,10 @@ export function observeYDocUpdates(
   );
 
   const onUpdate = (update: Uint8Array, origin: any) => {
-    if (origin === subscription) return; // Already applied.
+    if (origin === provider) return; // Already applied.
     db.table(updatesTableName)
       .add({
-        k: id,
+        k: parentId,
         u: update,
         f: 1, // Flag as local update (to be included when syncing)
       })

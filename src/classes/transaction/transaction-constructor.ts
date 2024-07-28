@@ -35,7 +35,7 @@ export function createTransactionConstructor(db: Dexie) {
       if (mode !== 'readonly') storeNames.forEach(storeName => {
         // Uncollapse storeName to include Y update tables in case deletion of a record - then we must also delete its Y updates.
         const yProps = dbschema[storeName]?.yProps;
-        if (yProps) storeNames = storeNames.concat(yProps.map(p => p.updTable));
+        if (yProps) storeNames = storeNames.concat(yProps.map(p => p.updatesTable));
       });
 
       this.db = db;

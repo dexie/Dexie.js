@@ -55,11 +55,11 @@ export interface DucktypedYDoc extends DucktypedYObservable {
 
 export interface DexieYDocMeta {
   db: Dexie,
-  table: string,
   updatesTable: string,
-  prop: string,
-  id: any,
-  cacheKey: string
+  parentTable: string,
+  parentId: any
+  //prop: string,
+  //cacheKey: string
 }
 
 /** Docktyped Awareness */

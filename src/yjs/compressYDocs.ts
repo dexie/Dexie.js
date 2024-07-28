@@ -25,10 +25,10 @@ export function compressYDocs(db: Dexie, interval?: number) {
 /** Compress an individual Y.Doc table */
 function compressYDocsTable(
   db: Dexie,
-  { updTable }: { prop: string; updTable: string },
+  { updatesTable }: { prop: string; updatesTable: string },
   skipIfRunnedSince?: number // milliseconds
 ) {
-  const updTbl = db.table(updTable);
+  const updTbl = db.table(updatesTable);
   return Promise.all([
     // syncers (for example dexie-cloud-addon or other 3rd part syncers) They may have unsentFrom set.
     updTbl
@@ -37,7 +37,7 @@ function compressYDocsTable(
       .toArray(),
 
     // lastCompressed (pointer to the last compressed update)
-    db.transaction('rw', updTable, () =>
+    db.transaction('rw', updatesTable, () =>
       updTbl.get(0).then((lastCompressed: YLastCompressed | undefined) => {
         if (
           lastCompressed &&
@@ -72,7 +72,7 @@ function compressYDocsTable(
     // 6. Update lastCompressedId to the i of the latest compressed entry.
     return updTbl
       .where('i')
-      .between(lastCompressedUpdate, Infinity, false, false)
+      .between(lastCompressedUpdate, Infinity, false)
       .toArray((addedUpdates: YUpdateRow[]) => {
         if (addedUpdates.length <= 1) return; // For sure no updates to compress if there would be only 1.
         const docsToCompress: { docId: any; updates: YUpdateRow[] }[] = [];
@@ -80,7 +80,7 @@ function compressYDocsTable(
         for (let j = 0; j < addedUpdates.length; ++j) {
           const updateRow = addedUpdates[j];
           const { i, f, k } = updateRow;
-          if (i >= unsentFrom && f & 0x01) break; // An update that need to be synced was found. Stop here and let dontCompressFrom stay.
+          if (i >= unsentFrom && (f & 0x01)) break; // An update that need to be synced was found. Stop here and let dontCompressFrom stay.
           const entry = docsToCompress.find(
             (entry) => cmp(entry.docId, k) === 0
           );
@@ -90,7 +90,7 @@ function compressYDocsTable(
         }
         let p = Promise.resolve();
         for (const { docId, updates } of docsToCompress) {
-          p = p.then(() => compressUpdatesForDoc(db, updTable, docId, updates));
+          p = p.then(() => compressUpdatesForDoc(db, updatesTable, docId, updates));
         }
         return p.then(() => {
           // Update lastCompressed atomically to the value we computed.
@@ -115,29 +115,31 @@ function compressYDocsTable(
 
 export function compressUpdatesForDoc(
   db: Dexie,
-  updTable: string,
-  docRowId: any,
+  updatesTable: string,
+  parentId: any,
   addedUpdatesToCompress: YUpdateRow[]
 ) {
   if (addedUpdatesToCompress.length < 1) throw new Error('Invalid input');
-  return db.transaction('rw', updTable, (tx) => {
-    const updTbl = tx.table(updTable);
-    return updTbl.where({ k: docRowId }).first((mainUpdate: YUpdateRow) => {
+  return db.transaction('rw', updatesTable, (tx) => {
+    const updTbl = tx.table(updatesTable);
+    return updTbl.where({ k: parentId }).first((mainUpdate: YUpdateRow) => {
       const updates = [mainUpdate].concat(addedUpdatesToCompress); // in some situations, mainUpdate will be included twice here. But Y.js doesn't care!
       const Y = getYLibrary(db);
       const doc = new Y.Doc({ gc: true });
-      updates.forEach((update) => {
-        if (cmp(update.k, docRowId) !== 0) {
-          throw new Error('Invalid update');
-        }
-        Y.applyUpdateV2(doc, update.u);
-      });
+      //Y.transact(doc, ()=>{
+        updates.forEach((update) => {
+          //if (cmp(update.k, docRowId) !== 0) {
+          //  throw new Error('Invalid update');
+          //}
+          Y.applyUpdateV2(doc, update.u);
+        });
+      //}, "compressYDocs"); // Don't think anyone could be listening to this local doc.
       const compressedUpdate = Y.encodeStateAsUpdateV2(doc);
       const lastUpdate = updates.pop();
       return updTbl
         .put({
           i: lastUpdate.i,
-          k: docRowId,
+          k: parentId,
           u: compressedUpdate,
         })
         .then(() => updTbl.bulkDelete(updates.map((update) => update.i)));

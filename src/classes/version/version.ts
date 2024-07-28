@@ -81,7 +81,7 @@ export class Version implements IVersion {
             //     Could be using an index [f+i] but that wouldn't gain too much and Firefox before 126 doesnt support it.
             //     Local updates are flagged while remote updates are not.
             //      
-            { [yProp.updTable]: '++i,k' },
+            { [yProp.updatesTable]: '++i,k' },
             outSchema
           );
         }
