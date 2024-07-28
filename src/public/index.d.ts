@@ -72,7 +72,16 @@ export function remove(num: number | bigint | any[]): PropModification;
 declare var DexieYProvider: {
   (doc: DucktypedYDoc): DexieYProvider;
   new (doc: DucktypedYDoc): DexieYProvider;
+  getDocCache: (db: Dexie) => {
+    cache: { [key: string]: WeakRef<DucktypedYDoc> };
+    readonly size: number;
+    find: (updatesTable: string, parentId: any) => DucktypedYDoc | undefined;
+    add: (doc: DucktypedYDoc) => void;
+    delete: (doc: DucktypedYDoc) => void;
+  };
 }
+
+export { DexieYProvider, RangeSet };
 
 /** Exporting 'Dexie' as the default export.
  **/
