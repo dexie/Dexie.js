@@ -4,16 +4,16 @@ import Dexie from "dexie";
  */
 export function dbOnClosed(db: Dexie, handler: () => void) {
   db.on.close.subscribe(handler);
-  // @ts-ignore
+  /*// @ts-ignore
   const origClose = db._close;
   // @ts-ignore
   db._close = function () {
     origClose.call(this);
     handler();
-  };
+  };*/
   return () => {
     db.on.close.unsubscribe(handler);
     // @ts-ignore
-    db._close = origClose;
+    //db._close = origClose;
   };
 }

@@ -27,11 +27,13 @@ import { IntervalTree, RangeSetConstructor } from './types/rangeset';
 import { Dexie, TableProp } from './types/dexie';
 export type { TableProp };
 import { PropModification, PropModSpec, PropModSymbol } from './types/prop-modification';
+import { DexieYProvider, DucktypedYDoc, YSyncer, YUpdateRow, YLastCompressed, DexieYDocMeta } from './types/yjs-related';
 export { PropModification, PropModSpec, PropModSymbol };
 export * from './types/entity';
 export * from './types/entity-table';
 export { UpdateSpec } from './types/update-spec';
 export * from './types/insert-type';
+export type { YSyncer, YUpdateRow, YLastCompressed, DexieYDocMeta };
 
 // Alias of Table and Collection in order to be able to refer them from module below...
 interface _Table<T, TKey, TInsertType> extends Table<T, TKey, TInsertType> {}
@@ -67,6 +69,18 @@ export function cmp(a: any, b: any): number;
 export function replacePrefix(a: string, b: string): PropModification;
 export function add(num: number | bigint | any[]): PropModification;
 export function remove(num: number | bigint | any[]): PropModification;
+declare var DexieYProvider: {
+  (doc: DucktypedYDoc): DexieYProvider;
+  new (doc: DucktypedYDoc): DexieYProvider;
+  getDocCache: (db: Dexie) => {
+    readonly size: number;
+    find: (updatesTable: string, parentId: any) => DucktypedYDoc | undefined;
+    add: (doc: DucktypedYDoc) => void;
+    delete: (doc: DucktypedYDoc) => void;
+  };
+}
+
+export { DexieYProvider, RangeSet };
 
 /** Exporting 'Dexie' as the default export.
  **/

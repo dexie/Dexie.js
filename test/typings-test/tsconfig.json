@@ -8,7 +8,7 @@
         "noImplicitThis": true,
         "outDir": "../../tools/tmp/test-typings",
         "moduleResolution": "node",
-        "lib": ["dom", "es2020"]
+        "lib": ["dom", "es2021"]
     },
     "files": [
         "test-typings.ts"

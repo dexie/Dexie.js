@@ -14,10 +14,12 @@ import {
 import { encodeIdsForServer } from './encodeIdsForServer';
 import { UserLogin } from '../db/entities/UserLogin';
 import { updateSyncRateLimitDelays } from './ratelimit';
+import { YClientMessage } from 'dexie-cloud-common/src/YMessage';
 //import {BisonWebStreamReader} from "dreambase-library/dist/typeson-simplified/BisonWebStreamReader";
 
 export async function syncWithServer(
   changes: DBOperationsSet,
+  y: YClientMessage[],
   syncState: PersistedSyncState | undefined,
   baseRevs: BaseRevisionMapEntry[],
   db: DexieCloudDB,
@@ -63,6 +65,7 @@ export async function syncWithServer(
       : undefined,
     baseRevs,
     changes: encodeIdsForServer(db.dx.core.schema, currentUser, changes),
+    y
   };
   console.debug('Sync request', syncRequest);
   db.syncStateChangedEvent.next({
