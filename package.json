@@ -118,7 +118,7 @@
   "devDependencies": {
     "@lambdatest/node-tunnel": "^4.0.7",
     "cross-env": "^7.0.3",
-    "dts-bundle-generator": "^5.9.0",
+    "dts-bundle-generator": "^9.3.1",
     "just-build": "^0.9.24",
     "karma": "^6.1.1",
     "karma-chrome-launcher": "^3.1.0",
@@ -141,6 +141,7 @@
     "tslib": "^2.1.0",
     "typescript": "^5.3.3",
     "uglify-js": "^3.9.2",
+    "y-protocols": "^1.0.6",
     "yjs": "^13.6.16"
   }
 }
