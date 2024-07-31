@@ -27,7 +27,7 @@ import { IntervalTree, RangeSetConstructor } from './types/rangeset';
 import { Dexie, TableProp } from './types/dexie';
 export type { TableProp };
 import { PropModification, PropModSpec, PropModSymbol } from './types/prop-modification';
-import { DexieYProvider, DucktypedYDoc, YSyncer, YUpdateRow, YLastCompressed, DexieYDocMeta } from './types/yjs-related';
+import { DexieYProvider, DucktypedYDoc, YSyncer, YUpdateRow, YLastCompressed, DexieYDocMeta, YDocCache } from './types/yjs-related';
 export { PropModification, PropModSpec, PropModSymbol };
 export * from './types/entity';
 export * from './types/entity-table';
@@ -72,12 +72,7 @@ export function remove(num: number | bigint | any[]): PropModification;
 declare var DexieYProvider: {
   (doc: DucktypedYDoc): DexieYProvider;
   new (doc: DucktypedYDoc): DexieYProvider;
-  getDocCache: (db: Dexie) => {
-    readonly size: number;
-    find: (updatesTable: string, parentId: any) => DucktypedYDoc | undefined;
-    add: (doc: DucktypedYDoc) => void;
-    delete: (doc: DucktypedYDoc) => void;
-  };
+  getDocCache: (db: Dexie) => YDocCache;
 }
 
 export { DexieYProvider, RangeSet };

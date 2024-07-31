@@ -21,10 +21,11 @@ export async function listYClientMessages(
             .map(({ i, k, u }: YUpdateRow) => {
               return {
                 type: 'u-c',
-                utbl: yProp.updatesTable,
-                i,
+                table: table.name,
+                prop: yProp.prop,
                 k,
                 u,
+                i,
               } satisfies YClientMessage;
             })
         );

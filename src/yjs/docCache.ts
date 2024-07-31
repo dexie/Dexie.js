@@ -1,30 +1,30 @@
 import { Dexie } from '../public/types/dexie';
-import type { DucktypedYDoc } from '../public/types/yjs-related';
+import type { DexieYDocMeta, DucktypedYDoc, YDocCache } from '../public/types/yjs-related';
 
 // The Y.Doc cache containing all active documents
-export function getDocCache(db: Dexie) {
+export function getDocCache(db: Dexie): YDocCache {
   return db._novip['_docCache'] ??= {
     cache: {} as { [key: string]: WeakRef<DucktypedYDoc>; },
     get size() {
       return Object.keys(this.cache).length;
     },
-    find(updatesTable: string, parentId: any): DucktypedYDoc | undefined {
-      const cacheKey = getYDocCacheKey(updatesTable, parentId);
+    find(table: string, primaryKey: any, ydocProp: string): DucktypedYDoc | undefined {
+      const cacheKey = getYDocCacheKey(table, primaryKey, ydocProp);
       const docRef = this.cache[cacheKey];
       return docRef ? docRef.deref() : undefined;
     },
     add(doc: DucktypedYDoc): void {
-      const { updatesTable, parentId } = doc.meta;
-      if (!updatesTable || parentId == null)
+      const { parentTable, parentId, parentProp } = doc.meta as DexieYDocMeta;
+      if (!parentTable || !parentProp || parentId == null)
         throw new Error(`Missing Dexie-related metadata in Y.Doc`);
-      const cacheKey = getYDocCacheKey(updatesTable, parentId);
+      const cacheKey = getYDocCacheKey(parentTable, parentId, parentProp);
       this.cache[cacheKey] = new WeakRef(doc);
       docRegistry.register(doc, { cache: this.cache, key: cacheKey });
     },
     delete(doc: DucktypedYDoc): void {
       docRegistry.unregister(doc);
       delete this.cache[
-        getYDocCacheKey(doc.meta.updatesTable, doc.meta.parentId)
+        getYDocCacheKey(doc.meta.parentTable, doc.meta.parentId, doc.meta.parentProp)
       ];
     },
   };
@@ -43,6 +43,6 @@ export function throwIfDestroyed(doc: object) {
     throw new Error('Y.Doc has been destroyed');
 }
 
-export function getYDocCacheKey(yTable: string, parentId: any): string {
-  return `${yTable}[${parentId}]`;
+export function getYDocCacheKey(table: string, primaryKey: any, ydocProp: string): string {
+  return `${table}[${primaryKey}].${ydocProp}`;
 }

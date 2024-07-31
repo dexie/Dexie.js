@@ -5,7 +5,8 @@ export type YServerMessage = YUpdateFromClientAck | YUpdateFromClientReject | YU
 
 export interface YUpdateFromClientRequest {
   type: 'u-c';
-  utbl: string;
+  table: string;
+  prop: string;
   k: any;
   u: Uint8Array;
   i: number;
@@ -13,20 +14,23 @@ export interface YUpdateFromClientRequest {
 
 export interface YUpdateFromClientAck {
   type: 'u-ack';
-  utbl: string;
+  table: string;
+  prop: string;
   i: number;
 }
 
 export interface YUpdateFromClientReject {
   type: 'u-reject';
-  utbl: string;
+  table: string;
+  prop: string;
   i: number;
 }
 
 
 export interface YUpdateFromServerMessage {
   type: 'u-s';
-  utbl: string;
+  table: string;
+  prop: string;
   k: any;
   u: Uint8Array;
   realmSetHash: Uint8Array;
@@ -35,7 +39,8 @@ export interface YUpdateFromServerMessage {
 
 export interface YAwarenessUpdate {
   type: 'aware';
-  utbl: string;
+  table: string;
+  prop: string;
   k: any;
   u: Uint8Array;
 }

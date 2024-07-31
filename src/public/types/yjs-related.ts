@@ -54,12 +54,11 @@ export interface DucktypedYDoc extends DucktypedYObservable {
 }
 
 export interface DexieYDocMeta {
-  db: Dexie,
-  updatesTable: string,
-  parentTable: string,
-  parentId: any
-  //prop: string,
-  //cacheKey: string
+  db: Dexie;
+  parentTable: string;
+  parentId: any;
+  parentProp: string;
+  updatesTable: string;
 }
 
 /** Docktyped Awareness */
@@ -136,4 +135,11 @@ export interface DexieYProvider<YDoc=any> {
   off (name: string, f: (...args: any[]) => any): void;
   destroy(): void;
   readonly destroyed: boolean;
+}
+
+export interface YDocCache {
+  readonly size: number;
+  find: (table: string, primaryKey: any, ydocProp: string) => DucktypedYDoc | undefined
+  add: (doc: DucktypedYDoc) => void;
+  delete: (doc: DucktypedYDoc) => void;
 }

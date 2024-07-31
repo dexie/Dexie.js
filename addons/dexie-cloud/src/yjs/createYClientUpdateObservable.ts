@@ -1,5 +1,5 @@
 import { Observable, Subject, Subscription, merge, mergeMap } from 'rxjs';
-import { YClientMessage } from 'dexie-cloud-common/src/YMessage';
+import { YClientMessage, YUpdateFromClientRequest } from 'dexie-cloud-common/src/YMessage';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { flatten } from '../helpers/flatten';
 import { liveQuery } from 'dexie';
@@ -7,16 +7,20 @@ import { DEXIE_CLOUD_SYNCER_ID } from '../sync/DEXIE_CLOUD_SYNCER_ID';
 import { listUpdatesSince } from './listUpdatesSince';
 
 export function createYClientUpdateObservable(db: DexieCloudDB): Observable<YClientMessage> {
-  const yTableNames = flatten(
+  const yTableRecords = flatten(
     db.tables
       .filter((table) => db.cloud.schema?.[table.name].markedForSync && table.schema.yProps)
-      .map((table) => table.schema.yProps!.map((prop) => prop.updatesTable))
+      .map((table) => table.schema.yProps!.map((p) => ({
+        table: table.name,
+        ydocProp: p.prop,
+        updatesTable: p.updatesTable
+      })))
   );
   return merge(
-    ...yTableNames.map((tblName) => {
+    ...yTableRecords.map(({table, ydocProp, updatesTable}) => {
       let currentUnsentFrom = 1;
       return liveQuery(async () => {
-        const yTbl = db.table(tblName);
+        const yTbl = db.table(updatesTable);
         const unsentFrom = await yTbl
           .where({ i: DEXIE_CLOUD_SYNCER_ID })
           .first()
@@ -33,10 +37,12 @@ export function createYClientUpdateObservable(db: DexieCloudDB): Observable<YCli
           .map((update) => {
             return {
               type: 'u-c',
-              utbl: tblName,
+              table,
+              prop: ydocProp,
               k: update.k,
               u: update.u,
-            } as YClientMessage;
+              i: update.i,
+            } satisfies YUpdateFromClientRequest;
           });
       });
     })

@@ -16,7 +16,7 @@ export function createYHandler(db: DexieCloudDB) {
   const awap = getAwarenessLibrary(db);
   return (provider: DexieYProvider<import('yjs').Doc & {_awareness: any}>) => {
     const doc = provider.doc;
-    const { parentTable, parentId, updatesTable } = doc.meta as DexieYDocMeta;
+    const { parentTable, parentId, parentProp } = doc.meta as DexieYDocMeta;
     if (!db.cloud.schema?.[parentTable].markedForSync) {
       return; // The table that holds the doc is not marked for sync - leave it to dexie. No syncing, no awareness.
     }
@@ -32,7 +32,8 @@ export function createYHandler(db: DexieCloudDB) {
     );
     db.messageProducer.next({
       type: 'aware',
-      utbl: updatesTable,
+      table: parentTable,
+      prop: parentProp,
       k: parentId,
       u: update,
     });
@@ -43,7 +44,8 @@ export function createYHandler(db: DexieCloudDB) {
         const update = awap.encodeAwarenessUpdate(awareness!, changedClients);
         db.messageProducer.next({
           type: 'aware',
-          utbl: doc.meta.updatesTable!,
+          table: parentTable,
+          prop: parentProp,
           k: doc.meta.parentId,
           u: update,
         });

@@ -305,7 +305,7 @@ export class WSConnection extends Subscription {
           this.rev = msg.rev; // No meaning but seems reasonable.
         } else if (msg.type === 'aware') {
           const docCache = DexieYProvider.getDocCache(this.db.dx);
-          const doc = docCache.find(msg.utbl, msg.k);
+          const doc = docCache.find(msg.table, msg.k, msg.prop);
           if (doc) {
             const awareness = getDocAwareness(doc);
             if (awareness) {
