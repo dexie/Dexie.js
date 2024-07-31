@@ -1,5 +1,5 @@
-import Dexie, { DexieYProvider, DucktypedYDoc, type DucktypedY } from "dexie";
-import { type DexieCloudDB } from "./db/DexieCloudDB";
+import Dexie, { DexieYProvider, DexieYDocMeta } from "dexie";
+import { type DexieCloudDB } from "../db/DexieCloudDB";
 
 export function getAwarenessLibrary(db: DexieCloudDB): typeof import ('y-protocols/awareness') {
   if (!db.cloud.options?.awarenessProtocol) {
@@ -16,6 +16,10 @@ export function createYHandler(db: DexieCloudDB) {
   const awap = getAwarenessLibrary(db);
   return (provider: DexieYProvider<import('yjs').Doc & {_awareness: any}>) => {
     const doc = provider.doc;
+    const { parentTable, parentId, updatesTable } = doc.meta as DexieYDocMeta;
+    if (!db.cloud.schema?.[parentTable].markedForSync) {
+      return; // The table that holds the doc is not marked for sync - leave it to dexie. No syncing, no awareness.
+    }
     let awareness = awarenessWeakMap.get(doc);
     if (!awareness) {
       awareness = new awap.Awareness(doc);
@@ -28,8 +32,8 @@ export function createYHandler(db: DexieCloudDB) {
     );
     db.messageProducer.next({
       type: 'aware',
-      utbl: doc.meta.updatesTable!,
-      k: doc.meta.parentId,
+      utbl: updatesTable,
+      k: parentId,
       u: update,
     });
     awareness.on('update', ({ added, updated, removed }, origin: any) => {

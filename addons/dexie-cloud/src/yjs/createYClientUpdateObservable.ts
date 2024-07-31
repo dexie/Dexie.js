@@ -1,15 +1,15 @@
 import { Observable, Subject, Subscription, merge, mergeMap } from 'rxjs';
 import { YClientMessage } from 'dexie-cloud-common/src/YMessage';
-import { DexieCloudDB } from './db/DexieCloudDB';
-import { flatten } from './helpers/flatten';
+import { DexieCloudDB } from '../db/DexieCloudDB';
+import { flatten } from '../helpers/flatten';
 import { liveQuery } from 'dexie';
-import { DEXIE_CLOUD_SYNCER_ID } from './sync/DEXIE_CLOUD_SYNCER_ID';
-import { listUpdatesSince } from './sync/listUpdatesSince';
+import { DEXIE_CLOUD_SYNCER_ID } from '../sync/DEXIE_CLOUD_SYNCER_ID';
+import { listUpdatesSince } from './listUpdatesSince';
 
 export function createYClientUpdateObservable(db: DexieCloudDB): Observable<YClientMessage> {
   const yTableNames = flatten(
     db.tables
-      .filter((table) => table.schema.yProps)
+      .filter((table) => db.cloud.schema?.[table.name].markedForSync && table.schema.yProps)
       .map((table) => table.schema.yProps!.map((prop) => prop.updatesTable))
   );
   return merge(

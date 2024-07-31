@@ -1,7 +1,7 @@
 import { InsertType, YSyncer, YUpdateRow } from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { YServerMessage } from 'dexie-cloud-common/src/YMessage';
-import { DEXIE_CLOUD_SYNCER_ID } from './DEXIE_CLOUD_SYNCER_ID';
+import { DEXIE_CLOUD_SYNCER_ID } from '../sync/DEXIE_CLOUD_SYNCER_ID';
 
 export async function applyYServerMessages(
   yMessages: YServerMessage[],

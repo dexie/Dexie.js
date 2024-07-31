@@ -26,8 +26,8 @@ import { updateBaseRevs } from './updateBaseRevs';
 import { getLatestRevisionsPerTable } from './getLatestRevisionsPerTable';
 import { applyServerChanges } from './applyServerChanges';
 import { checkSyncRateLimitDelay } from './ratelimit';
-import { listYClientMessages } from './listYClientMessages';
-import { applyYServerMessages } from './applyYMessages';
+import { listYClientMessages } from '../yjs/listYClientMessages';
+import { applyYServerMessages } from '../yjs/applyYMessages';
 
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 

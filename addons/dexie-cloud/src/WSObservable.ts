@@ -5,10 +5,10 @@ import { DXCWebSocketStatus } from './DXCWebSocketStatus';
 import { TSON } from './TSON';
 import { YClientMessage, YServerMessage } from 'dexie-cloud-common/src/YMessage';
 import { DexieCloudDB } from './db/DexieCloudDB';
-import { createYClientUpdateObservable } from './createYClientUpdateObservable';
-import { applyYServerMessages } from './sync/applyYMessages';
+import { createYClientUpdateObservable } from './yjs/createYClientUpdateObservable';
+import { applyYServerMessages } from './yjs/applyYMessages';
 import { DexieYProvider } from 'dexie';
-import { getAwarenessLibrary, getDocAwareness } from './y-manager';
+import { getAwarenessLibrary, getDocAwareness } from './yjs/awareness';
 
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;
