@@ -3,6 +3,7 @@ import { DexieEvent } from "./dexie-event";
 import { Transaction } from "./transaction";
 import { Dexie } from "./dexie";
 import { IntervalTree } from "./rangeset";
+import { DexieYProvider } from "./yjs-related";
 
 export interface DexieOnReadyEvent {
   subscribe(fn: (vipDb: Dexie) => any, bSticky: boolean): void;
@@ -28,17 +29,27 @@ export interface DexieCloseEvent {
   fire(event: Event): any;
 }
 
-export interface DbEvents extends DexieEventSet {
-  (eventName: 'ready', subscriber: (vipDb: Dexie) => any, bSticky?: boolean): void;
+export interface DexieYEvent {
+  subscribe(fn: (provider: DexieYProvider, Y: any) => void): void;
+  unsubscribe(fn: (provider: DexieYProvider, Y: any) => void): void;
+  fire(provider: DexieYProvider, Y: any): void;
+}
+
+export interface DbEventFns {
   (eventName: 'populate', subscriber: (trans: Transaction) => any): void;
   (eventName: 'blocked', subscriber: (event: IDBVersionChangeEvent) => any): void;
   (eventName: 'versionchange', subscriber: (event: IDBVersionChangeEvent) => any): void;
   (eventName: 'close', subscriber: (event: Event) => any): void;
+  (eventName: 'y', subscriber: (provider: DexieYProvider, Y: any) => void): void;
+}
+export interface DbEvents extends DbEventFns, DexieEventSet {
+  (eventName: 'ready', subscriber: (vipDb: Dexie) => any, bSticky?: boolean): void;
   ready: DexieOnReadyEvent;
   populate: DexiePopulateEvent;
   blocked: DexieEvent;
   versionchange: DexieVersionChangeEvent;
   close: DexieCloseEvent;
+  y: DexieYEvent;
 }
 
 /** Set of mutated parts of the database
