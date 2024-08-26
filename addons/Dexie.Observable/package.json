@@ -81,11 +81,11 @@
   },
   "homepage": "https://dexie.org",
   "peerDependencies": {
-    "dexie": "workspace:^3.0.2 || ^4.0.1"
+    "dexie": "workspace:^"
   },
   "devDependencies": {
     "@types/node": "^18.11.18",
-    "dexie": "workspace:^3.0.2 || ^4.0.1",
+    "dexie": "workspace:^",
     "eslint": "^7.27.0",
     "just-build": "^0.9.24",
     "qunit": "^2.9.2",

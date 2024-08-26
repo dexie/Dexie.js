@@ -95,6 +95,6 @@
     "rxjs": "^7.x"
   },
   "peerDependencies": {
-    "dexie": "^4.0.1"
+    "dexie": "workspace:^"
   }
 }
