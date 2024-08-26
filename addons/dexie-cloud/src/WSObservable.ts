@@ -3,7 +3,7 @@ import { BehaviorSubject, Observable, Subscriber, Subscription } from 'rxjs';
 import { TokenExpiredError } from './authentication/TokenExpiredError';
 import { DXCWebSocketStatus } from './DXCWebSocketStatus';
 import { TSON } from './TSON';
-import { YClientMessage, YServerMessage } from 'dexie-cloud-common/src/YMessage';
+import type { YClientMessage, YServerMessage } from 'dexie-cloud-common';
 import { DexieCloudDB } from './db/DexieCloudDB';
 import { createYClientUpdateObservable } from './yjs/createYClientUpdateObservable';
 import { applyYServerMessages } from './yjs/applyYMessages';

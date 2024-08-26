@@ -91,7 +91,7 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "dexie-cloud-common": "^1.0.31",
+    "dexie-cloud-common": "workspace:^",
     "rxjs": "^7.x"
   },
   "peerDependencies": {

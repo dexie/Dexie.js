@@ -144,8 +144,8 @@ importers:
         specifier: workspace:^
         version: link:../..
       dexie-cloud-common:
-        specifier: ^1.0.31
-        version: 1.0.36
+        specifier: workspace:^
+        version: link:../../libs/dexie-cloud-common
       rxjs:
         specifier: ^7.x
         version: 7.5.6
