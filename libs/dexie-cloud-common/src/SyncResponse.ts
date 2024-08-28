@@ -3,7 +3,7 @@ import { DexieCloudSchema } from './DexieCloudSchema.js';
 import { YServerMessage } from './YMessage.js';
 
 export interface SyncResponse {
-  serverRevision: string | bigint; // string "[1,\"2823\"]" in protocol version 2. bigint in version 1.
+  serverRevision: string | bigint; // string "[1,\"2823\"]" in protocol version 2. bigint in version 1.
   dbId: string;
   realms: string[];
   inviteRealms: string[];
