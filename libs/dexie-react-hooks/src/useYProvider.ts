@@ -16,7 +16,6 @@ export function useYProvider<YDoc extends DucktypedYDoc>(
     } else if (provider) {
       // In case doc is set to null, don't keep the provider around.
       setProvider(null);
-      return () => provider.destroy();
     } else {
       // Support undefined/null since doc can be undefined initially if the same component loads it in a liveQuery.
       // In that case, we just do nothing. Will be called again when doc is set.
