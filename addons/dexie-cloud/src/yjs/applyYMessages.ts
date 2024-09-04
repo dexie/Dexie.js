@@ -23,7 +23,7 @@ export async function applyYServerMessages(
           let syncer = (await tx.table(utbl).get(DEXIE_CLOUD_SYNCER_ID)) as
             | YSyncer
             | undefined;
-          await tx.table(utbl).put(DEXIE_CLOUD_SYNCER_ID, {
+          await tx.table(utbl).put({
             ...(syncer || { i: DEXIE_CLOUD_SYNCER_ID }),
             unsentFrom: Math.max(syncer?.unsentFrom || 1, m.i + 1),
           } as YSyncer);
