@@ -17,7 +17,7 @@ export async function listYClientMessages(
         const updates = await listUpdatesSince(yTable, unsentFrom);
         result.push(
           ...updates
-            .filter((update) => (update.f || 0) & 0x01) // Only locla updates. Don't send back updates that we got from server or other clients.
+            .filter((update) => (update.f || 0) & 0x01) // Only local updates. Don't send back updates that we got from server or other clients.
             .map(({ i, k, u }: YUpdateRow) => {
               return {
                 type: 'u-c',
