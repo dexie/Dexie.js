@@ -1,7 +1,7 @@
 import { Dexie } from '../public/types/dexie';
 import type {
   YLastCompressed,
-  YSyncer,
+  YSyncState,
   YUpdateRow,
 } from '../public/types/yjs-related';
 import { getYLibrary } from './getYLibrary';
@@ -57,11 +57,11 @@ function compressYDocsTable(
           .then(() => lastCompressed);
       })
     ),
-  ]).then(([syncers, stamp]: [YSyncer[], YLastCompressed]) => {
+  ]).then(([syncers, stamp]: [YSyncState[], YLastCompressed]) => {
     if (!stamp) return; // Skip. Already running.
     const lastCompressedUpdate = stamp.lastCompressed;
-    const unsentFrom = Math.min(
-      ...syncers.map((s) => s.unsentFrom || Infinity)
+    const unsyncedFrom = Math.min(
+      ...syncers.map((s) => Math.min(s.unsentFrom || Infinity, s.receivedUntil != null ? s.receivedUntil + 1 : Infinity))
     );
     // Per updates-table:
     // 1. Find all updates after lastCompressedId. Run toArray() on them.
@@ -80,7 +80,7 @@ function compressYDocsTable(
         for (let j = 0; j < addedUpdates.length; ++j) {
           const updateRow = addedUpdates[j];
           const { i, f, k } = updateRow;
-          if (i >= unsentFrom && (f & 0x01)) break; // An update that need to be synced was found. Stop here and let dontCompressFrom stay.
+          if (i >= unsyncedFrom && (f & 0x01)) break; // An update that need to be synced was found. Stop here and let dontCompressFrom stay.
           const entry = docsToCompress.find(
             (entry) => cmp(entry.docId, k) === 0
           );
