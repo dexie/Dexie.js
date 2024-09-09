@@ -26,8 +26,9 @@ import { updateBaseRevs } from './updateBaseRevs';
 import { getLatestRevisionsPerTable } from './getLatestRevisionsPerTable';
 import { applyServerChanges } from './applyServerChanges';
 import { checkSyncRateLimitDelay } from './ratelimit';
-import { listYClientMessages } from '../yjs/listYClientMessages';
+import { listYClientMessagesAndStateVector } from '../yjs/listYClientMessagesAndStateVector';
 import { applyYServerMessages } from '../yjs/applyYMessages';
+import { updateYSyncStates } from '../yjs/updateYSyncStates';
 
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 
@@ -149,14 +150,14 @@ async function _sync(
   //
   // List changes to sync
   //
-  const [clientChangeSet, syncState, baseRevs, yMessages] = await db.transaction(
+  const [clientChangeSet, syncState, baseRevs, {yMessages, lastUpdateIds}] = await db.transaction(
     'r',
     db.tables,
     async () => {
       const syncState = await db.getPersistedSyncState();
       const baseRevs = await db.$baseRevs.toArray();
       let clientChanges = await listClientChanges(mutationTables, db);
-      const yMessages = await listYClientMessages(db);
+      const yResults = await listYClientMessagesAndStateVector(db);
       throwIfCancelled(cancelToken);
       if (doSyncify) {
         const alreadySyncedRealms = [
@@ -171,15 +172,15 @@ async function _sync(
         );
         throwIfCancelled(cancelToken);
         clientChanges = clientChanges.concat(syncificationInserts);
-        return [clientChanges, syncState, baseRevs, yMessages];
+        return [clientChanges, syncState, baseRevs, yResults];
       }
-      return [clientChanges, syncState, baseRevs, yMessages];
+      return [clientChanges, syncState, baseRevs, yResults];
     }
   );
 
   const pushSyncIsNeeded = clientChangeSet.some((set) =>
     set.muts.some((mut) => mut.keys.length > 0)
-  ) || yMessages.length > 0;
+  ) || yMessages.some(m => m.type === 'u-c');
   if (justCheckIfNeeded) {
     console.debug('Sync is needed:', pushSyncIsNeeded);
     return pushSyncIsNeeded;
@@ -335,10 +336,15 @@ async function _sync(
     //
     // apply yMessages
     //
-    await applyYServerMessages(res.yMessages, db);
+    const receivedUntils = await applyYServerMessages(res.yMessages, db);
 
     //
-    // Update syncState
+    // update Y SyncStates
+    //
+    await updateYSyncStates(lastUpdateIds, receivedUntils, db);
+
+    //
+    // Update regular syncState
     //
     db.$syncState.put(newSyncState, 'syncState');
 

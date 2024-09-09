@@ -1,6 +1,6 @@
 
 export type YMessage = YClientMessage | YServerMessage;
-export type YClientMessage = YUpdateFromClientRequest | YAwarenessUpdate; // | YDocumentClosed;
+export type YClientMessage = YUpdateFromClientRequest | YStateVector | YAwarenessUpdate; // | YDocumentClosed;
 export type YServerMessage = YUpdateFromClientAck | YUpdateFromClientReject | YUpdateFromServerMessage | YAwarenessUpdate;
 
 export interface YUpdateFromClientRequest {
@@ -10,6 +10,14 @@ export interface YUpdateFromClientRequest {
   k: any;
   u: Uint8Array;
   i: number;
+}
+
+export interface YStateVector {
+  type: 'sv';
+  table: string;
+  prop: string;
+  k: any;
+  sv: Uint8Array;
 }
 
 export interface YUpdateFromClientAck {
