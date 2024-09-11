@@ -10,7 +10,7 @@ export interface TransactionConstructor<T extends Transaction=Transaction> {
     mode: IDBTransactionMode,
     storeNames: string[],
     dbschema: DbSchema,
-    chromeTransactionDurability: ChromeTransactionDurability,
+    chromeTransactionDurability: IDBTransactionDurability,
     parent?: Transaction) : T;
   prototype: T;
 }
@@ -29,7 +29,7 @@ export function createTransactionConstructor(db: Dexie) {
       mode: IDBTransactionMode,
       storeNames: string[],
       dbschema: DbSchema,
-      chromeTransactionDurability: ChromeTransactionDurability,
+      chromeTransactionDurability: IDBTransactionDurability,
       parent?: Transaction)
     {
       if (mode !== 'readonly') storeNames.forEach(storeName => {
