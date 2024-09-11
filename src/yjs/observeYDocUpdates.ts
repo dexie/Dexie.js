@@ -1,23 +1,23 @@
 import type { Dexie } from '../public/types/dexie';
 import type {
-  DexieYProvider,
-  DucktypedY,
-  DucktypedYDoc,
+  YjsLib,
+  YjsDoc,
   YUpdateRow,
 } from '../public/types/yjs-related';
 import type { EntityTable } from '../public/types/entity-table';
 import { throwIfDestroyed } from './docCache';
 import { liveQuery } from '../live-query';
 import { cmp } from '../functions/cmp';
+import { DexieYProvider } from './DexieYProvider';
 
 export function observeYDocUpdates(
   provider: DexieYProvider,
-  doc: DucktypedYDoc,
+  doc: YjsDoc,
   db: Dexie,
   parentTableName: string,
   updatesTableName: string,
   parentId: any,
-  Y: DucktypedY
+  Y: YjsLib
 ): () => void {
   let lastUpdateId = 0;
   let initial = true;
@@ -56,7 +56,12 @@ export function observeYDocUpdates(
           doc,
           () => {
             updates.forEach((update) => {
-              Y.applyUpdateV2(doc, update.u);
+              try {
+                DexieYProvider.currentUpdateRow = update;
+                Y.applyUpdateV2(doc, update.u);
+              } finally {
+                DexieYProvider.currentUpdateRow = null;
+              }
             });
           },
           provider,
@@ -65,7 +70,6 @@ export function observeYDocUpdates(
       }
       if (initial) {
         initial = false;
-        provider.on('load').fire(provider);
         doc.emit('load', [doc]);
       }
     },

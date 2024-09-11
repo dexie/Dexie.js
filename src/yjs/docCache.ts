@@ -1,19 +1,19 @@
 import { Dexie } from '../public/types/dexie';
-import type { DexieYDocMeta, DucktypedYDoc, YDocCache } from '../public/types/yjs-related';
+import type { DexieYDocMeta, YjsDoc, YDocCache } from '../public/types/yjs-related';
 
 // The Y.Doc cache containing all active documents
 export function getDocCache(db: Dexie): YDocCache {
   return db._novip['_docCache'] ??= {
-    cache: {} as { [key: string]: WeakRef<DucktypedYDoc>; },
+    cache: {} as { [key: string]: WeakRef<YjsDoc>; },
     get size() {
       return Object.keys(this.cache).length;
     },
-    find(table: string, primaryKey: any, ydocProp: string): DucktypedYDoc | undefined {
+    find(table: string, primaryKey: any, ydocProp: string): YjsDoc | undefined {
       const cacheKey = getYDocCacheKey(table, primaryKey, ydocProp);
       const docRef = this.cache[cacheKey];
       return docRef ? docRef.deref() : undefined;
     },
-    add(doc: DucktypedYDoc): void {
+    add(doc: YjsDoc): void {
       const { parentTable, parentId, parentProp } = doc.meta as DexieYDocMeta;
       if (!parentTable || !parentProp || parentId == null)
         throw new Error(`Missing Dexie-related metadata in Y.Doc`);
@@ -21,7 +21,7 @@ export function getDocCache(db: Dexie): YDocCache {
       this.cache[cacheKey] = new WeakRef(doc);
       docRegistry.register(doc, { cache: this.cache, key: cacheKey });
     },
-    delete(doc: DucktypedYDoc): void {
+    delete(doc: YjsDoc): void {
       docRegistry.unregister(doc);
       delete this.cache[
         getYDocCacheKey(doc.meta.parentTable, doc.meta.parentId, doc.meta.parentProp)
@@ -34,12 +34,13 @@ export function getDocCache(db: Dexie): YDocCache {
 const docRegistry = new FinalizationRegistry<{cache: any, key: string}>(({cache, key}) => {
   delete cache[key];
 });
-// The weak map
-//export const doc2ProviderWeakMap = new WeakMap<object, WeakRef<DexieYProvider<any>>>();
-export const destroyed = new WeakSet<object>();
 
-export function throwIfDestroyed(doc: object) {
-  if (destroyed.has(doc))
+// Emulate a private boolean property "destroyed" on Y.Doc instances that we manage
+// in createYDocProperty.ts:
+export const destroyedDocs = new WeakSet<object>();
+
+export function throwIfDestroyed(doc: any) {
+  if (destroyedDocs.has(doc))
     throw new Error('Y.Doc has been destroyed');
 }
 

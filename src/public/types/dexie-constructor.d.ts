@@ -10,7 +10,7 @@ import { DexieDOMDependencies } from "./dexie-dom-dependencies";
 import { GlobalDexieEvents, ObservabilitySet } from "./db-events";
 import { Observable } from "./observable";
 import { GlobalQueryCache } from "./cache";
-import { DucktypedY } from "./yjs-related";
+import { YjsLib } from "./yjs-related";
 
 export type ChromeTransactionDurability = 'default' | 'strict' | 'relaxed'
 
@@ -23,7 +23,7 @@ export interface DexieOptions {
   modifyChunkSize?: number;
   chromeTransactionDurability?: ChromeTransactionDurability;
   cache?: 'immutable' | 'cloned' | 'disabled';
-  Y?: DucktypedY; // Caller supplies Y from the following: import * as Y from 'yjs';
+  Y?: YjsLib; // Caller supplies Y from the following: import * as Y from 'yjs';
 }
 
 export interface DexieConstructor extends DexieExceptionClasses {

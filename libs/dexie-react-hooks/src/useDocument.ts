@@ -1,7 +1,7 @@
-import { DexieYProvider, DucktypedYDoc } from 'dexie';
+import Dexie, { DexieYProvider, YjsDoc } from 'dexie';
 import React from 'react';
 
-export function useYProvider<YDoc extends DucktypedYDoc>(
+export function useDocument<YDoc extends YjsDoc>(
   doc: YDoc | null | undefined
 ): DexieYProvider<YDoc> | null {
   const [provider, setProvider] = React.useState<DexieYProvider<YDoc> | null>(
@@ -9,10 +9,12 @@ export function useYProvider<YDoc extends DucktypedYDoc>(
   );
   React.useEffect(() => {
     if (doc) {
-      // Doc is set or changed. Create a new provider.
-      const provider = new DexieYProvider(doc);
+      // Doc is set or changed. Create or hook into a provider for it.
+      const provider = DexieYProvider.load(doc);
       setProvider(provider);
-      return () => provider.destroy();
+      return () => DexieYProvider.release(doc, {
+        gracePeriod: 1000 // Grace period to optimize for unload/reload scenarios
+      });
     } else if (provider) {
       // In case doc is set to null, don't keep the provider around.
       setProvider(null);

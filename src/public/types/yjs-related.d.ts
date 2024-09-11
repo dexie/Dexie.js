@@ -7,14 +7,12 @@
  */
 
 import { Dexie } from "./dexie";
-import { DexieEvent } from "./dexie-event";
 import { DexieEventSet } from "./dexie-event-set";
-import { EntityTable } from "./entity-table";
 import { IndexableType } from "./indexable-type";
-import { Table } from "./table";
+import { Unsubscribable } from "./observable";
 
-export interface DucktypedY {
-  Doc: new(options?: {guid?: string, collectionid?: string, gc?: boolean, gcFilter?: any, meta?: any, autoLoad?: boolean, shouldLoad?: boolean}) => DucktypedYDoc;
+export interface YjsLib {
+  Doc: new(options?: {guid?: string, collectionid?: string, gc?: boolean, gcFilter?: any, meta?: any, autoLoad?: boolean, shouldLoad?: boolean}) => YjsDoc;
   applyUpdate: Function;
   applyUpdateV2: Function;
   encodeStateAsUpdate: Function;
@@ -29,7 +27,7 @@ export interface DucktypedY {
   transact: Function;
 }
 
-export interface DucktypedYObservable {
+export interface YjsObservable {
   on (name: string, f: (...args: any[]) => any): void;
   off (name: string, f: (...args: any[]) => any): void;
   once (name: string, f: (...args: any[]) => any): void;
@@ -37,8 +35,8 @@ export interface DucktypedYObservable {
   destroy(): void;
 }
 
-/** Dock-typed Y.Doc */
-export interface DucktypedYDoc extends DucktypedYObservable {
+/** Duck-typed Y.Doc */
+export interface YjsDoc extends YjsObservable {
   guid?: any;
   collectionid?: any;
   collection?: any;
@@ -53,17 +51,9 @@ export interface DucktypedYDoc extends DucktypedYObservable {
   share: Map<any, any>;
 }
 
-export interface DexieYDocMeta {
-  db: Dexie;
-  parentTable: string;
-  parentId: any;
-  parentProp: string;
-  updatesTable: string;
-}
-
 /** Docktyped Awareness */
-export interface DucktypedAwareness extends DucktypedYObservable {
-  doc: DucktypedYDoc;
+export interface YjsAwareness extends YjsObservable {
+  doc: YjsDoc;
   destroy: () => void;
   clientID: any;
   states: any;
@@ -74,6 +64,13 @@ export interface DucktypedAwareness extends DucktypedYObservable {
   getStates: any;
 }
 
+export interface DexieYDocMeta {
+  db: Dexie;
+  parentTable: string;
+  parentId: any;
+  parentProp: string;
+  updatesTable: string;
+}
 
 /** Stored in the updates table with auto-incremented number as primary key
  * 
@@ -125,22 +122,37 @@ export interface YLastCompressed {
   lastRun?: Date;
 }
 
-export interface DexieYProvider<YDoc=any> {
-  readonly doc: YDoc;
-  awareness?: any;
+interface ProviderReleaseOptions {
+  // Optional grace period to optimize for unload/reload scenarios when releasing a document
+  // and refcount reached zero - to avoid destroying the document immediately in case
+  // it's going to be reloaded soon.
+  // If not set, the document will be destroyed immediately when refcount reaches zero.
+  gracePeriod?: number; 
+}
 
-  whenLoaded: Promise<any>;
-  whenSynced: Promise<any>;
+export declare class DexieYProvider<YDoc=any> {
+  readonly doc: YDoc;
+  awareness?: YjsAwareness;
+
+  whenLoaded: Promise<void>;
+  whenSynced: Promise<void>;
 
   on: DexieEventSet & ((name: string, f: (...args: any[]) => any) => void);
-  off (name: string, f: (...args: any[]) => any): void;
+  off: (name: string, f: (...args: any[]) => any) => void;
+  addCleanupHandler(cleanupHandler: Unsubscribable | (()=>void)): void;
   destroy(): void;
   readonly destroyed: boolean;
+
+  static load<YDoc extends YjsDoc>(doc: YDoc): DexieYProvider<YDoc>;
+  static release<YDoc extends YjsDoc>(doc: YDoc, options?: ProviderReleaseOptions): void;
+  static for<YDoc extends YjsDoc>(doc: YDoc): DexieYProvider<YDoc> | undefined;
+  static getDocCache: (db: Dexie) => YDocCache;
+  static currentUpdateRow: YUpdateRow | null;
 }
 
 export interface YDocCache {
   readonly size: number;
-  find: (table: string, primaryKey: any, ydocProp: string) => DucktypedYDoc | undefined
-  add: (doc: DucktypedYDoc) => void;
-  delete: (doc: DucktypedYDoc) => void;
+  find: (table: string, primaryKey: any, ydocProp: string) => YjsDoc | undefined
+  add: (doc: YjsDoc) => void;
+  delete: (doc: YjsDoc) => void;
 }

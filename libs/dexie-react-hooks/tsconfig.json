@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "lib": ["es2016", "dom"],
+    "lib": ["es2020", "dom"],
     "moduleResolution": "node",
     "importHelpers": false,
     "jsx": "react",

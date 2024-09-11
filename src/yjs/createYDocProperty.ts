@@ -1,12 +1,12 @@
 import type { Table } from '../public/types/table';
 import type { Dexie } from '../public/types/dexie';
-import type { DexieYDocMeta, DucktypedY } from '../public/types/yjs-related';
+import type { DexieYDocMeta, YjsLib } from '../public/types/yjs-related';
 import { getByKeyPath } from '../functions/utils';
-import { destroyed, getDocCache } from './docCache';
+import { destroyedDocs, getDocCache } from './docCache';
 
 export function createYDocProperty(
   db: Dexie,
-  Y: DucktypedY,
+  Y: YjsLib,
   table: Table,
   prop: string,
   updatesTable: string
@@ -33,7 +33,7 @@ export function createYDocProperty(
       docCache.add(doc);
 
       doc.on('destroy', () => {
-        destroyed.add(doc);
+        destroyedDocs.add(doc);
         docCache.delete(doc);
       });
 

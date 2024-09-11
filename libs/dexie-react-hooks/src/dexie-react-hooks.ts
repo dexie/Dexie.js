@@ -1,4 +1,4 @@
 export * from './useLiveQuery';
 export * from './useObservable';
 export * from './usePermissions';
-export * from './useYProvider';
+export * from './useDocument';
