@@ -317,7 +317,7 @@ export class WSConnection extends Subscription {
               );
             }
           }
-        } else  if (msg.type === 'u-ack' || msg.type === 'u-reject' || msg.type === 'u-s') {
+        } else  if (msg.type === 'u-ack' || msg.type === 'u-reject' || msg.type === 'u-s' || msg.type === 'in-sync') {
           applyYServerMessages([msg], this.db);
         } else if (msg.type !== 'pong') {
           this.subscriber.next(msg);

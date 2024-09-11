@@ -1,14 +1,17 @@
-import { InsertType, YSyncState, YUpdateRow } from 'dexie';
+import { DexieYProvider, InsertType, YSyncState, YUpdateRow } from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { YServerMessage, YUpdateFromClientAck } from 'dexie-cloud-common/src/YMessage';
+import {
+  YServerMessage,
+  YUpdateFromClientAck,
+} from 'dexie-cloud-common/src/YMessage';
 import { DEXIE_CLOUD_SYNCER_ID } from '../sync/DEXIE_CLOUD_SYNCER_ID';
 import { getUpdatesTable } from './getUpdatesTable';
 
 export async function applyYServerMessages(
   yMessages: YServerMessage[],
   db: DexieCloudDB
-): Promise<{[yTable: string]: number}> {
-  const result: {[yTable: string]: number} = {};
+): Promise<{ [yTable: string]: number }> {
+  const result: { [yTable: string]: number } = {};
   for (const m of yMessages) {
     switch (m.type) {
       case 'u-s': {
@@ -21,10 +24,10 @@ export async function applyYServerMessages(
       }
       case 'u-ack': {
         const utbl = getUpdatesTable(db, m.table, m.prop);
-        await db.transaction('rw', utbl, async (tx) => {          
-          let syncer = (await tx.table(utbl.name).get(DEXIE_CLOUD_SYNCER_ID)) as
-            | YSyncState
-            | undefined;
+        await db.transaction('rw', utbl, async (tx) => {
+          let syncer = (await tx
+            .table(utbl.name)
+            .get(DEXIE_CLOUD_SYNCER_ID)) as YSyncState | undefined;
           await tx.table(utbl.name).put({
             ...(syncer || { i: DEXIE_CLOUD_SYNCER_ID }),
             unsentFrom: Math.max(syncer?.unsentFrom || 1, m.i + 1),
@@ -44,8 +47,18 @@ export async function applyYServerMessages(
         await utbl.delete(m.i);
         break;
       }
+      case 'in-sync': {
+        const doc = DexieYProvider.getDocCache(db.dx).find(
+          m.table,
+          m.k,
+          m.prop
+        );
+        if (doc && !doc.isSynced) {
+          doc.emit('sync', [true]);
+        }
+        break;
+      }
     }
   }
   return result;
 }
-

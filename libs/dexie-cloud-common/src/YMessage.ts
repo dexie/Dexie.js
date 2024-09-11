@@ -1,7 +1,7 @@
 
 export type YMessage = YClientMessage | YServerMessage;
-export type YClientMessage = YUpdateFromClientRequest | YStateVector | YAwarenessUpdate; // | YDocumentClosed;
-export type YServerMessage = YUpdateFromClientAck | YUpdateFromClientReject | YUpdateFromServerMessage | YAwarenessUpdate;
+export type YClientMessage = YUpdateFromClientRequest | YDocumentOpen | YAwarenessUpdate| YDocumentClose;
+export type YServerMessage = YUpdateFromClientAck | YUpdateFromClientReject | YUpdateFromServerMessage | YAwarenessUpdate | YInSyncMessage;
 
 export interface YUpdateFromClientRequest {
   type: 'u-c';
@@ -12,12 +12,19 @@ export interface YUpdateFromClientRequest {
   i: number;
 }
 
-export interface YStateVector {
-  type: 'sv';
+export interface YDocumentOpen {
+  type: 'doc-open';
   table: string;
   prop: string;
   k: any;
-  sv: Uint8Array;
+  sv?: Uint8Array;
+}
+
+export interface YDocumentClose {
+  type: 'doc-close';
+  table: string;
+  prop: string;
+  k: any;
 }
 
 export interface YUpdateFromClientAck {
@@ -52,6 +59,14 @@ export interface YAwarenessUpdate {
   k: any;
   u: Uint8Array;
 }
+
+export interface YInSyncMessage {
+  type: 'in-sync';
+  table: string;
+  prop: string;
+  k: any;
+}
+
 
 /*export interface YDocumentClosed { // Probably not needed. We have an awareness update for that. Just we need to identify clientID.
   type: 'doc-closed';

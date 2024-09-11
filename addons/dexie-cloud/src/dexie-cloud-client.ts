@@ -48,7 +48,7 @@ import { InvalidLicenseError } from './InvalidLicenseError';
 import { logout, _logout } from './authentication/logout';
 import { loadAccessToken } from './authentication/authenticate';
 import { isEagerSyncDisabled } from './isEagerSyncDisabled';
-import { createYHandler } from './yjs/awareness';
+import { createYHandler } from "./yjs/createYHandler";
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 export {
