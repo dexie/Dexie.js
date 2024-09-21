@@ -150,7 +150,7 @@ export class Collection implements ICollection {
     function sorter(a, b) {
       var aVal = getval(a, lastIndex),
         bVal = getval(b, lastIndex);
-      return aVal < bVal ? -order : aVal > bVal ? order : 0;
+      return indexedDB.cmp(aVal, bVal) * order;
     }
     return this.toArray(function (a) {
       return a.sort(sorter);
