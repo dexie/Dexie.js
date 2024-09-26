@@ -148,7 +148,7 @@ export class Table implements ITable<any, IndexableType> {
     const idb = this.db._deps.indexedDB;
 
     function equals (a, b) {
-      return idb.cmp(a,b) === 0; // Works with all indexable types including binary keys.
+      return cmp(a, b); // Works with all indexable types including binary keys.
     }
 
     const [idx, filterFunction] = keyPaths.reduce(([prevIndex, prevFilterFn], keyPath) => {
