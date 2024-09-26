@@ -146,7 +146,6 @@ export class Table implements ITable<any, IndexableType> {
     // and filter the rest.
     const { idxByName } = this.schema;
     const idb = this.db._deps.indexedDB;
-
     function equals (a, b) {
       return cmp(a, b); // Works with all indexable types including binary keys.
     }
