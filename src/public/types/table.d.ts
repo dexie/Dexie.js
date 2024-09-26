@@ -39,7 +39,7 @@ export interface Table<T=any, TKey=any, TInsertType=T> {
   toArray<R>(thenShortcut: ThenShortcut<T[], R>): PromiseExtended<R>;
 
   toCollection(): Collection<T, TKey, TInsertType>;
-  orderBy(index: string | string[]): Collection<T, TKey, TInsertType>;
+  orderBy(index: string | string[], order: 'asc' | 'desc'): Collection<T, TKey, TInsertType>;
   reverse(): Collection<T, TKey, TInsertType>;
   mapToClass(constructor: Function): Function;
   add(item: TInsertType, key?: TKey): PromiseExtended<TKey>;

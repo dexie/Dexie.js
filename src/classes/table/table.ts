@@ -244,11 +244,12 @@ export class Table implements ITable<any, IndexableType> {
    * https://dexie.org/docs/Table/Table.orderBy()
    * 
    **/
-  orderBy(index: string | string[]) {
-    return new this.db.Collection(
-      new this.db.WhereClause(this, isArray(index) ?
-        `[${index.join('+')}]` :
-        index));
+  orderBy(index: string | string[], order: 'asc' | 'desc' = 'asc') {
+    const collection = new this.db.Collection(
+        new this.db.WhereClause(this, isArray(index) ?
+            `[${index.join('+')}]` :
+            index));
+    return order === 'desc'? collection.reverse() : collection
   }
 
   /** Table.reverse()

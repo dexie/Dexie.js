@@ -260,6 +260,20 @@ asyncTest("limit(),orderBy(),modify(), abort(), reverse()", function () {
             equal(a[1].first, "David", "Second item is David");
             ok(!a[1].helloMessage, "David was not modified due to limit()");
         });
+
+        // Check the order parameter works just the same as chaining reverse():
+        db.users.orderBy("first", "desc").toArray(function (a) {
+            equal(a[0].first, "Karl", "First item is Karl");
+            equal(a[0].helloMessage, "Hello Karl", "Karl got helloMessage 'Hello Karl'");
+            equal(a[1].first, "David", "Second item is David");
+            ok(!a[1].helloMessage, "David was not modified due to limit()");
+        });
+        db.users.orderBy("first").toArray(function (a) {
+            equal(a[1].first, "Karl", "First item is Karl");
+            equal(a[1].helloMessage, "Hello Karl", "Karl got helloMessage 'Hello Karl'");
+            equal(a[0].first, "David", "Second item is David");
+            ok(!a[0].helloMessage, "David was not modified due to limit()");
+        });
     }).catch(function (e) {
         ok(false, "Error: " + e);
     }).finally(function () {
