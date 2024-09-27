@@ -1,11 +1,13 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { DEXIE_CLOUD_SYNCER_ID } from '../sync/DEXIE_CLOUD_SYNCER_ID';
 import { YSyncState } from 'dexie';
+import { YDexieCloudSyncState } from './YDexieCloudSyncState';
 
 export async function updateYSyncStates(
   lastUpdateIdsBeforeSync: { [yTable: string]: number },
   receivedUntilsAfterSync: { [yTable: string]: number },
-  db: DexieCloudDB
+  db: DexieCloudDB,
+  serverRevision: string
 ) {
   // We want to update unsentFrom for each yTable to the value specified in first argument
   //  because we got those values before we synced with server and here we are back from server
@@ -37,14 +39,15 @@ export async function updateYSyncStates(
     // We're already in a transaction, but for the sake of
     // code readability and correctness, let's launch an atomic sub transaction:
     await db.transaction('rw', yTable, async () => {
-      const state: YSyncState | undefined = await db.table(yTable).get(
+      const state: YDexieCloudSyncState | undefined = await db.table(yTable).get(
         DEXIE_CLOUD_SYNCER_ID
       );
       if (!state) {
-        await db.table(yTable).add({
+        await db.table<YDexieCloudSyncState>(yTable).add({
           i: DEXIE_CLOUD_SYNCER_ID,
           unsentFrom: unsentFrom || 1,
-          receivedUntil: receivedUntil || 0
+          receivedUntil: receivedUntil || 0,
+          serverRev: serverRevision,
         });
       } else {
         if (unsentFrom) {
@@ -55,6 +58,7 @@ export async function updateYSyncStates(
             receivedUntil,
             state.receivedUntil || 0
           );
+          state.serverRev = serverRevision;
         }
         await db.table(yTable).put(state);
       }

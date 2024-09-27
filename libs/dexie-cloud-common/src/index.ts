@@ -20,3 +20,5 @@ export * from "./entities/DBRealmRole.js";
 export * from "./entities/DBSyncedObject.js";
 export * from "./getDbNameFromDbUrl.js";
 export * from "./YMessage.js";
+export * from "./encoding.js";
+export * from "./decoding.js";

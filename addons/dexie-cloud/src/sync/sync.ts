@@ -341,7 +341,7 @@ async function _sync(
     //
     // update Y SyncStates
     //
-    await updateYSyncStates(lastUpdateIds, receivedUntils, db);
+    await updateYSyncStates(lastUpdateIds, receivedUntils, db, res.serverRevision);
 
     //
     // Update regular syncState

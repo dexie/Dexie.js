@@ -17,6 +17,7 @@ export interface YDocumentOpen {
   table: string;
   prop: string;
   k: any;
+  serverRev?: string; // The server revision of what client has received in last sync. User to query changes since this revision.
   sv?: Uint8Array;
 }
 
@@ -57,8 +58,6 @@ export interface YUpdateFromServerMessage {
   prop: string;
   k: any;
   u: Uint8Array;
-  realmSetHash: Uint8Array;
-  newRev: string;
 }
 
 export interface YAwarenessUpdate {

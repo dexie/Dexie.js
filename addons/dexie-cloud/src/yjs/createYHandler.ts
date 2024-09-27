@@ -105,18 +105,19 @@ export function createYHandler(db: DexieCloudDB) {
        */
       async function openDocumentOnServer(wsStatus: DXCWebSocketStatus) {
         const myFlow = currentFlowId; // So we can abort when a new flow is started
-        const docOpenMsg: YDocumentOpen = {
-          type: 'doc-open',
-          table: parentTable,
-          prop: parentProp,
-          k: parentId,
-        };
         const yTbl = db.table(updatesTable);
         const syncState = await yTbl.get(DEXIE_CLOUD_SYNCER_ID);
         // After every await, check if we still should be working on this task.
         if (provider.destroyed || currentFlowId !== myFlow || !connected) return;
 
         const receivedUntil = syncState?.receivedUntil || 0;
+        const docOpenMsg: YDocumentOpen = {
+          type: 'doc-open',
+          table: parentTable,
+          prop: parentProp,
+          k: parentId,
+          serverRev: syncState?.serverRev,
+        };
         const serverUpdatesSinceLastSync = await yTbl
           .where('i')
           .between(receivedUntil, Infinity, false)

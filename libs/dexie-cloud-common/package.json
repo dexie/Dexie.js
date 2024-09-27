@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-common",
-  "version": "1.0.38",
+  "version": "1.0.42",
   "description": "Library for shared code between dexie-cloud-addon, dexie-cloud (CLI) and dexie-cloud-server",
   "type": "module",
   "module": "dist/index.js",
@@ -16,5 +16,8 @@
   "devDependencies": {
     "@types/node": "^18.11.18",
     "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "lib0": "^0.2.97"
   }
 }

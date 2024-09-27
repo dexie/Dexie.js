@@ -78,6 +78,7 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^11.1.5",
     "@types/node": "^18.11.18",
+    "dexie-cloud-common": "workspace:^",
     "dreambase-library": "^1.0.21",
     "just-build": "*",
     "karma": "*",
@@ -91,7 +92,6 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "dexie-cloud-common": "workspace:^",
     "rxjs": "^7.x"
   },
   "peerDependencies": {

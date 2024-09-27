@@ -9,6 +9,7 @@ import { createYClientUpdateObservable } from './yjs/createYClientUpdateObservab
 import { applyYServerMessages } from './yjs/applyYMessages';
 import { DexieYProvider } from 'dexie';
 import { getAwarenessLibrary, getDocAwareness } from './yjs/awareness';
+import { encodeYMessage, decodeYMessage } from 'dexie-cloud-common';
 
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;
@@ -280,7 +281,7 @@ export class WSConnection extends Subscription {
     // Connect the WebSocket to given url:
     console.debug('dexie-cloud WebSocket create');
     const ws = (this.ws = new WebSocket(`${wsUrl}/changes?${searchParams}`));
-    //ws.binaryType = "arraybuffer"; // For future when subscribing to actual changes.
+    ws.binaryType = "arraybuffer";
 
     ws.onclose = (event: Event) => {
       if (!this.pinger) return;
@@ -294,11 +295,14 @@ export class WSConnection extends Subscription {
 
       this.lastServerActivity = new Date();
       try {
-        const msg = TSON.parse(event.data) as
-          | WSConnectionMsg
-          | PongMessage
-          | ErrorMessage
-          | YServerMessage;
+        const msg = typeof event.data === 'string'
+          ? TSON.parse(event.data) as
+            | WSConnectionMsg
+            | PongMessage
+            | ErrorMessage
+            | YServerMessage   
+          : decodeYMessage(new Uint8Array(event.data)) as
+            | YServerMessage;
         if (msg.type === 'error') {
           throw new Error(`Error message from dexie-cloud: ${msg.error}`);
         } else if (msg.type === 'rev') {
@@ -355,7 +359,13 @@ export class WSConnection extends Subscription {
             ) {
               this.webSocketStatus.next('connected');
             }
-            this.ws?.send(TSON.stringify(msg));
+            if (msg.type === 'ready') {
+              this.ws?.send(TSON.stringify(msg));
+            } else {
+              // If it's not a "ready" message, it's an YMessage.
+              // YMessages can be sent binary encoded.
+              this.ws?.send(encodeYMessage(msg));
+            }
           }
         }
       ));
