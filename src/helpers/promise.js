@@ -261,16 +261,6 @@ props (DexiePromise, {
         });
     },
 
-    withResolvers () {
-        // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/withResolvers
-        let resolve, reject;
-        const promise = new this((res, rej) => {
-            resolve = res;
-            reject = rej;
-        });
-        return { promise, resolve, reject };
-    },
-
     PSD: {
         get: ()=>PSD,
         set: value => PSD = value
@@ -341,6 +331,8 @@ if (NativePromise) {
                 }));
         });
     });
+    // https://developer.mozilla.org/en-US/docs/Web/JavaScript/Reference/Global_Objects/Promise/withResolvers
+    if (NativePromise.withResolvers) DexiePromise.withResolvers = NativePromise.withResolvers;
 }
 
 /**
