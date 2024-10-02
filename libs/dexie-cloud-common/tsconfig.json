@@ -11,7 +11,8 @@
     "declaration": true,
     "declarationMap": true,
     "allowSyntheticDefaultImports": true,
-    "composite": true
+    "composite": true,
+    "types": ["jest", "node"],
   },
   "include": ["./src"]
 }

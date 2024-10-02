@@ -1,7 +1,7 @@
 import { BaseRevisionMapEntry } from './BaseRevisionMapEntry.js';
 import { DBOperationsSet } from './DBOperationsSet.js';
 import { DexieCloudSchema } from './DexieCloudSchema.js';
-import { YClientMessage } from './YMessage.js';
+import { YClientMessage } from './yjs/YMessage.js';
 
 export interface SyncRequest {
   v?: number;

@@ -9,12 +9,16 @@
   "scripts": {
     "build": "tsc",
     "prepare": "tsc",
+    "test": "jest",
     "tsver": "tsc --version"
   },
   "author": "David Fahlander",
   "license": "Apache-2.0",
   "devDependencies": {
+    "@types/jest": "^29.5.2",
     "@types/node": "^18.11.18",
+    "jest": "^29.7.0",
+    "ts-jest": "^29.2.5",
     "typescript": "^5.3.3"
   },
   "dependencies": {
