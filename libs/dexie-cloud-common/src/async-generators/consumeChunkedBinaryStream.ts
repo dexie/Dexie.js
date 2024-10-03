@@ -1,5 +1,5 @@
 export async function* consumeChunkedBinaryStream(
-  source: AsyncGenerator<Uint8Array>
+  source: AsyncIterable<Uint8Array>
 ) {
   let state: number = 0;
   let sizeBuf = new Uint8Array(4);
