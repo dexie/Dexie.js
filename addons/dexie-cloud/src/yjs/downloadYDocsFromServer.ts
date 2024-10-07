@@ -109,6 +109,7 @@ export async function downloadYDocsFromServer(
                 k,
                 u,
               });
+              break;
             }
           }
         }
