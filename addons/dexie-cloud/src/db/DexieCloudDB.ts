@@ -15,7 +15,7 @@ import {
 import { BroadcastedAndLocalEvent } from '../helpers/BroadcastedAndLocalEvent';
 import { SyncState, SyncStatePhase } from '../types/SyncState';
 import { MessagesFromServerConsumer } from '../sync/messagesFromServerQueue';
-import { YClientMessage } from 'dexie-cloud-common/src/YMessage';
+import { YClientMessage } from 'dexie-cloud-common';
 
 /*export interface DexieCloudDB extends Dexie {
   table(name: string): Table<any, any>;

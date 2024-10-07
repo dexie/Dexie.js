@@ -1,9 +1,6 @@
 import { DexieYProvider, InsertType, YSyncState, YUpdateRow } from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import {
-  YServerMessage,
-  YUpdateFromClientAck,
-} from 'dexie-cloud-common/src/YMessage';
+import { YServerMessage } from 'dexie-cloud-common';
 import { DEXIE_CLOUD_SYNCER_ID } from '../sync/DEXIE_CLOUD_SYNCER_ID';
 import { getUpdatesTable } from './getUpdatesTable';
 

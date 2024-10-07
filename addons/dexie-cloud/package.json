@@ -85,6 +85,7 @@
     "karma-chrome-launcher": "*",
     "karma-firefox-launcher": "*",
     "karma-qunit": "*",
+    "lib0": "^0.2.97",
     "preact": "*",
     "rollup": "^4.1.4",
     "terser": "^5.20.0",

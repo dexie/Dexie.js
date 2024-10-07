@@ -11,5 +11,4 @@ export interface SyncResponse {
   changes: DBOperationsSet<string>;
   rejections: { name: string; message: string; txid: string }[];
   yMessages: YServerMessage[];
-  //invites: DBInvite[];
 }

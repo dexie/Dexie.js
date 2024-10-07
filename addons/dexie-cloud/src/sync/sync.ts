@@ -29,6 +29,8 @@ import { checkSyncRateLimitDelay } from './ratelimit';
 import { listYClientMessagesAndStateVector } from '../yjs/listYClientMessagesAndStateVector';
 import { applyYServerMessages } from '../yjs/applyYMessages';
 import { updateYSyncStates } from '../yjs/updateYSyncStates';
+import { downloadYDocsFromServer } from '../yjs/downloadYDocsFromServer';
+import { UpdateSpec } from 'dexie';
 
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 
@@ -217,7 +219,7 @@ async function _sync(
   //
   // Apply changes locally and clear old change entries:
   //
-  const done = await db.transaction('rw', db.tables, async (tx) => {
+  const {done, newSyncState} = await db.transaction('rw', db.tables, async (tx) => {
     // @ts-ignore
     tx.idbtrans.disableChangeTracking = true;
     // @ts-ignore
@@ -333,27 +335,37 @@ async function _sync(
     //
     await applyServerChanges(filteredChanges, db);
 
-    //
-    // apply yMessages
-    //
-    const receivedUntils = await applyYServerMessages(res.yMessages, db);
+    if (res.yMessages) {
+      //
+      // apply yMessages
+      //
+      const receivedUntils = await applyYServerMessages(res.yMessages, db);
 
-    //
-    // update Y SyncStates
-    //
-    await updateYSyncStates(lastUpdateIds, receivedUntils, db, res.serverRevision);
+      //
+      // update Y SyncStates
+      //
+      await updateYSyncStates(lastUpdateIds, receivedUntils, db, res.serverRevision);
+    }
 
     //
     // Update regular syncState
     //
     db.$syncState.put(newSyncState, 'syncState');
 
-    return addedClientChanges.length === 0;
+    return {
+      done: addedClientChanges.length === 0,
+      newSyncState
+    };
   });
   if (!done) {
     console.debug('MORE SYNC NEEDED. Go for it again!');
     await checkSyncRateLimitDelay(db);
     return await _sync(db, options, schema, { isInitialSync, cancelToken });
+  }
+  const usingYProps = Object.values(schema).some(tbl => tbl.yProps?.length);
+  const serverSupportsYprops = !!res.yMessages;
+  if (usingYProps && serverSupportsYprops) {
+    await downloadYDocsFromServer(db, databaseUrl, newSyncState);
   }
   console.debug('SYNC DONE', { isInitialSync });
   db.syncCompleteEvent.next();
@@ -412,6 +424,18 @@ async function deleteObjectsFromRemovedRealms(
           .delete();
       }
     }
+  }
+  if (rejectedRealms.size > 0) {
+    // Remove rejected/deleted realms from yDownloadedRealms because of the following use case:
+    // 1. User becomes added to the realm
+    // 2. User syncs and all documents of the realm is downloaded (downloadYDocsFromServer.ts)
+    // 3. User leaves the realm and all docs are deleted locally (built-in-trigger of deleting their rows in this file)
+    // 4. User is yet again added to the realm. At this point, we must make sure the docs are not considered already downloaded.
+    const updateSpec: UpdateSpec<PersistedSyncState> = {};
+    for (const realmId of rejectedRealms) {
+      updateSpec[`yDownloadedRealms.${realmId}`] = undefined; // Setting to undefined will delete the property
+    } 
+    await db.$syncState.update('syncState', updateSpec);
   }
 }
 

@@ -212,6 +212,18 @@ export function createMutationTrackingMiddleware({
               }
               const ts = Date.now();
 
+              // Canonicalize req.criteria.index to null if it's on the primary key.
+              const criteria =
+                'criteria' in req && req.criteria
+                  ? {
+                      ...req.criteria,
+                      index:
+                        req.criteria.index === schema.primaryKey.keyPath // Use null to inform server that criteria is on primary key
+                          ? null // This will disable the server from trying to log consistent operations where it shouldnt.
+                          : req.criteria.index,
+                    }
+                  : undefined;
+
               const mut: DBOperation =
                 req.type === 'delete'
                   ? {
@@ -219,7 +231,7 @@ export function createMutationTrackingMiddleware({
                       ts,
                       opNo,
                       keys,
-                      criteria: req.criteria,
+                      criteria,
                       txid,
                       userId,
                     }
@@ -233,14 +245,14 @@ export function createMutationTrackingMiddleware({
                       userId,
                       values,
                     }
-                  : req.criteria && req.changeSpec
+                  : criteria && req.changeSpec
                   ? {
                       // Common changeSpec for all keys
                       type: 'modify',
                       ts,
                       opNo,
                       keys,
-                      criteria: req.criteria,
+                      criteria,
                       changeSpec: req.changeSpec,
                       txid,
                       userId,
@@ -269,7 +281,7 @@ export function createMutationTrackingMiddleware({
               if ('isAdditionalChunk' in req && req.isAdditionalChunk) {
                 mut.isAdditionalChunk = true;
               }
-              return keys.length > 0 || ('criteria' in req && req.criteria)
+              return keys.length > 0 || criteria
                 ? mutsTable
                     .mutate({ type: 'add', trans, values: [mut] }) // Log entry
                     .then(() => res) // Return original response
