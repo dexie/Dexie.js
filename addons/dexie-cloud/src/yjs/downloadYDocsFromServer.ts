@@ -63,14 +63,16 @@ export async function downloadYDocsFromServer(
     let docsToInsert: InsertType<YUpdateRow, 'i'>[] = [];
 
     async function storeCollectedDocs(completedRealm: boolean) {
+      const lastDoc = docsToInsert[docsToInsert.length - 1];
       if (docsToInsert.length > 0) {
         if (!currentRealmId || !currentTable || !currentProp) {
           throw new Error(`Protocol error from ${databaseUrl}/y/download`);
         }
         const yTable = getUpdatesTable(db, currentTable, currentProp);
         await yTable.bulkAdd(docsToInsert);
+        docsToInsert = [];
       }
-      if (currentRealmId && currentTable && currentProp) {
+      if (currentRealmId && currentTable && currentProp && (lastDoc || completedRealm)) {
         await db.$syncState.update(
           'syncState',
           completedRealm
@@ -79,7 +81,7 @@ export async function downloadYDocsFromServer(
                 [`yDownloadedRealms.${currentRealmId}`]: {
                   tbl: currentTable,
                   prop: currentProp,
-                  key: docsToInsert[docsToInsert.length - 1].k,
+                  key: lastDoc.k,
                 },
               }
         );
