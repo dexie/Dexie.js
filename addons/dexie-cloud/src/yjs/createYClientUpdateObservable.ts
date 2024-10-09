@@ -13,7 +13,7 @@ export function createYClientUpdateObservable(
     db.tables
       .filter(
         (table) =>
-          db.cloud.schema?.[table.name].markedForSync && table.schema.yProps
+          db.cloud.schema?.[table.name]?.markedForSync && table.schema.yProps
       )
       .map((table) =>
         table.schema.yProps!.map((p) => ({
@@ -53,5 +53,11 @@ export function createYClientUpdateObservable(
           });
       });
     })
-  ).pipe(mergeMap((messages) => messages)); // Flattens the array of messages. If messageProducer emits empty array, nothing is emitted but if messageProducer emits array of messages, they are emitted one by one.
+  ).pipe(
+    // Flatten the array of messages.
+    // If messageProducer emits empty array, nothing is emitted
+    // but if messageProducer emits array of messages, they are
+    // emitted one by one.
+    mergeMap((messages) => messages)
+  ); 
 }
