@@ -61,7 +61,12 @@ function compressYDocsTable(
     if (!stamp) return; // Skip. Already running.
     const lastCompressedUpdate = stamp.lastCompressed;
     const unsyncedFrom = Math.min(
-      ...syncers.map((s) => Math.min(s.unsentFrom || Infinity, s.receivedUntil != null ? s.receivedUntil + 1 : Infinity))
+      ...syncers.map((s) =>
+        Math.min(
+          s.unsentFrom || Infinity,
+          s.receivedUntil != null ? s.receivedUntil + 1 : Infinity
+        )
+      )
     );
     // Per updates-table:
     // 1. Find all updates after lastCompressedId. Run toArray() on them.
@@ -74,13 +79,13 @@ function compressYDocsTable(
       .where('i')
       .between(lastCompressedUpdate, Infinity, false)
       .toArray((addedUpdates: YUpdateRow[]) => {
-        if (addedUpdates.length <= 1) return; // For sure no updates to compress if there would be only 1.
+        if (addedUpdates.length === 0) return; // No more updates where added
         const docsToCompress: { docId: any; updates: YUpdateRow[] }[] = [];
-        let lastUpdateToCompress = lastCompressedUpdate + 1;
+        let lastUpdateToCompress = lastCompressedUpdate;
         for (let j = 0; j < addedUpdates.length; ++j) {
           const updateRow = addedUpdates[j];
           const { i, f, k } = updateRow;
-          if (i >= unsyncedFrom && (f & 0x01)) break; // An update that need to be synced was found. Stop here and let dontCompressFrom stay.
+          if (i >= unsyncedFrom && f & 0x01) break; // An update that need to be synced was found. Stop here and let dontCompressFrom stay.
           const entry = docsToCompress.find(
             (entry) => cmp(entry.docId, k) === 0
           );
@@ -88,9 +93,12 @@ function compressYDocsTable(
           else docsToCompress.push({ docId: k, updates: [updateRow] });
           lastUpdateToCompress = i;
         }
+        if (lastUpdateToCompress === lastCompressedUpdate) return; // No updates to compress
         let p = Promise.resolve();
         for (const { docId, updates } of docsToCompress) {
-          p = p.then(() => compressUpdatesForDoc(db, updatesTable, docId, updates));
+          p = p.then(() =>
+            compressUpdatesForDoc(db, updatesTable, docId, updates)
+          );
         }
         return p.then(() => {
           // Update lastCompressed atomically to the value we computed.
@@ -123,16 +131,16 @@ export function compressUpdatesForDoc(
   return db.transaction('rw', updatesTable, (tx) => {
     const updTbl = tx.table(updatesTable);
     return updTbl.where({ k: parentId }).first((mainUpdate: YUpdateRow) => {
-      const updates = [mainUpdate].concat(addedUpdatesToCompress); // in some situations, mainUpdate will be included twice here. But Y.js doesn't care!
+      const updates = [mainUpdate].concat(addedUpdatesToCompress.filter(u => u.i !== mainUpdate.i)); // avoid duplicating the main update (can happen sometimes)
       const Y = getYLibrary(db);
       const doc = new Y.Doc({ gc: true });
       //Y.transact(doc, ()=>{
-        updates.forEach((update) => {
-          //if (cmp(update.k, docRowId) !== 0) {
-          //  throw new Error('Invalid update');
-          //}
-          Y.applyUpdateV2(doc, update.u);
-        });
+      updates.forEach((update) => {
+        //if (cmp(update.k, docRowId) !== 0) {
+        //  throw new Error('Invalid update');
+        //}
+        Y.applyUpdateV2(doc, update.u);
+      });
       //}, "compressYDocs"); // Don't think anyone could be listening to this local doc.
       const compressedUpdate = Y.encodeStateAsUpdateV2(doc);
       const lastUpdate = updates.pop();

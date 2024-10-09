@@ -27,7 +27,11 @@ export async function downloadYDocsFromServer(
   databaseUrl: string,
   { yDownloadedRealms, realms }: PersistedSyncState
 ) {
-  if (yDownloadedRealms && realms && realms.every(realmId => yDownloadedRealms[realmId] === '*')) {
+  if (
+    yDownloadedRealms &&
+    realms &&
+    realms.every((realmId) => yDownloadedRealms[realmId] === '*')
+  ) {
     return; // Already done!
   }
   console.debug('Downloading Y.Docs from added realms');
@@ -72,19 +76,21 @@ export async function downloadYDocsFromServer(
         await yTable.bulkAdd(docsToInsert);
         docsToInsert = [];
       }
-      if (currentRealmId && currentTable && currentProp && (lastDoc || completedRealm)) {
-        await db.$syncState.update(
-          'syncState',
-          completedRealm
+      if (
+        currentRealmId &&
+        ((currentTable && currentProp && lastDoc) || completedRealm)
+      ) {
+        await db.$syncState.update('syncState', (syncState: PersistedSyncState) => {
+          const yDownloadedRealms = syncState.yDownloadedRealms || {};
+          yDownloadedRealms[currentRealmId!] = completedRealm
             ? '*'
             : {
-                [`yDownloadedRealms.${currentRealmId}`]: {
-                  tbl: currentTable,
-                  prop: currentProp,
-                  key: lastDoc.k,
-                },
-              }
-        );
+                tbl: currentTable!,
+                prop: currentProp!,
+                key: lastDoc.k!,
+              };
+          syncState.yDownloadedRealms = yDownloadedRealms;
+        });
       }
     }
 
