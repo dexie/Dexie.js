@@ -12,6 +12,7 @@ import { $Y } from './Y';
 import { filter, firstValueFrom } from 'rxjs';
 import { YDocumentOpen } from 'dexie-cloud-common';
 import { DXCWebSocketStatus } from '../DXCWebSocketStatus';
+import { isEagerSyncDisabled } from '../isEagerSyncDisabled';
 
 type YDoc = import('yjs').Doc;
 
@@ -31,7 +32,7 @@ export function createYHandler(db: DexieCloudDB) {
       // Send the update
       const changedClients = added.concat(updated).concat(removed);
       const user = db.cloud.currentUser.value;
-      if (origin !== 'server' && user.isLoggedIn && user.license?.status === 'ok') {
+      if (origin !== 'server' && user.isLoggedIn && !isEagerSyncDisabled(db)) {
         const update = awap.encodeAwarenessUpdate(awareness!, changedClients);
         db.messageProducer.next({
           type: 'aware',
@@ -77,7 +78,7 @@ export function createYHandler(db: DexieCloudDB) {
 
         // We are or got connected. Open the document on the server.
         const user = db.cloud.currentUser.value;
-        if (wsStatus === "connected" && user.isLoggedIn && user.license?.status === 'ok') {
+        if (wsStatus === "connected" && user.isLoggedIn && !isEagerSyncDisabled(db)) {
           ++currentFlowId;
           openDocumentOnServer(wsStatus).catch(error => {
             console.warn(`Error catched in createYHandler.ts: ${error}`);

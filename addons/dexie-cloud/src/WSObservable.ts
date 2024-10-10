@@ -11,6 +11,7 @@ import { DexieYProvider } from 'dexie';
 import { getAwarenessLibrary, getDocAwareness } from './yjs/awareness';
 import { encodeYMessage, decodeYMessage } from 'dexie-cloud-common';
 import { UserLogin } from './dexie-cloud-client';
+import { isEagerSyncDisabled } from './isEagerSyncDisabled';
 
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;
@@ -366,7 +367,7 @@ export class WSConnection extends Subscription {
           }
         }
       ));
-      if (this.user.isLoggedIn && this.user.license?.status === 'ok') {
+      if (this.user.isLoggedIn && !isEagerSyncDisabled(this.db)) {
         this.subscriptions.add(
           createYClientUpdateObservable(this.db).subscribe(
             this.db.messageProducer
