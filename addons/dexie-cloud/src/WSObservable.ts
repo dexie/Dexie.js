@@ -10,6 +10,7 @@ import { applyYServerMessages } from './yjs/applyYMessages';
 import { DexieYProvider } from 'dexie';
 import { getAwarenessLibrary, getDocAwareness } from './yjs/awareness';
 import { encodeYMessage, decodeYMessage } from 'dexie-cloud-common';
+import { UserLogin } from './dexie-cloud-client';
 
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;
@@ -86,8 +87,7 @@ export class WSObservable extends Observable<WSConnectionMsg> {
     clientIdentity: string,
     messageProducer: Observable<WSClientToServerMsg>,
     webSocketStatus: BehaviorSubject<DXCWebSocketStatus>,
-    token?: string,
-    tokenExpiration?: Date
+    user: UserLogin
   ) {
     super(
       (subscriber) =>
@@ -96,8 +96,7 @@ export class WSObservable extends Observable<WSConnectionMsg> {
           rev,
           realmSetHash,
           clientIdentity,
-          token,
-          tokenExpiration,
+          user,
           subscriber,
           messageProducer,
           webSocketStatus
@@ -118,8 +117,7 @@ export class WSConnection extends Subscription {
   rev: string;
   realmSetHash: string;
   clientIdentity: string;
-  token: string | undefined;
-  tokenExpiration: Date | undefined;
+  user: UserLogin;
   subscriber: Subscriber<WSConnectionMsg>;
   pauseUntil?: Date;
   messageProducer: Observable<WSClientToServerMsg>;
@@ -134,8 +132,7 @@ export class WSConnection extends Subscription {
     rev: string,
     realmSetHash: string,
     clientIdentity: string,
-    token: string | undefined,
-    tokenExpiration: Date | undefined,
+    user: UserLogin,
     subscriber: Subscriber<WSConnectionMsg>,
     messageProducer: Observable<WSClientToServerMsg>,
     webSocketStatus: BehaviorSubject<DXCWebSocketStatus>
@@ -144,15 +141,14 @@ export class WSConnection extends Subscription {
     console.debug(
       'New WebSocket Connection',
       this.id,
-      token ? 'authorized' : 'unauthorized'
+      user.accessToken ? 'authorized' : 'unauthorized'
     );
     this.db = db;
     this.databaseUrl = db.cloud.options!.databaseUrl;
     this.rev = rev;
     this.realmSetHash = realmSetHash;
     this.clientIdentity = clientIdentity;
-    this.token = token;
-    this.tokenExpiration = tokenExpiration;
+    this.user = user;
     this.subscriber = subscriber;
     this.lastUserActivity = new Date();
     this.messageProducer = messageProducer;
@@ -213,7 +209,8 @@ export class WSConnection extends Subscription {
       //console.debug('SyncStatus: DUBB: Ooops it was closed!');
       return;
     }
-    if (this.tokenExpiration && this.tokenExpiration < new Date()) {
+    const tokenExpiration = this.user.accessTokenExpiration;
+    if (tokenExpiration && tokenExpiration < new Date()) {
       this.subscriber.error(new TokenExpiredError()); // Will be handled in connectWebSocket.ts.
       return;
     }
@@ -274,8 +271,8 @@ export class WSConnection extends Subscription {
     searchParams.set('rev', this.rev);
     searchParams.set('realmsHash', this.realmSetHash);
     searchParams.set('clientId', this.clientIdentity);
-    if (this.token) {
-      searchParams.set('token', this.token);
+    if (this.user.accessToken) {
+      searchParams.set('token', this.user.accessToken);
     }
 
     // Connect the WebSocket to given url:
@@ -369,11 +366,13 @@ export class WSConnection extends Subscription {
           }
         }
       ));
-      this.subscriptions.add(
-        createYClientUpdateObservable(this.db).subscribe(
-          this.db.messageProducer
-        )
-      );
+      if (this.user.isLoggedIn && this.user.license?.status === 'ok') {
+        this.subscriptions.add(
+          createYClientUpdateObservable(this.db).subscribe(
+            this.db.messageProducer
+          )
+        );
+      }
     } catch (error) {
       this.pauseUntil = new Date(Date.now() + FAIL_RETRY_WAIT_TIME);
     }

@@ -119,8 +119,7 @@ export function connectWebSocket(db: DexieCloudDB) {
               db.cloud.persistedSyncState!.value!.clientIdentity,
               messageProducer,
               db.cloud.webSocketStatus,
-              userLogin.accessToken,
-              userLogin.accessTokenExpiration
+              userLogin
             );
         } else {
           return from([] as WSConnectionMsg[]);

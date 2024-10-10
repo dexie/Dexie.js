@@ -1,9 +1,10 @@
-import type { YSyncState, YUpdateRow } from 'dexie';
+import type { Table, YSyncState, YUpdateRow } from 'dexie';
 import type { YClientMessage } from 'dexie-cloud-common';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { DEXIE_CLOUD_SYNCER_ID } from '../sync/DEXIE_CLOUD_SYNCER_ID';
 import { listUpdatesSince } from './listUpdatesSince';
 import { $Y } from './Y';
+import { EntityCommon } from '../db/entities/EntityCommon';
 
 /** Queries the local database for YMessages to send to server.
  * 
@@ -22,12 +23,13 @@ import { $Y } from './Y';
  * @returns 
  */
 export async function listYClientMessagesAndStateVector(
-  db: DexieCloudDB
+  db: DexieCloudDB,
+  tablesToSync: Table<EntityCommon>[]
 ): Promise<{yMessages: YClientMessage[], lastUpdateIds: {[yTable: string]: number}}> {
   const result: YClientMessage[] = [];
   const lastUpdateIds: {[yTable: string]: number} = {};
-  for (const table of db.tables) {
-    if (table.schema.yProps && db.cloud.schema?.[table.name].markedForSync) {
+  for (const table of tablesToSync) {
+    if (table.schema.yProps) {
       for (const yProp of table.schema.yProps) {
         const Y = $Y(db); // This is how we retrieve the user-provided Y library
         const yTable = db.table(yProp.updatesTable); // the updates-table for this combo of table+propName

@@ -159,7 +159,7 @@ async function _sync(
       const syncState = await db.getPersistedSyncState();
       const baseRevs = await db.$baseRevs.toArray();
       let clientChanges = await listClientChanges(mutationTables, db);
-      const yResults = await listYClientMessagesAndStateVector(db);
+      const yResults = await listYClientMessagesAndStateVector(db, tablesToSync);
       throwIfCancelled(cancelToken);
       if (doSyncify) {
         const alreadySyncedRealms = [

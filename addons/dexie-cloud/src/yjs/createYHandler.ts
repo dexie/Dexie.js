@@ -30,7 +30,8 @@ export function createYHandler(db: DexieCloudDB) {
     awareness.on('update', ({ added, updated, removed }, origin: any) => {
       // Send the update
       const changedClients = added.concat(updated).concat(removed);
-      if (origin !== 'server') {
+      const user = db.cloud.currentUser.value;
+      if (origin !== 'server' && user.isLoggedIn && user.license?.status === 'ok') {
         const update = awap.encodeAwarenessUpdate(awareness!, changedClients);
         db.messageProducer.next({
           type: 'aware',
@@ -75,7 +76,8 @@ export function createYHandler(db: DexieCloudDB) {
         connected = wsStatus === 'connected';
 
         // We are or got connected. Open the document on the server.
-        if (wsStatus === "connected") {
+        const user = db.cloud.currentUser.value;
+        if (wsStatus === "connected" && user.isLoggedIn && user.license?.status === 'ok') {
           ++currentFlowId;
           openDocumentOnServer(wsStatus).catch(error => {
             console.warn(`Error catched in createYHandler.ts: ${error}`);
