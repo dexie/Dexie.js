@@ -1,3 +1,4 @@
+import type * as Y from 'yjs';
 export interface TodoItem {
   id: string;
   realmId: string;
@@ -5,4 +6,5 @@ export interface TodoItem {
   title: string;
   owner: string;
   done?: boolean;
+  description: Y.Doc;
 }

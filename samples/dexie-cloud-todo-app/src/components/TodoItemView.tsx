@@ -4,6 +4,7 @@ import { TodoItem } from '../db/TodoItem';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
 import { faTrash } from '@fortawesome/free-solid-svg-icons';
 import { usePermissions } from 'dexie-react-hooks';
+import { TiptapEditor } from './tiptap/TipTapEditor';
 
 interface Props {
   item: TodoItem;
@@ -16,7 +17,7 @@ export function TodoItemView({ item }: Props) {
       <div className="narrow">
         <input
           type="checkbox"
-          disabled={!can.update('done')}
+          //disabled={!can.update('done')}
           checked={!!item.done}
           onChange={(ev) => {
             db.todoItems.update(item.id, {
@@ -25,7 +26,9 @@ export function TodoItemView({ item }: Props) {
           }}
         />
       </div>
-      <div className="todo-item-text">{item.title}</div>
+      <div className="todo-item-text">
+        <TiptapEditor doc={item.description} />
+      </div>
       <div className="todo-item-trash">
         <button
           disabled={!can.delete()}
