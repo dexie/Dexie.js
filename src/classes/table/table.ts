@@ -279,7 +279,8 @@ export class Table implements ITable<any, IndexableType> {
     }
     if (this.schema.yProps) {
       const Y = getYLibrary(db);
-      constructor = class extends (constructor as any) {};
+      class DBObjectWithYProps extends (constructor as any) {};
+      constructor = DBObjectWithYProps;
       this.schema.yProps.forEach(({prop, updatesTable}) => {
         Object.defineProperty(constructor.prototype, prop, createYDocProperty(db, Y, this, prop, updatesTable));
       });

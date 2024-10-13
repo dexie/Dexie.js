@@ -201,6 +201,95 @@ promisedTest('Test that syncers prohibit GC from compressing unsynced updates', 
 });
 
 
+promisedTest('Test creating a row with a populated Y.Doc', async () => {
+  const doc = new Y.Doc();
+  doc.getArray('arr').insert(0, ['a', 'b', 'c']);
+  await db.docs.add({
+    id: "doc1",
+    title: "Hello",
+    content: doc
+  });
+  let row = await db.docs.get("doc1");
+  equal(row.title, "Hello", "Title is correct");
+  let doc2 = row.content;
+  ok(doc2 instanceof Y.Doc, "Content is a Y.Doc");
+  DexieYProvider.load(doc2);
+  await doc2.whenLoaded;
+  deepEqual(doc2.getArray('arr').toJSON(), ['a', 'b', 'c'], "Array is correct");
+  DexieYProvider.release(doc2);
+});
+
+promisedTest('Verify error handling of misused Y.Doc properties', async () => {  
+  // Setting to null:
+  await db.docs.put({
+    id: "doc1",
+    title: "Hello",
+    content: null
+  }).then(() => {
+    ok(false, "Expected error when trying to create an Y.Doc property with null value");
+  }).catch(error => {
+    ok(error instanceof TypeError, "Expected TypeError when trying to create an Y.Doc property with null value");
+  });
+  // Setting to undefined should be allowed (because a class with the property declared must work):
+  await db.docs.put({
+    id: "doc1",
+    title: "Hello",
+    content: undefined
+  });
+  ok(true, "could set the property to undefined");
+
+  // Setting to a string:
+  await db.docs.put({
+    id: "doc1",
+    title: "Hello",
+    content: "a string"
+  }).then(() => {
+    ok(false, "Expected error when trying to create an Y.Doc property to a string");
+  }).catch(error => {
+    ok(error instanceof TypeError, "Expected TypeError when trying to create an Y.Doc property to a string");
+  });
+  // Setting to a Blob:
+  await db.docs.put({
+    id: "doc1",
+    title: "Hello",
+    content: new Blob([])
+  }).then(() => {
+    ok(false, "Expected error when trying to create an Y.Doc property to a Blob");
+  }).catch(error => {
+    ok(error instanceof TypeError, "Expected TypeError when trying to create an Y.Doc property to a Blob");
+  });
+  // Specifying an Y.Doc when adding is ok:
+  await db.docs.add({
+    id: "doc2",
+    title: "Hola",
+    content: new Y.Doc()
+  });
+  ok(true, "Successfully added a new Y.Doc");
+  await db.docs.put({
+    id: "doc3",
+    title: "Thridi",
+    content: new Y.Doc()
+  }).then(()=>{
+    ok(false, "Expected error when trying to put() with content data set on own property");
+  }).catch(error => {
+    ok(error instanceof TypeError, "Expected TypeError when trying to use put() with content data set on own property");
+  })
+  let doc2 = await db.docs.get("doc2");
+  ok(doc2.content instanceof Y.Doc, "The content property is an Y.Doc");
+  try {
+    doc2.content = new Y.Doc();
+    ok(false, "Should have thrown when trying to set content");
+  } catch(error) {
+    ok(true, "Failed when trying to set content of an existing doc");
+  }
+  doc2.title = "Quattro Pizza";
+  await db.docs.put(doc2); // Verify it's ok to use put when an existing ydoc had been retrieved from DB.
+  ok(true, "Could put back the doc2 we've added");
+  let doc2Back = await db.docs.get("doc2");
+  equal(doc2Back.title, "Quattro Pizza", "Verify that the put operation was successful for non-Y.Doc properties");
+  ok(doc2Back.content === doc2.content, "Verify that the Y.Doc property is equal be reference to the previously retrieved Y.Doc as long as it isn't destroyed");
+});
+
 /*promisedTest('Test awareness', async () => {
   const doc = new Y.Doc();
   const aw = new awareness.Awareness(doc);

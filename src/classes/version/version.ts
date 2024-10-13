@@ -7,6 +7,8 @@ import { removeTablesApi, setApiOnPlace, parseIndexSyntax } from './schema-helpe
 import { exceptions } from '../../errors';
 import { createTableSchema } from '../../helpers/table-schema';
 import { nop, promisableChain } from '../../functions/chaining-functions';
+import { createYjsMiddleware } from '../../yjs/createYjsMiddleware';
+import { getYLibrary } from '../../yjs/getYLibrary';
 
 /** class Version
  *
@@ -126,6 +128,11 @@ export class Version implements IVersion {
         );
       }
     });
+    if (Object.values(dbschema).some((table) => table.yProps)) {
+      db.use(createYjsMiddleware(dbschema, getYLibrary(db)));
+    } else {
+      db.unuse({ stack: 'dbcore', name: 'yjsMiddleware' });
+    }
     return this;
   }
 

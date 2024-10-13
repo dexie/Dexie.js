@@ -14,6 +14,9 @@ export function createYDocProperty(
   const pkKeyPath = table.schema.primKey.keyPath;
   const docCache = getDocCache(db);
   return {
+    set() {
+      throw new TypeError(`Y.Doc properties are read-only`);
+    },
     get(this: object) {
       const id = getByKeyPath(this, pkKeyPath);
 

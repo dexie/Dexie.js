@@ -85,7 +85,7 @@ export function observeYDocUpdates(
         k: parentId,
         u: update,
         f: 1, // Flag as local update (to be included when syncing)
-      })
+      } satisfies Omit<YUpdateRow, 'i'>)
       .then((i: number) => {
         // Optimization (not critical): Don't query for this update to put it back into the doc.
         // However, skip this optimization if the lastUpdateId is behind the current update.
