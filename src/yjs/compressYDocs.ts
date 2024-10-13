@@ -44,7 +44,7 @@ function compressYDocsTable(
           skipIfRunnedSince &&
           lastCompressed.lastRun.getTime() > Date.now() - skipIfRunnedSince
         ) {
-          // Skip it. It's still running.
+          // Skip it. It has run recently or is still running.
           return null;
         }
         // isRunning might be true but we don't respect it if started before skipIfRunningSince.
@@ -106,15 +106,16 @@ function compressYDocsTable(
           // that maybe compressed one or more extra updates and updated lastCompressed
           // before us.
           return db.transaction('rw', updTbl, () =>
-            updTbl.get(0).then((current: YLastCompressed) =>
-              updTbl.put({
+            updTbl.get(0).then((current: YLastCompressed) => {
+              if (current && lastUpdateToCompress <= current.lastCompressed) {
+                // No need to update. Nothing was done, or another job did more.
+                return;
+              }
+              return updTbl.put({
                 ...current,
-                lastCompressed: Math.max(
-                  lastUpdateToCompress,
-                  current?.lastCompressed || 0
-                ),
-              })
-            )
+                lastCompressed: lastUpdateToCompress,
+              });
+            })
           );
         });
       });
@@ -131,7 +132,9 @@ export function compressUpdatesForDoc(
   return db.transaction('rw', updatesTable, (tx) => {
     const updTbl = tx.table(updatesTable);
     return updTbl.where({ k: parentId }).first((mainUpdate: YUpdateRow) => {
-      const updates = [mainUpdate].concat(addedUpdatesToCompress.filter(u => u.i !== mainUpdate.i)); // avoid duplicating the main update (can happen sometimes)
+      const updates = [mainUpdate].concat(
+        addedUpdatesToCompress.filter((u) => u.i !== mainUpdate.i)
+      ); // avoid duplicating the main update (can happen sometimes)
       const Y = getYLibrary(db);
       const doc = new Y.Doc({ gc: true });
       //Y.transact(doc, ()=>{
