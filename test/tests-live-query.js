@@ -828,4 +828,21 @@ promisedTest("Issue 2067: useLiveQuery does not update when multiple items are d
   db.items.where('id').above(0).delete();
   items = await promise;
   deepEqual(items, [{id: 0},{id: -10}], "Should have deleted items where id > 0");
+  tester.subscription.unsubscribe();
+});
+
+promisedTest("Issue 2058: Cache error after bulkPut failures", async () => {
+  const tester = liveQueryUnitTester(()=>db.items.toArray());
+  let items = await tester.waitNextValue();
+  deepEqual(items, [{id:1},{id:2},{id:3}], "Initial items are correct");
+  let promise = tester.waitNextValue();
+  await db.items.bulkAdd([
+    {id:3}, // This one won't be added (constraint violation)
+    {id:88} // This one will be added
+  ]).catch(error => {
+    equal(error.failuresByPos[0].name, "ConstraintError", "Expected constraint error for the first operation");
+  });
+  items = await promise;
+  deepEqual(items, [{id:1},{id:2},{id:3},{id:88}], "The livequery emitted correct result after bulk operation");
+  tester.subscription.unsubscribe();
 });
