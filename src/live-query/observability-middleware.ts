@@ -100,7 +100,12 @@ export const observabilityMiddleware: Middleware<DBCore> = {
             } else if (keys) {
               // keys is a DBCoreKeyRange object. Transform it to [from,to]-style range.
               // As we can't know deleted index ranges, mark index-based subscriptions must trigger.
-              const range = { from: keys.lower, to: keys.upper };
+              // (above/below-style ranges are not supported in RangeSet.ts, so we must replace open ends
+              // with core.MIN_KEY and core.MAX_KEY respectively. This is what solves issue #2067!
+              const range = {
+                from: keys.lower ?? core.MIN_KEY,
+                to: keys.upper ?? core.MAX_KEY
+              };
               delsRangeSet.add(range);
               // deleteRange. keys is a DBCoreKeyRange objects. Transform it to [from,to]-style range.
               pkRangeSet.add(range);
