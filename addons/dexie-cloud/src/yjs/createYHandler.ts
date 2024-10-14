@@ -17,8 +17,8 @@ import { isEagerSyncDisabled } from '../isEagerSyncDisabled';
 type YDoc = import('yjs').Doc;
 
 export function createYHandler(db: DexieCloudDB) {
-  const awap = getAwarenessLibrary(db);
   return (provider: DexieYProvider<YDoc>) => {
+    const awap = getAwarenessLibrary(db);
     const doc = provider.doc;
     const { parentTable, parentId, parentProp, updatesTable } =
       doc.meta as DexieYDocMeta;
