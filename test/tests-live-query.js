@@ -1,12 +1,12 @@
-import Dexie, {liveQuery} from 'dexie';
-import {module, stop, start, asyncTest, equal, ok} from 'QUnit';
-import {resetDatabase, supports, promisedTest, isIE} from './dexie-unittest-utils';
-import {from} from "rxjs";
-import {map} from "rxjs/operators";
+import Dexie, { liveQuery } from 'dexie';
+import { equal, module, ok, start, stop } from 'QUnit';
+import { from } from "rxjs";
+import { map } from "rxjs/operators";
 import { deepEqual, isDeepEqual } from './deepEqual';
+import { isIE, promisedTest, resetDatabase } from './dexie-unittest-utils';
 
 const db = new Dexie("TestLiveQuery", {
-  cache: 'immutable' // Using immutable cache in tests because it is most likely to fail if not using properly.
+  cache: 'disabled' // Using immutable cache in tests because it is most likely to fail if not using properly.
 });
 db.version(2).stores({
     items: "id, name",
@@ -40,6 +40,46 @@ function objectify(map) {
 
 class Signal {
   promise = new Promise(resolve => this.resolve = resolve);
+}
+
+function liveQueryUnitTester(lq) {
+  let currentVal;
+  let currentError = null;
+  let signal = ()=>{};
+  let reject = ()=>{};
+  let querying = 0;
+  const subscription = liveQuery(async ()=>{
+    ++querying;
+    try {
+      currentVal = await lq();
+      currentError = null;
+    } catch (error) {
+      currentError = error;
+    }
+    if (--querying === 0) setTimeout(()=>{
+      if (querying === 0) {
+        if (currentError)
+          reject(currentError);
+        else
+          signal(currentVal);
+      }
+    }, 0);
+  }).subscribe(x => x);
+  return {
+    waitNextValue(timeout=500) {
+      const promise = new Promise((resolve, rej) => {
+        signal = resolve;
+        reject = rej;
+      });
+      return !timeout
+        ? promise
+        : Promise.race([
+            promise,
+            new Promise((_, rej) => setTimeout(()=>rej(new Error("Timeout")), timeout))
+          ]);
+    },
+    subscription
+  }
 }
 
 module("live-query", {
@@ -558,7 +598,7 @@ const mutsAndExpects = () => [
     },[
       "itemsStartsWithAOffset3" // Should not be updated but need to be ignored because otherwise it fails in dexie-syncable's integration tests that expects it to update to another empty array
     ]
-  ],
+  ]
 ]
 
 promisedTest("Full use case matrix", async ()=>{
@@ -772,4 +812,20 @@ promisedTest("Issue 1821: liveQuery containing primaryKeys should not emit when 
     {type: "emit", result: [1, 2, 3, 4]}
   ], "No new emit should have been made");
   subscription.unsubscribe();
+});
+
+promisedTest("Issue 2067: useLiveQuery does not update when multiple items are deleted", async () => {
+  let items = await db.items.reverse().toArray();
+  deepEqual(items, [{id:3},{id:2},{id:1}], "Initial items are correct");
+  const tester = liveQueryUnitTester(()=>db.items.reverse().toArray());
+  db.items.where('id').above(0).delete();
+  items = await tester.waitNextValue();
+  deepEqual(items, [], "Items are deleted");
+  db.items.bulkAdd([{id: -10},{id: 0},{id: 10}]);
+  items = await tester.waitNextValue();
+  deepEqual(items, [{id: 10},{id: 0},{id: -10}], "Reacts on bulkAdd");
+  let promise = tester.waitNextValue();
+  db.items.where('id').above(0).delete();
+  items = await promise;
+  deepEqual(items, [{id: 0},{id: -10}], "Should have deleted items where id > 0");
 });
