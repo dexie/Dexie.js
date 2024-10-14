@@ -6,7 +6,7 @@ import { deepEqual, isDeepEqual } from './deepEqual';
 import { isIE, promisedTest, resetDatabase } from './dexie-unittest-utils';
 
 const db = new Dexie("TestLiveQuery", {
-  cache: 'disabled' // Using immutable cache in tests because it is most likely to fail if not using properly.
+  cache: 'immutable' // Using immutable cache in tests because it is most likely to fail if not using properly.
 });
 db.version(2).stores({
     items: "id, name",
