@@ -14,7 +14,8 @@ db.version(2).stores({
     outbound: "++,name",
     friends: "++id, name, age",
     multiEntry: "id, *tags",
-    issue1946: "++id, [name+age], [name+age+id]"
+    issue1946: "++id, [name+age], [name+age+id]",
+    issue2058: "id, &[a+b]"
 });
 
 db.on('populate', ()=> {
@@ -832,7 +833,7 @@ promisedTest("Issue 2067: useLiveQuery does not update when multiple items are d
   tester.subscription.unsubscribe();
 });
 
-promisedTest("Issue 2058: Cache error after bulkPut failures", async () => {
+promisedTest("Issue 2058 - related but with bulkAdd and constraint error on duplicate primary keys.", async () => {
   const tester = liveQueryUnitTester(
     ()=>db.items.toArray()
   );
@@ -879,3 +880,35 @@ promisedTest("Issue 2058: Cache error after bulkPut failures", async () => {
   ], "Correct state after trying to add these half baked entries");
   tester.subscription.unsubscribe();
 });
+
+promisedTest("Issue 2058: Cache error after bulkPut failures", async () => {
+  const tester = liveQueryUnitTester(
+    ()=>db.issue2058.toArray(),
+    {graceTime: 10}
+  );
+  await db.issue2058.bulkAdd([
+    {id:"1.1",a:1,b:1},
+    {id:"1.2",a:1,b:2},
+    {id:"2.1",a:2,b:1},
+  ]);
+  let items = await tester.waitNextValue();
+  deepEqual(items, [
+    {id:"1.1",a:1,b:1},
+    {id:"1.2",a:1,b:2},
+    {id:"2.1",a:2,b:1}
+  ], "Initial items are correct");
+  await db.issue2058.bulkPut([
+    {id:"2.2",a:2,b:2},
+    {id:"foo", a: 1, b: 1}
+  ]).catch(error => {
+    equal(error.failuresByPos[1].name, "ConstraintError", "Expected constraint error for the first operation");
+  });
+  items = await tester.waitNextValue();
+  deepEqual(items, [
+    {id:"1.1",a:1,b:1},
+    {id:"1.2",a:1,b:2},
+    {id:"2.1",a:2,b:1},
+    {id:"2.2",a:2,b:2}
+  ], "The livequery emitted correct result after bulk operation");
+});
+
