@@ -48,14 +48,30 @@ export function applyOptimisticOps(
       }
     }
     switch (op.type) {
-      case 'add':
+      case 'add': {
+        const existingKeys = new RangeSet().addKeys(
+          req.values ? result.map((v) => extractPrimKey(v)) : result
+        );
+
         modifedResult = result.concat(
           req.values
-            ? includedValues
-            : includedValues.map((v) => extractPrimKey(v))
+            ? includedValues.filter((v) => {
+                const key = extractPrimKey(v);
+                if (existingKeys.hasKey(key)) return false;
+                existingKeys.addKey(key);
+                return true;
+              })
+            : includedValues
+                .map((v) => extractPrimKey(v))
+                .filter((k) => {
+                  if (existingKeys.hasKey(k)) return false;
+                  existingKeys.addKey(k);
+                  return true;
+                })
         );
         break;
-      case 'put':
+      }
+      case 'put': {
         const keySet = new RangeSet().addKeys(
           op.values.map((v) => extractPrimKey(v))
         );
@@ -71,16 +87,20 @@ export function applyOptimisticOps(
               : includedValues.map((v) => extractPrimKey(v))
           );
         break;
+      }
       case 'delete':
         const keysToDelete = new RangeSet().addKeys(op.keys);
         modifedResult = result.filter(
-          (item) => !keysToDelete.hasKey(req.values ? extractPrimKey(item) : item)
+          (item) =>
+            !keysToDelete.hasKey(req.values ? extractPrimKey(item) : item)
         );
 
         break;
       case 'deleteRange':
         const range = op.range;
-        modifedResult = result.filter((item) => !isWithinRange(extractPrimKey(item), range));
+        modifedResult = result.filter(
+          (item) => !isWithinRange(extractPrimKey(item), range)
+        );
         break;
     }
     return modifedResult;

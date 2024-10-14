@@ -14,7 +14,8 @@ db.version(2).stores({
     outbound: "++,name",
     friends: "++id, name, age",
     multiEntry: "id, *tags",
-    issue1946: "++id, [name+age], [name+age+id]"
+    issue1946: "++id, [name+age], [name+age+id]",
+    issue2058: "id, &[a+b]"
 });
 
 db.on('populate', ()=> {
@@ -42,7 +43,7 @@ class Signal {
   promise = new Promise(resolve => this.resolve = resolve);
 }
 
-function liveQueryUnitTester(lq) {
+function liveQueryUnitTester(lq, {graceTime}={graceTime: 0}) {
   let currentVal;
   let currentError = null;
   let signal = ()=>{};
@@ -52,6 +53,7 @@ function liveQueryUnitTester(lq) {
     ++querying;
     try {
       currentVal = await lq();
+      console.log("Emitted", currentVal);
       currentError = null;
     } catch (error) {
       currentError = error;
@@ -63,7 +65,7 @@ function liveQueryUnitTester(lq) {
         else
           signal(currentVal);
       }
-    }, 0);
+    }, graceTime);
   }).subscribe(x => x);
   return {
     waitNextValue(timeout=500) {
@@ -828,4 +830,85 @@ promisedTest("Issue 2067: useLiveQuery does not update when multiple items are d
   db.items.where('id').above(0).delete();
   items = await promise;
   deepEqual(items, [{id: 0},{id: -10}], "Should have deleted items where id > 0");
+  tester.subscription.unsubscribe();
 });
+
+promisedTest("Issue 2058 - related but with bulkAdd and constraint error on duplicate primary keys.", async () => {
+  const tester = liveQueryUnitTester(
+    ()=>db.items.toArray()
+  );
+  let items = await tester.waitNextValue();
+  deepEqual(items, [{id:1},{id:2},{id:3}], "Initial items are correct");
+  let promise = tester.waitNextValue();
+  await db.items.bulkAdd([
+    {id:3}, // This one won't be added (constraint violation)
+    {id:88} // This one will be added
+  ]).catch(error => {
+    equal(error.failuresByPos[0].name, "ConstraintError", "Expected constraint error for the first operation");
+  });
+  items = await promise;
+  deepEqual(items, [{id:1},{id:2},{id:3},{id:88}], "The livequery emitted correct result after bulk operation");
+  // Now making sure we go through a different code path (where the number of items > 50 in cache-middleware.ts)
+  const itemsToAdd = new Array(51)
+  .fill({id: 1}, 0, 40) // Positions 0..40 is constraint violations agains existing data + themselves
+  .fill({id:99}, 40, 49) // Positions 40 is new value but 41...49 is constraint violation of pos 40.
+  .fill({id:100}, 49, 50) // Position 50 is ok.
+  .fill({id:101}, 50) // Position 51 is ok.
+
+  await db.items.bulkAdd(itemsToAdd).catch(error => {
+    deepEqual(Object.keys(error.failuresByPos).map(Number),[
+      0,1,2,3,4,5,6,7,8,9,
+      10,11,12,13,14,15,16,17,18,19,
+      20,21,22,23,24,25,26,27,28,29,
+      30,31,32,33,34,35,36,37,38,39,
+      41,42,43,44,45,46,47,48
+    ]
+    , "We get errors on the expected positions");
+  });
+  
+  console.log("Before await promise", performance.now());
+  items = await tester.waitNextValue();
+  console.log("After await promise", performance.now());
+  deepEqual(items, [
+    {id:1},
+    {id:2},
+    {id:3},
+    {id:88},
+    {id:99},
+    {id:100},
+    {id:101}
+  ], "Correct state after trying to add these half baked entries");
+  tester.subscription.unsubscribe();
+});
+
+promisedTest("Issue 2058: Cache error after bulkPut failures", async () => {
+  const tester = liveQueryUnitTester(
+    ()=>db.issue2058.toArray(),
+    {graceTime: 10}
+  );
+  await db.issue2058.bulkAdd([
+    {id:"1.1",a:1,b:1},
+    {id:"1.2",a:1,b:2},
+    {id:"2.1",a:2,b:1},
+  ]);
+  let items = await tester.waitNextValue();
+  deepEqual(items, [
+    {id:"1.1",a:1,b:1},
+    {id:"1.2",a:1,b:2},
+    {id:"2.1",a:2,b:1}
+  ], "Initial items are correct");
+  await db.issue2058.bulkPut([
+    {id:"2.2",a:2,b:2},
+    {id:"foo", a: 1, b: 1}
+  ]).catch(error => {
+    equal(error.failuresByPos[1].name, "ConstraintError", "Expected constraint error for the first operation");
+  });
+  items = await tester.waitNextValue();
+  deepEqual(items, [
+    {id:"1.1",a:1,b:1},
+    {id:"1.2",a:1,b:2},
+    {id:"2.1",a:2,b:1},
+    {id:"2.2",a:2,b:2}
+  ], "The livequery emitted correct result after bulk operation");
+});
+
