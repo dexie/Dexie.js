@@ -168,6 +168,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                 const reqWithResolvedKeys = {
                   ...req,
                   values: req.values.map((value, i) => {
+                    if (res.failures[i]) return value; // No need to rewrite a failing value
                     const valueWithKey = primKey.keyPath?.includes('.')
                       ? deepClone(value)
                       : {
