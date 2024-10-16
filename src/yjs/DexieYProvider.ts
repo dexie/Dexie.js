@@ -51,8 +51,8 @@ export class DexieYProvider<YDoc extends YjsDoc = any>
   static release<YDoc extends YjsDoc>(doc: YDoc, options?: ReleaseOptions) {
     if (destroyedDocs.has(doc)) return;
     const p = wm.get(doc);
-    if (!p) {
-      if (--p.refCount === 0) {
+    if (p) {
+      if (--p.refCount <= 0) {
         if (isNaN(options?.gracePeriod)) {
           doc.destroy(); // No grace period
         } else {
