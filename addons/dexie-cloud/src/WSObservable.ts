@@ -289,7 +289,6 @@ export class WSConnection extends Subscription {
 
     ws.onmessage = (event: MessageEvent) => {
       if (!this.pinger) return;
-      console.debug('dexie-cloud WebSocket onmessage', event.data);
 
       this.lastServerActivity = new Date();
       try {
@@ -301,6 +300,7 @@ export class WSConnection extends Subscription {
             | YServerMessage   
           : decodeYMessage(new Uint8Array(event.data)) as
             | YServerMessage;
+        console.debug('dexie-cloud WebSocket onmessage', msg.type, msg);
         if (msg.type === 'error') {
           throw new Error(`Error message from dexie-cloud: ${msg.error}`);
         } else if (msg.type === 'rev') {
@@ -357,6 +357,7 @@ export class WSConnection extends Subscription {
             ) {
               this.webSocketStatus.next('connected');
             }
+            console.debug('dexie-cloud WebSocket send', msg.type, msg);
             if (msg.type === 'ready') {
               this.ws?.send(TSON.stringify(msg));
             } else {
