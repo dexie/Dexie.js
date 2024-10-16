@@ -24,6 +24,7 @@ export interface DexieOptions {
   chromeTransactionDurability?: ChromeTransactionDurability;
   cache?: 'immutable' | 'cloned' | 'disabled';
   Y?: YjsLib; // Caller supplies Y from the following: import * as Y from 'yjs';
+  gc?: boolean;
 }
 
 export interface DexieConstructor extends DexieExceptionClasses {

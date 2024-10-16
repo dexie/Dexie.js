@@ -256,7 +256,7 @@ export class Dexie implements IDexie {
     });
     this.vip = vipDB;
 
-    if (options?.Y) periodicGC(this);
+    if (options?.Y && options?.gc !== false) periodicGC(this);
 
     // Call each addon:
     addons.forEach(addon => addon(this));
