@@ -38,13 +38,13 @@ export function observeYDocUpdates(
             )
         : updatesTable.where({ k: parentId }).toArray()
       ).then((updates) => {
-        if (updates.length > 0) lastUpdateId = updates[updates.length - 1].i;
         return updates;
       }),
       db.table(parentTableName).where(':id').equals(parentId).toArray(), // Why not just count() or get()? Because of cache only works with toArray() currently (optimization)
     ]);
   }).subscribe(
     ([updates, parentRow]) => {
+      if (updates.length > 0) lastUpdateId = updates[updates.length - 1].i;
       if (parentRow.length === 0) {
         // Row deleted. Destroy Y.Doc.
         doc.destroy();
