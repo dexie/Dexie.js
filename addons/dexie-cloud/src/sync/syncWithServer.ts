@@ -10,6 +10,7 @@ import {
   DexieCloudSchema,
   SyncRequest,
   SyncResponse,
+  YClientMessage,
 } from 'dexie-cloud-common';
 import { encodeIdsForServer } from './encodeIdsForServer';
 import { UserLogin } from '../db/entities/UserLogin';
@@ -18,6 +19,7 @@ import { updateSyncRateLimitDelays } from './ratelimit';
 
 export async function syncWithServer(
   changes: DBOperationsSet,
+  y: YClientMessage[],
   syncState: PersistedSyncState | undefined,
   baseRevs: BaseRevisionMapEntry[],
   db: DexieCloudDB,
@@ -63,6 +65,7 @@ export async function syncWithServer(
       : undefined,
     baseRevs,
     changes: encodeIdsForServer(db.dx.core.schema, currentUser, changes),
+    y,
   };
   console.debug('Sync request', syncRequest);
   db.syncStateChangedEvent.next({

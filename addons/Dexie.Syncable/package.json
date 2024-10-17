@@ -74,11 +74,11 @@
   },
   "homepage": "https://dexie.org",
   "peerDependencies": {
-    "dexie": "workspace:^3.0.2 || ^4.0.1",
+    "dexie": "workspace:^",
     "dexie-observable": "workspace:^"
   },
   "devDependencies": {
-    "dexie": "workspace:^3.0.2 || ^4.0.1",
+    "dexie": "workspace:^",
     "dexie-observable": "workspace:^",
     "eslint": "^5.16.0",
     "just-build": "^0.9.24",

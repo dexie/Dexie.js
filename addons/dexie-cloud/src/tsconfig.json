@@ -17,10 +17,6 @@
     "jsxFragmentFactory": "Fragment",
     "downlevelIteration": true
   },
-  "include": [
-    "**/*.ts"
-  ],
-  "references": [
-    {"path": "../../../libs/dexie-cloud-common"}
-  ]
+  "include": ["**/*.ts"],
+  "references": [{ "path": "../../../libs/dexie-cloud-common" }]
 }

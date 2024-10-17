@@ -11,4 +11,11 @@ export interface PersistedSyncState {
   syncedTables: string[];
   timestamp?: Date;
   error?: string;
+  yDownloadedRealms?: {
+    [realmId: string]: "*" | {
+      tbl: string;
+      prop: string;
+      key: any;
+    }
+  }
 }

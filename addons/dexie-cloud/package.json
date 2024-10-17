@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "4.0.8",
+  "version": "4.1.0-alpha.13",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/umd/dexie-cloud-addon.js",
   "type": "module",
@@ -78,12 +78,14 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^11.1.5",
     "@types/node": "^18.11.18",
+    "dexie-cloud-common": "workspace:^",
     "dreambase-library": "^1.0.21",
     "just-build": "*",
     "karma": "*",
     "karma-chrome-launcher": "*",
     "karma-firefox-launcher": "*",
     "karma-qunit": "*",
+    "lib0": "^0.2.97",
     "preact": "*",
     "rollup": "^4.1.4",
     "terser": "^5.20.0",
@@ -91,10 +93,9 @@
     "typescript": "^5.3.3"
   },
   "dependencies": {
-    "dexie-cloud-common": "^1.0.31",
     "rxjs": "^7.x"
   },
   "peerDependencies": {
-    "dexie": "^4.0.1"
+    "dexie": "workspace:^"
   }
 }
