@@ -45,9 +45,8 @@ const createMiddleware: (db: Dexie) => Middleware<DBCore> = (db) => ({
           mutate(req) {
             switch (req.type) {
               case 'add': {
-                for (const obj of req.values) {
-                  const primaryKey =
-                    coreTable.schema.primaryKey.extractKey!(obj);
+                for (const yUpdateRow of req.values) {
+                  const primaryKey = (yUpdateRow as YUpdateRow).k;
                   const doc = DexieYProvider.getDocCache(db).find(
                     parentTable,
                     primaryKey,

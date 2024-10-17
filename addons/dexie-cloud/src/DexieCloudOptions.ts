@@ -29,6 +29,10 @@ export interface DexieCloudOptions {
   // not be synced with Dexie Cloud
   unsyncedTables?: string[];
 
+  unsyncedProperties?: {
+    [tableName: string]: string[];
+  }
+
   // By default Dexie Cloud will suffix the cloud DB ID to your IndexedDB database name
   // in order to ensure that the local database is uniquely tied to the remote one and
   // will use another local database if databaseURL is changed or if dexieCloud addon

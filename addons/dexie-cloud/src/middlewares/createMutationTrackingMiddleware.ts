@@ -7,8 +7,9 @@ import {
   DBCoreTable,
   DBCoreTransaction,
   Middleware,
+  RangeSet,
 } from 'dexie';
-import { DBOperation } from 'dexie-cloud-common';
+import { DBOperation, DBUpdateOperation } from 'dexie-cloud-common';
 import { BehaviorSubject } from 'rxjs';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { UserLogin } from '../db/entities/UserLogin';
@@ -94,10 +95,7 @@ export function createMutationTrackingMiddleware({
               outstandingTransactions.next(outstandingTransactions.value);
             };
             const txComplete = () => {
-              if (
-                tx.mutationsAdded &&
-                !isEagerSyncDisabled(db)
-              ) {
+              if (tx.mutationsAdded && !isEagerSyncDisabled(db)) {
                 triggerSync(db, 'push');
               }
               removeTransaction();
@@ -193,7 +191,8 @@ export function createMutationTrackingMiddleware({
             req: DBCoreDeleteRequest | DBCoreAddRequest | DBCorePutRequest
           ): Promise<DBCoreMutateResponse> {
             const trans = req.trans as DBCoreTransaction & TXExpandos;
-            trans.mutationsAdded = true;
+            const unsyncedProps =
+              db.cloud.options?.unsyncedProperties?.[tableName];
             const {
               txid,
               currentUser: { userId },
@@ -201,19 +200,89 @@ export function createMutationTrackingMiddleware({
             const { type } = req;
             const opNo = ++trans.opCount;
 
+            function stripChangeSpec(changeSpec: { [keyPath: string]: any }) {
+              if (!unsyncedProps) return changeSpec;
+              let rv = changeSpec;
+              for (const keyPath of Object.keys(changeSpec)) {
+                if (
+                  unsyncedProps.some(
+                    (p) => keyPath === p || keyPath.startsWith(p + '.')
+                  )
+                ) {
+                  if (rv === changeSpec) rv = { ...changeSpec }; // clone on demand
+                  delete rv[keyPath];
+                }
+              }
+              return rv;
+            }
+
             return table.mutate(req).then((res) => {
               const { numFailures: hasFailures, failures } = res;
               let keys = type === 'delete' ? req.keys! : res.results!;
               let values = 'values' in req ? req.values : [];
-              let updates = 'updates' in req && req.updates!;
+              let changeSpec = 'changeSpec' in req ? req.changeSpec : undefined;
+              let updates = 'updates' in req ? req.updates : undefined;
+
               if (hasFailures) {
                 keys = keys.filter((_, idx) => !failures[idx]);
                 values = values.filter((_, idx) => !failures[idx]);
               }
+              if (unsyncedProps) {
+                // Filter out unsynced properties
+                values = values.map((value) => {
+                  const newValue = { ...value };
+                  for (const prop of unsyncedProps) {
+                    delete newValue[prop];
+                  }
+                  return newValue;
+                });
+                if (changeSpec) {
+                  // modify operation with criteria and changeSpec.
+                  // We must strip out unsynced properties from changeSpec.
+                  // We deal with criteria later.
+                  changeSpec = stripChangeSpec(changeSpec);
+                  if (Object.keys(changeSpec).length === 0) {
+                    // Nothing to change on server
+                    return res;
+                  }
+                }
+                if (updates) {
+                  let strippedChangeSpecs =
+                    updates.changeSpecs.map(stripChangeSpec);
+                  let newUpdates: DBCorePutRequest['updates'] = {
+                    keys: [],
+                    changeSpecs: [],
+                  };
+                  const validKeys = new RangeSet();
+                  let anyChangeSpecBecameEmpty = false;
+                  for (let i = 0, l = strippedChangeSpecs.length; i < l; ++i) {
+                    if (Object.keys(strippedChangeSpecs[i]).length > 0) {
+                      newUpdates.keys.push(updates.keys[i]);
+                      newUpdates.changeSpecs.push(strippedChangeSpecs[i]);
+                      validKeys.addKey(updates.keys[i]);
+                    } else {
+                      anyChangeSpecBecameEmpty = true;
+                    }
+                  }
+                  updates = newUpdates;
+                  if (anyChangeSpecBecameEmpty) {
+                    // Some keys were stripped. We must also strip them from keys and values
+                    let newKeys: any[] = [];
+                    let newValues: any[] = [];
+                    for (let i = 0, l = keys.length; i < l; ++i) {
+                      if (validKeys.hasKey(keys[i])) {
+                        newKeys.push(keys[i]);
+                        newValues.push(values[i]);
+                      }
+                    }
+                    keys = newKeys;
+                    values = newValues;
+                  }
+                }
+              }
               const ts = Date.now();
-
               // Canonicalize req.criteria.index to null if it's on the primary key.
-              const criteria =
+              let criteria =
                 'criteria' in req && req.criteria
                   ? {
                       ...req.criteria,
@@ -223,6 +292,20 @@ export function createMutationTrackingMiddleware({
                           : req.criteria.index,
                     }
                   : undefined;
+              if (unsyncedProps && criteria?.index) {
+                const keyPaths = schema.indexes.find(
+                  (idx) => idx.name === criteria!.index
+                )?.keyPath;
+                const involvedProps = keyPaths
+                  ? typeof keyPaths === 'string'
+                    ? [keyPaths]
+                    : keyPaths
+                  : [];
+                if (involvedProps.some((p) => unsyncedProps?.includes(p))) {
+                  // Don't log criteria on unsynced properties as the server could not test them.
+                  criteria = undefined;
+                }
+              }
 
               const mut: DBOperation =
                 req.type === 'delete'
@@ -245,7 +328,7 @@ export function createMutationTrackingMiddleware({
                       userId,
                       values,
                     }
-                  : criteria && req.changeSpec
+                  : criteria && changeSpec
                   ? {
                       // Common changeSpec for all keys
                       type: 'modify',
@@ -253,7 +336,18 @@ export function createMutationTrackingMiddleware({
                       opNo,
                       keys,
                       criteria,
-                      changeSpec: req.changeSpec,
+                      changeSpec,
+                      txid,
+                      userId,
+                    }
+                  : changeSpec
+                  ? {
+                      // In case criteria involved an unsynced property, we go for keys instead.
+                      type: 'update',
+                      ts,
+                      opNo,
+                      keys,
+                      changeSpecs: keys.map(() => changeSpec!),
                       txid,
                       userId,
                     }
