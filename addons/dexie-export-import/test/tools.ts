@@ -17,23 +17,11 @@ export function promisedTest(name: string, tester: ()=>Promise<any>) {
 }
 
 export function readBlob(blob: Blob): Promise<string> {
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onabort = ev => reject(new Error("file read aborted"));
-    reader.onerror = ev => reject((ev.target as any).error);
-    reader.onload = ev => resolve((ev.target as any).result);
-    reader.readAsText(blob);
-  });
+  return blob.text();
 }
 
 export function readBlobBinary(blob: Blob): Promise<ArrayBuffer> {
-  return new Promise<ArrayBuffer>((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onabort = ev => reject(new Error("file read aborted"));
-    reader.onerror = ev => reject((ev.target as any).error);
-    reader.onload = ev => resolve((ev.target as any).result);
-    reader.readAsArrayBuffer(blob);
-  });
+  return blob.arrayBuffer();
 }
 
 // Must use this rather than QUnit's deepEqual() because that one fails on Safari when run via karma-browserstack-launcher
