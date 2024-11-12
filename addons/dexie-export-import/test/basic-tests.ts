@@ -84,6 +84,8 @@ promisedTest("export-format", async() => {
   await db.delete();
   const importedDB = await Dexie.import(blob);
   const outboundKeys = await importedDB.table('outbound').toCollection().primaryKeys();
+  const outboundValues = await importedDB.table('outbound').toArray();
+  const stringBlob = await readBlob(outboundValues[1].blob)
   const inboundValues = await importedDB.table('inbound').toArray();
   equal (outboundKeys[0], 2, "First key should be 2");
   ok('getTime' in (outboundKeys[1] as Date), "Second outbound key should be a Date instance");
@@ -96,7 +98,7 @@ promisedTest("export-format", async() => {
   const ba = new Uint8Array(ab);
   console.log("byte array", ba);
   deepEqual([].slice.call(ba), [].slice.call(fullByteArray), "The whole byte spectrum supported after redecoding blob");
-  //equal(firstBlobStr, "something", "First Blob should be 'something'");
+  equal( stringBlob, "something", "First Blob should be 'something'");
   equal( inboundValues[0].binary[0], 1, "First binary[0] should be 1");
   equal( inboundValues[0].binary[1], 2, "First binary[0] should be 2");
   equal( inboundValues[0].binary[2], 3, "First binary[0] should be 3");
