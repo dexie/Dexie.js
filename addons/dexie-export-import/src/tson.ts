@@ -77,5 +77,6 @@ TSON.finalize = async (items?: any[]) => {
     }
   }
   // Free up memory
-  // blobsToAwait = [];
+  blobsToAwait = [];
+  blobsToAwaitPos = 0;
 }
