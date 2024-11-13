@@ -61,19 +61,25 @@ promisedTest("export-format", async() => {
   for (let i=0;i<256;++i) {
     fullByteArray[i] = i;
   }
+  const blob1 = new Blob(["1"])
+  const blob2 = new Blob(["2"])
+  const blob3 = new Blob(["3"])
   await db.table("inbound").bulkAdd([{
     id: 1,
     date: new Date(1),
     fullBlob: new Blob([fullByteArray]),
+    imageBlob: blob1,
     binary: new Uint8Array([1,2,3]),
     text: "foo",
     bool: false
   },{
     id: 2,
-    foo: "bar"
+    foo: "bar",
+    imageBlob: blob2,
   },{
     id: 3,
-    bar: "foo"
+    bar: "foo",
+    imageBlob: blob3,
   }]);
 
   const blob = await db.export({prettyJson: true});
@@ -98,6 +104,19 @@ promisedTest("export-format", async() => {
   const ba = new Uint8Array(ab);
   console.log("byte array", ba);
   deepEqual([].slice.call(ba), [].slice.call(fullByteArray), "The whole byte spectrum supported after redecoding blob");
+  
+  const blob1A = await blob1.text()
+  const blob1B = await inboundValues[0].imageBlob.text()
+  deepEqual( blob1A, blob1B, "First Blob should be same as stored");
+
+  const blob2A = await blob2.text()
+  const blob2B = await inboundValues[1].imageBlob.text()
+  deepEqual( blob2A, blob2B, "Second Blob should be same as stored");
+
+  const blob3A = await blob3.text()
+  const blob3B = await inboundValues[2].imageBlob.text()
+  deepEqual( blob3A, blob3B, "Third Blob should be same as stored");
+  
   equal( stringBlob, "something", "First Blob should be 'something'");
   equal( inboundValues[0].binary[0], 1, "First binary[0] should be 1");
   equal( inboundValues[0].binary[1], 2, "First binary[0] should be 2");
