@@ -44,43 +44,31 @@ class Signal {
 }
 
 function liveQueryUnitTester(lq, {graceTime}={graceTime: 0}) {
-  let currentVal;
-  let currentError = null;
-  let signal = ()=>{};
-  let reject = ()=>{};
-  let querying = 0;
-  const subscription = liveQuery(async ()=>{
-    ++querying;
-    try {
-      currentVal = await lq();
-      console.log("Emitted", currentVal);
-      currentError = null;
-    } catch (error) {
-      currentError = error;
-    }
-    if (--querying === 0) setTimeout(()=>{
-      if (querying === 0) {
-        if (currentError)
-          reject(currentError);
-        else
-          signal(currentVal);
-      }
-    }, graceTime);
-  }).subscribe(x => x);
+  const lq = liveQuery(lq)
   return {
-    waitNextValue(timeout=500) {
-      const promise = new Promise((resolve, rej) => {
-        signal = resolve;
-        reject = rej;
+    waitTilDeepEqual(expected, description, timeout=500) {
+      return new Promise((resolve, reject) => {
+        let latestValue;
+        const subscription = lq.subscribe(value => {
+          latestValue = value;
+          if (isDeepEqual(value, expected)) {
+            deepEqual(value, expected, description);
+            clearTimeout(timer);
+            subscription.unsubscribe();
+            resolve();
+          }
+        });
+        let timer = setTimeout(() => {
+          subscription.unsubscribe();
+          try {
+            deepEqual(latestValue, expected, description);
+            resolve();
+          } catch (e) {
+            reject(e);
+          }
+        }, timeout);
       });
-      return !timeout
-        ? promise
-        : Promise.race([
-            promise,
-            new Promise((_, rej) => setTimeout(()=>rej(new Error("Timeout")), timeout))
-          ]);
-    },
-    subscription
+    }
   }
 }
 
@@ -158,22 +146,12 @@ module("live-query", {
 });*/
 
 promisedTest("subscribe to range", async ()=> {
-  let signal = new Signal();
-  let subscription = liveQuery(()=>db.items.toArray()).subscribe(result => {
-    signal.resolve(result);
-  });
-  let result = await signal.promise;
-  deepEqual(result, [{id:1},{id:2},{id:3}], "First callback should give initally populated content");
-  signal = new Signal();
+  let tester = liveQueryUnitTester(()=>db.items.toArray());
+  await tester.waitTilDeepEqual([{id: 1}, {id: 2}, {id: 3}], "First callback should give initally populated content");
   db.items.add({id:-1});
-  result = await signal.promise;
-  deepEqual(result, [{id:-1},{id:1},{id:2},{id:3}], "2nd callback should give updated content");
-
-  signal = new Signal();
+  await tester.waitTilDeepEqual([{id:-1}, {id: 1}, {id: 2}, {id: 3}], "2nd callback should give updated content");
   db.items.delete(2);
-  result = await signal.promise;
-  deepEqual(result, [{id:-1},{id:1},{id:3}], "3rd callback should wake up when deletion was made");
-  subscription.unsubscribe();
+  await tester.waitTilDeepEqual([{id:-1}, {id: 1}, {id: 3}], "3rd callback should wake up when deletion was made");
 });
 
 promisedTest("subscribe to keys", async ()=>{
@@ -821,33 +799,25 @@ promisedTest("Issue 2067: useLiveQuery does not update when multiple items are d
   deepEqual(items, [{id:3},{id:2},{id:1}], "Initial items are correct");
   const tester = liveQueryUnitTester(()=>db.items.reverse().toArray());
   db.items.where('id').above(0).delete();
-  items = await tester.waitNextValue();
-  deepEqual(items, [], "Items are deleted");
+  await tester.waitTilDeepEqual([], "Items are deleted");
   db.items.bulkAdd([{id: -10},{id: 0},{id: 10}]);
-  items = await tester.waitNextValue();
-  deepEqual(items, [{id: 10},{id: 0},{id: -10}], "Reacts on bulkAdd");
-  let promise = tester.waitNextValue();
+  await tester.waitTilDeepEqual([{id: 10},{id: 0},{id: -10}], "Reacts on bulkAdd");
   db.items.where('id').above(0).delete();
-  items = await promise;
-  deepEqual(items, [{id: 0},{id: -10}], "Should have deleted items where id > 0");
-  tester.subscription.unsubscribe();
+  await tester.waitTilDeepEqual([{id: 0},{id: -10}], "Should have deleted items where id > 0");
 });
 
 promisedTest("Issue 2058 - related but with bulkAdd and constraint error on duplicate primary keys.", async () => {
   const tester = liveQueryUnitTester(
-    ()=>db.items.toArray()
+    ()=>db.items.toArray(), { graceTime: 100 }
   );
-  let items = await tester.waitNextValue();
-  deepEqual(items, [{id:1},{id:2},{id:3}], "Initial items are correct");
-  let promise = tester.waitNextValue();
+  await tester.waitTilDeepEqual([{id:1},{id:2},{id:3}], "Initial items are correct");
   await db.items.bulkAdd([
     {id:3}, // This one won't be added (constraint violation)
     {id:88} // This one will be added
   ]).catch(error => {
     equal(error.failuresByPos[0].name, "ConstraintError", "Expected constraint error for the first operation");
   });
-  items = await promise;
-  deepEqual(items, [{id:1},{id:2},{id:3},{id:88}], "The livequery emitted correct result after bulk operation");
+  await tester.waitTilDeepEqual([{id:1},{id:2},{id:3},{id:88}], "The livequery emitted correct result after bulk operation");
   // Now making sure we go through a different code path (where the number of items > 50 in cache-middleware.ts)
   const itemsToAdd = new Array(51)
   .fill({id: 1}, 0, 40) // Positions 0..40 is constraint violations agains existing data + themselves
@@ -867,9 +837,7 @@ promisedTest("Issue 2058 - related but with bulkAdd and constraint error on dupl
   });
   
   console.log("Before await promise", performance.now());
-  items = await tester.waitNextValue();
-  console.log("After await promise", performance.now());
-  deepEqual(items, [
+  await tester.waitTilDeepEqual([
     {id:1},
     {id:2},
     {id:3},
@@ -878,7 +846,7 @@ promisedTest("Issue 2058 - related but with bulkAdd and constraint error on dupl
     {id:100},
     {id:101}
   ], "Correct state after trying to add these half baked entries");
-  tester.subscription.unsubscribe();
+  console.log("After await promise", performance.now());
 });
 
 promisedTest("Issue 2058: Cache error after bulkPut failures", async () => {
@@ -891,8 +859,7 @@ promisedTest("Issue 2058: Cache error after bulkPut failures", async () => {
     {id:"1.2",a:1,b:2},
     {id:"2.1",a:2,b:1},
   ]);
-  let items = await tester.waitNextValue();
-  deepEqual(items, [
+  await tester.waitTilDeepEqual([
     {id:"1.1",a:1,b:1},
     {id:"1.2",a:1,b:2},
     {id:"2.1",a:2,b:1}
@@ -903,8 +870,7 @@ promisedTest("Issue 2058: Cache error after bulkPut failures", async () => {
   ]).catch(error => {
     equal(error.failuresByPos[1].name, "ConstraintError", "Expected constraint error for the first operation");
   });
-  items = await tester.waitNextValue();
-  deepEqual(items, [
+  await tester.waitTilDeepEqual([
     {id:"1.1",a:1,b:1},
     {id:"1.2",a:1,b:2},
     {id:"2.1",a:2,b:1},
