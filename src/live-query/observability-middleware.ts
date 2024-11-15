@@ -136,7 +136,9 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                     // Find the position of the primary key in the index:
                     const pkPos = (idx.keyPath as string[]).findIndex(prop => prop === primaryKey.keyPath);
                     // Update idxVals with the resulting primary keys to complete the index value:
-                    res.results!.forEach(pk => idxVals[pkPos] = pk);
+                    for (let i = 0, len = res.results!.length; i < len; ++i) {
+                      idxVals[i][pkPos] = res.results![i];
+                    }
                     // Add the updated index to the rangeset:
                     getRangeSet(idx.name).addKeys(idxVals);
                   });
