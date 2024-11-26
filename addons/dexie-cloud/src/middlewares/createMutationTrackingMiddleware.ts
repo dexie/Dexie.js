@@ -378,7 +378,10 @@ export function createMutationTrackingMiddleware({
               return keys.length > 0 || criteria
                 ? mutsTable
                     .mutate({ type: 'add', trans, values: [mut] }) // Log entry
-                    .then(() => res) // Return original response
+                    .then(() => {
+                      trans.mutationsAdded = true; // Mark transaction as having added mutations to trigger eager sync
+                      return res; // Return original response
+                    })
                 : res;
             });
           }
