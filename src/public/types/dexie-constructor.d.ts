@@ -29,7 +29,7 @@ export interface DexieOptions {
 
 export interface DexieConstructor extends DexieExceptionClasses {
   new(databaseName: string, options?: DexieOptions) : Dexie;
-  prototype: Dexie;
+  prototype: any;
 
   addons: Array<(db: Dexie) => void>;
   version: number;
