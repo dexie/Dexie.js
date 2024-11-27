@@ -1,7 +1,6 @@
 import { Transaction } from "./transaction";
-import { LooseStoresSpec, StoresSpec } from "./strictly-typed-schema";
 
 export interface Version {
-  stores(schema: LooseStoresSpec): Version;
+  stores(schema: { [tableName: string]: string | null }): Version;
   upgrade(fn: (trans: Transaction) => PromiseLike<any> | void): Version;
 }
