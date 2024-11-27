@@ -19,6 +19,18 @@ type StringProps<T> = {
   [K in keyof T]: K extends string ? (T[K] extends string ? K : never) : never;
 }[keyof T];
 
+type IgnoreObjects =
+  | RegExp
+  | DataView
+  | Map<any, any>
+  | Set<any>
+  | CryptoKey
+  | Promise<any>
+  | ReadableStream<any>
+  | ReadableStreamDefaultReader<any>
+  | ReadableStreamDefaultController<any>
+  | { whenLoaded: Promise<any> }; // Y.Doc
+
 // Nested indexable arrays (configurable max depth)
 type ArrayKeyPaths<
   T,
@@ -54,17 +66,19 @@ type IndexableKeyPaths<
   CURRDEPTH extends string = ''
 > = CURRDEPTH extends MAXDEPTH
   ? IndexableProps<T>
-  :
-      | IndexableKeyPaths<T, MAXDEPTH, `${CURRDEPTH}I`>
-      | {
-          [K in keyof T]: K extends string
-            ? T[K] extends object
-              ? `${K}.${keyof T[K] extends string
-                  ? IndexableKeyPaths<T[K], MAXDEPTH, `${CURRDEPTH}I`>
-                  : never}`
-              : never
-            : never;
-        }[keyof T];
+  : {
+      [K in keyof T]: K extends string
+        ? T[K] extends IndexableType
+          ? K
+          : T[K] extends IgnoreObjects
+          ? never
+          : T[K] extends object
+          ? `${K}.${keyof T[K] extends string
+              ? IndexableKeyPaths<T[K], MAXDEPTH, `${CURRDEPTH}I`>
+              : never}`
+          : never
+        : never;
+    }[keyof T];
 
 // Compound index syntax
 type Combo<
@@ -104,73 +118,31 @@ type DexiePrimaryKeySyntax<T> =
   | `++${NumberProps<T>}`
   | `@${StringProps<T>}`
   | `&${IndexableKeyPaths<T>}`
-  | IndexableKeyPaths<T>
-  | Exclude<`[${Combo<IndexablePathObj<T>>}]`, SingleCombound<T>> // Combined non-array keys
+  | `${IndexableKeyPaths<T>}`
+  | `${IndexableKeyPaths<T>}:Y.Doc`
+  | `${Exclude<`[${Combo<IndexablePathObj<T>>}]`, SingleCombound<T>>}` // Combined non-array keys
   | `&${Exclude<`[${Combo<IndexablePathObj<T>>}]`, SingleCombound<T>>}`;
+
+type TypedProperties<T> = {
+  [K in keyof T]: K extends string
+    ? T[K] extends { whenLoaded: Promise<any> }
+      ? `${K}:Y.Doc`
+      : never
+    : never;
+}[keyof T];
 
 type LooseStoresSpec = { [tableName: string]: string | null | string[] };
 
-type StoresSpec<DX extends Dexie> = TableProp<DX> extends never
-  ? LooseStoresSpec
-  : {
+type StoresSpec<DX extends Dexie> =  TableProp<Omit<DX, keyof Dexie>> extends never ? LooseStoresSpec :
+  Dexie extends DX ? LooseStoresSpec :
+    {
       [TN in TableProp<DX>]?: DX[TN] extends Table<infer T, any, any>
-        ? string | null | [DexiePrimaryKeySyntax<T>, ...DexieIndexSyntax<T>[]]
-        : never;
-    } & LooseStoresSpec;
-
-// -------
-
-/*
-type ClazzDecorator<T> = (target: new () => T) => new () => T;
-declare function index<T>(
-  ...indexSpec: DexieIndexSyntax<T>[]
-): ClazzDecorator<T>;
-
-@index(
-  "[name+id+tags]",
-  "[allanlarson+apansson+name]",
-  "ydoc.meta",
-  "fredriksod",
-  "&[name+bosse+allanlarson]",
-  "[allanlarson+apansson+blob.size]",
-)
-
-// Test example with the Friend interface
-interface Friend {
-  name: string;
-  age: number;
-  tags: string[];
-}
-
-// Example usage
-const index1: DexieIndexSyntax<Friend> = "name"; // valid
-const index2: DexieIndexSyntax<Friend> = "age"; // valid
-const index3: DexieIndexSyntax<Friend> = "*tags"; // valid (array field)
-const index4: DexieIndexSyntax<Friend> = "&[name+age]"; // valid (combined index)
-const index5: DexieIndexSyntax<Friend> = "[age+name]"; // valid (combined index)
-
-// Invalid cases
-// const invalidIndex1: DexieIndexSyntax<Friend> = '*name';        // error (* not allowed for non-array fields)
-// const invalidIndex2: DexieIndexSyntax<Friend> = '[name+*tags]'; // error (composite index cannot include *tags)
-// const invalidIndex3: DexieIndexSyntax<Friend> = '[*tags+age]';  // error (composite index cannot include *tags)
-
-// -------
-
-function stores<DX extends Dexie>(storesSpec: StoresSpec<DX>): void {
-  console.log(storesSpec);
-}
-
-const db = new Dexie("MyDatabase") as Dexie & {
-  friends: EntityTable<Friend, "name">;
-  todoItems: EntityTable<TodoItem, "id">;
-};
-
-stores<typeof db>({
-  //friends: ["&age"],
-  todoItems: [
-    "&[allanlarson+apansson+blob.size]",
-    "[allanlarson+apansson+bosse]",
-    "[allanlarson+bosse+name]",
-  ],
-});
-*/
+        ?
+            | string
+            | null
+            | [
+                DexiePrimaryKeySyntax<T>,
+                ...(DexieIndexSyntax<T> | TypedProperties<T>)[]
+              ]
+        : string | string[] | null;
+    };
