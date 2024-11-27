@@ -370,10 +370,10 @@ import * as Y from 'yjs';
     db.version(1).stores({
       friends: '++id, name, age'
     });
-    db.version(2).stores({
+    /*db.version(2).stores({
       friends: ['++id', 'name', 'age', '*tags', 'doc:Y.Doc', '&[age+id]'],
       items: ['id', 'name'],
-    });
+    });*/
 }
 
 // Strongly typed stores spec2
@@ -397,7 +397,7 @@ import * as Y from 'yjs';
         }
     }
     const db = new MyDexie();
-    db.version(1).stores({
+    /*db.version(1).stores({
         friends: ['', '&[age+id+name]'],
-    })
+    })*/
 }
