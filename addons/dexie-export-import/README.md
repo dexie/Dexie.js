@@ -115,6 +115,7 @@ export interface StaticImportOptions {
   chunkSizeBytes?: number; // Default: DEFAULT_KILOBYTES_PER_CHUNK ( 1MB )
   filter?: (table: string, value: any, key?: any) => boolean;
   progressCallback?: (progress: ImportProgress) => boolean;
+  name?: string;
 }
 
 export interface ImportOptions extends StaticImportOptions {

@@ -151,7 +151,7 @@ export class Collection implements ICollection {
     function sorter(a, b) {
       var aVal = getval(a, lastIndex),
         bVal = getval(b, lastIndex);
-      return aVal < bVal ? -order : aVal > bVal ? order : 0;
+      return cmp(aVal, bVal) * order;
     }
     return this.toArray(function (a) {
       return a.sort(sorter);
@@ -492,7 +492,15 @@ export class Collection implements ICollection {
 
       const coreTable = ctx.table.core;
       const {outbound, extractKey} = coreTable.schema.primaryKey;
-      const limit = this.db._options.modifyChunkSize || 200;
+      let limit = 200;
+      const modifyChunkSize = this.db._options.modifyChunkSize;
+      if (modifyChunkSize) {
+        if (typeof modifyChunkSize == 'object') {
+          limit = modifyChunkSize[coreTable.name] || modifyChunkSize['*'] || 200;
+        } else {
+          limit = modifyChunkSize;
+        }
+      }
       const totalFailures = [];
       let successCount = 0;
       const failedKeys: IndexableType[] = [];

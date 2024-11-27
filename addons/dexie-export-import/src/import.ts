@@ -10,6 +10,7 @@ export interface StaticImportOptions {
   filter?: (table: string, value: any, key?: any) => boolean;
   transform?: (table: string, value: any, key?: any) => ({value: any, key?: any});
   progressCallback?: (progress: ImportProgress) => boolean;
+  name?: string;
 }
 
 export interface ImportOptions extends StaticImportOptions {
@@ -42,9 +43,9 @@ export async function importDB(exportedData: Blob | JsonStream<DexieExportJsonSt
   const CHUNK_SIZE = options!.chunkSizeBytes || (DEFAULT_KILOBYTES_PER_CHUNK * 1024);
   const stream = await loadUntilWeGotEnoughData(exportedData, CHUNK_SIZE);
   const dbExport = stream.result.data!;
-  const db = new Dexie(dbExport.databaseName);
+  const db = new Dexie(options.name !== undefined ? options.name : dbExport.databaseName);
   db.version(dbExport.databaseVersion).stores(extractDbSchema(dbExport));
-  await importInto(db, stream, options);
+  await importInto(db, stream, options.name !== undefined ? {...options, acceptNameDiff: true } : options);
   return db;
 }
 

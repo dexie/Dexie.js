@@ -148,10 +148,9 @@ export class Table implements ITable<any, IndexableType> {
     // Ok, now let's fallback to finding at least one matching index
     // and filter the rest.
     const { idxByName } = this.schema;
-    const idb = this.db._deps.indexedDB;
 
-    function equals (a, b) {
-      return idb.cmp(a,b) === 0; // Works with all indexable types including binary keys.
+    function equals(a, b) {
+      return cmp(a, b) === 0; // Works with all indexable types including binary keys.
     }
 
     const [idx, filterFunction] = keyPaths.reduce(([prevIndex, prevFilterFn], keyPath) => {
