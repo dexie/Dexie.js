@@ -47,5 +47,5 @@ jobs:
       - name: Run headless test
         uses: coactions/setup-xvfb@v1
         with:
-          run: bash ./gh-actions.sh
+          run: bash -e ./gh-actions.sh
           working-directory: ${{ matrix.TF }}
