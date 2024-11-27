@@ -59,6 +59,7 @@ export async function syncWithServer(
     lastPull: syncState
       ? {
           serverRevision: syncState.serverRevision!,
+          yServerRevision: syncState.yServerRevision,
           realms: syncState.realms,
           inviteRealms: syncState.inviteRealms,
         }

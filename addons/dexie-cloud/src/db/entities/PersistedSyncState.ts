@@ -1,5 +1,6 @@
 export interface PersistedSyncState {
   serverRevision?: any;
+  yServerRevision?: string;
   latestRevisions: {
     [tableName: string]: number
   };

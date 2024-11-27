@@ -10,6 +10,12 @@ import {
 export function decodeYMessage(a: Uint8Array): YMessage {
   const decoder = new Decoder(a);
   const type = readVarString(decoder) as YMessage['type'];
+  if (type === 'outdated-server-rev') {
+    return { type };
+  }
+  if (type === 'y-complete-sync-done') {
+    return { type, yServerRev: readVarString(decoder) };
+  }
   const table = readVarString(decoder);
   const prop = readVarString(decoder);
 

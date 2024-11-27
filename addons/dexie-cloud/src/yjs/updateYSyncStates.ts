@@ -1,12 +1,13 @@
+import { UpdateSpec } from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
+import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import { DEXIE_CLOUD_SYNCER_ID } from '../sync/DEXIE_CLOUD_SYNCER_ID';
 import { YDexieCloudSyncState } from './YDexieCloudSyncState';
 
 export async function updateYSyncStates(
   lastUpdateIdsBeforeSync: { [yTable: string]: number },
   receivedUntilsAfterSync: { [yTable: string]: number },
-  db: DexieCloudDB,
-  serverRevision: string
+  db: DexieCloudDB
 ) {
   // We want to update unsentFrom for each yTable to the value specified in first argument
   //  because we got those values before we synced with server and here we are back from server
@@ -65,13 +66,11 @@ export async function updateYSyncStates(
         await db.table<YDexieCloudSyncState>(yTable).add({
           i: DEXIE_CLOUD_SYNCER_ID,
           unsentFrom,
-          receivedUntil,
-          serverRev: serverRevision,
+          receivedUntil
         });
       } else {
         state.unsentFrom = Math.max(unsentFrom, state.unsentFrom || 1);
         state.receivedUntil = Math.max(receivedUntil, state.receivedUntil || 0);
-        state.serverRev = serverRevision;
         await db.table(yTable).put(state);
       }
     });

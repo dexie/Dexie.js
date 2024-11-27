@@ -10,6 +10,7 @@ export interface SyncRequest {
   schema: DexieCloudSchema;
   lastPull?: {
     serverRevision: string | bigint;
+    yServerRevision?: string;
     realms: string[];
     inviteRealms: string[];
   };

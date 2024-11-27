@@ -46,6 +46,7 @@ const createMiddleware: (db: Dexie) => Middleware<DBCore> = (db) => ({
             switch (req.type) {
               case 'add': {
                 for (const yUpdateRow of req.values) {
+                  if (yUpdateRow.k == undefined) continue; // A syncer or garbage collection state does not point to a key
                   const primaryKey = (yUpdateRow as YUpdateRow).k;
                   const doc = DexieYProvider.getDocCache(db).find(
                     parentTable,
@@ -58,7 +59,7 @@ const createMiddleware: (db: Dexie) => Middleware<DBCore> = (db) => ({
                       docIsAlreadyHooked.add(doc);
                     }
                   } else {
-                    enqueueTrigger(tblName, primaryKey, trigger);
+                    enqueueTrigger(db, tblName, primaryKey, trigger);
                   }
                 }
                 break;
@@ -78,10 +79,10 @@ const createMiddleware: (db: Dexie) => Middleware<DBCore> = (db) => ({
                     .then((updates) => {
                       const keySet = new RangeSet();
                       for (const { k } of updates as YUpdateRow[]) {
-                        keySet.addKey(k);
+                        if (k != undefined) keySet.addKey(k);
                       }
-                      for (const key of keySet) {
-                        enqueueTrigger(tblName, key, trigger);
+                      for (const interval of keySet) {
+                        enqueueTrigger(db, tblName, interval.from, trigger);
                       }
                     });
                 }
@@ -113,14 +114,14 @@ function $Y(db: Dexie): YjsLib {
 async function executeTriggers(triggersToRun: typeof scheduledTriggers) {
   for (const { db, parentId, trigger, updatesTable } of triggersToRun) {
     // Load entire document into an Y.Doc instance:
-    const updates = await db
+    const updates: YUpdateRow[] = await db
       .table(updatesTable)
       .where({ k: parentId })
       .toArray();
     const Y = $Y(db);
     const yDoc = new Y.Doc();
     for (const update of updates) {
-      Y.applyUpdateV2(yDoc, update);
+      Y.applyUpdateV2(yDoc, update.u);
     }
     try {
       await trigger(yDoc, parentId);
@@ -131,11 +132,14 @@ async function executeTriggers(triggersToRun: typeof scheduledTriggers) {
 }
 
 function enqueueTrigger(
+  db: Dexie,
   updatesTable: string,
   parentId: any,
   trigger: (ydoc: YjsDoc, parentId: any) => any
 ) {
-  (scheduledTriggers[updatesTable] ??= []).push({
+  scheduledTriggers.push({
+    db,
+    updatesTable,
     parentId,
     trigger,
   });

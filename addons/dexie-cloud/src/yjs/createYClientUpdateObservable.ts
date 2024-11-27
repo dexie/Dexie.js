@@ -71,9 +71,6 @@ export function createYClientUpdateObservable(
     // If messageProducer emits empty array, nothing is emitted
     // but if messageProducer emits array of messages, they are
     // emitted one by one.
-    mergeMap((messages) => messages),
-    tap((message) => {
-      console.debug('dexie-cloud emitting y-c', message);
-    })
+    mergeMap((messages) => messages)
   );
 }

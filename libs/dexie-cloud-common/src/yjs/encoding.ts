@@ -11,13 +11,18 @@ import {
 export function encodeYMessage(msg: YMessage): Uint8Array {
   const encoder = new Encoder();
   writeVarString(encoder, msg.type);
-  writeVarString(encoder, msg.table);
-  writeVarString(encoder, msg.prop);
+  if ('table' in msg) writeVarString(encoder, msg.table);
+  if ('prop' in msg) writeVarString(encoder, msg.prop);
 
   switch (msg.type) {
     case 'u-ack':
     case 'u-reject':
       writeBigUint64(encoder, BigInt(msg.i));
+      break;
+    case 'outdated-server-rev':
+      break;
+    case 'y-complete-sync-done':
+      writeVarString(encoder, msg.yServerRev);
       break;
     default:
       writeAny(encoder, msg.k);

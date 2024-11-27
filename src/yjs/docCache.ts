@@ -18,14 +18,20 @@ export function getDocCache(db: Dexie): YDocCache {
       if (!parentTable || !parentProp || parentId == null)
         throw new Error(`Missing Dexie-related metadata in Y.Doc`);
       const cacheKey = getYDocCacheKey(parentTable, parentId, parentProp);
+      const existingDoc = this.cache[cacheKey]?.deref();
+      if (existingDoc) {
+        docRegistry.unregister(existingDoc); // Don't run garbage collection on this doc as it is being replaced.
+      }
       this.cache[cacheKey] = new WeakRef(doc);
       docRegistry.register(doc, { cache: this.cache, key: cacheKey });
     },
     delete(doc: YjsDoc): void {
-      docRegistry.unregister(doc);
-      delete this.cache[
-        getYDocCacheKey(doc.meta.parentTable, doc.meta.parentId, doc.meta.parentProp)
-      ];
+      docRegistry.unregister(doc); // Don't run garbage collection on this doc as it is being deleted here and now.
+      const cacheKey = getYDocCacheKey(doc.meta.parentTable, doc.meta.parentId, doc.meta.parentProp);
+      const cacheEntry = this.cache[cacheKey];
+      if (cacheEntry?.deref() === doc) {
+        delete this.cache[cacheKey]; // Remove the entry from the cache only if it is the same doc.
+      }
     },
   };
 }

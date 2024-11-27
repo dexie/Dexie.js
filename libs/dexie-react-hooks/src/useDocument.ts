@@ -12,9 +12,11 @@ export function useDocument<YDoc extends YjsDoc>(
       // Doc is set or changed. Create or hook into a provider for it.
       const provider = DexieYProvider.load(doc);
       setProvider(provider);
-      return () => DexieYProvider.release(doc, {
-        gracePeriod: 1000 // Grace period to optimize for unload/reload scenarios
-      });
+      return () => {
+        DexieYProvider.release(doc, {
+          gracePeriod: 1000 // Grace period to optimize for unload/reload scenarios
+        });
+      }
     } else if (provider) {
       // In case doc is set to null, don't keep the provider around.
       setProvider(null);

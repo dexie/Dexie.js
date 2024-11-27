@@ -7,13 +7,19 @@ import { getUpdatesTable } from './getUpdatesTable';
 export async function applyYServerMessages(
   yMessages: YServerMessage[],
   db: DexieCloudDB
-): Promise<{ [yTable: string]: number }> {
-  const result: { [yTable: string]: number } = {};
+): Promise<{
+  receivedUntils: { [yTable: string]: number };
+  resyncNeeded: boolean;
+  yServerRevision?: string
+}> {
+  const receivedUntils: { [yTable: string]: number } = {};
+  let resyncNeeded = false;
+  let yServerRevision: string | undefined;
   for (const m of yMessages) {
     switch (m.type) {
       case 'u-s': {
         const utbl = getUpdatesTable(db, m.table, m.prop);
-        result[utbl.name] = await utbl.add({
+        receivedUntils[utbl.name] = await utbl.add({
           k: m.k,
           u: m.u,
         } satisfies InsertType<YUpdateRow, 'i'>);
@@ -45,17 +51,23 @@ export async function applyYServerMessages(
         // and destroy it's open document if there is one.
         const primaryKey = (await utbl.get(m.i))?.k;
         if (primaryKey != null) {
-          await db.transaction('rw', utbl, tx => {
+          await db.transaction('rw', utbl, (tx) => {
             // @ts-ignore
             tx.idbtrans._rejecting_y_ypdate = true; // Inform ydoc triggers that we delete because of a rejection and not GC
             return utbl
               .where('i')
               .aboveOrEqual(m.i)
-              .filter(u => cmp(u.k, primaryKey) === 0 && ((u.f ||0) & 1) === 1)
+              .filter(
+                (u) => cmp(u.k, primaryKey) === 0 && ((u.f || 0) & 1) === 1
+              )
               .delete();
           });
           // Destroy active doc
-          const activeDoc = DexieYProvider.getDocCache(db.dx).find(m.table, primaryKey, m.prop);
+          const activeDoc = DexieYProvider.getDocCache(db.dx).find(
+            m.table,
+            primaryKey,
+            m.prop
+          );
           if (activeDoc) activeDoc.destroy(); // Destroy the document so that editors don't continue to work on it
         }
         break;
@@ -71,7 +83,19 @@ export async function applyYServerMessages(
         }
         break;
       }
+      case 'y-complete-sync-done': {
+        yServerRevision = m.yServerRev;
+        break;
+      }
+      case 'outdated-server-rev':
+        resyncNeeded = true;
+        break;
     }
   }
-  return result;
+
+  return {
+    receivedUntils,
+    resyncNeeded,
+    yServerRevision
+  };
 }

@@ -322,6 +322,7 @@ async function _sync(
     newSyncState.realms = res.realms;
     newSyncState.inviteRealms = res.inviteRealms;
     newSyncState.serverRevision = res.serverRevision;
+    newSyncState.yServerRevision = res.serverRevision;
     newSyncState.timestamp = new Date();
     delete newSyncState.error;
 
@@ -339,12 +340,19 @@ async function _sync(
       //
       // apply yMessages
       //
-      const receivedUntils = await applyYServerMessages(res.yMessages, db);
+      const {receivedUntils, resyncNeeded, yServerRevision} = await applyYServerMessages(res.yMessages, db);
+      if (yServerRevision) {
+        newSyncState.yServerRevision = yServerRevision;
+      }
 
       //
       // update Y SyncStates
       //
-      await updateYSyncStates(lastUpdateIds, receivedUntils, db, res.serverRevision);
+      await updateYSyncStates(lastUpdateIds, receivedUntils, db);
+
+      if (resyncNeeded) {
+        newSyncState.yDownloadedRealms = {}; // Will trigger a full download of Y-documents below...
+      }
     }
 
     //

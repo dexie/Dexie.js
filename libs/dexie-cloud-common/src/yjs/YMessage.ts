@@ -1,7 +1,21 @@
-
 export type YMessage = YClientMessage | YServerMessage;
-export type YClientMessage = YUpdateFromClientRequest | YStateVector | YDocumentOpen | YAwarenessUpdate| YDocumentClose;
-export type YServerMessage = YUpdateFromClientAck | YUpdateFromClientReject | YUpdateFromServerMessage | YAwarenessUpdate | YInSyncMessage;
+
+export type YClientMessage =
+  | YUpdateFromClientRequest
+  | YStateVector
+  | YDocumentOpen
+  | YAwarenessUpdate
+  | YDocumentClose;
+
+export type YServerMessage =
+  | YUpdateFromClientAck
+  | YUpdateFromClientReject
+  | YUpdateFromServerMessage
+  | YAwarenessUpdate
+  | YInSyncMessage
+  | YOutdatedServerRevNotice
+  | YCompleteSyncDone
+  | YDocumentOpen; // When server want's the client to send a document open message.
 
 export interface YUpdateFromClientRequest {
   type: 'u-c';
@@ -29,7 +43,6 @@ export interface YStateVector {
   sv: Uint8Array;
 }
 
-
 export interface YDocumentClose {
   type: 'doc-close';
   table: string;
@@ -50,7 +63,6 @@ export interface YUpdateFromClientReject {
   prop: string;
   i: number;
 }
-
 
 export interface YUpdateFromServerMessage {
   type: 'u-s';
@@ -75,10 +87,11 @@ export interface YInSyncMessage {
   k: any;
 }
 
-
-/*export interface YDocumentClosed { // Probably not needed. We have an awareness update for that. Just we need to identify clientID.
-  type: 'doc-closed';
-  utbl: string;
-  k: any;
+export interface YCompleteSyncDone {
+  type: 'y-complete-sync-done';
+  yServerRev: string;
 }
-*/
+
+export interface YOutdatedServerRevNotice {
+  type: 'outdated-server-rev';
+}

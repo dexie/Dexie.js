@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "4.1.0-alpha.13",
+  "version": "4.1.0-alpha.22",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/umd/dexie-cloud-addon.js",
   "type": "module",
@@ -90,7 +90,7 @@
     "rollup": "^4.1.4",
     "terser": "^5.20.0",
     "tslib": "*",
-    "typescript": "^5.3.3"
+    "typescript": "^5.6.3"
   },
   "dependencies": {
     "rxjs": "^7.x"

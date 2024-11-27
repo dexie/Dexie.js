@@ -1,5 +1,5 @@
 import { DBOperationsSet } from 'dexie-cloud-common';
-import { BehaviorSubject, Observable, Subscriber, Subscription } from 'rxjs';
+import { BehaviorSubject, Observable, Subscriber, Subscription, tap } from 'rxjs';
 import { TokenExpiredError } from './authentication/TokenExpiredError';
 import { DXCWebSocketStatus } from './DXCWebSocketStatus';
 import { TSON } from './TSON';
@@ -12,6 +12,7 @@ import { getAwarenessLibrary, getDocAwareness } from './yjs/awareness';
 import { encodeYMessage, decodeYMessage } from 'dexie-cloud-common';
 import { UserLogin } from './dexie-cloud-client';
 import { isEagerSyncDisabled } from './isEagerSyncDisabled';
+import { getOpenDocSignal } from './yjs/reopenDocSignal';
 
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;
@@ -303,8 +304,6 @@ export class WSConnection extends Subscription {
         console.debug('dexie-cloud WebSocket onmessage', msg.type, msg);
         if (msg.type === 'error') {
           throw new Error(`Error message from dexie-cloud: ${msg.error}`);
-        } else if (msg.type === 'rev') {
-          this.rev = msg.rev; // No meaning but seems reasonable.
         } else if (msg.type === 'aware') {
           const docCache = DexieYProvider.getDocCache(this.db.dx);
           const doc = docCache.find(msg.table, msg.k, msg.prop);
@@ -319,9 +318,19 @@ export class WSConnection extends Subscription {
               );
             }
           }
-        } else  if (msg.type === 'u-ack' || msg.type === 'u-reject' || msg.type === 'u-s' || msg.type === 'in-sync') {
+        } else if (msg.type === 'u-ack' || msg.type === 'u-reject' || msg.type === 'u-s' || msg.type === 'in-sync') {
           applyYServerMessages([msg], this.db);
+        } else if (msg.type === 'doc-open') {
+          const docCache = DexieYProvider.getDocCache(this.db.dx);
+          const doc = docCache.find(msg.table, msg.k, msg.prop);
+          if (doc) {
+            getOpenDocSignal(doc).next(); // Make yHandler reopen the document on server.
+          }
+        } else if (msg.type === 'outdated-server-rev' || msg.type === 'y-complete-sync-done') {
+          // Won't happen but need this for typing.
+          throw new Error('Outdated server revision or y-complete-sync-done not expected over WebSocket - only in sync using fetch()');
         } else if (msg.type !== 'pong') {
+          // Forward the request to our subscriber, wich is in messageFromServerQueue.ts (via connectWebSocket's subscribe() at the end!)
           this.subscriber.next(msg);
         }
       } catch (e) {
@@ -359,6 +368,10 @@ export class WSConnection extends Subscription {
             }
             console.debug('dexie-cloud WebSocket send', msg.type, msg);
             if (msg.type === 'ready') {
+              // Ok, we are certain to have stored everything up until revision msg.rev.
+              // Update this.rev in case of reconnect - remember where we were and don't just start over!
+              this.rev = msg.rev; 
+              // ... and then send along the request to the server so it would also be updated!
               this.ws?.send(TSON.stringify(msg));
             } else {
               // If it's not a "ready" message, it's an YMessage.
@@ -380,4 +393,3 @@ export class WSConnection extends Subscription {
     }
   }
 }
-
