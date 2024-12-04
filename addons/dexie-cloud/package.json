@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "4.1.0-alpha.23",
+  "version": "4.1.0-beta.25",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/umd/dexie-cloud-addon.js",
   "type": "module",
@@ -55,7 +55,8 @@
     "test-unit": "karma start test/unit/karma.conf.js --single-run",
     "build": "rollup -c tools/build-configs/rollup.config.mjs",
     "watch": "rollup -c tools/build-configs/rollup.config.mjs --watch",
-    "clean": "rm -rf tools/tmp dist test/unit/bundle.*"
+    "clean": "rm -rf tools/tmp dist test/unit/bundle.*",
+    "postinstall": "tools/postinstall-banner.js"
   },
   "just-build": {
     "default": [
