@@ -48,8 +48,7 @@ export function sync(
   schema: DexieCloudSchema,
   syncOptions?: SyncOptions
 ): Promise<boolean> {
-  return _sync
-    .apply(this, arguments)
+  return _sync(db, options, schema, syncOptions)
     .then((result) => {
       if (!syncOptions?.justCheckIfNeeded) { // && syncOptions?.purpose !== 'push') {
         db.syncStateChangedEvent.next({
@@ -126,7 +125,7 @@ async function _sync(
   // Prepare for syncification by modifying locally unauthorized objects:
   //
   const persistedSyncState = await db.getPersistedSyncState();
-  const readyForSyncification = !isInitialSync && currentUser.isLoggedIn;
+  const readyForSyncification = currentUser.isLoggedIn;
   const tablesToSyncify = readyForSyncification
     ? getTablesToSyncify(db, persistedSyncState)
     : [];
