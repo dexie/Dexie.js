@@ -14,7 +14,7 @@ npx dexie-cloud create
 
 # The Cloud Service
 
-[![Better Stack Badge](https://uptime.betterstack.com/status-badges/v2/monitor/jist.svg)](https://uptime.betterstack.com/?utm_source=status_badge)
+[![Better Stack Badge](https://uptime.betterstack.com/status-badges/v2/monitor/jist.svg)](https://www.dexie-cloud-status.com)
 
 The official production service for Dexie Cloud Server is forever free of charge so you do not need to install any server to get started. The free service has some limits, see https://dexie.org/cloud/pricing
 
