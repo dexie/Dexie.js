@@ -3,10 +3,12 @@ The web client for [Dexie Cloud](https://dexie.org/cloud/).
 ## Getting started
 
 ```
-npm install dexie-cloud-addon
+npm install dexie@latest
+npm install dexie-cloud-addon@latest
 ```
 
 ```ts
+import Dexie from 'dexie';
 import dexieCloud from 'dexie-cloud-addon';
 
 const db = new Dexie('dbname', { addons: [dexieCloud]});
@@ -19,6 +21,10 @@ db.cloud.configure({
   databaseUrl: 'https://<yourdb>.dexie.cloud'
 })
 ```
+
+## See also
+
+https://dexie.org/cloud/docs/dexie-cloud-addon#api
 
 ## Obtaining a database URL
 
