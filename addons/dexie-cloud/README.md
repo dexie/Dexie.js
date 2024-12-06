@@ -1,6 +1,26 @@
 The web client for [Dexie Cloud](https://dexie.org/cloud/).
 
-# Getting started
+## Getting started
+
+```
+npm install dexie-cloud-addon
+```
+
+```ts
+import dexieCloud from 'dexie-cloud-addon';
+
+const db = new Dexie('dbname', { addons: [dexieCloud]});
+
+db.version(1).stores({
+    yourTable: '@primKeyProp, indexedProp1, indexedProp2, ...'
+});
+
+db.cloud.configure({
+  databaseUrl: 'https://<yourdb>.dexie.cloud'
+})
+```
+
+## Obtaining a database URL
 
 Run the following command in a console / terminal:
 
@@ -8,7 +28,7 @@ Run the following command in a console / terminal:
 npx dexie-cloud create
 ```
 
-...then follow the instructions on https://dexie.org/cloud/#getting-started
+See also https://dexie.org/cloud/#getting-started
 
 *Having problems getting started, please [file an issue](https://github.com/dexie/Dexie.js/issues/new)*
 
