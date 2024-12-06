@@ -2,70 +2,27 @@
 
 This library is an addon for Dexie.js that works as the sync client for Dexie Cloud. See https://dexie.org/cloud/
 
-# Hackathon 3-5 January 2025
+# Getting started
+
+To start using Dexie Cloud, create a database in the cloud
 
 ```
-
- .-. .-.  .--.    ,--,  ,-. .-.  .--.  _______ .-. .-. .---.  .-. .-. 
- | | | | / /\ \ .' .')  | |/ /  / /\ \|__   __|| | | |/ .-. ) |  \| | 
- | `-' |/ /__\ \|  |(_) | | /  / /__\ \ )| |   | `-' || | |(_)|   | | 
- | .-. ||  __  |\  \    | | \  |  __  |(_) |   | .-. || | | | | |\  | 
- | | |)|| |  |)| \  `-. | |) \ | |  |)|  | |   | | |)|\ `-' / | | |)| 
- /(  (_)|_|  (_)  \____\|((_)-'|_|  (_)  `-'   /(  (_) )---'  /(  (_) 
-(__)                    (_)                   (__)    (_)    (__)     
-
-
- __  __               \             .    _                   
- |   |    ___    ___  |   ,   ___  _/_   /        __.  , __  
- |___|   /   ` .'   ` |  /   /   `  |    |,---. .'   \ |'  `.
- |   |  |    | |      |-<   |    |  |    |'   ` |    | |    |
- /   /  `.__/|  `._.' /  \_ `.__/|  \__/ /    |  `._.' /    |
-                                                             
-
-
-  _    _            _         _   _                 
- | |  | |          | |       | | | |                
- | |__| | __ _  ___| | ____ _| |_| |__   ___  _ __  
- |  __  |/ _` |/ __| |/ / _` | __| '_ \ / _ \| '_ \ 
- | |  | | (_| | (__|   < (_| | |_| | | | (_) | | | |
- |_|  |_|\__,_|\___|_|\_\__,_|\__|_| |_|\___/|_| |_|
-                                                    
-                                                    
-                                                                                 
-                                             
-▗▖ ▗▖▗▞▀▜▌▗▞▀▘█  ▄ ▗▞▀▜▌   ■  ▐▌    ▄▄▄  ▄▄▄▄  
-▐▌ ▐▌▝▚▄▟▌▝▚▄▖█▄▀  ▝▚▄▟▌▗▄▟▙▄▖▐▌   █   █ █   █ 
-▐▛▀▜▌         █ ▀▄        ▐▌  ▐▛▀▚▖▀▄▄▄▀ █   █ 
-▐▌ ▐▌         █  █        ▐▌  ▐▌ ▐▌            
-                          ▐▌                   
-                                               
-                                               
-                                    
-
-    )                                                
- ( /(                )           )    )              
- )\())    )       ( /(     )  ( /( ( /(              
-((_)\  ( /(   (   )\()) ( /(  )\()))\())  (    (     
- _((_) )(_))  )\ ((_)\  )(_))(_))/((_)\   )\   )\ )  
-| || |((_)_  ((_)| |(_)((_)_ | |_ | |(_) ((_) _(_/(  
-| __ |/ _` |/ _| | / / / _` ||  _|| ' \ / _ \| ' \)) 
-|_||_|\__,_|\__| |_\_\ \__,_| \__||_||_|\___/|_||_|  
-                                                     
-
-                  _         _   _                 
-  /\  /\__ _  ___| | ____ _| |_| |__   ___  _ __  
- / /_/ / _` |/ __| |/ / _` | __| '_ \ / _ \| '_ \ 
-/ __  / (_| | (__|   < (_| | |_| | | | (_) | | | |
-\/ /_/ \__,_|\___|_|\_\__,_|\__|_| |_|\___/|_| |_|
-                                                  
-                                          
-                                                    
-🌟 Welcomne to Dexie.js Hackathon! 🌟
-📅 Date: January 3, 2025
-🕒 Start coding with Dexie Cloud and win prices!
-
-For more information: https://dexie.com/hackathon 
-
-Good luck! 🚀`
-
+npx dexie-cloud create
 ```
+
+Then follow the instructions on https://dexie.org/cloud/#getting-started
+
+## The Cloud Service
+
+[![Better Stack Badge](https://uptime.betterstack.com/status-badges/v2/monitor/jist.svg)](https://uptime.betterstack.com/?utm_source=status_badge)
+
+The official production service for Dexie Cloud Server is forever free of charge so you do not need to install any server to get started. The free service has some limits, see https://dexie.org/cloud/pricing
+
+## On-Prem version
+
+Dexie Cloud Server is a closed source software that can be purchased and installed on own hardware, see [On-Prem Silver / On-Prem Gold](https://dexie.org/cloud/pricing)
+
+## Dexie Cloud CLI
+
+See https://dexie.org/cloud/docs/cli
+
