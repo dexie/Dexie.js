@@ -33,7 +33,7 @@ export interface DBCoreMutateResponse {
   numFailures: number,
   failures: {[operationNumber: number]: Error};
   lastResult: any;
-  results?: any[]; // Present on AddRequest and PutRequest.
+  results?: any[]; // Always present on responses to AddRequest and PutRequest.
 }
 
 export interface DBCoreAddRequest {

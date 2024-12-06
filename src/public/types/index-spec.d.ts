@@ -6,4 +6,5 @@ export interface IndexSpec {
   auto: boolean | undefined;
   compound: boolean | undefined;
   src: string;
+  type?: string | undefined;
 }

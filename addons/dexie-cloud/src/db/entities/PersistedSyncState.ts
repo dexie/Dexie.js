@@ -1,5 +1,6 @@
 export interface PersistedSyncState {
   serverRevision?: any;
+  yServerRevision?: string;
   latestRevisions: {
     [tableName: string]: number
   };
@@ -11,4 +12,11 @@ export interface PersistedSyncState {
   syncedTables: string[];
   timestamp?: Date;
   error?: string;
+  yDownloadedRealms?: {
+    [realmId: string]: "*" | {
+      tbl: string;
+      prop: string;
+      key: any;
+    }
+  }
 }
