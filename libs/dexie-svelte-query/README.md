@@ -1,4 +1,4 @@
-# Dexis Svelte Query
+# Dexie.js Svelte Query
 
 Svelte reactive state query for fetching using Dexie.js
 
