@@ -1,46 +1,40 @@
 import sourcemaps from 'rollup-plugin-sourcemaps';
-import {readFileSync} from 'fs';
-import path from 'path';
 import commonjs from 'rollup-plugin-commonjs';
 import nodeResolve from 'rollup-plugin-node-resolve';
+import path from 'path';
 import alias from '@rollup/plugin-alias';
+import { fileURLToPath } from 'url';
 
-const version = require(path.resolve(__dirname, '../../package.json')).version;
+// Define __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const ERRORS_TO_IGNORE = [
-  "THIS_IS_UNDEFINED",
+  "THIS_IS_UNDEFINED"
 ];
 
 export default {
-  input: 'tools/tmp/src/dexie-export-import.js',
+  input: 'tools/tmp/test/index.js',
   output: [{
-    file: 'dist/dexie-export-import.js',
+    file: 'test/bundle.js',
     format: 'umd',
-    banner: readFileSync(path.resolve(__dirname, 'banner.txt'), "utf-8")
-        .replace(/{version}/g, version)
-        .replace(/{date}/g, new Date().toDateString()),
-    globals: {dexie: "Dexie"},
+    globals: {
+      dexie: "Dexie",
+      qunit: "QUnit",
+      "dexie-export-import":
+      "DexieExportImport"
+    },
     name: 'DexieExportImport',
     sourcemap: true,
     exports: 'named'
-  },{
-    file: 'dist/dexie-export-import.mjs',
-    format: 'es',
-    banner: readFileSync(path.resolve(__dirname, 'banner.txt'), "utf-8")
-        .replace(/{version}/g, version)
-        .replace(/{date}/g, new Date().toDateString()),
-    sourcemap: true
   }],
-  external: ['dexie'],
+  external: ['dexie', "qunit", "dexie-export-import"],
   plugins: [
     sourcemaps(),
     alias({entries: [{
       find: "stream", replacement: path.resolve(__dirname, './fake-stream')}
     ]}),
-    nodeResolve({
-      browser: true,
-      preferBuiltins: false
-    }),
+    nodeResolve({browser: true}),
     commonjs()
   ],
   onwarn ({loc, frame, code, message}) {
