@@ -11,9 +11,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 //const version = require(path.resolve(__dirname, '../../package.json')).version;
-console.log("URL", import.meta.url);
 const packageJsonPath = new URL('../../package.json', import.meta.url).pathname;
-console.log("resolved: ", packageJsonPath);
 const { version } = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
 const ERRORS_TO_IGNORE = [
