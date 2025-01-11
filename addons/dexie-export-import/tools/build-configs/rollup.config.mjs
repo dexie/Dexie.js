@@ -4,8 +4,15 @@ import path from 'path';
 import commonjs from 'rollup-plugin-commonjs';
 import nodeResolve from 'rollup-plugin-node-resolve';
 import alias from '@rollup/plugin-alias';
+import { fileURLToPath } from 'url';
 
-const version = require(path.resolve(__dirname, '../../package.json')).version;
+// Define __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
+//const version = require(path.resolve(__dirname, '../../package.json')).version;
+const packageJsonPath = new URL('../../package.json', import.meta.url).pathname;
+const { version } = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
 
 const ERRORS_TO_IGNORE = [
   "THIS_IS_UNDEFINED",

@@ -24,12 +24,12 @@
     ],
     "src": [
       "tsc -p src",
-      "rollup -c tools/build-configs/rollup.config.js"
+      "rollup -c tools/build-configs/rollup.config.mjs"
     ],
     "test": [
       "tsc -p test [--watch 'Watching for file changes.']",
-      "rollup -c tools/build-configs/rollup.config.js",
-      "rollup -c tools/build-configs/rollup.tests.config.js"
+      "rollup -c tools/build-configs/rollup.config.mjs",
+      "rollup -c tools/build-configs/rollup.tests.config.mjs"
     ]
   },
   "author": "david.fahlander@gmail.com",
