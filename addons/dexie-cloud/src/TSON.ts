@@ -1,5 +1,5 @@
 import { TypesonSimplified } from 'dreambase-library/dist/typeson-simplified/TypesonSimplified';
-import { Bison } from "dreambase-library/dist/typeson-simplified/Bison";
+import { Bison } from 'dreambase-library/dist/typeson-simplified/Bison';
 import undefinedDef from 'dreambase-library/dist/typeson-simplified/types/undefined.js';
 import tsonBuiltinDefs from 'dreambase-library/dist/typeson-simplified/presets/builtin.js';
 import { TypeDefSet } from 'dreambase-library/dist/typeson-simplified/TypeDefSet';
@@ -20,7 +20,8 @@ import { PropModSpec, PropModification } from 'dexie';
 //     serverRev.rev = bigIntDef.bigint.revive(server.rev)
 //   else
 //     serverRev.rev = new FakeBigInt(server.rev)
-export const hasBigIntSupport = typeof BigInt === 'function' && typeof BigInt(0) === 'bigint';
+export const hasBigIntSupport =
+  typeof BigInt === 'function' && typeof BigInt(0) === 'bigint';
 
 function getValueOfBigInt(x: bigint | FakeBigInt | string) {
   if (typeof x === 'bigint') {
@@ -33,7 +34,10 @@ function getValueOfBigInt(x: bigint | FakeBigInt | string) {
   }
 }
 
-export function compareBigInts(a: bigint | FakeBigInt | string, b:bigint | FakeBigInt | string) {
+export function compareBigInts(
+  a: bigint | FakeBigInt | string,
+  b: bigint | FakeBigInt | string
+) {
   const valA = getValueOfBigInt(a);
   const valB = getValueOfBigInt(b);
   return valA < valB ? -1 : valA > valB ? 1 : 0;
@@ -48,42 +52,40 @@ export class FakeBigInt {
   }
 }
 
-const defs: TypeDefSet = {
-  ...undefinedDef,
-  ...(hasBigIntSupport
-    ? {}
-    : {
-        bigint: {
-          test: (val: any) => val instanceof FakeBigInt,
-          replace: (fakeBigInt: any) => {
-            return {
-              $t: 'bigint',
-              ...fakeBigInt
-            };
-          },
-          revive: ({
-            v,
-          }: {
-            $t: 'bigint';
-            v: string;
-          }) => new FakeBigInt(v) as any as bigint
-        }
-      }),
-      PropModification: {
-        test: (val: any) => val instanceof PropModification,
-        replace: (propModification: any) => {
+const bigIntDef = hasBigIntSupport
+  ? {}
+  : {
+      bigint: {
+        test: (val: any) => val instanceof FakeBigInt,
+        replace: (fakeBigInt: any) => {
           return {
-            $t: 'PropModification',
-            ...propModification
+            $t: 'bigint',
+            ...fakeBigInt,
           };
         },
-        revive: ({
-          $t,
-          ...propModification
-        }: {
-          $t: 'PropModification';
-        } & PropModSpec) => new PropModification(propModification)
-      }
+        revive: ({ v }: { $t: 'bigint'; v: string }) =>
+          new FakeBigInt(v) as any as bigint,
+      },
+    };
+
+const defs: TypeDefSet = {
+  ...undefinedDef,
+  ...bigIntDef,
+  PropModification: {
+    test: (val: any) => val instanceof PropModification,
+    replace: (propModification: any) => {
+      return {
+        $t: 'PropModification',
+        ...propModification['@@propmod'],
+      };
+    },
+    revive: ({
+      $t, // strip '$t'
+      ...propModSpec // keep the rest
+    }: {
+      $t: 'PropModification';
+    } & PropModSpec) => new PropModification(propModSpec),
+  },
 };
 
 export const TSON = TypesonSimplified(tsonBuiltinDefs, defs);

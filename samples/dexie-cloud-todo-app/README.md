@@ -12,15 +12,15 @@ If you just want to see the app in action, navigate to the [pre-built published 
 
 If you want to build and play with it locally, follow these steps:
 
-1. `npm install --global yarn` (if yarn not already installed)
+1. `npm install --global pnpm@latest-9` (if pnpm not already installed)
 2. `npx dexie-cloud create`
-3. `yarn install`
+3. `pnpm install`
 4. `./configure-app.sh`
-5. `yarn start`
+5. `pnpm start`
 
 The steps above will:
 
-1. Install yarn (if you haven't already)
+1. Install pnpm (if you haven't already)
 2. Create a new database in the cloud
 3. Install dependencies
 4. Import demo-users to your database and create a .env file that connects the ToDo app to your database.
@@ -30,7 +30,7 @@ The steps above will:
 
 Service worker is automatically disabled in dev-mode (the default for create-react-app). To enable it, the easiest way is to deploy the app:
 
-1. `yarn deploy` (will publish the app to your gh-pages branch of your Dexie.js fork)
+1. `pnpm run deploy` (will publish the app to your gh-pages branch of your Dexie.js fork)
 2. `npx dexie-cloud whitelist https://your-github-username.github.io` (replace `your-github-username`)
 3. Voila: Go to https://your-github-username.github.io/Dexie.js/dexie-cloud-todo-app/ from your browser. This is a full installable PWA that you can add to your start screen on a mobile phone.
 
@@ -61,7 +61,7 @@ This command will create the file .env.local and configure it against the DB URL
 You can equally well set the environment variable REACT_APP_DBURL manually to the URL of your
 Dexie Cloud database.
 
-### `yarn start`
+### `pnpm start`
 
 Runs the app in the development mode.\
 Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
@@ -69,12 +69,12 @@ Open [http://localhost:3000](http://localhost:3000) to view it in the browser.
 The page will reload if you make edits.\
 You will also see any lint errors in the console.
 
-### `yarn test`
+### `pnpm test`
 
 Launches the test runner in the interactive watch mode.\
 See the section about [running tests](https://facebook.github.io/create-react-app/docs/running-tests) for more information.
 
-### `yarn build`
+### `pnpm build`
 
 Builds the app for production to the `build` folder.\
 It correctly bundles React in production mode and optimizes the build for the best performance.
@@ -84,11 +84,11 @@ Your app is ready to be deployed!
 
 See the section about [deployment](https://facebook.github.io/create-react-app/docs/deployment) for more information.
 
-### `yarn deploy`
+### `pnpm run deploy`
 
 Deploys the built app to gh-pages branch of this github repository under the folder /dexie-cloud-todo-app/.
 
-### `yarn eject`
+### `pnpm run eject`
 
 **Note: this is a one-way operation. Once you `eject`, you can’t go back!**
 
