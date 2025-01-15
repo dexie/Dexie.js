@@ -9,7 +9,7 @@ if (_Dexie.semVer !== Dexie.semVer) {
 }
 const {
     liveQuery, mergeRanges, rangesOverlap, RangeSet, cmp, Entity,
-    PropModSymbol, PropModification, replacePrefix, add, remove } = Dexie;
+    PropModification, replacePrefix, add, remove } = Dexie;
 export { liveQuery, mergeRanges, rangesOverlap, RangeSet, cmp, Dexie, Entity,
-    PropModSymbol, PropModification, replacePrefix, add, remove };
+    PropModification, replacePrefix, add, remove };
 export default Dexie;
