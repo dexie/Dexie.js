@@ -19,5 +19,5 @@ echo "REACT_APP_DBURL=$DB_URL" > .env.local
 echo "FAST_REFRESH=false" >> .env.local
 echo ""
 echo "Application is now configured!"
-echo "Use 'yarn install' if you haven't done so already."
-echo "Use 'yarn start' to start the app."
+echo "Use 'npm install' if you haven't done so already."
+echo "Use 'npm start' to start the app."
