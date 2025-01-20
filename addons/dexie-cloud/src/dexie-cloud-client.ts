@@ -66,6 +66,7 @@ export type { DexieCloudOptions, PeriodicSyncOptions } from './DexieCloudOptions
 export * from './types/DXCAlert';
 export * from './types/DXCInputField';
 export * from './types/DXCUserInteraction';
+export { defineYDocTrigger } from './define-ydoc-trigger';
 
 const DEFAULT_OPTIONS: Partial<DexieCloudOptions> = {
   nameSuffix: true,
