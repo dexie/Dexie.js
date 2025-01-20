@@ -40,6 +40,8 @@ validate_semver $next_version
 
 if echo "$next_version" | grep -q "-"; then
 	NPMTAG="next$master_suffix"
+elif [ "$1" = "canary" ]; then
+  NPMTAG="canary$master_suffix"
 else
 	NPMTAG="latest$master_suffix"
 fi

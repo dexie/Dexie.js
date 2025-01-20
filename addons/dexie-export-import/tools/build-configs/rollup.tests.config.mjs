@@ -3,6 +3,11 @@ import commonjs from 'rollup-plugin-commonjs';
 import nodeResolve from 'rollup-plugin-node-resolve';
 import path from 'path';
 import alias from '@rollup/plugin-alias';
+import { fileURLToPath } from 'url';
+
+// Define __dirname
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const ERRORS_TO_IGNORE = [
   "THIS_IS_UNDEFINED"

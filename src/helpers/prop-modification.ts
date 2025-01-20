@@ -1,8 +1,6 @@
 import { isArray } from "../functions/utils";
 import { PropModSpec } from "../public/types/prop-modification";
 
-export const PropModSymbol: unique symbol = Symbol();
-
 /** Consistent change propagation across offline synced data.
  * 
  * This class is executed client- and server side on sync, making
@@ -25,16 +23,13 @@ export const PropModSymbol: unique symbol = Symbol();
  * 2. Here in PropModification with the logic they represent
  * 3. (Optionally) a sugar function for it, such as const mathAdd = (amount: number | BigInt) => new PropModification({mathAdd: amount})
  */
-export class PropModification implements PropModSpec {
-  [PropModSymbol]?: true;
-  replacePrefix?: [string, string];
-  add?: number | bigint | Array<string | number>;
-  remove?: number | bigint | Array<string | number>;
-
+export class PropModification {
+  ["@@propmod"]: PropModSpec;
   execute(value: any): any {
+    const spec = this["@@propmod"]
     // add (mathematical or set-wise)
-    if (this.add !== undefined) {
-      const term = this.add;
+    if (spec.add !== undefined) {
+      const term = spec.add;
       // Set-addition on array representing a set of primitive types (strings, numbers)
       if (isArray(term)) {
         return [...(isArray(value) ? value : []), ...term].sort();
@@ -52,8 +47,8 @@ export class PropModification implements PropModSpec {
     }
 
     // remove (mathematical or set-wise)
-    if (this.remove !== undefined) {
-      const subtrahend = this.remove;
+    if (spec.remove !== undefined) {
+      const subtrahend = spec.remove;
       // Set-addition on array representing a set of primitive types (strings, numbers)
       if (isArray(subtrahend)) {
         return isArray(value) ? value.filter(item => !subtrahend.includes(item)).sort() : [];
@@ -71,14 +66,14 @@ export class PropModification implements PropModSpec {
     }
 
     // Replace a prefix:
-    const prefixToReplace = this.replacePrefix?.[0];
+    const prefixToReplace = spec.replacePrefix?.[0];
     if (prefixToReplace && typeof value === 'string' && value.startsWith(prefixToReplace)) {
-      return this.replacePrefix[1] + value.substring(prefixToReplace.length);
+      return spec.replacePrefix[1] + value.substring(prefixToReplace.length);
     }
     return value;
   }
 
   constructor(spec: PropModSpec) {
-    Object.assign(this, spec);
+    this["@@propmod"] = spec;
   }
 }

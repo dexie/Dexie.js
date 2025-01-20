@@ -13,7 +13,7 @@ import './support-bfcache';
 import { liveQuery } from './live-query/live-query';
 import { Entity } from './classes/entity/Entity';
 import { cmp } from './functions/cmp';
-import { PropModification, PropModSymbol } from './helpers/prop-modification';
+import { PropModification } from './helpers/prop-modification';
 import { replacePrefix, add, remove } from './functions/propmods';
 
 
@@ -30,6 +30,6 @@ export { RangeSet, mergeRanges, rangesOverlap } from "./helpers/rangeset";
 export { Dexie, liveQuery }; // Comply with public/index.d.ts.
 export { Entity };
 export { cmp };
-export { PropModSymbol, PropModification, replacePrefix, add, remove };
+export { PropModification, replacePrefix, add, remove };
 export { DexieYProvider } from './yjs/DexieYProvider';
 export default Dexie;
