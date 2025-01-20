@@ -72,11 +72,12 @@ export async function syncWithServer(
   db.syncStateChangedEvent.next({
     phase: 'pushing',
   });
+  const body = TSON.stringify(syncRequest);
   const res = await fetch(`${databaseUrl}/sync`, {
     method: 'post',
     headers,
     credentials: 'include', // For Arr Affinity cookie only, for better Rate-Limit counting only.
-    body: TSON.stringify(syncRequest),
+    body,
   });
   //const contentLength = Number(res.headers.get('content-length'));
   db.syncStateChangedEvent.next({

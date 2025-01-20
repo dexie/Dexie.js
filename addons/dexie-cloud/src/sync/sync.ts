@@ -372,7 +372,11 @@ async function _sync(
   const usingYProps = Object.values(schema).some(tbl => tbl.yProps?.length);
   const serverSupportsYprops = !!res.yMessages;
   if (usingYProps && serverSupportsYprops) {
-    await downloadYDocsFromServer(db, databaseUrl, newSyncState);
+    try {
+      await downloadYDocsFromServer(db, databaseUrl, newSyncState);
+    } catch (error) {
+      console.error('Failed to download Yjs documents from server', error);
+    }
   }
   console.debug('SYNC DONE', { isInitialSync });
   db.syncCompleteEvent.next();
