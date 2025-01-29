@@ -143,6 +143,9 @@ importers:
       dexie:
         specifier: workspace:^
         version: link:../..
+      dexie-cloud-common:
+        specifier: workspace:^
+        version: link:../../libs/dexie-cloud-common
       rxjs:
         specifier: ^7.x
         version: 7.5.6
@@ -165,9 +168,6 @@ importers:
       '@types/node':
         specifier: ^18.11.18
         version: 18.11.18
-      dexie-cloud-common:
-        specifier: workspace:^
-        version: link:../../libs/dexie-cloud-common
       dreambase-library:
         specifier: ^1.0.21
         version: 1.0.21
