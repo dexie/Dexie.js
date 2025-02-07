@@ -6,7 +6,7 @@ import Dexie, {
   type DBCore,
   type Middleware,
   type Table,
-  type YjsDoc
+  type YjsDoc,
 } from 'dexie';
 
 const ydocTriggers: {
@@ -17,8 +17,104 @@ const ydocTriggers: {
   };
 } = {};
 
-const docIsAlreadyHooked = new WeakSet<YjsDoc>();
 const middlewares = new WeakMap<Dexie, Middleware<DBCore>>();
+let subscribedToProviderBeforeUnload = false;
+const txRunner = TriggerRunner("tx");
+const unloadRunner = TriggerRunner("unload");
+
+type TriggerRegistry = Map<
+  string,
+  {
+    db: Dexie;
+    parentTable: string;
+    parentId: any;
+    prop: string;
+    triggers: Set<(ydoc: YjsDoc, parentId: any) => any>;
+  }
+>;
+
+function TriggerRunner(name: string) {
+  let triggerExecPromise: Promise<any> | null = null;
+  let triggerScheduled = false;
+  let registry: TriggerRegistry = new Map<
+    string,
+    {
+      db: Dexie;
+      parentTable: string;
+      parentId: any;
+      prop: string;
+      triggers: Set<(ydoc: YjsDoc, parentId: any) => any>;
+    }
+  >();
+
+  async function execute(registryCopy: TriggerRegistry) {
+    for (const {
+      db,
+      parentId,
+      triggers,
+      parentTable,
+      prop,
+    } of registryCopy.values()) {
+      const yDoc = DexieYProvider.getOrCreateDocument(
+        db,
+        parentTable,
+        prop,
+        parentId
+      );
+      try {
+        DexieYProvider.load(yDoc); // If doc is open, this would just be a ++refount
+        await yDoc.whenLoaded; // If doc is loaded, this would resolve immediately
+        for (const trigger of triggers) {
+          await trigger(yDoc, parentId);
+        }
+      } catch (error) {
+        console.error(`Error in YDocTrigger ${error}`);
+      } finally {
+        DexieYProvider.release(yDoc);
+      }
+    }
+  }
+
+  return {
+    name,
+    async run() {
+      if (!triggerScheduled && registry.size > 0) {
+        triggerScheduled = true;
+        if (triggerExecPromise) await triggerExecPromise.catch(() => {});
+        setTimeout(() => {
+          // setTimeout() is to escape from Promise.PSD zones and never run within liveQueries or transaction scopes
+          triggerScheduled = false;
+          const registryCopy = registry;
+          registry = new Map();
+          triggerExecPromise = execute(registryCopy).finally(
+            () => (triggerExecPromise = null)
+          );
+        }, 0);
+      }
+    },
+    enqueue(
+      db: Dexie,
+      parentTable: string,
+      parentId: any,
+      prop: string,
+      trigger: (ydoc: YjsDoc, parentId: any) => any
+    ) {
+      const key = `${db.name}:${parentTable}:${parentId}:${prop}`;
+      let entry = registry.get(key);
+      if (!entry) {
+        entry = {
+          db,
+          parentTable,
+          parentId,
+          prop,
+          triggers: new Set(),
+        };
+        registry.set(key, entry);
+      }
+      entry.triggers.add(trigger);
+    },
+  };
+}
 
 const createMiddleware: (db: Dexie) => Middleware<DBCore> = (db) => ({
   stack: 'dbcore',
@@ -29,15 +125,17 @@ const createMiddleware: (db: Dexie) => Middleware<DBCore> = (db) => ({
       ...down,
       transaction: (stores, mode, options) => {
         const idbtrans = down.transaction(stores, mode, options);
+        if (mode === 'readonly') return idbtrans;
+        if (!stores.some((store) => ydocTriggers[store])) return idbtrans;
         (idbtrans as IDBTransaction).addEventListener(
           'complete',
           onTransactionCommitted
         );
         return idbtrans;
       },
-      table: (tblName) => {
-        const coreTable = down.table(tblName);
-        const triggerSpec = ydocTriggers[tblName];
+      table: (updatesTable) => {
+        const coreTable = down.table(updatesTable);
+        const triggerSpec = ydocTriggers[updatesTable];
         if (!triggerSpec) return coreTable;
         const { trigger, parentTable, prop } = triggerSpec;
         return {
@@ -53,14 +151,11 @@ const createMiddleware: (db: Dexie) => Middleware<DBCore> = (db) => ({
                     primaryKey,
                     prop
                   );
-                  if (doc) {
-                    if (!docIsAlreadyHooked.has(doc)) {
-                      hookToDoc(doc, primaryKey, trigger);
-                      docIsAlreadyHooked.add(doc);
-                    }
-                  } else {
-                    enqueueTrigger(db, tblName, primaryKey, trigger);
-                  }
+                  const runner =
+                    doc && DexieYProvider.for(doc)?.refCount
+                      ? unloadRunner // Document is open. Wait with trigger until it's closed.
+                      : txRunner; // Document is closed. Run trigger immediately after transaction commits.
+                  runner.enqueue(db, parentTable, primaryKey, prop, trigger);
                 }
                 break;
               }
@@ -82,7 +177,13 @@ const createMiddleware: (db: Dexie) => Middleware<DBCore> = (db) => ({
                         if (k != undefined) keySet.addKey(k);
                       }
                       for (const interval of keySet) {
-                        enqueueTrigger(db, tblName, interval.from, trigger);
+                        txRunner.enqueue(
+                          db,
+                          parentTable,
+                          interval.from,
+                          prop,
+                          trigger
+                        );
                       }
                     });
                 }
@@ -96,88 +197,12 @@ const createMiddleware: (db: Dexie) => Middleware<DBCore> = (db) => ({
   },
 });
 
-let triggerExecPromise: Promise<any> | null = null;
-let triggerScheduled = false;
-let scheduledTriggers: {
-  db: Dexie;
-  updatesTable: string;
-  parentId: any;
-  trigger: (ydoc: YjsDoc, parentId: any) => any;
-}[] = [];
-
-function $Y(db: Dexie): YjsLib {
-  const $Y = db._options.Y;
-  if (!$Y) throw new Error('Y library not supplied to Dexie constructor');
-  return $Y;
+function onTransactionCommitted() {
+  txRunner.run();
 }
 
-async function executeTriggers(triggersToRun: typeof scheduledTriggers) {
-  for (const { db, parentId, trigger, updatesTable } of triggersToRun) {
-    // Load entire document into an Y.Doc instance:
-    const updates: YUpdateRow[] = await db
-      .table(updatesTable)
-      .where({ k: parentId })
-      .toArray();
-    const Y = $Y(db);
-    const yDoc = new Y.Doc();
-    for (const update of updates) {
-      Y.applyUpdateV2(yDoc, update.u);
-    }
-    try {
-      await trigger(yDoc, parentId);
-    } catch (error) {
-      console.error(`Error in YDocTrigger ${error}`);
-    }
-  }
-}
-
-function enqueueTrigger(
-  db: Dexie,
-  updatesTable: string,
-  parentId: any,
-  trigger: (ydoc: YjsDoc, parentId: any) => any
-) {
-  scheduledTriggers.push({
-    db,
-    updatesTable,
-    parentId,
-    trigger,
-  });
-}
-
-async function onTransactionCommitted() {
-  if (!triggerScheduled && scheduledTriggers.length > 0) {
-    triggerScheduled = true;
-    if (triggerExecPromise) await triggerExecPromise.catch(() => {});
-    setTimeout(() => {
-      // setTimeout() is to escape from Promise.PSD zones and never run within liveQueries or transaction scopes
-      triggerScheduled = false;
-      const triggersToRun = scheduledTriggers;
-      scheduledTriggers = [];
-      triggerExecPromise = executeTriggers(triggersToRun).finally(
-        () => (triggerExecPromise = null)
-      );
-    }, 0);
-  }
-}
-
-function hookToDoc(
-  doc: YjsDoc,
-  parentId: any,
-  trigger: (ydoc: YjsDoc, parentId: any) => any
-) {
-  // From now on, keep listening to doc updates and execute the trigger when it happens there instead
-  doc.on('updateV2', (update: Uint8Array, origin: any) => {
-    //Dexie.ignoreTransaction(()=>{
-    trigger(doc, parentId);
-    //});
-  });
-  /*
-    NOT NEEDED because DexieYProvider's docCache will also listen to destroy and remove it from its cache:
-    doc.on('destroy', ()=>{
-    docIsAlreadyHooked.delete(doc);
-  })
-  */
+function beforeProviderUnload() {
+  unloadRunner.run();
 }
 
 export function defineYDocTrigger<T, TKey>(
@@ -204,4 +229,8 @@ export function defineYDocTrigger<T, TKey>(
     middlewares.set(db, mw);
   }
   db.use(mw);
+
+  if (!subscribedToProviderBeforeUnload) {
+    DexieYProvider.on('beforeunload', beforeProviderUnload);
+  }
 }

@@ -3,6 +3,7 @@ import type { Dexie } from '../public/types/dexie';
 import type { DexieYDocMeta, YjsLib } from '../public/types/yjs-related';
 import { getByKeyPath } from '../functions/utils';
 import { destroyedDocs, getDocCache } from './docCache';
+import { getOrCreateDocument } from './getOrCreateDocument';
 
 export function createYDocProperty(
   db: Dexie,
@@ -19,28 +20,15 @@ export function createYDocProperty(
     },
     get(this: object) {
       const id = getByKeyPath(this, pkKeyPath);
-
-      let doc = docCache.find(table.name, id, prop);
-      if (doc) return doc;
-
-      doc = new Y.Doc({
-        meta: {
-          db,
-          updatesTable,
-          parentProp: prop,
-          parentTable: table.name,
-          parentId: id
-        } satisfies DexieYDocMeta,
-      });
-
-      docCache.add(doc);
-
-      doc.on('destroy', () => {
-        destroyedDocs.add(doc);
-        docCache.delete(doc);
-      });
-
-      return doc;
+      return getOrCreateDocument(
+        db,
+        docCache,
+        Y,
+        table.name,
+        prop,
+        updatesTable,
+        id
+      );
     },
   };
 }

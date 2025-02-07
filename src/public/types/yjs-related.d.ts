@@ -143,6 +143,8 @@ export declare class DexieYProvider<YDoc=any> {
   destroy(): void;
   readonly destroyed: boolean;
 
+  static on: DexieEventSet & ((name: string, f: (...args: any[]) => any) => void);
+  static getOrCreateDocument(db: Dexie, table: string, prop: string, id: any): YjsDoc;
   static load<YDoc extends YjsDoc>(doc: YDoc): DexieYProvider<YDoc>;
   static release<YDoc extends YjsDoc>(doc: YDoc, options?: ProviderReleaseOptions): void;
   static for<YDoc extends YjsDoc>(doc: YDoc): DexieYProvider<YDoc> | undefined;

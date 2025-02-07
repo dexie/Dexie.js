@@ -14,7 +14,7 @@ export function useDocument<YDoc extends YjsDoc>(
       setProvider(provider);
       return () => {
         DexieYProvider.release(doc, {
-          gracePeriod: 1000 // Grace period to optimize for unload/reload scenarios
+          gracePeriod: 100 // Grace period to optimize for unload/reload scenarios
         });
       }
     } else if (provider) {

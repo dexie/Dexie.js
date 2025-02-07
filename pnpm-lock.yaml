@@ -85,10 +85,10 @@ importers:
         version: 3.14.2
       y-protocols:
         specifier: ^1.0.6
-        version: 1.0.6(yjs@13.6.16)
+        version: 1.0.6(yjs@13.6.23)
       yjs:
-        specifier: ^13.6.16
-        version: 13.6.16
+        specifier: ^13.6.23
+        version: 13.6.23
 
   addons/Dexie.Observable:
     devDependencies:
@@ -5261,6 +5261,11 @@ packages:
     engines: {node: '>=16'}
     hasBin: true
 
+  lib0@0.2.99:
+    resolution: {integrity: sha512-vwztYuUf1uf/1zQxfzRfO5yzfNKhTtgOByCruuiQQxWQXnPb8Itaube5ylofcV0oM0aKal9Mv+S1s1Ky0UYP1w==}
+    engines: {node: '>=16'}
+    hasBin: true
+
   lilconfig@2.1.0:
     resolution: {integrity: sha512-utWOt/GHzuUxnLKxB6dk81RoOeoNeHgbrXiuGk4yyF5qlRz+iIVWu56E2fqGHFrXz0QNUhLB/8nKqvRH66JKGQ==}
     engines: {node: '>=10'}
@@ -7952,8 +7957,8 @@ packages:
     resolution: {integrity: sha512-7dSzzRQ++CKnNI/krKnYRV7JKKPUXMEh61soaHKg9mrWEhzFWhFnxPxGl+69cD1Ou63C13NUPCnmIcrvqCuM6w==}
     engines: {node: '>=12'}
 
-  yjs@13.6.16:
-    resolution: {integrity: sha512-uEq+n/dFIecBElEdeQea8nDnltScBfuhCSyAxDw4CosveP9Ag0eW6iZi2mdpW7EgxSFT7VXK2MJl3tKaLTmhAQ==}
+  yjs@13.6.23:
+    resolution: {integrity: sha512-ExtnT5WIOVpkL56bhLeisG/N5c4fmzKn4k0ROVfJa5TY2QHbH7F0Wu2T5ZhR7ErsFWQEFafyrnSI8TPKVF9Few==}
     engines: {node: '>=16.0.0', npm: '>=8.0.0'}
 
   yocto-queue@0.1.0:
@@ -14388,6 +14393,10 @@ snapshots:
     dependencies:
       isomorphic.js: 0.2.5
 
+  lib0@0.2.99:
+    dependencies:
+      isomorphic.js: 0.2.5
+
   lilconfig@2.1.0: {}
 
   lines-and-columns@1.2.4: {}
@@ -17420,10 +17429,10 @@ snapshots:
 
   xmlchars@2.2.0: {}
 
-  y-protocols@1.0.6(yjs@13.6.16):
+  y-protocols@1.0.6(yjs@13.6.23):
     dependencies:
       lib0: 0.2.97
-      yjs: 13.6.16
+      yjs: 13.6.23
 
   y18n@5.0.8: {}
 
@@ -17459,9 +17468,9 @@ snapshots:
       y18n: 5.0.8
       yargs-parser: 21.1.1
 
-  yjs@13.6.16:
+  yjs@13.6.23:
     dependencies:
-      lib0: 0.2.97
+      lib0: 0.2.99
 
   yocto-queue@0.1.0: {}
 
