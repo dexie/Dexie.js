@@ -1,5 +1,7 @@
 # Dexie.Observable.js
 
+*NOTE! Dexie's liveQuery feature is NOT dependent on this old package. This package has been unmaintained for a looong time and might be retired*
+
 Observe changes to database - even when they happen in another browser window.
 
 ### Install
