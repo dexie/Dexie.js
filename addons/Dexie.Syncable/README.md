@@ -2,6 +2,8 @@
 
 Enables two-way synchronization with remote database.
 
+*NOTE! This package has been unmaintained for a looong time and might be retired. Some people go under the impression that Dexie Cloud would be based on this package, but it's not - it has its own sync system based on middlewares - all source for it is in addons/dexie-cloud.*
+
 ### Install
 ```
 npm install dexie --save
