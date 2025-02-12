@@ -27,16 +27,16 @@ function generateInputData(chunkSize: number, numChunks = 4) {
 async function* generateChunk(chunkSizes: AsyncGenerator<number>) {
   for await (const chunkSize of chunkSizes) {
     for (let i = 0; i < inputData.length; i += chunkSize) {
-      console.log('Yielding chunk of size ' + (''+i)+':'+(i + chunkSize));
+      //console.log('Yielding chunk of size ' + (''+i)+':'+(i + chunkSize));
       yield inputData.slice(i, i + chunkSize);
     }
   }
 }
 
 async function* generateChunkSizes() {
-  console.log('yield 1024');
+  //console.log('yield 1024');
   yield 1040;
-  console.log('yield 512');
+  //console.log('yield 512');
   yield 520;
   yield 260;
   yield 1;
