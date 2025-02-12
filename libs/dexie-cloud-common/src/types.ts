@@ -84,6 +84,7 @@ export interface TokenOtpDetailsResponse {
   type: 'otp-details';
   otp: string;
   otp_id: string;
+  data?: any;
 }
 
 export interface TokenErrorResponse {
