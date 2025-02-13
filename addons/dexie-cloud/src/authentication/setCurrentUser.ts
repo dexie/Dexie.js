@@ -18,8 +18,6 @@ export async function setCurrentUser(
   db: DexieCloudDB,
   user: AuthPersistedContext
 ) {
-  if (user.userId === db.cloud.currentUserId) return; // Already this user.
-
   const $logins = db.table('$logins');
   await db.transaction('rw', $logins, async (tx) => {
     const existingLogins = await $logins.toArray();
@@ -47,8 +45,11 @@ export async function setCurrentUser(
         }
       } catch {}
       throw e;
-    }  
+    }
     console.debug('Saved new user', user.email);
   });
-  await waitUntil(db.cloud.currentUser, (currentUser) => currentUser.userId === user.userId);
+  await waitUntil(
+    db.cloud.currentUser,
+    (currentUser) => currentUser.userId === user.userId
+  );
 }
