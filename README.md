@@ -4,6 +4,27 @@
 
 Dexie.js is a wrapper library for indexedDB - the standard database in the browser. https://dexie.org.
 
+# Hackathon 3-5 January 2025
+
+```
+ /$$   /$$                     /$$                   /$$     /$$                          
+| $$  | $$                    | $$                  | $$    | $$                          
+| $$  | $$  /$$$$$$   /$$$$$$$| $$   /$$  /$$$$$$  /$$$$$$  | $$$$$$$   /$$$$$$  /$$$$$$$ 
+| $$$$$$$$ |____  $$ /$$_____/| $$  /$$/ |____  $$|_  $$_/  | $$__  $$ /$$__  $$| $$__  $$
+| $$__  $$  /$$$$$$$| $$      | $$$$$$/   /$$$$$$$  | $$    | $$  \ $$| $$  \ $$| $$  \ $$
+| $$  | $$ /$$__  $$| $$      | $$_  $$  /$$__  $$  | $$ /$$| $$  | $$| $$  | $$| $$  | $$
+| $$  | $$|  $$$$$$$|  $$$$$$$| $$ \  $$|  $$$$$$$  |  $$$$/| $$  | $$|  $$$$$$/| $$  | $$
+|__/  |__/ \_______/ \_______/|__/  \__/ \_______/   \___/  |__/  |__/ \______/ |__/  |__/
+                                                    
+🌟 Welcomne to Dexie.js Hackathon! 🌟
+📅 Date: February 14 --> April 13, 2025
+🕒 Start coding with Dexie Cloud and win prices!
+
+Good luck! 🚀`
+
+```
+For more information: https://dexie.com/hackathon 
+
 #### Why Dexie.js?
 
 IndexedDB is the portable database for all browser engines. Dexie.js makes it fun and easy to work with.
