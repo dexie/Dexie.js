@@ -6,7 +6,7 @@ Dexie.js is a wrapper library for indexedDB - the standard database in the brows
 
 # Hackathon February 14 - April 13 2025
 
-[```
+```
  /$$   /$$                     /$$                   /$$     /$$                          
 | $$  | $$                    | $$                  | $$    | $$                          
 | $$  | $$  /$$$$$$   /$$$$$$$| $$   /$$  /$$$$$$  /$$$$$$  | $$$$$$$   /$$$$$$  /$$$$$$$ 
@@ -24,7 +24,8 @@ For more information: https://dexie.com/hackathon
 
 Good luck! 🚀`
 
-```](https://dexie.com/hackathon)
+```
+https://dexie.com/hackathon
 
 #### Why Dexie.js?
 
