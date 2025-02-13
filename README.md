@@ -4,7 +4,7 @@
 
 Dexie.js is a wrapper library for indexedDB - the standard database in the browser. https://dexie.org.
 
-# Hackathon February 14 - April 13 2025
+# Join our Hackathon!
 
 ```
  /$$   /$$                     /$$                   /$$     /$$                          
