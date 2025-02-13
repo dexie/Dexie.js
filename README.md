@@ -20,12 +20,12 @@ Dexie.js is a wrapper library for indexedDB - the standard database in the brows
 📅 Date: February 14 --> April 13, 2025
 🕒 Start coding with Dexie Cloud and win prices!
 
-For more information: https://dexie.com/hackathon 
+For more information: https://dexie.org/hackathon 
 
 Good luck! 🚀`
 
 ```
-https://dexie.com/hackathon
+https://dexie.org/hackathon
 
 #### Why Dexie.js?
 
