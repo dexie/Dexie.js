@@ -45,19 +45,16 @@ export function createMutationTrackingMiddleware({
     name: 'MutationTrackingMiddleware',
     level: 1,
     create: (core) => {
+      const allTableNames = new Set(core.schema.tables.map((t) => t.name));
       const ordinaryTables = core.schema.tables.filter(
         (t) => !/^\$/.test(t.name)
       );
-      let mutTableMap: Map<string, DBCoreTable>;
-      try {
-        mutTableMap = new Map(
-          ordinaryTables.map((tbl) => [
-            tbl.name,
-            core.table(`$${tbl.name}_mutations`),
-          ])
-        );
-      } catch {
-        throwVersionIncrementNeeded();
+      const mutTableMap = new Map<string, DBCoreTable>();
+      for (const tbl of ordinaryTables) {
+        const mutationTableName = `$${tbl.name}_mutations`;
+        if (allTableNames.has(mutationTableName)) {
+          mutTableMap.set(tbl.name, core.table(mutationTableName));
+        }
       }
 
       return {
@@ -152,6 +149,11 @@ export function createMutationTrackingMiddleware({
           }
           const { schema } = table;
           const mutsTable = mutTableMap.get(tableName)!;
+          if (!mutsTable) {
+            // We cannot track mutations on this table because there is no mutations table for it.
+            // This might happen in upgraders that executes before cloud schema is applied.
+            return table; 
+          }
           return guardedTable({
             ...table,
             mutate: (req) => {

@@ -8,6 +8,7 @@
     "noImplicitAny": false,
     "noImplicitReturns": true,
     "moduleResolution": "node",
+    "skipLibCheck": true,
     "lib": ["ES2020", "DOM"],
     "forceConsistentCasingInFileNames": true,
     "sourceMap": true,

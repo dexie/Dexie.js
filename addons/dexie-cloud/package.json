@@ -52,7 +52,7 @@
   },
   "scripts": {
     "test": "just-build test && pnpm run test-unit",
-    "test-unit": "karma start test/unit/karma.conf.js --single-run",
+    "test-unit": "karma start test/unit/karma.conf.cjs --single-run",
     "build": "rollup -c tools/build-configs/rollup.config.mjs",
     "watch": "rollup -c tools/build-configs/rollup.config.mjs --watch",
     "clean": "rm -rf tools/tmp dist test/unit/bundle.*"
