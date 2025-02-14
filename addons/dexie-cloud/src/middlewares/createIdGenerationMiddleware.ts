@@ -3,6 +3,7 @@ import Dexie, {
   DBCoreAddRequest,
   DBCoreMutateRequest,
   DBCorePutRequest,
+  DBCoreTransaction,
   Middleware,
 } from 'dexie';
 import { isValidSyncableID } from 'dexie-cloud-common';
@@ -12,6 +13,7 @@ import {
   generateKey,
   toStringTag,
 } from '../middleware-helpers/idGenerationHelpers';
+import { TXExpandos } from '../types/TXExpandos';
 
 export function createIdGenerationMiddleware(
   db: DexieCloudDB
@@ -70,8 +72,14 @@ export function createIdGenerationMiddleware(
           return {
             ...table,
             mutate: (req) => {
-              // @ts-ignore
-              if (req.trans.disableChangeTracking) {
+              const idbtrans = req.trans as DBCoreTransaction & IDBTransaction & TXExpandos;
+              if (idbtrans.mode === 'versionchange') {
+                // Tell all the other middlewares to skip bothering. We're in versionchange mode.
+                // dexie-cloud is not initialized yet.
+                idbtrans.disableChangeTracking = true;
+                idbtrans.disableAccessControl = true;
+              }
+              if (idbtrans.disableChangeTracking) {
                 // Disable ID policy checks and ID generation
                 return table.mutate(req);
               }

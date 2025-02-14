@@ -4,6 +4,7 @@ import undefinedDef from 'dreambase-library/dist/typeson-simplified/types/undefi
 import tsonBuiltinDefs from 'dreambase-library/dist/typeson-simplified/presets/builtin.js';
 import { TypeDefSet } from 'dreambase-library/dist/typeson-simplified/TypeDefSet';
 import { PropModSpec, PropModification } from 'dexie';
+import FileDef from "dreambase-library/dist/typeson-simplified/types/File.js";
 
 // Since server revisions are stored in bigints, we need to handle clients without
 // bigint support to not fail when serverRevision is passed over to client.
@@ -71,6 +72,7 @@ const bigIntDef = hasBigIntSupport
 const defs: TypeDefSet = {
   ...undefinedDef,
   ...bigIntDef,
+  ...FileDef,
   PropModification: {
     test: (val: any) => val instanceof PropModification,
     replace: (propModification: any) => {

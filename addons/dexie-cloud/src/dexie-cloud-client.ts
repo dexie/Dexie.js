@@ -14,7 +14,6 @@ import { DexieCloudOptions } from './DexieCloudOptions';
 import { DISABLE_SERVICEWORKER_STRATEGY } from './DISABLE_SERVICEWORKER_STRATEGY';
 import './extend-dexie-interface';
 import { DexieCloudSyncOptions } from './DexieCloudSyncOptions';
-import { dbOnClosed } from './helpers/dbOnClosed';
 import { IS_SERVICE_WORKER } from './helpers/IS_SERVICE_WORKER';
 import { throwVersionIncrementNeeded } from './helpers/throwVersionIncrementNeeded';
 import { createIdGenerationMiddleware } from './middlewares/createIdGenerationMiddleware';
@@ -49,6 +48,7 @@ import { InvalidLicenseError } from './InvalidLicenseError';
 import { logout, _logout } from './authentication/logout';
 import { loadAccessToken } from './authentication/authenticate';
 import { isEagerSyncDisabled } from './isEagerSyncDisabled';
+import { createYHandler } from "./yjs/createYHandler";
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 export {
@@ -66,6 +66,7 @@ export type { DexieCloudOptions, PeriodicSyncOptions } from './DexieCloudOptions
 export * from './types/DXCAlert';
 export * from './types/DXCInputField';
 export * from './types/DXCUserInteraction';
+export { defineYDocTrigger } from './define-ydoc-trigger';
 
 const DEFAULT_OPTIONS: Partial<DexieCloudOptions> = {
   nameSuffix: true,
@@ -101,8 +102,9 @@ export function dexieCloud(dexie: Dexie) {
     if (closed) throw new Dexie.DatabaseClosedError();
   }
 
-  dbOnClosed(dexie, () => {
+  dexie.once('close', () => {
     subscriptions.forEach((subscription) => subscription.unsubscribe());
+    subscriptions.splice(0, subscriptions.length);
     closed = true;
     localSyncWorker && localSyncWorker.stop();
     localSyncWorker = null;
@@ -298,6 +300,7 @@ export function dexieCloud(dexie: Dexie) {
             ...options,
           };
           delete newPersistedOptions.fetchTokens;
+          delete newPersistedOptions.awarenessProtocol;
           await db.$syncState.put(newPersistedOptions, 'options');
         }
         if (
@@ -368,11 +371,6 @@ export function dexieCloud(dexie: Dexie) {
 
     verifySchema(db);
 
-    if (db.cloud.options?.databaseUrl && !initiallySynced) {
-      await performInitialSync(db, db.cloud.options, db.cloud.schema!);
-      db.setInitiallySynced(true);
-    }
-
     // Manage CurrentUser observable:
     throwIfClosed();
     if (!db.cloud.isServiceWorkerDB) {
@@ -393,6 +391,12 @@ export function dexieCloud(dexie: Dexie) {
         currentUserEmitter.pipe(skip(1), take(1)),
         db.cloud.persistedSyncState.pipe(skip(1), take(1)),
       ]));
+
+      const yHandler = createYHandler(db);
+      db.dx.on('y', yHandler);
+      db.dx.once('close', () => {
+        db.dx.on.y?.unsubscribe(yHandler);
+      });
     }
 
     // HERE: If requireAuth, do athentication now.
@@ -400,19 +404,27 @@ export function dexieCloud(dexie: Dexie) {
     const user = await db.getCurrentUser();
     const requireAuth = db.cloud.options?.requireAuth;
     if (requireAuth) {
-      if (typeof requireAuth === 'object') {
-        // requireAuth contains login hints. Check if we already fulfil it:
-        if (
-          !user.isLoggedIn ||
-          (requireAuth.userId && user.userId !== requireAuth.userId) ||
-          (requireAuth.email && user.email !== requireAuth.email)
-        ) {
-          // If not, login the configured user:
-          changedUser = await login(db, requireAuth);
+      if (db.cloud.isServiceWorkerDB) {
+        // If this is a service worker DB, we can't do authentication here,
+        // we just wait until the application has done it.
+        console.debug('Dexie Cloud Service worker. Waiting for application to authenticate.');
+        await firstValueFrom(currentUserEmitter.pipe(filter((user) => !!user.isLoggedIn), take(1)));
+        console.debug('Dexie Cloud Service worker. Application has authenticated.');
+      } else {
+        if (typeof requireAuth === 'object') {
+          // requireAuth contains login hints. Check if we already fulfil it:
+          if (
+            !user.isLoggedIn ||
+            (requireAuth.userId && user.userId !== requireAuth.userId) ||
+            (requireAuth.email && user.email !== requireAuth.email)
+          ) {
+            // If not, login the configured user:
+            changedUser = await login(db, requireAuth);
+          }
+        } else if (!user.isLoggedIn) {
+          // requireAuth is true and user is not logged in
+          changedUser = await login(db);
         }
-      } else if (!user.isLoggedIn) {
-        // requireAuth is true and user is not logged in
-        changedUser = await login(db);
       }
     }
     if (user.isLoggedIn && (!lastSyncedRealms || !lastSyncedRealms.includes(user.userId!))) {
@@ -427,8 +439,19 @@ export function dexieCloud(dexie: Dexie) {
     if (localSyncWorker) localSyncWorker.stop();
     localSyncWorker = null;
     throwIfClosed();
+
+    const doInitialSync = db.cloud.options?.databaseUrl && (!initiallySynced || changedUser);
+    if (doInitialSync) {
+      // Do the initial sync directly in the browser thread no matter if we are using service worker or not.
+      await performInitialSync(db, db.cloud.options!, db.cloud.schema!);
+      db.setInitiallySynced(true);
+    }
+
+    throwIfClosed();
     if (db.cloud.usingServiceWorker && db.cloud.options?.databaseUrl) {
-      registerSyncEvent(db, changedUser ? 'pull' : 'push').catch(() => {});
+      if (!doInitialSync) {
+        registerSyncEvent(db, 'push').catch(() => {});
+      }
       registerPeriodicSyncEvent(db).catch(() => {});
     } else if (
       db.cloud.options?.databaseUrl &&
@@ -438,7 +461,9 @@ export function dexieCloud(dexie: Dexie) {
       // There's no SW. Start SyncWorker instead.
       localSyncWorker = LocalSyncWorker(db, db.cloud.options, db.cloud.schema!);
       localSyncWorker.start();
-      triggerSync(db, changedUser ? 'pull' : 'push');
+      if (!doInitialSync) {
+        triggerSync(db, 'push');
+      }
     }
 
     // Listen to online event and do sync.
@@ -463,7 +488,7 @@ export function dexieCloud(dexie: Dexie) {
       );
     }
 
-    // Connect WebSocket unless we
+    // Connect WebSocket unless we are in a service worker or websocket is disabled.
     if (
       db.cloud.options?.databaseUrl &&
       !db.cloud.options?.disableWebSocket &&

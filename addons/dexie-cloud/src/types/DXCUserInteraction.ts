@@ -14,7 +14,7 @@ export interface DXCGenericUserInteraction<Type extends string="generic", TField
   alerts: DXCAlert[];
   fields: TFields;
   submitLabel: string;
-  cancelLabel: string | null;
+  cancelLabel: string | null;
   onSubmit: (params: { [P in keyof TFields]: string} ) => void;
   onCancel: () => void;
 }

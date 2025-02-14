@@ -71,6 +71,14 @@ export function overrideParseStoresSpec(origFunc: Function, dexie: Dexie) {
       }
     });
     const rv = origFunc.call(this, storesClone, dbSchema);
+    for (const [tableName, spec] of Object.entries(dbSchema)) {
+      if (spec.yProps?.length) {
+        const cloudTableSchema = cloudSchema[tableName];
+        if (cloudTableSchema) {
+          cloudTableSchema.yProps = spec.yProps.map((yProp) => yProp.prop);
+        }
+      }
+    }
     return rv;
   }
 }

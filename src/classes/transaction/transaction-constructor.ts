@@ -10,7 +10,7 @@ export interface TransactionConstructor<T extends Transaction=Transaction> {
     mode: IDBTransactionMode,
     storeNames: string[],
     dbschema: DbSchema,
-    chromeTransactionDurability: ChromeTransactionDurability,
+    chromeTransactionDurability: IDBTransactionDurability,
     parent?: Transaction) : T;
   prototype: T;
 }
@@ -29,9 +29,15 @@ export function createTransactionConstructor(db: Dexie) {
       mode: IDBTransactionMode,
       storeNames: string[],
       dbschema: DbSchema,
-      chromeTransactionDurability: ChromeTransactionDurability,
+      chromeTransactionDurability: IDBTransactionDurability,
       parent?: Transaction)
     {
+      if (mode !== 'readonly') storeNames.forEach(storeName => {
+        // Uncollapse storeName to include Y update tables in case deletion of a record - then we must also delete its Y updates.
+        const yProps = dbschema[storeName]?.yProps;
+        if (yProps) storeNames = storeNames.concat(yProps.map(p => p.updatesTable));
+      });
+
       this.db = db;
       this.mode = mode;
       this.storeNames = storeNames;

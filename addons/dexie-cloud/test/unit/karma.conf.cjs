@@ -17,15 +17,15 @@ module.exports = function (config) {
     basePath: '../../../../',
     files: karmaCommon.files.concat([
       'dist/dexie.js',
-      'addons/Dexie.Observable/dist/dexie-observable.js',
-      'addons/Dexie.Syncable/dist/dexie-syncable.js',
+      'addons/dexie-cloud/node_modules/rxjs/dist/bundles/rxjs.umd.js',
       'addons/dexie-cloud/test/unit/bundle.js',
-      { pattern: 'addons/Dexie.Observable/dist/*.map', watched: false, included: false },
-      { pattern: 'addons/Dexie.Syncable/dist/*.map', watched: false, included: false },
       { pattern: 'addons/dexie-cloud/test/*.map', watched: false, included: false },
       { pattern: 'addons/dexie-cloud/dist/*.map', watched: false, included: false }
     ])
   });
+
+  cfg.hostname = 'localhost';
+  cfg.port = 9876;
 
   config.set(cfg);
 }

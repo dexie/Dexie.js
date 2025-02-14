@@ -1,8 +1,8 @@
 import { DexieCloudSchema } from 'dexie-cloud-common';
 import { DexieCloudDB } from './db/DexieCloudDB';
 import { DexieCloudOptions } from './DexieCloudOptions';
+import { CURRENT_SYNC_WORKER, sync } from './sync/sync';
 import { performGuardedJob } from './sync/performGuardedJob';
-import { sync } from './sync/sync';
 
 export async function performInitialSync(
   db: DexieCloudDB,
@@ -10,6 +10,10 @@ export async function performInitialSync(
   cloudSchema: DexieCloudSchema
 ) {
   console.debug('Performing initial sync');  
-  await sync(db, cloudOptions, cloudSchema, { isInitialSync: true });
+  await performGuardedJob(
+    db,
+    CURRENT_SYNC_WORKER,
+    () => sync(db, cloudOptions, cloudSchema, { isInitialSync: true })
+  );
   console.debug('Done initial sync');
 }

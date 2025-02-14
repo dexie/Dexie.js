@@ -1,1 +1,1 @@
-import "./test-dexie-cloud-client";
+import "./tests-migrate-to-cloud";

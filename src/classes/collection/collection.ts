@@ -14,6 +14,7 @@ import { DBCoreCursor, DBCoreTransaction, DBCoreRangeType, DBCoreMutateResponse,
 import { cmp } from "../../functions/cmp";
 import { PropModification } from "../../helpers/prop-modification";
 import { UpdateSpec } from "../../public/types/update-spec";
+import { builtInDeletionTrigger } from "../table/table-helpers";
 
 /** class Collection
  * 
@@ -510,29 +511,31 @@ export class Collection implements ICollection {
           totalFailures.push(failures[pos]);
         }
       }
+      const isUnconditionalDelete = changes === deleteCallback; // Collection.delete() calls this.
       return this.clone().primaryKeys().then(keys => {
         const criteria = isPlainKeyRange(ctx) &&
           ctx.limit === Infinity &&
-          (typeof changes !== 'function' || changes === deleteCallback) && {
+          (typeof changes !== 'function' || isUnconditionalDelete) && {
             index: ctx.index,
             range: ctx.range
           };
 
         const nextChunk = (offset: number) => {
           const count = Math.min(limit, keys.length - offset);
-          return coreTable.getMany({
+          const keysInChunk = keys.slice(offset, offset + count);
+          return (isUnconditionalDelete ? Promise.resolve([]) : coreTable.getMany({
             trans,
-            keys: keys.slice(offset, offset + count),
+            keys: keysInChunk,
             cache: "immutable" // Optimize for 2 things:
             // 1) observability-middleware can track changes better.
             // 2) hooks middleware don't have to query the existing values again when tracking changes.
             // We can use "immutable" because we promise to not touch the values we retrieve here!
-          }).then(values => {
+          })).then(values => {
             const addValues = [];
             const putValues = [];
             const putKeys = outbound ? [] : null;
-            const deleteKeys = [];
-            for (let i=0; i<count; ++i) {
+            const deleteKeys = isUnconditionalDelete ? keysInChunk : [];
+            if (!isUnconditionalDelete) for (let i=0; i<count; ++i) {
               const origValue = values[i];
               const ctx = {
                 value: deepClone(origValue),
@@ -574,14 +577,15 @@ export class Collection implements ICollection {
                     && changes,
                   isAdditionalChunk: offset > 0
                 }).then(res=>applyMutateResult(putValues.length, res))
-            ).then(()=>(deleteKeys.length > 0 || (criteria && changes === deleteCallback)) &&
+            ).then(()=>(deleteKeys.length > 0 || (criteria && isUnconditionalDelete)) &&
                 coreTable.mutate({
                   trans,
                   type: 'delete',
                   keys: deleteKeys,
                   criteria,
                   isAdditionalChunk: offset > 0
-                }).then(res=>applyMutateResult(deleteKeys.length, res))
+                }).then(res => builtInDeletionTrigger(ctx.table, deleteKeys, res))
+                .then(res => applyMutateResult(deleteKeys.length, res))
             ).then(()=>{
               return keys.length > offset + count && nextChunk(offset + limit);
             });
@@ -610,6 +614,7 @@ export class Collection implements ICollection {
       //deletingHook = ctx.table.hook.deleting.fire,
       //hasDeleteHook = deletingHook !== nop;
     if (isPlainKeyRange(ctx) &&
+      !ctx.table.schema.yProps && // No Y documents on this table (requires special care)
       (ctx.isPrimKey || range.type === DBCoreRangeType.Any)) // if no range, we'll use clear().
     {
       // May use IDBObjectStore.delete(IDBKeyRange) in this case (Issue #208)
@@ -620,9 +625,10 @@ export class Collection implements ICollection {
         // Our API contract is to return a count of deleted items, so we have to count() before delete().
         const {primaryKey} = ctx.table.core.schema;
         const coreRange = range;
+
         return ctx.table.core.count({trans, query: {index: primaryKey, range: coreRange}}).then(count => {
           return ctx.table.core.mutate({trans, type: 'deleteRange', range: coreRange})
-          .then(({failures, lastResult, results, numFailures}) => {
+          .then(({failures, numFailures}) => {
             if (numFailures) throw new ModifyError("Could not delete some values",
               Object.keys(failures).map(pos => failures[pos]),
               count - numFailures);

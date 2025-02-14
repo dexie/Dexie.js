@@ -1,6 +1,7 @@
 import Dexie, { DBCore, DBCoreTransaction, Middleware } from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { TXExpandos } from '../types/TXExpandos';
+import { UNAUTHORIZED_USER } from '../authentication/UNAUTHORIZED_USER';
 
 export function createImplicitPropSetterMiddleware(
   db: DexieCloudDB
@@ -17,17 +18,15 @@ export function createImplicitPropSetterMiddleware(
           return {
             ...table,
             mutate: (req) => {
-              // @ts-ignore
-              if (req.trans.disableChangeTracking) {
+              const trans = req.trans as DBCoreTransaction & TXExpandos & IDBTransaction;
+
+              if (trans.disableChangeTracking) {
                 return table.mutate(req);
               }
 
-              const trans = req.trans as DBCoreTransaction & TXExpandos & IDBTransaction;
+              const currentUserId = trans.currentUser?.userId ?? UNAUTHORIZED_USER.userId;
+
               if (db.cloud.schema?.[tableName]?.markedForSync) {
-                if (trans.mode === 'versionchange') {
-                  // Don't mutate tables marked for sync in versionchange transactions.
-                  return Promise.reject(new Dexie.UpgradeError(`Dexie Cloud Addon: Cannot upgrade or populate synced table "${tableName}". See https://dexie.org/cloud/docs/best-practices`));
-                }
                 if (req.type === 'add' || req.type === 'put') {
                   if (tableName === 'members') {
                     for (const member of req.values) {
@@ -51,10 +50,10 @@ export function createImplicitPropSetterMiddleware(
                   // and expect them to be returned. That scenario must work also when db.cloud.currentUserId === 'unauthorized'.
                   for (const obj of req.values) {
                     if (!obj.owner) {
-                      obj.owner = trans.currentUser.userId;
+                      obj.owner = currentUserId;
                     }
                     if (!obj.realmId) {
-                      obj.realmId = trans.currentUser.userId;
+                      obj.realmId = currentUserId;
                     }
                     const key = table.schema.primaryKey.extractKey?.(obj);
                     if (typeof key === 'string' && key[0] === '#') {

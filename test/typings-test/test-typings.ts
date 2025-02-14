@@ -3,9 +3,10 @@
  * It tests Dexie.d.ts.
  */
 
-import Dexie, { EntityTable, IndexableType, Table, replacePrefix } from '../../dist/dexie'; // Imports the source Dexie.d.ts file
+import Dexie, { EntityTable, IndexableType, Table, add, replacePrefix } from '../../dist/dexie'; // Imports the source Dexie.d.ts file
 import './test-extend-dexie';
 import './test-updatespec';
+import * as Y from 'yjs';
 
 // constructor overloads:
 {
@@ -299,4 +300,104 @@ import './test-updatespec';
     db.transaction('rw', db.friends, tx => {
         tx.friends.add({name: "Bar", age: 33});
     })
+}
+
+{
+  // Typings for Y.Doc and other exotic types
+  interface TodoItem {
+    id: string;
+    title: string;
+    done: number;
+    text: Y.Doc;
+    address?: {
+      city: string;
+      blob: Blob;
+      shoeSize?: number;
+      tags?: string[];
+      items?: {name: string}[];
+    };
+  }
+
+  const db = new Dexie('dbname', { Y }) as Dexie & {
+    todos: EntityTable<TodoItem, 'id'>;
+  };
+
+  db.version(1).stores({
+    todos: 'id, title, done, text:Y',
+  });
+
+  db.todos.add({ title: 'Foo', done: 0, address: {} as TodoItem["address"] }); // Verify that Y.Doc prop is not allowed here
+
+  db.todos.update('some-id', (item) => {});
+  db.todos.update('some-id', {
+    "address.blob": new Blob(),
+    address: { city: 'New York', blob: new Blob() },
+    "address.shoeSize": undefined,
+    done: add(1),
+    "address.tags.0": 'important',
+    "address.items.278.name": 'foo',
+    "address.items": add([{name: 'bar'}]),
+  }); 
+
+  db.todos.get('some-id').then((item) => {
+    if (!item) return;
+    // Verify that Y.Doc prop is retrieved here:
+    item.text.get('some-prop');
+
+    // Verify we can change things and put it back:
+    item.done = 1;
+    db.todos.put(item); // Yes, we could put it back despite having more props than in the InsertType.
+  });
+}
+
+// Strongly typed stores spec
+{
+    const db = new Dexie('dbname') as Dexie & {
+      friends: Table<
+        {
+          id: number;
+          name: string;
+          age: number;
+          picture: Blob;
+          tags: string[];
+          doc: Y.Doc
+        },
+        number
+      >;
+      items: Table<{ id: number; name: string }, number>;
+    };
+
+    db.version(1).stores({
+      friends: '++id, name, age'
+    });
+    /*db.version(2).stores({
+      friends: ['++id', 'name', 'age', '*tags', 'doc:Y.Doc', '&[age+id]'],
+      items: ['id', 'name'],
+    });*/
+}
+
+// Strongly typed stores spec2
+{
+    class MyDexie extends Dexie {
+        friends!: Table<{
+            id: number;
+            name: string;
+            age: number;
+            picture: Blob;
+            tags: string[];
+            doc: Y.Doc
+          }, number>;
+          
+        constructor() {
+            super("myDexie");
+            this.version(1).stores({
+                //friends: ['++id', 'doc:Y.Doc'] // Typescript 5.5.4 don't understand.
+                friends: '++id, name, age'
+            })
+        }
+    }
+    const db = new MyDexie();
+    /*db.version(1).stores({
+        friends: ['', '&[age+id+name]'],
+    })*/
 }

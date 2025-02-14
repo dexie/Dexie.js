@@ -80,6 +80,12 @@ export interface TokenOtpSentResponse {
   type: 'otp-sent';
   otp_id: string;
 }
+export interface TokenOtpDetailsResponse {
+  type: 'otp-details';
+  otp: string;
+  otp_id: string;
+  data?: any;
+}
 
 export interface TokenErrorResponse {
   type: 'error';
@@ -107,8 +113,10 @@ export interface TokenResponseInvalidTimestamp {
 export type TokenResponse =
   | TokenFinalResponse
   | TokenOtpSentResponse
+  | TokenOtpDetailsResponse
   | TokenErrorResponse
   | TokenResponseInvalidTimestamp;
+  
 export interface CreateDbResponse {
   url: string;
   clientId: string;
