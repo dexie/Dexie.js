@@ -6,6 +6,7 @@ import { Transaction } from '../transaction';
 import { removeTablesApi, setApiOnPlace, parseIndexSyntax } from './schema-helpers';
 import { exceptions } from '../../errors';
 import { createTableSchema } from '../../helpers/table-schema';
+import { LooseStoresSpec } from '../../public/types/strictly-typed-schema';
 import { nop, promisableChain } from '../../functions/chaining-functions';
 
 /** class Version
@@ -38,11 +39,22 @@ export class Version implements IVersion {
     });
   }
 
-  stores(stores: { [key: string]: string | null; }): IVersion {
+  stores(stores: LooseStoresSpec): IVersion {
     const db = this.db;
-    this._cfg.storesSource = this._cfg.storesSource ?
-      extend(this._cfg.storesSource, stores) :
-      stores;
+    const bwCompatStores = {} as { [key: string]: string | null };
+    for (const table of keys(stores)) {
+      const spec = stores[table];
+      if (spec === null) {
+        bwCompatStores[table] = null;
+      } else if (typeof spec === 'string') {
+        bwCompatStores[table] = spec;
+      } else if (Array.isArray(spec)) {
+        bwCompatStores[table] = spec.join(',');
+      }
+    }
+    this._cfg.storesSource = this._cfg.storesSource
+      ? extend(this._cfg.storesSource, bwCompatStores)
+      : bwCompatStores;
     const versions = db._versions;
 
     // Derive stores from earlier versions if they are not explicitely specified as null or a new syntax.

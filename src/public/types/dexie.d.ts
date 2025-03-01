@@ -13,7 +13,7 @@ import { IndexableType } from './indexable-type';
 import { DBCore } from './dbcore';
 import { Middleware, DexieStacks } from './middleware';
 
-export type TableProp<DX extends Dexie> = {
+export type TableProp<DX> = {
   [K in keyof DX]: DX[K] extends {schema: any, get: any, put: any, add: any, where: any} ? K : never;
 }[keyof DX] & string;
 
