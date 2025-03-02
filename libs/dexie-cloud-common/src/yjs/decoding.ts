@@ -75,7 +75,8 @@ export function decodeYMessage(a: Uint8Array): YMessage {
             table,
             prop,
             k,
-            u: readVarUint8Array(decoder)
+            u: readVarUint8Array(decoder),
+            r: decoder.pos < decoder.arr.length ? readVarString(decoder) : '',
           };
         default:
           throw new TypeError(`Unknown message type: ${type}`);

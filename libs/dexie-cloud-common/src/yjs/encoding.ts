@@ -45,6 +45,7 @@ export function encodeYMessage(msg: YMessage): Uint8Array {
           break;
         case 'u-s':
           writeVarUint8Array(encoder, msg.u);
+          writeVarString(encoder, msg.r || '');
           break;
         case 'in-sync':
           break;

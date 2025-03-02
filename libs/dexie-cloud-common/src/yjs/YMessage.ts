@@ -70,6 +70,7 @@ export interface YUpdateFromServerMessage {
   prop: string;
   k: any;
   u: Uint8Array;
+  r?: string;
 }
 
 export interface YAwarenessUpdate {
