@@ -218,6 +218,11 @@ export class WSConnection extends Subscription {
     }
     this.webSocketStatus.next('connecting');
     this.pinger = setInterval(async () => {
+      // setInterval here causes unnecessary pings when server is proved active anyway.
+      // TODO: Use setTimout() here instead. When triggered, check if we really need to ping.
+      // In case we've had server activity, we don't need to ping. Then schedule then next ping
+      // to the time when we should ping next time (based on lastServerActivity + CLIENT_PING_INTERVAL).
+      // Else, ping now and schedule next ping to CLIENT_PING_INTERVAL from now.
       if (this.closed) {
         console.debug('pinger check', this.id, 'CLOSED.');
         this.teardown();
