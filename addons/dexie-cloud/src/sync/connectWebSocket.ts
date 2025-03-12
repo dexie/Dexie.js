@@ -115,6 +115,7 @@ export function connectWebSocket(db: DexieCloudDB) {
           return new WSObservable(
               db,
               db.cloud.persistedSyncState!.value!.serverRevision,
+              db.cloud.persistedSyncState!.value!.yServerRevision,
               realmSetHash,
               db.cloud.persistedSyncState!.value!.clientIdentity,
               messageProducer,

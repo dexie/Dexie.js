@@ -47,7 +47,7 @@ export const destroyedDocs = new WeakSet<object>();
 
 export function throwIfDestroyed(doc: any) {
   if (destroyedDocs.has(doc))
-    throw new Error('Y.Doc has been destroyed');
+    throw new Error(`Y.Doc ${doc.meta.parentId} has been destroyed`);
 }
 
 export function getYDocCacheKey(table: string, primaryKey: any, ydocProp: string): string {

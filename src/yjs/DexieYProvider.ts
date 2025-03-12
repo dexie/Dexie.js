@@ -163,6 +163,7 @@ export class DexieYProvider<YDoc extends YjsDoc = any>
   }
 
   destroy() {
+    console.debug(`YDoc ${this.doc.meta?.parentId} was destroyed`);
     wm.delete(this.doc);
     this.doc = null;
     this.destroyed = true;

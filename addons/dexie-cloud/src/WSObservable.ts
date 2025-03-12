@@ -84,7 +84,8 @@ export interface TokenExpiredMessage {
 export class WSObservable extends Observable<WSConnectionMsg> {
   constructor(
     db: DexieCloudDB,
-    rev: string,
+    rev: string | undefined,
+    yrev: string | undefined,
     realmSetHash: string,
     clientIdentity: string,
     messageProducer: Observable<WSClientToServerMsg>,
@@ -96,6 +97,7 @@ export class WSObservable extends Observable<WSConnectionMsg> {
         new WSConnection(
           db,
           rev,
+          yrev,
           realmSetHash,
           clientIdentity,
           user,
@@ -116,7 +118,8 @@ export class WSConnection extends Subscription {
   lastUserActivity: Date;
   lastPing: Date;
   databaseUrl: string;
-  rev: string;
+  rev: string | undefined;
+  yrev: string | undefined;
   realmSetHash: string;
   clientIdentity: string;
   user: UserLogin;
@@ -131,7 +134,8 @@ export class WSConnection extends Subscription {
 
   constructor(
     db: DexieCloudDB,
-    rev: string,
+    rev: string | undefined,
+    yrev: string | undefined,
     realmSetHash: string,
     clientIdentity: string,
     user: UserLogin,
@@ -148,6 +152,7 @@ export class WSConnection extends Subscription {
     this.db = db;
     this.databaseUrl = db.cloud.options!.databaseUrl;
     this.rev = rev;
+    this.yrev = yrev;
     this.realmSetHash = realmSetHash;
     this.clientIdentity = clientIdentity;
     this.user = user;
@@ -275,7 +280,8 @@ export class WSConnection extends Subscription {
     const searchParams = new URLSearchParams();
     if (this.subscriber.closed) return;
     searchParams.set('v', '2');
-    searchParams.set('rev', this.rev);
+    if (this.rev) searchParams.set('rev', this.rev);
+    if (this.yrev) searchParams.set('yrev', this.yrev);
     searchParams.set('realmsHash', this.realmSetHash);
     searchParams.set('clientId', this.clientIdentity);
     if (this.user.accessToken) {
@@ -323,18 +329,24 @@ export class WSConnection extends Subscription {
               );
             }
           }
-        } else if (msg.type === 'u-ack' || msg.type === 'u-reject' || msg.type === 'u-s' || msg.type === 'in-sync') {
-          applyYServerMessages([msg], this.db);
+        } else if (msg.type === 'pong') {
+          // Do nothing
         } else if (msg.type === 'doc-open') {
           const docCache = DexieYProvider.getDocCache(this.db.dx);
           const doc = docCache.find(msg.table, msg.k, msg.prop);
           if (doc) {
             getOpenDocSignal(doc).next(); // Make yHandler reopen the document on server.
           }
-        } else if (msg.type === 'outdated-server-rev' || msg.type === 'y-complete-sync-done') {
-          // Won't happen but need this for typing.
-          throw new Error('Outdated server revision or y-complete-sync-done not expected over WebSocket - only in sync using fetch()');
-        } else if (msg.type !== 'pong') {
+        } else if (msg.type === 'u-ack' || msg.type === 'u-reject' || msg.type === 'u-s' || msg.type === 'in-sync' || msg.type === 'outdated-server-rev' || msg.type === 'y-complete-sync-done') {
+          applyYServerMessages([msg], this.db).then(async ({resyncNeeded, yServerRevision, receivedUntils}) => {
+            if (yServerRevision) {
+              await this.db.$syncState.update('syncState', { yServerRevision: yServerRevision });
+            }
+            if (resyncNeeded) {
+              await this.db.cloud.sync({ purpose: 'pull', wait: true });
+            }
+          })
+        } else {
           // Forward the request to our subscriber, wich is in messageFromServerQueue.ts (via connectWebSocket's subscribe() at the end!)
           this.subscriber.next(msg);
         }

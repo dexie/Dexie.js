@@ -9,8 +9,13 @@ export async function applyServerChanges(
 ) {
   console.debug('Applying server changes', changes, Dexie.currentTransaction);
   for (const { table: tableName, muts } of changes) {
+    if (!db.dx._allTables[tableName]) {
+      console.debug(
+        `Server sent changes for table ${tableName} that we don't have. Ignoring.`
+      );
+      continue;
+    }
     const table = db.table(tableName);
-    if (!table) continue; // If server sends changes on a table we don't have, ignore it.
     const { primaryKey } = table.core.schema;
     const keyDecoder = (key: string) => {
       switch (key[0]) {
