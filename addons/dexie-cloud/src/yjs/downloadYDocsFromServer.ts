@@ -73,7 +73,9 @@ export async function downloadYDocsFromServer(
           throw new Error(`Protocol error from ${databaseUrl}/y/download`);
         }
         const yTable = getUpdatesTable(db, currentTable, currentProp);
-        await yTable.bulkAdd(docsToInsert);
+        if (yTable) {
+          await yTable.bulkAdd(docsToInsert);
+        }
         docsToInsert = [];
       }
       if (
