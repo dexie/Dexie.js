@@ -20,26 +20,33 @@ export async function applyYServerMessages(
       switch (m.type) {
         case 'u-s': {
           const utbl = getUpdatesTable(db, m.table, m.prop);
-          receivedUntils[utbl.name] = await utbl.add({
-            k: m.k,
-            u: m.u,
-          } satisfies InsertType<YUpdateRow, 'i'>);
-          if (m.r) {
-            yServerRevision = m.r;
+          if (utbl) {
+            const updateRow: InsertType<YUpdateRow, 'i'> = {
+              k: m.k,
+              u: m.u,
+            };
+            if (m.r) {
+              // @ts-ignore
+              updateRow.r = m.r;
+              yServerRevision = m.r;
+            }
+            receivedUntils[utbl.name] = await utbl.add(updateRow);
           }
           break;
         }
         case 'u-ack': {
           const utbl = getUpdatesTable(db, m.table, m.prop);
-          await db.transaction('rw', utbl, async (tx) => {
-            let syncer = (await tx
-              .table(utbl.name)
-              .get(DEXIE_CLOUD_SYNCER_ID)) as YSyncState | undefined;
-            await tx.table(utbl.name).put({
-              ...(syncer || { i: DEXIE_CLOUD_SYNCER_ID }),
-              unsentFrom: Math.max(syncer?.unsentFrom || 1, m.i + 1),
-            } as YSyncState);
-          });
+          if (utbl) {
+            await db.transaction('rw', utbl, async (tx) => {
+              let syncer = (await tx
+                .table(utbl.name)
+                .get(DEXIE_CLOUD_SYNCER_ID)) as YSyncState | undefined;
+              await tx.table(utbl.name).put({
+                ...(syncer || { i: DEXIE_CLOUD_SYNCER_ID }),
+                unsentFrom: Math.max(syncer?.unsentFrom || 1, m.i + 1),
+              } as YSyncState);
+            });
+          }
           break;
         }
         case 'u-reject': {
@@ -51,6 +58,7 @@ export async function applyYServerMessages(
           // See my question in https://discuss.yjs.dev/t/generate-an-inverse-update/2765
           console.debug(`Y update rejected. Deleting it.`);
           const utbl = getUpdatesTable(db, m.table, m.prop);
+          if (!utbl) break;
           // Delete the rejected update and all local updates since (avoid holes in the CRDT)
           // and destroy it's open document if there is one.
           const primaryKey = (await utbl.get(m.i))?.k;

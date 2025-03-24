@@ -7,12 +7,14 @@ import type { YClientMessage, YServerMessage } from 'dexie-cloud-common';
 import { DexieCloudDB } from './db/DexieCloudDB';
 import { createYClientUpdateObservable } from './yjs/createYClientUpdateObservable';
 import { applyYServerMessages } from './yjs/applyYMessages';
-import { DexieYProvider } from 'dexie';
+import { DexieYProvider, Table, YSyncState } from 'dexie';
 import { getAwarenessLibrary, getDocAwareness } from './yjs/awareness';
 import { encodeYMessage, decodeYMessage } from 'dexie-cloud-common';
 import { UserLogin } from './dexie-cloud-client';
 import { isEagerSyncDisabled } from './isEagerSyncDisabled';
 import { getOpenDocSignal } from './yjs/reopenDocSignal';
+import { getUpdatesTable } from './yjs/getUpdatesTable';
+import { DEXIE_CLOUD_SYNCER_ID } from './sync/DEXIE_CLOUD_SYNCER_ID';
 
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;
@@ -341,6 +343,15 @@ export class WSConnection extends Subscription {
           applyYServerMessages([msg], this.db).then(async ({resyncNeeded, yServerRevision, receivedUntils}) => {
             if (yServerRevision) {
               await this.db.$syncState.update('syncState', { yServerRevision: yServerRevision });
+            }
+            if (msg.type === 'u-s' && receivedUntils) {
+              const utbl = getUpdatesTable(this.db, msg.table, msg.prop) as any as Table<YSyncState, string>;
+              if (utbl) {
+                const receivedUntil = receivedUntils[utbl.name];
+                if (receivedUntil) {
+                  await utbl.update(DEXIE_CLOUD_SYNCER_ID, { receivedUntil });
+                }
+              }
             }
             if (resyncNeeded) {
               await this.db.cloud.sync({ purpose: 'pull', wait: true });
