@@ -5,7 +5,9 @@ const gracePeriod = 100 // 100 ms = grace period to optimize for unload/reload s
 
 const fr = typeof FinalizationRegistry !== 'undefined' && new FinalizationRegistry((provider: DexieYProvider) => {
   // Cleanup when component is garbage collected
-  DexieYProvider.release(provider.doc, { gracePeriod });
+  if (provider.doc) {
+    DexieYProvider.release(provider.doc, { gracePeriod });
+  }
 });
 
 export function useDocument<YDoc extends YjsDoc>(
