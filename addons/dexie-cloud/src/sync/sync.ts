@@ -386,12 +386,12 @@ async function _sync(
 async function deleteObjectsFromRemovedRealms(
   db: DexieCloudDB,
   res: SyncResponse,
-  prevState: PersistedSyncState | undefined
+  syncState: PersistedSyncState | undefined
 ) {
   const deletedRealms = new Set<string>();
   const rejectedRealms = new Set<string>();
-  const previousRealmSet = prevState ? prevState.realms : [];
-  const previousInviteRealmSet = prevState ? prevState.inviteRealms : [];
+  const previousRealmSet = syncState ? syncState.realms : [];
+  const previousInviteRealmSet = syncState ? syncState.inviteRealms : [];
   const updatedRealmSet = new Set(res.realms);
   const updatedTotalRealmSet = new Set(res.realms.concat(res.inviteRealms));
   for (const realmId of previousRealmSet) {
@@ -436,7 +436,7 @@ async function deleteObjectsFromRemovedRealms(
       }
     }
   }
-  if (rejectedRealms.size > 0) {
+  if (rejectedRealms.size > 0 && syncState?.yDownloadedRealms) {
     // Remove rejected/deleted realms from yDownloadedRealms because of the following use case:
     // 1. User becomes added to the realm
     // 2. User syncs and all documents of the realm is downloaded (downloadYDocsFromServer.ts)
@@ -444,9 +444,8 @@ async function deleteObjectsFromRemovedRealms(
     // 4. User is yet again added to the realm. At this point, we must make sure the docs are not considered already downloaded.
     const updateSpec: UpdateSpec<PersistedSyncState> = {};
     for (const realmId of rejectedRealms) {
-      updateSpec[`yDownloadedRealms.${realmId}`] = undefined; // Setting to undefined will delete the property
+      delete syncState.yDownloadedRealms[realmId];
     } 
-    await db.$syncState.update('syncState', updateSpec);
   }
 }
 
