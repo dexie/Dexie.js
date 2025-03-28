@@ -286,6 +286,7 @@ export class WSConnection extends Subscription {
     if (this.yrev) searchParams.set('yrev', this.yrev);
     searchParams.set('realmsHash', this.realmSetHash);
     searchParams.set('clientId', this.clientIdentity);
+    searchParams.set('dxcv', this.db.cloud.version);
     if (this.user.accessToken) {
       searchParams.set('token', this.user.accessToken);
     }

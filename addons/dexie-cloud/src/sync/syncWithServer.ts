@@ -67,6 +67,7 @@ export async function syncWithServer(
     baseRevs,
     changes: encodeIdsForServer(db.dx.core.schema, currentUser, changes),
     y,
+    dxcv: db.cloud.version
   };
   console.debug('Sync request', syncRequest);
   db.syncStateChangedEvent.next({

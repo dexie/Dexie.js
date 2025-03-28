@@ -17,5 +17,6 @@ export interface SyncRequest {
   baseRevs: BaseRevisionMapEntry[];
   changes: DBOperationsSet;
   y?: YClientMessage[];
+  dxcv?: string; // dexie libs and versions
   //invites: {[inviteId: string]: "accept" | "reject"}
 }
