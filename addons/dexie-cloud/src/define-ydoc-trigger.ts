@@ -19,8 +19,8 @@ const ydocTriggers: {
 
 const middlewares = new WeakMap<Dexie, Middleware<DBCore>>();
 let subscribedToProviderBeforeUnload = false;
-const txRunner = TriggerRunner("tx");
-const unloadRunner = TriggerRunner("unload");
+const txRunner = TriggerRunner("tx"); // Trigger registry for transaction completion. Avoids open docs.
+const unloadRunner = TriggerRunner("unload"); // Trigger registry for unload. Runs when a document is closed.
 
 type TriggerRegistry = Map<
   string,
@@ -62,13 +62,17 @@ function TriggerRunner(name: string) {
         parentId
       );
       try {
-        DexieYProvider.load(yDoc); // If doc is open, this would just be a ++refount
-        await yDoc.whenLoaded; // If doc is loaded, this would resolve immediately
+        const provider = DexieYProvider.load(yDoc); // If doc is open, this would just be a ++refount
+        await provider.whenLoaded; // If doc is loaded, this would resolve immediately
         for (const trigger of triggers) {
           await trigger(yDoc, parentId);
         }
       } catch (error) {
-        console.error(`Error in YDocTrigger ${error}`);
+        if (error?.name === 'AbortError') {
+          // Ignore abort errors. They are expected when the document is closed.
+        } else {
+          console.error(`Error in YDocTrigger ${error}`);
+        }
       } finally {
         DexieYProvider.release(yDoc);
       }
@@ -78,16 +82,20 @@ function TriggerRunner(name: string) {
   return {
     name,
     async run() {
+      console.log(`Running trigger (${name})?`, triggerScheduled, registry.size, !!triggerExecPromise);
       if (!triggerScheduled && registry.size > 0) {
         triggerScheduled = true;
         if (triggerExecPromise) await triggerExecPromise.catch(() => {});
         setTimeout(() => {
           // setTimeout() is to escape from Promise.PSD zones and never run within liveQueries or transaction scopes
+          console.log("Running trigger really!", name);
           triggerScheduled = false;
           const registryCopy = registry;
           registry = new Map();
           triggerExecPromise = execute(registryCopy).finally(
-            () => (triggerExecPromise = null)
+            () => {
+              triggerExecPromise = null;
+            }
           );
         }, 0);
       }
@@ -109,6 +117,7 @@ function TriggerRunner(name: string) {
           prop,
           triggers: new Set(),
         };
+        console.log(`Adding trigger ${key}`);
         registry.set(key, entry);
       }
       entry.triggers.add(trigger);

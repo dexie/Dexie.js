@@ -3,11 +3,9 @@ import React from 'react';
 
 const gracePeriod = 100 // 100 ms = grace period to optimize for unload/reload scenarios
 
-const fr = typeof FinalizationRegistry !== 'undefined' && new FinalizationRegistry((provider: DexieYProvider) => {
-  // Cleanup when component is garbage collected
-  if (provider.doc) {
-    DexieYProvider.release(provider.doc, { gracePeriod });
-  }
+const fr = typeof FinalizationRegistry !== 'undefined' && new FinalizationRegistry((doc: YjsDoc) => {
+  // If coming here, react effect never ran. This is a fallback cleanup mechanism.
+  DexieYProvider.release(doc);
 });
 
 export function useDocument<YDoc extends YjsDoc>(
@@ -15,20 +13,14 @@ export function useDocument<YDoc extends YjsDoc>(
 ): DexieYProvider<YDoc> | null {
   if (!fr) throw new TypeError('FinalizationRegistry not supported.');
   const providerRef = React.useRef<DexieYProvider | null>(null);
+  let unregisterToken: object | undefined = undefined;
   if (doc) {
     if (doc !== providerRef.current?.doc) {
-      if (providerRef.current?.doc) {
-        // Doc is changed. Release previous doc.
-        // and then also prohibit FinalizationRegistry from releasing it.
-        fr.unregister(providerRef.current); // provider is the registry token used when registering
-        DexieYProvider.release(providerRef.current.doc, { gracePeriod });
-      }
-      providerRef.current = DexieYProvider.load(doc);
-      fr.register(providerRef, providerRef.current, providerRef.current);
+      providerRef.current = DexieYProvider.load(doc, { gracePeriod });
+      unregisterToken = Object.create(null);
+      fr.register(providerRef, doc, unregisterToken);
     }
   } else if (providerRef.current?.doc) {
-    fr.unregister(providerRef.current); // provider is the registry token used when registering
-    DexieYProvider.release(providerRef.current.doc, { gracePeriod });
     providerRef.current = null;
   }
   React.useEffect(() => {
@@ -41,15 +33,19 @@ export function useDocument<YDoc extends YjsDoc>(
       // need to rely on FinalizationRegistry to release the doc as a fallback.
       // We cannot wait with loading the document until the effect happens, because the doc
       // could have been destroyed in the meantime.
-      const provider = DexieYProvider.for(doc);
+      if (unregisterToken) fr.unregister(unregisterToken);
+      let provider = DexieYProvider.for(doc);
       if (provider) {
-        // Take over the cleanup from here
-        fr.unregister(provider); // "provider" is the registry token used when registering
         return () => {
-          DexieYProvider.release(doc, { gracePeriod });
+          DexieYProvider.release(doc);
         }
+      } else {
+        // Maybe the doc was destroyed in the meantime.
+        // Can not happen if React and FinalizationRegistry works as we expect them to.
+        // Except if a user had called DexieYProvider.release() on the doc
+        throw new Error(`FATAL. DexieYProvider.release() has been called somewhere in application code, making us lose the document.`);
       }
     }
-  }, [doc]);
+  }, [doc, unregisterToken]);
   return providerRef.current;
 }
