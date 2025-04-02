@@ -1,6 +1,11 @@
 import { Dexie } from '../public/types/dexie';
 import type { DexieYDocMeta, YjsDoc, YDocCache } from '../public/types/yjs-related';
 
+// The finalization registry
+const docRegistry = new FinalizationRegistry<{cache: any, key: string}>(({cache, key}) => {
+  delete cache[key];
+});
+
 // The Y.Doc cache containing all active documents
 export function getDocCache(db: Dexie): YDocCache {
   return db._novip['_docCache'] ??= {
@@ -23,7 +28,7 @@ export function getDocCache(db: Dexie): YDocCache {
         docRegistry.unregister(existingDoc); // Don't run garbage collection on this doc as it is being replaced.
       }
       this.cache[cacheKey] = new WeakRef(doc);
-      docRegistry.register(doc, { cache: this.cache, key: cacheKey });
+      docRegistry.register(doc, { cache: this.cache, key: cacheKey }, doc);
     },
     delete(doc: YjsDoc): void {
       docRegistry.unregister(doc); // Don't run garbage collection on this doc as it is being deleted here and now.
@@ -35,11 +40,6 @@ export function getDocCache(db: Dexie): YDocCache {
     },
   };
 }
-//export let docCache: { [key: string]: WeakRef<DucktypedYDoc>; } = {};
-// The finalization registry
-const docRegistry = new FinalizationRegistry<{cache: any, key: string}>(({cache, key}) => {
-  delete cache[key];
-});
 
 // Emulate a private boolean property "destroyed" on Y.Doc instances that we manage
 // in createYDocProperty.ts:
