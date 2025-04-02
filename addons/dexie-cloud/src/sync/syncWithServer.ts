@@ -10,6 +10,7 @@ import {
   DexieCloudSchema,
   SyncRequest,
   SyncResponse,
+  YClientMessage,
 } from 'dexie-cloud-common';
 import { encodeIdsForServer } from './encodeIdsForServer';
 import { UserLogin } from '../db/entities/UserLogin';
@@ -18,6 +19,7 @@ import { updateSyncRateLimitDelays } from './ratelimit';
 
 export async function syncWithServer(
   changes: DBOperationsSet,
+  y: YClientMessage[],
   syncState: PersistedSyncState | undefined,
   baseRevs: BaseRevisionMapEntry[],
   db: DexieCloudDB,
@@ -57,22 +59,26 @@ export async function syncWithServer(
     lastPull: syncState
       ? {
           serverRevision: syncState.serverRevision!,
+          yServerRevision: syncState.yServerRevision,
           realms: syncState.realms,
           inviteRealms: syncState.inviteRealms,
         }
       : undefined,
     baseRevs,
     changes: encodeIdsForServer(db.dx.core.schema, currentUser, changes),
+    y,
+    dxcv: db.cloud.version
   };
   console.debug('Sync request', syncRequest);
   db.syncStateChangedEvent.next({
     phase: 'pushing',
   });
+  const body = TSON.stringify(syncRequest);
   const res = await fetch(`${databaseUrl}/sync`, {
     method: 'post',
     headers,
     credentials: 'include', // For Arr Affinity cookie only, for better Rate-Limit counting only.
-    body: TSON.stringify(syncRequest),
+    body,
   });
   //const contentLength = Number(res.headers.get('content-length'));
   db.syncStateChangedEvent.next({

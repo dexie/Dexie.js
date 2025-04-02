@@ -6,5 +6,6 @@ export type DexieCloudSchema = {
     markedForSync?: boolean;
     initiallySynced?: boolean;
     primaryKey?: string
+    yProps?: string[];
   };
 };

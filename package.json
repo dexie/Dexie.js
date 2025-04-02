@@ -1,6 +1,6 @@
 {
   "name": "dexie",
-  "version": "4.0.11",
+  "version": "4.1.0-beta.45",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "module": "dist/dexie.mjs",
@@ -77,7 +77,7 @@
       "# Build dist/dexie.js, dist/dexie.mjs and dist/dexie.d.ts",
       "cd src",
       "tsc [--watch 'Watching for file changes']",
-      "tsc --target es2020 --outdir ../tools/tmp/modern/src/",
+      "tsc --target es2021 --outdir ../tools/tmp/modern/src/",
       "rollup -c ../tools/build-configs/rollup.config.js",
       "rollup -c ../tools/build-configs/rollup.umd.config.js",
       "rollup -c ../tools/build-configs/rollup.modern.config.js",
@@ -118,7 +118,7 @@
   "devDependencies": {
     "@lambdatest/node-tunnel": "^4.0.7",
     "cross-env": "^7.0.3",
-    "dts-bundle-generator": "^5.9.0",
+    "dts-bundle-generator": "^9.3.1",
     "just-build": "^0.9.24",
     "karma": "^6.1.1",
     "karma-chrome-launcher": "^3.1.0",
@@ -139,7 +139,9 @@
     "sorted-json": "^0.2.6",
     "terser": "^5.3.1",
     "tslib": "^2.1.0",
-    "typescript": "^5.3.3",
-    "uglify-js": "^3.9.2"
+    "typescript": "^5.6.3",
+    "uglify-js": "^3.9.2",
+    "y-protocols": "^1.0.6",
+    "yjs": "^13.6.23"
   }
 }

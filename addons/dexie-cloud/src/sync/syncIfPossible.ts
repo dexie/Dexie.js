@@ -70,22 +70,10 @@ export function syncIfPossible(
   async function _syncIfPossible() {
     try {
       // Check if should delay sync due to ratelimit:
-      await checkSyncRateLimitDelay(db);
-      
-      // Check if we need to lock the sync job. Not needed if we are the service worker.
-      if (db.cloud.isServiceWorkerDB) {
-        // We are the dedicated sync SW:
-        await sync(db, cloudOptions, cloudSchema, options);
-      } else if (!db.cloud.usingServiceWorker) {
-        // We use a flow that is better suited for the case when multiple workers want to
-        // do the same thing.
-        await performGuardedJob(db, CURRENT_SYNC_WORKER, () =>
-          sync(db, cloudOptions, cloudSchema, options)
-        );
-      } else {
-        assert(false);
-        throw new Error('Internal _syncIfPossible() - invalid precondition - should not have been called.');
-      }
+      await checkSyncRateLimitDelay(db);      
+      await performGuardedJob(db, CURRENT_SYNC_WORKER, () =>
+        sync(db, cloudOptions, cloudSchema, options)
+      );
       ongoingSyncs.delete(db);
       console.debug('Done sync');
     } catch (error) {

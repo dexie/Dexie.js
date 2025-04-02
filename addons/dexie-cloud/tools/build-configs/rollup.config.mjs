@@ -5,9 +5,12 @@ import nodeResolve from '@rollup/plugin-node-resolve';
 import { readFileSync, writeFileSync } from 'fs';
 import typescript from '@rollup/plugin-typescript';
 import terser from '@rollup/plugin-terser';
-import replace from '@rollup/plugin-replace'
+import replace from '@rollup/plugin-replace';
+// @ts-ignore: requires tsconfig settings that we don't need for the web build but is ok here in the build config.
 import pkg from '../../package.json' assert { type: 'json' };
-import fs from 'fs';
+import * as fs from 'fs';
+
+//const ERRORS_TO_IGNORE = ['THIS_IS_UNDEFINED'];
 
 export function createBanner() {
   // Create a copy of banner.txt with version and date replaced.
@@ -20,10 +23,10 @@ export function createBanner() {
 }
 
 /**
- * 
+ *
  * @param {String} entry such as src/dexie-cloud-client.ts
  * @param {String} outputName such as dexie-cloud-addon
- * @returns 
+ * @returns
  */
 export function createRollupConfig(entry, outputName) {
   return {
@@ -114,10 +117,19 @@ export function createRollupConfig(entry, outputName) {
       replace({
         preventAssignment: true,
         values: {
-          "__VERSION__": JSON.stringify(pkg.version),
+          __VERSION__: JSON.stringify(pkg.version),
         },
       }),
     ],
+    /*onwarn({ loc, frame, code, message }) {
+      //if (ERRORS_TO_IGNORE.includes(code)) return;
+      if (loc) {
+        console.warn(`${loc.file} (${loc.line}:${loc.column}) ${message}`);
+        if (frame) console.warn(frame);
+      } else {
+        console.warn(`${code} ${message}`);
+      }
+    },*/
   };
 }
 
@@ -125,5 +137,5 @@ createBanner();
 
 export default [
   createRollupConfig('src/dexie-cloud-addon.ts', 'dexie-cloud-addon'),
-  createRollupConfig('src/service-worker.ts', 'service-worker')
+  createRollupConfig('src/service-worker.ts', 'service-worker'),
 ];

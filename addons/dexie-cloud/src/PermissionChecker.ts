@@ -42,6 +42,7 @@ export class PermissionChecker<T, TableNames extends string = TableName<T>> {
     // If user can update any prop in any table in this realm, return true unless
     // it regards to ownership change:
     if (this.permissions.update === '*') {
+      // @ts-ignore
       return props.every((prop) => prop !== 'owner');
     }
     const tablePermissions = this.permissions.update?.[this.tableName];

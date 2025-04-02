@@ -1,11 +1,13 @@
-import { BehaviorSubject, firstValueFrom, from, Observable, of, throwError } from 'rxjs';
+import { BehaviorSubject, firstValueFrom, from, Observable, of, throwError, merge } from 'rxjs';
 import {
   catchError,
+  combineLatestAll,
   debounceTime,
   delay,
   distinctUntilChanged,
   filter,
   map,
+  mergeMap,
   switchMap,
   take,
   tap,
@@ -25,6 +27,7 @@ import {
   WSObservable,
 } from '../WSObservable';
 import { InvalidLicenseError } from '../InvalidLicenseError';
+import { read } from 'fs';
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
@@ -48,7 +51,7 @@ export function connectWebSocket(db: DexieCloudDB) {
     throw new Error(`No database URL to connect WebSocket to`);
   }
 
-  const messageProducer = db.messageConsumer.readyToServe.pipe(
+  const readyForChangesMessage = db.messageConsumer.readyToServe.pipe(
     filter((isReady) => isReady), // When consumer is ready for new messages, produce such a message to inform server about it
     switchMap(() => db.getPersistedSyncState()), // We need the info on which server revision we are at:
     filter((syncState) => syncState && syncState.serverRevision), // We wont send anything to server before inital sync has taken place
@@ -57,7 +60,12 @@ export function connectWebSocket(db: DexieCloudDB) {
       type: 'ready',
       rev: syncState.serverRevision,
       realmSetHash: await computeRealmSetHash(syncState)
-    }))
+    } satisfies ReadyForChangesMessage))
+  );
+
+  const messageProducer = merge(
+    readyForChangesMessage,
+    db.messageProducer
   );
 
   function createObservable(): Observable<WSConnectionMsg | null> {
@@ -105,14 +113,14 @@ export function connectWebSocket(db: DexieCloudDB) {
         // and the baseRev of the last from same client-ID.
         if (userLogin) {
           return new WSObservable(
-              db.cloud.options!.databaseUrl,
+              db,
               db.cloud.persistedSyncState!.value!.serverRevision,
+              db.cloud.persistedSyncState!.value!.yServerRevision,
               realmSetHash,
               db.cloud.persistedSyncState!.value!.clientIdentity,
               messageProducer,
               db.cloud.webSocketStatus,
-              userLogin.accessToken,
-              userLogin.accessTokenExpiration
+              userLogin
             );
         } else {
           return from([] as WSConnectionMsg[]);

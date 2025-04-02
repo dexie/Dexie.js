@@ -1,14 +1,26 @@
 import { DBOperationsSet } from 'dexie-cloud-common';
-import { BehaviorSubject, Observable, Subscriber, Subscription } from 'rxjs';
+import { BehaviorSubject, Observable, Subscriber, Subscription, tap } from 'rxjs';
 import { TokenExpiredError } from './authentication/TokenExpiredError';
 import { DXCWebSocketStatus } from './DXCWebSocketStatus';
 import { TSON } from './TSON';
+import type { YClientMessage, YServerMessage } from 'dexie-cloud-common';
+import { DexieCloudDB } from './db/DexieCloudDB';
+import { createYClientUpdateObservable } from './yjs/createYClientUpdateObservable';
+import { applyYServerMessages } from './yjs/applyYMessages';
+import { DexieYProvider, Table, YSyncState } from 'dexie';
+import { getAwarenessLibrary, getDocAwareness } from './yjs/awareness';
+import { encodeYMessage, decodeYMessage } from 'dexie-cloud-common';
+import { UserLogin } from './dexie-cloud-client';
+import { isEagerSyncDisabled } from './isEagerSyncDisabled';
+import { getOpenDocSignal } from './yjs/reopenDocSignal';
+import { getUpdatesTable } from './yjs/getUpdatesTable';
+import { DEXIE_CLOUD_SYNCER_ID } from './sync/DEXIE_CLOUD_SYNCER_ID';
 
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;
 const FAIL_RETRY_WAIT_TIME = 60000;
 
-export type WSClientToServerMsg = ReadyForChangesMessage;
+export type WSClientToServerMsg = ReadyForChangesMessage | YClientMessage;
 export interface ReadyForChangesMessage {
   type: 'ready';
   realmSetHash: string;
@@ -73,24 +85,24 @@ export interface TokenExpiredMessage {
 
 export class WSObservable extends Observable<WSConnectionMsg> {
   constructor(
-    databaseUrl: string,
-    rev: string,
+    db: DexieCloudDB,
+    rev: string | undefined,
+    yrev: string | undefined,
     realmSetHash: string,
     clientIdentity: string,
     messageProducer: Observable<WSClientToServerMsg>,
     webSocketStatus: BehaviorSubject<DXCWebSocketStatus>,
-    token?: string,
-    tokenExpiration?: Date
+    user: UserLogin
   ) {
     super(
       (subscriber) =>
         new WSConnection(
-          databaseUrl,
+          db,
           rev,
+          yrev,
           realmSetHash,
           clientIdentity,
-          token,
-          tokenExpiration,
+          user,
           subscriber,
           messageProducer,
           webSocketStatus
@@ -102,16 +114,17 @@ export class WSObservable extends Observable<WSConnectionMsg> {
 let counter = 0;
 
 export class WSConnection extends Subscription {
+  db: DexieCloudDB;
   ws: WebSocket | null;
   lastServerActivity: Date;
   lastUserActivity: Date;
   lastPing: Date;
   databaseUrl: string;
-  rev: string;
+  rev: string | undefined;
+  yrev: string | undefined;
   realmSetHash: string;
   clientIdentity: string;
-  token: string | undefined;
-  tokenExpiration: Date | undefined;
+  user: UserLogin;
   subscriber: Subscriber<WSConnectionMsg>;
   pauseUntil?: Date;
   messageProducer: Observable<WSClientToServerMsg>;
@@ -119,15 +132,15 @@ export class WSConnection extends Subscription {
   id = ++counter;
 
   private pinger: any;
-  private messageProducerSubscription: null | Subscription;
+  private subscriptions: Set<Subscription> = new Set();
 
   constructor(
-    databaseUrl: string,
-    rev: string,
+    db: DexieCloudDB,
+    rev: string | undefined,
+    yrev: string | undefined,
     realmSetHash: string,
     clientIdentity: string,
-    token: string | undefined,
-    tokenExpiration: Date | undefined,
+    user: UserLogin,
     subscriber: Subscriber<WSConnectionMsg>,
     messageProducer: Observable<WSClientToServerMsg>,
     webSocketStatus: BehaviorSubject<DXCWebSocketStatus>
@@ -136,18 +149,18 @@ export class WSConnection extends Subscription {
     console.debug(
       'New WebSocket Connection',
       this.id,
-      token ? 'authorized' : 'unauthorized'
+      user.accessToken ? 'authorized' : 'unauthorized'
     );
-    this.databaseUrl = databaseUrl;
+    this.db = db;
+    this.databaseUrl = db.cloud.options!.databaseUrl;
     this.rev = rev;
+    this.yrev = yrev;
     this.realmSetHash = realmSetHash;
     this.clientIdentity = clientIdentity;
-    this.token = token;
-    this.tokenExpiration = tokenExpiration;
+    this.user = user;
     this.subscriber = subscriber;
     this.lastUserActivity = new Date();
     this.messageProducer = messageProducer;
-    this.messageProducerSubscription = null;
     this.webSocketStatus = webSocketStatus;
     this.connect();
   }
@@ -169,10 +182,10 @@ export class WSConnection extends Subscription {
       } catch {}
     }
     this.ws = null;
-    if (this.messageProducerSubscription) {
-      this.messageProducerSubscription.unsubscribe();
-      this.messageProducerSubscription = null;
+    for (const sub of this.subscriptions) {
+      sub.unsubscribe();
     }
+    this.subscriptions.clear();
   }
 
   reconnecting = false;
@@ -205,12 +218,18 @@ export class WSConnection extends Subscription {
       //console.debug('SyncStatus: DUBB: Ooops it was closed!');
       return;
     }
-    if (this.tokenExpiration && this.tokenExpiration < new Date()) {
+    const tokenExpiration = this.user.accessTokenExpiration;
+    if (tokenExpiration && tokenExpiration < new Date()) {
       this.subscriber.error(new TokenExpiredError()); // Will be handled in connectWebSocket.ts.
       return;
     }
     this.webSocketStatus.next('connecting');
     this.pinger = setInterval(async () => {
+      // setInterval here causes unnecessary pings when server is proved active anyway.
+      // TODO: Use setTimout() here instead. When triggered, check if we really need to ping.
+      // In case we've had server activity, we don't need to ping. Then schedule then next ping
+      // to the time when we should ping next time (based on lastServerActivity + CLIENT_PING_INTERVAL).
+      // Else, ping now and schedule next ping to CLIENT_PING_INTERVAL from now.
       if (this.closed) {
         console.debug('pinger check', this.id, 'CLOSED.');
         this.teardown();
@@ -263,17 +282,19 @@ export class WSConnection extends Subscription {
     const searchParams = new URLSearchParams();
     if (this.subscriber.closed) return;
     searchParams.set('v', '2');
-    searchParams.set('rev', this.rev);
+    if (this.rev) searchParams.set('rev', this.rev);
+    if (this.yrev) searchParams.set('yrev', this.yrev);
     searchParams.set('realmsHash', this.realmSetHash);
     searchParams.set('clientId', this.clientIdentity);
-    if (this.token) {
-      searchParams.set('token', this.token);
+    searchParams.set('dxcv', this.db.cloud.version);
+    if (this.user.accessToken) {
+      searchParams.set('token', this.user.accessToken);
     }
 
     // Connect the WebSocket to given url:
     console.debug('dexie-cloud WebSocket create');
     const ws = (this.ws = new WebSocket(`${wsUrl}/changes?${searchParams}`));
-    //ws.binaryType = "arraybuffer"; // For future when subscribing to actual changes.
+    ws.binaryType = "arraybuffer";
 
     ws.onclose = (event: Event) => {
       if (!this.pinger) return;
@@ -283,21 +304,62 @@ export class WSConnection extends Subscription {
 
     ws.onmessage = (event: MessageEvent) => {
       if (!this.pinger) return;
-      console.debug('dexie-cloud WebSocket onmessage', event.data);
 
       this.lastServerActivity = new Date();
       try {
-        const msg = TSON.parse(event.data) as
-          | WSConnectionMsg
-          | PongMessage
-          | ErrorMessage;
+        const msg = typeof event.data === 'string'
+          ? TSON.parse(event.data) as
+            | WSConnectionMsg
+            | PongMessage
+            | ErrorMessage
+            | YServerMessage   
+          : decodeYMessage(new Uint8Array(event.data)) as
+            | YServerMessage;
+        console.debug('dexie-cloud WebSocket onmessage', msg.type, msg);
         if (msg.type === 'error') {
           throw new Error(`Error message from dexie-cloud: ${msg.error}`);
-        }
-        if (msg.type === 'rev') {
-          this.rev = msg.rev; // No meaning but seems reasonable.
-        }
-        if (msg.type !== 'pong') {
+        } else if (msg.type === 'aware') {
+          const docCache = DexieYProvider.getDocCache(this.db.dx);
+          const doc = docCache.find(msg.table, msg.k, msg.prop);
+          if (doc) {
+            const awareness = getDocAwareness(doc);
+            if (awareness) {
+              const awap = getAwarenessLibrary(this.db);
+              awap.applyAwarenessUpdate(
+                awareness,
+                msg.u,
+                'server',
+              );
+            }
+          }
+        } else if (msg.type === 'pong') {
+          // Do nothing
+        } else if (msg.type === 'doc-open') {
+          const docCache = DexieYProvider.getDocCache(this.db.dx);
+          const doc = docCache.find(msg.table, msg.k, msg.prop);
+          if (doc) {
+            getOpenDocSignal(doc).next(); // Make yHandler reopen the document on server.
+          }
+        } else if (msg.type === 'u-ack' || msg.type === 'u-reject' || msg.type === 'u-s' || msg.type === 'in-sync' || msg.type === 'outdated-server-rev' || msg.type === 'y-complete-sync-done') {
+          applyYServerMessages([msg], this.db).then(async ({resyncNeeded, yServerRevision, receivedUntils}) => {
+            if (yServerRevision) {
+              await this.db.$syncState.update('syncState', { yServerRevision: yServerRevision });
+            }
+            if (msg.type === 'u-s' && receivedUntils) {
+              const utbl = getUpdatesTable(this.db, msg.table, msg.prop) as any as Table<YSyncState, string>;
+              if (utbl) {
+                const receivedUntil = receivedUntils[utbl.name];
+                if (receivedUntil) {
+                  await utbl.update(DEXIE_CLOUD_SYNCER_ID, { receivedUntil });
+                }
+              }
+            }
+            if (resyncNeeded) {
+              await this.db.cloud.sync({ purpose: 'pull', wait: true });
+            }
+          })
+        } else {
+          // Forward the request to our subscriber, wich is in messageFromServerQueue.ts (via connectWebSocket's subscribe() at the end!)
           this.subscriber.next(msg);
         }
       } catch (e) {
@@ -324,7 +386,7 @@ export class WSConnection extends Subscription {
           }
         };
       });
-      this.messageProducerSubscription = this.messageProducer.subscribe(
+      this.subscriptions.add(this.messageProducer.subscribe(
         (msg) => {
           if (!this.closed) {
             if (
@@ -333,10 +395,28 @@ export class WSConnection extends Subscription {
             ) {
               this.webSocketStatus.next('connected');
             }
-            this.ws?.send(TSON.stringify(msg));
+            console.debug('dexie-cloud WebSocket send', msg.type, msg);
+            if (msg.type === 'ready') {
+              // Ok, we are certain to have stored everything up until revision msg.rev.
+              // Update this.rev in case of reconnect - remember where we were and don't just start over!
+              this.rev = msg.rev; 
+              // ... and then send along the request to the server so it would also be updated!
+              this.ws?.send(TSON.stringify(msg));
+            } else {
+              // If it's not a "ready" message, it's an YMessage.
+              // YMessages can be sent binary encoded.
+              this.ws?.send(encodeYMessage(msg));
+            }
           }
         }
-      );
+      ));
+      if (this.user.isLoggedIn && !isEagerSyncDisabled(this.db)) {
+        this.subscriptions.add(
+          createYClientUpdateObservable(this.db).subscribe(
+            this.db.messageProducer
+          )
+        );
+      }
     } catch (error) {
       this.pauseUntil = new Date(Date.now() + FAIL_RETRY_WAIT_TIME);
     }

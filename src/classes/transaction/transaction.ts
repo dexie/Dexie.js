@@ -21,7 +21,7 @@ export class Transaction implements ITransaction {
   db: Dexie;
   active: boolean;
   mode: IDBTransactionMode;
-  chromeTransactionDurability: ChromeTransactionDurability;
+  chromeTransactionDurability: IDBTransactionDurability;
   idbtrans: IDBTransaction;
   storeNames: string[];
   explicit?: boolean;

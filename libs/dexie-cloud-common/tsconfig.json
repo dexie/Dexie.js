@@ -2,6 +2,7 @@
   "compilerOptions": {
     "lib": ["es2020", "dom"],
     "moduleResolution": "node",
+    "importHelpers": true,
     "target": "es2017",
     "module": "esnext",
     "outDir": "dist",
@@ -11,7 +12,8 @@
     "declaration": true,
     "declarationMap": true,
     "allowSyntheticDefaultImports": true,
-    "composite": true
+    "composite": true,
+    "types": ["jest", "node"]
   },
   "include": ["./src"]
 }

@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "lib": ["es2016", "dom"],
+    "lib": ["es2021", "dom"],
     "moduleResolution": "node",
     "importHelpers": false,
     "jsx": "react",

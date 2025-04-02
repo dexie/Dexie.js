@@ -1,19 +1,18 @@
 import { Table } from './table';
 import { Version } from './version';
-import { DbEvents } from './db-events';
+import { DbEvents, DbEventFns } from './db-events';
 import { TransactionMode } from './transaction-mode';
 import { Transaction } from './transaction';
 import { WhereClause } from './where-clause';
 import { Collection } from './collection';
 import { DbSchema } from './db-schema';
-import { TableSchema } from './table-schema';
-import { DexieConstructor } from './dexie-constructor';
+import { DexieOptions } from './dexie-constructor';
 import { PromiseExtended } from './promise-extended';
 import { IndexableType } from './indexable-type';
 import { DBCore } from './dbcore';
 import { Middleware, DexieStacks } from './middleware';
 
-export type TableProp<DX extends Dexie> = {
+export type TableProp<DX> = {
   [K in keyof DX]: DX[K] extends {schema: any, get: any, put: any, add: any, where: any} ? K : never;
 }[keyof DX] & string;
 
@@ -29,6 +28,7 @@ export interface Dexie {
   readonly vip: Dexie;
 
   readonly _allTables: { [name: string]: Table<any, IndexableType> };
+  readonly _options: DexieOptions;
 
   readonly core: DBCore;
 
@@ -47,6 +47,8 @@ export interface Dexie {
   version(versionNumber: number): Version;
 
   on: DbEvents;
+
+  once: DbEventFns;
 
   open(): PromiseExtended<Dexie>;
 
@@ -113,6 +115,8 @@ export interface Dexie {
   // Add more supported stacks here... : use(middleware: Middleware<HookStack>): this;
   unuse({ stack, create }: Middleware<{ stack: keyof DexieStacks }>): this;
   unuse({ stack, name }: { stack: keyof DexieStacks; name: string }): this;
+
+  gc(): Promise<void>;
 
   // Make it possible to touch physical class constructors where they reside - as properties on db instance.
   // For example, checking if (x instanceof db.Table). Can't do (x instanceof Dexie.Table because it's just a virtual interface)

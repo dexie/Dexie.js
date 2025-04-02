@@ -463,7 +463,10 @@ export function adjustToExistingIndexNames(db: Dexie, schema: DbSchema, idbtrans
 
 export function parseIndexSyntax(primKeyAndIndexes: string): IndexSpec[] {
   return primKeyAndIndexes.split(',').map((index, indexNum) => {
-    index = index.trim();
+    const typeSplit = index.split(':');
+    const type = typeSplit[1]?.trim();
+    index = typeSplit[0].trim();
+    if (type && type !== 'Y') throw new exceptions.Schema(`Unsupported type '${type}'`); // Y is currently the only supported type.
     const name = index.replace(/([&*]|\+\+)/g, ""); // Remove "&", "++" and "*"
     // Let keyPath of "[a+b]" be ["a","b"]:
     const keyPath = /^\[/.test(name) ? name.match(/^\[(.*)\]$/)[1].split('+') : name;
@@ -475,7 +478,8 @@ export function parseIndexSyntax(primKeyAndIndexes: string): IndexSpec[] {
       /\*/.test(index),
       /\+\+/.test(index),
       isArray(keyPath),
-      indexNum === 0
+      indexNum === 0,
+      type
     );
   });
 }

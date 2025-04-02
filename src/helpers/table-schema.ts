@@ -1,18 +1,22 @@
 import { IndexSpec } from '../public/types/index-spec';
 import { TableSchema } from '../public/types/table-schema';
-import { createIndexSpec } from './index-spec';
 import { arrayToObject } from '../functions/utils';
 
-export function createTableSchema (
+export function createTableSchema(
   name: string,
   primKey: IndexSpec,
-  indexes: IndexSpec[]
+  indexes: IndexSpec[],
+  yProps?: string[]
 ): TableSchema {
   return {
     name,
     primKey,
     indexes,
     mappedClass: null,
-    idxByName: arrayToObject(indexes, index => [index.name, index])
+    yProps: yProps?.map((prop) => ({
+      prop,
+      updatesTable: `$${name}.${prop}_updates`,
+    })),
+    idxByName: arrayToObject(indexes, (index) => [index.name, index]),
   };
 }

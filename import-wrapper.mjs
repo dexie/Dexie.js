@@ -8,7 +8,10 @@ if (_Dexie.semVer !== Dexie.semVer) {
     throw new Error(`Two different versions of Dexie loaded in the same app: ${_Dexie.semVer} and ${Dexie.semVer}`);
 }
 const { liveQuery, mergeRanges, rangesOverlap, RangeSet, cmp, Entity,
-    PropModification, replacePrefix, add, remove } = Dexie;
+    PropModification, replacePrefix, add, remove,
+    DexieYProvider } = Dexie;
 export { liveQuery, mergeRanges, rangesOverlap, RangeSet, cmp, Dexie, Entity,
-    PropModification, replacePrefix, add, remove };
+    PropModification, replacePrefix, add, remove,
+    DexieYProvider};
+    
 export default Dexie;

@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "4.0.11",
+  "version": "4.1.0-beta.45",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "main": "dist/umd/dexie-cloud-addon.js",
   "type": "module",
@@ -52,7 +52,7 @@
   },
   "scripts": {
     "test": "just-build test && pnpm run test-unit",
-    "test-unit": "karma start test/unit/karma.conf.js --single-run",
+    "test-unit": "karma start test/unit/karma.conf.cjs --single-run",
     "build": "rollup -c tools/build-configs/rollup.config.mjs",
     "watch": "rollup -c tools/build-configs/rollup.config.mjs --watch",
     "clean": "rm -rf tools/tmp dist test/unit/bundle.*"
@@ -78,20 +78,21 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^11.1.5",
     "@types/node": "^18.11.18",
-    "dreambase-library": "^1.0.21",
+    "dreambase-library": "^1.0.23",
     "just-build": "*",
     "karma": "*",
     "karma-chrome-launcher": "*",
     "karma-firefox-launcher": "*",
     "karma-qunit": "*",
+    "lib0": "^0.2.97",
     "preact": "*",
     "rollup": "^4.1.4",
     "terser": "^5.20.0",
     "tslib": "*",
-    "typescript": "^5.3.3"
+    "typescript": "^5.6.3"
   },
   "dependencies": {
-    "dexie-cloud-common": "^1.0.31",
+    "dexie-cloud-common": "workspace:^",
     "rxjs": "^7.x"
   },
   "peerDependencies": {
