@@ -1,4 +1,4 @@
-import { liveQuery } from 'dexie';
+import Dexie from 'dexie';
 import { useObservable } from './useObservable';
 
 export function useLiveQuery<T>(
@@ -16,7 +16,7 @@ export function useLiveQuery<T, TDefault>(
   defaultResult?: TDefault
 ): T | TDefault {
   return useObservable(
-    () => liveQuery(querier),
+    () => Dexie.liveQuery(querier),
     deps || [],
     defaultResult as TDefault
   );
