@@ -1,5 +1,5 @@
 /* ========================================================================== 
- *                           dexie-cloud-addom.js
+ *                           dexie-cloud-addon.js
  * ==========================================================================
  *
  * Dexie addon that syncs IndexedDB with Dexie Cloud.
