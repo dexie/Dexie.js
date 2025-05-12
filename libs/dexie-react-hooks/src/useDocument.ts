@@ -1,22 +1,22 @@
-import { DexieYProvider, YjsDoc } from 'dexie';
+import * as Dexie from 'dexie';
 import React from 'react';
 
 const gracePeriod = 100 // 100 ms = grace period to optimize for unload/reload scenarios
 
-const fr = typeof FinalizationRegistry !== 'undefined' && new FinalizationRegistry((doc: YjsDoc) => {
+const fr = typeof FinalizationRegistry !== 'undefined' && new FinalizationRegistry((doc: Dexie.YjsDoc) => {
   // If coming here, react effect never ran. This is a fallback cleanup mechanism.
-  DexieYProvider.release(doc);
+  Dexie.DexieYProvider.release(doc);
 });
 
-export function useDocument<YDoc extends YjsDoc>(
+export function useDocument<YDoc extends Dexie.YjsDoc>(
   doc: YDoc | null | undefined
-): DexieYProvider<YDoc> | null {
+): Dexie.DexieYProvider<YDoc> | null {
   if (!fr) throw new TypeError('FinalizationRegistry not supported.');
-  const providerRef = React.useRef<DexieYProvider | null>(null);
+  const providerRef = React.useRef<Dexie.DexieYProvider | null>(null);
   let unregisterToken: object | undefined = undefined;
   if (doc) {
     if (doc !== providerRef.current?.doc) {
-      providerRef.current = DexieYProvider.load(doc, { gracePeriod });
+      providerRef.current = Dexie.DexieYProvider.load(doc, { gracePeriod });
       unregisterToken = Object.create(null);
       fr.register(providerRef, doc, unregisterToken);
     }
@@ -34,10 +34,10 @@ export function useDocument<YDoc extends YjsDoc>(
       // We cannot wait with loading the document until the effect happens, because the doc
       // could have been destroyed in the meantime.
       if (unregisterToken) fr.unregister(unregisterToken);
-      let provider = DexieYProvider.for(doc);
+      let provider = Dexie.DexieYProvider.for(doc);
       if (provider) {
         return () => {
-          DexieYProvider.release(doc);
+          Dexie.DexieYProvider.release(doc);
         }
       } else {
         // Maybe the doc was destroyed in the meantime.
