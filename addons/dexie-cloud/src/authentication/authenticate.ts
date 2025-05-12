@@ -55,6 +55,7 @@ export async function loadAccessToken(
     accessTokenExpiration: refreshedLogin.accessTokenExpiration,
     claims: refreshedLogin.claims,
     license: refreshedLogin.license,
+    data: refreshedLogin.data,
   });
   return refreshedLogin;
 }
