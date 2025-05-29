@@ -76,7 +76,7 @@ Yes, it's that simple. Read [the docs](https://dexie.org/docs/) to get into the 
 
 #### Hello World (for modern browsers)
 
-All modern browsers support ES modules and top-level awaits. No transipler needed. Here's the previous example in a modern flavour:
+All modern browsers support ES modules and top-level awaits. No transpiler needed. Here's the previous example in a modern flavour:
 
 ```html
 <!DOCTYPE html>
