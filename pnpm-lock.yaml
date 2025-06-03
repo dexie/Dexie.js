@@ -169,8 +169,8 @@ importers:
         specifier: ^18.11.18
         version: 18.11.18
       dreambase-library:
-        specifier: ^1.0.25
-        version: 1.0.25
+        specifier: ^1.0.26
+        version: 1.0.26
       just-build:
         specifier: '*'
         version: 0.9.24
@@ -3572,8 +3572,8 @@ packages:
     resolution: {integrity: sha512-rlBi9d8jpv9Sf1klPjNfFAuWDjKLwTIJJ/VxtoTwIR6hnZxcEOQCZg2oIL3MWBYw5GpUDKOEnND7LXTbIpQ03Q==}
     engines: {node: '>=10'}
 
-  dreambase-library@1.0.25:
-    resolution: {integrity: sha512-oJjRmz1OedNGLkiB+AeJrRY4l5N5kNno9+BFfwxqjbVSxgqZE8QzVTFyrX6tEuOcfiA+gbipQUktHofGIdXYTg==}
+  dreambase-library@1.0.26:
+    resolution: {integrity: sha512-+7v7bvkPncxytcKZ6D+vZDpMvv6ctPpik6YeOzky8SLqJfqVIhKog99Vom+eUcQrZqIKb3FuOHak37MNXWGh9Q==}
     engines: {node: '>=14.8.0'}
 
   dts-bundle-generator@9.3.1:
@@ -11878,7 +11878,7 @@ snapshots:
 
   dotenv@10.0.0: {}
 
-  dreambase-library@1.0.25: {}
+  dreambase-library@1.0.26: {}
 
   dts-bundle-generator@9.3.1:
     dependencies:
