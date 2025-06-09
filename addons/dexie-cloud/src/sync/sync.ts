@@ -152,7 +152,11 @@ async function _sync(
     db.tables,
     async () => {
       const syncState = await db.getPersistedSyncState();
-      const baseRevs = await db.$baseRevs.toArray();
+      let baseRevs = await db.$baseRevs.toArray();
+      
+      // Resolve #2168
+      baseRevs = baseRevs.filter(br => tablesToSync.some(tbl => tbl.name === br.tableName));
+
       let clientChanges = await listClientChanges(mutationTables, db);
       throwIfCancelled(cancelToken);
       if (doSyncify) {

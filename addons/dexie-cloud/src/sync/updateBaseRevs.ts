@@ -14,4 +14,9 @@ export async function updateBaseRevs(db: DexieCloudDB, schema: DexieCloudSchema,
         };
       })
   );
+  // Clean up baseRevs for tables that do not exist anymore or are no longer marked for sync
+  // Resolve #2168 by also cleaning up baseRevs for tables that are not marked for sync
+  await db.$baseRevs.where('tableName').noneOf(
+    Object.keys(schema).filter((table) => schema[table].markedForSync)
+  ).delete();
 }
