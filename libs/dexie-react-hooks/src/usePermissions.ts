@@ -1,4 +1,4 @@
-import { Dexie } from 'dexie';
+import Dexie from 'dexie';
 import { useObservable } from './useObservable';
 //import type { KeyPaths, TableProp } from 'dexie'; // Issue #1725 - not compatible with dexie@3.
 // Workaround: provide these types inline for now. When dexie 4 stable is out, we can use the types from dexie@4.
