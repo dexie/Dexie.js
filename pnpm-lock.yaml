@@ -239,6 +239,67 @@ importers:
         specifier: ^1.0.0-alpha.21
         version: 1.0.0-alpha.39
 
+  addons/y-dexie:
+    dependencies:
+      dexie:
+        specifier: workspace:>=4.2.0-beta.1 <5.0.0
+        version: link:../..
+    devDependencies:
+      '@rollup/plugin-commonjs':
+        specifier: ^25.0.7
+        version: 25.0.7(rollup@4.1.4)
+      '@rollup/plugin-node-resolve':
+        specifier: ^15.2.3
+        version: 15.2.3(rollup@4.1.4)
+      '@rollup/plugin-replace':
+        specifier: ^5.0.4
+        version: 5.0.4(rollup@4.1.4)
+      '@rollup/plugin-terser':
+        specifier: ^0.4.4
+        version: 0.4.4(rollup@4.1.4)
+      '@rollup/plugin-typescript':
+        specifier: ^11.1.5
+        version: 11.1.5(rollup@4.1.4)(tslib@2.4.0)(typescript@5.8.3)
+      '@types/node':
+        specifier: ^18.11.18
+        version: 18.11.18
+      dreambase-library:
+        specifier: ^1.0.26
+        version: 1.0.26
+      just-build:
+        specifier: '*'
+        version: 0.9.24
+      karma:
+        specifier: '*'
+        version: 6.4.0
+      karma-chrome-launcher:
+        specifier: '*'
+        version: 3.1.1
+      karma-firefox-launcher:
+        specifier: '*'
+        version: 2.1.2
+      karma-qunit:
+        specifier: '*'
+        version: 4.1.2(karma@6.4.0)(qunit@2.21.1)
+      lib0:
+        specifier: ^0.2.97
+        version: 0.2.99
+      rollup:
+        specifier: ^4.1.4
+        version: 4.1.4
+      terser:
+        specifier: ^5.20.0
+        version: 5.20.0
+      tslib:
+        specifier: '*'
+        version: 2.4.0
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
+      yjs:
+        specifier: ^13.6
+        version: 13.6.23
+
   libs/dexie-cloud-common:
     dependencies:
       lib0:
@@ -7442,6 +7503,11 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  typescript@5.8.3:
+    resolution: {integrity: sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   typeson-registry@1.0.0-alpha.39:
     resolution: {integrity: sha512-NeGDEquhw+yfwNhguLPcZ9Oj0fzbADiX4R0WxvoY8nGhy98IbzQy1sezjoEFWOywOboj/DWehI+/aUlRVrJnnw==}
     engines: {node: '>=10.0.0'}
@@ -9969,6 +10035,15 @@ snapshots:
       rollup: 4.1.4
       tslib: 2.4.0
 
+  '@rollup/plugin-typescript@11.1.5(rollup@4.1.4)(tslib@2.4.0)(typescript@5.8.3)':
+    dependencies:
+      '@rollup/pluginutils': 5.0.5(rollup@4.1.4)
+      resolve: 1.22.2
+      typescript: 5.8.3
+    optionalDependencies:
+      rollup: 4.1.4
+      tslib: 2.4.0
+
   '@rollup/plugin-typescript@8.4.0(rollup@2.79.0)(tslib@2.4.0)(typescript@5.3.3)':
     dependencies:
       '@rollup/pluginutils': 3.1.0(rollup@2.79.0)
@@ -10355,7 +10430,7 @@ snapshots:
 
   '@types/resolve@0.0.8':
     dependencies:
-      '@types/node': 18.11.18
+      '@types/node': 20.2.5
 
   '@types/resolve@1.17.1':
     dependencies:
@@ -11882,7 +11957,7 @@ snapshots:
 
   dts-bundle-generator@9.3.1:
     dependencies:
-      typescript: 5.6.3
+      typescript: 5.8.3
       yargs: 17.7.2
 
   duplexer@0.1.2: {}
@@ -11940,7 +12015,7 @@ snapshots:
     dependencies:
       '@types/cookie': 0.4.1
       '@types/cors': 2.8.12
-      '@types/node': 18.11.18
+      '@types/node': 20.2.5
       accepts: 1.3.8
       base64id: 2.0.0
       cookie: 0.4.2
@@ -11957,7 +12032,7 @@ snapshots:
     dependencies:
       '@types/cookie': 0.4.1
       '@types/cors': 2.8.12
-      '@types/node': 18.11.18
+      '@types/node': 20.2.5
       accepts: 1.3.8
       base64id: 2.0.0
       cookie: 0.4.2
@@ -16820,6 +16895,8 @@ snapshots:
 
   typescript@5.6.3: {}
 
+  typescript@5.8.3: {}
+
   typeson-registry@1.0.0-alpha.39:
     dependencies:
       base64-arraybuffer-es6: 0.7.0
@@ -17431,7 +17508,7 @@ snapshots:
 
   y-protocols@1.0.6(yjs@13.6.23):
     dependencies:
-      lib0: 0.2.97
+      lib0: 0.2.99
       yjs: 13.6.23
 
   y18n@5.0.8: {}
