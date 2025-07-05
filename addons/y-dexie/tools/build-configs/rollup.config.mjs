@@ -33,13 +33,13 @@ export function createRollupConfig(entry, outputName) {
     input: entry,
     output: [
       {
-        file: `dist/modern/${outputName}.js`,
+        file: `dist/${outputName}.js`,
         format: 'es',
         banner: readFileSync('tools/tmp/banner.txt', 'utf-8'),
         sourcemap: true,
       },
       {
-        file: `dist/modern/${outputName}.min.js`,
+        file: `dist/${outputName}.min.js`,
         format: 'es',
         banner: readFileSync('tools/tmp/banner.txt', 'utf-8'),
         sourcemap: true,
@@ -56,46 +56,7 @@ export function createRollupConfig(entry, outputName) {
             },
           }),
         ],
-      },
-      {
-        file: `dist/umd/${outputName}.js`,
-        format: 'umd',
-        globals: {
-          dexie: 'Dexie',
-          yjs: 'Y',
-          lib0: 'lib0',
-        },
-        name: 'YDexie',
-        banner: readFileSync('tools/tmp/banner.txt', 'utf-8'),
-        sourcemap: true,
-        exports: 'named',
-      },
-      {
-        file: `dist/umd/${outputName}.min.js`,
-        format: 'umd',
-        globals: {
-          dexie: 'Dexie',
-          yjs: 'Y',
-          lib0: 'lib0',
-        },
-        name: 'YDexie',
-        banner: readFileSync('tools/tmp/banner.txt', 'utf-8'),
-        sourcemap: true,
-        exports: 'named',
-        plugins: [
-          terser({
-            compress: {
-              drop_console: true,
-              drop_debugger: true,
-            },
-            mangle: true,
-            sourceMap: true,
-            output: {
-              comments: false,
-            },
-          }),
-        ],
-      },
+      }
     ],
     external: ['dexie', 'yjs', 'lib0'],
     plugins: [

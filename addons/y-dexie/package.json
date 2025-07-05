@@ -3,29 +3,15 @@
   "version": "4.2.0-beta.1",
   "description": "Integration of Y.js with Dexie",
   "type": "module",
-  "module": "dist/modern/y-dexie.js",
-  "main": "dist/umd/y-dexie.js",
+  "module": "dist/y-dexie.js",
   "homepage": "https://dexie.org",
   "exports": {
     ".": {
-      "development": {
-        "import": "./dist/modern/y-dexie.js",
-        "require": "./dist/umd/y-dexie.js",
-        "default": "./dist/umd/y-dexie.js"
-      },
-      "production": {
-        "import": "./dist/modern/y-dexie.min.js",
-        "require": "./dist/umd/y-dexie.min.js",
-        "default": "./dist/umd/y-dexie.min.js"
-      },
-      "default": {
-        "import": "./dist/modern/y-dexie.js",
-        "require": "./dist/umd/y-dexie.js",
-        "default": "./dist/umd/y-dexie.js"
-      }
+      "import": "./dist/y-dexie.js",
+      "require": false
     }
   },
-  "types": "dist/modern/y-dexie.d.ts",
+  "types": "dist/y-dexie.d.ts",
   "engines": {
     "node": ">=18"
   },
@@ -73,8 +59,6 @@
     "terser": "^5.20.0",
     "tslib": "*",
     "typescript": "^5.8.3"
-  },
-  "dependencies": {
   },
   "peerDependencies": {
     "dexie": "workspace:>=4.2.0-beta.1 <5.0.0",
