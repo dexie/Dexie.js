@@ -4,28 +4,6 @@
 
 Dexie.js is a wrapper library for indexedDB - the standard database in the browser. https://dexie.org.
 
-
-```
- /$$   /$$                     /$$                   /$$     /$$                          
-| $$  | $$                    | $$                  | $$    | $$                          
-| $$  | $$  /$$$$$$   /$$$$$$$| $$   /$$  /$$$$$$  /$$$$$$  | $$$$$$$   /$$$$$$  /$$$$$$$ 
-| $$$$$$$$ |____  $$ /$$_____/| $$  /$$/ |____  $$|_  $$_/  | $$__  $$ /$$__  $$| $$__  $$
-| $$__  $$  /$$$$$$$| $$      | $$$$$$/   /$$$$$$$  | $$    | $$  \ $$| $$  \ $$| $$  \ $$
-| $$  | $$ /$$__  $$| $$      | $$_  $$  /$$__  $$  | $$ /$$| $$  | $$| $$  | $$| $$  | $$
-| $$  | $$|  $$$$$$$|  $$$$$$$| $$ \  $$|  $$$$$$$  |  $$$$/| $$  | $$|  $$$$$$/| $$  | $$
-|__/  |__/ \_______/ \_______/|__/  \__/ \_______/   \___/  |__/  |__/ \______/ |__/  |__/
-                                                    
-🌟 Welcome to Dexie Global Hackathon 25! 🌟
-📅 Date: February 14 --> April 13, 2025
-🕒 Start coding with Dexie Cloud and win prices!
-
-For more information: dexie.org/hackathon 
-
-Good luck! 🚀
-
-```
-[dexie.org/hackathon](https://dexie.org/hackathon/)
-
 #### Why Dexie.js?
 
 IndexedDB is the portable database for all browser engines. Dexie.js makes it fun and easy to work with.
@@ -36,47 +14,7 @@ But also:
 * Dexie.js works around bugs in the IndexedDB implementations, giving a more stable user experience.
 * It's an easy step to [make it sync](https://dexie.org/#sync).
 
-#### Hello World
-
-```html
-<!DOCTYPE html>
-<html>
-  <head>
-    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
-    <script>
-
-      //
-      // Declare Database
-      //
-      const db = new Dexie('FriendDatabase');
-      db.version(1).stores({
-        friends: '++id, age'
-      });
-
-      //
-      // Play with it
-      //
-      db.friends.add({ name: 'Alice', age: 21 }).then(() => {
-        return db.friends
-          .where('age')
-          .below(30)
-          .toArray();
-      }).then(youngFriends => {
-        alert (`My young friends: ${JSON.stringify(youngFriends)}`);
-      }).catch (e => {
-        alert(`Oops: ${e}`);
-      });
-
-    </script>
-  </head>
-</html>
-```
-
-Yes, it's that simple. Read [the docs](https://dexie.org/docs/) to get into the details.
-
-#### Hello World (for modern browsers)
-
-All modern browsers support ES modules and top-level awaits. No transpiler needed. Here's the previous example in a modern flavour:
+#### Hello World (vanilla JS)
 
 ```html
 <!DOCTYPE html>
@@ -109,6 +47,44 @@ All modern browsers support ES modules and top-level awaits. No transpiler neede
       } catch (e) {
         alert(`Oops: ${e}`);
       }
+    </script>
+  </head>
+</html>
+```
+
+Yes, it's that simple. Read [the docs](https://dexie.org/docs/) to get into the details.
+
+#### Hello World (legacy script tags)
+
+```html
+<!DOCTYPE html>
+<html>
+  <head>
+    <script src="https://unpkg.com/dexie/dist/dexie.js"></script>
+    <script>
+
+      //
+      // Declare Database
+      //
+      const db = new Dexie('FriendDatabase');
+      db.version(1).stores({
+        friends: '++id, age'
+      });
+
+      //
+      // Play with it
+      //
+      db.friends.add({ name: 'Alice', age: 21 }).then(() => {
+        return db.friends
+          .where('age')
+          .below(30)
+          .toArray();
+      }).then(youngFriends => {
+        alert (`My young friends: ${JSON.stringify(youngFriends)}`);
+      }).catch (e => {
+        alert(`Oops: ${e}`);
+      });
+
     </script>
   </head>
 </html>
