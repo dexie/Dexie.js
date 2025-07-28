@@ -1,6 +1,6 @@
 import type { Dexie } from 'dexie';
 import * as Y from 'yjs';
-import { YUpdateRow } from './YUpdateRow';
+import { YUpdateRow } from './types/YUpdateRow';
 import type { EntityTable } from 'dexie';
 import { throwIfDestroyed } from './docCache';
 import { liveQuery } from 'dexie';
