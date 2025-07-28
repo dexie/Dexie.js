@@ -49,7 +49,7 @@ export class DexieYProvider<YDoc extends YjsDoc = any>
   static getOrCreateDocument(db: Dexie, table: string, prop: string, id: any) {
     const docCache = getDocCache(db);
     const updatesTable = db.table(table).schema.yProps?.find(p => p.prop === prop)?.updatesTable;
-    return getOrCreateDocument(db, docCache, getYLibrary(db), table, prop, updatesTable, id);
+    return getOrCreateDocument(db, docCache, table, prop, updatesTable, id);
   }
 
   static load<YDoc extends YjsDoc>(doc: YDoc, options?: ReleaseOptions): DexieYProvider<YDoc> {

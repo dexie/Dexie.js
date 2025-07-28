@@ -1,16 +1,12 @@
-import type { Table } from '../public/types/table';
-import type { Dexie } from '../public/types/dexie';
-import type {
-  DexieYDocMeta,
-  YDocCache,
-  YjsLib,
-} from '../public/types/yjs-related';
+import type { Dexie } from 'dexie';
 import { destroyedDocs } from './docCache';
+import { YDocCache } from './types/YDocCache';
+import * as Y from 'yjs';
+import { DexieYDocMeta } from './types/DexieYDocMeta';
 
 export function getOrCreateDocument(
   db: Dexie,
   docCache: YDocCache,
-  Y: YjsLib,
   tableName: string,
   prop: string,
   updatesTable: string,

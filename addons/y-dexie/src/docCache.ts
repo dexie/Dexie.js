@@ -1,5 +1,7 @@
-import { Dexie } from '../public/types/dexie';
-import type { DexieYDocMeta, YjsDoc, YDocCache } from '../public/types/yjs-related';
+import { Dexie } from 'dexie';
+import * as Y from 'yjs';
+import { YDocCache } from './types/YDocCache';
+import { DexieYDocMeta } from './types/DexieYDocMeta';
 
 // The finalization registry
 const docRegistry = new FinalizationRegistry<{cache: any, key: string}>(({cache, key}) => {
@@ -9,16 +11,16 @@ const docRegistry = new FinalizationRegistry<{cache: any, key: string}>(({cache,
 // The Y.Doc cache containing all active documents
 export function getDocCache(db: Dexie): YDocCache {
   return db._novip['_docCache'] ??= {
-    cache: {} as { [key: string]: WeakRef<YjsDoc>; },
+    cache: {} as { [key: string]: WeakRef<Y.Doc>; },
     get size() {
       return Object.keys(this.cache).length;
     },
-    find(table: string, primaryKey: any, ydocProp: string): YjsDoc | undefined {
+    find(table: string, primaryKey: any, ydocProp: string): Y.Doc | undefined {
       const cacheKey = getYDocCacheKey(table, primaryKey, ydocProp);
       const docRef = this.cache[cacheKey];
       return docRef ? docRef.deref() : undefined;
     },
-    add(doc: YjsDoc): void {
+    add(doc: Y.Doc): void {
       const { parentTable, parentId, parentProp } = doc.meta as DexieYDocMeta;
       if (!parentTable || !parentProp || parentId == null)
         throw new Error(`Missing Dexie-related metadata in Y.Doc`);
@@ -30,7 +32,7 @@ export function getDocCache(db: Dexie): YDocCache {
       this.cache[cacheKey] = new WeakRef(doc);
       docRegistry.register(doc, { cache: this.cache, key: cacheKey }, doc);
     },
-    delete(doc: YjsDoc): void {
+    delete(doc: Y.Doc): void {
       docRegistry.unregister(doc); // Don't run garbage collection on this doc as it is being deleted here and now.
       const cacheKey = getYDocCacheKey(doc.meta.parentTable, doc.meta.parentId, doc.meta.parentProp);
       const cacheEntry = this.cache[cacheKey];

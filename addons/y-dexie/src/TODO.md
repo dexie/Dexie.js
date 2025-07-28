@@ -6,10 +6,10 @@ Files to go through:
 - [x] periodicGC.ts
 - [x] Remove getYLibrary.ts 
 - [x] compressYDocs.ts
-- [ ] createYDocProperty.ts
+- [x] docCache.ts
+- [x] getOrCreateDocument.ts
 - [ ] DexieYProvider.ts
-- [ ] docCache.ts
-- [ ] getOrCreateDocument.ts
+- [ ] createYDocProperty.ts
 - [ ] 
 
 Steps to do:

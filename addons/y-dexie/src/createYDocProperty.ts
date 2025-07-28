@@ -23,7 +23,6 @@ export function createYDocProperty(
       return getOrCreateDocument(
         db,
         docCache,
-        Y,
         table.name,
         prop,
         updatesTable,
