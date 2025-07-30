@@ -318,12 +318,12 @@ import * as Y from 'yjs';
     };
   }
 
-  const db = new Dexie('dbname', { Y }) as Dexie & {
+  const db = new Dexie('dbname') as Dexie & {
     todos: EntityTable<TodoItem, 'id'>;
   };
 
   db.version(1).stores({
-    todos: 'id, title, done, text:Y',
+    todos: 'id, title, done, text:Y.Doc',
   });
 
   db.todos.add({ title: 'Foo', done: 0, address: {} as TodoItem["address"] }); // Verify that Y.Doc prop is not allowed here

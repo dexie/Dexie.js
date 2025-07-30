@@ -19,9 +19,7 @@ import { workaroundForUndefinedPrimKey } from '../../functions/workaround-undefi
 import { Entity } from '../entity/Entity';
 import { UpdateSpec } from '../../public';
 import { cmp } from '../../functions/cmp';
-import { createYDocProperty } from '../../yjs/createYDocProperty';
 import { builtInDeletionTrigger } from './table-helpers';
-import { getYLibrary } from '../../yjs/getYLibrary';
 
 /** class Table
  * 
@@ -275,14 +273,6 @@ export class Table implements ITable<any, IndexableType> {
         get db () { return db; }
         table() { return tableName; }
       }
-    }
-    if (this.schema.yProps) {
-      const Y = getYLibrary(db);
-      class DBObjectWithYProps extends (constructor as any) {};
-      constructor = DBObjectWithYProps;
-      this.schema.yProps.forEach(({prop, updatesTable}) => {
-        Object.defineProperty(constructor.prototype, prop, createYDocProperty(db, Y, this, prop, updatesTable));
-      });
     }
     // Collect all inherited property names (including method names) by
     // walking the prototype chain. This is to avoid overwriting them from

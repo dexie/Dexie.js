@@ -9,11 +9,11 @@ import * as Y from 'yjs';
  * @param db Dexie
  * @returns
  */
-export function compressYDocs(db: Dexie, interval?: number) {
+export function compressYDocs(db: Dexie, skipIfRecentlyDoneMillisec?: number) {
   let p: Promise<any> = Promise.resolve();
   for (const table of db.tables) {
     for (const yProp of table.schema.yProps || []) {
-      p = p.then(() => compressYDocsTable(db, yProp, interval));
+      p = p.then(() => compressYDocsTable(db, yProp, skipIfRecentlyDoneMillisec));
     }
   }
   return p;

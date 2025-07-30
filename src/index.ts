@@ -31,5 +31,4 @@ export { Dexie, liveQuery }; // Comply with public/index.d.ts.
 export { Entity };
 export { cmp };
 export { PropModification, replacePrefix, add, remove };
-export { DexieYProvider } from './yjs/DexieYProvider';
 export default Dexie;

@@ -1,4 +1,5 @@
-import Dexie, { DexieYProvider } from 'dexie';
+import Dexie from 'dexie';
+import yDexie, { compressYDocs } from 'y-dexie';
 import { module, stop, start, equal, deepEqual, ok } from 'QUnit';
 import {
   resetDatabase,
@@ -7,9 +8,9 @@ import {
 import * as Y from 'yjs';
 import * as awareness from 'y-protocols/awareness';
 
-const db = new Dexie('TestYjs', { Y });
+const db = new Dexie('TestYjs', { addons: [yDexie] });
 db.version(1).stores({
-  docs: 'id, title, content:Y',
+  docs: 'id, title, content:Y.Doc',
 });
 
 module('yjs', {
@@ -109,7 +110,7 @@ promisedTest('Test Y document compression', async () => {
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 3, 'Three updates stored');
   // Run the GC:
   console.debug('Running GC', await db.table(updateTable).toArray());
-  await db.gc();
+  await compressYDocs(db);
   console.debug('After running GC', await db.table(updateTable).toArray());
   // Verify we have 1 (compressed) update:
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 1, 'One update stored after gc');
@@ -122,7 +123,7 @@ promisedTest('Test Y document compression', async () => {
   });
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 4, 'Four updates stored after additional inserts');
   console.debug('Running GC', await db.table(updateTable).toArray());
-  await db.gc();
+  await compressYDocs(db);
   console.debug('After running GC', await db.table(updateTable).toArray());
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 1, 'One update stored after gc');
   await db.docs.put({
@@ -139,7 +140,7 @@ promisedTest('Test Y document compression', async () => {
   });
   console.debug('After adding thigns to other doc', await db.table(updateTable).toArray());
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 4, 'Four updates stored after additional inserts on other doc');
-  await db.gc();
+  await compressYDocs(db);
   console.debug('After GC where we have 2 docs', await db.table(updateTable).toArray());
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 2, 'Two updates stored after gc (2 different docs)');
 

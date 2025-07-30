@@ -46,8 +46,6 @@ import { observabilityMiddleware } from '../../live-query/observability-middlewa
 import { cacheExistingValuesMiddleware } from '../../dbcore/cache-existing-values-middleware';
 import { cacheMiddleware } from "../../live-query/cache/cache-middleware";
 import { vipify } from "../../helpers/vipify";
-import { periodicGC } from "../../yjs/periodicGC";
-import { compressYDocs } from "../../yjs/compressYDocs";
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -146,7 +144,6 @@ export class Dexie implements IDexie {
       "blocked",
       "versionchange",
       "close",
-      "y",
       { ready: [promisableChain, nop] }
     ) as DbEvents;
     this.once = (event: any, callback: any) => {
@@ -255,8 +252,6 @@ export class Dexie implements IDexie {
       }
     });
     this.vip = vipDB;
-
-    if (options?.Y && options?.gc !== false) periodicGC(this);
 
     // Call each addon:
     addons.forEach(addon => addon(this));
@@ -503,9 +498,5 @@ export class Dexie implements IDexie {
     if (!hasOwn(this._allTables, tableName)) {
       throw new exceptions.InvalidTable(`Table ${tableName} does not exist`); }
     return this._allTables[tableName];
-  }
-
-  gc() {
-    return compressYDocs(this);
   }
 }

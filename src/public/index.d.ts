@@ -27,14 +27,11 @@ import { IntervalTree, RangeSetConstructor } from './types/rangeset';
 import { Dexie, TableProp } from './types/dexie';
 export type { TableProp };
 import { PropModification, PropModSpec } from './types/prop-modification';
-import { YjsDoc, YSyncState, YUpdateRow, YLastCompressed, DexieYDocMeta, YDocCache } from './types/yjs-related';
 export { PropModification, PropModSpec };
 export * from './types/entity';
 export * from './types/entity-table';
 export { UpdateSpec } from './types/update-spec';
 export * from './types/insert-type';
-export type { YSyncState, YUpdateRow, YLastCompressed, DexieYDocMeta };
-import { DexieYProvider } from '../yjs/DexieYProvider';
 
 // Alias of Table and Collection in order to be able to refer them from module below...
 interface _Table<T, TKey, TInsertType> extends Table<T, TKey, TInsertType> {}
@@ -79,7 +76,7 @@ export function remove(num: number | bigint | any[]): PropModification;
   currentUpdateRow: YUpdateRow | null;
 }*/
 
-export { RangeSet, DexieYProvider };
+export { RangeSet };
 
 /** Exporting 'Dexie' as the default export.
  **/

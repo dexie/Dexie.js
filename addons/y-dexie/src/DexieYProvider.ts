@@ -5,6 +5,7 @@ import { throwIfDestroyed, getDocCache, destroyedDocs } from './docCache';
 import { getOrCreateDocument } from './getOrCreateDocument';
 import { observeYDocUpdates } from './observeYDocUpdates';
 import { promisableChain } from './helpers/promisableChain';
+import { nonStoppableEventChain } from './helpers/nonStoppableEventChain';
 
 export const wm = new WeakMap<any, DexieYProvider>();
 
@@ -36,6 +37,7 @@ export class DexieYProvider
   destroyed = false;
 
   static on = (Dexie.Events as any)(null, {
+    new: [nonStoppableEventChain],
     beforeunload: [promisableChain],
   }) as DexieEventSet & ((name: string, f: (...args: any[]) => any) => void);
 
@@ -216,7 +218,7 @@ export class DexieYProvider
       updatesTable,
       parentId
     );
-    db.on.y.fire(this, Y); // Allow for addons to invoke their sync- and awareness providers here.
+    DexieYProvider.on("new").fire(this); // Allow for addons to invoke their sync- and awareness providers here.
   }
 
   destroy() {
