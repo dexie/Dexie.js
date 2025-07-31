@@ -23,6 +23,7 @@ jobs:
           - addons/Dexie.Observable/test
           - addons/Dexie.Syncable/test
           - addons/dexie-export-import/test
+          - addons/y-dexie/test
           - libs/dexie-react-hooks/test
       fail-fast: true # If one test fails, abort the rest of the tests
       max-parallel: 5 # At least for browserstack, this seems to be needed to avoid timeouts
