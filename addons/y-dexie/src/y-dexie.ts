@@ -2,6 +2,7 @@ import { DbSchema, Dexie, ExtendableVersion, IndexSpec, TableSchema } from 'dexi
 import { createYjsMiddleware } from './createYjsMiddleware';
 import { createYDocProperty } from './createYDocProperty';
 import { periodicGC } from './periodicGC';
+import { DexieYProvider } from './DexieYProvider';
 
 const YJS_MIDDLEWARE_NAME = 'yjsMiddleware';
 
