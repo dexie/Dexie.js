@@ -243,3 +243,5 @@ export class DexieYProvider
     );
   }
 }
+// @ts-ignore
+Dexie.DexieYProvider = DexieYProvider;

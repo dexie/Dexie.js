@@ -323,6 +323,13 @@ importers:
         version: 5.3.3
 
   libs/dexie-react-hooks:
+    optionalDependencies:
+      dexie:
+        specifier: workspace:4.2.0-beta.1
+        version: link:../..
+      y-dexie:
+        specifier: 4.2.0-alpha.1
+        version: 4.2.0-alpha.1(dexie@)(yjs@13.6.23)
     devDependencies:
       '@rollup/plugin-commonjs':
         specifier: ^17.1.0
@@ -342,9 +349,6 @@ importers:
       '@types/react-dom':
         specifier: ^17.0.0
         version: 17.0.17
-      dexie:
-        specifier: workspace:^
-        version: link:../..
       just-build:
         specifier: ^0.9.24
         version: 0.9.24
@@ -384,6 +388,9 @@ importers:
       webpack-cli:
         specifier: ^4.5.0
         version: 4.10.0(webpack@5.74.0)
+      yjs:
+        specifier: ^13.6.23
+        version: 13.6.23
 
   samples/dexie-cloud-todo-app:
     dependencies:
@@ -7982,6 +7989,13 @@ packages:
 
   xmlchars@2.2.0:
     resolution: {integrity: sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==}
+
+  y-dexie@4.2.0-alpha.1:
+    resolution: {integrity: sha512-YcO4/RCrJ67viP88DPx9z5gY0ykl7Yc7jysBS70v+3D4v+Lswklt3RnyCWRsX4eRhrEaJTh5GqacQhgRuy7Kcw==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      dexie: '>=4.2.0-beta.1 <5.0.0'
+      yjs: ^13.6
 
   y-protocols@1.0.6:
     resolution: {integrity: sha512-vHRF2L6iT3rwj1jub/K5tYcTT/mEYDUppgNPXwp8fmLpui9f7Yeq3OEtTLVF012j39QnV+KEQpNqoN7CWU7Y9Q==}
@@ -17505,6 +17519,12 @@ snapshots:
   xml-name-validator@3.0.0: {}
 
   xmlchars@2.2.0: {}
+
+  y-dexie@4.2.0-alpha.1(dexie@)(yjs@13.6.23):
+    dependencies:
+      dexie: 'link:'
+      yjs: 13.6.23
+    optional: true
 
   y-protocols@1.0.6(yjs@13.6.23):
     dependencies:
