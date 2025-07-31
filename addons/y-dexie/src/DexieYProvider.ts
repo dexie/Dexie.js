@@ -1,6 +1,5 @@
 import { Dexie, DexieEventSet, Unsubscribable } from 'dexie';
 import * as Y from 'yjs';
-import type { YUpdateRow } from './types/YUpdateRow';
 import { throwIfDestroyed, getDocCache, destroyedDocs } from './docCache';
 import { getOrCreateDocument } from './getOrCreateDocument';
 import { observeYDocUpdates } from './observeYDocUpdates';
@@ -243,5 +242,3 @@ export class DexieYProvider
     );
   }
 }
-// @ts-ignore
-Dexie.DexieYProvider = DexieYProvider;

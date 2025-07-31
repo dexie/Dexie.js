@@ -12,6 +12,9 @@ export interface YDexieOptions {
 export { compressYDocs } from './compressYDocs';
 export { DexieYProvider } from './DexieYProvider';
 
+// @ts-ignore
+Dexie.DexieYProvider = DexieYProvider;
+
 export default function yDexie(dbOrOptions: Dexie | YDexieOptions) {
   // This function is a placeholder for the y-dexie addon.
   // It can be used to initialize or configure the addon as needed.

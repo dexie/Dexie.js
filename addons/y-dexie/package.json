@@ -49,6 +49,7 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^11.1.5",
     "@types/node": "^18.11.18",
+    "dexie": "workspace:>=4.2.0-alpha.1 <5.0.0",
     "dreambase-library": "^1.0.26",
     "just-build": "*",
     "karma": "*",
@@ -61,10 +62,10 @@
     "tslib": "*",
     "typescript": "^5.8.3",
     "y-protocols": "^1.0.6",
-    "yjs": "^13.6.23"
+    "yjs": "^13.6"
   },
   "peerDependencies": {
-    "dexie": "workspace:>=4.2.0-beta.1 <5.0.0",
+    "dexie": "workspace:>=4.2.0-alpha.1 <5.0.0",
     "yjs": "^13.6"
   }
 }

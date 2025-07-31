@@ -1,13 +1,11 @@
 import * as Dexie from 'dexie';
 import React from 'react';
 
-/**
- * Hook to manage a Yjs document using DexieYProvider.
- * It uses FinalizationRegistry to clean up the provider when the component unmounts or when
- * the document changes.
- */
-
 // Using import('y-dexie') and import('yjs') to not break the build if y-dexie or yjs are not installed.
+// (these two libries are truly optional and not listed in neither peerDependencies nor optionalDependencies)
+// We want the compiler to not complain about missing imports, so we use type imports.
+// Runtime, we will detect if y-dexie is available and use it via Dexie['DexieYProvider'].
+
 type DexieYProvider = import('y-dexie').DexieYProvider;
 type DexieYProviderConstructor = typeof import('y-dexie').DexieYProvider;
 type YDoc = import('yjs').Doc;
@@ -27,7 +25,7 @@ export function useDocument(
   const providerRef = React.useRef<DexieYProvider | null>(null);
   const DexieYProvider = Dexie['DexieYProvider'] as DexieYProviderConstructor;
   if (!DexieYProvider) {
-    throw new Error('DexieYProvider is not available. Make sure y-dexie is installed and imported.');
+    throw new Error('DexieYProvider is not available. Make sure `y-dexie` is installed and imported.');
   }
   let unregisterToken: object | undefined = undefined;
   if (doc) {
