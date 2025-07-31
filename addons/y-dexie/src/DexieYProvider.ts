@@ -1,4 +1,4 @@
-import { Dexie, DexieEventSet, Unsubscribable } from 'dexie';
+import { Dexie, DexieEvent, DexieEventSet, Unsubscribable } from 'dexie';
 import * as Y from 'yjs';
 import { throwIfDestroyed, getDocCache, destroyedDocs } from './docCache';
 import { getOrCreateDocument } from './getOrCreateDocument';
@@ -39,7 +39,10 @@ export class DexieYProvider
   static on = (Dexie.Events as any)(null, {
     new: [nonStoppableEventChain],
     beforeunload: [promisableChain],
-  }) as DexieEventSet & ((name: string, f: (...args: any[]) => any) => void);
+  }) as DexieEventSet & ((name: string, f: (...args: any[]) => any) => void) & {
+    new: DexieEvent;
+    beforeunload: DexieEvent;
+  };
 
   static getOrCreateDocument(db: Dexie, table: string, prop: string, id: any) {
     const docCache = getDocCache(db);

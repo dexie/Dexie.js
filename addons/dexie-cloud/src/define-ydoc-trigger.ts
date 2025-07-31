@@ -1,13 +1,11 @@
 import Dexie, {
-  DexieYProvider,
   RangeSet,
-  type YjsLib,
-  type YUpdateRow,
   type DBCore,
   type Middleware,
   type Table,
-  type YjsDoc,
 } from 'dexie';
+import { DexieYProvider, YUpdateRow } from 'y-dexie';
+import type { Doc as YjsDoc } from 'yjs';
 
 const ydocTriggers: {
   [ydocTable: string]: {

@@ -62,10 +62,10 @@
     "tslib": "*",
     "typescript": "^5.8.3",
     "y-protocols": "^1.0.6",
-    "yjs": "^13.6"
+    "yjs": "^13.6.27"
   },
   "peerDependencies": {
     "dexie": "workspace:>=4.2.0-alpha.1 <5.0.0",
-    "yjs": "^13.6"
+    "yjs": "^13.6.27"
   }
 }

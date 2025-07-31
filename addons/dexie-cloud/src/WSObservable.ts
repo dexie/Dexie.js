@@ -7,7 +7,7 @@ import type { YClientMessage, YServerMessage } from 'dexie-cloud-common';
 import { DexieCloudDB } from './db/DexieCloudDB';
 import { createYClientUpdateObservable } from './yjs/createYClientUpdateObservable';
 import { applyYServerMessages } from './yjs/applyYMessages';
-import { DexieYProvider, Table, YSyncState } from 'dexie';
+import { Table } from 'dexie';
 import { getAwarenessLibrary, getDocAwareness } from './yjs/awareness';
 import { encodeYMessage, decodeYMessage } from 'dexie-cloud-common';
 import { UserLogin } from './dexie-cloud-client';
@@ -15,6 +15,7 @@ import { isEagerSyncDisabled } from './isEagerSyncDisabled';
 import { getOpenDocSignal } from './yjs/reopenDocSignal';
 import { getUpdatesTable } from './yjs/getUpdatesTable';
 import { DEXIE_CLOUD_SYNCER_ID } from './sync/DEXIE_CLOUD_SYNCER_ID';
+import { DexieYProvider, YSyncState } from 'y-dexie';
 
 const SERVER_PING_TIMEOUT = 20000;
 const CLIENT_PING_INTERVAL = 30000;

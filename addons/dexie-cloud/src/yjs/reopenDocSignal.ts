@@ -1,6 +1,5 @@
-import { YjsDoc } from "dexie";
 import { Subject } from "rxjs";
-
+import { Doc as YjsDoc } from "yjs";
 
 const wm = new WeakMap<YjsDoc, Subject<void>>();
 

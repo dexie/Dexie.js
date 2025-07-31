@@ -11,6 +11,8 @@ export interface YDexieOptions {
 
 export { compressYDocs } from './compressYDocs';
 export { DexieYProvider } from './DexieYProvider';
+export * from './types';
+
 
 // @ts-ignore
 Dexie.DexieYProvider = DexieYProvider;

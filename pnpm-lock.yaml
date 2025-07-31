@@ -84,8 +84,8 @@ importers:
         specifier: ^3.9.2
         version: 3.14.2
       yjs:
-        specifier: ^13.6.23
-        version: 13.6.23
+        specifier: ^13.6.27
+        version: 13.6.27
 
   addons/Dexie.Observable:
     devDependencies:
@@ -146,6 +146,15 @@ importers:
       rxjs:
         specifier: ^7.x
         version: 7.5.6
+      y-dexie:
+        specifier: workspace:^
+        version: link:../y-dexie
+      y-protocols:
+        specifier: ^1.0.6
+        version: 1.0.6(yjs@13.6.27)
+      yjs:
+        specifier: ^13.6.27
+        version: 13.6.27
     devDependencies:
       '@rollup/plugin-commonjs':
         specifier: ^25.0.7
@@ -294,10 +303,10 @@ importers:
         version: 5.8.3
       y-protocols:
         specifier: ^1.0.6
-        version: 1.0.6(yjs@13.6.23)
+        version: 1.0.6(yjs@13.6.27)
       yjs:
-        specifier: ^13.6
-        version: 13.6.23
+        specifier: ^13.6.27
+        version: 13.6.27
 
   libs/dexie-cloud-common:
     dependencies:
@@ -387,8 +396,8 @@ importers:
         specifier: workspace:>=4.2.0-alpha.1 <5.0.0
         version: link:../../addons/y-dexie
       yjs:
-        specifier: ^13.6.23
-        version: 13.6.23
+        specifier: ^13.6.27
+        version: 13.6.27
 
   samples/dexie-cloud-todo-app:
     dependencies:
@@ -8028,8 +8037,8 @@ packages:
     resolution: {integrity: sha512-7dSzzRQ++CKnNI/krKnYRV7JKKPUXMEh61soaHKg9mrWEhzFWhFnxPxGl+69cD1Ou63C13NUPCnmIcrvqCuM6w==}
     engines: {node: '>=12'}
 
-  yjs@13.6.23:
-    resolution: {integrity: sha512-ExtnT5WIOVpkL56bhLeisG/N5c4fmzKn4k0ROVfJa5TY2QHbH7F0Wu2T5ZhR7ErsFWQEFafyrnSI8TPKVF9Few==}
+  yjs@13.6.27:
+    resolution: {integrity: sha512-OIDwaflOaq4wC6YlPBy2L6ceKeKuF7DeTxx+jPzv1FHn9tCZ0ZwSRnUBxD05E3yed46fv/FWJbvR+Ud7x0L7zw==}
     engines: {node: '>=16.0.0', npm: '>=8.0.0'}
 
   yocto-queue@0.1.0:
@@ -17401,10 +17410,10 @@ snapshots:
 
   xmlchars@2.2.0: {}
 
-  y-protocols@1.0.6(yjs@13.6.23):
+  y-protocols@1.0.6(yjs@13.6.27):
     dependencies:
       lib0: 0.2.99
-      yjs: 13.6.23
+      yjs: 13.6.27
 
   y18n@5.0.8: {}
 
@@ -17440,7 +17449,7 @@ snapshots:
       y18n: 5.0.8
       yargs-parser: 21.1.1
 
-  yjs@13.6.23:
+  yjs@13.6.27:
     dependencies:
       lib0: 0.2.99
 

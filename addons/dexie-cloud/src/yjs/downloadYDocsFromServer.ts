@@ -16,7 +16,8 @@ import {
   hasContent,
 } from 'lib0/decoding';
 import { getUpdatesTable } from './getUpdatesTable';
-import Dexie, { InsertType, YUpdateRow } from 'dexie';
+import Dexie, { InsertType } from 'dexie';
+import type { YUpdateRow } from 'y-dexie';
 
 const BINSTREAM_TYPE_REALMID = 1;
 const BINSTREAM_TYPE_TABLE_AND_PROP = 2;

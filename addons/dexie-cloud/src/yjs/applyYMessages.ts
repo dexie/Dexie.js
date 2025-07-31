@@ -1,8 +1,9 @@
-import { cmp, DexieYProvider, InsertType, YSyncState, YUpdateRow } from 'dexie';
+import { cmp, InsertType } from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { YServerMessage } from 'dexie-cloud-common';
 import { DEXIE_CLOUD_SYNCER_ID } from '../sync/DEXIE_CLOUD_SYNCER_ID';
 import { getUpdatesTable } from './getUpdatesTable';
+import { DexieYProvider, YSyncState, YUpdateRow } from 'y-dexie';
 
 export async function applyYServerMessages(
   yMessages: YServerMessage[],
@@ -91,7 +92,7 @@ export async function applyYServerMessages(
             m.prop
           );
           if (doc && !doc.isSynced) {
-            doc.emit('sync', [true]);
+            doc.emit('sync', [true, doc]);
           }
           break;
         }

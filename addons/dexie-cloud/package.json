@@ -89,11 +89,15 @@
     "rollup": "^4.1.4",
     "terser": "^5.20.0",
     "tslib": "*",
-    "typescript": "^5.6.3"
+    "typescript": "^5.6.3",
+    "y-dexie": "workspace:>=4.2.0-alpha.1 <5.0.0"
   },
   "dependencies": {
     "dexie-cloud-common": "workspace:^",
-    "rxjs": "^7.x"
+    "y-dexie": "workspace:^",
+    "rxjs": "^7.x",
+    "yjs": "^13.6.27",
+    "y-protocols": "^1.0.6"
   },
   "peerDependencies": {
     "dexie": "workspace:^"

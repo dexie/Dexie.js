@@ -49,6 +49,7 @@ import { logout, _logout } from './authentication/logout';
 import { loadAccessToken } from './authentication/authenticate';
 import { isEagerSyncDisabled } from './isEagerSyncDisabled';
 import { createYHandler } from "./yjs/createYHandler";
+import { DexieYProvider } from 'y-dexie';
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 export {
@@ -393,9 +394,9 @@ export function dexieCloud(dexie: Dexie) {
       ]));
 
       const yHandler = createYHandler(db);
-      db.dx.on('y', yHandler);
+      DexieYProvider.on.new.subscribe(yHandler);
       db.dx.once('close', () => {
-        db.dx.on.y?.unsubscribe(yHandler);
+        DexieYProvider.on.new.unsubscribe(yHandler);
       });
     }
 
@@ -503,7 +504,5 @@ export function dexieCloud(dexie: Dexie) {
 dexieCloud.version = __VERSION__;
 
 Dexie.Cloud = dexieCloud;
-
-//Dexie.addons.push(dexieCloud);
 
 export default dexieCloud;
