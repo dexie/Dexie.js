@@ -83,6 +83,9 @@ importers:
       uglify-js:
         specifier: ^3.9.2
         version: 3.14.2
+      yjs:
+        specifier: ^13.6.23
+        version: 13.6.23
 
   addons/Dexie.Observable:
     devDependencies:
@@ -294,7 +297,7 @@ importers:
         specifier: ^1.0.6
         version: 1.0.6(yjs@13.6.23)
       yjs:
-        specifier: ^13.6
+        specifier: ^13.6.23
         version: 13.6.23
 
   libs/dexie-cloud-common:
