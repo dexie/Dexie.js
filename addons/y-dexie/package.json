@@ -54,11 +54,12 @@
     "karma-firefox-launcher": "*",
     "karma-qunit": "*",
     "lib0": "^0.2.97",
-    "yjs": "^13.6",
     "rollup": "^4.1.4",
     "terser": "^5.20.0",
     "tslib": "*",
-    "typescript": "^5.8.3"
+    "typescript": "^5.8.3",
+    "y-protocols": "^1.0.6",
+    "yjs": "^13.6"
   },
   "peerDependencies": {
     "dexie": "workspace:>=4.2.0-beta.1 <5.0.0",

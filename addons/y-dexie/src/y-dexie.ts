@@ -10,6 +10,7 @@ export interface YDexieOptions {
 }
 
 export { compressYDocs } from './compressYDocs';
+export { DexieYProvider } from './DexieYProvider';
 
 export default function yDexie(dbOrOptions: Dexie | YDexieOptions) {
   // This function is a placeholder for the y-dexie addon.
@@ -60,7 +61,7 @@ function configurableYDexie(db: Dexie, options: YDexieOptions) {
       if (yProps.length > 0) {
         tableSchema.yProps = yProps.map((idx) => ({
           prop: idx.name,
-          updatesTable: `${name}_updates`,
+          updatesTable: `$${name}.${idx.name}_updates`,
         }));
       }
       return tableSchema;

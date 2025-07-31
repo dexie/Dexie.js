@@ -6,6 +6,7 @@ import { getOrCreateDocument } from './getOrCreateDocument';
 import { observeYDocUpdates } from './observeYDocUpdates';
 import { promisableChain } from './helpers/promisableChain';
 import { nonStoppableEventChain } from './helpers/nonStoppableEventChain';
+import { currentUpdateRow } from './currentUpdateRow';
 
 export const wm = new WeakMap<any, DexieYProvider>();
 
@@ -130,7 +131,9 @@ export class DexieYProvider
     return wm.get(doc);
   }
   static getDocCache = getDocCache;
-  static currentUpdateRow: YUpdateRow | null = null;
+  static get currentUpdateRow() {
+    return currentUpdateRow;
+  }
 
   // Use a getter to avoid unhandled rejections when no one bothers about it.
   get whenLoaded(): Promise<void> {

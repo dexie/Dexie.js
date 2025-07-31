@@ -67,14 +67,6 @@ export function cmp(a: any, b: any): number;
 export function replacePrefix(a: string, b: string): PropModification;
 export function add(num: number | bigint | any[]): PropModification;
 export function remove(num: number | bigint | any[]): PropModification;
-/*declare var DexieYProvider: {
-  (doc: YjsDoc): DexieYProvider;
-  new (doc: YjsDoc): DexieYProvider;
-  new (doc: YjsDoc, takeDocOwnership: boolean): DexieYProvider;
-  getDocCache: (db: Dexie) => YDocCache;
-  docToProviderWeakMap: WeakMap<YjsDoc, DexieYProvider>;
-  currentUpdateRow: YUpdateRow | null;
-}*/
 
 export { RangeSet };
 

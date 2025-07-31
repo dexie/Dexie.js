@@ -5,7 +5,8 @@ import type { EntityTable } from 'dexie';
 import { throwIfDestroyed } from './docCache';
 import { liveQuery } from 'dexie';
 import { cmp } from 'dexie';
-import { DexieYProvider } from './DexieYProvider';
+import { setCurrentUpdateRow } from './currentUpdateRow';
+import type { DexieYProvider } from './DexieYProvider';
 
 export function observeYDocUpdates(
   provider: DexieYProvider,
@@ -53,10 +54,10 @@ export function observeYDocUpdates(
           () => {
             updates.forEach((update) => {
               try {
-                DexieYProvider.currentUpdateRow = update;
+                setCurrentUpdateRow(update);
                 Y.applyUpdateV2(doc, update.u);
               } finally {
-                DexieYProvider.currentUpdateRow = null;
+                setCurrentUpdateRow(null);
               }
             });
           },

@@ -140,8 +140,6 @@
     "terser": "^5.3.1",
     "tslib": "^2.1.0",
     "typescript": "^5.6.3",
-    "uglify-js": "^3.9.2",
-    "y-protocols": "^1.0.6",
-    "yjs": "^13.6.23"
+    "uglify-js": "^3.9.2"
   }
 }
