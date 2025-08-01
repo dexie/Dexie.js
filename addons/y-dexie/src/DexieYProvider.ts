@@ -7,7 +7,7 @@ import { promisableChain } from './helpers/promisableChain';
 import { nonStoppableEventChain } from './helpers/nonStoppableEventChain';
 import { currentUpdateRow } from './currentUpdateRow';
 
-export const wm = new WeakMap<any, DexieYProvider>();
+const wm = new WeakMap<any, DexieYProvider>();
 
 function createEvents() {
   return (Dexie.Events as any)(null, 'load', 'sync', 'error') as DexieYProvider['on'];
@@ -17,7 +17,7 @@ interface ReleaseOptions {
   gracePeriod?: number; // Grace period to optimize for unload/reload scenarios
 }
 
-export class DexieYProvider
+class DexieYProvider
 {
   refCount = 1;
   private stopObserving: () => void;
@@ -245,3 +245,17 @@ export class DexieYProvider
     );
   }
 }
+
+//
+// Eliminate dual package hazard 
+//
+// Since we're holding static state, make sure to singletonize DexieYProvider
+//
+if (Dexie["DexieYProvider"]) {
+  // @ts-ignore
+  DexieYProvider = Dexie["DexieYProvider"] || DexieYProvider;
+} else {
+  Dexie["DexieYProvider"] = DexieYProvider;
+}
+
+export { DexieYProvider };

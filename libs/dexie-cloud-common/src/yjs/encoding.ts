@@ -6,7 +6,7 @@ import {
   writeAny,
   toUint8Array,
   writeVarUint8Array,
-} from 'lib0/encoding.js';
+} from 'lib0/encoding';
 
 export function encodeYMessage(msg: YMessage): Uint8Array {
   const encoder = new Encoder();

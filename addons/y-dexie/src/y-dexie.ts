@@ -2,7 +2,6 @@ import { DbSchema, Dexie, ExtendableVersion, IndexSpec, TableSchema } from 'dexi
 import { createYjsMiddleware } from './createYjsMiddleware';
 import { createYDocProperty } from './createYDocProperty';
 import { periodicGC } from './periodicGC';
-import { DexieYProvider } from './DexieYProvider';
 
 const YJS_MIDDLEWARE_NAME = 'yjsMiddleware';
 
@@ -13,10 +12,6 @@ export interface YDexieOptions {
 export { compressYDocs } from './compressYDocs';
 export { DexieYProvider } from './DexieYProvider';
 export * from './types';
-
-
-// @ts-ignore
-Dexie.DexieYProvider = DexieYProvider;
 
 export default function yDexie(dbOrOptions: Dexie | YDexieOptions) {
   // This function is a placeholder for the y-dexie addon.
