@@ -1,6 +1,6 @@
 {
   "name": "dexie-react-hooks",
-  "version": "4.1.0-beta.47",
+  "version": "4.2.0-alpha.1",
   "description": "React hooks for reactive data fetching using Dexie.js",
   "main": "dist/dexie-react-hooks.js",
   "typings": "dist/dexie-react-hooks.d.ts",
