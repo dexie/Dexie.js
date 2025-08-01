@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "4.2.0-alpha.6",
+  "version": "4.2.0-alpha.7",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "type": "module",
   "module": "dist/modern/dexie-cloud-addon.min.js",
@@ -9,36 +9,42 @@
     ".": {
       "development": {
         "import": "./dist/modern/dexie-cloud-addon.js",
-        "require": false
+        "require": false,
+        "types": "./dist/modern/dexie-cloud-addon.d.ts"
       },
       "production": {
         "import": "./dist/modern/dexie-cloud-addon.min.js",
-        "require": false
+        "require": false,
+        "types": "./dist/modern/dexie-cloud-addon.d.ts"
       },
       "default": {
         "import": "./dist/modern/dexie-cloud-addon.min.js",
-        "require": false
+        "require": false,
+        "types": "./dist/modern/dexie-cloud-addon.d.ts"
       }
     },
     "./service-worker": {
       "development": {
         "import": "./dist/modern/service-worker.js",
         "require": "./dist/umd/service-worker.js",
-        "default": "./dist/umd/service-worker.js"
+        "default": "./dist/umd/service-worker.js",
+         "types": "./dist/modern/service-worker.d.ts"
       },
       "production": {
         "import": "./dist/modern/service-worker.min.js",
         "require": "./dist/umd/service-worker.min.js",
-        "default": "./dist/umd/service-worker.min.js"
+        "default": "./dist/umd/service-worker.min.js",
+        "types": "./dist/modern/service-worker.d.ts"
       },
       "default": {
         "import": "./dist/modern/service-worker.min.js",
         "require": "./dist/umd/service-worker.min.js",
-        "default": "./dist/umd/service-worker.min.js"
+        "default": "./dist/umd/service-worker.min.js",
+        "types": "./dist/modern/service-worker.d.ts"
       }
     }
   },
-  "types": "dist/modern/dexie-cloud-client.d.ts",
+  "types": "dist/modern/dexie-cloud-addon.d.ts",
   "engines": {
     "node": ">=14"
   },
