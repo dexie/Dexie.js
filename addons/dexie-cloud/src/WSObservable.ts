@@ -8,7 +8,8 @@ import { DexieCloudDB } from './db/DexieCloudDB';
 import { createYClientUpdateObservable } from './yjs/createYClientUpdateObservable';
 import { applyYServerMessages } from './yjs/applyYMessages';
 import { Table } from 'dexie';
-import { getAwarenessLibrary, getDocAwareness } from './yjs/awareness';
+import { getDocAwareness } from './yjs/awareness';
+import * as awap from 'y-protocols/awareness';
 import { encodeYMessage, decodeYMessage } from 'dexie-cloud-common';
 import { UserLogin } from './dexie-cloud-client';
 import { isEagerSyncDisabled } from './isEagerSyncDisabled';
@@ -325,7 +326,6 @@ export class WSConnection extends Subscription {
           if (doc) {
             const awareness = getDocAwareness(doc);
             if (awareness) {
-              const awap = getAwarenessLibrary(this.db);
               awap.applyAwarenessUpdate(
                 awareness,
                 msg.u,

@@ -1,6 +1,7 @@
 import { cmp, Table } from 'dexie';
 import type { DexieCloudDB } from '../db/DexieCloudDB';
-import { getAwarenessLibrary, awarenessWeakMap } from './awareness';
+import { awarenessWeakMap } from './awareness';
+import * as awap from 'y-protocols/awareness';
 import { DEXIE_CLOUD_SYNCER_ID } from '../sync/DEXIE_CLOUD_SYNCER_ID';
 import * as Y from 'yjs';
 import { combineLatest, startWith } from 'rxjs';
@@ -41,7 +42,6 @@ function createAwareness(
 ) {
   const { parentTable, parentId, parentProp, updatesTable } =
     doc.meta as DexieYDocMeta;
-  const awap = getAwarenessLibrary(db);
   const awareness = new awap.Awareness(doc);
   const reopenDocSignal = getOpenDocSignal(doc);
 

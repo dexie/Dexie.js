@@ -96,7 +96,7 @@ export function createRollupConfigs(entry, outputName) {
         },
       ],
       plugins: COMMON_PLUGINS,
-      external: ['dexie', 'rxjs', 'rxjs/operators', 'y-dexie', 'lib0', 'lib0/encoding', 'lib0/decoding', 'yjs'],
+      external: ['dexie', 'rxjs', 'rxjs/operators', 'y-dexie', 'lib0', 'lib0/encoding', 'lib0/decoding', 'yjs', 'y-protocols/awareness'],
     },
 
     //
