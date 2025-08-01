@@ -6,6 +6,7 @@ import { observeYDocUpdates } from './observeYDocUpdates';
 import { promisableChain } from './helpers/promisableChain';
 import { nonStoppableEventChain } from './helpers/nonStoppableEventChain';
 import { currentUpdateRow } from './currentUpdateRow';
+import { Disposable } from './helpers/Disposable';
 
 const wm = new WeakMap<any, DexieYProvider>();
 
@@ -245,6 +246,13 @@ class DexieYProvider
     );
   }
 }
+
+//
+// Support `using DexieYProvider.load();` syntax
+//
+// Extend DexieYProvider with Disposable interface if Symbol.dispose is supported.
+// (At runtime, this[Symbol.dispose] is created in the constructor, so we indeed implement Disposable interface)
+interface DexieYProvider extends Disposable {}
 
 //
 // Eliminate dual package hazard 
