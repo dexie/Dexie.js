@@ -1,4 +1,4 @@
-import Dexie from 'dexie';
+import { Dexie } from 'dexie';
 import { useObservable } from './useObservable';
 
 export function useLiveQuery<T>(

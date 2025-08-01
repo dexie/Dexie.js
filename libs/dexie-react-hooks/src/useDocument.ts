@@ -1,4 +1,4 @@
-import * as Dexie from 'dexie';
+import { Dexie } from 'dexie';
 import React from 'react';
 
 // Using import('y-dexie') and import('yjs') to not break the build if y-dexie or yjs are not installed.
