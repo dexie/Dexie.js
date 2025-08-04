@@ -441,14 +441,14 @@ importers:
         specifier: 5.3.0
         version: 5.3.0(@popperjs/core@2.11.8)
       dexie:
-        specifier: ^4.0.11
-        version: 4.0.11
+        specifier: '>=4.2.0-alpha.1 <5.0.0'
+        version: 4.2.0-alpha.1
       dexie-cloud-addon:
-        specifier: ^4.0.11
-        version: 4.0.11(dexie@4.0.11)
+        specifier: '>=4.2.0-alpha.1 <5.0.0'
+        version: 4.2.0-alpha.7(dexie@4.2.0-alpha.1)
       dexie-react-hooks:
-        specifier: ^1.1.7
-        version: 1.1.7(@types/react@18.2.8)(dexie@4.0.11)(react@17.0.2)
+        specifier: '>=4.2.0-alpha.1 <5.0.0'
+        version: 4.2.0-alpha.2(@types/react@18.2.8)(dexie@4.2.0-alpha.1)(react@17.0.2)
       postcss-flexbugs-fixes:
         specifier: ^5.0.2
         version: 5.0.2(postcss@8.4.24)
@@ -3539,24 +3539,24 @@ packages:
     engines: {node: '>= 4.2.1'}
     hasBin: true
 
-  dexie-cloud-addon@4.0.11:
-    resolution: {integrity: sha512-CkszT8Eg8Nk2GV6rDRpoimH/Kb8an8LY9eU2QA20m8CVlmtuKjetIrxoBlA0lNRaUXP5r+6O69AUwne4NldhrA==}
+  dexie-cloud-addon@4.2.0-alpha.7:
+    resolution: {integrity: sha512-tf7HizqF+qcvdugTdvzv4Q5N7xG2e796LZbfgMhH4jIcUv3ew5pSTo8Uf3yF8XnhByXbs8nlXgmUtsxZ5XPJcQ==}
     engines: {node: '>=14'}
     peerDependencies:
-      dexie: ^4.0.11
+      dexie: ^4.2.0-alpha.1
 
-  dexie-cloud-common@1.0.36:
-    resolution: {integrity: sha512-kwk67RkSh1++16U7bLS/Sd9CIoW1P+upGgA+VKStKfoM/z0gbt7bR6gy4pJxlzo5fPMW+qgm92WHPMA1ygcHXQ==}
+  dexie-cloud-common@1.0.52:
+    resolution: {integrity: sha512-6ZSGZ4eYdWXfXnMvabvLySOlGl1s0UIt4B8V0j51aHvwUfEfcefJuBj41u51iTht7emIHjHNrz8GJmiean+3cQ==}
 
-  dexie-react-hooks@1.1.7:
-    resolution: {integrity: sha512-Lwv5W0Hk+uOW3kGnsU9GZoR1er1B7WQ5DSdonoNG+focTNeJbHW6vi6nBoX534VKI3/uwHebYzSw1fwY6a7mTw==}
+  dexie-react-hooks@4.2.0-alpha.2:
+    resolution: {integrity: sha512-xrCQv2S6L9NSBgBmJWIvakl0QSayCgJpriLW3AnxTDkrAAanjTqpUbF/cJy5sl9YerlYa1PAK8IuNyqyqgHQjQ==}
     peerDependencies:
       '@types/react': '>=16'
-      dexie: ^3.2 || ^4.0.1-alpha
+      dexie: '>=4.2.0-alpha.1 <5.0.0'
       react: '>=16'
 
-  dexie@4.0.11:
-    resolution: {integrity: sha512-SOKO002EqlvBYYKQSew3iymBoN2EQ4BDw/3yprjh7kAfFzjBYkaMNa/pZvcA7HSWlcKSQb9XhPe3wKyQ0x4A8A==}
+  dexie@4.2.0-alpha.1:
+    resolution: {integrity: sha512-oPyQYFArYv7cQOi9PJS3/T2BLh85nnbUCrbwHWc1yAVRx54QgipT5Nl4nTBbIVXSSJOXatGnyVScYSNIPsWP4A==}
 
   di@0.0.1:
     resolution: {integrity: sha512-uJaamHkagcZtHPqCIHZxnFrXlunQXgBOsZSUOWwFw31QJCAbyTBoHMW75YOTur5ZNx8pIeAKgf6GWIgaqqiLhA==}
@@ -7997,6 +7997,13 @@ packages:
   xmlchars@2.2.0:
     resolution: {integrity: sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==}
 
+  y-dexie@4.2.0-alpha.6:
+    resolution: {integrity: sha512-nRn+7PqUPS7ru4KKZ+BDi4mUE8Mp0/bRGVAv4idGvIFTFf6Hgkzkkb2cEY04ENofJPMYeCZKh3ucjlgA8o45VQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      dexie: '>=4.2.0-alpha.1 <5.0.0'
+      yjs: ^13.6.27
+
   y-protocols@1.0.6:
     resolution: {integrity: sha512-vHRF2L6iT3rwj1jub/K5tYcTT/mEYDUppgNPXwp8fmLpui9f7Yeq3OEtTLVF012j39QnV+KEQpNqoN7CWU7Y9Q==}
     engines: {node: '>=16.0.0', npm: '>=8.0.0'}
@@ -11750,21 +11757,26 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  dexie-cloud-addon@4.0.11(dexie@4.0.11):
+  dexie-cloud-addon@4.2.0-alpha.7(dexie@4.2.0-alpha.1):
     dependencies:
-      dexie: 4.0.11
-      dexie-cloud-common: 1.0.36
+      dexie: 4.2.0-alpha.1
+      dexie-cloud-common: 1.0.52
       rxjs: 7.5.6
+      y-dexie: 4.2.0-alpha.6(dexie@4.2.0-alpha.1)(yjs@13.6.27)
+      y-protocols: 1.0.6(yjs@13.6.27)
+      yjs: 13.6.27
 
-  dexie-cloud-common@1.0.36: {}
+  dexie-cloud-common@1.0.52:
+    dependencies:
+      lib0: 0.2.99
 
-  dexie-react-hooks@1.1.7(@types/react@18.2.8)(dexie@4.0.11)(react@17.0.2):
+  dexie-react-hooks@4.2.0-alpha.2(@types/react@18.2.8)(dexie@4.2.0-alpha.1)(react@17.0.2):
     dependencies:
       '@types/react': 18.2.8
-      dexie: 4.0.11
+      dexie: 4.2.0-alpha.1
       react: 17.0.2
 
-  dexie@4.0.11: {}
+  dexie@4.2.0-alpha.1: {}
 
   di@0.0.1: {}
 
@@ -17409,6 +17421,11 @@ snapshots:
   xml-name-validator@3.0.0: {}
 
   xmlchars@2.2.0: {}
+
+  y-dexie@4.2.0-alpha.6(dexie@4.2.0-alpha.1)(yjs@13.6.27):
+    dependencies:
+      dexie: 4.2.0-alpha.1
+      yjs: 13.6.27
 
   y-protocols@1.0.6(yjs@13.6.27):
     dependencies:
