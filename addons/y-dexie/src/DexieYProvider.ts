@@ -1,38 +1,31 @@
-import { exceptions } from '../errors';
-import { nop, promisableChain } from '../functions/chaining-functions';
-import Events from '../helpers/Events';
-import type Dexie from '../public';
-import { DexieEventSet } from '../public/types/dexie-event-set';
-import { Unsubscribable } from '../public/types/observable';
-import type {
-  YjsDoc,
-  YUpdateRow,
-  DexieYProvider as IDexieYProvider,
-} from '../public/types/yjs-related';
+import { Dexie, DexieEvent, DexieEventSet, Unsubscribable } from 'dexie';
+import * as Y from 'yjs';
 import { throwIfDestroyed, getDocCache, destroyedDocs } from './docCache';
 import { getOrCreateDocument } from './getOrCreateDocument';
-import { getYLibrary } from './getYLibrary';
 import { observeYDocUpdates } from './observeYDocUpdates';
+import { promisableChain } from './helpers/promisableChain';
+import { nonStoppableEventChain } from './helpers/nonStoppableEventChain';
+import { currentUpdateRow } from './currentUpdateRow';
+import { Disposable } from './helpers/Disposable';
 
-export const wm = new WeakMap<any, DexieYProvider>();
+const wm = new WeakMap<any, DexieYProvider>();
 
 function createEvents() {
-  return Events(null, 'load', 'sync', 'error') as DexieYProvider['on'];
+  return (Dexie.Events as any)(null, 'load', 'sync', 'error') as DexieYProvider['on'];
 }
 
 interface ReleaseOptions {
   gracePeriod?: number; // Grace period to optimize for unload/reload scenarios
 }
 
-export class DexieYProvider<YDoc extends YjsDoc = any>
-  implements IDexieYProvider<YDoc>
+class DexieYProvider
 {
   refCount = 1;
   private stopObserving: () => void;
   private cleanupHandlers: (() => void)[] = [];
   private graceTimer: any;
   private graceTimeout = -1;
-  doc: YDoc;
+  doc: Y.Doc | null = null;
   awareness?: any;
   private _error?: any;
 
@@ -44,19 +37,37 @@ export class DexieYProvider<YDoc extends YjsDoc = any>
 
   destroyed = false;
 
-  static on = Events(null, {beforeunload: [promisableChain]}) as DexieEventSet & ((name: string, f: (...args: any[]) => any) => void);
+  static on = (Dexie.Events as any)(null, {
+    new: [nonStoppableEventChain],
+    beforeunload: [promisableChain],
+  }) as DexieEventSet & ((name: string, f: (...args: any[]) => any) => void) & {
+    new: DexieEvent;
+    beforeunload: DexieEvent;
+  };
 
   static getOrCreateDocument(db: Dexie, table: string, prop: string, id: any) {
     const docCache = getDocCache(db);
-    const updatesTable = db.table(table).schema.yProps?.find(p => p.prop === prop)?.updatesTable;
-    return getOrCreateDocument(db, docCache, getYLibrary(db), table, prop, updatesTable, id);
+    const updatesTable = db
+      .table(table)
+      .schema.yProps?.find((p) => p.prop === prop)?.updatesTable;
+    if (!updatesTable) {
+      throw new Error(`Updates table for ${table}.${prop} not found`);
+    }
+    // Get or create the Y.Doc for the given table, prop, and id
+    return getOrCreateDocument(db, docCache, table, prop, updatesTable, id);
   }
 
-  static load<YDoc extends YjsDoc>(doc: YDoc, options?: ReleaseOptions): DexieYProvider<YDoc> {
+  static load(
+    doc: Y.Doc,
+    options?: ReleaseOptions
+  ): DexieYProvider {
     let p = wm.get(doc);
     if (p) {
       ++p.refCount;
-      if (options?.gracePeriod != null && p.graceTimeout < options.gracePeriod) {
+      if (
+        options?.gracePeriod != null &&
+        p.graceTimeout < options.gracePeriod
+      ) {
         p.graceTimeout = options.gracePeriod;
       }
       if (p.graceTimer) {
@@ -71,7 +82,7 @@ export class DexieYProvider<YDoc extends YjsDoc = any>
     return p;
   }
 
-  static release<YDoc extends YjsDoc>(doc: YDoc) {
+  static release(doc: Y.Doc) {
     if (!doc || destroyedDocs.has(doc)) return; // Document already destroyed.
     const p = wm.get(doc);
     if (p) {
@@ -89,7 +100,7 @@ export class DexieYProvider<YDoc extends YjsDoc = any>
                 // Release only if refCount is still zero
                 p._release();
               }
-            }, 
+            },
             p.graceTimeout // Grace period to optimize for unload/reload scenarios
           );
         }
@@ -105,69 +116,83 @@ export class DexieYProvider<YDoc extends YjsDoc = any>
     // Also, in case the event listener uses DexieYProvider.load() without calling DexieYProvider.release(),
     // it must prevent the release to happen until the provider is finally released.
     if (!this.doc) return;
-    Promise.resolve(DexieYProvider.on('beforeunload').fire(this)).finally(()=>{
-      // Re-check that refCount is zero before actually destroying the document (which
-      // leads to provider.destroy() through the destroy-event on the doc).
-      if (this.refCount === 0) {  
-        this.doc?.destroy();
+    Promise.resolve(DexieYProvider.on('beforeunload').fire(this)).finally(
+      () => {
+        // Re-check that refCount is zero before actually destroying the document (which
+        // leads to provider.destroy() through the destroy-event on the doc).
+        if (this.refCount === 0) {
+          this.doc?.destroy();
+        }
+        // If refCount is not zero, it means that DexieYProvider.load() has been called from the listener
+        // and the listener has prevented the release from happening. The listener must call DexieYProvider.release()
+        // when it's done with the document.
       }
-      // If refCount is not zero, it means that DexieYProvider.load() has been called from the listener
-      // and the listener has prevented the release from happening. The listener must call DexieYProvider.release()
-      // when it's done with the document.
-    });
+    );
   }
 
-  static for<YDoc extends YjsDoc>(doc: YDoc): DexieYProvider<YDoc> | undefined {
+  static for(doc: Y.Doc): DexieYProvider | undefined {
     return wm.get(doc);
   }
   static getDocCache = getDocCache;
-  static currentUpdateRow: YUpdateRow | null = null;
+  static get currentUpdateRow() {
+    return currentUpdateRow;
+  }
 
   // Use a getter to avoid unhandled rejections when no one bothers about it.
   get whenLoaded(): Promise<void> {
     if (!this._whenLoaded) {
       this._whenLoaded = new Promise((resolve, reject) => {
+        if (!this.doc) {
+          reject(new Error('No Y.Doc associated with this provider'));
+          return;
+        }
         if (this.doc.isLoaded) resolve();
         else if (this._error) reject(this._error);
         else if (destroyedDocs.has(this.doc)) {
-          reject(new exceptions.Abort('Document was destroyed before loaded'));
+          reject(new Dexie.AbortError('Document was destroyed before loaded'));
         } else {
-          this.on('load', resolve); 
+          this.on('load', resolve);
           this.on('error', reject);
-          this.doc.on('destroy', () => reject(new exceptions.Abort('Document was destroyed before loaded')));
+          this.doc.on('destroy', () =>
+            reject(new Dexie.AbortError('Document was destroyed before loaded'))
+          );
         }
-      })  
+      });
     }
-    return this._whenLoaded
+    return this._whenLoaded;
   }
 
   // Use a getter to avoid unhandled rejections when no one bothers about it.
   get whenSynced(): Promise<void> {
     if (!this._whenSynced) {
       this._whenSynced = new Promise((resolve, reject) => {
+        if (!this.doc) {
+          reject(new Error('No Y.Doc associated with this provider'));
+          return;
+        }
         if (this.doc.isSynced) resolve();
         else if (this._error) reject(this._error);
         else if (destroyedDocs.has(this.doc)) {
-          reject(new exceptions.Abort('Document was destroyed before synced'));
+          reject(new Dexie.AbortError('Document was destroyed before synced'));
         } else {
           this.on('sync', resolve);
           this.on('error', reject);
-          this.doc.on('destroy', () => reject(new exceptions.Abort('Document was destroyed before synced')));
+          this.doc.on('destroy', () =>
+            reject(new Dexie.AbortError('Document was destroyed before synced'))
+          );
         }
-      })
+      });
     }
     return this._whenSynced;
   }
 
-
-  constructor(doc: YDoc) {
+  constructor(doc: Y.Doc) {
     this.on = createEvents();
     this.doc = doc;
     this.off = (name: string, f: Function) => this.on[name]?.unsubscribe(f);
     if ('dispose' in Symbol) {
       // @ts-ignore
-      this[Symbol.dispose] =
-        () => DexieYProvider.release(doc);
+      this[Symbol.dispose] = () => DexieYProvider.release(doc);
     }
     doc.on('load', () => this.on('load').fire());
     doc.on('sync', (sync) => sync !== false && this.on('sync').fire());
@@ -176,8 +201,9 @@ export class DexieYProvider<YDoc extends YjsDoc = any>
       // In case error happens before awaiting provider.whenLoaded or provider.whenSynced.
       this._error = error;
     });
-    
-    const { db, parentTable, parentId, updatesTable } = (doc as YDoc).meta || {};
+
+    const { db, parentTable, parentId, updatesTable } =
+      (doc as Y.Doc).meta || {};
     if (!db || !parentTable || !updatesTable) {
       throw new Error(
         `Missing Dexie-related metadata in Y.Doc. Documents need to be obtained through Y.Doc properties from dexie queries.`
@@ -190,21 +216,19 @@ export class DexieYProvider<YDoc extends YjsDoc = any>
       );
     }
     throwIfDestroyed(doc);
-    const Y = getYLibrary(db);
     this.stopObserving = observeYDocUpdates(
       this,
       doc,
       db,
       parentTable,
       updatesTable,
-      parentId,
-      Y
+      parentId
     );
-    db.on.y.fire(this, Y); // Allow for addons to invoke their sync- and awareness providers here.
+    DexieYProvider.on("new").fire(this); // Allow for addons to invoke their sync- and awareness providers here.
   }
 
   destroy() {
-    console.debug(`YDoc ${this.doc.meta?.parentId} was destroyed`);
+    console.debug(`Y.Doc ${this.doc?.meta?.parentId} was destroyed`);
     wm.delete(this.doc);
     this.doc = null;
     this.destroyed = true;
@@ -214,9 +238,7 @@ export class DexieYProvider<YDoc extends YjsDoc = any>
     this.cleanupHandlers.forEach((cleanup) => cleanup());
   }
 
-  addCleanupHandler(
-    cleanupHandler: (() => void) | Unsubscribable
-  ) {
+  addCleanupHandler(cleanupHandler: (() => void) | Unsubscribable) {
     this.cleanupHandlers.push(
       typeof cleanupHandler === 'function'
         ? cleanupHandler
@@ -224,3 +246,24 @@ export class DexieYProvider<YDoc extends YjsDoc = any>
     );
   }
 }
+
+//
+// Support `using DexieYProvider.load();` syntax
+//
+// Extend DexieYProvider with Disposable interface if Symbol.dispose is supported.
+// (At runtime, this[Symbol.dispose] is created in the constructor, so we indeed implement Disposable interface)
+interface DexieYProvider extends Disposable {}
+
+//
+// Eliminate dual package hazard 
+//
+// Since we're holding static state, make sure to singletonize DexieYProvider
+//
+if (Dexie["DexieYProvider"]) {
+  // @ts-ignore
+  DexieYProvider = Dexie["DexieYProvider"] || DexieYProvider;
+} else {
+  Dexie["DexieYProvider"] = DexieYProvider;
+}
+
+export { DexieYProvider };

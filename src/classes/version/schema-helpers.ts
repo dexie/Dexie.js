@@ -466,7 +466,6 @@ export function parseIndexSyntax(primKeyAndIndexes: string): IndexSpec[] {
     const typeSplit = index.split(':');
     const type = typeSplit[1]?.trim();
     index = typeSplit[0].trim();
-    if (type && type !== 'Y') throw new exceptions.Schema(`Unsupported type '${type}'`); // Y is currently the only supported type.
     const name = index.replace(/([&*]|\+\+)/g, ""); // Remove "&", "++" and "*"
     // Let keyPath of "[a+b]" be ["a","b"]:
     const keyPath = /^\[/.test(name) ? name.match(/^\[(.*)\]$/)[1].split('+') : name;

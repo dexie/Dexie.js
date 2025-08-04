@@ -1,0 +1,9 @@
+.DS_Store
+tools/
+src/
+bin-src/
+.*
+tmp/
+**/tmp/
+test
+*.log

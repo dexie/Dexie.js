@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "module": "es2015",
+    "target": "ES5",
+    "declaration": true,
+    "importHelpers": true,
+    "strictNullChecks": true,
+    "noImplicitAny": false,
+    "noImplicitReturns": true,
+    "moduleResolution": "node",
+    "skipLibCheck": true,
+    "allowJs": true,
+    "lib": ["ES2021", "DOM"],
+    "forceConsistentCasingInFileNames": true,
+    "sourceMap": true,
+    "rootDir": "..",
+    "downlevelIteration": true,
+    "outDir": "../tools/tmp/",
+  },
+  "include": [
+    "../src/",
+    "./unit/",
+    "./*.ts",
+    "./qunit.d.ts"
+  ]
+}

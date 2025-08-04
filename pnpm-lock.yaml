@@ -83,12 +83,9 @@ importers:
       uglify-js:
         specifier: ^3.9.2
         version: 3.14.2
-      y-protocols:
-        specifier: ^1.0.6
-        version: 1.0.6(yjs@13.6.23)
       yjs:
-        specifier: ^13.6.23
-        version: 13.6.23
+        specifier: ^13.6.27
+        version: 13.6.27
 
   addons/Dexie.Observable:
     devDependencies:
@@ -149,6 +146,15 @@ importers:
       rxjs:
         specifier: ^7.x
         version: 7.5.6
+      y-dexie:
+        specifier: workspace:^
+        version: link:../y-dexie
+      y-protocols:
+        specifier: ^1.0.6
+        version: 1.0.6(yjs@13.6.27)
+      yjs:
+        specifier: ^13.6.27
+        version: 13.6.27
     devDependencies:
       '@rollup/plugin-commonjs':
         specifier: ^25.0.7
@@ -239,6 +245,69 @@ importers:
         specifier: ^1.0.0-alpha.21
         version: 1.0.0-alpha.39
 
+  addons/y-dexie:
+    devDependencies:
+      '@rollup/plugin-commonjs':
+        specifier: ^25.0.7
+        version: 25.0.7(rollup@4.1.4)
+      '@rollup/plugin-node-resolve':
+        specifier: ^15.2.3
+        version: 15.2.3(rollup@4.1.4)
+      '@rollup/plugin-replace':
+        specifier: ^5.0.4
+        version: 5.0.4(rollup@4.1.4)
+      '@rollup/plugin-terser':
+        specifier: ^0.4.4
+        version: 0.4.4(rollup@4.1.4)
+      '@rollup/plugin-typescript':
+        specifier: ^11.1.5
+        version: 11.1.5(rollup@4.1.4)(tslib@2.4.0)(typescript@5.8.3)
+      '@types/node':
+        specifier: ^18.11.18
+        version: 18.11.18
+      dexie:
+        specifier: workspace:>=4.2.0-alpha.1 <5.0.0
+        version: link:../..
+      dreambase-library:
+        specifier: ^1.0.26
+        version: 1.0.26
+      just-build:
+        specifier: '*'
+        version: 0.9.24
+      karma:
+        specifier: '*'
+        version: 6.4.0
+      karma-chrome-launcher:
+        specifier: '*'
+        version: 3.1.1
+      karma-firefox-launcher:
+        specifier: '*'
+        version: 2.1.2
+      karma-qunit:
+        specifier: '*'
+        version: 4.1.2(karma@6.4.0)(qunit@2.21.1)
+      lib0:
+        specifier: ^0.2.97
+        version: 0.2.99
+      rollup:
+        specifier: ^4.1.4
+        version: 4.1.4
+      terser:
+        specifier: ^5.20.0
+        version: 5.20.0
+      tslib:
+        specifier: '*'
+        version: 2.4.0
+      typescript:
+        specifier: ^5.8.3
+        version: 5.8.3
+      y-protocols:
+        specifier: ^1.0.6
+        version: 1.0.6(yjs@13.6.27)
+      yjs:
+        specifier: ^13.6.27
+        version: 13.6.27
+
   libs/dexie-cloud-common:
     dependencies:
       lib0:
@@ -256,7 +325,7 @@ importers:
         version: 29.7.0(@types/node@18.11.18)(babel-plugin-macros@3.1.0)
       ts-jest:
         specifier: ^29.2.5
-        version: 29.2.5(@babel/core@7.25.7)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.25.7))(jest@29.7.0(@types/node@18.11.18)(babel-plugin-macros@3.1.0))(typescript@5.3.3)
+        version: 29.2.5(@babel/core@7.22.1)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.22.1))(jest@29.7.0(@types/node@18.11.18)(babel-plugin-macros@3.1.0))(typescript@5.3.3)
       typescript:
         specifier: ^5.3.3
         version: 5.3.3
@@ -282,7 +351,7 @@ importers:
         specifier: ^17.0.0
         version: 17.0.17
       dexie:
-        specifier: workspace:^
+        specifier: workspace:>=4.2.0-alpha.1 <5.0.0
         version: link:../..
       just-build:
         specifier: ^0.9.24
@@ -323,6 +392,12 @@ importers:
       webpack-cli:
         specifier: ^4.5.0
         version: 4.10.0(webpack@5.74.0)
+      y-dexie:
+        specifier: workspace:>=4.2.0-alpha.1 <5.0.0
+        version: link:../../addons/y-dexie
+      yjs:
+        specifier: ^13.6.27
+        version: 13.6.27
 
   samples/dexie-cloud-todo-app:
     dependencies:
@@ -366,14 +441,14 @@ importers:
         specifier: 5.3.0
         version: 5.3.0(@popperjs/core@2.11.8)
       dexie:
-        specifier: ^4.0.11
-        version: 4.0.11
+        specifier: '>=4.2.0-alpha.1 <5.0.0'
+        version: 4.2.0-alpha.1
       dexie-cloud-addon:
-        specifier: ^4.0.11
-        version: 4.0.11(dexie@4.0.11)
+        specifier: '>=4.2.0-alpha.1 <5.0.0'
+        version: 4.2.0-alpha.7(dexie@4.2.0-alpha.1)
       dexie-react-hooks:
-        specifier: ^1.1.7
-        version: 1.1.7(@types/react@18.2.8)(dexie@4.0.11)(react@17.0.2)
+        specifier: '>=4.2.0-alpha.1 <5.0.0'
+        version: 4.2.0-alpha.2(@types/react@18.2.8)(dexie@4.2.0-alpha.1)(react@17.0.2)
       postcss-flexbugs-fixes:
         specifier: ^5.0.2
         version: 5.0.2(postcss@8.4.24)
@@ -3464,24 +3539,24 @@ packages:
     engines: {node: '>= 4.2.1'}
     hasBin: true
 
-  dexie-cloud-addon@4.0.11:
-    resolution: {integrity: sha512-CkszT8Eg8Nk2GV6rDRpoimH/Kb8an8LY9eU2QA20m8CVlmtuKjetIrxoBlA0lNRaUXP5r+6O69AUwne4NldhrA==}
+  dexie-cloud-addon@4.2.0-alpha.7:
+    resolution: {integrity: sha512-tf7HizqF+qcvdugTdvzv4Q5N7xG2e796LZbfgMhH4jIcUv3ew5pSTo8Uf3yF8XnhByXbs8nlXgmUtsxZ5XPJcQ==}
     engines: {node: '>=14'}
     peerDependencies:
-      dexie: ^4.0.11
+      dexie: ^4.2.0-alpha.1
 
-  dexie-cloud-common@1.0.36:
-    resolution: {integrity: sha512-kwk67RkSh1++16U7bLS/Sd9CIoW1P+upGgA+VKStKfoM/z0gbt7bR6gy4pJxlzo5fPMW+qgm92WHPMA1ygcHXQ==}
+  dexie-cloud-common@1.0.52:
+    resolution: {integrity: sha512-6ZSGZ4eYdWXfXnMvabvLySOlGl1s0UIt4B8V0j51aHvwUfEfcefJuBj41u51iTht7emIHjHNrz8GJmiean+3cQ==}
 
-  dexie-react-hooks@1.1.7:
-    resolution: {integrity: sha512-Lwv5W0Hk+uOW3kGnsU9GZoR1er1B7WQ5DSdonoNG+focTNeJbHW6vi6nBoX534VKI3/uwHebYzSw1fwY6a7mTw==}
+  dexie-react-hooks@4.2.0-alpha.2:
+    resolution: {integrity: sha512-xrCQv2S6L9NSBgBmJWIvakl0QSayCgJpriLW3AnxTDkrAAanjTqpUbF/cJy5sl9YerlYa1PAK8IuNyqyqgHQjQ==}
     peerDependencies:
       '@types/react': '>=16'
-      dexie: ^3.2 || ^4.0.1-alpha
+      dexie: '>=4.2.0-alpha.1 <5.0.0'
       react: '>=16'
 
-  dexie@4.0.11:
-    resolution: {integrity: sha512-SOKO002EqlvBYYKQSew3iymBoN2EQ4BDw/3yprjh7kAfFzjBYkaMNa/pZvcA7HSWlcKSQb9XhPe3wKyQ0x4A8A==}
+  dexie@4.2.0-alpha.1:
+    resolution: {integrity: sha512-oPyQYFArYv7cQOi9PJS3/T2BLh85nnbUCrbwHWc1yAVRx54QgipT5Nl4nTBbIVXSSJOXatGnyVScYSNIPsWP4A==}
 
   di@0.0.1:
     resolution: {integrity: sha512-uJaamHkagcZtHPqCIHZxnFrXlunQXgBOsZSUOWwFw31QJCAbyTBoHMW75YOTur5ZNx8pIeAKgf6GWIgaqqiLhA==}
@@ -7442,6 +7517,11 @@ packages:
     engines: {node: '>=14.17'}
     hasBin: true
 
+  typescript@5.8.3:
+    resolution: {integrity: sha512-p1diW6TqL9L07nNxvRMM7hMMw4c5XOo/1ibL4aAIGmSAt9slTE1Xgw5KWuof2uTOvCg9BY7ZRi+GaF+7sfgPeQ==}
+    engines: {node: '>=14.17'}
+    hasBin: true
+
   typeson-registry@1.0.0-alpha.39:
     resolution: {integrity: sha512-NeGDEquhw+yfwNhguLPcZ9Oj0fzbADiX4R0WxvoY8nGhy98IbzQy1sezjoEFWOywOboj/DWehI+/aUlRVrJnnw==}
     engines: {node: '>=10.0.0'}
@@ -7917,6 +7997,13 @@ packages:
   xmlchars@2.2.0:
     resolution: {integrity: sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==}
 
+  y-dexie@4.2.0-alpha.6:
+    resolution: {integrity: sha512-nRn+7PqUPS7ru4KKZ+BDi4mUE8Mp0/bRGVAv4idGvIFTFf6Hgkzkkb2cEY04ENofJPMYeCZKh3ucjlgA8o45VQ==}
+    engines: {node: '>=18'}
+    peerDependencies:
+      dexie: '>=4.2.0-alpha.1 <5.0.0'
+      yjs: ^13.6.27
+
   y-protocols@1.0.6:
     resolution: {integrity: sha512-vHRF2L6iT3rwj1jub/K5tYcTT/mEYDUppgNPXwp8fmLpui9f7Yeq3OEtTLVF012j39QnV+KEQpNqoN7CWU7Y9Q==}
     engines: {node: '>=16.0.0', npm: '>=8.0.0'}
@@ -7957,8 +8044,8 @@ packages:
     resolution: {integrity: sha512-7dSzzRQ++CKnNI/krKnYRV7JKKPUXMEh61soaHKg9mrWEhzFWhFnxPxGl+69cD1Ou63C13NUPCnmIcrvqCuM6w==}
     engines: {node: '>=12'}
 
-  yjs@13.6.23:
-    resolution: {integrity: sha512-ExtnT5WIOVpkL56bhLeisG/N5c4fmzKn4k0ROVfJa5TY2QHbH7F0Wu2T5ZhR7ErsFWQEFafyrnSI8TPKVF9Few==}
+  yjs@13.6.27:
+    resolution: {integrity: sha512-OIDwaflOaq4wC6YlPBy2L6ceKeKuF7DeTxx+jPzv1FHn9tCZ0ZwSRnUBxD05E3yed46fv/FWJbvR+Ud7x0L7zw==}
     engines: {node: '>=16.0.0', npm: '>=8.0.0'}
 
   yocto-queue@0.1.0:
@@ -8422,33 +8509,15 @@ snapshots:
       '@babel/core': 7.22.1
       '@babel/helper-plugin-utils': 7.21.5
 
-  '@babel/plugin-syntax-async-generators@7.8.4(@babel/core@7.25.7)':
-    dependencies:
-      '@babel/core': 7.25.7
-      '@babel/helper-plugin-utils': 7.21.5
-    optional: true
-
   '@babel/plugin-syntax-bigint@7.8.3(@babel/core@7.22.1)':
     dependencies:
       '@babel/core': 7.22.1
       '@babel/helper-plugin-utils': 7.21.5
 
-  '@babel/plugin-syntax-bigint@7.8.3(@babel/core@7.25.7)':
-    dependencies:
-      '@babel/core': 7.25.7
-      '@babel/helper-plugin-utils': 7.21.5
-    optional: true
-
   '@babel/plugin-syntax-class-properties@7.12.13(@babel/core@7.22.1)':
     dependencies:
       '@babel/core': 7.22.1
       '@babel/helper-plugin-utils': 7.21.5
-
-  '@babel/plugin-syntax-class-properties@7.12.13(@babel/core@7.25.7)':
-    dependencies:
-      '@babel/core': 7.25.7
-      '@babel/helper-plugin-utils': 7.21.5
-    optional: true
 
   '@babel/plugin-syntax-class-static-block@7.14.5(@babel/core@7.22.1)':
     dependencies:
@@ -8495,22 +8564,10 @@ snapshots:
       '@babel/core': 7.22.1
       '@babel/helper-plugin-utils': 7.21.5
 
-  '@babel/plugin-syntax-import-meta@7.10.4(@babel/core@7.25.7)':
-    dependencies:
-      '@babel/core': 7.25.7
-      '@babel/helper-plugin-utils': 7.21.5
-    optional: true
-
   '@babel/plugin-syntax-json-strings@7.8.3(@babel/core@7.22.1)':
     dependencies:
       '@babel/core': 7.22.1
       '@babel/helper-plugin-utils': 7.21.5
-
-  '@babel/plugin-syntax-json-strings@7.8.3(@babel/core@7.25.7)':
-    dependencies:
-      '@babel/core': 7.25.7
-      '@babel/helper-plugin-utils': 7.21.5
-    optional: true
 
   '@babel/plugin-syntax-jsx@7.21.4(@babel/core@7.22.1)':
     dependencies:
@@ -8532,66 +8589,30 @@ snapshots:
       '@babel/core': 7.22.1
       '@babel/helper-plugin-utils': 7.21.5
 
-  '@babel/plugin-syntax-logical-assignment-operators@7.10.4(@babel/core@7.25.7)':
-    dependencies:
-      '@babel/core': 7.25.7
-      '@babel/helper-plugin-utils': 7.21.5
-    optional: true
-
   '@babel/plugin-syntax-nullish-coalescing-operator@7.8.3(@babel/core@7.22.1)':
     dependencies:
       '@babel/core': 7.22.1
       '@babel/helper-plugin-utils': 7.21.5
-
-  '@babel/plugin-syntax-nullish-coalescing-operator@7.8.3(@babel/core@7.25.7)':
-    dependencies:
-      '@babel/core': 7.25.7
-      '@babel/helper-plugin-utils': 7.21.5
-    optional: true
 
   '@babel/plugin-syntax-numeric-separator@7.10.4(@babel/core@7.22.1)':
     dependencies:
       '@babel/core': 7.22.1
       '@babel/helper-plugin-utils': 7.21.5
 
-  '@babel/plugin-syntax-numeric-separator@7.10.4(@babel/core@7.25.7)':
-    dependencies:
-      '@babel/core': 7.25.7
-      '@babel/helper-plugin-utils': 7.21.5
-    optional: true
-
   '@babel/plugin-syntax-object-rest-spread@7.8.3(@babel/core@7.22.1)':
     dependencies:
       '@babel/core': 7.22.1
       '@babel/helper-plugin-utils': 7.21.5
-
-  '@babel/plugin-syntax-object-rest-spread@7.8.3(@babel/core@7.25.7)':
-    dependencies:
-      '@babel/core': 7.25.7
-      '@babel/helper-plugin-utils': 7.21.5
-    optional: true
 
   '@babel/plugin-syntax-optional-catch-binding@7.8.3(@babel/core@7.22.1)':
     dependencies:
       '@babel/core': 7.22.1
       '@babel/helper-plugin-utils': 7.21.5
 
-  '@babel/plugin-syntax-optional-catch-binding@7.8.3(@babel/core@7.25.7)':
-    dependencies:
-      '@babel/core': 7.25.7
-      '@babel/helper-plugin-utils': 7.21.5
-    optional: true
-
   '@babel/plugin-syntax-optional-chaining@7.8.3(@babel/core@7.22.1)':
     dependencies:
       '@babel/core': 7.22.1
       '@babel/helper-plugin-utils': 7.21.5
-
-  '@babel/plugin-syntax-optional-chaining@7.8.3(@babel/core@7.25.7)':
-    dependencies:
-      '@babel/core': 7.25.7
-      '@babel/helper-plugin-utils': 7.21.5
-    optional: true
 
   '@babel/plugin-syntax-private-property-in-object@7.14.5(@babel/core@7.22.1)':
     dependencies:
@@ -8602,12 +8623,6 @@ snapshots:
     dependencies:
       '@babel/core': 7.22.1
       '@babel/helper-plugin-utils': 7.21.5
-
-  '@babel/plugin-syntax-top-level-await@7.14.5(@babel/core@7.25.7)':
-    dependencies:
-      '@babel/core': 7.25.7
-      '@babel/helper-plugin-utils': 7.21.5
-    optional: true
 
   '@babel/plugin-syntax-typescript@7.21.4(@babel/core@7.22.1)':
     dependencies:
@@ -9969,6 +9984,15 @@ snapshots:
       rollup: 4.1.4
       tslib: 2.4.0
 
+  '@rollup/plugin-typescript@11.1.5(rollup@4.1.4)(tslib@2.4.0)(typescript@5.8.3)':
+    dependencies:
+      '@rollup/pluginutils': 5.0.5(rollup@4.1.4)
+      resolve: 1.22.2
+      typescript: 5.8.3
+    optionalDependencies:
+      rollup: 4.1.4
+      tslib: 2.4.0
+
   '@rollup/plugin-typescript@8.4.0(rollup@2.79.0)(tslib@2.4.0)(typescript@5.3.3)':
     dependencies:
       '@rollup/pluginutils': 3.1.0(rollup@2.79.0)
@@ -10355,7 +10379,7 @@ snapshots:
 
   '@types/resolve@0.0.8':
     dependencies:
-      '@types/node': 18.11.18
+      '@types/node': 20.2.5
 
   '@types/resolve@1.17.1':
     dependencies:
@@ -10900,20 +10924,6 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  babel-jest@29.7.0(@babel/core@7.25.7):
-    dependencies:
-      '@babel/core': 7.25.7
-      '@jest/transform': 29.7.0
-      '@types/babel__core': 7.20.1
-      babel-plugin-istanbul: 6.1.1
-      babel-preset-jest: 29.6.3(@babel/core@7.25.7)
-      chalk: 4.1.2
-      graceful-fs: 4.2.11
-      slash: 3.0.0
-    transitivePeerDependencies:
-      - supports-color
-    optional: true
-
   babel-loader@8.3.0(@babel/core@7.22.1)(webpack@5.74.0(uglify-js@3.14.2)):
     dependencies:
       '@babel/core': 7.22.1
@@ -10999,23 +11009,6 @@ snapshots:
       '@babel/plugin-syntax-optional-chaining': 7.8.3(@babel/core@7.22.1)
       '@babel/plugin-syntax-top-level-await': 7.14.5(@babel/core@7.22.1)
 
-  babel-preset-current-node-syntax@1.0.1(@babel/core@7.25.7):
-    dependencies:
-      '@babel/core': 7.25.7
-      '@babel/plugin-syntax-async-generators': 7.8.4(@babel/core@7.25.7)
-      '@babel/plugin-syntax-bigint': 7.8.3(@babel/core@7.25.7)
-      '@babel/plugin-syntax-class-properties': 7.12.13(@babel/core@7.25.7)
-      '@babel/plugin-syntax-import-meta': 7.10.4(@babel/core@7.25.7)
-      '@babel/plugin-syntax-json-strings': 7.8.3(@babel/core@7.25.7)
-      '@babel/plugin-syntax-logical-assignment-operators': 7.10.4(@babel/core@7.25.7)
-      '@babel/plugin-syntax-nullish-coalescing-operator': 7.8.3(@babel/core@7.25.7)
-      '@babel/plugin-syntax-numeric-separator': 7.10.4(@babel/core@7.25.7)
-      '@babel/plugin-syntax-object-rest-spread': 7.8.3(@babel/core@7.25.7)
-      '@babel/plugin-syntax-optional-catch-binding': 7.8.3(@babel/core@7.25.7)
-      '@babel/plugin-syntax-optional-chaining': 7.8.3(@babel/core@7.25.7)
-      '@babel/plugin-syntax-top-level-await': 7.14.5(@babel/core@7.25.7)
-    optional: true
-
   babel-preset-jest@27.5.1(@babel/core@7.22.1):
     dependencies:
       '@babel/core': 7.22.1
@@ -11027,13 +11020,6 @@ snapshots:
       '@babel/core': 7.22.1
       babel-plugin-jest-hoist: 29.6.3
       babel-preset-current-node-syntax: 1.0.1(@babel/core@7.22.1)
-
-  babel-preset-jest@29.6.3(@babel/core@7.25.7):
-    dependencies:
-      '@babel/core': 7.25.7
-      babel-plugin-jest-hoist: 29.6.3
-      babel-preset-current-node-syntax: 1.0.1(@babel/core@7.25.7)
-    optional: true
 
   babel-preset-react-app@10.0.1:
     dependencies:
@@ -11771,21 +11757,26 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  dexie-cloud-addon@4.0.11(dexie@4.0.11):
+  dexie-cloud-addon@4.2.0-alpha.7(dexie@4.2.0-alpha.1):
     dependencies:
-      dexie: 4.0.11
-      dexie-cloud-common: 1.0.36
+      dexie: 4.2.0-alpha.1
+      dexie-cloud-common: 1.0.52
       rxjs: 7.5.6
+      y-dexie: 4.2.0-alpha.6(dexie@4.2.0-alpha.1)(yjs@13.6.27)
+      y-protocols: 1.0.6(yjs@13.6.27)
+      yjs: 13.6.27
 
-  dexie-cloud-common@1.0.36: {}
+  dexie-cloud-common@1.0.52:
+    dependencies:
+      lib0: 0.2.99
 
-  dexie-react-hooks@1.1.7(@types/react@18.2.8)(dexie@4.0.11)(react@17.0.2):
+  dexie-react-hooks@4.2.0-alpha.2(@types/react@18.2.8)(dexie@4.2.0-alpha.1)(react@17.0.2):
     dependencies:
       '@types/react': 18.2.8
-      dexie: 4.0.11
+      dexie: 4.2.0-alpha.1
       react: 17.0.2
 
-  dexie@4.0.11: {}
+  dexie@4.2.0-alpha.1: {}
 
   di@0.0.1: {}
 
@@ -11882,7 +11873,7 @@ snapshots:
 
   dts-bundle-generator@9.3.1:
     dependencies:
-      typescript: 5.6.3
+      typescript: 5.8.3
       yargs: 17.7.2
 
   duplexer@0.1.2: {}
@@ -11940,7 +11931,7 @@ snapshots:
     dependencies:
       '@types/cookie': 0.4.1
       '@types/cors': 2.8.12
-      '@types/node': 18.11.18
+      '@types/node': 20.2.5
       accepts: 1.3.8
       base64id: 2.0.0
       cookie: 0.4.2
@@ -11957,7 +11948,7 @@ snapshots:
     dependencies:
       '@types/cookie': 0.4.1
       '@types/cors': 2.8.12
-      '@types/node': 18.11.18
+      '@types/node': 20.2.5
       accepts: 1.3.8
       base64id: 2.0.0
       cookie: 0.4.2
@@ -16730,7 +16721,7 @@ snapshots:
 
   ts-interface-checker@0.1.13: {}
 
-  ts-jest@29.2.5(@babel/core@7.25.7)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.25.7))(jest@29.7.0(@types/node@18.11.18)(babel-plugin-macros@3.1.0))(typescript@5.3.3):
+  ts-jest@29.2.5(@babel/core@7.22.1)(@jest/transform@29.7.0)(@jest/types@29.6.3)(babel-jest@29.7.0(@babel/core@7.22.1))(jest@29.7.0(@types/node@18.11.18)(babel-plugin-macros@3.1.0))(typescript@5.3.3):
     dependencies:
       bs-logger: 0.2.6
       ejs: 3.1.10
@@ -16744,10 +16735,10 @@ snapshots:
       typescript: 5.3.3
       yargs-parser: 21.1.1
     optionalDependencies:
-      '@babel/core': 7.25.7
+      '@babel/core': 7.22.1
       '@jest/transform': 29.7.0
       '@jest/types': 29.6.3
-      babel-jest: 29.7.0(@babel/core@7.25.7)
+      babel-jest: 29.7.0(@babel/core@7.22.1)
 
   ts-loader@8.4.0(typescript@5.3.3)(webpack@5.74.0(uglify-js@3.14.2)(webpack-cli@4.10.0)):
     dependencies:
@@ -16819,6 +16810,8 @@ snapshots:
   typescript@5.3.3: {}
 
   typescript@5.6.3: {}
+
+  typescript@5.8.3: {}
 
   typeson-registry@1.0.0-alpha.39:
     dependencies:
@@ -17429,10 +17422,15 @@ snapshots:
 
   xmlchars@2.2.0: {}
 
-  y-protocols@1.0.6(yjs@13.6.23):
+  y-dexie@4.2.0-alpha.6(dexie@4.2.0-alpha.1)(yjs@13.6.27):
     dependencies:
-      lib0: 0.2.97
-      yjs: 13.6.23
+      dexie: 4.2.0-alpha.1
+      yjs: 13.6.27
+
+  y-protocols@1.0.6(yjs@13.6.27):
+    dependencies:
+      lib0: 0.2.99
+      yjs: 13.6.27
 
   y18n@5.0.8: {}
 
@@ -17468,7 +17466,7 @@ snapshots:
       y18n: 5.0.8
       yargs-parser: 21.1.1
 
-  yjs@13.6.23:
+  yjs@13.6.27:
     dependencies:
       lib0: 0.2.99
 

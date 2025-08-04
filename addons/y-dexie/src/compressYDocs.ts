@@ -1,22 +1,19 @@
-import { Dexie } from '../public/types/dexie';
-import type {
-  YLastCompressed,
-  YSyncState,
-  YUpdateRow,
-} from '../public/types/yjs-related';
-import { getYLibrary } from './getYLibrary';
-import { cmp } from '../functions/cmp';
+import { Dexie, cmp } from 'dexie';
+import { YLastCompressed } from './types/YLastCompressed';
+import { YSyncState } from './types/YSyncState';
+import { YUpdateRow } from './types/YUpdateRow';
+import * as Y from 'yjs';
 
 /** Go through all Y.Doc tables in the entire local db and compress updates
  *
  * @param db Dexie
  * @returns
  */
-export function compressYDocs(db: Dexie, interval?: number) {
+export function compressYDocs(db: Dexie, skipIfRecentlyDoneMillisec?: number) {
   let p: Promise<any> = Promise.resolve();
   for (const table of db.tables) {
     for (const yProp of table.schema.yProps || []) {
-      p = p.then(() => compressYDocsTable(db, yProp, interval));
+      p = p.then(() => compressYDocsTable(db, yProp, skipIfRecentlyDoneMillisec));
     }
   }
   return p;
@@ -40,8 +37,9 @@ function compressYDocsTable(
     db.transaction('rw', updatesTable, () =>
       updTbl.get(0).then((lastCompressed: YLastCompressed | undefined) => {
         if (
-          lastCompressed &&
           skipIfRunnedSince &&
+          lastCompressed &&
+          lastCompressed.lastRun &&
           lastCompressed.lastRun.getTime() > Date.now() - skipIfRunnedSince
         ) {
           // Skip it. It has run recently or is still running.
@@ -85,7 +83,7 @@ function compressYDocsTable(
         for (let j = 0; j < addedUpdates.length; ++j) {
           const updateRow = addedUpdates[j];
           const { i, f, k } = updateRow;
-          if (i >= unsyncedFrom && f & 0x01) break; // An update that need to be synced was found. Stop here and let dontCompressFrom stay.
+          if (i >= unsyncedFrom && f && f & 0x01) break; // An update that need to be synced was found. Stop here and let dontCompressFrom stay.
           const entry = docsToCompress.find(
             (entry) => cmp(entry.docId, k) === 0
           );
@@ -132,21 +130,16 @@ export function compressUpdatesForDoc(
   return db.transaction('rw', updatesTable, (tx) => {
     const updTbl = tx.table(updatesTable);
     return updTbl.where({ k: parentId }).first((mainUpdate: YUpdateRow) => {
+      if (!mainUpdate) return; // No main update found. Nothing to compress.
       const updates = [mainUpdate].concat(
         addedUpdatesToCompress.filter((u) => u.i !== mainUpdate.i)
       ); // avoid duplicating the main update (can happen sometimes)
-      const Y = getYLibrary(db);
       const doc = new Y.Doc({ gc: true });
-      //Y.transact(doc, ()=>{
       updates.forEach((update) => {
-        //if (cmp(update.k, docRowId) !== 0) {
-        //  throw new Error('Invalid update');
-        //}
         Y.applyUpdateV2(doc, update.u);
       });
-      //}, "compressYDocs"); // Don't think anyone could be listening to this local doc.
       const compressedUpdate = Y.encodeStateAsUpdateV2(doc);
-      const lastUpdate = updates.pop();
+      const lastUpdate = updates.pop()!;
       return updTbl
         .put({
           i: lastUpdate.i,

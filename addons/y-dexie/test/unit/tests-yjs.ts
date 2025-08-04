@@ -1,5 +1,6 @@
-import Dexie, { DexieYProvider } from 'dexie';
-import { module, stop, start, equal, deepEqual, ok } from 'QUnit';
+import Dexie from 'dexie';
+import yDexie, { compressYDocs, DexieYProvider } from '../../src/y-dexie';
+import { module, stop, start, equal, deepEqual, ok } from 'qunit';
 import {
   resetDatabase,
   promisedTest,
@@ -7,9 +8,15 @@ import {
 import * as Y from 'yjs';
 import * as awareness from 'y-protocols/awareness';
 
-const db = new Dexie('TestYjs', { Y });
+const db = new Dexie('TestYjs', { addons: [yDexie] }) as Dexie & {
+  docs: Dexie.Table<{
+    id: string;
+    title?: string;
+    content?: Y.Doc
+  }, string>;
+}
 db.version(1).stores({
-  docs: 'id, title, content:Y',
+  docs: 'id, title, content:Y.Doc',
 });
 
 module('yjs', {
@@ -30,21 +37,21 @@ promisedTest('Test Y.js basic support', async () => {
     title: "Hello",
   });
   let row = await db.docs.get("doc1");
-  equal(row.title, "Hello", "Title is correct");
-  let doc = row.content;
+  equal(row!.title, "Hello", "Title is correct");
+  let doc = row!.content;
   ok(doc instanceof Y.Doc, "Content is a Y.Doc");
 
   let row2 = await db.docs.get("doc1");
-  let doc2 = row2.content;
+  let doc2 = row2!.content;
   equal(doc, doc2, "The two doc instances are the same");
 
   let rows = await db.docs.toArray();
   equal(rows[0].content, doc, "The two doc instances are the same");
 
   // Now destroy the doc:
-  doc.destroy();
+  doc!.destroy();
   row2 = await db.docs.get("doc1");
-  doc2 = row2.content;
+  doc2 = row2!.content;
   ok(doc !== doc2, "After destroying doc, a new instance is retrieved");
 
   // Delete document
@@ -52,29 +59,30 @@ promisedTest('Test Y.js basic support', async () => {
 });
 
 promisedTest('Test DexieYProvider', async () => {
+  debugger;
   await db.docs.put({
     id: "doc2",
     title: "Hello2",
   });
   let row = await db.docs.get("doc2");
   /* @type {Y.Doc} */
-  let doc = row.content;
+  let doc = row!.content!;
   let provider = new DexieYProvider(doc);
   // Await the transaction of doc manipulation to not
   // bring down the database before it has been stored.
   await db.transaction('rw', db.docs, () => {
-    doc.getArray('arr').insert(0, ['a', 'b', 'c']);
+    doc!.getArray('arr').insert(0, ['a', 'b', 'c']);
   });
   //await provider.whenLoaded;
-  doc.destroy();
+  doc!.destroy();
   db.close({disableAutoOpen: false});
   await db.open();
   row = await db.docs.get("doc2");
-  doc = row.content;
+  doc = row!.content!;
   provider = new DexieYProvider(doc);
-  await doc.whenLoaded;
+  await doc!.whenLoaded;
   // Verify that we got the same data:
-  deepEqual(doc.getArray('arr').toJSON(), ['a', 'b', 'c'], "Array is correct after reload");
+  deepEqual(doc!.getArray('arr').toJSON(), ['a', 'b', 'c'], "Array is correct after reload");
   // Verify we have updates in the update table (this part can be deleted if implementation is changed)
   let updates = await db.table('$docs.content_updates').toArray();
   ok(updates.length > 0, "Got updates in update table");
@@ -90,39 +98,39 @@ promisedTest('Test Y document compression', async () => {
     title: 'Hello',
   });
   let row = await db.docs.get('doc1');
-  let doc = row.content;
+  let doc = row!.content!;
   let provider = new DexieYProvider(doc);
 
   // Verify there are no updates in the updates table initially:
-  const updateTable = db.docs.schema.yProps.find(
+  const updateTable = db.docs.schema.yProps!.find(
     (p) => p.prop === 'content'
-  ).updatesTable;
+  )!.updatesTable;
   equal(await db.table(updateTable).count(), 0, 'No docs stored yet');
 
   // Create three updates:
   await db.transaction('rw', db.docs, () => {
-    doc.getArray('arr').insert(0, ['a', 'b', 'c']);
-    doc.getArray('arr').insert(0, ['1', '2', '3']);
-    doc.getArray('arr').insert(0, ['x', 'y', 'z']);
+    doc!.getArray('arr').insert(0, ['a', 'b', 'c']);
+    doc!.getArray('arr').insert(0, ['1', '2', '3']);
+    doc!.getArray('arr').insert(0, ['x', 'y', 'z']);
   });
   // Verify we have 3 updates:
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 3, 'Three updates stored');
   // Run the GC:
   console.debug('Running GC', await db.table(updateTable).toArray());
-  await db.gc();
+  await compressYDocs(db);
   console.debug('After running GC', await db.table(updateTable).toArray());
   // Verify we have 1 (compressed) update:
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 1, 'One update stored after gc');
   // Verify the provider is still alive:
   ok(!provider.destroyed, "Provider is not destroyed");
   await db.transaction('rw', db.docs, () => {
-    doc.getArray('arr').insert(0, ['a', 'b', 'c']);
-    doc.getArray('arr').insert(0, ['1', '2', '3']);
-    doc.getArray('arr').insert(0, ['x', 'y', 'z']);
+    doc!.getArray('arr').insert(0, ['a', 'b', 'c']);
+    doc!.getArray('arr').insert(0, ['1', '2', '3']);
+    doc!.getArray('arr').insert(0, ['x', 'y', 'z']);
   });
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 4, 'Four updates stored after additional inserts');
   console.debug('Running GC', await db.table(updateTable).toArray());
-  await db.gc();
+  await compressYDocs(db);
   console.debug('After running GC', await db.table(updateTable).toArray());
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 1, 'One update stored after gc');
   await db.docs.put({
@@ -130,7 +138,7 @@ promisedTest('Test Y document compression', async () => {
     title: 'Hello2',
   });
   let row2 = await db.docs.get('doc2');
-  let doc2 = row2.content;
+  let doc2 = row2!.content!;
   await new DexieYProvider(doc2).whenLoaded;
   await db.transaction('rw', db.docs, async () => {    
     doc2.getArray('arr2').insert(0, ['a', 'b', 'c']);
@@ -139,7 +147,7 @@ promisedTest('Test Y document compression', async () => {
   });
   console.debug('After adding thigns to other doc', await db.table(updateTable).toArray());
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 4, 'Four updates stored after additional inserts on other doc');
-  await db.gc();
+  await compressYDocs(db);
   console.debug('After GC where we have 2 docs', await db.table(updateTable).toArray());
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 2, 'Two updates stored after gc (2 different docs)');
 
@@ -163,13 +171,13 @@ promisedTest('Test that syncers prohibit GC from compressing unsynced updates', 
     title: 'Hello',
   });
   let row = await db.docs.get('doc1');
-  let doc = row.content;
+  let doc = row!.content!;
   let provider = new DexieYProvider(doc);
 
   // Verify there are no updates in the updates table initially:
-  const updateTable = db.docs.schema.yProps.find(
+  const updateTable = db.docs.schema.yProps!.find(
     (p) => p.prop === 'content'
-  ).updatesTable;
+  )!.updatesTable;
   equal(await db.table(updateTable).where('i').between(1,Infinity).count(), 0, 'No docs stored yet');
 
   // Create three updates:
@@ -190,11 +198,11 @@ promisedTest('Test that syncers prohibit GC from compressing unsynced updates', 
   });
 
   console.debug('Running GC');
-  await db.gc();
+  await compressYDocs(db);
   console.debug('After running GC');
   // Verify we have 2 updates (the first 2 was compressed but the last one was not):
   equal(await db.table(updateTable).where('i').between(1, Infinity).count(), 2, '2 updates stored');
-  await db.docs.delete(row.id);
+  await db.docs.delete(row!.id);
   // Verify we have 0 updates after deleting the row holding our Y.Doc property:
   equal(await db.table(updateTable).where('i').between(1, Infinity).count(), 0, '0 updates stored');
   ok(provider.destroyed, "Provider was destroyed when our document was deleted");
@@ -210,13 +218,13 @@ promisedTest('Test creating a row with a populated Y.Doc', async () => {
     content: doc
   });
   let row = await db.docs.get("doc1");
-  equal(row.title, "Hello", "Title is correct");
-  let doc2 = row.content;
+  equal(row!.title, "Hello", "Title is correct");
+  let doc2 = row!.content;
   ok(doc2 instanceof Y.Doc, "Content is a Y.Doc");
-  DexieYProvider.load(doc2);
-  await doc2.whenLoaded;
-  deepEqual(doc2.getArray('arr').toJSON(), ['a', 'b', 'c'], "Array is correct");
-  DexieYProvider.release(doc2);
+  DexieYProvider.load(doc2!);
+  await doc2!.whenLoaded;
+  deepEqual(doc2!.getArray('arr').toJSON(), ['a', 'b', 'c'], "Array is correct");
+  DexieYProvider.release(doc2!);
 });
 
 promisedTest('Verify error handling of misused Y.Doc properties', async () => {  
@@ -224,6 +232,7 @@ promisedTest('Verify error handling of misused Y.Doc properties', async () => {
   await db.docs.put({
     id: "doc1",
     title: "Hello",
+    // @ts-ignore
     content: null
   }).then(() => {
     ok(false, "Expected error when trying to create an Y.Doc property with null value");
@@ -242,6 +251,7 @@ promisedTest('Verify error handling of misused Y.Doc properties', async () => {
   await db.docs.put({
     id: "doc1",
     title: "Hello",
+    // @ts-ignore
     content: "a string"
   }).then(() => {
     ok(false, "Expected error when trying to create an Y.Doc property to a string");
@@ -252,6 +262,7 @@ promisedTest('Verify error handling of misused Y.Doc properties', async () => {
   await db.docs.put({
     id: "doc1",
     title: "Hello",
+    // @ts-ignore
     content: new Blob([])
   }).then(() => {
     ok(false, "Expected error when trying to create an Y.Doc property to a Blob");
@@ -275,19 +286,19 @@ promisedTest('Verify error handling of misused Y.Doc properties', async () => {
     ok(error instanceof TypeError, "Expected TypeError when trying to use put() with content data set on own property");
   })
   let doc2 = await db.docs.get("doc2");
-  ok(doc2.content instanceof Y.Doc, "The content property is an Y.Doc");
+  ok(doc2!.content instanceof Y.Doc, "The content property is an Y.Doc");
   try {
-    doc2.content = new Y.Doc();
+    doc2!.content = new Y.Doc();
     ok(false, "Should have thrown when trying to set content");
   } catch(error) {
     ok(true, "Failed when trying to set content of an existing doc");
   }
-  doc2.title = "Quattro Pizza";
-  await db.docs.put(doc2); // Verify it's ok to use put when an existing ydoc had been retrieved from DB.
+  doc2!.title = "Quattro Pizza";
+  await db.docs.put(doc2!); // Verify it's ok to use put when an existing ydoc had been retrieved from DB.
   ok(true, "Could put back the doc2 we've added");
   let doc2Back = await db.docs.get("doc2");
-  equal(doc2Back.title, "Quattro Pizza", "Verify that the put operation was successful for non-Y.Doc properties");
-  ok(doc2Back.content === doc2.content, "Verify that the Y.Doc property is equal be reference to the previously retrieved Y.Doc as long as it isn't destroyed");
+  equal(doc2Back!.title, "Quattro Pizza", "Verify that the put operation was successful for non-Y.Doc properties");
+  ok(doc2Back!.content === doc2!.content, "Verify that the Y.Doc property is equal be reference to the previously retrieved Y.Doc as long as it isn't destroyed");
 });
 
 /*promisedTest('Test awareness', async () => {

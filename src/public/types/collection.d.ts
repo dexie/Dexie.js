@@ -21,12 +21,14 @@ export interface Collection<T=any, TKey=IndexableType, TInsertType=T> {
   filter(filter: (x: T) => boolean): Collection<T, TKey, TInsertType>;
   first(): PromiseExtended<T | undefined>;
   first<R>(thenShortcut: ThenShortcut<T | undefined, R>): PromiseExtended<R>;
+  firstKey(): PromiseExtended<IndexableType | undefined>;
   keys(): PromiseExtended<IndexableTypeArray>;
   keys<R>(thenShortcut: ThenShortcut<IndexableTypeArray, R>): PromiseExtended<R>;
   primaryKeys(): PromiseExtended<TKey[]>;
   primaryKeys<R>(thenShortcut: ThenShortcut<TKey[], R>): PromiseExtended<R>;
   last(): PromiseExtended<T | undefined>;
   last<R>(thenShortcut: ThenShortcut<T | undefined, R>): PromiseExtended<R>;
+  lastKey(): PromiseExtended<IndexableType | undefined>;
   limit(n: number): Collection<T, TKey, TInsertType>;
   offset(n: number): Collection<T, TKey, TInsertType>;
   or(indexOrPrimayKey: string): WhereClause<T, TKey, TInsertType>;

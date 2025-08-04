@@ -5,6 +5,9 @@ pnpm build
 cd libs/dexie-cloud-common
 pnpm install
 pnpm build
+cd ../../addons/y-dexie
+pnpm install
+pnpm build
 cd ../../addons/dexie-cloud
 pnpm install
 pnpm build

@@ -1,23 +1,20 @@
-import type { Dexie } from '../public/types/dexie';
-import type {
-  YjsLib,
-  YjsDoc,
-  YUpdateRow,
-} from '../public/types/yjs-related';
-import type { EntityTable } from '../public/types/entity-table';
+import type { Dexie } from 'dexie';
+import * as Y from 'yjs';
+import { YUpdateRow } from './types/YUpdateRow';
+import type { EntityTable } from 'dexie';
 import { throwIfDestroyed } from './docCache';
-import { liveQuery } from '../live-query';
-import { cmp } from '../functions/cmp';
-import { DexieYProvider } from './DexieYProvider';
+import { liveQuery } from 'dexie';
+import { cmp } from 'dexie';
+import { setCurrentUpdateRow } from './currentUpdateRow';
+import type { DexieYProvider } from './DexieYProvider';
 
 export function observeYDocUpdates(
   provider: DexieYProvider,
-  doc: YjsDoc,
+  doc: Y.Doc,
   db: Dexie,
   parentTableName: string,
   updatesTableName: string,
-  parentId: any,
-  Y: YjsLib
+  parentId: any
 ): () => void {
   let lastUpdateId = 0;
   let initial = true;
@@ -57,10 +54,10 @@ export function observeYDocUpdates(
           () => {
             updates.forEach((update) => {
               try {
-                DexieYProvider.currentUpdateRow = update;
+                setCurrentUpdateRow(update);
                 Y.applyUpdateV2(doc, update.u);
               } finally {
-                DexieYProvider.currentUpdateRow = null;
+                setCurrentUpdateRow(null);
               }
             });
           },

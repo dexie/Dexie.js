@@ -28,114 +28,123 @@ export function createBanner() {
  * @param {String} outputName such as dexie-cloud-addon
  * @returns
  */
-export function createRollupConfig(entry, outputName) {
-  return {
-    input: entry,
-    output: [
-      {
-        file: `dist/modern/${outputName}.js`,
-        format: 'es',
-        banner: readFileSync('tools/tmp/banner.txt', 'utf-8'),
-        sourcemap: true,
+export function createRollupConfigs(entry, outputName) {
+  const COMMON_PLUGINS = [
+    typescript({
+      tsconfig: 'src/tsconfig.json',
+      compilerOptions: {
+        target: 'es2016',
       },
-      {
-        file: `dist/modern/${outputName}.min.js`,
-        format: 'es',
-        banner: readFileSync('tools/tmp/banner.txt', 'utf-8'),
-        sourcemap: true,
-        plugins: [
-          terser({
-            compress: {
-              drop_console: true,
-              drop_debugger: true,
-            },
-            mangle: true,
-            sourceMap: true,
-            output: {
-              comments: false,
-            },
-          }),
-        ],
+      declarationDir: 'dist/',
+      //sourceMap: false, // Required (see https://stackoverflow.com/questions/63218218/rollup-is-not-generating-typescript-sourcemap)
+      inlineSources: true, // But this was even better because then we get the real source code in the sourcemap!
+    }),
+    //sourcemaps(),
+    nodeResolve({
+      browser: true,
+      preferBuiltins: false,
+    }),
+    commonjs(),
+    replace({
+      preventAssignment: true,
+      values: {
+        __VERSION__: JSON.stringify(pkg.version),
       },
-      {
-        file: `dist/umd/${outputName}.js`,
-        format: 'umd',
-        globals: {
-          dexie: 'Dexie',
-          rxjs: 'rxjs',
-          'rxjs/operators': 'rxjs.operators',
-        },
-        name: 'DexieCloud',
-        banner: readFileSync('tools/tmp/banner.txt', 'utf-8'),
-        sourcemap: true,
-        exports: 'named',
+    }),
+  ];
+
+  // DEV and PRODUCTION build plugins
+  const DEV_BUILD_PLUGINS = [];
+
+  // PROD build plugins removes console logs and minifies code
+  const PRODUCTION_BUILD_PLUGINS = [
+    terser({
+      compress: {
+        drop_console: true,
+        drop_debugger: true,
       },
-      {
-        file: `dist/umd/${outputName}.min.js`,
-        format: 'umd',
-        globals: {
-          dexie: 'Dexie',
-          rxjs: 'rxjs',
-          'rxjs/operators': 'rxjs.operators',
-        },
-        name: 'DexieCloud',
-        banner: readFileSync('tools/tmp/banner.txt', 'utf-8'),
-        sourcemap: true,
-        exports: 'named',
-        plugins: [
-          terser({
-            compress: {
-              drop_console: true,
-              drop_debugger: true,
-            },
-            mangle: true,
-            sourceMap: true,
-            output: {
-              comments: false,
-            },
-          }),
-        ],
+      mangle: true,
+      sourceMap: true,
+      output: {
+        comments: false,
       },
-    ],
-    external: ['dexie', 'rxjs'],
-    plugins: [
-      typescript({
-        tsconfig: 'src/tsconfig.json',
-        compilerOptions: {
-          target: 'es2016',
+    }),
+  ];
+
+  return [
+    //
+    // Modern ES builds
+    //
+    {
+      input: entry,
+      output: [
+        // Modern DEV build
+        {
+          file: `dist/modern/${outputName}.js`,
+          format: 'es',
+          banner: readFileSync('tools/tmp/banner.txt', 'utf-8'),
+          sourcemap: true,
+          plugins: DEV_BUILD_PLUGINS,
         },
-        declarationDir: 'dist/',
-        //sourceMap: false, // Required (see https://stackoverflow.com/questions/63218218/rollup-is-not-generating-typescript-sourcemap)
-        inlineSources: true, // But this was even better because then we get the real source code in the sourcemap!
-      }),
-      //sourcemaps(),
-      nodeResolve({
-        browser: true,
-        preferBuiltins: false,
-      }),
-      commonjs(),
-      replace({
-        preventAssignment: true,
-        values: {
-          __VERSION__: JSON.stringify(pkg.version),
+        // Modern PROD build
+        {
+          file: `dist/modern/${outputName}.min.js`,
+          format: 'es',
+          banner: readFileSync('tools/tmp/banner.txt', 'utf-8'),
+          sourcemap: true,
+          plugins: PRODUCTION_BUILD_PLUGINS,
         },
-      }),
-    ],
-    /*onwarn({ loc, frame, code, message }) {
-      //if (ERRORS_TO_IGNORE.includes(code)) return;
-      if (loc) {
-        console.warn(`${loc.file} (${loc.line}:${loc.column}) ${message}`);
-        if (frame) console.warn(frame);
-      } else {
-        console.warn(`${code} ${message}`);
-      }
-    },*/
-  };
+      ],
+      plugins: COMMON_PLUGINS,
+      external: ['dexie', 'rxjs', 'rxjs/operators', 'y-dexie', 'lib0', 'lib0/encoding', 'lib0/decoding', 'yjs', 'y-protocols/awareness'],
+    },
+
+    //
+    // UMD build
+    //
+    {
+      input: entry,
+      output: [
+        // UMD DEV build
+        {
+          file: `dist/umd/${outputName}.js`,
+          format: 'umd',
+          globals: {
+            dexie: 'Dexie',
+            rxjs: 'rxjs',
+            'rxjs/operators': 'rxjs.operators',
+          },
+          name: 'DexieCloud',
+          banner: readFileSync('tools/tmp/banner.txt', 'utf-8'),
+          sourcemap: true,
+          exports: 'named',
+          plugins: DEV_BUILD_PLUGINS,
+        },
+        // UMD PROD build
+        {
+          file: `dist/umd/${outputName}.min.js`,
+          format: 'umd',
+          globals: {
+            dexie: 'Dexie',
+            rxjs: 'rxjs',
+            'rxjs/operators': 'rxjs.operators',
+          },
+          name: 'DexieCloud',
+          banner: readFileSync('tools/tmp/banner.txt', 'utf-8'),
+          sourcemap: true,
+          exports: 'named',
+          plugins: PRODUCTION_BUILD_PLUGINS,
+        },
+      ],
+      plugins: COMMON_PLUGINS,
+      external: ['dexie', 'rxjs', 'rxjs/operators'],
+    },
+  ];
 }
 
 createBanner();
 
 export default [
-  createRollupConfig('src/dexie-cloud-addon.ts', 'dexie-cloud-addon'),
-  createRollupConfig('src/service-worker.ts', 'service-worker'),
+  ...createRollupConfigs('src/dexie-cloud-addon.ts', 'dexie-cloud-addon'),
+  ...createRollupConfigs('src/service-worker.ts', 'service-worker'),
 ];
