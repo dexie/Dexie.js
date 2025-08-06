@@ -1,6 +1,6 @@
 {
   "name": "y-dexie",
-  "version": "4.2.0-alpha.6",
+  "version": "4.2.0-rc.1",
   "description": "Integration of Y.js with Dexie",
   "type": "module",
   "module": "dist/y-dexie.js",
