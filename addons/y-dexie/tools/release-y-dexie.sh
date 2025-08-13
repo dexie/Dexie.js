@@ -2,7 +2,8 @@
 cd ../..
 pnpm install
 pnpm build
-cd ../../addons/y-dexie
+cd -
 pnpm install
 pnpm build
+pnpm test
 echo "All built. To publish, run 'pnpm publish [--tag test|next]'"
