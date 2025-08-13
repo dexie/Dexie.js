@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "4.2.0-rc.1",
+  "version": "4.2.0",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "type": "module",
   "module": "dist/modern/dexie-cloud-addon.min.js",
