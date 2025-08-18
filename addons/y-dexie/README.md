@@ -127,7 +127,7 @@ Y.js allows multiple providers on the same document. It is possible to combine D
 
 ## Adding sync and awareness
 
-The [dexie-cloud-addon](/cloud/docs/dexie-cloud-addon) integrates with `y-dexie` and extends the existing DexieYProvider to become a provider also for sync and awareness. Just like other data, Y.Docs
+The [dexie-cloud-addon](https://dexie.org/cloud/docs/dexie-cloud-addon) integrates with `y-dexie` and extends the existing DexieYProvider to become a provider also for sync and awareness. Just like other data, Y.Docs
 will sync to Dexie Cloud Server. A websocket connection will propagate awareness
 and updates between clients.
 
