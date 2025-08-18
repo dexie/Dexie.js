@@ -118,8 +118,11 @@ export function dexieOpen (db: Dexie) {
             db.on("versionchange").fire(ev);
         });
         
-        idbdb.onclose = wrap(ev => {
-            db.on("close").fire(ev);
+        idbdb.onclose = wrap(() => {
+          // Resolve issue #2186: Once Dexie.on.close is triggered, Dexie.isOpen() is still true.
+          // Let the code path be the same as for db.close() so that db.isOpen() returns false
+          // and every other state is reset the same way.          
+          db.close({ disableAutoOpen: false })
         });
 
         if (wasCreated) _onDatabaseCreated(db._deps, dbName);
