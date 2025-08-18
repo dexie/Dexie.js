@@ -16,10 +16,10 @@ import yDexie from 'y-dexie';
 import type * as Y from 'yjs';
 
 interface Friend {
-    id: number;
-    name: string;
-    age: number;
-    notes: Y.Doc;
+  id: number;
+  name: string;
+  age: number;
+  notes: Y.Doc;
 }
 
 const db = new Dexie('myDB', { addons: [yDexie] }) as Dexie & {
@@ -88,10 +88,10 @@ The above line is equivalent to the following:
 ```ts
 const provider = DexieYProvider.load(doc);
 try {
-    await provider.whenLoaded;
-    ...
+  await provider.whenLoaded;
+  ...
 } finally {
-    DexieYProvider.release(doc);
+  DexieYProvider.release(doc);
 }
 ```
 
@@ -130,6 +130,45 @@ Y.js allows multiple providers on the same document. It is possible to combine D
 The [dexie-cloud-addon](/cloud/docs/dexie-cloud-addon) integrates with `y-dexie` and extends the existing DexieYProvider to become a provider also for sync and awareness. Just like other data, Y.Docs
 will sync to Dexie Cloud Server. A websocket connection will propagate awareness
 and updates between clients.
+
+1. Create a dexie cloud database to sync with:
+
+```
+npx dexie-cloud create
+```
+
+2. Update database declaration to use dexieCloud addon:
+
+```ts
+import { Dexie } from 'dexie';
+import yDexie from 'y-dexie';
+import dexieCloud, { DexieCloudTable } from 'dexie-cloud-addon';
+import type * as Y from 'yjs';
+
+interface Friend {
+  id: string;
+  name: string;
+  age: number;
+  notes: Y.Doc;
+}
+
+const db = new Dexie('myDB', { addons: [yDexie, dexieCloud] }) as Dexie & {
+  friends: DexieCloudTable<Friend, 'id'>
+}
+
+db.version(1).stores({
+  friends: `
+    @id,
+    name,
+    age,
+    notes: Y.Doc`, // each friend as a 'notes' document
+});
+
+db.cloud.configure({
+  databaseUrl: 'https://xxxxx.dexie.cloud' // Obtained from CLI: `npx dexie-cloud create`
+});
+```
+
 
 ## Using with React
 
