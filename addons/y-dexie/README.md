@@ -201,7 +201,30 @@ by the ecosystem of text editors supporting Y.js, such as TipTap or Prosemirror.
 
 This application showcases the following:
 
-* Collaborative text editing with y-dexie and tiptap
-* Sync and awareness with dexie cloud
+* Collaborative text editing with y-dexie and TipTap
+* Sync and awareness with Dexie Cloud
 * Full-text search with lunr
+* Sharing and access control
 
+### [Lkal.ma](https://lkal.ma/boards)
+
+The winner of Dexie Cloud Hackathon 2025.
+
+This application showcases the following:
+
+* Collaborative drawing using TLDraw with Y.js
+* Sync and awareness with Dexie Cloud
+* Sharing and access control
+
+### [To To Do](https://totodo.app)
+
+A commercial ToDo application for iOS, Android and web built on top of
+Dexie Cloud, Capacitor, Y.js, TipTap, ChatGPT and NextJS.
+
+This application showcases the following:
+
+* Collaborative task list sharing
+* Notes taking with Y.js and TipTap
+* Sharing and access control
+* Native app bundling with Capacitor
+* Smart AI suggestions
