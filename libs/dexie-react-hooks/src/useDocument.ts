@@ -73,7 +73,7 @@ export function useDocument(
         return () => {
           DexieYProvider.release(doc);
           if (onErrorRef.current) {
-            provider.off('error', onErrorRef.current);
+            provider!.off('error', onErrorRef.current);
           }
         };
       } else {
