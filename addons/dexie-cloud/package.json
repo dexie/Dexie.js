@@ -92,7 +92,7 @@
     "terser": "^5.20.0",
     "tslib": "*",
     "typescript": "^5.6.3",
-    "y-dexie": "workspace:>=4.2.0-alpha.1 <5.0.0"
+    "y-dexie": "workspace:*"
   },
   "dependencies": {
     "dexie-cloud-common": "workspace:^",

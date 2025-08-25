@@ -49,7 +49,7 @@
     "@rollup/plugin-terser": "^0.4.4",
     "@rollup/plugin-typescript": "^11.1.5",
     "@types/node": "^18.11.18",
-    "dexie": "workspace:>=4.2.0-alpha.1 <5.0.0",
+    "dexie": "workspace:*",
     "dreambase-library": "^1.0.26",
     "just-build": "*",
     "karma": "*",
@@ -65,7 +65,7 @@
     "yjs": "^13.6.27"
   },
   "peerDependencies": {
-    "dexie": "workspace:>=4.2.0-alpha.1 <5.0.0",
+    "dexie": ">=4.2.0-alpha.1 <5.0.0",
     "yjs": "^13.6.27"
   }
 }

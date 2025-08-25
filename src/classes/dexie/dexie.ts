@@ -323,8 +323,14 @@ export class Dexie implements IDexie {
     );
   }
 
+  private _isFiringClose?: boolean;
   _close(): void {
-    this.on.close.fire(new CustomEvent('close'));
+    if (!this._isFiringClose) {
+      this._isFiringClose = true;
+      try {this.on.close.fire(new CustomEvent('close'));} finally {
+        this._isFiringClose = false;
+      }
+    }
     const state = this._state;
     const idx = connections.indexOf(this);
     if (idx >= 0) connections.splice(idx, 1);
