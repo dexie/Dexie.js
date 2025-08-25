@@ -55,7 +55,7 @@
   "homepage": "https://dexie.org",
   "peerDependencies": {
     "@types/react": ">=16",
-    "dexie": "workspace:>=4.2.0-alpha.1 <5.0.0",
+    "dexie": ">=4.2.0-alpha.1 <5.0.0",
     "react": ">=16"
   },
   "devDependencies": {
@@ -78,8 +78,8 @@
     "typescript": "^5.3.3",
     "webpack": "^5.74.0",
     "webpack-cli": "^4.5.0",
-    "dexie": "workspace:>=4.2.0-alpha.1 <5.0.0",
-    "y-dexie": "workspace:>=4.2.0-alpha.1 <5.0.0",
+    "dexie": "workspace:*",
+    "y-dexie": "workspace:*",
     "yjs": "^13.6.27"
   }
 }
