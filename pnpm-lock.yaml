@@ -443,6 +443,24 @@ importers:
       web-vitals:
         specifier: ^3.3.2
         version: 3.3.2
+      workbox-core:
+        specifier: ^7.0.0
+        version: 7.3.0
+      workbox-expiration:
+        specifier: ^7.0.0
+        version: 7.3.0
+      workbox-precaching:
+        specifier: ^7.0.0
+        version: 7.3.0
+      workbox-routing:
+        specifier: ^7.0.0
+        version: 7.3.0
+      workbox-strategies:
+        specifier: ^7.0.0
+        version: 7.3.0
+      workbox-window:
+        specifier: ^7.0.0
+        version: 7.3.0
     devDependencies:
       '@testing-library/jest-dom':
         specifier: ^5.16.5
@@ -479,7 +497,7 @@ importers:
         version: 4.5.14(@types/node@20.2.5)(terser@5.20.0)
       vite-plugin-pwa:
         specifier: ^0.16.0
-        version: 0.16.7(vite@4.5.14(@types/node@20.2.5)(terser@5.20.0))(workbox-build@6.6.0(@types/babel__core@7.20.5))(workbox-window@6.6.0)
+        version: 0.16.7(vite@4.5.14(@types/node@20.2.5)(terser@5.20.0))(workbox-build@6.6.0(@types/babel__core@7.20.5))(workbox-window@7.3.0)
       vitest:
         specifier: ^0.34.0
         version: 0.34.6(@vitest/ui@0.34.7)(jsdom@22.1.0)(terser@5.20.0)
@@ -3595,10 +3613,6 @@ packages:
     resolution: {integrity: sha512-cntlB5ghuB0iuO65Ovoi8ogLHiWGs/5yNrtUcKjFhSSiVeAIVpD7koaSU9RM8mpXw5YDi9RdYXGQMaOURB7ycQ==}
     engines: {node: '>=6.0.0'}
 
-  internal-slot@1.0.5:
-    resolution: {integrity: sha512-Y+R5hJrzs52QCG2laLn4udYVnxsfny9CpOhNhUvk/SSSVyF6T27FzRbF0sroPidSu3X8oEAkOn2K804mjpt6UQ==}
-    engines: {node: '>= 0.4'}
-
   internal-slot@1.1.0:
     resolution: {integrity: sha512-4gd7VpWNQNB4UKKCFFVcp1AVv+FMOgs9NKzjHKusc8jTMhd5eL1NqQqOpE0KzMds804/yHlglp3uxgluOqAPLw==}
     engines: {node: '>= 0.4'}
@@ -4798,10 +4812,6 @@ packages:
   regenerator-transform@0.15.1:
     resolution: {integrity: sha512-knzmNAcuyxV+gQCufkYcvOqX/qIIfHLv0u5x79kRxuGojfYVky1f15TzZEu2Avte8QGepvUNTnLskf8E6X6Vyg==}
 
-  regexp.prototype.flags@1.5.0:
-    resolution: {integrity: sha512-0SutC3pNudRKgquxGoRGIz946MZVHqbNfPjBdxeOhBrdgDKlRoXmYLQN9xRbrR09ZXWeGAdPuif7egofn6v5LA==}
-    engines: {node: '>= 0.4'}
-
   regexp.prototype.flags@1.5.4:
     resolution: {integrity: sha512-dYqgNSZbDwkaJ2ceRd9ojCGjBq+mOm9LmtXnAnEGyHhN/5R7iDW2TRw3h+o/jCFxus3P2LfWIIiwowAjANm7IA==}
     engines: {node: '>= 0.4'}
@@ -5905,10 +5915,6 @@ packages:
     resolution: {integrity: sha512-rEvr90Bck4WZt9HHFC4DJMsjvu7x+r6bImz0/BrbWb7A2djJ8hnZMrWnHo9F8ssv0OMErasDhftrfROTyqSDrw==}
     engines: {node: '>= 0.4'}
 
-  which-typed-array@1.1.9:
-    resolution: {integrity: sha512-w9c4xkx6mPidwp7180ckYWfMmvxpjlZuIudNtDf4N/tTAUB8VJbX25qZoAsrtGuYNnGw3pa0AXgbGKRB8/EceA==}
-    engines: {node: '>= 0.4'}
-
   which@1.3.1:
     resolution: {integrity: sha512-HxJdYWq1MTIQbJ3nw0cqssHoTNU267KlrDuGZ1WYlxDStUtKUhOaJmh112/TZmHxxUfuJqPXSOm7tDyas0OSIQ==}
     hasBin: true
@@ -5947,8 +5953,14 @@ packages:
   workbox-core@6.6.0:
     resolution: {integrity: sha512-GDtFRF7Yg3DD859PMbPAYPeJyg5gJYXuBQAC+wyrWuuXgpfoOrIQIvFRZnQ7+czTIQjIr1DhLEGFzZanAT/3bQ==}
 
+  workbox-core@7.3.0:
+    resolution: {integrity: sha512-Z+mYrErfh4t3zi7NVTvOuACB0A/jA3bgxUN3PwtAVHvfEsZxV9Iju580VEETug3zYJRc0Dmii/aixI/Uxj8fmw==}
+
   workbox-expiration@6.6.0:
     resolution: {integrity: sha512-baplYXcDHbe8vAo7GYvyAmlS4f6998Jff513L4XvlzAOxcl8F620O91guoJ5EOf5qeXG4cGdNZHkkVAPouFCpw==}
+
+  workbox-expiration@7.3.0:
+    resolution: {integrity: sha512-lpnSSLp2BM+K6bgFCWc5bS1LR5pAwDWbcKt1iL87/eTSJRdLdAwGQznZE+1czLgn/X05YChsrEegTNxjM067vQ==}
 
   workbox-google-analytics@6.6.0:
     resolution: {integrity: sha512-p4DJa6OldXWd6M9zRl0H6vB9lkrmqYFkRQ2xEiNdBFp9U0LhsGO7hsBscVEyH9H2/3eZZt8c97NB2FD9U2NJ+Q==}
@@ -5960,6 +5972,9 @@ packages:
   workbox-precaching@6.6.0:
     resolution: {integrity: sha512-eYu/7MqtRZN1IDttl/UQcSZFkHP7dnvr/X3Vn6Iw6OsPMruQHiVjjomDFCNtd8k2RdjLs0xiz9nq+t3YVBcWPw==}
 
+  workbox-precaching@7.3.0:
+    resolution: {integrity: sha512-ckp/3t0msgXclVAYaNndAGeAoWQUv7Rwc4fdhWL69CCAb2UHo3Cef0KIUctqfQj1p8h6aGyz3w8Cy3Ihq9OmIw==}
+
   workbox-range-requests@6.6.0:
     resolution: {integrity: sha512-V3aICz5fLGq5DpSYEU8LxeXvsT//mRWzKrfBOIxzIdQnV/Wj7R+LyJVTczi4CQ4NwKhAaBVaSujI1cEjXW+hTw==}
 
@@ -5969,8 +5984,14 @@ packages:
   workbox-routing@6.6.0:
     resolution: {integrity: sha512-x8gdN7VDBiLC03izAZRfU+WKUXJnbqt6PG9Uh0XuPRzJPpZGLKce/FkOX95dWHRpOHWLEq8RXzjW0O+POSkKvw==}
 
+  workbox-routing@7.3.0:
+    resolution: {integrity: sha512-ZUlysUVn5ZUzMOmQN3bqu+gK98vNfgX/gSTZ127izJg/pMMy4LryAthnYtjuqcjkN4HEAx1mdgxNiKJMZQM76A==}
+
   workbox-strategies@6.6.0:
     resolution: {integrity: sha512-eC07XGuINAKUWDnZeIPdRdVja4JQtTuc35TZ8SwMb1ztjp7Ddq2CJ4yqLvWzFWGlYI7CG/YGqaETntTxBGdKgQ==}
+
+  workbox-strategies@7.3.0:
+    resolution: {integrity: sha512-tmZydug+qzDFATwX7QiEL5Hdf7FrkhjaF9db1CbB39sDmEZJg3l9ayDvPxy8Y18C3Y66Nrr9kkN1f/RlkDgllg==}
 
   workbox-streams@6.6.0:
     resolution: {integrity: sha512-rfMJLVvwuED09CnH1RnIep7L9+mj4ufkTyDPVaXPKlhi9+0czCu+SJggWCIFbPpJaAZmp2iyVGLqS3RUmY3fxg==}
@@ -5980,6 +6001,9 @@ packages:
 
   workbox-window@6.6.0:
     resolution: {integrity: sha512-L4N9+vka17d16geaJXXRjENLFldvkWy7JyGxElRD0JvBxvFEd8LOhr+uXCcar/NzAmIBRv9EZ+M+Qr4mOoBITw==}
+
+  workbox-window@7.3.0:
+    resolution: {integrity: sha512-qW8PDy16OV1UBaUNGlTVcepzrlzyzNW/ZJvFQQs2j2TzGsg6IKjcpZC1RSquqQnTOafl5pCj5bGfAHlCjOOjdA==}
 
   wrap-ansi@7.0.0:
     resolution: {integrity: sha512-YVGIj2kamLSTxw6NsZjoBxfSwsn0ycdesmc4p+Q21c5zPuZ1pl+NfxVdxPtdHvmNVOQ6XSYG4AUtyt/Fi7D16Q==}
@@ -9108,20 +9132,20 @@ snapshots:
   es-abstract@1.21.2:
     dependencies:
       array-buffer-byte-length: 1.0.0
-      available-typed-arrays: 1.0.5
-      call-bind: 1.0.2
+      available-typed-arrays: 1.0.7
+      call-bind: 1.0.8
       es-set-tostringtag: 2.0.1
       es-to-primitive: 1.2.1
       function.prototype.name: 1.1.5
-      get-intrinsic: 1.2.1
+      get-intrinsic: 1.3.0
       get-symbol-description: 1.0.0
       globalthis: 1.0.3
-      gopd: 1.0.1
+      gopd: 1.2.0
       has: 1.0.3
-      has-property-descriptors: 1.0.0
+      has-property-descriptors: 1.0.2
       has-proto: 1.0.1
-      has-symbols: 1.0.3
-      internal-slot: 1.0.5
+      has-symbols: 1.1.0
+      internal-slot: 1.1.0
       is-array-buffer: 3.0.2
       is-callable: 1.2.7
       is-negative-zero: 2.0.2
@@ -9130,17 +9154,17 @@ snapshots:
       is-string: 1.0.7
       is-typed-array: 1.1.10
       is-weakref: 1.0.2
-      object-inspect: 1.12.3
+      object-inspect: 1.13.4
       object-keys: 1.1.1
       object.assign: 4.1.4
-      regexp.prototype.flags: 1.5.0
+      regexp.prototype.flags: 1.5.4
       safe-regex-test: 1.0.0
       string.prototype.trim: 1.2.7
       string.prototype.trimend: 1.0.6
       string.prototype.trimstart: 1.0.6
       typed-array-length: 1.0.4
       unbox-primitive: 1.0.2
-      which-typed-array: 1.1.9
+      which-typed-array: 1.1.19
 
   es-define-property@1.0.1: {}
 
@@ -9166,9 +9190,9 @@ snapshots:
 
   es-set-tostringtag@2.0.1:
     dependencies:
-      get-intrinsic: 1.2.1
+      get-intrinsic: 1.3.0
       has: 1.0.3
-      has-tostringtag: 1.0.0
+      has-tostringtag: 1.0.2
 
   es-to-primitive@1.2.1:
     dependencies:
@@ -9567,8 +9591,8 @@ snapshots:
 
   function.prototype.name@1.1.5:
     dependencies:
-      call-bind: 1.0.2
-      define-properties: 1.2.0
+      call-bind: 1.0.8
+      define-properties: 1.2.1
       es-abstract: 1.21.2
       functions-have-names: 1.2.3
 
@@ -9617,8 +9641,8 @@ snapshots:
 
   get-symbol-description@1.0.0:
     dependencies:
-      call-bind: 1.0.2
-      get-intrinsic: 1.2.1
+      call-bind: 1.0.8
+      get-intrinsic: 1.3.0
 
   getpass@0.1.7:
     dependencies:
@@ -9674,7 +9698,7 @@ snapshots:
 
   globalthis@1.0.3:
     dependencies:
-      define-properties: 1.2.0
+      define-properties: 1.2.1
 
   globalyzer@0.1.0: {}
 
@@ -9862,12 +9886,6 @@ snapshots:
       strip-ansi: 5.2.0
       through: 2.3.8
 
-  internal-slot@1.0.5:
-    dependencies:
-      get-intrinsic: 1.2.1
-      has: 1.0.3
-      side-channel: 1.0.4
-
   internal-slot@1.1.0:
     dependencies:
       es-errors: 1.3.0
@@ -9999,7 +10017,7 @@ snapshots:
 
   is-weakref@1.0.2:
     dependencies:
-      call-bind: 1.0.2
+      call-bind: 1.0.8
 
   is-weakset@2.0.4:
     dependencies:
@@ -11311,12 +11329,6 @@ snapshots:
     dependencies:
       '@babel/runtime': 7.27.0
 
-  regexp.prototype.flags@1.5.0:
-    dependencies:
-      call-bind: 1.0.2
-      define-properties: 1.2.0
-      functions-have-names: 1.2.3
-
   regexp.prototype.flags@1.5.4:
     dependencies:
       call-bind: 1.0.8
@@ -11553,8 +11565,8 @@ snapshots:
 
   safe-regex-test@1.0.0:
     dependencies:
-      call-bind: 1.0.2
-      get-intrinsic: 1.2.1
+      call-bind: 1.0.8
+      get-intrinsic: 1.3.0
       is-regex: 1.1.4
 
   safer-buffer@2.1.2: {}
@@ -11903,31 +11915,31 @@ snapshots:
 
   string.prototype.matchall@4.0.8:
     dependencies:
-      call-bind: 1.0.2
-      define-properties: 1.2.0
+      call-bind: 1.0.8
+      define-properties: 1.2.1
       es-abstract: 1.21.2
-      get-intrinsic: 1.2.1
-      has-symbols: 1.0.3
-      internal-slot: 1.0.5
-      regexp.prototype.flags: 1.5.0
-      side-channel: 1.0.4
+      get-intrinsic: 1.3.0
+      has-symbols: 1.1.0
+      internal-slot: 1.1.0
+      regexp.prototype.flags: 1.5.4
+      side-channel: 1.1.0
 
   string.prototype.trim@1.2.7:
     dependencies:
-      call-bind: 1.0.2
-      define-properties: 1.2.0
+      call-bind: 1.0.8
+      define-properties: 1.2.1
       es-abstract: 1.21.2
 
   string.prototype.trimend@1.0.6:
     dependencies:
-      call-bind: 1.0.2
-      define-properties: 1.2.0
+      call-bind: 1.0.8
+      define-properties: 1.2.1
       es-abstract: 1.21.2
 
   string.prototype.trimstart@1.0.6:
     dependencies:
-      call-bind: 1.0.2
-      define-properties: 1.2.0
+      call-bind: 1.0.8
+      define-properties: 1.2.1
       es-abstract: 1.21.2
 
   string_decoder@1.1.1:
@@ -12200,8 +12212,8 @@ snapshots:
 
   typed-array-length@1.0.4:
     dependencies:
-      call-bind: 1.0.2
-      for-each: 0.3.3
+      call-bind: 1.0.8
+      for-each: 0.3.5
       is-typed-array: 1.1.10
 
   typescript@5.3.3: {}
@@ -12233,9 +12245,9 @@ snapshots:
 
   unbox-primitive@1.0.2:
     dependencies:
-      call-bind: 1.0.2
+      call-bind: 1.0.8
       has-bigints: 1.0.2
-      has-symbols: 1.0.3
+      has-symbols: 1.1.0
       which-boxed-primitive: 1.0.2
 
   uncontrollable@7.2.1(react@18.3.1):
@@ -12344,14 +12356,14 @@ snapshots:
       - supports-color
       - terser
 
-  vite-plugin-pwa@0.16.7(vite@4.5.14(@types/node@20.2.5)(terser@5.20.0))(workbox-build@6.6.0(@types/babel__core@7.20.5))(workbox-window@6.6.0):
+  vite-plugin-pwa@0.16.7(vite@4.5.14(@types/node@20.2.5)(terser@5.20.0))(workbox-build@6.6.0(@types/babel__core@7.20.5))(workbox-window@7.3.0):
     dependencies:
       debug: 4.4.0
       fast-glob: 3.3.3
       pretty-bytes: 6.1.1
       vite: 4.5.14(@types/node@20.2.5)(terser@5.20.0)
       workbox-build: 6.6.0(@types/babel__core@7.20.5)
-      workbox-window: 6.6.0
+      workbox-window: 7.3.0
     transitivePeerDependencies:
       - supports-color
 
@@ -12544,15 +12556,6 @@ snapshots:
       gopd: 1.2.0
       has-tostringtag: 1.0.2
 
-  which-typed-array@1.1.9:
-    dependencies:
-      available-typed-arrays: 1.0.5
-      call-bind: 1.0.2
-      for-each: 0.3.3
-      gopd: 1.0.1
-      has-tostringtag: 1.0.0
-      is-typed-array: 1.1.10
-
   which@1.3.1:
     dependencies:
       isexe: 2.0.0
@@ -12628,10 +12631,17 @@ snapshots:
 
   workbox-core@6.6.0: {}
 
+  workbox-core@7.3.0: {}
+
   workbox-expiration@6.6.0:
     dependencies:
       idb: 7.1.1
       workbox-core: 6.6.0
+
+  workbox-expiration@7.3.0:
+    dependencies:
+      idb: 7.1.1
+      workbox-core: 7.3.0
 
   workbox-google-analytics@6.6.0:
     dependencies:
@@ -12650,6 +12660,12 @@ snapshots:
       workbox-routing: 6.6.0
       workbox-strategies: 6.6.0
 
+  workbox-precaching@7.3.0:
+    dependencies:
+      workbox-core: 7.3.0
+      workbox-routing: 7.3.0
+      workbox-strategies: 7.3.0
+
   workbox-range-requests@6.6.0:
     dependencies:
       workbox-core: 6.6.0
@@ -12667,9 +12683,17 @@ snapshots:
     dependencies:
       workbox-core: 6.6.0
 
+  workbox-routing@7.3.0:
+    dependencies:
+      workbox-core: 7.3.0
+
   workbox-strategies@6.6.0:
     dependencies:
       workbox-core: 6.6.0
+
+  workbox-strategies@7.3.0:
+    dependencies:
+      workbox-core: 7.3.0
 
   workbox-streams@6.6.0:
     dependencies:
@@ -12682,6 +12706,11 @@ snapshots:
     dependencies:
       '@types/trusted-types': 2.0.3
       workbox-core: 6.6.0
+
+  workbox-window@7.3.0:
+    dependencies:
+      '@types/trusted-types': 2.0.3
+      workbox-core: 7.3.0
 
   wrap-ansi@7.0.0:
     dependencies:
