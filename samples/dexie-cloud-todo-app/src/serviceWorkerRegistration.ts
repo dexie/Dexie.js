@@ -1,8 +1,6 @@
 // This file integrates with vite-plugin-pwa for service worker functionality
 // vite-plugin-pwa automatically generates the service worker based on the config
 
-import { registerSW } from 'virtual:pwa-register'
-
 type Config = {
   onSuccess?: (registration: ServiceWorkerRegistration) => void;
   onUpdate?: (registration: ServiceWorkerRegistration) => void;
@@ -11,39 +9,37 @@ type Config = {
 };
 
 export function register(config?: Config) {
-  // Only register in production
-  if (import.meta.env.PROD) {
-    const updateSW = registerSW({
-      onNeedRefresh() {
-        console.log('New content is available and will be used when all tabs for this page are closed.');
-        if (config?.onUpdate && 'serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistration().then((registration) => {
-            if (registration) {
-              config.onUpdate!(registration);
-            }
-          });
-        }
-        if (config?.onNeedRefresh) {
-          config.onNeedRefresh();
-        }
-      },
-      onOfflineReady() {
-        console.log('App ready to work offline.');
-        if (config?.onSuccess && 'serviceWorker' in navigator) {
-          navigator.serviceWorker.getRegistration().then((registration) => {
-            if (registration) {
-              config.onSuccess!(registration);
-            }
-          });
-        }
-        if (config?.onOfflineReady) {
-          config.onOfflineReady();
-        }
-      },
-    });
+  // Only register in production and if service worker is supported
+  if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+    window.addEventListener('load', async () => {
+      try {
+        const registration = await navigator.serviceWorker.register('/sw.js', {
+          scope: '/'
+        });
 
-    // Return function to manually update the service worker
-    return updateSW;
+        registration.addEventListener('updatefound', () => {
+          const newWorker = registration.installing;
+          if (!newWorker) return;
+
+          newWorker.addEventListener('statechange', () => {
+            if (newWorker.state === 'installed') {
+              if (navigator.serviceWorker.controller) {
+                console.log('New content is available and will be used when all tabs for this page are closed.');
+                config?.onUpdate?.(registration);
+                config?.onNeedRefresh?.();
+              } else {
+                console.log('App ready to work offline.');
+                config?.onSuccess?.(registration);
+                config?.onOfflineReady?.();
+              }
+            }
+          });
+        });
+
+      } catch (error) {
+        console.error('Service worker registration failed:', error);
+      }
+    });
   }
   
   return () => {};

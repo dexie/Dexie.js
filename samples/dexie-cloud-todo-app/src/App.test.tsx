@@ -1,9 +1,12 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
+import { describe, it, expect } from 'vitest';
 import App from './App';
 
-test('renders learn react link', () => {
-  render(<App />);
-  const linkElement = screen.getByText(/learn react/i);
-  expect(linkElement).toBeInTheDocument();
+describe('App', () => {
+  it('renders todo app', () => {
+    render(<App />);
+    // Test that the navbar and app title renders
+    const element = screen.getByText('Dexie Cloud ToDo App');
+    expect(element).toBeInTheDocument();
+  });
 });

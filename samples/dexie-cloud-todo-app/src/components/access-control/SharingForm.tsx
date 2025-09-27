@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { TodoList } from '../../db/TodoList';
-import { useLiveQuery, useObservable, usePermissions } from 'dexie-react-hooks';
+import { useLiveQuery, usePermissions } from 'dexie-react-hooks';
 import { db } from '../../db';
 import { DBRealmMember } from 'dexie-cloud-addon';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';

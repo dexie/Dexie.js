@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { db } from '../db';
 import { TodoItem } from '../db/TodoItem';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';

@@ -2,7 +2,6 @@ import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
 import {
   faCheckDouble,
   faEye,
-  faQuestion,
   faUserEdit,
   faUserTie,
 } from '@fortawesome/free-solid-svg-icons';

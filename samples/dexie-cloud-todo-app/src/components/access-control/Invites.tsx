@@ -4,7 +4,6 @@ import { useObservable } from 'react-use';
 import { db } from '../../db';
 
 export function Invites() {
-  const currentUser = useObservable(db.cloud.currentUser);
   const invites = useObservable(db.cloud.invites, []);
   if (invites.length === 0) return null;
   return (

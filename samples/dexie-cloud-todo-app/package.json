@@ -17,7 +17,8 @@
     "react-dom": "^18.2.0",
     "react-use": "^17.4.0",
     "typescript": "^5.0.0",
-    "web-vitals": "^3.3.2"
+    "web-vitals": "^3.3.2",
+    "workbox-window": "^7.0.0"
   },
   "scripts": {
     "dev": "vite",
@@ -42,6 +43,9 @@
     ]
   },
   "devDependencies": {
+    "@testing-library/jest-dom": "^5.16.5",
+    "@testing-library/react": "^14.0.0",
+    "@testing-library/user-event": "^14.4.3",
     "@types/node": "^20.2.5",
     "@types/react": "^18.2.8",
     "@types/react-dom": "^18.2.4",

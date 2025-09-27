@@ -1,6 +1,6 @@
 import { TodoDB } from './TodoDB';
 
-export function populate(db: TodoDB) {
+export function populate(_db: TodoDB) {
   // SHOWCASE FOR "Private IDs"!
   //
   // What is Private IDs?

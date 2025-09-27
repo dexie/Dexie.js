@@ -1,7 +1,7 @@
 import { faList } from "@fortawesome/free-solid-svg-icons";
 import { FontAwesomeIcon } from "@fortawesome/react-fontawesome";
 import { useLiveQuery } from "dexie-react-hooks";
-import React, { useState } from "react";
+import { useState } from "react";
 import { db } from "../db";
 
 export function AddTodoList() {
