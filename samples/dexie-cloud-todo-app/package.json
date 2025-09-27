@@ -27,7 +27,8 @@
     "preview": "vite preview",
     "predeploy": "VITE_BUILD_TIME=$(date +%s) npm run build",
     "deploy": "gh-pages -d build -e dexie-cloud-todo-app",
-    "test": "vitest",
+    "test": "vitest run",
+    "test:watch": "vitest",
     "test:ui": "vitest --ui"
   },
   "browserslist": {

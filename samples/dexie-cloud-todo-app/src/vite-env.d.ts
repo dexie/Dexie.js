@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 /// <reference types="vite-plugin-pwa/client" />
 /// <reference types="vitest/globals" />
+/// <reference types="@testing-library/jest-dom" />
 
 interface ImportMetaEnv {
   readonly VITE_DBURL: string
