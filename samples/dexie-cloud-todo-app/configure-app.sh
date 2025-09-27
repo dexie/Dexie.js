@@ -14,10 +14,9 @@ echo "Whitelisting origin: http://localhost:3000"
 npx dexie-cloud whitelist http://localhost:3000
 DB_URL=$(node -p "require('./dexie-cloud.json').dbUrl")
 echo ""
-echo "Configuring .env.local: REACT_APP_DBURL=$DB_URL"
-echo "REACT_APP_DBURL=$DB_URL" > .env.local
-echo "FAST_REFRESH=false" >> .env.local
+echo "Configuring .env.local: VITE_DBURL=$DB_URL"
+echo "VITE_DBURL=$DB_URL" > .env.local
 echo ""
 echo "Application is now configured!"
 echo "Use 'npm install' if you haven't done so already."
-echo "Use 'npm start' to start the app."
+echo "Use 'npm run dev' or 'npm start' to start the app."
