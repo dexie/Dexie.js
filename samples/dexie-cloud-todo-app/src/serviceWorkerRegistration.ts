@@ -11,6 +11,7 @@ type Config = {
 export function register(config?: Config) {
   // Only register in production and if service worker is supported
   if (import.meta.env.PROD && 'serviceWorker' in navigator) {
+    console.log('🔧 Service Worker: Registering in production mode...');
     window.addEventListener('load', async () => {
       try {
         const registration = await navigator.serviceWorker.register('/sw.js', {
@@ -40,6 +41,12 @@ export function register(config?: Config) {
         console.error('Service worker registration failed:', error);
       }
     });
+  } else {
+    if (!import.meta.env.PROD) {
+      console.log('🚫 Service Worker: Disabled in development mode for easier debugging');
+    } else if (!('serviceWorker' in navigator)) {
+      console.log('🚫 Service Worker: Not supported in this browser');
+    }
   }
   
   return () => {};

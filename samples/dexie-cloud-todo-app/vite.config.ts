@@ -12,6 +12,10 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
+      devOptions: {
+        enabled: false, // Explicitly disable service worker in development
+        type: 'module'
+      },
       includeAssets: ['favicon.ico', 'dexie-icon-192x192.png', 'dexie-icon-512x512.png'],
       manifest: {
         name: 'Dexie Cloud ToDo App',
