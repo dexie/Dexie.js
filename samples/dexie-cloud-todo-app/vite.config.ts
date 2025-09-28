@@ -4,6 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
 export default defineConfig({
+  base: process.env.PUBLIC_URL ?? './',
   plugins: [
     react(),
     VitePWA({
@@ -46,6 +47,7 @@ export default defineConfig({
   build: {
     outDir: 'build',
     sourcemap: true,
+    chunkSizeWarningLimit: 1000, // Increase warning limit to 1MB
   },
   server: {
     port: 3000,

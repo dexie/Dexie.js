@@ -129,4 +129,20 @@ This project has been migrated from Create React App to Vite for improved develo
 - **Environment variables** now use `VITE_` prefix instead of `REACT_APP_`
 - **Modern build output** optimized for modern browsers
 
+### Public URL Configuration
+
+Unlike Create React App's `%PUBLIC_URL%` template syntax, Vite handles public paths through the `base` configuration in `vite.config.ts`. 
+
+- **Default**: Absolute paths (`/assets/...`) for root domain deployment
+- **Subdirectory deployment**: Set `PUBLIC_URL` environment variable
+  ```bash
+  # For deployment in subdirectory
+  PUBLIC_URL=/my-app npm run build
+  
+  # For relative paths (e.g., GitHub Pages without custom domain)
+  PUBLIC_URL=. npm run build
+  ```
+
+The `PUBLIC_URL` environment variable is automatically converted to Vite's `base` option during build.
+
 The application functionality remains exactly the same, but with better performance and developer experience.
