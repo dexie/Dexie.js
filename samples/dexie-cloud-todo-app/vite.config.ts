@@ -19,7 +19,7 @@ export default defineConfig({
     open: true
   },
   preview: {
-    port: 3000
+    port: 3001
   },
   plugins: [
     react(),

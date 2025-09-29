@@ -28,7 +28,7 @@ Service worker is automatically enabled in production builds thanks to vite-plug
 
 The easiest way to test the full PWA experience is to deploy the app:
 
-1. `npm run build && npm run preview` (local production preview)
+1. `npm run build && npm run preview` (local production preview). The production build is previewed on port 3001
 2. Or deploy with: `npm run deploy` (will publish the app to your gh-pages branch of your Dexie.js fork)
 3. `npx dexie-cloud whitelist https://your-github-username.github.io` (replace `your-github-username`)
 4. Voila: Go to https://your-github-username.github.io/Dexie.js/dexie-cloud-todo-app/ from your browser. This is a full installable PWA that you can add to your start screen on a mobile phone.

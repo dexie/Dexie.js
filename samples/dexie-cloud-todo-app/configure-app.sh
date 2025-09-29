@@ -10,8 +10,10 @@ if [ ! -f "./dexie-cloud.json" ]; then
 fi
 echo "Adding demo users to your application..."
 npx dexie-cloud import src/data/importfile.json
-echo "Whitelisting origin: http://localhost:3000"
+echo "Whitelisting origin: http://localhost:3000 (for npm run dev)"
 npx dexie-cloud whitelist http://localhost:3000
+echo "Whitelisting origin: http://localhost:3001 (for npm run build && npm run preview)"
+npx dexie-cloud whitelist http://localhost:3001
 DB_URL=$(node -p "require('./dexie-cloud.json').dbUrl")
 echo ""
 echo "Configuring .env.local: VITE_DBURL=$DB_URL"
