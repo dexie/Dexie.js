@@ -11,8 +11,6 @@ import { precacheAndRoute, cleanupOutdatedCaches } from 'workbox-precaching';
 import { clientsClaim, skipWaiting } from 'workbox-core';
 import { registerRoute, NavigationRoute } from 'workbox-routing';
 import { createHandlerBoundToURL } from 'workbox-precaching';
-import { CacheFirst } from 'workbox-strategies';
-import { ExpirationPlugin } from 'workbox-expiration';
 
 declare const self: ServiceWorkerGlobalScope;
 
@@ -34,33 +32,6 @@ const navigationRoute = new NavigationRoute(
   createHandlerBoundToURL(`${baseUrl}index.html`)
 );
 registerRoute(navigationRoute);
-
-// Cache Google Fonts
-registerRoute(
-  /^https:\/\/fonts\.googleapis\.com\/.*/i,
-  new CacheFirst({
-    cacheName: 'google-fonts-cache',
-    plugins: [
-      new ExpirationPlugin({
-        maxEntries: 10,
-        maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
-      }),
-    ],
-  })
-);
-
-registerRoute(
-  /^https:\/\/fonts\.gstatic\.com\/.*/i,
-  new CacheFirst({
-    cacheName: 'gstatic-fonts-cache',
-    plugins: [
-      new ExpirationPlugin({
-        maxEntries: 10,
-        maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
-      }),
-    ],
-  })
-);
 
 // Force update strategy for development
 self.addEventListener('install', () => {
