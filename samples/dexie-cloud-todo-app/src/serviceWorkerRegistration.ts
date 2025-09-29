@@ -11,7 +11,7 @@ type Config = {
 export function register(config?: Config) {
   // Only register in production and if service worker is supported
   if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-    console.log('🔧 Service Worker: Registering in production mode...');
+    console.log(`🔧 Service Worker: Registering in production mode...`);
     window.addEventListener('load', async () => {
       try {
         // Use Vite's BASE_URL to support deployment to subpaths
