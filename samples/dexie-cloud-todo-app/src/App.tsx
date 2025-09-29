@@ -2,23 +2,30 @@ import { TodoLists } from './components/TodoLists';
 import { AddTodoList } from './components/AddTodoList';
 import { ResetDatabaseButton } from './components/ResetDatabaseButton';
 import { NavBar } from './components/navbar/NavBar';
-
-import 'bootstrap/dist/css/bootstrap.min.css';
-import './App.css';
 import { Invites } from './components/access-control/Invites';
 import { useObservable } from 'dexie-react-hooks';
 import { db } from './db';
 import { type UserLogin } from 'dexie-cloud-addon';
+import { Button } from './components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './components/ui/card';
 
 function App() {
   return (
-    <div>
+    <div className="min-h-screen bg-background">
       <NavBar />
-      <LicenseAdvertiseExample />
-      <Invites />
-      <TodoLists />
-      <AddTodoList />
-      <ResetDatabaseButton />
+      <main className="pt-16">
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <LicenseAdvertiseExample />
+          <Invites />
+        </div>
+        <TodoLists />
+        <div className="max-w-4xl mx-auto px-4 py-6">
+          <div className="flex flex-col sm:flex-row gap-4">
+            <AddTodoList />
+            <ResetDatabaseButton />
+          </div>
+        </div>
+      </main>
     </div>
   );
 }
@@ -41,19 +48,31 @@ function LicenseAdvertiseExample() {
   if (license.status !== 'ok') {
     // User license has expired or is invalid.
     return (
-      <div>
-        <p>No valid license. You are in offline mode until a valid license is purchased.</p>
-        <p>
-          Click <a href="https://example.com">here</a> to purchase license.
-        </p>
-        <p>
-          Click <a href="#" onClick={(ev)=>{
-            ev.preventDefault();
-            ev.stopPropagation();
-            deleteUserAccount(currentUser);
-          }}>here</a> to delete your account on the server completely along all private data stored (any data shared with others will not be deleted)
-        </p>
-      </div>
+      <Card className="mb-6 border-destructive">
+        <CardHeader>
+          <CardTitle className="text-destructive">License Required</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <CardDescription>
+            No valid license. You are in offline mode until a valid license is purchased.
+          </CardDescription>
+          <div className="space-y-2">
+            <Button asChild>
+              <a href="https://example.com">Purchase License</a>
+            </Button>
+            <Button 
+              variant="destructive" 
+              onClick={(ev) => {
+                ev.preventDefault();
+                ev.stopPropagation();
+                deleteUserAccount(currentUser);
+              }}
+            >
+              Delete Account & All Data
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
     );
   }
 
@@ -68,13 +87,19 @@ function LicenseAdvertiseExample() {
 
   if (licenseExpiresInDays < 7) {
     return (
-      <div>
-        <p>License expires in {licenseExpiresInDays} days.</p>
-        <p>
-          Click <a href="https://example.com">here</a> to purchase a production
-          license.
-        </p>
-      </div>
+      <Card className="mb-6 border-yellow-500">
+        <CardHeader>
+          <CardTitle className="text-yellow-600">License Expiring Soon</CardTitle>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <CardDescription>
+            License expires in {licenseExpiresInDays} days.
+          </CardDescription>
+          <Button asChild>
+            <a href="https://example.com">Purchase Production License</a>
+          </Button>
+        </CardContent>
+      </Card>
     );
   }
 
