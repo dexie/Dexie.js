@@ -28,6 +28,32 @@ export default defineConfig({
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',
+      manifest: {
+        name: 'Dexie Cloud ToDo Sample App',
+        short_name: 'DexieCloudToDo',
+        description: 'A todo app demonstrating Dexie Cloud with Vite',
+        theme_color: '#000000',
+        background_color: '#ffffff',
+        display: 'standalone',
+        start_url: './',
+        icons: [
+          {
+            src: '/dexie-icon-64x64.gif',
+            sizes: '64x64',
+            type: 'image/gif'
+          },
+          {
+            src: '/dexie-icon-192x192.png',
+            sizes: '192x192',
+            type: 'image/png'
+          },
+          {
+            src: '/dexie-icon-512x512.png',
+            sizes: '512x512',
+            type: 'image/png'
+          }
+        ]
+      }
     })
   ],
 })
