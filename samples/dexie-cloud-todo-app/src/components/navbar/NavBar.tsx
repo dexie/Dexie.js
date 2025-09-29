@@ -1,10 +1,8 @@
-import React from 'react';
 import {
   Navbar,
   NavDropdown,
   Button,
   NavLink,
-  Container,
 } from 'react-bootstrap';
 import { useObservable } from 'react-use';
 import { db } from '../../db';

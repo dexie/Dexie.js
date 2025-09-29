@@ -1,4 +1,3 @@
-import React from 'react';
 import { TodoLists } from './components/TodoLists';
 import { AddTodoList } from './components/AddTodoList';
 import { ResetDatabaseButton } from './components/ResetDatabaseButton';

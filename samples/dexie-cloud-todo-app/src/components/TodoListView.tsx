@@ -1,7 +1,7 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useLiveQuery, usePermissions } from 'dexie-react-hooks';
 import { TodoList } from '../db/TodoList';
-import { db, TodoDB } from '../db';
+import { db } from '../db';
 import { TodoItemView } from './TodoItemView';
 import { AddTodoItem } from './AddTodoItem';
 import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
