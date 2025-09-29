@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-todo-app",
-  "version": "0.4.2",
+  "version": "2.0.0",
   "type": "module",
   "private": true,
   "dependencies": {
