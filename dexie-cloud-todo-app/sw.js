@@ -14958,7 +14958,7 @@ function yb(t) {
 function gb(t, e) {
   yb(t), fb(e);
 }
-console.log("🚀 Service Worker starting (built at 2025-09-29T16:05:14.249Z)");
+console.log("🚀 Service Worker starting (built at 2025-09-29T16:08:48.853Z)");
 gb([{"revision":null,"url":"assets/index-0fb16d74.js"},{"revision":null,"url":"assets/index-44b953c9.css"},{"revision":null,"url":"assets/web-vitals-dfcc5b9a.js"},{"revision":"6aa62bc5550f77f8ace36c35b30c1d6b","url":"index.html"},{"revision":"fc723c843a0b8a137167d3d63dda4e28","url":"dexie-icon-64x64.gif"},{"revision":"0ea25c17ba9443457d913d6be03fea55","url":"dexie-icon-192x192.png"},{"revision":"f1749b24004626d4cb2f90aee4e442d2","url":"dexie-icon-512x512.png"},{"revision":"acd85660640bec89af261bfb55459305","url":"manifest.webmanifest"}]);
 pb();
 self.addEventListener("install", (t) => {
