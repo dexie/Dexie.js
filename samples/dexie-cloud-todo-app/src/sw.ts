@@ -1,4 +1,10 @@
 /// <reference lib="webworker" />
+
+console.log('Service Worker starting (built at ' + process.env.BUILD_DATE + ')');
+
+//
+// Include Dexie Cloud's service worker code to enable background sync of Dexie Cloud changes
+//
 import "dexie-cloud-addon/service-worker";
 
 // Import Workbox functionality

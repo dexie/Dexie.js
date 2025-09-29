@@ -3,17 +3,17 @@
   "name": "Dexie Cloud ToDo Sample App",
   "icons": [
     {
-      "src": "dexie-icon-64x64.gif",
-      "sizes": "64x64 32x32 24x24 16x16",
+      "src": "./dexie-icon-64x64.gif",
+      "sizes": "64x64",
       "type": "image/gif"
     },
     {
-      "src": "dexie-icon-192x192.png",
+      "src": "./dexie-icon-192x192.png",
       "type": "image/png",
       "sizes": "192x192"
     },
     {
-      "src": "dexie-icon-512x512.png",
+      "src": "./dexie-icon-512x512.png",
       "type": "image/png",
       "sizes": "512x512"
     }

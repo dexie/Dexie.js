@@ -30,7 +30,7 @@
     "start": "vite",
     "build": "tsc && vite build",
     "preview": "vite preview",
-    "predeploy": "VITE_BUILD_TIME=$(date +%s) npm run build",
+    "predeploy": "npm run build",
     "deploy": "gh-pages -d build -e dexie-cloud-todo-app",
     "test": "vitest run",
     "test:watch": "vitest",
