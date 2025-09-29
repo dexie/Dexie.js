@@ -33,8 +33,8 @@ export function TodoListView({ todoList }: Props) {
   return (
     <div className="border-b border-border bg-background">
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-3 border-b border-border bg-muted/30">
-        <h2 className="text-lg font-semibold text-foreground">{todoList.title}</h2>
+      <div className="flex items-center justify-between px-4 py-4 border-b border-blue-300/70 bg-blue-500 dark:bg-blue-600">
+        <h2 className="text-lg font-semibold text-white">{todoList.title}</h2>
         <div className="flex items-center gap-2">
           {!todoList.isPrivate() && (
             <Button
@@ -42,6 +42,7 @@ export function TodoListView({ todoList }: Props) {
               size="icon"
               onClick={() => setShowInviteForm(!showInviteForm)}
               title="Share list"
+              className="text-white hover:bg-blue-600"
             >
               <Share2 className="h-4 w-4" />
             </Button>
@@ -52,6 +53,7 @@ export function TodoListView({ todoList }: Props) {
             disabled={!can.delete()}
             onClick={handleDelete}
             title="Delete list"
+            className="text-white hover:bg-blue-600"
           >
             <Trash2 className="h-4 w-4" />
           </Button>
@@ -60,18 +62,18 @@ export function TodoListView({ todoList }: Props) {
       
       {/* Sharing Form */}
       {showInviteForm && (
-        <div className="px-4 py-3 bg-muted/50 border-b border-border">
+        <div className="px-4 py-4 bg-blue-50/70 dark:bg-blue-900/15 border-b border-blue-200/60">
           <SharingForm todoList={todoList} />
         </div>
       )}
       
       {/* Todo Items */}
-      <div className="px-4 py-2">
+      <div className="px-0 py-0">
         {items.map((item) => (
           <TodoItemView key={item.id} item={item} />
         ))}
         {can.add('todoItems') && (
-          <div className="mt-2">
+          <div className="px-4 py-3 border-b border-blue-200/60 bg-background">
             <AddTodoItem todoList={todoList} />
           </div>
         )}

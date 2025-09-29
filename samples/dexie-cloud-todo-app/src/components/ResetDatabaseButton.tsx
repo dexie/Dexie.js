@@ -16,10 +16,10 @@ export function ResetDatabaseButton() {
 
   return (
     <Button
-      variant="destructive"
+      variant="outline"
       size="lg"
       onClick={handleReset}
-      className="w-full sm:w-auto flex items-center gap-2"
+      className="w-full sm:w-auto flex items-center gap-2 border-red-300 text-red-700 bg-red-50 hover:bg-red-100 hover:border-red-400"
     >
       <RotateCcw className="h-4 w-4" />
       Factory reset client

@@ -3,10 +3,12 @@ import { TodoList } from '../../db/TodoList';
 import { useLiveQuery, usePermissions } from 'dexie-react-hooks';
 import { db } from '../../db';
 import { DBRealmMember } from 'dexie-cloud-addon';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faTrash } from '@fortawesome/free-solid-svg-icons';
+import { Trash2, Mail, UserPlus } from 'lucide-react';
 import { EditMember } from './EditMember';
+import { Button } from '../ui/button';
+import { Input } from '../ui/input';
 import importFile from '../../data/importfile.json';
+
 interface Props {
   todoList: TodoList;
 }
@@ -17,97 +19,112 @@ export function SharingForm({ todoList }: Props) {
   const members = useLiveQuery(async () => {
     const result = await db.members
       .where({ realmId: todoList.realmId })
-      //.filter((m) => !!m.email)
       .toArray();
     return result;
   }, [todoList.realmId]);
   const [manualInviteOpen, setManualInviteOpen] = useState(false);
 
   const can = usePermissions(todoList);
+  
   return (
-    <>
+    <div className="space-y-4">
       {members && members.length > 0 && (
-        <table>
-          <thead>
-            <tr>
-              <th>Shared with:</th>
-              <th>Role</th>
-            </tr>
-          </thead>
-          <tbody>
+        <div>
+          <h4 className="text-sm font-medium text-foreground mb-3">Shared with:</h4>
+          <div className="space-y-2">
             {members?.map((member) => (
               <MemberRow key={member.id} {...{ todoList, member }} />
             ))}
-          </tbody>
-        </table>
+          </div>
+        </div>
       )}
-      <hr />
-      {can.add('members') && (
-        <>
-          <h4>Invite someone?</h4>
-          <table>
-            <tbody>
+      
+      <div className="border-t border-border pt-4">
+        {can.add('members') && (
+          <div className="space-y-4">
+            <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
+              <UserPlus className="h-4 w-4" />
+              Invite someone?
+            </h4>
+            
+            <div className="space-y-2">
               {Object.keys(importFile.demoUsers)
                 .filter((demoUser) => demoUser !== db.cloud.currentUserId)
                 .map((demoUser) => (
-                  <tr key={demoUser}>
-                    <td>{demoUser}</td>
-                    <td>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setManualInviteOpen(false);
-                          todoList.shareWith(demoUser, demoUser, true, [
-                            'doer',
-                          ]);
-                        }}
-                      >
-                        Invite
-                      </button>
-                    </td>
-                  </tr>
+                  <div key={demoUser} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                    <span className="text-sm text-foreground">{demoUser}</span>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => {
+                        setManualInviteOpen(false);
+                        todoList.shareWith(demoUser, demoUser, true, ['doer']);
+                      }}
+                    >
+                      Invite
+                    </Button>
+                  </div>
                 ))}
-            </tbody>
-          </table>
-          {manualInviteOpen ? (
-            <form
-              onSubmit={(ev) => {
-                ev.preventDefault();
-                setManualInviteOpen(false);
-                todoList.shareWith(name, email, true, ['doer']);
-              }}
-            >
-              <input
-                type="email"
-                placeholder="Email"
-                value={email}
-                onChange={(ev) => setEmail(ev.target.value)}
-              />
-              <input
-                type="text"
-                placeholder="Name"
-                value={name}
-                onChange={(ev) => setName(ev.target.value)}
-              />
-              <button type="submit" disabled={!/@/.test(email)}>
-                Send invite
-              </button>
-            </form>
-          ) : (
-            <a
-              href="#"
-              onClick={(ev) => {
-                ev.preventDefault();
-                setManualInviteOpen(true);
-              }}
-            >
-              Invite by email address
-            </a>
-          )}
-          <hr />
-        </>
-      )}
-    </>
+            </div>
+            
+            {manualInviteOpen ? (
+              <form
+                onSubmit={(ev) => {
+                  ev.preventDefault();
+                  setManualInviteOpen(false);
+                  todoList.shareWith(name, email, true, ['doer']);
+                  setName('');
+                  setEmail('');
+                }}
+                className="space-y-3 p-4 bg-muted/50 rounded-lg"
+              >
+                <Input
+                  type="email"
+                  placeholder="Email address"
+                  value={email}
+                  onChange={(ev) => setEmail(ev.target.value)}
+                />
+                <Input
+                  type="text"
+                  placeholder="Name"
+                  value={name}
+                  onChange={(ev) => setName(ev.target.value)}
+                />
+                <div className="flex gap-2">
+                  <Button 
+                    type="submit" 
+                    disabled={!/@/.test(email)}
+                    size="sm"
+                    className="flex items-center gap-2"
+                  >
+                    <Mail className="h-4 w-4" />
+                    Send invite
+                  </Button>
+                  <Button 
+                    type="button" 
+                    variant="outline" 
+                    size="sm"
+                    onClick={() => setManualInviteOpen(false)}
+                  >
+                    Cancel
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setManualInviteOpen(true)}
+                className="flex items-center gap-2"
+              >
+                <Mail className="h-4 w-4" />
+                Invite by email address
+              </Button>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -125,31 +142,47 @@ function MemberRow({
   if (isMe) memberText += ' (me)';
 
   return (
-    <tr style={member.accepted ? {} : {opacity: 0.5}}>
-      <td style={{ paddingRight: 12 }}>{memberText}</td>
-      <td>
+    <div className={`flex items-center justify-between p-3 bg-background rounded-lg border ${
+      member.accepted ? 'border-border' : 'border-border opacity-50'
+    }`}>
+      <div className="flex-1">
+        <span className="text-sm text-foreground">{memberText}</span>
+        {!member.rejected && !member.accepted && (
+          <span className="text-xs text-muted-foreground italic ml-2">Pending invite</span>
+        )}
+        {member.rejected && (
+          <span className="text-xs text-muted-foreground italic ml-2">Rejected</span>
+        )}
+      </div>
+      
+      <div className="flex items-center gap-2">
         <EditMember member={member} todoList={todoList} />
-      </td>
-      <td>
+        
         {can.delete() && !isOwner ? (
-          <div className="todo-list-trash">
-            <button
-              className="button"
-              onClick={() => todoList.unshareWith(member)}
-            >
-              {!!member.rejected && <span style={{fontStyle: 'italic'}}>Rejected </span>}
-              {!member.rejected && !member.accepted && <span style={{fontStyle: 'italic'}}>Pending invite </span>}
-              <FontAwesomeIcon icon={faTrash} />
-            </button>
-          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => todoList.unshareWith(member)}
+            className="text-destructive hover:text-destructive"
+          >
+            <Trash2 className="h-4 w-4" />
+          </Button>
         ) : (
           !isOwner &&
           member.userId === db.cloud.currentUserId &&
           ((member.accepted?.getTime() || 0) >
           (member.rejected?.getTime() || 0) ? (
-            <button onClick={() => todoList.leave()}>Leave list</button>
+            <Button 
+              variant="outline" 
+              size="sm" 
+              onClick={() => todoList.leave()}
+            >
+              Leave list
+            </Button>
           ) : (
-            <button
+            <Button
+              variant="default"
+              size="sm"
               onClick={() =>
                 db.members.update(member.id!, {
                   accepted: new Date(),
@@ -158,11 +191,10 @@ function MemberRow({
               }
             >
               Accept invite
-            </button>
+            </Button>
           ))
         )}
-      </td>
-      <td></td>
-    </tr>
+      </div>
+    </div>
   );
 }

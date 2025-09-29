@@ -26,7 +26,8 @@ export function AddTodoList() {
     <Button 
       onClick={() => setIsActive(true)}
       size="lg"
-      className="w-full sm:w-auto flex items-center gap-2"
+      variant="outline"
+      className="w-full sm:w-auto flex items-center gap-2 border-slate-300 text-slate-700 hover:bg-slate-50"
     >
       <List className="h-4 w-4" />
       {hasAnyList ? `Add another list` : `Create ToDo List`}

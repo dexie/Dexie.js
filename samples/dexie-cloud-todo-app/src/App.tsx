@@ -14,7 +14,7 @@ function App() {
     <div className="min-h-screen bg-background">
       <NavBar />
       <main className="pt-16">
-        <div className="max-w-4xl mx-auto px-4 py-6">
+        <div className="max-w-4xl mx-auto px-4 pb-2">
           <LicenseAdvertiseExample />
           <Invites />
         </div>
