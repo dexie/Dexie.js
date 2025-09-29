@@ -27,9 +27,15 @@ precacheAndRoute(self.__WB_MANIFEST);
 // Clean up old caches
 cleanupOutdatedCaches();
 
-// Handle navigation requests
+// Handle navigation requests - use BASE_URL to support subpaths
+let baseUrl = import.meta.env.BASE_URL;
+if (!baseUrl.endsWith('/')) baseUrl += '/';
+const indexUrl = `${baseUrl}index.html`;
+
+console.log('Service Worker: Setting up navigation route for', indexUrl);
+
 const navigationRoute = new NavigationRoute(
-  createHandlerBoundToURL('/index.html')
+  createHandlerBoundToURL(indexUrl)
 );
 registerRoute(navigationRoute);
 

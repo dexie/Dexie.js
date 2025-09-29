@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa'
 
 // https://vitejs.dev/config/
 export default defineConfig({
-  base: './',
+  base: process.env.PUBLIC_URL ?? './',
   define: {
     // Replace process.env.BUILD_DATE with actual timestamp
     "process.env.BUILD_DATE": JSON.stringify(new Date().toISOString()),
@@ -24,8 +24,7 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'autoUpdate',
-      injectRegister: 'auto',
+      injectRegister: false, // We handle registration manually
       strategies: 'injectManifest',
       srcDir: 'src',
       filename: 'sw.ts',

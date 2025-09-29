@@ -11,12 +11,33 @@ type Config = {
 export function register(config?: Config) {
   // Only register in production and if service worker is supported
   if (import.meta.env.PROD && 'serviceWorker' in navigator) {
-    console.log(`🔧 Service Worker: Registering in production mode...`);
+    console.log(`🔧 Service Worker: Starting registration process...`);
+    
+    // Check if already registered
+    navigator.serviceWorker.getRegistrations().then(registrations => {
+      console.log(`🔧 Service Worker: Found ${registrations.length} existing registrations`, registrations);
+    });
+    
     window.addEventListener('load', async () => {
+      console.log(`🔧 Service Worker: Window loaded, attempting registration...`);
       try {
-        const registration = await navigator.serviceWorker.register('/sw.js', {
-          scope: '/'
+        // Use Vite's BASE_URL to support deployment to subpaths
+        let baseUrl = import.meta.env.BASE_URL;
+        // Ensure baseUrl ends with /
+        if (!baseUrl.endsWith('/')) baseUrl += '/';
+        
+        const swPath = `${baseUrl}sw.js`;
+        const swScope = baseUrl;
+        
+        console.log(`🔧 Service Worker: Registering at ${swPath} with scope ${swScope}`);
+        console.log(`🔧 Service Worker: Current location: ${window.location.href}`);
+        console.log(`🔧 Service Worker: BASE_URL: ${import.meta.env.BASE_URL}`);
+        
+        const registration = await navigator.serviceWorker.register(swPath, {
+          scope: swScope
         });
+        
+        console.log(`🔧 Service Worker: Registration successful`, registration);
 
         registration.addEventListener('updatefound', () => {
           const newWorker = registration.installing;
@@ -38,7 +59,14 @@ export function register(config?: Config) {
         });
 
       } catch (error) {
-        console.error('Service worker registration failed:', error);
+        console.error('🚨 Service worker registration failed:', error);
+        if (error instanceof Error) {
+          console.error('🚨 Error details:', {
+            name: error.name,
+            message: error.message,
+            stack: error.stack
+          });
+        }
       }
     });
   } else {
