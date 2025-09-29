@@ -27,11 +27,11 @@ export function SharingForm({ todoList }: Props) {
   const can = usePermissions(todoList);
   
   return (
-    <div className="space-y-4">
+    <div className="space-y-3">
       {members && members.length > 0 && (
         <div>
-          <h4 className="text-sm font-medium text-foreground mb-3">Shared with:</h4>
-          <div className="space-y-2">
+          <h4 className="text-sm font-medium text-foreground mb-2">Shared with:</h4>
+          <div className="space-y-1">
             {members?.map((member) => (
               <MemberRow key={member.id} {...{ todoList, member }} />
             ))}
@@ -39,19 +39,19 @@ export function SharingForm({ todoList }: Props) {
         </div>
       )}
       
-      <div className="border-t border-border pt-4">
+      <div className="border-t border-border pt-3">
         {can.add('members') && (
-          <div className="space-y-4">
+          <div className="space-y-3">
             <h4 className="text-sm font-medium text-foreground flex items-center gap-2">
               <UserPlus className="h-4 w-4" />
               Invite someone?
             </h4>
             
-            <div className="space-y-2">
+            <div className="space-y-1">
               {Object.keys(importFile.demoUsers)
                 .filter((demoUser) => demoUser !== db.cloud.currentUserId)
                 .map((demoUser) => (
-                  <div key={demoUser} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
+                  <div key={demoUser} className="flex items-center justify-between py-2 px-3 bg-white rounded border border-blue-100">
                     <span className="text-sm text-foreground">{demoUser}</span>
                     <Button
                       size="sm"
@@ -60,6 +60,7 @@ export function SharingForm({ todoList }: Props) {
                         setManualInviteOpen(false);
                         todoList.shareWith(demoUser, demoUser, true, ['doer']);
                       }}
+                      className="h-7 px-3 text-xs border-blue-200 text-blue-600 hover:bg-blue-50"
                     >
                       Invite
                     </Button>
@@ -111,15 +112,17 @@ export function SharingForm({ todoList }: Props) {
                 </div>
               </form>
             ) : (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => setManualInviteOpen(true)}
-                className="flex items-center gap-2"
-              >
-                <Mail className="h-4 w-4" />
-                Invite by email address
-              </Button>
+              <div className="mt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setManualInviteOpen(true)}
+                  className="flex items-center gap-2 h-8 px-3 text-xs border-blue-200 text-blue-600 hover:bg-blue-50"
+                >
+                  <Mail className="h-4 w-4" />
+                  Invite by email address
+                </Button>
+              </div>
             )}
           </div>
         )}
@@ -142,11 +145,11 @@ function MemberRow({
   if (isMe) memberText += ' (me)';
 
   return (
-    <div className={`flex items-center justify-between p-3 bg-background rounded-lg border ${
-      member.accepted ? 'border-border' : 'border-border opacity-50'
+    <div className={`flex items-center justify-between py-2 px-3 bg-white rounded border border-blue-100 ${
+      member.accepted ? '' : 'opacity-50'
     }`}>
       <div className="flex-1">
-        <span className="text-sm text-foreground">{memberText}</span>
+        <span className="text-sm text-foreground font-medium">{memberText}</span>
         {!member.rejected && !member.accepted && (
           <span className="text-xs text-muted-foreground italic ml-2">Pending invite</span>
         )}
@@ -155,45 +158,49 @@ function MemberRow({
         )}
       </div>
       
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 min-w-[140px] justify-end">
         <EditMember member={member} todoList={todoList} />
         
-        {can.delete() && !isOwner ? (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={() => todoList.unshareWith(member)}
-            className="text-destructive hover:text-destructive"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        ) : (
-          !isOwner &&
-          member.userId === db.cloud.currentUserId &&
-          ((member.accepted?.getTime() || 0) >
-          (member.rejected?.getTime() || 0) ? (
-            <Button 
-              variant="outline" 
-              size="sm" 
-              onClick={() => todoList.leave()}
+        <div className="w-8 flex justify-center ml-1">
+          {can.delete() && !isOwner ? (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => todoList.unshareWith(member)}
+              className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
             >
-              Leave list
+              <Trash2 className="h-4 w-4" />
             </Button>
           ) : (
-            <Button
-              variant="default"
-              size="sm"
-              onClick={() =>
-                db.members.update(member.id!, {
-                  accepted: new Date(),
-                  rejected: undefined,
-                })
-              }
-            >
-              Accept invite
-            </Button>
-          ))
-        )}
+            !isOwner &&
+            member.userId === db.cloud.currentUserId &&
+            ((member.accepted?.getTime() || 0) >
+            (member.rejected?.getTime() || 0) ? (
+              <Button 
+                variant="outline" 
+                size="sm" 
+                onClick={() => todoList.leave()}
+                className="h-7 px-3 text-xs border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 min-w-[50px]"
+              >
+                Leave
+              </Button>
+            ) : (
+              <Button
+                variant="default"
+                size="sm"
+                onClick={() =>
+                  db.members.update(member.id!, {
+                    accepted: new Date(),
+                    rejected: undefined,
+                  })
+                }
+                className="h-7 px-3 text-xs bg-blue-500 hover:bg-blue-600"
+              >
+                Accept
+              </Button>
+            ))
+          )}
+        </div>
       </div>
     </div>
   );

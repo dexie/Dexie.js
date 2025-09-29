@@ -1,5 +1,4 @@
-import { faQuestion } from '@fortawesome/free-solid-svg-icons';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
+import { User, Crown } from 'lucide-react';
 import { DBRealmMember } from 'dexie-cloud-addon';
 import { useObservable, usePermissions } from 'dexie-react-hooks';
 import { db, TodoList } from '../../db';
@@ -21,9 +20,15 @@ export function EditMember({ member, todoList }: Props) {
 
   const memberAccessDisplayName =
     memberAccess === 'owner' ? 'Owner' : role?.displayName || memberAccess;
+
+  const getIcon = () => {
+    if (memberAccess === 'owner') return <Crown className="h-4 w-4" />;
+    return <User className="h-4 w-4" />;
+  };
+
   return (
-    <fieldset className="border p-1">
-        <FontAwesomeIcon style={{margin: '0 4px 0 0', width: 22}} icon={memberAccessIcon[memberAccess] || faQuestion} />
+    <div className="flex items-center gap-2 px-2 py-1 bg-gray-50 rounded border border-gray-200 min-w-[100px]">
+      {getIcon()}
       {can.update('roles') ? (
         <EditMemberAccess
           todoList={todoList}
@@ -31,8 +36,8 @@ export function EditMember({ member, todoList }: Props) {
           access={memberAccess}
         />
       ) : (
-        memberAccessDisplayName
+        <span className="text-sm font-medium">{memberAccessDisplayName}</span>
       )}
-    </fieldset>
+    </div>
   );
 }
