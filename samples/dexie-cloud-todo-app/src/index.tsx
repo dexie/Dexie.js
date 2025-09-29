@@ -16,7 +16,9 @@ root.render(
 );
 
 // Register service worker for PWA capabilities
+console.log('🚀 App: About to call serviceWorkerRegistration.register()');
 serviceWorkerRegistration.register();
+console.log('🚀 App: Called serviceWorkerRegistration.register()');
 
 // If you want to start measuring performance in your app, pass a function
 // to log results (for example: reportWebVitals(console.log))
