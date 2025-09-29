@@ -1,6 +1,5 @@
 /// <reference lib="webworker" />
-
-console.log('Service Worker starting (built at ' + process.env.BUILD_DATE + ')');
+console.log('🚀 Service Worker starting (built at ' + process.env.BUILD_DATE + ')');
 
 //
 // Include Dexie Cloud's service worker code to enable background sync of Dexie Cloud changes
@@ -30,12 +29,9 @@ cleanupOutdatedCaches();
 // Handle navigation requests - use BASE_URL to support subpaths
 let baseUrl = import.meta.env.BASE_URL;
 if (!baseUrl.endsWith('/')) baseUrl += '/';
-const indexUrl = `${baseUrl}index.html`;
-
-console.log('Service Worker: Setting up navigation route for', indexUrl);
 
 const navigationRoute = new NavigationRoute(
-  createHandlerBoundToURL(indexUrl)
+  createHandlerBoundToURL(`${baseUrl}index.html`)
 );
 registerRoute(navigationRoute);
 
