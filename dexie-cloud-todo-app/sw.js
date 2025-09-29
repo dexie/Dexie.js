@@ -14958,8 +14958,8 @@ function yb(t) {
 function gb(t, e) {
   yb(t), fb(e);
 }
-console.log("🚀 Service Worker starting (built at 2025-09-29T16:34:54.106Z)");
-gb([{"revision":null,"url":"assets/index-0fb16d74.js"},{"revision":null,"url":"assets/index-44b953c9.css"},{"revision":null,"url":"assets/web-vitals-dfcc5b9a.js"},{"revision":"d059445cb31e01851fed767fabd60853","url":"index.html"},{"revision":"fc723c843a0b8a137167d3d63dda4e28","url":"./dexie-icon-64x64.gif"},{"revision":"0ea25c17ba9443457d913d6be03fea55","url":"./dexie-icon-192x192.png"},{"revision":"f1749b24004626d4cb2f90aee4e442d2","url":"./dexie-icon-512x512.png"},{"revision":"5996bc8bdbf40618ee1c38cf3d97a8b4","url":"manifest.webmanifest"}]);
+console.log("🚀 Service Worker starting (built at 2025-09-29T16:48:18.126Z)");
+gb([{"revision":null,"url":"assets/index-0fb16d74.js"},{"revision":null,"url":"assets/index-44b953c9.css"},{"revision":null,"url":"assets/web-vitals-dfcc5b9a.js"},{"revision":"d059445cb31e01851fed767fabd60853","url":"index.html"},{"revision":"fc723c843a0b8a137167d3d63dda4e28","url":"./dexie-icon-64x64.gif"},{"revision":"0ea25c17ba9443457d913d6be03fea55","url":"./dexie-icon-192x192.png"},{"revision":"f1749b24004626d4cb2f90aee4e442d2","url":"./dexie-icon-512x512.png"},{"revision":"2482ade6e4b177e1de1473f83be15e59","url":"manifest.webmanifest"}]);
 pb();
 self.addEventListener("install", (t) => {
   self.skipWaiting();
