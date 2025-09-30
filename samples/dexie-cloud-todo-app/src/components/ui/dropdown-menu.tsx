@@ -9,13 +9,13 @@ const DropdownMenu = ({ children, ...props }: React.ComponentProps<"div">) => {
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child)) {
           if (child.type === DropdownMenuTrigger) {
-            return React.cloneElement(child, {
+            return React.cloneElement(child as React.ReactElement<any>, {
               onClick: () => setIsOpen(!isOpen),
               'aria-expanded': isOpen,
             })
           }
           if (child.type === DropdownMenuContent) {
-            return React.cloneElement(child, {
+            return React.cloneElement(child as React.ReactElement<any>, {
               isOpen,
               onClose: () => setIsOpen(false),
             })
@@ -79,7 +79,7 @@ const DropdownMenuContent = React.forwardRef<
     >
       {React.Children.map(children, (child) => {
         if (React.isValidElement(child) && child.type === DropdownMenuItem) {
-          return React.cloneElement(child, {
+          return React.cloneElement(child as React.ReactElement<any>, {
             onClick: (e: React.MouseEvent) => {
               child.props.onClick?.(e)
               onClose?.()
