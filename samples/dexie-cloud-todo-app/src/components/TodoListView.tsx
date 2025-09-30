@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { useLiveQuery, usePermissions } from 'dexie-react-hooks';
 import { TodoList } from '../db/TodoList';
 import { db } from '../db';

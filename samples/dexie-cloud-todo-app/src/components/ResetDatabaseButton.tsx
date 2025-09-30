@@ -1,4 +1,4 @@
-import { Database, RotateCcw } from 'lucide-react';
+import { RotateCcw } from 'lucide-react';
 import { db } from '../db';
 import { Button } from './ui/button';
 
