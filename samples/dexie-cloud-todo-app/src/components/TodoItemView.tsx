@@ -64,12 +64,11 @@ export function TodoItemView({ item }: Props) {
     };
   }, [isHovering, can]);
 
-  const showTrashOnClick = () => {
-    // Let mobile users show the faded-out trash icon again
-    // by clicking on the item (only if they can delete and not editing)
-    if (isHovering && can.delete() && !isEditing) {
+  const showTrashOnClick = (e: React.MouseEvent) => {
+    // Show trash on any click within the item (for mobile users)
+    if (can.delete()) {
       setShowTrash(true);
-      // Trigger a re-render of useEffect by setting isHovering
+      // Reset hover state to trigger useEffect timer
       setIsHovering(false);
       setTimeout(() => setIsHovering(true), 10);
     }
