@@ -1,22 +1,6 @@
-import { IconDefinition } from '@fortawesome/fontawesome-svg-core';
-import {
-  faCheckDouble,
-  faEye,
-  faUserEdit,
-  faUserTie,
-} from '@fortawesome/free-solid-svg-icons';
 import { DBRealmMember, getTiedRealmId } from 'dexie-cloud-addon';
 import { useObservable } from 'dexie-react-hooks';
 import { db, TodoList } from '../../db';
-
-export const memberAccessIcon: {
-  [memberAccess: string]: IconDefinition;
-} = {
-  owner: faUserEdit,
-  doer: faCheckDouble,
-  manager: faUserTie,
-  readonly: faEye,
-};
 
 interface Props {
   todoList: TodoList;
