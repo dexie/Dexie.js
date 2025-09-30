@@ -47,16 +47,17 @@ export function TodoListView({ todoList }: Props) {
               <Share2 className="h-4 w-4" />
             </Button>
           )}
-          <Button
-            variant="ghost"
-            size="icon"
-            disabled={!can.delete()}
-            onClick={handleDelete}
-            title="Delete list"
-            className="text-white hover:bg-blue-600"
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
+          {can.delete() && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={handleDelete}
+              title="Delete list"
+              className="text-white hover:bg-blue-600"
+            >
+              <Trash2 className="h-4 w-4" />
+            </Button>
+          )}
         </div>
       </div>
       

@@ -32,7 +32,7 @@ export class TodoList extends Entity<TodoDB> {
   }
 
   isPrivate() {
-    return this.id[0] === '#';
+    return this.id[0] === '#'; // Private ids in Dexie Cloud start with #
   }
 
   async makeSharable() {
@@ -42,7 +42,7 @@ export class TodoList extends Entity<TodoDB> {
     const newRealmId = getTiedRealmId(this.id);
     const { db } = this;
 
-    await this.db.transaction(
+    await db.transaction(
       'rw',
       [db.todoLists, db.todoItems, db.realms],
       async () => {
@@ -111,7 +111,7 @@ export class TodoList extends Entity<TodoDB> {
         }
 
         // Add given name and email as a member with full permissions
-        await this.db.members.add({
+        await db.members.add({
           realmId,
           name,
           email,
@@ -142,9 +142,14 @@ export class TodoList extends Entity<TodoDB> {
   }
 
   async leave() {
+    // Delete own member entry --> you will then no longer have access
+    // to the shared list.
     const { db } = this;
     await db.members
-      .where({ realmId: this.realmId, userId: db.cloud.currentUserId })
+      .where({
+        realmId: this.realmId,
+        userId: db.cloud.currentUserId
+      })
       .delete();
   }
 

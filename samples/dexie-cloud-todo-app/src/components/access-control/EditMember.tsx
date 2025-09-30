@@ -2,7 +2,7 @@ import { User, Crown } from 'lucide-react';
 import { DBRealmMember } from 'dexie-cloud-addon';
 import { useObservable, usePermissions } from 'dexie-react-hooks';
 import { db, TodoList } from '../../db';
-import { EditMemberAccess, memberAccessIcon } from './EditMemberAccess';
+import { EditMemberAccess } from './EditMemberAccess';
 
 interface Props {
   member: DBRealmMember;
