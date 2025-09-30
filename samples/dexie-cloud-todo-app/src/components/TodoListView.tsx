@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useLiveQuery, usePermissions } from 'dexie-react-hooks';
 import { TodoList } from '../db/TodoList';
 import { db } from '../db';
@@ -7,12 +8,15 @@ import { Share2, Trash2 } from 'lucide-react';
 import { SharingForm } from './access-control/SharingForm';
 import { usePersistedOpenState } from '../helpers/usePersistedOpenState';
 import { Button } from './ui/button';
+import { handleError } from '../helpers/handleError';
+import { cn } from '../lib/utils';
 
 interface Props {
   todoList: TodoList;
 }
 
 export function TodoListView({ todoList }: Props) {
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
   const items = useLiveQuery(
     () => db.todoItems.where({ todoListId: todoList.id }).toArray(),
     [todoList.id]
@@ -29,11 +33,54 @@ export function TodoListView({ todoList }: Props) {
     }
   };
 
+  const handleStartTitleEdit = () => {
+    if (can.update('title')) {
+      setIsEditingTitle(true);
+    }
+  };
+
+  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setIsEditingTitle(false);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsEditingTitle(false);
+    }
+  };
+
   return (
     <div className="border-b border-border bg-background">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-4 border-b border-blue-300/70 bg-blue-500 dark:bg-blue-600">
-        <h2 className="text-lg font-semibold text-white">{todoList.title}</h2>
+        {/* Editable Title */}
+        <div className="flex-1 mr-4">
+          {isEditingTitle ? (
+            <input
+              type="text"
+              defaultValue={todoList.title}
+              onChange={handleError(
+                (ev) => db.todoLists.update(todoList.id, { title: ev.target.value })
+              )}
+              onKeyDown={handleTitleKeyDown}
+              autoFocus
+              className={cn(
+                "text-lg font-semibold bg-transparent border-none outline-none focus:ring-1 focus:ring-white/50 rounded px-2 py-1 text-white placeholder-white/70 w-full"
+              )}
+            />
+          ) : (
+            <h2 
+              className={cn(
+                "text-lg font-semibold text-white cursor-pointer hover:bg-white/10 rounded px-2 py-1 transition-colors",
+                !can.update('title') && "cursor-default hover:bg-transparent"
+              )}
+              onClick={handleStartTitleEdit}
+              title={can.update('title') ? "Click to edit list name" : undefined}
+            >
+              {todoList.title}
+            </h2>
+          )}
+        </div>
         <div className="flex items-center gap-2">
           {!todoList.isPrivate() && (
             <Button
