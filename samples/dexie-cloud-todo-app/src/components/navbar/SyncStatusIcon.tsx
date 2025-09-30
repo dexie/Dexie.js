@@ -1,6 +1,6 @@
 import { 
   Cloud, 
-  CloudOff, 
+  CloudMoon,
   Wifi, 
   WifiOff, 
   AlertCircle, 
@@ -21,26 +21,47 @@ export function SyncStatusIcon({ className }: Props) {
   
   switch (syncStatus?.status) {
     case 'not-started':
-      return <Cloud className={iconClassName} />;
+      return (
+        <div title="Sync not started">
+          <Cloud className={iconClassName} />
+        </div>
+      );
     case 'connecting':
-      return <Loader2 className={cn(iconClassName, "animate-spin")} />;
+      return (
+        <div title="Connecting to cloud...">
+          <Loader2 className={cn(iconClassName, "animate-spin")} />
+        </div>
+      );
     case 'connected':
-      return <Wifi className={cn(iconClassName, "text-green-500")} />;
+      return (
+        <div title="Connected and syncing">
+          <Wifi className={cn(iconClassName, "text-green-500")} />
+        </div>
+      );
     case 'disconnected':
-      return <CloudOff className={cn(iconClassName, "text-yellow-500")} />;
+      // Use CloudMoon to suggest "sleeping/dormant" rather than "off"
+      return (
+        <div title="Connection sleeping - will reconnect when active">
+          <CloudMoon className={cn(iconClassName, "text-blue-400")} />
+        </div>
+      );
     case 'offline':
       return (
-        <div title={syncStatus.error ? String(syncStatus.error) : undefined}>
+        <div title={syncStatus.error ? String(syncStatus.error) : "Offline"}>
           <WifiOff className={cn(iconClassName, "text-orange-500")} />
         </div>
       );
     case 'error':
       return (
-        <div title={syncStatus.error ? String(syncStatus.error) : undefined}>
+        <div title={syncStatus.error ? String(syncStatus.error) : "Connection error"}>
           <AlertCircle className={cn(iconClassName, "text-red-500")} />
         </div>
       );
     default:
-      return <Cloud className={iconClassName} />;
+      return (
+        <div title="Sync status unknown">
+          <Cloud className={iconClassName} />
+        </div>
+      );
   }
 }
