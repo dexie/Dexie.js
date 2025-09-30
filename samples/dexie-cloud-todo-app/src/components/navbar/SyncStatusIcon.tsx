@@ -1,63 +1,46 @@
+import { 
+  Cloud, 
+  CloudOff, 
+  Wifi, 
+  WifiOff, 
+  AlertCircle, 
+  Loader2 
+} from 'lucide-react';
 import { useObservable } from 'react-use';
 import { db } from '../../db';
-import { IconConnecting } from '../icons/IconConnecting';
-import { IconError } from '../icons/IconError';
-import { IconOffline } from '../icons/IconOffline';
-import { IconOnline } from '../icons/IconOnline';
-import { IconSleepyCloud } from '../icons/IconSleepyCloud';
-import { SvgIcon } from './SvgIcon';
+import { cn } from '../../lib/utils';
 
 interface Props {
   className?: string;
 }
+
 export function SyncStatusIcon({ className }: Props) {
   const syncStatus = useObservable(db.cloud.syncState);
+  
+  const iconClassName = cn("text-muted-foreground", className);
+  
   switch (syncStatus?.status) {
     case 'not-started':
-      return <SvgIcon className={className}></SvgIcon>;
+      return <Cloud className={iconClassName} />;
     case 'connecting':
-      return (
-        <SvgIcon className={className}>
-          <IconConnecting />
-        </SvgIcon>
-      );
+      return <Loader2 className={cn(iconClassName, "animate-spin")} />;
     case 'connected':
-      return (
-        <SvgIcon className={className}>
-          <IconOnline />
-        </SvgIcon>
-      );
+      return <Wifi className={cn(iconClassName, "text-green-500")} />;
     case 'disconnected':
-      return (
-        <SvgIcon className={className}>
-          <IconSleepyCloud />
-        </SvgIcon>
-      );
+      return <CloudOff className={cn(iconClassName, "text-yellow-500")} />;
     case 'offline':
       return (
-        <SvgIcon
-          className={className}
-          title={syncStatus.error && '' + syncStatus.error}
-        >
-          <IconOffline />
-        </SvgIcon>
+        <div title={syncStatus.error ? String(syncStatus.error) : undefined}>
+          <WifiOff className={cn(iconClassName, "text-orange-500")} />
+        </div>
       );
     case 'error':
       return (
-        <SvgIcon
-          className={className}
-          title={syncStatus.error && '' + syncStatus.error}
-        >
-          <IconError />
-        </SvgIcon>
+        <div title={syncStatus.error ? String(syncStatus.error) : undefined}>
+          <AlertCircle className={cn(iconClassName, "text-red-500")} />
+        </div>
       );
-
     default:
-      /*return (
-        <SvgIcon className={className}>
-          <IconInSync />
-        </SvgIcon>
-      );*/
-      return <SvgIcon className={className}>{syncStatus?.phase}</SvgIcon>;
+      return <Cloud className={iconClassName} />;
   }
 }

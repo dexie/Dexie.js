@@ -4,10 +4,10 @@ import { TodoList } from '../db/TodoList';
 import { db } from '../db';
 import { TodoItemView } from './TodoItemView';
 import { AddTodoItem } from './AddTodoItem';
-import { FontAwesomeIcon } from '@fortawesome/react-fontawesome';
-import { faShareAlt, faTrashAlt } from '@fortawesome/free-solid-svg-icons';
+import { Share2, Trash2 } from 'lucide-react';
 import { SharingForm } from './access-control/SharingForm';
 import { usePersistedOpenState } from '../helpers/usePersistedOpenState';
+import { Button } from './ui/button';
 
 interface Props {
   todoList: TodoList;
@@ -23,35 +23,61 @@ export function TodoListView({ todoList }: Props) {
 
   if (!items) return null;
 
-  return (
-    <div className="box">
-      <div className="grid-row">
-        <h2>{todoList.title}</h2>
-        <div className="todo-list-trash">
-          <button
-            disabled={!can.delete()}
-            onClick={() => todoList.delete()}
-            title="Delete list"
-          >
-            <FontAwesomeIcon icon={faTrashAlt} />
-          </button>
-        </div>
+  const handleDelete = async () => {
+    const confirmed = confirm(`Are you sure you want to delete "${todoList.title}" and all its items?`);
+    if (confirmed) {
+      await todoList.delete();
+    }
+  };
 
-        {!todoList.isPrivate() && <div className="todo-list-trash">
-          <button
-            onClick={() => setShowInviteForm(!showInviteForm)}
+  return (
+    <div className="border-b border-border bg-background">
+      {/* Header */}
+      <div className="flex items-center justify-between px-4 py-4 border-b border-blue-300/70 bg-blue-500 dark:bg-blue-600">
+        <h2 className="text-lg font-semibold text-white">{todoList.title}</h2>
+        <div className="flex items-center gap-2">
+          {!todoList.isPrivate() && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={() => setShowInviteForm(!showInviteForm)}
+              title="Share list"
+              className="text-white hover:bg-blue-600"
+            >
+              <Share2 className="h-4 w-4" />
+            </Button>
+          )}
+          <Button
+            variant="ghost"
+            size="icon"
+            disabled={!can.delete()}
+            onClick={handleDelete}
+            title="Delete list"
+            className="text-white hover:bg-blue-600"
           >
-            <FontAwesomeIcon icon={faShareAlt} />
-          </button>
-        </div>}
+            <Trash2 className="h-4 w-4" />
+          </Button>
+        </div>
       </div>
-      {showInviteForm && <SharingForm todoList={todoList} />}
-      <div>
+      
+      {/* Sharing Form */}
+      {showInviteForm && (
+        <div className="px-4 py-4 bg-blue-50/70 dark:bg-blue-900/15 border-b border-blue-200/60">
+          <SharingForm todoList={todoList} />
+        </div>
+      )}
+      
+      {/* Todo Items */}
+      <div className="px-0 py-0">
         {items.map((item) => (
           <TodoItemView key={item.id} item={item} />
         ))}
+        {can.add('todoItems') && (
+          <div className="px-4 py-3 border-b border-blue-200/60 bg-background">
+            <AddTodoItem todoList={todoList} />
+          </div>
+        )}
       </div>
-      <div>{can.add('todoItems') && <AddTodoItem todoList={todoList} />}</div>
     </div>
   );
 }

@@ -7,7 +7,7 @@ export function TodoLists() {
   if (!lists) return null;
 
   return (
-    <div>
+    <div className="w-full">
       {lists.map(list => (
         <TodoListView key={list.id} todoList={list} />
       ))}
