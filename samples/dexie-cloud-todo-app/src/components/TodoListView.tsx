@@ -88,9 +88,15 @@ export function TodoListView({ todoList }: Props) {
               size="icon"
               onClick={() => setShowInviteForm(!showInviteForm)}
               title="Share list"
-              className="text-white hover:bg-blue-600"
+              className={cn(
+                "text-white hover:bg-blue-600 transition-all duration-200",
+                showInviteForm && "bg-blue-600/50"
+              )}
             >
-              <Share2 className="h-4 w-4" />
+              <Share2 className={cn(
+                "h-4 w-4 transition-transform duration-200",
+                showInviteForm && "rotate-180"
+              )} />
             </Button>
           )}
           {can.delete() && (
@@ -108,11 +114,18 @@ export function TodoListView({ todoList }: Props) {
       </div>
       
       {/* Sharing Form */}
-      {showInviteForm && (
+      <div 
+        className={cn(
+          "overflow-hidden transition-all duration-300 ease-in-out",
+          showInviteForm 
+            ? "max-h-96 opacity-100" 
+            : "max-h-0 opacity-0"
+        )}
+      >
         <div className="px-4 py-4 bg-blue-50/70 dark:bg-blue-900/15 border-b border-blue-200/60">
           <SharingForm todoList={todoList} />
         </div>
-      )}
+      </div>
       
       {/* Todo Items */}
       <div className="px-0 py-0">
