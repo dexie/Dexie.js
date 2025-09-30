@@ -437,9 +437,6 @@ importers:
       typescript:
         specifier: ^5.0.0
         version: 5.8.3
-      web-vitals:
-        specifier: ^3.3.2
-        version: 3.3.2
       workbox-core:
         specifier: ^7.0.0
         version: 7.3.0
@@ -6115,9 +6112,6 @@ packages:
     resolution: {integrity: sha512-X7ZfGHHYlQ5zYpRlgP16LUsvYti+Al/6fz3T/ClVyivVCpCZQpESTDdz6zbK910O5OIvujO23Ym2DBBo3XsQlA==}
     engines: {'0': node}
     hasBin: true
-
-  web-vitals@3.3.2:
-    resolution: {integrity: sha512-qRkpmSeKfEWAzNhtX541xA8gCJ+pqCqBmUlDVkVDSCSYUvfvNqF+k9g8I+uyreRcDBdfiJrd0/aLbTy5ydo49Q==}
 
   webidl-conversions@4.0.2:
     resolution: {integrity: sha512-YQ+BmxuTgd6UXZW3+ICGfyqRyHXVlD5GtQr5+qjiNW7bF0cqrzX500HVXPBOvgXb5YnzDd+h0zqyv61KUD7+Sg==}
@@ -13086,8 +13080,6 @@ snapshots:
       q: 1.5.1
       request: 2.88.0
       vargs: 0.1.0
-
-  web-vitals@3.3.2: {}
 
   webidl-conversions@4.0.2: {}
 

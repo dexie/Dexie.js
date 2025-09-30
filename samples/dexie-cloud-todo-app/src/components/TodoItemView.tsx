@@ -4,6 +4,7 @@ import { TodoItem } from '../db/TodoItem';
 import { Trash2 } from 'lucide-react';
 import { usePermissions } from 'dexie-react-hooks';
 import { Button } from './ui/button';
+import { CheckedSign } from './ui/CheckedSign';
 import { cn } from '../lib/utils';
 
 interface Props {
@@ -15,12 +16,23 @@ export function TodoItemView({ item }: Props) {
   const [isHovering, setIsHovering] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
   
+  const handleToggle = (checked: boolean) => {
+    db.todoItems.update(item.id, {
+      done: checked,
+    });
+  };
+
+  const handleDelete = async () => {
+    await db.todoItems.delete(item.id!);
+  };
+
   useEffect(() => {
+    // On hover, show trash icon. After 2 seconds of hover, start fading out.
     let timer: NodeJS.Timeout;
     
     if (isHovering) {
       setShowTrash(true);
-      // Efter 2 sekunder av hover, börja fade out
+      // After 2 seconds of hover, start fading out
       timer = setTimeout(() => {
         setShowTrash(false);
       }, 2000);
@@ -33,23 +45,15 @@ export function TodoItemView({ item }: Props) {
     };
   }, [isHovering]);
 
-  const resetTimer = () => {
+  const showTrashOnClick = () => {
+    // Let mobile users show the faded-out trash icon again
+    // by clicking on the item
     if (isHovering) {
       setShowTrash(true);
-      // Trigger en re-render av useEffect genom att sätta isHovering
+      // Trigger a re-render of useEffect by setting isHovering
       setIsHovering(false);
       setTimeout(() => setIsHovering(true), 10);
     }
-  };
-  
-  const handleToggle = (checked: boolean) => {
-    db.todoItems.update(item.id, {
-      done: checked,
-    });
-  };
-
-  const handleDelete = async () => {
-    await db.todoItems.delete(item.id!);
   };
 
   return (
@@ -62,7 +66,7 @@ export function TodoItemView({ item }: Props) {
       )}
       onMouseEnter={() => setIsHovering(true)}
       onMouseLeave={() => setIsHovering(false)}
-      onClick={resetTimer}
+      onClick={showTrashOnClick}
     >
       {/* Custom Checkbox */}
       <label className="relative flex items-center cursor-pointer">
@@ -81,9 +85,7 @@ export function TodoItemView({ item }: Props) {
           !can.update('done') && "opacity-50 cursor-not-allowed"
         )}>
           {item.done && (
-            <svg className="w-4 h-4 fill-current" viewBox="0 0 20 20">
-              <path d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"/>
-            </svg>
+            <CheckedSign />
           )}
         </div>
       </label>
