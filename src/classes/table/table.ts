@@ -20,6 +20,7 @@ import { Entity } from '../entity/Entity';
 import { UpdateSpec } from '../../public';
 import { cmp } from '../../functions/cmp';
 import { builtInDeletionTrigger } from './table-helpers';
+import { applyUpdateSpec } from '../../functions/apply-update-spec';
 
 /** class Table
  * 
@@ -333,6 +334,30 @@ export class Table implements ITable<any, IndexableType> {
         try{setByKeyPath(obj, keyPath, lastResult);}catch(_){};
       }
       return lastResult;
+    });
+  }
+
+  /** Table.upsert()
+   * 
+   * https://dexie.org/docs/Table/Table.upsert()
+   * 
+   **/
+  upsert(key: IndexableType, modifications: { [keyPath: string]: any; }): PromiseExtended<boolean> {
+    const {keyPath} = this.schema.primKey;
+    return this._trans('readwrite', trans => {
+      return this.core.get({trans, key}).then(existing => {
+        const obj = existing ?? {};
+        applyUpdateSpec(obj, modifications);
+        if (keyPath) setByKeyPath(obj, keyPath, key);
+        return this.core.mutate({
+          trans,
+          type: 'put',
+          values: [obj],
+          keys: [key],
+          upsert: true,
+          updates: {keys: [key], changeSpecs: [modifications]}
+        }).then(res => res.numFailures ? Promise.reject(res.failures[0]) : !!existing);
+      });
     });
   }
 
