@@ -52,6 +52,7 @@ export interface DBCorePutRequest {
   values: readonly any[];
   keys?: any[];
   mutatedParts?: ObservabilitySet
+  upsert?: boolean; // If true, will insert the object if it does not exist. If false, will only update existing objects using the 'updates' property.
   criteria?: {
     index: string | null;
     range: DBCoreKeyRange;

@@ -224,6 +224,7 @@ export function createMutationTrackingMiddleware({
               let values = 'values' in req ? req.values : [];
               let changeSpec = 'changeSpec' in req ? req.changeSpec : undefined;
               let updates = 'updates' in req ? req.updates : undefined;
+              let upsert = updates && 'upsert' in req ? req.upsert : false;
 
               if (hasFailures) {
                 keys = keys.filter((_, idx) => !failures[idx]);
@@ -257,28 +258,31 @@ export function createMutationTrackingMiddleware({
                   };
                   const validKeys = new RangeSet();
                   let anyChangeSpecBecameEmpty = false;
-                  for (let i = 0, l = strippedChangeSpecs.length; i < l; ++i) {
-                    if (Object.keys(strippedChangeSpecs[i]).length > 0) {
-                      newUpdates.keys.push(updates.keys[i]);
-                      newUpdates.changeSpecs.push(strippedChangeSpecs[i]);
-                      validKeys.addKey(updates.keys[i]);
-                    } else {
-                      anyChangeSpecBecameEmpty = true;
-                    }
-                  }
-                  updates = newUpdates;
-                  if (anyChangeSpecBecameEmpty) {
-                    // Some keys were stripped. We must also strip them from keys and values
-                    let newKeys: any[] = [];
-                    let newValues: any[] = [];
-                    for (let i = 0, l = keys.length; i < l; ++i) {
-                      if (validKeys.hasKey(keys[i])) {
-                        newKeys.push(keys[i]);
-                        newValues.push(values[i]);
+                  if (!upsert) {
+                    for (let i = 0, l = strippedChangeSpecs.length; i < l; ++i) {
+                      if (Object.keys(strippedChangeSpecs[i]).length > 0) {
+                        newUpdates.keys.push(updates.keys[i]);
+                        newUpdates.changeSpecs.push(strippedChangeSpecs[i]);
+                        validKeys.addKey(updates.keys[i]);
+                      } else {
+                        anyChangeSpecBecameEmpty = true;
                       }
                     }
-                    keys = newKeys;
-                    values = newValues;
+                    updates = newUpdates;
+                    if (anyChangeSpecBecameEmpty) {
+                      // Some keys were stripped. We must also strip them from keys and values
+                      // unless this is an upsert operation in which case we want to send them all.
+                      let newKeys: any[] = [];
+                      let newValues: any[] = [];
+                      for (let i = 0, l = keys.length; i < l; ++i) {
+                        if (validKeys.hasKey(keys[i])) {
+                          newKeys.push(keys[i]);
+                          newValues.push(values[i]);
+                        }
+                      }
+                      keys = newKeys;
+                      values = newValues;
+                    }
                   }
                 }
               }
@@ -330,6 +334,16 @@ export function createMutationTrackingMiddleware({
                       userId,
                       values,
                     }
+                  : upsert ? {
+                      type: 'upsert',
+                      ts,
+                      opNo,
+                      keys,
+                      values,
+                      changeSpecs: updates!.changeSpecs.filter((_, idx) => !failures[idx]),
+                      txid,
+                      userId,
+                  }
                   : criteria && changeSpec
                   ? {
                       // Common changeSpec for all keys
