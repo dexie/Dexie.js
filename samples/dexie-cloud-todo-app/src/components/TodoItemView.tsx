@@ -118,6 +118,7 @@ export function TodoItemView({ item }: Props) {
                 (ev) => db.todoItems.update(item.id, { title: ev.target.value })
             )}
             onKeyDown={handleKeyDown}
+            onBlur={() => setIsEditing(false)}
             autoFocus
             className={cn(
               "w-full text-sm leading-relaxed bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-500 rounded px-1 py-0.5",

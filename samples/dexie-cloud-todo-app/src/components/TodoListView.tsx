@@ -63,6 +63,7 @@ export function TodoListView({ todoList }: Props) {
                 (ev) => db.todoLists.update(todoList.id, { title: ev.target.value })
               )}
               onKeyDown={handleTitleKeyDown}
+              onBlur={() => setIsEditingTitle(false)}
               autoFocus
               className={cn(
                 "text-lg font-semibold bg-transparent border-none outline-none focus:ring-1 focus:ring-white/50 rounded px-2 py-1 text-white placeholder-white/70 w-full"
