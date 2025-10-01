@@ -125,12 +125,14 @@ function canonicalizeToUpdateOps(muts: DBOperation[]) {
       const updateMut = {
         ...mut,
         criteria: undefined,
-        type: 'update' as const,
+        changeSpec: undefined,
+        type: 'update',
         keys: mut.keys,
         changeSpecs: [mut.changeSpec],
       };
       delete updateMut.criteria;
-      return updateMut;
+      delete updateMut.changeSpec;
+      return updateMut as DBUpdateOperation;
     }
 
     return mut;
