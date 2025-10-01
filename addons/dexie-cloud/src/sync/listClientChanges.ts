@@ -1,7 +1,7 @@
-import { Table } from 'dexie';
+import { PropModification, Table, UpdateSpec } from 'dexie';
 import { getTableFromMutationTable } from '../helpers/getTableFromMutationTable';
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { DBOperation, DBOperationsSet } from 'dexie-cloud-common';
+import { DBOperation, DBOperationsSet, DBUpdateOperation } from 'dexie-cloud-common';
 import { flatten } from '../helpers/flatten';
 
 export async function listClientChanges(
@@ -20,18 +20,18 @@ export async function listClientChanges(
 
       if (limit < Infinity) query = query.limit(limit);
 
-      const muts: DBOperation[] = await query.toArray();
+      let muts: DBOperation[] = await query.toArray();
 
-      //const objTable = db.table(tableName);
-      /*for (const mut of muts) {
-        if (mut.type === "insert" || mut.type === "upsert") {
-          mut.values = await objTable.bulkGet(mut.keys);
-        }
-      }*/
-      return muts.map((mut) => ({
+      muts = canonicalizeToUpdateOps(muts);
+
+      muts = removeRedundantUpdateOps(muts);
+
+      const rv = muts.map((mut) => ({
         table: tableName,
         mut,
       }));
+
+      return rv;
     })
   );
 
@@ -66,3 +66,77 @@ export async function listClientChanges(
   // Filter out those tables that doesn't have any mutations:
   return result;
 }
+
+
+function removeRedundantUpdateOps(muts: DBOperation[]) {
+  const updateCoverage = new Map<string, Array<{ txid: string; updateSpec: UpdateSpec<any>; }>>();
+  for (const mut of muts) {
+    if (mut.type === 'update') {
+      if (mut.keys.length !== 1 || mut.changeSpecs.length !== 1) {
+        continue; // Don't optimize multi-key updates
+      }
+      const strKey = '' + mut.keys[0];
+      const changeSpecs = mut.changeSpecs[0];
+      if (Object.values(changeSpecs).some(v => typeof v === "object" && v && "@@propmod" in v)) {
+        continue; // Cannot optimize if any PropModification is present
+      }
+      let keyCoverage = updateCoverage.get(strKey);
+      if (keyCoverage) {
+        keyCoverage.push({ txid: mut.txid!, updateSpec: changeSpecs });
+      } else {
+        updateCoverage.set(strKey, [{ txid: mut.txid!, updateSpec: changeSpecs }]);
+      }
+    }
+  }
+  muts = muts.filter(mut => {
+    // Only apply optimization to update mutations that are single-key
+    if (mut.type !== 'update') return true;
+    if (mut.keys.length !== 1 || mut.changeSpecs.length !== 1) return true;
+    // Keep track of properties that aren't overlapped by later transactions
+    const unoverlappedProps = new Set(Object.keys(mut.changeSpecs[0]));
+    const strKey = '' + mut.keys[0];
+    const keyCoverage = updateCoverage.get(strKey)!;
+
+    for (let i = keyCoverage.length - 1; i >= 0; --i) {
+      const { txid, updateSpec } = keyCoverage[i];
+      if (txid === mut.txid) break; // Stop when reaching own txid
+
+
+      // If all changes in updateSpec are covered by all props on all mut.changeSpecs then
+      // txid is redundant and can be removed.
+      for (const keyPath of Object.keys(updateSpec)) {
+        unoverlappedProps.delete(keyPath);
+      }
+    }
+    if (unoverlappedProps.size === 0) {
+      // This operation is completely overlapped by later operations. It can be removed.
+      return false;
+    }
+    return true;
+  });
+  return muts;
+}
+
+function canonicalizeToUpdateOps(muts: DBOperation[]) {
+  muts = muts.map(mut => {
+    if (mut.type === 'modify' && mut.criteria.index === null) {
+      // The criteria is on primary key. Convert to an update operation instead.
+      // It is simpler for the server to handle and also more efficient.
+      const updateMut = {
+        ...mut,
+        criteria: undefined,
+        changeSpec: undefined,
+        type: 'update',
+        keys: mut.keys,
+        changeSpecs: [mut.changeSpec],
+      };
+      delete updateMut.criteria;
+      delete updateMut.changeSpec;
+      return updateMut as DBUpdateOperation;
+    }
+
+    return mut;
+  });
+  return muts;
+}
+
