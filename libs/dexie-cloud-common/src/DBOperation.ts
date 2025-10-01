@@ -44,6 +44,7 @@ export interface DBInsertOperation<PK=DBOpPrimaryKey> extends DBOperationCommon<
 export interface DBUpsertOperation<PK=DBOpPrimaryKey> extends DBOperationCommon<PK> {
   type: "upsert";
   values: readonly any[];
+  changeSpecs?: ({ [keyPath: string]: any } | null)[];
 }
 
 export interface DBUpdateOperation<PK=DBOpPrimaryKey> extends DBOperationCommon<PK> {
