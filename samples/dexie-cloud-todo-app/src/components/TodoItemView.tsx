@@ -6,6 +6,7 @@ import { usePermissions } from 'dexie-react-hooks';
 import { Button } from './ui/button';
 import { CheckedSign } from './ui/CheckedSign';
 import { cn } from '../lib/utils';
+import { handleError } from '../helpers/handleError';
 
 interface Props {
   item: TodoItem;
@@ -15,6 +16,7 @@ export function TodoItemView({ item }: Props) {
   const can = usePermissions(db, 'todoItems', item);
   const [isHovering, setIsHovering] = useState(false);
   const [showTrash, setShowTrash] = useState(false);
+  const [isEditing, setIsEditing] = useState(false);
   
   const handleToggle = (checked: boolean) => {
     db.todoItems.update(item.id, {
@@ -24,6 +26,23 @@ export function TodoItemView({ item }: Props) {
 
   const handleDelete = async () => {
     await db.todoItems.delete(item.id!);
+  };
+
+  const handleStartEdit = () => {
+    if (can.update('title')) {
+      setIsEditing(true);
+    }
+  };
+
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      setIsEditing(false);
+    } else if (e.key === 'Escape') {
+      e.preventDefault();
+      setIsEditing(false);
+    }
   };
 
   useEffect(() => {
@@ -45,12 +64,11 @@ export function TodoItemView({ item }: Props) {
     };
   }, [isHovering, can]);
 
-  const showTrashOnClick = () => {
-    // Let mobile users show the faded-out trash icon again
-    // by clicking on the item (only if they can delete)
-    if (isHovering && can.delete()) {
+  const showTrashOnClick = (e: React.MouseEvent) => {
+    // Show trash on any click within the item (for mobile users)
+    if (can.delete()) {
       setShowTrash(true);
-      // Trigger a re-render of useEffect by setting isHovering
+      // Reset hover state to trigger useEffect timer
       setIsHovering(false);
       setTimeout(() => setIsHovering(true), 10);
     }
@@ -90,11 +108,35 @@ export function TodoItemView({ item }: Props) {
         </div>
       </label>
       
-      <div className={cn(
-        "flex-1 text-sm leading-relaxed",
-        item.done ? "text-foreground/80" : "text-foreground"
-      )}>
-        {item.title}
+      {/* Editable Title */}
+      <div className="flex-1">
+        {isEditing ? (
+          <input
+            type="text"
+            defaultValue={item.title}
+            onChange={handleError(
+                (ev) => db.todoItems.update(item.id, { title: ev.target.value })
+            )}
+            onKeyDown={handleKeyDown}
+            autoFocus
+            className={cn(
+              "w-full text-sm leading-relaxed bg-transparent border-none outline-none focus:ring-1 focus:ring-blue-500 rounded px-1 py-0.5",
+              item.done ? "text-foreground/80" : "text-foreground"
+            )}
+          />
+        ) : (
+          <div 
+            className={cn(
+              "text-sm leading-relaxed cursor-pointer hover:bg-muted/30 rounded px-1 py-0.5 transition-colors",
+              item.done ? "text-foreground/80" : "text-foreground",
+              !can.update('title') && "cursor-default hover:bg-transparent"
+            )}
+            onClick={handleStartEdit}
+            title={can.update('title') ? "Click to edit" : undefined}
+          >
+            {item.title}
+          </div>
+        )}
       </div>
       
       <Button
