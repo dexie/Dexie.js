@@ -108,10 +108,11 @@ Calling friend.notes twice will return the same Y.Doc instance unless the first 
 
 * Y properties are never nullish. If declared in the dexie schema, they'll exist on all objects from all queries (toArray(), get() etc).
 * Y properties are not `own properties`. They are set on the prototype of the returned object.
-* Y properties are readonly, except when adding new objects to a table (using table.add() or bulkAdd(). Only then, it's possible to create a new Y.Doc() instance - empty or with content - and put it on the property of the object being inserted to the database)
+* Y properties are readonly but can be mutated using the [Y.Doc methods](https://docs.yjs.dev/api/y.doc).
+* When adding new objects to a table (using table.add() or bulkAdd()), it's possible to create a new Y.Doc() instance - empty or with content - and put it on the property of the object being inserted to the database.
 * If providing a custom Y.Doc to add() or bulkAdd() its udates will be cloned when added.
 * If not providing the Y.Doc or setting the Y property to null when adding objects, there will still be an Y.Doc property on query results of the object, since Y props are defined by the schema and cannot be null or undefined.
-* Y properties on dexie objects are readonly. You can not replace them with another document or update them using table.update() or collection.modify(). The only way to update Y.Docs is via the [Y.Doc methods](https://docs.yjs.dev/api/y.doc) on the document instance.
+* Y properties on dexie objects can only be mutated using the [Y.Doc methods](https://docs.yjs.dev/api/y.doc). The property itself is readonly. You cannot replace them with another document or update them using Table.update() or Collection.modify().
 * Y properties are not loaded until using DexieYProvider.load() or the new react hook `useDocument()`
 * Y.Doc instances are kept in a global cache integrated with FinalizationRegistry. First time you access the getter, it will be created, and will stay in cache until it's garbage collected. This means that you'll always get the same Y.Doc instance when querying the same Y property of a the same object. This holds true even if the there are multiple obj instances representing the same ID in the database. All of these will hold one single instance of the Y.Doc because the cache is connected to the primary key of the parent object.
 
