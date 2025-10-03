@@ -71,7 +71,7 @@ export function LoginDialog({
         <>
           <button
             type="submit"
-            style={Styles.Button}
+            style={Styles.PrimaryButton}
             onClick={() => onSubmit(params)}
           >
             {submitLabel}
