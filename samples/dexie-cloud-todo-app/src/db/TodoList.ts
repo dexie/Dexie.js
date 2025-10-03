@@ -47,17 +47,16 @@ export class TodoList extends Entity<TodoDB> {
       [db.todoLists, db.todoItems, db.realms],
       async () => {
         // Create tied realm
-        // We use put() here in case same user does this on
+        // We use upsert() here in case same user does this on
         // two offline devices to add different members - we don't
         // want one of the actions to fail - we want both to succeed
         // and add both members
-        await db.realms.put({
-          realmId: newRealmId,
+        await db.realms.upsert(newRealmId,{
           name: this.title,
           represents: 'a to-do list',
         });
 
-        // "Realmify entity" (setting realmId equals own id will make it become a Realm)
+        // Move the todoList into the new realm
         await db.todoLists.update(this.id!, { realmId: newRealmId });
         // Move all todo items into the new realm consistently (modify() is consistent across sync peers)
         await db.todoItems
