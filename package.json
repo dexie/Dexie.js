@@ -1,6 +1,6 @@
 {
   "name": "dexie",
-  "version": "4.2.0",
+  "version": "4.2.1",
   "description": "A Minimalistic Wrapper for IndexedDB",
   "main": "dist/dexie.js",
   "module": "dist/dexie.mjs",
