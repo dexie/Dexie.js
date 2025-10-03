@@ -15,6 +15,7 @@ import { cmp } from "../../functions/cmp";
 import { PropModification } from "../../helpers/prop-modification";
 import { UpdateSpec } from "../../public/types/update-spec";
 import { builtInDeletionTrigger } from "../table/table-helpers";
+import { applyUpdateSpec } from "../../functions/apply-update-spec";
 
 /** class Collection
  * 
@@ -469,25 +470,7 @@ export class Collection implements ICollection {
         modifyer = changes as (obj: any, ctx:{value: any, primKey: IndexableType}) => void | boolean;
       } else {
         // changes is a set of {keyPath: value} and no one is listening to the updating hook.
-        var keyPaths = keys(changes);
-        var numKeys = keyPaths.length;
-        modifyer = function (item) {
-          let anythingModified = false;
-          for (let i = 0; i < numKeys; ++i) {
-            let keyPath = keyPaths[i];
-            let val = changes[keyPath];
-            let origVal = getByKeyPath(item, keyPath);
-
-            if (val instanceof PropModification) {
-              setByKeyPath(item, keyPath, val.execute(origVal));
-              anythingModified = true;
-            } else if (origVal !== val) {
-              setByKeyPath(item, keyPath, val); // Adding {keyPath: undefined} means that the keyPath should be deleted. Handled by setByKeyPath
-              anythingModified = true;
-            }
-          }
-          return anythingModified;
-        };
+        modifyer = item => applyUpdateSpec(item, changes);
       }
 
       const coreTable = ctx.table.core;

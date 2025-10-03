@@ -46,6 +46,9 @@ export interface Table<T=any, TKey=any, TInsertType=T> {
   update(
     key: TKey | T,
     changes: UpdateSpec<TInsertType> | ((obj: T, ctx:{value: any, primKey: IndexableType}) => void | boolean)): PromiseExtended<number>;
+  upsert(
+    key: TKey | T,
+    changes: UpdateSpec<TInsertType>): PromiseExtended<boolean>;
   put(item: TInsertType, key?: TKey): PromiseExtended<TKey>;
   delete(key: TKey): PromiseExtended<void>;
   clear(): PromiseExtended<void>;

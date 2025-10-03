@@ -7,6 +7,7 @@ db.version(1).stores({
     users: "++id,first,last,&username,*&email,*pets",
     folks: "++,first,last",
     items: "id",
+    outbound: "", // For testing outbound primary keys
     schema: "" // Test issue #1039
 });
 
@@ -39,6 +40,114 @@ module("table", {
     },
     teardown: function () {
     }
+});
+
+promisedTest("Table.upsert()", async () => {
+    // Test 1: Upsert on existing object (should behave like update)
+    const existingId = await db.users.add({
+        first: "Alice", 
+        last: "Smith", 
+        username: "asmith", 
+        email: ["alice@example.com"]
+    });
+    
+    // Upsert should update the existing object
+    const wasUpdate = await db.users.upsert(existingId, {
+        last: "Johnson",
+        "email.0": "alice.johnson@example.com"
+    });
+    
+    equal(wasUpdate, true, "upsert() should return true when updating existing object");
+    
+    const updatedUser = await db.users.get(existingId);
+    equal(updatedUser.first, "Alice", "First name should remain unchanged");
+    equal(updatedUser.last, "Johnson", "Last name should be updated");
+    equal(updatedUser.username, "asmith", "Username should remain unchanged");
+    equal(updatedUser.email[0], "alice.johnson@example.com", "Email should be updated using dotted path");
+    
+    // Test 2: Upsert on non-existing object (should create new object)
+    const nonExistingId = existingId + 1000; // Use a key that definitely doesn't exist
+    
+    // Upsert should create a new object
+    const wasCreate = await db.users.upsert(nonExistingId, {
+        first: "Bob",
+        last: "Wilson",
+        "email.0": "bob@example.com"
+    });
+    
+    equal(wasCreate, false, "upsert() should return false when creating new object");
+    
+    const newUser = await db.users.get(nonExistingId);
+    ok(newUser !== null, "New user should exist");
+    equal(newUser.id, nonExistingId, "Primary key should be set correctly");
+    equal(newUser.first, "Bob", "First name should be set");
+    equal(newUser.last, "Wilson", "Last name should be set");
+    equal(newUser.email[0], "bob@example.com", "Email should be set using dotted path");
+    ok(newUser.username === undefined, "Username should be undefined (not specified in modifications)");
+    
+    // Test 3: Upsert on table with outbound primary key (outbound table)
+    await db.outbound.put({name: "Original Item"}, 100);
+    
+    // Update existing item
+    const itemWasUpdate = await db.outbound.upsert(100, {
+        name: "Updated Item",
+        description: "Added description"
+    });
+    
+    equal(itemWasUpdate, true, "Should return true for existing item update");
+    
+    const updatedItem = await db.outbound.get(100);
+    equal(updatedItem.name, "Updated Item", "Item name should be updated");
+    equal(updatedItem.description, "Added description", "Description should be added");
+    
+    // Create new item
+    const itemWasCreate = await db.outbound.upsert(101, {
+        name: "New Item",
+        category: "Test"
+    });
+    
+    equal(itemWasCreate, false, "Should return false for new item creation");
+    
+    const newItem = await db.outbound.get(101);
+    equal(newItem.name, "New Item", "Item name should be set");
+    equal(newItem.category, "Test", "Category should be set");
+    ok(newItem.id === undefined, "Primary key should not be set in object for outbound keys");
+    
+    // Test 4: Upsert with nested object modifications
+    const nestedId = await db.folks.add({
+        first: "Carol",
+        last: "Davis",
+        address: {
+            city: "Stockholm",
+            street: "Kungsgatan"
+        }
+    });
+    
+    await db.folks.upsert(nestedId, {
+        "address.postalCode": "11122",
+        "address.country": "Sweden"
+    });
+    
+    const nestedUser = await db.folks.get(nestedId);
+    equal(nestedUser.address.city, "Stockholm", "Existing nested property should remain");
+    equal(nestedUser.address.street, "Kungsgatan", "Existing nested property should remain");
+    equal(nestedUser.address.postalCode, "11122", "New nested property should be added");
+    equal(nestedUser.address.country, "Sweden", "New nested property should be added");
+    
+    // Test 5: Upsert creating object with nested structure from scratch
+    const newNestedId = await db.folks.count() + 1000; // Ensure non-existing ID
+    
+    await db.folks.upsert(newNestedId, {
+        first: "David",
+        "address.city": "Göteborg",
+        "address.street": "Avenyn"
+    });
+    
+    const newNestedUser = await db.folks.get(newNestedId);
+    equal(newNestedUser.first, "David", "First name should be set");
+    equal(newNestedUser.address.city, "Göteborg", "Nested city should be set");
+    equal(newNestedUser.address.street, "Avenyn", "Nested street should be set");
+    ok(newNestedUser.last === undefined, "Unspecified properties should be undefined");
 });
 
 promisedTest("Issue #841 - put() ignores date changes", async ()=> {
