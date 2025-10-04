@@ -10,5 +10,8 @@ export function useSuspendingLiveQuery<T>(
   querier: () => Promise<T> | T,
   cacheKey: React.DependencyList
 ): T {
-  return useSuspendingObservable(() => Dexie.liveQuery(querier), cacheKey);
+  return useSuspendingObservable(
+    () => Dexie.liveQuery(querier),
+    ['dexie', ...cacheKey]
+  );
 }
