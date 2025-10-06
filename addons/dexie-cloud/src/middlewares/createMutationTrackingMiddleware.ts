@@ -334,13 +334,13 @@ export function createMutationTrackingMiddleware({
                       userId,
                       values,
                     }
-                  : upsert ? {
+                  : upsert && updates ? {
                       type: 'upsert',
                       ts,
                       opNo,
                       keys,
                       values,
-                      changeSpecs: updates!.changeSpecs.filter((_, idx) => !failures[idx]),
+                      changeSpecs: updates.changeSpecs.filter((_, idx) => !failures[idx]),
                       txid,
                       userId,
                   }

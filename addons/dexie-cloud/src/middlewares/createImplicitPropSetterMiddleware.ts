@@ -73,10 +73,9 @@ export function createImplicitPropSetterMiddleware(
                       // for them - so that server knows when a private ID has been deleted on server
                       // not accept insert/upserts on them.
                       if (req.type === 'put') {
-                        const now = Date.now();
                         delete req.criteria;
                         delete req.changeSpec;
-                        delete req.updates;
+                        if (!req.upsert) delete req.updates;
                         obj.$ts = Date.now();
                       }
                     }
