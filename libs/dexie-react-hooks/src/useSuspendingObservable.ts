@@ -18,8 +18,8 @@ export function useSuspendingObservable<T>(
   // TODO: enable iterators in TS and remove Array.from
   for (const [key, val] of Array.from(OBSERVABLES.entries())) {
     if (
-      cacheKey.length === key.length &&
-      cacheKey.every((x, i) => x === key[i])
+      key.length === cacheKey.length &&
+      key.every((k, i) => Object.is(k, cacheKey[i]))
     ) {
       observable = val;
       break;
@@ -30,6 +30,36 @@ export function useSuspendingObservable<T>(
     OBSERVABLES.set(cacheKey, observable);
   }
 
+  const incrementRef = () => {
+    const timeout = TIMEOUTS.get(observable);
+    if (timeout != null) clearTimeout(timeout);
+
+    let refCount = REF_COUNTS.get(observable) ?? 0;
+    refCount += 1;
+    REF_COUNTS.set(observable, refCount);
+  };
+
+  const decrementRef = () => {
+    let refCount = REF_COUNTS.get(observable)!;
+    refCount -= 1;
+    REF_COUNTS.set(observable, refCount);
+
+    if (refCount <= 0) {
+      const timeout = setTimeout(() => {
+        for (const [key, val] of Array.from(OBSERVABLES.entries())) {
+          if (val === observable) {
+            OBSERVABLES.delete(key);
+            break;
+          }
+        }
+        PROMISES.delete(observable);
+        VALUES.delete(observable);
+        TIMEOUTS.delete(observable);
+      }, 1000);
+      TIMEOUTS.set(observable, timeout);
+    }
+  };
+
   let promise: Promise<T> | undefined = PROMISES.get(observable);
   if (!promise) {
     promise = new Promise<T>((resolve, reject) => {
@@ -37,20 +67,24 @@ export function useSuspendingObservable<T>(
         resolve(VALUES.get(observable)!);
         return;
       }
+
+      incrementRef();
+
       const sub = observable.subscribe(
         (val) => {
           resolve(val);
           VALUES.set(observable, val);
           unsub(sub);
-          PROMISES.delete(observable);
+          decrementRef();
         },
         (err) => {
           reject(err);
           unsub(sub);
-          PROMISES.delete(observable);
+          decrementRef();
         }
       );
     });
+
     PROMISES.set(observable, promise);
   }
 
@@ -60,14 +94,22 @@ export function useSuspendingObservable<T>(
   const [error, setError] = React.useState<any>(null);
 
   React.useEffect(() => {
+    incrementRef();
+
     const sub = observable.subscribe(
       (val) => {
         VALUES.set(observable, val);
         setValue(val);
       },
-      (err) => setError(err)
+      (err) => {
+        setError(err);
+      }
     );
-    return () => unsub(sub);
+
+    return () => {
+      unsub(sub);
+      decrementRef();
+    };
   }, [observable]);
 
   if (error) throw error;
@@ -79,6 +121,13 @@ const OBSERVABLES = new Map<React.DependencyList, InteropableObservable<any>>();
 const PROMISES = new WeakMap<InteropableObservable<any>, Promise<any>>();
 
 const VALUES = new WeakMap<InteropableObservable<any>, any>();
+
+const TIMEOUTS = new WeakMap<
+  InteropableObservable<any>,
+  ReturnType<typeof setTimeout>
+>();
+
+const REF_COUNTS = new WeakMap<InteropableObservable<any>, number>();
 
 /** Unsubscribes from an observable */
 function unsub(sub: (() => unknown) | { unsubscribe: () => unknown }) {
