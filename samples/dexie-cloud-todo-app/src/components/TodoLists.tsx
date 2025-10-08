@@ -3,7 +3,7 @@ import { db } from "../db";
 import { TodoListView } from "./TodoListView";
 
 export function TodoLists() {
-  const lists = useLiveQuery(() => db.todoLists.toArray());
+  const lists = useLiveQuery(() => db.todoLists.reverse().toArray());
   if (!lists) return null;
 
   return (

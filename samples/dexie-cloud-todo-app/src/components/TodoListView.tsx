@@ -18,7 +18,10 @@ interface Props {
 export function TodoListView({ todoList }: Props) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const items = useLiveQuery(
-    () => db.todoItems.where({ todoListId: todoList.id }).toArray(),
+    () => db.todoItems
+      .where({ todoListId: todoList.id })
+      .reverse()
+      .toArray(),
     [todoList.id]
   );
   const can = usePermissions(todoList);
@@ -130,14 +133,14 @@ export function TodoListView({ todoList }: Props) {
 
       {/* Todo Items */}
       <div className="px-0 py-0">
-        {items.map((item) => (
-          <TodoItemView key={item.id} item={item} />
-        ))}
         {can.add('todoItems') && (
           <div className="px-4 py-3 border-b border-blue-200/60 bg-background">
             <AddTodoItem todoList={todoList} />
           </div>
         )}
+        {items.map((item) => (
+          <TodoItemView key={item.id} item={item} />
+        ))}
       </div>
     </div>
   );
