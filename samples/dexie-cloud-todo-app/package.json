@@ -8,7 +8,7 @@
     "dexie-cloud-addon": "^4.2.2",
     "dexie-react-hooks": "^4.2.0",
     "lucide-react": "^0.544.0",
-    "react": "^18.2.0",
+    "react": "^18.3.1",
     "react-dom": "^18.2.0",
     "react-use": "^17.4.0",
     "typescript": "^5.0.0",
