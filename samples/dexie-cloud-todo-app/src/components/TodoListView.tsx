@@ -20,7 +20,7 @@ export function TodoListView({ todoList }: Props) {
   const items = useLiveQuery(
     () => db.todoItems
       .where({ todoListId: todoList.id })
-      .reverse()
+      .reverse() // Show newest items first
       .toArray(),
     [todoList.id]
   );
