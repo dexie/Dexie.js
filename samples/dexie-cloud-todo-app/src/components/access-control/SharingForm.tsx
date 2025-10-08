@@ -7,7 +7,7 @@ import { Trash2, Mail, UserPlus } from 'lucide-react';
 import { EditMember } from './EditMember';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
-import importFile from '../../data/importfile.json';
+import demoUsersJson from '../../data/demoUsers.json';
 
 interface Props {
   todoList: TodoList;
@@ -25,7 +25,7 @@ export function SharingForm({ todoList }: Props) {
   const [manualInviteOpen, setManualInviteOpen] = useState(false);
 
   const can = usePermissions(todoList);
-  
+
   return (
     <div className="space-y-3">
       {members && members.length > 0 && (
@@ -48,7 +48,7 @@ export function SharingForm({ todoList }: Props) {
             </h4>
             
             <div className="space-y-1">
-              {Object.keys(importFile.demoUsers)
+              {Object.keys(demoUsersJson.demoUsers)
                 .filter((demoUser) => demoUser !== db.cloud.currentUserId)
                 .map((demoUser) => (
                   <div key={demoUser} className="flex items-center justify-between py-2 px-3 bg-white rounded border border-blue-100">
@@ -144,6 +144,21 @@ function MemberRow({
   let memberText = member.name || member.email || member.userId;
   if (isMe) memberText += ' (me)';
 
+  const handleUnshare = async (member: DBRealmMember) => {
+    await todoList.unshareWith(member);
+    const numOtherPeople = await db.members
+          .where({ realmId: todoList.realmId })
+          .filter((m) => m.userId !== db.cloud.currentUserId)
+          .count();
+    if (numOtherPeople === 0) {
+      // If you removed the last other person, you are now the sole owner.
+      // Remove all other members (there should be none) and make the list
+      // private again.
+      await todoList.makePrivate();
+    }
+  }
+  
+
   return (
     <div className={`flex items-center justify-between py-2 px-3 bg-white rounded border border-blue-100 ${
       member.accepted ? '' : 'opacity-50'
@@ -166,7 +181,7 @@ function MemberRow({
             <Button
               variant="ghost"
               size="sm"
-              onClick={() => todoList.unshareWith(member)}
+              onClick={() => handleUnshare(member)}
               className="text-red-500 hover:text-red-700 hover:bg-red-50 h-8 w-8 p-0"
             >
               <Trash2 className="h-4 w-4" />
@@ -179,7 +194,7 @@ function MemberRow({
               <Button 
                 variant="outline" 
                 size="sm" 
-                onClick={() => todoList.leave()}
+                onClick={() => todoList.leaveList()}
                 className="h-7 px-3 text-xs border-red-300 text-red-600 hover:bg-red-50 hover:border-red-400 min-w-[50px]"
               >
                 Leave

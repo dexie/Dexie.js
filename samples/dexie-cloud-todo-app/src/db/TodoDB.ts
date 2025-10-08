@@ -1,6 +1,5 @@
 import Dexie, { Table } from 'dexie';
 import dexieCloud, { DexieCloudTable } from 'dexie-cloud-addon';
-import { populate } from './populate';
 import { TodoItem } from './TodoItem';
 import { TodoList } from './TodoList';
 
@@ -15,20 +14,23 @@ export class TodoDB extends Dexie {
       addons: [dexieCloud],
       cache: "immutable"
     });
-    this.version(14).stores({
-      todoLists: `@id`,
-      todoItems: `@id, [todoListId+realmId]`,
+
+    this.version(15).stores({
+      todoLists: `@id, [realmId+id]`,
+      todoItems: `@id, realmId, [todoListId+realmId]`,
       openCloseStates: `` // Set of open ids (persisted local state only)
     });
     this.todoLists.mapToClass(TodoList);
-    this.on('populate', () => {
-      this.on('ready', () => {
-        return populate(this);
-      });
-    });
+
     // Configure cloud:
+    //
+    // See docs: https://dexie.org/cloud/docs/db.cloud.configure()
+    //
     this.cloud.configure({
-      unsyncedTables: ['openCloseStates'],
+      unsyncedTables: ['openCloseStates'], // See also unsyncedProperties
+      unsyncedProperties: {
+        todoLists: ['_isExpanded', '_isSharingDialogOpen', '_isAccessControlDialogOpen'],
+      },
       databaseUrl: import.meta.env.VITE_DBURL!,
       tryUseServiceWorker: true,
       requireAuth: false,

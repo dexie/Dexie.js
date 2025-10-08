@@ -29,7 +29,7 @@ export function TodoListView({ todoList }: Props) {
   const handleDelete = async () => {
     const confirmed = confirm(`Are you sure you want to delete "${todoList.title}" and all its items?`);
     if (confirmed) {
-      await todoList.delete();
+      await todoList.deleteList();
     }
   };
 
@@ -70,7 +70,7 @@ export function TodoListView({ todoList }: Props) {
               )}
             />
           ) : (
-            <h2 
+            <h2
               className={cn(
                 "text-lg font-semibold text-white cursor-pointer hover:bg-white/10 rounded px-2 py-1 transition-colors",
                 !can.update('title') && "cursor-default hover:bg-transparent"
@@ -83,23 +83,23 @@ export function TodoListView({ todoList }: Props) {
           )}
         </div>
         <div className="flex items-center gap-2">
-          {!todoList.isPrivate() && (
-            <Button
-              variant="ghost"
-              size="icon"
-              onClick={() => setShowInviteForm(!showInviteForm)}
-              title="Share list"
-              className={cn(
-                "text-white hover:bg-blue-600 transition-all duration-200",
-                showInviteForm && "bg-blue-600/50"
-              )}
-            >
-              <Share2 className={cn(
-                "h-4 w-4 transition-transform duration-200",
-                showInviteForm && "rotate-180"
-              )} />
-            </Button>
-          )}
+
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setShowInviteForm(!showInviteForm)}
+            title="Share list"
+            className={cn(
+              "text-white hover:bg-blue-600 transition-all duration-200",
+              showInviteForm && "bg-blue-600/50"
+            )}
+          >
+            <Share2 className={cn(
+              "h-4 w-4 transition-transform duration-200",
+              showInviteForm && "rotate-180"
+            )} />
+          </Button>
+
           {can.delete() && (
             <Button
               variant="ghost"
@@ -113,13 +113,13 @@ export function TodoListView({ todoList }: Props) {
           )}
         </div>
       </div>
-      
+
       {/* Sharing Form */}
-      <div 
+      <div
         className={cn(
           "overflow-hidden transition-all duration-300 ease-in-out",
-          showInviteForm 
-            ? "max-h-96 opacity-100" 
+          showInviteForm
+            ? "max-h-96 opacity-100"
             : "max-h-0 opacity-0"
         )}
       >
@@ -127,7 +127,7 @@ export function TodoListView({ todoList }: Props) {
           <SharingForm todoList={todoList} />
         </div>
       </div>
-      
+
       {/* Todo Items */}
       <div className="px-0 py-0">
         {items.map((item) => (

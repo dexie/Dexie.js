@@ -1,4 +1,4 @@
-import { DBRealmMember, getTiedRealmId } from 'dexie-cloud-addon';
+import { DBRealmMember } from 'dexie-cloud-addon';
 import { useObservable } from 'dexie-react-hooks';
 import { db, TodoList } from '../../db';
 
@@ -16,7 +16,7 @@ export function EditMemberAccess({ todoList, member, access }: Props) {
         todoList.owner === member.userId &&
         member.userId === db.cloud.currentUserId
       }
-      style={{border: 0}}
+      style={{ border: 0 }}
       value={access}
       onChange={(ev) => changeAccess(todoList, member, access, ev.target.value)}
     >
@@ -33,39 +33,38 @@ export function EditMemberAccess({ todoList, member, access }: Props) {
   );
 }
 
-function changeAccess(
+async function changeAccess(
   todoList: TodoList,
   member: DBRealmMember,
   existingAccess: string,
   newAccess: string
 ) {
-  const realmId = getTiedRealmId(todoList.id);
-  return db.transaction('rw', db.todoLists, db.members, db.realms, () => {
-    if (existingAccess !== 'owner' && newAccess === 'owner') {
-      if (!member.userId)
-        throw new Error(
-          `Cannot give ownership to user before invite is accepted.`
-        );
-      // Before changing owner, give full permissions to the old owner:
-      db.members
-        .where({ realmId, userId: todoList.owner })
-        .modify({ roles: ['manager'] });
-      // Change owner of all members in the realm:
-      db.members.where({ realmId }).modify({ owner: member.userId });
-      // Change owner of the todo list:
-      db.todoLists.update(todoList, { owner: member.userId });
-      // Change owner of realm:
-      db.realms.update(realmId, { owner: member.userId });
+  if (newAccess === 'owner') {
+    //
+    // Assigning ownership
+    //
+    if (!member.userId) {
+      throw new Error(
+        `Cannot give ownership to user before invite is accepted.`
+      );
     }
-    if (newAccess !== 'owner') {
-      db.members.update(member, { permissions: {}, roles: [newAccess] });
+    if (existingAccess === 'owner') {
+      // Already owner - no change
+      return;
+    } else {
+      // Change ownership to this member
+      return todoList.changeOwner(member.userId);
     }
-    if (existingAccess === 'owner' && newAccess !== 'owner') {
-      // Remove ownership by letting current user take ownership instead:
-      db.todoLists.update(todoList, { owner: db.cloud.currentUserId });
-      db.realms.update(realmId, {
-        owner: db.cloud.currentUserId,
-      });
+  } else {
+    //
+    // Assigning role
+    //
+    if (member.userId === todoList.owner) {
+      // The user wants to change the current owner to get another role.
+      // Assume user wants to deassign the ownership first to someone else.
+      // Since somebody has to be owner, transfer ownership to the actor (current user).
+      await todoList.changeOwner(db.cloud.currentUserId);
     }
-  });
+    await todoList.changeMemberRole(member, newAccess);
+  }
 }
