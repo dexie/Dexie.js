@@ -44,20 +44,21 @@ export function useSuspendingObservable<T>(
     refCount -= 1;
     REF_COUNTS.set(observable, refCount);
 
-    if (refCount <= 0) {
-      const timeout = setTimeout(() => {
-        for (const [key, val] of Array.from(OBSERVABLES.entries())) {
-          if (val === observable) {
-            OBSERVABLES.delete(key);
-            break;
-          }
+    if (refCount > 0) return;
+    
+    const timeout = setTimeout(() => {
+      for (const [key, val] of Array.from(OBSERVABLES.entries())) {
+        if (val === observable) {
+          OBSERVABLES.delete(key);
+          break;
         }
-        PROMISES.delete(observable);
-        VALUES.delete(observable);
-        TIMEOUTS.delete(observable);
-      }, 1000);
-      TIMEOUTS.set(observable, timeout);
-    }
+      }
+      PROMISES.delete(observable);
+      VALUES.delete(observable);
+      TIMEOUTS.delete(observable);
+      REF_COUNTS.delete(observable);
+    }, 1000);
+    TIMEOUTS.set(observable, timeout);
   };
 
   let promise: Promise<T> | undefined = PROMISES.get(observable);
