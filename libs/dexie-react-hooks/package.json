@@ -65,10 +65,11 @@
     "@types/qunit": "^2.9.6",
     "@types/react": "^17.0.0",
     "@types/react-dom": "^17.0.0",
+    "dexie": "workspace:>=4.2.0-alpha.1 <5.0.0",
     "just-build": "^0.9.24",
     "qunit": "^2.12.0",
-    "react": "^17.0.1",
-    "react-dom": "^17.0.1",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
     "rollup": "^2.40.0",
     "rollup-plugin-cleanup": "^3.2.1",
     "rollup-plugin-commonjs": "^10.1.0",
@@ -78,7 +79,6 @@
     "typescript": "^5.3.3",
     "webpack": "^5.74.0",
     "webpack-cli": "^4.5.0",
-    "dexie": "workspace:>=4.2.0-alpha.1 <5.0.0",
     "y-dexie": "workspace:>=4.2.0-alpha.1 <5.0.0",
     "yjs": "^13.6.27"
   }
