@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { InteropableObservable } from './useObservable';
+import { usePromise } from './usePromise';
 
 /**
  * Subscribes to an observable and returns the latest value.
@@ -86,7 +87,7 @@ export function useSuspendingObservable<T>(
     PROMISES.set(observable, promise);
   }
 
-  React.use(promise);
+  usePromise(promise);
 
   const [value, setValue] = React.useState<T>(VALUES.get(observable));
   const [error, setError] = React.useState<any>(null);
