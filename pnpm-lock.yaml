@@ -345,11 +345,11 @@ importers:
         specifier: ^2.9.6
         version: 2.19.2
       '@types/react':
-        specifier: ^17.0.0
-        version: 17.0.49
+        specifier: ^19.2.2
+        version: 19.2.2
       '@types/react-dom':
-        specifier: ^17.0.0
-        version: 17.0.17
+        specifier: ^19.2.1
+        version: 19.2.1(@types/react@19.2.2)
       dexie:
         specifier: workspace:>=4.2.0-alpha.1 <5.0.0
         version: link:../..
@@ -1967,9 +1967,6 @@ packages:
   '@types/qunit@2.19.2':
     resolution: {integrity: sha512-hVOSrAcRtRY2R2iCQopzkiSy6BowuSFuR5llHE9R3FDxBCNP4bMdrPpxkE0jZTknn+cmFMT31RfbZWAdu5Qa1w==}
 
-  '@types/react-dom@17.0.17':
-    resolution: {integrity: sha512-VjnqEmqGnasQKV0CWLevqMTXBYG9GbwuE6x3VetERLh0cq2LTptFE73MrQi2S7GkKXCf2GgwItB/melLnxfnsg==}
-
   '@types/react-dom@18.2.25':
     resolution: {integrity: sha512-o/V48vf4MQh7juIKZU2QGDfli6p1+OOi5oXx36Hffpc9adsHeXjVp8rHuPkjd8VT8sOJ2Zp05HR7CdpGTIUFUA==}
 
@@ -1978,14 +1975,19 @@ packages:
     peerDependencies:
       '@types/react': ^18.0.0
 
-  '@types/react@17.0.49':
-    resolution: {integrity: sha512-CCBPMZaPhcKkYUTqFs/hOWqKjPxhTEmnZWjlHHgIMop67DsXywf9B5Os9Hz8KSacjNOgIdnZVJamwl232uxoPg==}
+  '@types/react-dom@19.2.1':
+    resolution: {integrity: sha512-/EEvYBdT3BflCWvTMO7YkYBHVE9Ci6XdqZciZANQgKpaiDRGOLIlRo91jbTNRQjgPFWVaRxcYc0luVNFitz57A==}
+    peerDependencies:
+      '@types/react': ^19.2.0
 
   '@types/react@18.2.79':
     resolution: {integrity: sha512-RwGAGXPl9kSXwdNTafkOEuFrTBD5SA2B3iEB96xi8+xu5ddUa/cpvyVCSNn+asgLCTHkb5ZxN8gbuibYJi4s1w==}
 
   '@types/react@18.3.24':
     resolution: {integrity: sha512-0dLEBsA1kI3OezMBF8nSsb7Nk19ZnsyE1LLhB8r27KbgU5H4pvuqZLdtE+aUkJVoXgTVuA+iLIwmZ0TuK4tx6A==}
+
+  '@types/react@19.2.2':
+    resolution: {integrity: sha512-6mDvHUFSjyT2B2yeNx2nUgMxh9LtOWvkhIU3uePn2I2oyNymUAX1NIsdgviM4CH+JSrp2D2hsMvJOkxY+0wNRA==}
 
   '@types/resolve@0.0.8':
     resolution: {integrity: sha512-auApPaJf3NPfe18hSoJkp8EbZzer2ISk7o8mCC3M9he/a04+gbMF97NkpD2S8riMGvm4BMRI59/SZQSaLTKpsQ==}
@@ -1995,9 +1997,6 @@ packages:
 
   '@types/resolve@1.20.2':
     resolution: {integrity: sha512-60BCwRFOZCQhDncwQdxxeOEEkbc5dIMccYLwbxsS4TUNeVECQ/pBJ0j09mrHOl/JJvpRPGwO9SvE4nR2Nb/a4Q==}
-
-  '@types/scheduler@0.16.2':
-    resolution: {integrity: sha512-hppQEBDmlwhFAXKJX2KnWLYu5yMfi91yazPb2l+lbJiwW+wdo1gNeRA+3RgNSO39WYX2euey41KEwnqesU2Jew==}
 
   '@types/stack-utils@2.0.1':
     resolution: {integrity: sha512-Hl219/BT5fLAaz6NDkSuhzasy49dwQS/DSdu4MdggFB8zcXv7vflBI3xp7FEmkmdDkBUI2bPUNeMttp2knYdxw==}
@@ -8134,10 +8133,6 @@ snapshots:
 
   '@types/qunit@2.19.2': {}
 
-  '@types/react-dom@17.0.17':
-    dependencies:
-      '@types/react': 17.0.49
-
   '@types/react-dom@18.2.25':
     dependencies:
       '@types/react': 18.3.24
@@ -8146,11 +8141,9 @@ snapshots:
     dependencies:
       '@types/react': 18.2.79
 
-  '@types/react@17.0.49':
+  '@types/react-dom@19.2.1(@types/react@19.2.2)':
     dependencies:
-      '@types/prop-types': 15.7.5
-      '@types/scheduler': 0.16.2
-      csstype: 3.1.0
+      '@types/react': 19.2.2
 
   '@types/react@18.2.79':
     dependencies:
@@ -8162,6 +8155,10 @@ snapshots:
       '@types/prop-types': 15.7.5
       csstype: 3.1.0
 
+  '@types/react@19.2.2':
+    dependencies:
+      csstype: 3.1.0
+
   '@types/resolve@0.0.8':
     dependencies:
       '@types/node': 20.2.5
@@ -8171,8 +8168,6 @@ snapshots:
       '@types/node': 20.2.5
 
   '@types/resolve@1.20.2': {}
-
-  '@types/scheduler@0.16.2': {}
 
   '@types/stack-utils@2.0.1': {}
 
