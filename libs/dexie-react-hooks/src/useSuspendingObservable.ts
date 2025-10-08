@@ -15,8 +15,7 @@ export function useSuspendingObservable<T>(
   cacheKey: React.DependencyList
 ): T {
   let observable: InteropableObservable<T> | undefined;
-  // TODO: enable iterators in TS and remove Array.from
-  for (const [key, val] of Array.from(OBSERVABLES.entries())) {
+  for (const [key, val] of OBSERVABLES.entries()) {
     if (
       key.length === cacheKey.length &&
       key.every((k, i) => Object.is(k, cacheKey[i]))
@@ -45,9 +44,9 @@ export function useSuspendingObservable<T>(
     REF_COUNTS.set(observable, refCount);
 
     if (refCount > 0) return;
-    
+
     const timeout = setTimeout(() => {
-      for (const [key, val] of Array.from(OBSERVABLES.entries())) {
+      for (const [key, val] of OBSERVABLES.entries()) {
         if (val === observable) {
           OBSERVABLES.delete(key);
           break;

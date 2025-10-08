@@ -1,11 +1,11 @@
 {
   "compilerOptions": {
-    "lib": ["es2021", "dom"],
-    "moduleResolution": "node",
+    "lib": ["es2024", "dom", "dom.iterable"],
+    "moduleResolution": "node16",
     "importHelpers": false,
     "jsx": "react",
-    "target": "es5",
-    "module": "es6",
+    "target": "es2024",
+    "module": "node20",
     "noImplicitAny": false,
     "strictNullChecks": true,
     "declaration": true,
