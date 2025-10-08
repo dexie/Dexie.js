@@ -13,9 +13,10 @@ import { cn } from '../lib/utils';
 
 interface Props {
   todoList: TodoList;
+  autoFocus?: boolean;
 }
 
-export function TodoListView({ todoList }: Props) {
+export function TodoListView({ todoList, autoFocus }: Props) {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const items = useLiveQuery(
     () => db.todoItems
@@ -135,7 +136,7 @@ export function TodoListView({ todoList }: Props) {
       <div className="px-0 py-0">
         {can.add('todoItems') && (
           <div className="px-4 py-3 border-b border-blue-200/60 bg-background">
-            <AddTodoItem todoList={todoList} />
+            <AddTodoItem todoList={todoList} autoFocus={autoFocus} />
           </div>
         )}
         {items.map((item) => (

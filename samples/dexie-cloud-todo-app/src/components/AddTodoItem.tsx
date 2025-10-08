@@ -8,9 +8,10 @@ import { Button } from './ui/button';
 
 interface Props {
   todoList: TodoList;
+  autoFocus?: boolean;
 }
 
-export function AddTodoItem({ todoList }: Props) {
+export function AddTodoItem({ todoList, autoFocus }: Props) {
   const [title, setTitle] = useState('');
 
   const handleSubmit = async (ev: React.FormEvent) => {
@@ -32,6 +33,7 @@ export function AddTodoItem({ todoList }: Props) {
           type="text"
           placeholder="Add todo item ..."
           value={title}
+          autoFocus={autoFocus}
           onChange={(ev) => setTitle(ev.target.value)}
         />
       </div>

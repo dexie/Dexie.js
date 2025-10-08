@@ -12,8 +12,8 @@ export function TodoLists() {
 
   return (
     <div className="w-full">
-      {lists.map(list => (
-        <TodoListView key={list.id} todoList={list} />
+      {lists.map((list, i) => (
+        <TodoListView key={list.id} todoList={list} autoFocus={i === 0} />
       ))}
     </div>
   );
