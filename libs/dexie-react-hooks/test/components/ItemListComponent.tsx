@@ -1,5 +1,5 @@
 import React from "react";
-import { useSuspendingLiveQuery } from "../../src";
+import { useLiveQuery } from "../../src";
 import { Item } from "../models/Item";
 import { ItemComponent } from "./ItemComponent";
 
@@ -8,7 +8,7 @@ interface Props {
 }
 
 export function ItemListComponent({ loadItems }: Props) {
-  const items = useSuspendingLiveQuery(loadItems, []);
+  const items = useLiveQuery(loadItems);
   if (!items) return <p>Loading...</p>;
   return (
     <>
