@@ -13,7 +13,7 @@ export function useSuspendingObservable<T>(
   getObservable: () => InteropableObservable<T>,
   cacheKey: React.DependencyList
 ): T {
-  let observable: InteropableObservable<T> | undefined;
+  let observable: InteropableObservable<T>;
   for (const [key, val] of OBSERVABLES.entries()) {
     if (
       key.length === cacheKey.length &&
@@ -23,10 +23,12 @@ export function useSuspendingObservable<T>(
       break;
     }
   }
+  //@ts-ignore (because observable might be undefined here)
   if (!observable) {
     observable = getObservable();
     OBSERVABLES.set(cacheKey, observable);
   }
+  // At this point, observable is always set.
 
   const incrementRef = () => {
     const timeout = TIMEOUTS.get(observable);
