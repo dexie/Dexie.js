@@ -8,7 +8,7 @@
   "exports": {
     ".": {
       "import": "./dist/y-dexie.js",
-      "require": false
+      "require": null
     }
   },
   "types": "dist/y-dexie.d.ts",
