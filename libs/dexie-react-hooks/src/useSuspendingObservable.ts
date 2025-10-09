@@ -73,19 +73,23 @@ export function useSuspendingObservable<T>(
 
       incrementRef();
 
+      let calledSynchronously = false;
       const sub = observable.subscribe(
         (val) => {
           resolve(val);
           VALUES.set(observable, val);
-          unsub(sub);
+          if (!sub) calledSynchronously = true;
+          else unsub(sub);
           decrementRef();
         },
         (err) => {
           reject(err);
-          unsub(sub);
+          if (!sub) calledSynchronously = true;
+          else unsub(sub);
           decrementRef();
         }
       );
+      if (calledSynchronously) unsub(sub);
     });
 
     PROMISES.set(observable, promise);
