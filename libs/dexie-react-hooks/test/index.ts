@@ -1,5 +1,5 @@
 import React from "react";
-import ReactDOM from "react-dom";
+import * as ReactDOMClient from "react-dom/client";
 import { module, test, equiv, assert } from "qunit";
 import { db } from "./db";
 import { App } from "./components/App";
@@ -10,7 +10,9 @@ const div = document.createElement('div');
 
 document.body.insertAdjacentHTML('beforeend', `<div style="margin-top: 300px;"></div>`);
 document.body.appendChild(div);
-ReactDOM.render(React.createElement(App), div);
+// Use React 18 createRoot API
+const root = ReactDOMClient.createRoot(div);
+root.render(React.createElement(App));
 
 module('useLiveQuery', {
   async beforeEach(assert) {
