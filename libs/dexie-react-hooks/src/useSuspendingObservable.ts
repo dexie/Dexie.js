@@ -95,7 +95,9 @@ export function useSuspendingObservable<T>(
     PROMISES.set(observable, promise);
   }
 
-  usePromise(promise);
+  if (!VALUES.has(observable)) {
+    usePromise(promise);
+  }
 
   const [value, setValue] = React.useState<T>(VALUES.get(observable));
   const [error, setError] = React.useState<any>(null);
