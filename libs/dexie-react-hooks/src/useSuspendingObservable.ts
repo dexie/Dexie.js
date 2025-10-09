@@ -10,7 +10,7 @@ import { usePromise } from './usePromise';
  * cacheKey must be globally unique.
  */
 export function useSuspendingObservable<T>(
-  getObservable: () => InteropableObservable<T>,
+  getObservable: (() => InteropableObservable<T>) | InteropableObservable<T>,
   cacheKey: React.DependencyList
 ): T {
   let observable: InteropableObservable<T>;
@@ -25,7 +25,9 @@ export function useSuspendingObservable<T>(
   }
   //@ts-ignore (because observable might be undefined here)
   if (!observable) {
-    observable = getObservable();
+    observable = typeof getObservable === 'function'
+      ? getObservable()
+      : getObservable;
     OBSERVABLES.set(cacheKey, observable);
   }
   // At this point, observable is always set.
