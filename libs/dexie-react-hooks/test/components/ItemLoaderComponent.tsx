@@ -1,5 +1,5 @@
 import React from "react";
-import { useLiveQuery } from "../../src";
+import { useSuspendingLiveQuery } from "../../src";
 import { Item } from "../models/Item";
 import { ItemComponent } from "./ItemComponent";
 
@@ -9,8 +9,7 @@ export interface Props {
 }
 
 export function ItemLoaderComponent({ id, loadItem }: Props) {
-  const item = useLiveQuery(() => loadItem(id), [id], "loading");
-  if (item === "loading") return <p>Loading...</p>;
+  const item = useSuspendingLiveQuery(() => loadItem(id), ["item", id]);
   if (!item)
     return (
       <p className="not-found-item">
