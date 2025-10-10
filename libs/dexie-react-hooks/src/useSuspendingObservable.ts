@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { InteropableObservable } from './useObservable';
+import { AnySubscription, InteropableObservable } from './useObservable';
 import { usePromise } from './usePromise';
 
 /**
@@ -74,7 +74,8 @@ export function useSuspendingObservable<T>(
       incrementRef();
 
       let calledSynchronously = false;
-      const sub = observable.subscribe(
+      let sub: AnySubscription;
+      sub = observable.subscribe(
         (val) => {
           resolve(val);
           VALUES.set(observable, val);
@@ -139,7 +140,7 @@ const TIMEOUTS = new WeakMap<
 const REF_COUNTS = new WeakMap<InteropableObservable<any>, number>();
 
 /** Unsubscribes from an observable */
-function unsub(sub: (() => unknown) | { unsubscribe: () => unknown }) {
+function unsub(sub: AnySubscription) {
   if (typeof sub === 'function') {
     sub();
   } else {
