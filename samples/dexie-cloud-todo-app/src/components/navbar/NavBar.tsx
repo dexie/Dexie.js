@@ -12,7 +12,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '../ui/dropdown-menu';
-import importData from '../../data/importfile.json';
+import demoUsersJson from '../../data/demoUsers.json';
 import { handleError } from '../../helpers/handleError';
 import { logout } from '../../db/logout';
 
@@ -60,7 +60,7 @@ export function NavBar() {
                 </DropdownMenuTrigger>
                 <DropdownMenuContent>
                   <DropdownMenuLabel>Sign in a demo user</DropdownMenuLabel>
-                  {Object.keys(importData.demoUsers).map((email) => (
+                  {Object.keys(demoUsersJson.demoUsers).map((email) => (
                     <DropdownMenuItem
                       key={email}
                       onClick={handleError(() =>
@@ -121,7 +121,7 @@ export function NavBar() {
                   <div className="px-3 py-2 text-sm font-medium text-muted-foreground">
                     Sign in a demo user
                   </div>
-                  {Object.keys(importData.demoUsers).map((email) => (
+                  {Object.keys(demoUsersJson.demoUsers).map((email) => (
                     <Button
                       key={email}
                       variant="ghost"
