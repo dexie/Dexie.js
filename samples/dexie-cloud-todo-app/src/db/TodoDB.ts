@@ -28,9 +28,6 @@ export class TodoDB extends Dexie {
     //
     this.cloud.configure({
       unsyncedTables: ['openCloseStates'], // See also unsyncedProperties
-      unsyncedProperties: {
-        todoLists: ['_isExpanded', '_isSharingDialogOpen', '_isAccessControlDialogOpen'],
-      },
       databaseUrl: import.meta.env.VITE_DBURL!,
       tryUseServiceWorker: true,
       requireAuth: false,
