@@ -49,7 +49,7 @@ export class TodoList extends Entity<TodoDB> {
     // Compute a deterministic realmId tied to this todoList:
     const realmId = getTiedRealmId(this.id);
 
-    const db = this.db; // Entity<TodoDB> provides this.db - avoids cyclic deps and support multi-db setups
+    const db = this.db; // Entity<T> provides this.db - avoids cyclic deps.
     await db.transaction('rw', [db.todoLists, db.todoItems, db.realms], () => {
       // Make sure a realm exists (using a deterministic id based on the id of the
       // todo-list)
