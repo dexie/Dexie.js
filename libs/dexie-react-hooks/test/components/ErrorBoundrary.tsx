@@ -1,7 +1,7 @@
 import React, { Component } from "react";
 
-export class ErrorBoundary extends Component<{}, { error: any }> {
-  constructor(props) {
+export class ErrorBoundary extends Component<React.PropsWithChildren<{}>, { error: any }> {
+  constructor(props: React.PropsWithChildren<{}>) {
     super(props);
     this.state = { error: null };
   }
@@ -11,7 +11,7 @@ export class ErrorBoundary extends Component<{}, { error: any }> {
     return { error };
   }
 
-  componentDidCatch(error, errorInfo) {
+  componentDidCatch(error: Error, errorInfo: React.ErrorInfo) {
     //console.error(error, errorInfo);
   }
 
