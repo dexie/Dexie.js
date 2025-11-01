@@ -33,39 +33,44 @@ promisedTest('https://github.com/dexie/Dexie.js/issues/1922', async () => {
     requireAuth: { email: 'foo@demo.local', grant_type: 'demo' },
     disableEagerSync: true, // Let us manually sync them
   });
-  await db.open();
-  ok(true, 'DB opened and synced successfully');
-  await db.items1922.clear();
-  ok(true, 'Items cleared successfully');
-  let primKeys = await db.items1922.bulkAdd(
-    [
-      { bookId: 'book1', tags: ['tag1', 'tag2'] },
-      { bookId: 'book2', tags: ['tag2', 'tag3'] },
-    ],
-    { allKeys: true }
-  );
-  await db.cloud.sync();
-  ok(true, 'Items added and synced successfully');
-  await db.items1922.where('tags').equals('tag1').modify({ bookId: 'book3' });
-  let itemsBeforeSync = await db.items1922.toArray();
-  deepEqual(
-    itemsBeforeSync.map(strip(...DEXIE_CLOUD_PROPS)),
-    [
-      { id: primKeys[0], bookId: 'book3', tags: ['tag1', 'tag2'] },
-      { id: primKeys[1], bookId: 'book2', tags: ['tag2', 'tag3'] },
-    ],
-    'Items before sync'
-  );
-  await db.cloud.sync();
-  let itemsAfterSync = await db.items1922.toArray();
-  deepEqual(
-    itemsAfterSync.map(strip(...DEXIE_CLOUD_PROPS)),
-    [
-      { id: primKeys[0], bookId: 'book3', tags: ['tag1', 'tag2'] },
-      { id: primKeys[1], bookId: 'book2', tags: ['tag2', 'tag3'] },
-    ],
-    'Items after sync'
-  );
+  try {
+    await db.open();
+    ok(true, 'DB opened and synced successfully');
+    await db.items1922.clear();
+    ok(true, 'Items cleared successfully');
+    let primKeys = await db.items1922.bulkAdd(
+      [
+        { bookId: 'book1', tags: ['tag1', 'tag2'] },
+        { bookId: 'book2', tags: ['tag2', 'tag3'] },
+      ],
+      { allKeys: true }
+    );
+    await db.cloud.sync();
+    ok(true, 'Items added and synced successfully');
+    await db.items1922.where('tags').equals('tag1').modify({ bookId: 'book3' });
+    let itemsBeforeSync = await db.items1922.toArray();
+    deepEqual(
+      itemsBeforeSync.map(strip(...DEXIE_CLOUD_PROPS)),
+      [
+        { id: primKeys[0], bookId: 'book3', tags: ['tag1', 'tag2'] },
+        { id: primKeys[1], bookId: 'book2', tags: ['tag2', 'tag3'] },
+      ],
+      'Items before sync'
+    );
+    await db.cloud.sync();
+    let itemsAfterSync = await db.items1922.toArray();
+    deepEqual(
+      itemsAfterSync.map(strip(...DEXIE_CLOUD_PROPS)),
+      [
+        { id: primKeys[0], bookId: 'book3', tags: ['tag1', 'tag2'] },
+        { id: primKeys[1], bookId: 'book2', tags: ['tag2', 'tag3'] },
+      ],
+      'Items after sync'
+    );
+  } finally {
+    await db.items1922.clear();
+    await db.cloud.sync();
+  }
 });
 
 /** Dexie issue #2185
