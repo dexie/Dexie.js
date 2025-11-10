@@ -1,5 +1,6 @@
 ﻿import Dexie from 'dexie';
 Dexie.test = true; // Improve code coverage
+import './next/tests-next.js';
 import "./tests-cmp.js";
 import "./tests-table.js";
 import "./tests-chrome-transaction-durability.js";
