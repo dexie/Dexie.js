@@ -9,3 +9,5 @@ export { createMangoFilter } from './createMangoFilter.mjs';
 export { executeQuery, executeCount } from './executeMangoQuery.mjs';
 export type { MangoExpression } from './MangoExpression.mjs';
 export { toMapKey } from './toMapKey.mjs';
+export { NextDexie } from './NextDexie.mjs'
+
