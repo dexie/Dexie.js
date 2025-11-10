@@ -5,14 +5,14 @@ export function createMangoFilter(expr: MangoExpression): (obj: any) => boolean 
   const { getByKeyPath } = Dexie;
 
   function matchesRange(value: any, range: MangoRange): boolean {
+    // Handle $inRanges - if present, it should be the only operator
+    if ('$inRanges' in range && range.$inRanges) {
+      return range.$inRanges.some((r: MangoRange) => matchesRange(value, r));
+    }
+
     // Handle $eq
     if ('$eq' in range) {
       if (cmp(value, range.$eq) !== 0) return false;
-    }
-
-    // Handle $ne
-    if ('$ne' in range) {
-      if (cmp(value, range.$ne) === 0) return false;
     }
 
     // Handle $gt
@@ -33,27 +33,6 @@ export function createMangoFilter(expr: MangoExpression): (obj: any) => boolean 
     // Handle $lte
     if ('$lte' in range) {
       if (cmp(value, range.$lte) > 0) return false;
-    }
-
-    // Handle $in
-    if ('$in' in range && range.$in) {
-      if (!range.$in.some((item: any) => cmp(value, item) === 0)) {
-        return false;
-      }
-    }
-
-    // Handle $nin
-    if ('$nin' in range && range.$nin) {
-      if (range.$nin.some((item: any) => cmp(value, item) === 0)) {
-        return false;
-      }
-    }
-
-    // Handle $inRanges
-    if ('$inRanges' in range && range.$inRanges) {
-      if (!range.$inRanges.some((r: MangoRange) => matchesRange(value, r))) {
-        return false;
-      }
     }
 
     return true;
