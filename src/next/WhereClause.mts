@@ -1,4 +1,4 @@
-import { Collection, FilteredCollection } from "./Collection";
+import { Collection, FilteredCollection } from "./Collection.mjs";
 
 export class WhereClause {
   _coll: Collection;
