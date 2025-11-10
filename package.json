@@ -98,7 +98,7 @@
       "dts-bundle-generator --inline-declare-global --inline-declare-externals -o ../dist/dexie.d.ts public/index.d.ts",
       "node ../tools/prepend.js ../dist/dexie.d.ts ../tools/build-configs/banner.txt",
       "node ../tools/replaceVersionAndDate.js ../dist/dexie.d.ts",
-      "tsc -p next/tsconfig.json",
+      "tsc -p next/tsconfig.json [--watch 'Watching for file changes']",
       "node ../tools/build-next-modules.js"
     ],
     "release": [
