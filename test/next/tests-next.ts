@@ -32,3 +32,15 @@ promisedTest("basic next", async () => {
     equal(f3[0].name, "Arne3", "Oldest friend should be Arne3");
 });
 
+promisedTest("next with query", async () => {
+    const friends = await db.friends
+        .where("age").above(30)
+        .where("shoeSize").below(45)
+        .orderBy("name")
+        .desc()
+        .toArray();
+    equal(friends.length, 2, "Should have 2 friends above 30 years with shoe size below 45");
+    equal(friends[0].name, "Bengt", "First should be Bengt");
+    equal(friends[1].name, "Arne3", "Second should be Arne3");
+});
+
