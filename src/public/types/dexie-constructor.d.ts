@@ -10,6 +10,7 @@ import { DexieDOMDependencies } from './dexie-dom-dependencies';
 import { GlobalDexieEvents, ObservabilitySet } from './db-events';
 import { Observable } from './observable';
 import { GlobalQueryCache } from './cache';
+import { DBCoreKeyRange } from './dbcore';
 
 export type ChromeTransactionDurability = 'default' | 'strict' | 'relaxed';
 
@@ -22,7 +23,6 @@ export interface DexieOptions {
   modifyChunkSize?: number | { [key: string]: number };
   chromeTransactionDurability?: ChromeTransactionDurability;
   cache?: 'immutable' | 'cloned' | 'disabled';
-  maxConnections?: number;
 }
 
 export interface DexieConstructor extends DexieExceptionClasses {
@@ -49,6 +49,7 @@ export interface DexieConstructor extends DexieExceptionClasses {
     target: ObservabilitySet,
     newSet: ObservabilitySet
   ): ObservabilitySet;
+  obsSetsOverlap(set1: ObservabilitySet, set2: ObservabilitySet): boolean;
   override<F>(origFunc: F, overridedFactory: (fn: any) => any): F; // ?
   getByKeyPath(obj: Object, keyPath: string | string[]): any;
   setByKeyPath(obj: Object, keyPath: string | string[], value: any): void;
@@ -58,6 +59,8 @@ export interface DexieConstructor extends DexieExceptionClasses {
   asap(fn: Function): void; //?
   maxKey: Array<Array<void>> | string;
   minKey: number;
+  AnyRange: DBCoreKeyRange;
+  NeverRange: DBCoreKeyRange;
   exists(dbName: string): Promise<boolean>;
   delete(dbName: string): Promise<void>;
   dependencies: DexieDOMDependencies;
