@@ -1,6 +1,6 @@
 import { Table } from '../..';
 import { Collection } from './Collection.mjs';
-import { Query } from './Query.mjs';
+import { Query, QueryPlan } from './Query.mjs';
 import { executeQuery, executeCount } from './executeMangoQuery.mjs';
 
 export class DexieCollection<T = any, TKey = any, TInsertType = T> extends Collection<T, TKey, TInsertType> {
@@ -14,7 +14,7 @@ export class DexieCollection<T = any, TKey = any, TInsertType = T> extends Colle
     // No additional building needed at the collection level
   }
 
-  protected _exec(query: Query): Promise<ReadonlyArray<T>> {
+  protected _exec(query: Query): Promise<ReadonlyArray<T> | QueryPlan> {
     // @ts-ignore
     return this._table._trans('readonly', (idbtrans) => {
       return executeQuery({
