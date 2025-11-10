@@ -21,12 +21,10 @@ export abstract class Queryable<T = any, TKey = any, TInsertType = T> {
 
   toArray(): Promise<ReadonlyArray<T>> {
     const query = new Query();
-    this._build(query);
     return this._exec(query);
   }
   count(): Promise<number> {
     const query = new Query();
-    this._build(query);
     return this._count(query);
   }
 }
