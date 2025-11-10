@@ -81,7 +81,8 @@
   "just-build": {
     "default": [
       "# Build all targets (es5, es6 and test) and minify the default es5 UMD module",
-      "just-build release test"
+      "just-build release",
+      "just-build test"
     ],
     "dexie": [
       "# Build dist/dexie.js, dist/dexie.mjs and dist/dexie.d.ts",
