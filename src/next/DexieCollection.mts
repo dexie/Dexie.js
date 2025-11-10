@@ -3,9 +3,9 @@ import { Collection } from './Collection.mjs';
 import { Query } from './Query.mjs';
 import { executeQuery, executeCount } from './executeMangoQuery.mjs';
 
-export class DexieCollection extends Collection {
-  _table: Table;
-  constructor(table: Table) {
+export class DexieCollection<T = any, TKey = any, TInsertType = T> extends Collection<T, TKey, TInsertType> {
+  _table: Table<T, TKey, TInsertType>;
+  constructor(table: Table<T, TKey, TInsertType>) {
     super(null);
     this._table = table;
   }
@@ -14,7 +14,7 @@ export class DexieCollection extends Collection {
     // No additional building needed at the collection level
   }
 
-  protected _exec(query: Query): Promise<ReadonlyArray<any>> {
+  protected _exec(query: Query): Promise<ReadonlyArray<T>> {
     // @ts-ignore
     return this._table._trans('readonly', (idbtrans) => {
       return executeQuery({

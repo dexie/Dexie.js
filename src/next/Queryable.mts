@@ -1,13 +1,13 @@
 import { Query } from "./Query.mjs";
 
-export abstract class Queryable {
-  protected _parent: Queryable | null;
+export abstract class Queryable<T = any, TKey = any, TInsertType = T> {
+  protected _parent: Queryable<T, TKey, TInsertType> | null;
 
-  constructor(parent: Queryable | null) {
+  constructor(parent: Queryable<T, TKey, TInsertType> | null) {
     this._parent = parent;
   }
 
-  protected _exec(query: Query): Promise<ReadonlyArray<any>> {
+  protected _exec(query: Query): Promise<ReadonlyArray<T>> {
     if (!this._parent) throw new Error("No engine to execute query.");
     this._build(query);
     return this._parent._exec(query);
@@ -19,7 +19,7 @@ export abstract class Queryable {
   }
   protected abstract _build(query: Query): void;
 
-  toArray(): Promise<ReadonlyArray<any>> {
+  toArray(): Promise<ReadonlyArray<T>> {
     const query = new Query();
     this._build(query);
     return this._exec(query);
@@ -31,9 +31,9 @@ export abstract class Queryable {
   }
 }
 
-export class OffsetQueryable extends Queryable {
+export class OffsetQueryable<T = any, TKey = any, TInsertType = T> extends Queryable<T, TKey, TInsertType> {
   protected _offsetValue: number;
-  constructor(parent: Queryable, _offsetValue: number) {
+  constructor(parent: Queryable<T, TKey, TInsertType>, _offsetValue: number) {
     super(parent);
     this._offsetValue = _offsetValue;
   }
@@ -42,14 +42,14 @@ export class OffsetQueryable extends Queryable {
     query.offset = this._offsetValue;
   }
 
-  limit(n: number): Queryable {
+  limit(n: number): LimitQueryable<T, TKey, TInsertType> {
     return new LimitQueryable(this, n);
   }
 }
 
-export class LimitQueryable extends Queryable {
+export class LimitQueryable<T = any, TKey = any, TInsertType = T> extends Queryable<T, TKey, TInsertType> {
   protected _limitValue: number;
-  constructor(parent: Queryable, _limitValue: number) {
+  constructor(parent: Queryable<T, TKey, TInsertType>, _limitValue: number) {
     super(parent);
     this._limitValue = _limitValue;
   }

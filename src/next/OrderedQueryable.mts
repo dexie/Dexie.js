@@ -1,27 +1,27 @@
 import { Query } from './Query.mjs';
 import { Queryable, OffsetQueryable, LimitQueryable } from './Queryable.mjs';
 
-export abstract class OrderedQueryable extends Queryable {
-  offset(n: number) {
+export abstract class OrderedQueryable<T = any, TKey = any, TInsertType = T> extends Queryable<T, TKey, TInsertType> {
+  offset(n: number): OffsetQueryable<T, TKey, TInsertType> {
     return new OffsetQueryable(this, n);
   }
-  limit(n: number) {
+  limit(n: number): LimitQueryable<T, TKey, TInsertType> {
     return new LimitQueryable(this, n);
   }
-  direction(dir: 'asc' | 'desc') {
+  direction(dir: 'asc' | 'desc'): DirectionQueryable<T, TKey, TInsertType> {
     return new DirectionQueryable(this, dir);
   }
-  desc() {
+  desc(): DirectionQueryable<T, TKey, TInsertType> {
     return this.direction('desc');
   }
-  asc() {
+  asc(): DirectionQueryable<T, TKey, TInsertType> {
     return this.direction('asc');
   }
 }
 
-export class OrderByQueryable extends OrderedQueryable {
+export class OrderByQueryable<T = any, TKey = any, TInsertType = T> extends OrderedQueryable<T, TKey, TInsertType> {
   _props: string[];
-  constructor(parent: Queryable, props: string[]) {
+  constructor(parent: Queryable<T, TKey, TInsertType>, props: string[]) {
     super(parent);
     this._props = props;
   }
@@ -30,9 +30,9 @@ export class OrderByQueryable extends OrderedQueryable {
   }
 }
 
-export class DirectionQueryable extends OrderedQueryable {
+export class DirectionQueryable<T = any, TKey = any, TInsertType = T> extends OrderedQueryable<T, TKey, TInsertType> {
   _dir: 'asc' | 'desc';
-  constructor(parent: Queryable, dir: 'asc' | 'desc') {
+  constructor(parent: Queryable<T, TKey, TInsertType>, dir: 'asc' | 'desc') {
     super(parent);
     this._dir = dir;
   }
