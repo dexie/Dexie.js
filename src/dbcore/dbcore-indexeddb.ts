@@ -292,7 +292,7 @@ export function createDBCore (
       return (request: DBCoreQueryRequest) => {
         return new Promise<DBCoreQueryResponse>((resolve, reject) => {
           resolve = wrap(resolve);
-          const {trans, values, limit, query, direction} = request;
+          const {trans, values, limit, query, direction, records} = request;
           const nonInfinitLimit = limit === Infinity ? undefined : limit;
           const {index, range} = query;
           const store = (trans as IDBTransaction).objectStore(tableName);
@@ -300,7 +300,7 @@ export function createDBCore (
           const idbKeyRange = makeIDBKeyRange(range);
           if (limit === 0) return resolve({result: []});
           
-          // Use getAll/getAllKeys with direction option (IDB 3.0)
+          // Use getAll/getAllKeys/getAllRecords with direction option (IDB 3.0)
           // This is 2-5x faster than cursor iteration for reverse queries
           if (hasIdb3Features) {
             const options = {
@@ -308,12 +308,14 @@ export function createDBCore (
               count: nonInfinitLimit,
               direction: direction || 'next'
             };
-            const req = values ?
-                (source as any).getAll(options) :
-                (source as any).getAllKeys(options);
+            const req = records
+                ? (source as any).getAllRecords(options)
+                : values
+                ? (source as any).getAll(options)
+                : (source as any).getAllKeys(options);
             req.onsuccess = event => resolve({result: event.target.result});
             req.onerror = eventRejectHandler(reject);
-          } else if (hasGetAll && (!direction || direction === 'next')) {
+          } else if (hasGetAll && !records && (!direction || direction === 'next')) {
             const req = values ?
                 (source as any).getAll(idbKeyRange, nonInfinitLimit) :
                 (source as any).getAllKeys(idbKeyRange, nonInfinitLimit);
@@ -321,15 +323,20 @@ export function createDBCore (
             req.onerror = eventRejectHandler(reject);
           } else {
             // Fallback: use cursor for non-default direction when IDB 3.0 features not available
+            // or when records are requested
             let count = 0;
-            const req = values || !('openKeyCursor' in source) ?
+            const req = values || records || !('openKeyCursor' in source) ?
               source.openCursor(idbKeyRange, direction) :
               source.openKeyCursor(idbKeyRange, direction);
             const result = [];
             req.onsuccess = () => {
               const cursor = req.result as IDBCursorWithValue;
               if (!cursor) return resolve({result});
-              result.push(values ? cursor.value : cursor.primaryKey);
+              result.push(records ? {
+                key: cursor.key,
+                primaryKey: cursor.primaryKey,
+                value: cursor.value
+              } : values ? cursor.value : cursor.primaryKey);
               if (++count === limit) return resolve({result});
               cursor.continue();
             };

@@ -40,6 +40,7 @@ export function findCompatibleQuery(
           (entry.req as DBCoreQueryRequest).limit === req.limit &&
           (entry.req as DBCoreQueryRequest).values === req.values &&
           (entry.req as DBCoreQueryRequest).direction === req.direction &&
+          (entry.req as DBCoreQueryRequest).records === req.records &&
           areRangesEqual(entry.req.query.range, req.query.range)
       );
       if (equalEntry)
@@ -54,6 +55,7 @@ export function findCompatibleQuery(
         return (
           limit >= req.limit &&
           (entry.req as DBCoreQueryRequest).direction === req.direction &&
+          (entry.req as DBCoreQueryRequest).records === req.records &&
           (req.values ? (entry.req as DBCoreQueryRequest).values : true) &&
           isSuperRange(entry.req.query.range, req.query.range)
         );
