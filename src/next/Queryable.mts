@@ -1,4 +1,4 @@
-import { Query } from "./Query";
+import { Query } from "./Query.mjs";
 
 export abstract class Queryable {
   protected _parent: Queryable | null;

@@ -1,4 +1,4 @@
-import { MangoExpression } from './MangoExpression';
+import { MangoExpression } from './MangoExpression.mjs';
 
 export class Query {
   where: MangoExpression | null;

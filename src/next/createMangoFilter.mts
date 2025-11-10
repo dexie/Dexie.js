@@ -1,5 +1,5 @@
 import { cmp, Dexie } from '../..';
-import { MangoExpression, MangoRange } from './MangoExpression';
+import { MangoExpression, MangoRange } from './MangoExpression.mjs';
 
 export function createMangoFilter(expr: MangoExpression): (obj: any) => boolean {
   const { getByKeyPath } = Dexie;

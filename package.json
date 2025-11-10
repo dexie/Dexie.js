@@ -27,7 +27,17 @@
       }
     },
     "./package.json": "./package.json",
-    "./dist/*": "./dist/*"
+    "./dist/*": "./dist/*",
+    "./next": {
+      "types": "./dist/next/index.d.mts",
+      "import": "./dist/next/index.mjs",
+      "default": "./dist/next/index.mjs"
+    },
+    "./next/*": {
+      "types": "./dist/next/*.d.mts",
+      "import": "./dist/next/*.mjs",
+      "default": "./dist/next/*.mjs"
+    }
   },
   "typings": "dist/dexie.d.ts",
   "jspm": {
@@ -78,6 +88,7 @@
       "cd src",
       "tsc [--watch 'Watching for file changes']",
       "tsc --target es2021 --outdir ../tools/tmp/modern/src/",
+      "tsc --declaration --emitDeclarationOnly --outdir ../tools/tmp/src/",
       "rollup -c ../tools/build-configs/rollup.config.js",
       "rollup -c ../tools/build-configs/rollup.umd.config.js",
       "rollup -c ../tools/build-configs/rollup.modern.config.js",
@@ -86,7 +97,8 @@
       "node ../tools/replaceVersionAndDate.js ../dist/modern/dexie.mjs",
       "dts-bundle-generator --inline-declare-global --inline-declare-externals -o ../dist/dexie.d.ts public/index.d.ts",
       "node ../tools/prepend.js ../dist/dexie.d.ts ../tools/build-configs/banner.txt",
-      "node ../tools/replaceVersionAndDate.js ../dist/dexie.d.ts"
+      "node ../tools/replaceVersionAndDate.js ../dist/dexie.d.ts",
+      "node ../tools/build-next-modules.js"
     ],
     "release": [
       "# Build ES5 umd module as well as the es6 module.",

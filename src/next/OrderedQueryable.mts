@@ -1,5 +1,5 @@
-import { Query } from './Query';
-import { Queryable, OffsetQueryable, LimitQueryable } from './Queryable';
+import { Query } from './Query.mjs';
+import { Queryable, OffsetQueryable, LimitQueryable } from './Queryable.mjs';
 
 export abstract class OrderedQueryable extends Queryable {
   offset(n: number) {

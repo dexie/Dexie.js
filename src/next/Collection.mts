@@ -1,8 +1,8 @@
-import { WhereClause } from './WhereClause';
-import { Queryable } from './Queryable';
-import { canonicalizeMango, MangoExpression, MangoExpressionWithAliases } from './MangoExpression';
-import { OrderByQueryable } from './OrderedQueryable';
-import { Query } from './Query';
+import { WhereClause } from './WhereClause.mjs';
+import { Queryable } from './Queryable.mjs';
+import { canonicalizeMango, MangoExpression, MangoExpressionWithAliases } from './MangoExpression.mjs';
+import { OrderByQueryable } from './OrderedQueryable.mjs';
+import { Query } from './Query.mjs';
 
 export abstract class Collection extends Queryable {
   where(prop: string): WhereClause;
