@@ -328,7 +328,15 @@ function findBestIndex(
       }
     });
 
-    if (!bestMatch || score > bestMatch.score) {
+    // Prefer simpler indexes when scores are equal
+    const shouldReplace = !bestMatch || score > bestMatch.score || 
+      (score === bestMatch.score && keyPathArray.length < (
+        Array.isArray(bestMatch.index.keyPath) 
+          ? bestMatch.index.keyPath.length 
+          : 1
+      ));
+    
+    if (shouldReplace) {
       bestMatch = {
         index,
         equalityProps: matchedEquality,
