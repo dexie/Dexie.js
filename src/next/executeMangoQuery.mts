@@ -2,7 +2,7 @@ import { MangoExpression, MangoRange, SimleMangoRange } from './MangoExpression.
 import { DBCoreKeyRange, DBCoreRangeType, DBCoreIndex, DBCoreTable, DBCoreTableSchema, cmp, AnyRange } from '../..';
 import { toMapKey } from './toMapKey.mjs';
 import { createMangoFilter } from './createMangoFilter.mjs';
-import { Query } from './Query.mjs';
+import { Query, QueryPlan } from './Query.mjs';
 
 interface QueryContext {
   core: DBCoreTable;
@@ -717,19 +717,81 @@ export function executeCount(ctx: QueryContext): Promise<number> {
 
   // Case 3: Complex query or needs filtering - execute and count
   // We need to pass offset/limit to executeQuery to get accurate count
-  return executeQuery(ctx).then(results => results.length);
+  return executeQuery(ctx).then(results => (results as any[]).length);
+}
+
+// Helper to build query plan
+function buildQueryPlan(
+  strategy: string,
+  index: DBCoreIndex | null,
+  ranges?: DBCoreKeyRange[],
+  options?: {
+    where?: MangoExpression;
+    orderBy?: string[];
+    direction?: 'asc' | 'desc';
+    limit?: number;
+    offset?: number;
+    filtering?: { indexCovered: string[]; manualFilter: MangoExpression };
+    cursorBased?: boolean;
+    complexity?: string;
+    notes?: string[];
+  }
+): QueryPlan {
+  const plan: QueryPlan = {
+    strategy,
+    index: index
+      ? {
+          name: index.name || (index === index ? 'primaryKey' : 'unknown'),
+          keyPath: index.keyPath!,
+          compound: Array.isArray(index.keyPath) && index.keyPath.length > 1,
+        }
+      : null,
+  };
+
+  if (ranges && ranges.length > 0) {
+    plan.ranges = ranges.map((r) => ({
+      type: r.type === DBCoreRangeType.Equal ? 'Equal' : 'Range',
+      lower: r.lower,
+      upper: r.upper,
+      lowerOpen: r.lowerOpen,
+      upperOpen: r.upperOpen,
+    }));
+  }
+
+  if (options) {
+    if (options.where) plan.where = options.where;
+    if (options.orderBy && options.orderBy.length > 0) plan.orderBy = options.orderBy;
+    if (options.direction) plan.direction = options.direction;
+    if (options.limit !== undefined && options.limit !== Infinity) plan.limit = options.limit;
+    if (options.offset) plan.offset = options.offset;
+    if (options.filtering) plan.filtering = options.filtering;
+    if (options.cursorBased) plan.cursorBased = options.cursorBased;
+    if (options.complexity) plan.estimatedComplexity = options.complexity;
+    if (options.notes && options.notes.length > 0) plan.notes = options.notes;
+  }
+
+  return plan;
 }
 
 // Main entry point
-export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any>> {
+export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any> | QueryPlan> {
   const { core, trans, schema, query } = ctx;
-  const { where, orderBy, limit, offset, direction } = query;
+  const { where, orderBy, limit, offset, direction, explain } = query;
   
   // Convert direction to DBCore format
   const dbDirection = direction === 'desc' ? 'prev' : 'next';
 
   // Case 1: Simple toArray() - no where, no orderBy, no offset
   if (!where && orderBy.length === 0 && offset === 0) {
+    if (explain) {
+      return Promise.resolve(
+        buildQueryPlan('Full table scan', schema.primaryKey, [AnyRange], {
+          limit,
+          complexity: 'O(n)',
+          notes: ['No filters or ordering specified', 'Scanning primary key'],
+        })
+      );
+    }
     return core.query({
       trans,
       values: true,
@@ -754,6 +816,38 @@ export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any>> {
   if (!where) {
     const queryIndex = orderByIndex || schema.primaryKey;
     const needsManualSort = orderBy.length > 0 && !orderByIndex;
+    
+    if (explain) {
+      const notes: string[] = [];
+      let complexity = 'O(n)';
+      
+      if (needsManualSort) {
+        notes.push('No matching index for orderBy, will sort in memory');
+        if (offset > 0 || limit !== Infinity) {
+          notes.push('Loading all records for manual sort with offset/limit');
+          complexity = 'O(n log n)';
+        }
+      } else if (orderByIndex) {
+        notes.push('Using orderBy index for natural ordering');
+        complexity = 'O(log n + k)';
+      }
+      
+      return Promise.resolve(
+        buildQueryPlan(
+          needsManualSort ? 'Scan + manual sort' : 'Index scan',
+          queryIndex,
+          [AnyRange],
+          {
+            orderBy,
+            direction,
+            limit,
+            offset,
+            complexity,
+            notes,
+          }
+        )
+      );
+    }
     
     // If we need manual sort and have offset, we MUST load everything
     // Otherwise we can optimize with limit
@@ -802,6 +896,71 @@ export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any>> {
     if (whereAnalysis) {
       const { index, ranges, partial, orderByMatched } = whereAnalysis;
       const needsFiltering = !!partial;
+      
+      // Handle explain mode
+      if (explain) {
+        const notes: string[] = [];
+        let strategy = 'Index scan';
+        let complexity = 'O(log n + k)';
+        let cursorBased = false;
+        
+        // Determine actual strategy
+        if (orderByMatched && !needsFiltering) {
+          strategy = 'Direct index query (fast path)';
+          notes.push('Index covers both where and orderBy');
+          notes.push('No additional filtering needed');
+          if (ranges.length > 1) {
+            notes.push(`Using ${ranges.length} ranges (from $inRanges)`);
+          }
+        } else if (orderBy.length > 0 && orderByIndex && limit !== Infinity) {
+          strategy = 'OrderBy index with filtering';
+          cursorBased = offset > 0 || needsFiltering;
+          if (cursorBased) {
+            notes.push('Using cursor iteration for efficient limit with filtering');
+          }
+          notes.push('Filtering on where clause manually');
+          complexity = 'O(log n + m)';
+        } else {
+          strategy = 'Where index scan';
+          if (needsFiltering) {
+            notes.push('Partial filtering needed after index scan');
+          }
+          if (orderBy.length > 0 && !orderByMatched) {
+            notes.push('Manual sort needed - orderBy not covered by index');
+            complexity = 'O(log n + k log k)';
+          }
+          if (ranges.length > 1) {
+            notes.push(`Querying ${ranges.length} ranges in parallel`);
+          }
+        }
+        
+        const indexCovered: string[] = [];
+        const keyPathArray = Array.isArray(index.keyPath) ? index.keyPath : [index.keyPath!];
+        keyPathArray.forEach(kp => {
+          if ((where as any)[kp] !== undefined) {
+            indexCovered.push(kp);
+          }
+        });
+        
+        return Promise.resolve(
+          buildQueryPlan(strategy, index, ranges, {
+            where,
+            orderBy,
+            direction,
+            limit,
+            offset,
+            filtering: needsFiltering
+              ? {
+                  indexCovered,
+                  manualFilter: partial!,
+                }
+              : undefined,
+            cursorBased,
+            complexity,
+            notes,
+          })
+        );
+      }
       
       // STRATEGY DECISION:
       // 1. If orderBy is matched AND no filtering needed => Direct query (fast path)
@@ -954,6 +1113,27 @@ export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any>> {
   }
 
   // Complex query with $and/$or: Execute recursively to get matching keys
+  if (explain) {
+    const notes: string[] = [];
+    notes.push('Complex query with $and/$or operators');
+    notes.push('Using recursive key extraction strategy');
+    if (orderBy.length > 0 && !orderByIndex) {
+      notes.push('Manual sort needed after key extraction');
+    }
+    
+    return Promise.resolve(
+      buildQueryPlan('Complex query (recursive)', orderByIndex || schema.primaryKey, undefined, {
+        where,
+        orderBy,
+        direction,
+        limit,
+        offset,
+        complexity: 'O(n)',
+        notes,
+      })
+    );
+  }
+  
   return executeMangoQuery(ctx, where, orderBy).then(matchingKeys => {
     if (matchingKeys.size === 0) {
       return [];

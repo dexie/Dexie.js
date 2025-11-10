@@ -2,6 +2,7 @@
 export { DexieCollection } from './DexieCollection.mjs';
 export { Collection } from './Collection.mjs';
 export { Query } from './Query.mjs';
+export type { QueryPlan } from './Query.mjs';
 export { Queryable } from './Queryable.mjs';
 export { OrderedQueryable } from './OrderedQueryable.mjs';
 export { WhereClause } from './WhereClause.mjs';
