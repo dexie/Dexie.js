@@ -35,15 +35,12 @@ export function findCompatibleQuery(
 
   switch (type) {
     case 'query':
-      // Normalize direction to improve cache hit rate for forward queries
-      // (undefined and 'next' are equivalent)
-      const reqDirection = req.direction ?? 'next';
       const equalEntry = entries.find(
         (entry) =>
           (entry.req as DBCoreQueryRequest).limit === req.limit &&
           (entry.req as DBCoreQueryRequest).values === req.values &&
-          ((entry.req as DBCoreQueryRequest).direction ?? 'next') ===
-            reqDirection &&
+          (entry.req as DBCoreQueryRequest).direction === req.direction &&
+          (entry.req as DBCoreQueryRequest).records === req.records &&
           areRangesEqual(entry.req.query.range, req.query.range)
       );
       if (equalEntry)
@@ -57,8 +54,8 @@ export function findCompatibleQuery(
         const limit = 'limit' in entry.req ? entry.req.limit : Infinity;
         return (
           limit >= req.limit &&
-          ((entry.req as DBCoreQueryRequest).direction ?? 'next') ===
-            reqDirection &&
+          (entry.req as DBCoreQueryRequest).direction === req.direction &&
+          (entry.req as DBCoreQueryRequest).records === req.records &&
           (req.values ? (entry.req as DBCoreQueryRequest).values : true) &&
           isSuperRange(entry.req.query.range, req.query.range)
         );
