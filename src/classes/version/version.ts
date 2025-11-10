@@ -42,7 +42,13 @@ export class Version implements IVersion {
   ): any {
     keys(stores).forEach((tableName) => {
       if (stores[tableName] !== null) {
-        let indexes = this._parseIndexSyntax(stores[tableName]);
+        // Allow comments in index syntax after a '#' char:
+        const indexSyntax = stores[tableName]
+          .split('\n')
+          .map(
+            line => line.split('#')[0].trim()
+          ).filter(line => line.length > 0).join(',') || '';
+        let indexes = this._parseIndexSyntax(indexSyntax);
 
         const primKey = indexes.shift();
         if (!primKey) {
