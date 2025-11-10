@@ -1,13 +1,13 @@
-export type MangoRange = {
+export interface SimleMangoRange {
   $gt?: any;
   $gte?: any;
   $lt?: any;
   $lte?: any;
   $eq?: any;
-  $ne?: any;
-  $in?: any[];
-  $nin?: any[];
-  $inRanges?: MangoRange[];
+}
+
+export interface MangoRange extends SimleMangoRange {
+  $inRanges?: SimleMangoRange[];
 };
 
 export type MangoExpression =
@@ -41,9 +41,12 @@ export const mangoRangeAliases = {
       $lt: prefix + '\uffff',
     })),
   }),
-  anyOf: (values: any[]) => ({ $in: values }),
-  noneOf: (values: any[]) => ({ $nin: values }),
-  notEqual: (value: any) => ({ $ne: value }),
+  anyOf: (values: any[]) => ({ $inRanges: values.map((v) => ({ $eq: v })) }),
+  noneOf: (values: any[]) => ({ $inRanges: values.map((v) => [{ $gt: v }, { $lt: v}]).flat() }),
+  notEqual: (value: any) => ({ $inRanges: [{$gt: value }, { $lt: value }] }),
+  $ne: (value: any) => ({ $inRanges: [{$gt: value }, { $lt: value }] }),
+  $in: (values: any[]) => ({ $inRanges: values.map((v) => ({ $eq: v })) }),
+  $nin: (values: any[]) => ({ $inRanges: values.map((v) => [{ $gt: v }, { $lt: v}]).flat() }),
 };
 
 
