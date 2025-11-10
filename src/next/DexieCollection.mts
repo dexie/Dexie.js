@@ -1,7 +1,7 @@
 import { Table } from '../..';
-import { Collection } from './Collection';
-import { Query } from './Query';
-import { executeQuery, executeCount } from './executeMangoQuery';
+import { Collection } from './Collection.mjs';
+import { Query } from './Query.mjs';
+import { executeQuery, executeCount } from './executeMangoQuery.mjs';
 
 export class DexieCollection extends Collection {
   _table: Table;

@@ -1,8 +1,8 @@
-import { MangoExpression, MangoRange, SimleMangoRange } from './MangoExpression';
+import { MangoExpression, MangoRange, SimleMangoRange } from './MangoExpression.mjs';
 import { DBCoreKeyRange, DBCoreRangeType, DBCoreIndex, DBCoreTable, DBCoreTableSchema, cmp, AnyRange } from '../..';
-import { toMapKey } from './toMapKey';
-import { createMangoFilter } from './createMangoFilter';
-import { Query } from './Query';
+import { toMapKey } from './toMapKey.mjs';
+import { createMangoFilter } from './createMangoFilter.mjs';
+import { Query } from './Query.mjs';
 
 interface QueryContext {
   core: DBCoreTable;
