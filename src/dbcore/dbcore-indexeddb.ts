@@ -298,10 +298,10 @@ export function createDBCore (
           if (limit === 0) return resolve({result: []});
           if (hasGetAllRecords) {
             const req = records
-              ? (source as any).getAllRecords(idbKeyRange, nonInfinitLimit, direction)
+              ? (source as any).getAllRecords({query: idbKeyRange, direction, ...{count: nonInfinitLimit}})
               : values
-              ? (source as any).getAll(idbKeyRange, nonInfinitLimit, direction)
-              : (source as any).getAllKeys(idbKeyRange, nonInfinitLimit, direction);
+              ? (source as any).getAll({query: idbKeyRange, direction, ...{count: nonInfinitLimit}})
+              : (source as any).getAllKeys({query: idbKeyRange, direction, ...{count: nonInfinitLimit}});
             req.onsuccess = event => resolve({result: event.target.result});
             req.onerror = eventRejectHandler(reject);
           } else if (hasGetAll && !records && (!direction || direction === "next")) {
