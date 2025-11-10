@@ -1,57 +1,57 @@
 import { Collection, FilteredCollection } from "./Collection.mjs";
 
-export class WhereClause {
-  _coll: Collection;
+export class WhereClause<T = any, TKey = any, TInsertType = T> {
+  _coll: Collection<T, TKey, TInsertType>;
   _prop: string
   _op: 'or' | 'and';
 
-  constructor(expression: Collection, prop: string, op: 'or' | 'and') {
+  constructor(expression: Collection<T, TKey, TInsertType>, prop: string, op: 'or' | 'and') {
     this._coll = expression;
     this._prop = prop;
     this._op = op;
   }
 
-  equals(value: any): Collection {
+  equals(value: any): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, { [this._prop]: { $eq: value } }, this._op);
   }
-  above(value: any): Collection {
+  above(value: any): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, { [this._prop]: { $gt: value } }, this._op);
   }
-  aboveOrEqual(value: any): Collection {
+  aboveOrEqual(value: any): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, {
       [this._prop]: { $gte: value },
     }, this._op);
   }
-  before(value: any): Collection {
+  before(value: any): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, { [this._prop]: { $lt: value } }, this._op);
   }
-  beforeOrEqual(value: any): Collection {
+  beforeOrEqual(value: any): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, {
       [this._prop]: { $lte: value },
     }, this._op);
   }
-  below(value: any): Collection {
+  below(value: any): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, { [this._prop]: { $lt: value } }, this._op);
   }
-  belowOrEqual(value: any): Collection {
+  belowOrEqual(value: any): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, {
       [this._prop]: { $lte: value },
     }, this._op);
   }
-  after(value: any): Collection {
+  after(value: any): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, { [this._prop]: { $gt: value } }, this._op);
   }
-  afterOrEqual(value: any): Collection {
+  afterOrEqual(value: any): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, {
       [this._prop]: { $gte: value },
     }, this._op);
   }
-  startsWith(value: string): Collection {
+  startsWith(value: string): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, {
       [this._prop]: { $gte: value, $lt: value + '\uffff' },
     }, this._op);
   }
-  startsWithAnyOf(...prefixes: string[]): Collection {
+  startsWithAnyOf(...prefixes: string[]): Collection<T, TKey, TInsertType> {
     return this.inAnyRange(
       prefixes.map((prefix) => [prefix, prefix + '\uffff'])
     );
@@ -64,7 +64,7 @@ export class WhereClause {
     upper: any,
     includeLower?: boolean,
     includeUpper?: boolean
-  ): Collection {
+  ): Collection<T, TKey, TInsertType> {
     return this.isBetween(lower, upper, {
       includeLower: includeLower ?? true,
       includeUpper: includeUpper ?? false,
@@ -76,7 +76,7 @@ export class WhereClause {
     lower: any,
     upper: any,
     { includeLower = true, includeUpper = true } = {}
-  ): Collection {
+  ): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, {
       [this._prop]: {
         ...(includeLower ? { $gte: lower } : { $gt: lower }),
@@ -85,17 +85,17 @@ export class WhereClause {
     }, this._op);
   }
 
-  anyOf(keys: ReadonlyArray<any>): Collection {
+  anyOf(keys: ReadonlyArray<any>): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, {
       [this._prop]: { $in: keys },
     }, this._op);
   }
-  noneOf(keys: ReadonlyArray<any>): Collection {
+  noneOf(keys: ReadonlyArray<any>): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, {
       [this._prop]: { $nin: keys },
     }, this._op);
   }
-  notEqual(value: any): Collection {
+  notEqual(value: any): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, { [this._prop]: { $ne: value } }, this._op);
   }
   inAnyRange(
@@ -104,7 +104,7 @@ export class WhereClause {
       includeLowers = true,
       includeUppers = false,
     }: { includeLowers?: boolean; includeUppers?: boolean } = {}
-  ): Collection {
+  ): Collection<T, TKey, TInsertType> {
     return new FilteredCollection(this._coll, {
       [this._prop]: {
         $inRanges: ranges.map(([lower, upper]) => {
