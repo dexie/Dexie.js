@@ -7,7 +7,7 @@ import {resetDatabase, supports, spawnedTest, promisedTest, isSafari, isSafariPr
 const _db = new Dexie("Apansson") as Dexie & {
     friends: Dexie.Table<{id?: number, name: string, age: number, shoeSize: number}, number>;
 }
-_db.version(1).stores({friends: '++id,name,age,[name+age+shoeSize]'});
+_db.version(13).stores({friends: '++id,age,name,[name+age+shoeSize]'});
 _db.on("populate", function() {
     _db.friends.bulkAdd([
         {name: "Arne1", age: 42, shoeSize: 46},
