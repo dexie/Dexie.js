@@ -2,13 +2,15 @@ import { MangoExpression, MangoRange, SimleMangoRange } from './MangoExpression.
 import { DBCoreKeyRange, DBCoreRangeType, DBCoreIndex, DBCoreTable, DBCoreTableSchema, cmp, AnyRange } from '../..';
 import { toMapKey } from './toMapKey.mjs';
 import { createMangoFilter } from './createMangoFilter.mjs';
-import { Query, QueryPlan } from './Query.mjs';
+import { Query, QueryPlan, SuggestedIndex, recordSuggestedIndex } from './Query.mjs';
+import { Dexie } from '../..';
 
 interface QueryContext {
   core: DBCoreTable;
   trans: any;
   schema: DBCoreTableSchema;
   query: Query;
+  tableName?: string;
 }
 
 // Helper to convert a simple MangoRange (without $inRanges) to DBCoreKeyRange
@@ -583,7 +585,7 @@ function executeMangoQuery(
 
 // Helper to sort results in memory when no suitable index exists
 function sortResults(results: any[], orderBy: string[], direction: 'asc' | 'desc', schema: DBCoreTableSchema): any[] {
-  const { getByKeyPath } = require('../..').Dexie;
+  const { getByKeyPath } = Dexie;
   
   // Add primary key to orderBy if not already present (IndexedDB does this implicitly)
   const pkKeyPath = schema.primaryKey.keyPath;
@@ -720,6 +722,162 @@ export function executeCount(ctx: QueryContext): Promise<number> {
   return executeQuery(ctx).then(results => (results as any[]).length);
 }
 
+// Helper to check if an index already exists
+function indexExists(schema: DBCoreTableSchema, keyPath: string | string[]): boolean {
+  // Use the built-in getIndexByKeyPath which handles virtual indexes and keyPath aliases
+  return schema.getIndexByKeyPath(keyPath) != null;
+}
+
+// Helper to analyze and suggest missing indexes
+function analyzeSuggestedIndexes(
+  ctx: QueryContext,
+  where: MangoExpression | null,
+  orderBy: string[],
+  currentIndex: DBCoreIndex | null,
+  needsManualSort: boolean,
+  needsFiltering: boolean
+): SuggestedIndex[] {
+  const { schema, tableName } = ctx;
+  const suggestions: SuggestedIndex[] = [];
+  
+  if (!tableName) return suggestions;
+
+  // Priority levels:
+  // 10: Critical - full table scan with filtering
+  // 8: High - manual sort on large result set
+  // 7: High - compound index could cover where + orderBy
+  // 6: Medium - partial index coverage
+  
+  // Case 1: No usable index for where clause (full scan) OR complex query needs indexes
+  if (where && (!currentIndex || '$and' in where)) {
+    const props = Object.keys(where);
+    if (props.length > 0 && !('$and' in where) && !('$or' in where)) {
+      const firstProp = props[0];
+      if (!indexExists(schema, firstProp)) {
+        suggestions.push({
+          keyPath: firstProp,
+          reason: 'Full table scan - no index available for where clause',
+          priority: 10,
+        });
+        recordSuggestedIndex(tableName, firstProp, 10, 'Full table scan - no index available for where clause');
+      }
+    } else if ('$and' in where) {
+      // For $and queries, check if ANY condition has an index
+      const andClauses = (where as any).$and as MangoExpression[];
+      const propsWithoutIndex: string[] = [];
+      const propsWithIndex: string[] = [];
+      
+      andClauses.forEach((clause: MangoExpression) => {
+        const clauseProps = Object.keys(clause).filter(k => k !== '$and' && k !== '$or');
+        clauseProps.forEach(prop => {
+          if (!indexExists(schema, prop)) {
+            propsWithoutIndex.push(prop);
+          } else {
+            propsWithIndex.push(prop);
+          }
+        });
+      });
+      
+      // Only suggest if NO conditions have indexes (full scan scenario)
+      // If some conditions already have indexes, those can be used for filtering
+      if (propsWithIndex.length === 0 && propsWithoutIndex.length > 0) {
+        propsWithoutIndex.forEach(prop => {
+          suggestions.push({
+            keyPath: prop,
+            reason: 'Complex query with no available indexes - full scan required',
+            priority: 9,
+          });
+          recordSuggestedIndex(tableName, prop, 9, 'Complex query with no available indexes - full scan required');
+        });
+      }
+    }
+  }
+  
+  // Case 2: Manual sort needed (no orderBy index)
+  if (needsManualSort && orderBy.length > 0) {
+    const orderByKey = orderBy.length === 1 ? orderBy[0] : orderBy;
+    
+    // Only suggest if index doesn't exist
+    if (!indexExists(schema, orderByKey)) {
+      suggestions.push({
+        keyPath: orderByKey,
+        reason: 'Manual in-memory sort required',
+        priority: 8,
+      });
+      recordSuggestedIndex(tableName, orderByKey, 8, 'Manual in-memory sort required');
+    }
+  }
+  
+  // Case 3: Compound index could cover where + orderBy
+  // BUT: Only if where uses equality (not ranges) on all components before orderBy
+  // This is because IndexedDB can only use subsequent index components for ordering
+  // if all previous components are exact matches (not ranges)
+  if (where && orderBy.length > 0 && currentIndex && needsManualSort) {
+    const whereProps = Object.keys(where).filter(k => k !== '$and' && k !== '$or');
+    
+    if (whereProps.length > 0) {
+      // Check if all where conditions are equality (not ranges)
+      let allEquality = true;
+      for (const prop of whereProps) {
+        const value = (where as any)[prop];
+        // Check if it's a range operator
+        if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+          if ('$gt' in value || '$gte' in value || '$lt' in value || '$lte' in value || '$inRanges' in value) {
+            allEquality = false;
+            break;
+          }
+        }
+      }
+      
+      // Only suggest compound index if all where conditions are equality
+      if (allEquality) {
+        const compoundKeyPath = [...whereProps, ...orderBy];
+        
+        if (!indexExists(schema, compoundKeyPath)) {
+          suggestions.push({
+            keyPath: compoundKeyPath,
+            reason: 'Compound index would cover both where (equality) and orderBy',
+            priority: 7,
+          });
+          recordSuggestedIndex(tableName, compoundKeyPath, 7, 'Compound index would cover both where (equality) and orderBy');
+        }
+      }
+    }
+  }
+  
+  // Case 4: Manual filtering needed (partial index coverage)
+  if (needsFiltering && where) {
+    const props = Object.keys(where);
+    const uncoveredProps: string[] = [];
+    
+    if (!('$and' in where) && !('$or' in where)) {
+      const currentKeyPath = currentIndex?.keyPath;
+      const currentKeyPathArray = Array.isArray(currentKeyPath) ? currentKeyPath : currentKeyPath ? [currentKeyPath] : [];
+      
+      props.forEach(prop => {
+        if (!currentKeyPathArray.includes(prop)) {
+          uncoveredProps.push(prop);
+        }
+      });
+      
+      if (uncoveredProps.length > 0) {
+        // Suggest compound index that covers all props
+        const suggestedKeyPath = [...currentKeyPathArray.filter(kp => props.includes(kp)), ...uncoveredProps];
+        if (suggestedKeyPath.length > 1 && !indexExists(schema, suggestedKeyPath)) {
+          suggestions.push({
+            keyPath: suggestedKeyPath,
+            reason: 'Compound index would eliminate manual filtering',
+            priority: 6,
+          });
+          recordSuggestedIndex(tableName, suggestedKeyPath, 6, 'Compound index would eliminate manual filtering');
+        }
+      }
+    }
+  }
+  
+  return suggestions;
+}
+
 // Helper to build query plan
 function buildQueryPlan(
   strategy: string,
@@ -735,13 +893,14 @@ function buildQueryPlan(
     cursorBased?: boolean;
     complexity?: string;
     notes?: string[];
+    suggestedIndexes?: SuggestedIndex[];
   }
 ): QueryPlan {
   const plan: QueryPlan = {
     strategy,
     index: index
       ? {
-          name: index.name || (index === index ? 'primaryKey' : 'unknown'),
+          name: index.name ?? ':id', // Use ":id" alias for primary key (matches getKeyPathAlias)
           keyPath: index.keyPath!,
           compound: Array.isArray(index.keyPath) && index.keyPath.length > 1,
         }
@@ -768,6 +927,9 @@ function buildQueryPlan(
     if (options.cursorBased) plan.cursorBased = options.cursorBased;
     if (options.complexity) plan.estimatedComplexity = options.complexity;
     if (options.notes && options.notes.length > 0) plan.notes = options.notes;
+    if (options.suggestedIndexes && options.suggestedIndexes.length > 0) {
+      plan.suggestedIndexes = options.suggestedIndexes;
+    }
   }
 
   return plan;
@@ -817,6 +979,9 @@ export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any> | Qu
     const queryIndex = orderByIndex || schema.primaryKey;
     const needsManualSort = orderBy.length > 0 && !orderByIndex;
     
+    // Analyze and record suggested indexes
+    const suggestions = analyzeSuggestedIndexes(ctx, null, orderBy, queryIndex, needsManualSort, false);
+    
     if (explain) {
       const notes: string[] = [];
       let complexity = 'O(n)';
@@ -844,6 +1009,7 @@ export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any> | Qu
             offset,
             complexity,
             notes,
+            suggestedIndexes: suggestions,
           }
         )
       );
@@ -896,6 +1062,10 @@ export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any> | Qu
     if (whereAnalysis) {
       const { index, ranges, partial, orderByMatched } = whereAnalysis;
       const needsFiltering = !!partial;
+      const needsManualSort = orderBy.length > 0 && !orderByMatched;
+      
+      // Analyze and record suggested indexes
+      const suggestions = analyzeSuggestedIndexes(ctx, where, orderBy, index, needsManualSort, needsFiltering);
       
       // Handle explain mode
       if (explain) {
@@ -903,6 +1073,7 @@ export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any> | Qu
         let strategy = 'Index scan';
         let complexity = 'O(log n + k)';
         let cursorBased = false;
+        let explainIndex = index; // Default to where index
         
         // Determine actual strategy
         if (orderByMatched && !needsFiltering) {
@@ -914,10 +1085,9 @@ export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any> | Qu
           }
         } else if (orderBy.length > 0 && orderByIndex && limit !== Infinity) {
           strategy = 'OrderBy index with filtering';
-          cursorBased = offset > 0 || needsFiltering;
-          if (cursorBased) {
-            notes.push('Using cursor iteration for efficient limit with filtering');
-          }
+          explainIndex = orderByIndex; // Use orderBy index for this strategy
+          cursorBased = true; // Always use cursor when filtering manually
+          notes.push('Using cursor iteration for efficient limit with filtering');
           notes.push('Filtering on where clause manually');
           complexity = 'O(log n + m)';
         } else {
@@ -935,7 +1105,7 @@ export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any> | Qu
         }
         
         const indexCovered: string[] = [];
-        const keyPathArray = Array.isArray(index.keyPath) ? index.keyPath : [index.keyPath!];
+        const keyPathArray = Array.isArray(explainIndex.keyPath) ? explainIndex.keyPath : [explainIndex.keyPath!];
         keyPathArray.forEach(kp => {
           if ((where as any)[kp] !== undefined) {
             indexCovered.push(kp);
@@ -943,7 +1113,7 @@ export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any> | Qu
         });
         
         return Promise.resolve(
-          buildQueryPlan(strategy, index, ranges, {
+          buildQueryPlan(strategy, explainIndex, ranges, {
             where,
             orderBy,
             direction,
@@ -958,6 +1128,7 @@ export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any> | Qu
             cursorBased,
             complexity,
             notes,
+            suggestedIndexes: suggestions,
           })
         );
       }
@@ -1113,23 +1284,51 @@ export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any> | Qu
   }
 
   // Complex query with $and/$or: Execute recursively to get matching keys
+  const needsManualSortForComplex = orderBy.length > 0 && !orderByIndex;
+  const suggestionsForComplex = analyzeSuggestedIndexes(
+    ctx, 
+    where, 
+    orderBy, 
+    null, // No index used for where clause in complex queries
+    needsManualSortForComplex, 
+    true // Complex queries always involve filtering
+  );
+  
   if (explain) {
     const notes: string[] = [];
-    notes.push('Complex query with $and/$or operators');
-    notes.push('Using recursive key extraction strategy');
-    if (orderBy.length > 0 && !orderByIndex) {
-      notes.push('Manual sort needed after key extraction');
+    let strategy = 'Complex query (recursive)';
+    let complexity = 'O(n)';
+    let cursorBased = false;
+    let explainIndex = orderByIndex || schema.primaryKey;
+    
+    // Check if we can use orderBy index with cursor iteration (more efficient with limit/offset)
+    if (orderBy.length > 0 && orderByIndex && (limit !== Infinity || offset > 0)) {
+      strategy = 'OrderBy index with filtering';
+      cursorBased = true;
+      complexity = 'O(n) worst case, O(log n + m) average';
+      notes.push('Complex query with multiple conditions');
+      notes.push('Using cursor iteration for efficient limit/offset with filtering');
+      notes.push('Filtering all where conditions manually during iteration');
+      notes.push('m = number of records scanned until limit reached (best case: m ≈ limit)');
+    } else {
+      notes.push('Complex query with $and/$or operators');
+      notes.push('Using recursive key extraction strategy');
+      if (orderBy.length > 0 && !orderByIndex) {
+        notes.push('Manual sort needed after key extraction');
+      }
     }
     
     return Promise.resolve(
-      buildQueryPlan('Complex query (recursive)', orderByIndex || schema.primaryKey, undefined, {
+      buildQueryPlan(strategy, explainIndex, undefined, {
         where,
         orderBy,
         direction,
         limit,
         offset,
-        complexity: 'O(n)',
+        complexity,
+        cursorBased,
         notes,
+        suggestedIndexes: suggestionsForComplex,
       })
     );
   }
