@@ -22,6 +22,7 @@ export class DexieCollection<T = any, TKey = any, TInsertType = T> extends Colle
         trans: idbtrans as any,
         schema: this._table.core.schema,
         query,
+        tableName: this._table.name,
       });
     });
   }
@@ -34,6 +35,7 @@ export class DexieCollection<T = any, TKey = any, TInsertType = T> extends Colle
         trans: idbtrans as any,
         schema: this._table.core.schema,
         query,
+        tableName: this._table.name,
       });
     });
   }
