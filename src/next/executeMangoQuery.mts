@@ -247,6 +247,10 @@ function findBestIndex(
     
     if (keyPathArray.length === 0) continue; // Skip null keyPath
     
+    // Check if this is a virtual index - if so, only use the first keyLength components
+    const effectiveLength = (index as any).keyLength !== undefined ? (index as any).keyLength : keyPathArray.length;
+    const effectiveKeyPath = keyPathArray.slice(0, effectiveLength);
+    
     // Try to match this index
     const matchedEquality = new Map<string, any>();
     const matchedRange = new Map<string, MangoRange>();
@@ -255,9 +259,9 @@ function findBestIndex(
     let hasSeenRange = false;
     let indexPosition = 0;
 
-    // Go through each component of the index
-    for (indexPosition = 0; indexPosition < keyPathArray.length; indexPosition++) {
-      const keyPathProp = keyPathArray[indexPosition];
+    // Go through each component of the index (only effective components for virtual indexes)
+    for (indexPosition = 0; indexPosition < effectiveKeyPath.length; indexPosition++) {
+      const keyPathProp = effectiveKeyPath[indexPosition];
       
       // Check if this prop is in our equality constraints
       if (equalityProps.has(keyPathProp)) {
@@ -288,8 +292,8 @@ function findBestIndex(
         let orderByIndex = 0;
         let allOrderByMatch = true;
         
-        for (let i = indexPosition; i < keyPathArray.length && orderByIndex < orderBy.length; i++) {
-          if (keyPathArray[i] === orderBy[orderByIndex]) {
+        for (let i = indexPosition; i < effectiveKeyPath.length && orderByIndex < orderBy.length; i++) {
+          if (effectiveKeyPath[i] === orderBy[orderByIndex]) {
             matchedOrderBy.push(orderBy[orderByIndex]);
             orderByIndex++;
           } else {
@@ -313,6 +317,25 @@ function findBestIndex(
       // Can't use this index or it doesn't help at all
       continue;
     }
+    
+    // Important: A non-virtual compound index cannot be used for range queries
+    // unless all components before the range have equality constraints.
+    // This is because IndexedDB cannot compare a single value against an array.
+    // Virtual indexes handle this by translating the range appropriately.
+    const isNonVirtualCompound = Array.isArray(keyPath) && keyPath.length > 1 && !(index as any).isVirtual;
+    if (isNonVirtualCompound && matchedRange.size > 0) {
+      // Check if we have a range without all preceding components having equality
+      const rangeKeyPath = Array.from(matchedRange.keys())[0];
+      const rangePosition = effectiveKeyPath.indexOf(rangeKeyPath);
+      
+      // For a compound index to be usable with a range:
+      // - Range cannot be on the first component (position 0)
+      // - Range position must equal the number of equality constraints (all before have equality)
+      if (rangePosition === 0 || rangePosition !== matchedEquality.size) {
+        // Range is on first component or we have a gap - can't use this compound index
+        continue;
+      }
+    }
 
     // Calculate score: equality props + range props + orderBy props
     const score = matchedEquality.size + matchedRange.size + matchedOrderBy.length;
@@ -330,12 +353,25 @@ function findBestIndex(
       }
     });
 
-    // Prefer simpler indexes when scores are equal
-    const shouldReplace = !bestMatch || score > bestMatch.score || 
-      (score === bestMatch.score && keyPathArray.length < (
-        Array.isArray(bestMatch.index.keyPath) 
-          ? bestMatch.index.keyPath.length 
-          : 1
+    // Prefer simpler indexes when scores are equal (use effective length for virtual indexes)
+    // Prefer real indexes over virtual indexes when they match equally well
+    const currentEffectiveLength = (index as any).keyLength !== undefined ? (index as any).keyLength : keyPathArray.length;
+    const bestMatchEffectiveLength = bestMatch ? 
+      ((bestMatch.index as any).keyLength !== undefined ? 
+        (bestMatch.index as any).keyLength : 
+        (Array.isArray(bestMatch.index.keyPath) ? bestMatch.index.keyPath.length : 1)) :
+      Infinity;
+    
+    const isCurrentVirtual = (index as any).isVirtual === true;
+    const isBestMatchVirtual = bestMatch ? (bestMatch.index as any).isVirtual === true : false;
+    
+    const shouldReplace = !bestMatch || 
+      score > bestMatch.score || 
+      (score === bestMatch.score && (
+        // Prefer real (non-virtual) over virtual
+        (!isCurrentVirtual && isBestMatchVirtual) ||
+        // If both same virtual status, prefer shorter effective length
+        (isCurrentVirtual === isBestMatchVirtual && currentEffectiveLength < bestMatchEffectiveLength)
       ));
     
     if (shouldReplace) {
@@ -360,10 +396,15 @@ function buildRangesForIndex(
   rangeProps: Map<string, MangoRange>
 ): DBCoreKeyRange[] {
   const keyPathArray = Array.isArray(index.keyPath) ? index.keyPath : [index.keyPath!];
+  
+  // Check if this is a virtual index - if so, only use the first keyLength components
+  const effectiveLength = (index as any).keyLength !== undefined ? (index as any).keyLength : keyPathArray.length;
+  const effectiveKeyPath = keyPathArray.slice(0, effectiveLength);
+  
   const values: any[] = [];
   let rangeValue: MangoRange | null = null;
 
-  for (const keyPathProp of keyPathArray) {
+  for (const keyPathProp of effectiveKeyPath) {
     if (equalityProps.has(keyPathProp)) {
       values.push(equalityProps.get(keyPathProp));
     } else if (rangeProps.has(keyPathProp)) {
@@ -1281,6 +1322,48 @@ export function executeQuery(ctx: QueryContext): Promise<ReadonlyArray<any> | Qu
         return merged.slice(offset, offset + limit);
       });
     }
+    
+    // No index available for simple where - need full scan with filtering
+    const filter = createMangoFilter(where);
+    const suggestions = analyzeSuggestedIndexes(ctx, where, orderBy, null, orderBy.length > 0 && !orderByIndex, true);
+    
+    if (explain) {
+      return Promise.resolve(
+        buildQueryPlan('Full table scan with filtering', orderByIndex || schema.primaryKey, [AnyRange], {
+          where,
+          orderBy,
+          direction,
+          limit,
+          offset,
+          complexity: orderBy.length > 0 ? 'O(n log n)' : 'O(n)',
+          notes: [
+            'No index available for where clause',
+            'Full table scan required',
+            'Filtering all records manually',
+            orderBy.length > 0 ? 'Manual sort needed' : ''
+          ].filter(Boolean),
+          suggestedIndexes: suggestions,
+        })
+      );
+    }
+    
+    return core.query({
+      trans,
+      values: true,
+      query: {
+        index: orderByIndex || schema.primaryKey,
+        range: AnyRange,
+      },
+      direction: dbDirection,
+    }).then(res => {
+      let results = res.result.filter(filter);
+      
+      if (orderBy.length > 0) {
+        results = sortResults(results, orderBy, direction, schema);
+      }
+      
+      return results.slice(offset, offset + limit);
+    });
   }
 
   // Complex query with $and/$or: Execute recursively to get matching keys
