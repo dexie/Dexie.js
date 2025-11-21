@@ -1,5 +1,5 @@
 import React from "react";
-import ReactDOM from "react-dom";
+import * as ReactDOMClient from "react-dom/client";
 import { module, test, equiv, assert } from "qunit";
 import { db } from "./db";
 import { App } from "./components/App";
@@ -10,7 +10,9 @@ const div = document.createElement('div');
 
 document.body.insertAdjacentHTML('beforeend', `<div style="margin-top: 300px;"></div>`);
 document.body.appendChild(div);
-ReactDOM.render(React.createElement(App), div);
+// Use React 18 createRoot API
+const root = ReactDOMClient.createRoot(div);
+root.render(React.createElement(App));
 
 module('useLiveQuery', {
   async beforeEach(assert) {
@@ -26,6 +28,11 @@ module('useLiveQuery', {
 });
 
 test("List component is reacting to changes", async ()=>{
+  await waitTilEqual(
+    () => div.querySelector('ul#itemList')?.textContent,
+    '',
+    'The list should be empty'
+  );
   // Add items:
   console.log("Putting items");
   await db.items.bulkPut([{
@@ -110,6 +117,17 @@ test("Clicking next button will update the currently viewed item", async ()=>{
   // Click button:
   (btnNext as HTMLElement).click();
   await waitTilEqual(()=>divCurrent.textContent, "Current itemID: 2Name: World", "We are now vieweing item 2");
+
+  // Go back to first:
+  const btnFirst = div.querySelector("#btnFirst");
+  (btnFirst as HTMLElement).click();
+  await waitTilEqual(()=>divCurrent.textContent, "Current itemID: 1Name: Hello", "We are now viewing item 1 again");
+
+  // Update item 2 while it's not rendered but still in promise cache:
+  await db.items.update(2, {name: "Earth"});
+  // Go to item 2 again:
+  (btnNext as HTMLElement).click();
+  await waitTilEqual(()=>divCurrent.textContent, "Current itemID: 2Name: Earth", "We are now viewing updated item 2");
 });
 
 test("Selecting invalid key trigger the err-boundrary", async ()=>{
@@ -151,4 +169,8 @@ test("Selecting invalid key trigger the err-boundrary", async ()=>{
   // Restore the gui from the error state:
   (div.querySelector("#btnFirst") as HTMLElement).click();
   (div.querySelector("#btnRetry") as HTMLElement).click();
+  await waitTilEqual(
+    () => div.querySelector("div#current")?.textContent,
+    "Current itemID: 1Name: Hello", "We should be back to viewing item 1"
+  );
 });

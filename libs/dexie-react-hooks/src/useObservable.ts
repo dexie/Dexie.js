@@ -3,10 +3,12 @@ export interface InteropableObservable<T> {
   subscribe(
     onNext: (x: T) => any,
     onError?: (error: any) => any
-  ): (() => any) | { unsubscribe(): any };
+  ): AnySubscription;
   getValue?(): T; // For BehaviorSubject
   hasValue?(): boolean; // For liveQuery observable returning false until a value is available
 }
+
+export type AnySubscription = { unsubscribe(): any } | (() => any);
 
 export function useObservable<T, TDefault>(
   observable: InteropableObservable<T>
