@@ -13,7 +13,12 @@
     "outDir": "../tools/tmp/",
     "sourceMap": true,
     "rootDir": "..",
-    "downlevelIteration": true
+    "downlevelIteration": true,
+    "baseUrl": "..",
+    "paths": {
+      "dexie": ["dist/dexie.d.ts"],
+      "dexie/next": ["dist/next/index.d.mts"]
+    }
   },
   "files": [
     "tests-all.js", "./deepEqual.js"

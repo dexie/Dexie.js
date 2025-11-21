@@ -107,6 +107,8 @@ export interface DBCoreQuery {
 export interface DBCoreQueryRequest {
   trans: DBCoreTransaction;
   values?: boolean;
+  records?: boolean;
+  direction?: "next" | "nextunique" | "prev" | "prevunique";
   limit?: number;
   query: DBCoreQuery;
   obsSet?: ObservabilitySet

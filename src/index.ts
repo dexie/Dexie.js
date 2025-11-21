@@ -15,6 +15,8 @@ import { Entity } from './classes/entity/Entity';
 import { cmp } from './functions/cmp';
 import { PropModification } from './helpers/prop-modification';
 import { replacePrefix, add, remove } from './functions/propmods';
+import { AnyRange, NeverRange } from './dbcore/keyrange';
+import { obsSetsOverlap } from './live-query/obs-sets-overlap';
 
 
 // Set rejectionMapper of DexiePromise so that it generally tries to map
@@ -29,6 +31,6 @@ Debug.setDebug(Debug.debug, dexieStackFrameFilter);
 export { RangeSet, mergeRanges, rangesOverlap } from "./helpers/rangeset";
 export { Dexie, liveQuery }; // Comply with public/index.d.ts.
 export { Entity };
-export { cmp };
+export { cmp, AnyRange, NeverRange, obsSetsOverlap };
 export { PropModification, replacePrefix, add, remove };
 export default Dexie;

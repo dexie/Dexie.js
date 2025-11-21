@@ -1,0 +1,62 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Debug Test</title>
+    <script src="dist/dexie.js"></script>
+    <script src="dist/next/index.mjs" type="module"></script>
+</head>
+<body>
+    <h1>Debug Test</h1>
+    <div id="output"></div>
+    
+    <script type="module">
+        import { NextDexie } from './dist/next/index.mjs';
+        
+        const output = document.getElementById('output');
+        function log(msg) {
+            console.log(msg);
+            output.innerHTML += msg + '<br>';
+        }
+        
+        async function test() {
+            try {
+                const _db = new Dexie("DebugTest");
+                _db.version(1).stores({friends: '++id,name,age'});
+                
+                await _db.delete(); // Clear any previous data
+                await _db.open();
+                
+                await _db.friends.bulkAdd([
+                    {name: "Arne1", age: 42},
+                    {name: "Arne2", age: 43},
+                    {name: "Arne3", age: 44},
+                    {name: "Bengt", age: 36},
+                    {name: "Cecilia", age: 25}
+                ]);
+                
+                const db = NextDexie(_db);
+                
+                log('Test 1: db.friends.toArray()');
+                const all = await db.friends.toArray();
+                log(`Result: ${all.length} friends - ${JSON.stringify(all.map(f => f.name))}`);
+                
+                log('Test 2: db.friends.where("name").startsWith("A").toArray()');
+                const filtered = await db.friends.where("name").startsWith("A").toArray();
+                log(`Result: ${filtered.length} friends - ${JSON.stringify(filtered.map(f => f.name))}`);
+                
+                if (filtered.length === 3) {
+                    log('SUCCESS!');
+                } else {
+                    log('FAILED! Expected 3, got ' + filtered.length);
+                }
+            } catch (err) {
+                log('ERROR: ' + err.message);
+                console.error(err);
+            }
+        }
+        
+        test();
+    </script>
+</body>
+</html>
