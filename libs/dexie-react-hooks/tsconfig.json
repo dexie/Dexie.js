@@ -1,10 +1,10 @@
 {
   "compilerOptions": {
-    "lib": ["es2021", "dom"],
+    "lib": ["es2022", "dom"],
     "moduleResolution": "node",
     "importHelpers": false,
     "jsx": "react",
-    "target": "es5",
+    "target": "es2022",
     "module": "es6",
     "noImplicitAny": false,
     "strictNullChecks": true,

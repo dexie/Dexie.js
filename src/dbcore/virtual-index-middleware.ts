@@ -60,6 +60,7 @@ export function createVirtualIndexMiddleware (down: DBCore) : DBCore {
           name: isVirtual
             ? `${keyPathAlias}(virtual-from:${lowLevelIndex.name})`
             : lowLevelIndex.name,
+          keyPath, // Override keyPath from lowLevelIndex with the virtual one
           lowLevelIndex,
           isVirtual,
           keyTail,
