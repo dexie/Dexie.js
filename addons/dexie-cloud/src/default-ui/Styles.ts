@@ -64,7 +64,12 @@ export const Styles: { [styleAlias: string]: Partial<CSSStyleDeclaration> | any}
     outline: "none",
     fontSize: "16px",
     padding: "8px",
-    boxSizing: "border-box"
+    boxSizing: "border-box",
+    backgroundColor: "#f9f9f9",
+    borderRadius: "4px",
+    border: "1px solid #ccc",
+    marginTop: "6px",
+    fontFamily: "inherit"
   },
   Button: {
     padding: "10px 20px",
