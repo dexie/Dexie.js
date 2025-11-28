@@ -1,6 +1,6 @@
 {
   "name": "dexie-react-hooks",
-  "version": "4.2.1-alpha.1",
+  "version": "4.2.1-beta.1",
   "description": "React hooks for reactive data fetching using Dexie.js",
   "main": "dist/dexie-react-hooks.js",
   "typings": "dist/dexie-react-hooks.d.ts",
@@ -54,7 +54,6 @@
   },
   "homepage": "https://dexie.org",
   "peerDependencies": {
-    "@types/react": ">=16",
     "dexie": "workspace:>=4.2.0-alpha.1 <5.0.0",
     "react": ">=16"
   },
