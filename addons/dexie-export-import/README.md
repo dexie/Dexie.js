@@ -17,7 +17,7 @@ Here's the basic usage. There's a lot you can do by supplying optional `[options
 *NOTE:* Typescript users using dexie@2.x will get compilation errors if using the static import method `Dexie.import()`. 
 
 ```js
-import Dexie from "dexie";
+import { Dexie } from "dexie";
 import "dexie-export-import";
 
 //
@@ -293,7 +293,7 @@ As Dexie can dynamically open non-Dexie IndexedDB databases, this is not an issu
 Sample provided here:
 
 ```js
-import Dexie from 'dexie';
+import { Dexie } from 'dexie';
 import 'dexie-export-import';
 
 async function exportDatabase(databaseName) {

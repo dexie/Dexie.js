@@ -8,7 +8,7 @@ npm install dexie-cloud-addon@latest
 ```
 
 ```ts
-import Dexie from 'dexie';
+import { Dexie } from 'dexie';
 import dexieCloud from 'dexie-cloud-addon';
 
 const db = new Dexie('dbname', { addons: [dexieCloud]});
