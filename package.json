@@ -118,10 +118,10 @@
   "homepage": "https://dexie.org",
   "devDependencies": {
     "@lambdatest/node-tunnel": "^4.0.7",
-    "@rollup/plugin-commonjs": "^28.0.2",
-    "@rollup/plugin-node-resolve": "^15.3.1",
+    "@rollup/plugin-commonjs": "^29.0.0",
+    "@rollup/plugin-node-resolve": "^16.0.3",
     "cross-env": "^10.1.0",
-    "dts-bundle-generator": "^9.3.1",
+    "dts-bundle-generator": "^9.5.1",
     "just-build": "^0.9.24",
     "karma": "^6.1.1",
     "karma-chrome-launcher": "^3.1.0",

@@ -16,7 +16,7 @@
   "license": "Apache-2.0",
   "devDependencies": {
     "@types/jest": "^30.0.0",
-    "@types/node": "^24.10.1",
+    "@types/node": "^22.10.1",
     "jest": "^30.2.0",
     "ts-jest": "^29.4.6",
     "typescript": "^5.9.3"
