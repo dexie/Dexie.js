@@ -1,8 +1,8 @@
 import sourcemaps from 'rollup-plugin-sourcemaps';
 import {readFileSync} from 'fs';
 import path from 'path';
-import commonjs from 'rollup-plugin-commonjs';
-import nodeResolve from 'rollup-plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs';
+import nodeResolve from '@rollup/plugin-node-resolve';
 import alias from '@rollup/plugin-alias';
 import { fileURLToPath } from 'url';
 
