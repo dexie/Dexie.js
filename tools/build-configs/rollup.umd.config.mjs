@@ -4,18 +4,24 @@ import cleanup from 'rollup-plugin-cleanup';
 
 import {readFileSync} from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const version = require(path.resolve(__dirname, '../../package.json')).version;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const packageJson = JSON.parse(readFileSync(path.resolve(__dirname, '../../package.json'), 'utf-8'));
+const version = packageJson.version;
 
 const ERRORS_TO_IGNORE = [
   "CIRCULAR_DEPENDENCY" // Circular imports are OK. See https://github.com/rollup/rollup/issues/2271
 ];
 
 export default {
-  input: path.resolve(__dirname, '../../tools/tmp/modern/src/index.js'),
+  input: path.resolve(__dirname, '../../tools/tmp/src/index-umd.js'),
   output: [{
-    file: path.resolve(__dirname, '../../dist/modern/dexie.mjs'),
-    format: 'es',
+    file: path.resolve(__dirname, '../../dist/dexie.js'),
+    format: 'umd',
+    name: 'Dexie',
+    globals: {}, // For tests, use "QUnit". For addons, use "Dexie"
     sourcemap: true,
     banner: readFileSync(path.resolve(__dirname, 'banner.txt')),
   }],

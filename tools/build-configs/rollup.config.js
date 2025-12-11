@@ -1,5 +1,5 @@
 import sourcemaps from 'rollup-plugin-sourcemaps';
-import nodeResolve from 'rollup-plugin-node-resolve';
+import nodeResolve from '@rollup/plugin-node-resolve';
 import cleanup from 'rollup-plugin-cleanup';
 
 import {readFileSync} from 'fs';
