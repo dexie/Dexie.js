@@ -3,7 +3,7 @@
     "lib": ["es2020", "dom"],
     "moduleResolution": "node",
     "importHelpers": true,
-    "target": "es2017",
+    "target": "es2020",
     "module": "esnext",
     "outDir": "dist",
     "rootDir": "src",
