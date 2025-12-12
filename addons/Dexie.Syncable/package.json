@@ -82,7 +82,8 @@
     "dexie-observable": "workspace:^",
     "eslint": "^5.16.0",
     "just-build": "^0.9.24",
-    "qunit": "^2.9.2",
+    "qunit": "2.10.0",
+    "qunitjs": "1.23.1",
     "typescript": "^5.3.3",
     "uglify-js": "^3.5.6"
   }

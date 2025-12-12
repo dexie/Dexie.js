@@ -40,6 +40,8 @@
     "base64-arraybuffer-es6": "*",
     "clarinet": "dfahlander/clarinet",
     "just-build": "^0.9.24",
+    "qunit": "2.10.0",
+    "qunitjs": "1.23.1",
     "rollup-plugin-alias": "^2.2.0",
     "typescript": "^5.3.3",
     "typeson": "^5.8.2",

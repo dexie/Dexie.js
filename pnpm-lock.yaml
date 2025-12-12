@@ -102,8 +102,11 @@ importers:
         specifier: ^0.9.24
         version: 0.9.24
       qunit:
-        specifier: ^2.9.2
-        version: 2.24.3
+        specifier: 2.10.0
+        version: 2.10.0
+      qunitjs:
+        specifier: 1.23.1
+        version: 1.23.1
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
@@ -129,8 +132,11 @@ importers:
         specifier: ^0.9.24
         version: 0.9.24
       qunit:
-        specifier: ^2.9.2
-        version: 2.24.3
+        specifier: 2.10.0
+        version: 2.10.0
+      qunitjs:
+        specifier: 1.23.1
+        version: 1.23.1
       typescript:
         specifier: ^5.3.3
         version: 5.9.3
@@ -201,6 +207,12 @@ importers:
       preact:
         specifier: '*'
         version: 10.28.0
+      qunit:
+        specifier: 2.10.0
+        version: 2.10.0
+      qunitjs:
+        specifier: 1.23.1
+        version: 1.23.1
       rollup:
         specifier: ^4.53.3
         version: 4.53.3
@@ -235,6 +247,12 @@ importers:
       just-build:
         specifier: ^0.9.24
         version: 0.9.24
+      qunit:
+        specifier: 2.10.0
+        version: 2.10.0
+      qunitjs:
+        specifier: 1.23.1
+        version: 1.23.1
       rollup-plugin-alias:
         specifier: ^2.2.0
         version: 2.2.0
@@ -292,6 +310,12 @@ importers:
       lib0:
         specifier: ^0.2.97
         version: 0.2.114
+      qunit:
+        specifier: 2.10.0
+        version: 2.10.0
+      qunitjs:
+        specifier: 1.23.1
+        version: 1.23.1
       rollup:
         specifier: ^4.53.3
         version: 4.53.3
@@ -360,8 +384,11 @@ importers:
         specifier: ^0.9.24
         version: 0.9.24
       qunit:
-        specifier: ^2.12.0
-        version: 2.24.3
+        specifier: 2.10.0
+        version: 2.10.0
+      qunitjs:
+        specifier: 1.23.1
+        version: 1.23.1
       react:
         specifier: ^19.2.3
         version: 19.2.3
@@ -2588,10 +2615,6 @@ packages:
     resolution: {integrity: sha512-NOKm8xhkzAjzFx8B2v5OAHT+u5pRQc2UCa2Vq9jYL/31o2wi9mxBA7LIFs3sV5VSC49z6pEhfbMULvShKj26WA==}
     engines: {node: '>= 6'}
 
-  commander@7.2.0:
-    resolution: {integrity: sha512-QrWXB+ZQSVPmIWIhtEO9H+gwHaMGYiF5ChvoJ+K9ZGHG/sVsa6yiesAD1GC/x46sET00Xlwo1u49RVVVzvcSkw==}
-    engines: {node: '>= 10'}
-
   common-tags@1.8.2:
     resolution: {integrity: sha512-gk/Z852D2Wtb//0I+kRFNKKE9dIIVirjoqPoA1wJU+XePVXZfGeBpk45+A1rKO4Q43prqWBNY/MiIeRLbPWUaA==}
     engines: {node: '>=4.0.0'}
@@ -3355,15 +3378,9 @@ packages:
     resolution: {integrity: sha512-sFdI5LyBiNTHjRd7cGPWapiHWMOXKyuBNX/cWJ3NfzrZQVa8GI/8cofCl74AOVqq9W5kNmguTIzJ/1s2gyI9wA==}
     engines: {node: '>= 0.4'}
 
-  globalyzer@0.1.0:
-    resolution: {integrity: sha512-40oNTM9UfG6aBmuKxk/giHn5nQ8RVz/SS4Ir6zgzOv9/qC3kKZ9v4etGTcJbEl/NyVQH7FGU7d+X1egr57Md2Q==}
-
   globby@11.1.0:
     resolution: {integrity: sha512-jhIXaOzy1sb8IyocaruWSn1TjmnBVs8Ayhcy83rmxNJ8q2uWKCAj3CnJY+KpGSXCueAPc0i05kVvVKtP1t9S3g==}
     engines: {node: '>=10'}
-
-  globrex@0.1.2:
-    resolution: {integrity: sha512-uHJgbwAMwNFf5mLst7IWLNg14x1CkeqglJb/K3doi4dw6q2IvAAmM/Y81kevy83wP+Sst+nutFTYOGg3d1lsxg==}
 
   gopd@1.2.0:
     resolution: {integrity: sha512-ZUKRh6/kUFoAiTAtTYPZJ3hw9wNxx+BIBOijnlG9PnrJsCcSjs1wyyD6vJpaYtgnzDrKYRSqf3OO6Rfa93xsRg==}
@@ -4288,10 +4305,6 @@ packages:
     resolution: {integrity: sha512-gwQiR7weFRV8mAtT0x0kXkZ18dfRLB45xH7q0hCOVQMLfLb2f1ZaSvR57q4/b/Vj6B0RwMNJYbvb69e1yM7qEA==}
     engines: {node: '>=6'}
 
-  node-watch@0.7.3:
-    resolution: {integrity: sha512-3l4E8uMPY1HdMMryPRUAl+oIHtXtyiTlIiESNSVSNxcPfzAFzeTbXFQkZfAwBbo0B1qMSG8nUABx+Gd+YrbKrQ==}
-    engines: {node: '>=6'}
-
   normalize-path@3.0.0:
     resolution: {integrity: sha512-6eZs5Ls3WtCisHWp9S2GUy8dqkpGi4BVSz3GaqiE6ezub0512ESztXUwUB6C6IKbQkY2Pnb/mD4WYojCRwcwLA==}
     engines: {node: '>=0.10.0'}
@@ -4604,11 +4617,6 @@ packages:
   qunit@2.10.0:
     resolution: {integrity: sha512-EP9Q9Kf45z4l/X02ZJtyTQU9DBc82pEWAncSNx7Weo/73BDpX71xqbsdDAQrtEeeilK70cib7CY/lniJV6Cwwg==}
     engines: {node: '>=6'}
-    hasBin: true
-
-  qunit@2.24.3:
-    resolution: {integrity: sha512-JTHwSfHf2Cw8TqusZo2tT4F9d+XA/pp/veoxUDiPNHtB1Wc1VPctiHHIv6HA3vrXNOBu9LSzFM7YU2OV9Gz4vQ==}
-    engines: {node: '>=10'}
     hasBin: true
 
   qunitjs@1.23.1:
@@ -5300,9 +5308,6 @@ packages:
 
   through@2.3.8:
     resolution: {integrity: sha512-w89qg7PI8wAdvX60bMDP+bFoD5Dvhm9oLheFp5O4a2QF0cSBGsBX4qZmadPMvVqlLJBBci+WqGGOAPvcDeNSVg==}
-
-  tiny-glob@0.2.9:
-    resolution: {integrity: sha512-g/55ssRPUjShh+xkfx9UPDXqhckHEsHr4Vd9zX55oSdGZc/MD0m3sferOkwWtp98bv+kcVfEHtRJgBVJzelrzg==}
 
   tinybench@2.9.0:
     resolution: {integrity: sha512-0+DUvqWMValLmha6lr4kD8iAMK1HzV0/aKnCtWb9v9641TnP/MFb7Pc2bxoxQjTXAErryXVgUOfv2YqNllqGeg==}
@@ -8240,8 +8245,6 @@ snapshots:
 
   commander@4.1.1: {}
 
-  commander@7.2.0: {}
-
   common-tags@1.8.2: {}
 
   commondir@1.0.1: {}
@@ -9108,8 +9111,6 @@ snapshots:
     dependencies:
       define-properties: 1.2.1
 
-  globalyzer@0.1.0: {}
-
   globby@11.1.0:
     dependencies:
       array-union: 2.1.0
@@ -9118,8 +9119,6 @@ snapshots:
       ignore: 5.3.2
       merge2: 1.4.1
       slash: 3.0.0
-
-  globrex@0.1.2: {}
 
   gopd@1.2.0: {}
 
@@ -10201,8 +10200,6 @@ snapshots:
 
   node-watch@0.6.1: {}
 
-  node-watch@0.7.3: {}
-
   normalize-path@3.0.0: {}
 
   normalize-range@0.1.2: {}
@@ -10456,12 +10453,6 @@ snapshots:
       minimatch: 3.0.4
       node-watch: 0.6.1
       resolve: 1.9.0
-
-  qunit@2.24.3:
-    dependencies:
-      commander: 7.2.0
-      node-watch: 0.7.3
-      tiny-glob: 0.2.9
 
   qunitjs@1.23.1: {}
 
@@ -11303,11 +11294,6 @@ snapshots:
   throttle-debounce@3.0.1: {}
 
   through@2.3.8: {}
-
-  tiny-glob@0.2.9:
-    dependencies:
-      globalyzer: 0.1.0
-      globrex: 0.1.2
 
   tinybench@2.9.0: {}
 
