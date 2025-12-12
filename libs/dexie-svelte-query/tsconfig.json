@@ -10,5 +10,6 @@
 		"strict": true,
 		"module": "NodeNext",
 		"moduleResolution": "NodeNext"
-	}
+	},
+	"exclude": ["dist", "node_modules"]
 }
