@@ -7,7 +7,7 @@ import typescript from '@rollup/plugin-typescript';
 import terser from '@rollup/plugin-terser';
 import replace from '@rollup/plugin-replace';
 // @ts-ignore: requires tsconfig settings that we don't need for the web build but is ok here in the build config.
-import pkg from '../../package.json' assert { type: 'json' };
+import pkg from '../../package.json' with { type: 'json' };
 import * as fs from 'fs';
 
 //const ERRORS_TO_IGNORE = ['THIS_IS_UNDEFINED'];

@@ -4,7 +4,7 @@ import commonjs from '@rollup/plugin-commonjs';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import replace from '@rollup/plugin-replace';
 // @ts-ignore: requires tsconfig settings that we don't need for the web build but is ok here in the build config.
-import pkg from '../../package.json' assert { type: 'json' };
+import pkg from '../../package.json' with { type: 'json' };
 
 const ERRORS_TO_IGNORE = [
   "THIS_IS_UNDEFINED",
