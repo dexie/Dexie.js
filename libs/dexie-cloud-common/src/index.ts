@@ -6,6 +6,7 @@ export * from "./utils.js"
 export * from "./DexieCloudSchema.js"
 export * from "./DBOperationsSet.js"
 export * from "./DBOperation.js"
+export * from "./SyncChange.js"
 export * from "./validation/isValidSyncableID.js"
 export * from "./change-processing/applyOperation.js"
 export * from "./change-processing/applyOperations.js"
@@ -13,6 +14,7 @@ export * from "./change-processing/DBKeyMutation.js"
 export * from "./change-processing/DBKeyMutationSet.js"
 export * from "./change-processing/subtractChanges.js"
 export * from "./change-processing/toDBOperationSet.js"
+export * from "./change-processing/toSyncChangeSet.js"
 export * from "./DBPermissionSet.js";
 export * from "./entities/DBRealm.js";
 export * from "./entities/DBRealmMember.js";

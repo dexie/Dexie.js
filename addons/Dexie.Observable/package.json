@@ -55,8 +55,8 @@
     ],
     "dexie-observable": [
       "# Build UMD module",
-      "tsc --allowJs -t es5 -m es2015 --outDir tools/tmp/es5/src/ --sourceMap src/Dexie.Observable.js [--watch 'Compilation complete.']",
-      "rollup -c tools/build-configs/rollup.config.js",
+      "tsc --allowJs -t es5 -m es2015 --outDir tools/tmp/es5/src/ --sourceMap --skipLibCheck src/Dexie.Observable.js [--watch 'Compilation complete.']",
+      "rollup -c tools/build-configs/rollup.config.mjs",
       "node tools/replaceVersionAndDate.js dist/dexie-observable.js",
       "# eslint ",
       "eslint src --cache"
@@ -72,8 +72,8 @@
     ],
     "test": [
       "# Build the unit tests (integration tests need no build)",
-      "tsc --allowJs --moduleResolution node --lib es2018,dom -t es5 -m es2015 --outDir tools/tmp/es5/test --rootDir ../.. --sourceMap test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
-      "rollup -c tools/build-configs/rollup.tests.config.js"
+      "tsc --allowJs --moduleResolution node --lib es2018,dom -t es5 -m es2015 --outDir tools/tmp/es5/test --rootDir ../.. --sourceMap --skipLibCheck test/unit/unit-tests-all.js [--watch 'Compilation complete.']",
+      "rollup -c tools/build-configs/rollup.tests.config.mjs"
     ],
     "test-typings": [
       "tsc -p test/typings/"
@@ -88,8 +88,10 @@
     "dexie": "workspace:^",
     "eslint": "^7.27.0",
     "just-build": "^0.9.24",
-    "qunit": "^2.9.2",
+    "qunit": "2.10.0",
+    "qunitjs": "1.23.1",
     "typescript": "^5.3.3",
-    "uglify-js": "^3.5.6"
+    "uglify-js": "^3.5.6",
+    "undici-types": "^6.21.0"
   }
 }

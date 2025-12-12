@@ -4,7 +4,9 @@ const { configureLambdaTest } = require('./karma.lambdatest');
  */
 const karmaCommon = {
   hostname: 'localhost.lambdatest.com',
-  frameworks: ['qunit'],
+  // Use qunitjs 1.23.1 instead of qunit 2.x
+  // We load it manually in files array instead of using the 'qunit' framework
+  frameworks: [],
 
   reporters: ['mocha'],
 
@@ -29,7 +31,10 @@ const karmaCommon = {
 
   files: [
     'test/babel-polyfill/polyfill.min.js',
+    // Load qunitjs 1.23.1 manually (creates global QUnit, asyncTest, test, etc.)
     'node_modules/qunitjs/qunit/qunit.js',
+    // karma-qunit adapter (expects window.QUnit to exist)
+    'node_modules/karma-qunit/lib/adapter.js',
     'test/karma-env.js',
     {
       pattern: 'test/worker.js',

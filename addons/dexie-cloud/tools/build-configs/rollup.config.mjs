@@ -7,7 +7,7 @@ import typescript from '@rollup/plugin-typescript';
 import terser from '@rollup/plugin-terser';
 import replace from '@rollup/plugin-replace';
 // @ts-ignore: requires tsconfig settings that we don't need for the web build but is ok here in the build config.
-import pkg from '../../package.json' assert { type: 'json' };
+import pkg from '../../package.json' with { type: 'json' };
 import * as fs from 'fs';
 
 //const ERRORS_TO_IGNORE = ['THIS_IS_UNDEFINED'];
@@ -29,16 +29,28 @@ export function createBanner() {
  * @returns
  */
 export function createRollupConfigs(entry, outputName) {
-  const COMMON_PLUGINS = [
-    typescript({
-      tsconfig: 'src/tsconfig.json',
-      compilerOptions: {
-        target: 'es2016',
-      },
-      declarationDir: 'dist/',
-      //sourceMap: false, // Required (see https://stackoverflow.com/questions/63218218/rollup-is-not-generating-typescript-sourcemap)
-      inlineSources: true, // But this was even better because then we get the real source code in the sourcemap!
-    }),
+  // TypeScript plugin for modern build (generates .d.ts files)
+  const modernTypescriptPlugin = typescript({
+    tsconfig: 'src/tsconfig.json',
+    compilerOptions: {
+      target: 'es2016',
+      declaration: true,
+      declarationDir: 'dist/modern',
+    },
+    inlineSources: true,
+  });
+
+  // TypeScript plugin for UMD build (no declarations needed)
+  const umdTypescriptPlugin = typescript({
+    tsconfig: 'src/tsconfig.json',
+    compilerOptions: {
+      target: 'es2016',
+      declaration: false,
+    },
+    inlineSources: true,
+  });
+
+  const COMMON_NON_TS_PLUGINS = [
     //sourcemaps(),
     nodeResolve({
       browser: true,
@@ -95,7 +107,7 @@ export function createRollupConfigs(entry, outputName) {
           plugins: PRODUCTION_BUILD_PLUGINS,
         },
       ],
-      plugins: COMMON_PLUGINS,
+      plugins: [modernTypescriptPlugin, ...COMMON_NON_TS_PLUGINS],
       external: ['dexie', 'rxjs', 'rxjs/operators', 'y-dexie', 'lib0', 'lib0/encoding', 'lib0/decoding', 'yjs', 'y-protocols/awareness'],
     },
 
@@ -136,7 +148,7 @@ export function createRollupConfigs(entry, outputName) {
           plugins: PRODUCTION_BUILD_PLUGINS,
         },
       ],
-      plugins: COMMON_PLUGINS,
+      plugins: [umdTypescriptPlugin, ...COMMON_NON_TS_PLUGINS],
       external: ['dexie', 'rxjs', 'rxjs/operators'],
     },
   ];

@@ -9,5 +9,6 @@ export function performGuardedJob<T>(
     // No support for guarding jobs. IE11, node.js, etc.
     return job();
   }
-  return navigator.locks.request(db.name + '|' + jobName, () => job());
+  // @ts-expect-error - LockManager callback type inference issue with generics
+  return navigator.locks.request(db.name + '|' + jobName, job);
 }

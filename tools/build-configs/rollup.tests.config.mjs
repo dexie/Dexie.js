@@ -1,28 +1,31 @@
 import sourcemaps from 'rollup-plugin-sourcemaps';
+import commonjs from '@rollup/plugin-commonjs';
 import nodeResolve from '@rollup/plugin-node-resolve';
-import cleanup from 'rollup-plugin-cleanup';
-
-import {readFileSync} from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 
-const version = require(path.resolve(__dirname, '../../package.json')).version;
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const ERRORS_TO_IGNORE = [
+  "THIS_IS_UNDEFINED",
   "CIRCULAR_DEPENDENCY" // Circular imports are OK. See https://github.com/rollup/rollup/issues/2271
 ];
 
 export default {
-  input: path.resolve(__dirname, '../../tools/tmp/modern/src/index.js'),
-  output: [{
-    file: path.resolve(__dirname, '../../dist/modern/dexie.mjs'),
-    format: 'es',
+  input: path.resolve(__dirname, '../tmp/test/tests-all.js'),
+  output: {
+    file: path.resolve(__dirname, '../../test/bundle.js'),
+    format: 'umd',
     sourcemap: true,
-    banner: readFileSync(path.resolve(__dirname, 'banner.txt')),
-  }],
+    name: 'dexieTests',
+    globals: {dexie: "Dexie", QUnit: "QUnit"},
+  },
+  external: ['dexie', 'QUnit'],
   plugins: [
     sourcemaps(),
-    nodeResolve({browser: true, ignoreGlobal: false}),
-    cleanup()
+    nodeResolve({browser: true}),
+    commonjs()
   ],
   onwarn ({loc, frame, code, message}) {
     if (ERRORS_TO_IGNORE.includes(code)) return;

@@ -1,14 +1,15 @@
 import { DBDeleteOperation, DBOperation, DBUpdateOperation, DBUpsertOperation } from "../DBOperation.js";
 import { DBOperationsSet } from "../DBOperationsSet.js";
+import { SyncChangeSet } from "../SyncChangeSet.js";
 import { DBKeyMutationSet } from "./DBKeyMutationSet.js";
 
 /** Convert a DBKeyMutationSet (which is an internal format capable of looking up changes per ID)
- * ...into a DBOperationsSet (which is more optimal for performing DB operations into DB (bulkAdd() etc))
+ * ...into a SyncChangeSet (which is more optimal for performing DB operations into DB SQL UPSERT, UPDATE, DELETE)
  * 
  * @param inSet 
- * @returns DBOperationsSet representing inSet
+ * @returns SyncChangeSet representing inSet
  */
-export function toDBOperationSet(inSet: DBKeyMutationSet, txid?: string): DBOperationsSet<string> {
+export function toSyncChangeSet(inSet: DBKeyMutationSet): SyncChangeSet {
   // Convert data into a temporary map to collect mutations of same table and type
   const map: {
     [table: string]: { [opType: string]: { key: any, val?: any, mod?: any }[] };
@@ -22,47 +23,37 @@ export function toDBOperationSet(inSet: DBKeyMutationSet, txid?: string): DBOper
   }
 
   // Start computing the resulting format:
-  const result: DBOperationsSet<string> = [];
+  const result: SyncChangeSet = {};
 
   for (const [table, ops] of Object.entries(map)) {
-    const resultEntry = {
-      table,
-      muts: [] as DBOperation<string>[],
-    };
+    const resultEntry: {
+      upsert?: object[];
+      update?: { [key: string]: { [keyPath: string]: any } };
+      delete?: string[];
+    } = {};
+    
     for (const [optype, muts] of Object.entries(ops)) {
       switch (optype) {
         case "ups": {
-          const op: DBUpsertOperation<string> = {
-            type: "upsert",
-            keys: muts.map(mut => mut.key),
-            values: muts.map(mut => mut.val),
-            txid
-          };
-          resultEntry.muts.push(op);
+          resultEntry.upsert = muts.map(mut => mut.val);
           break;
         }
         case "upd": {
-          const op: DBUpdateOperation<string> = {
-            type: "update",
-            keys: muts.map(mut => mut.key),
-            changeSpecs: muts.map(mut => mut.mod),
-            txid
-          };
-          resultEntry.muts.push(op);
+          const updateMap: { [key: string]: { [keyPath: string]: any } } = {};
+          for (const mut of muts) {
+            updateMap[mut.key] = mut.mod;
+          }
+          resultEntry.update = updateMap;
           break;
         }
         case "del": {
-          const op: DBDeleteOperation<string> = {
-            type: "delete",
-            keys: muts.map(mut => mut.key),
-            txid,
-          }
-          resultEntry.muts.push(op);
+          resultEntry.delete = muts.map(mut => mut.key);
           break;
         }
       }
     }
-    result.push(resultEntry);
+    
+    result[table] = resultEntry;
   }
 
   return result;

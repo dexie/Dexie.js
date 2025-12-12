@@ -1,6 +1,6 @@
 import sourcemaps from 'rollup-plugin-sourcemaps';
-import commonjs from 'rollup-plugin-commonjs';
-import nodeResolve from 'rollup-plugin-node-resolve';
+import commonjs from '@rollup/plugin-commonjs';
+import nodeResolve from '@rollup/plugin-node-resolve';
 import path from 'path';
 import alias from '@rollup/plugin-alias';
 import { fileURLToPath } from 'url';
