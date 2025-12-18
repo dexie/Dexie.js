@@ -48,7 +48,7 @@ export function overrideParseStoresSpec(origFunc: Function, dexie: Dexie) {
     const cloudSchema = dexie.cloud.schema || (dexie.cloud.schema = {});
     const allPrefixes = new Set<string>();
     Object.keys(storesClone).forEach(tableName => {
-      const schemaSrc = storesClone[tableName];
+      const schemaSrc = storesClone[tableName]?.trim(); 
       const cloudTableSchema = cloudSchema[tableName] || (cloudSchema[tableName] = {});
       if (schemaSrc != null) {
         if (/^\@/.test(schemaSrc)) {
