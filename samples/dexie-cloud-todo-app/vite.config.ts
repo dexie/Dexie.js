@@ -26,6 +26,10 @@ export default defineConfig(({ command }) => {
       // (replaces process.env.BUILD_DATE with actual build timestamp - for logging)
       "process.env.BUILD_DATE": JSON.stringify(new Date().toISOString()),
     },
+    optimizeDeps: {
+      // Exclude workspace packages from pre-bundling to get live updates during dev
+      exclude: ['dexie', 'dexie-cloud-addon', 'dexie-react-hooks']
+    },
     build: {
       outDir: 'build',
       sourcemap: true,
