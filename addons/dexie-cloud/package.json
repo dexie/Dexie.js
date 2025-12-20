@@ -86,6 +86,7 @@
     "karma-chrome-launcher": "*",
     "karma-firefox-launcher": "*",
     "karma-qunit": "*",
+    "karma-webdriver-launcher": "*",
     "qunit": "2.10.0",
     "qunitjs": "1.23.1",
     "lib0": "^0.2.97",

@@ -1,6 +1,7 @@
 {
   "demoUsers": {
     "foo@demo.local": {},
-    "bar@demo.local": {}
+    "bar@demo.local": {},
+    "issue2228@demo.local": {}
   }
 }

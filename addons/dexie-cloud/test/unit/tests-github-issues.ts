@@ -10,10 +10,50 @@ import {
   deepEqual,
 } from 'qunit';
 import { promisedTest } from '../promisedTest';
-import Dexie from 'dexie';
+import Dexie, { add, remove } from 'dexie';
 import dexieCloud, { DexieCloudOptions, DexieCloudTable, getTiedRealmId } from '../../src/dexie-cloud-client';
 
+const DBURL = 'https://zv8n7bwcs.dexie.cloud'; // Shall exist in cloud.
+
 module('github-issues');
+
+promisedTest('https://github.com/dexie/Dexie.js/issues/2228', async () => {
+  const DBNAME = 'Issue2228_DB';
+  const db = new Dexie(DBNAME, { addons: [dexieCloud] }) as Dexie & {
+    items2228: DexieCloudTable<{ id: string; drinks: string[] }, 'id'>;
+  };
+  db.version(1).stores({ items2228: '@id' });
+  db.cloud.configure({
+    databaseUrl: DBURL,
+    requireAuth: { email: 'issue2228@demo.local', grant_type: 'demo' }
+  });
+  await db.open();
+
+  ok(true, 'Cleared existing items in items2228 table');
+  await db.items2228.clear();
+  ok(true, 'Now syncing to cloud');
+  await db.cloud.sync({purpose: 'push', wait: true });
+
+  await db.items2228.update('nonExistingId', { drinks: add(['coffee']) });
+  await db.items2228.update('nonExistingId', { drinks: remove(['coffee']) });
+
+  ok(true, 'Now syncing to cloud after adding and removing from non-existing item');
+  await db.cloud.sync({purpose: 'push', wait: true });
+
+  const itemId = await db.items2228.add({ drinks: ['coffee', 'tea'] });
+  ok(true, `Added item with id ${itemId} and drinks ['coffee', 'tea']`);
+
+  await db.items2228.update(itemId, { drinks: add(['milk']) });
+  await db.items2228.update(itemId, { drinks: remove(['milk']) });
+
+  ok(true, 'Now syncing to cloud after adding and removing from existing item');
+  await db.cloud.sync({purpose: 'push', wait: true });
+
+  ok(true, 'Test completed successfully');
+  db.close();
+  await Dexie.delete(DBNAME);
+  console.log('Database deleted successfully');
+});
 
 /** Dexie issue #2185
  * 
