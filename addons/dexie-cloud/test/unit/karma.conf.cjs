@@ -21,7 +21,14 @@ module.exports = function (config) {
       'addons/dexie-cloud/test/unit/bundle.js',
       { pattern: 'addons/dexie-cloud/test/*.map', watched: false, included: false },
       { pattern: 'addons/dexie-cloud/dist/*.map', watched: false, included: false }
-    ])
+    ]),
+    // Override plugins to exclude karma-webdriver-launcher for local testing
+    plugins: [
+      'karma-qunit',
+      'karma-mocha-reporter', 
+      'karma-chrome-launcher',
+      'karma-firefox-launcher'
+    ]
   });
 
   cfg.hostname = 'localhost';

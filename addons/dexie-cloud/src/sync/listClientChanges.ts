@@ -92,10 +92,18 @@ function removeRedundantUpdateOps(muts: DBOperation[]) {
     // Only apply optimization to update mutations that are single-key
     if (mut.type !== 'update') return true;
     if (mut.keys.length !== 1 || mut.changeSpecs.length !== 1) return true;
+    
+    // Check if this has PropModifications - if so, skip optimization
+    const changeSpecs = mut.changeSpecs[0];
+    if (Object.values(changeSpecs).some(v => typeof v === "object" && v && "@@propmod" in v)) {
+      return true; // Cannot optimize if any PropModification is present
+    }
+    
     // Keep track of properties that aren't overlapped by later transactions
     const unoverlappedProps = new Set(Object.keys(mut.changeSpecs[0]));
     const strKey = '' + mut.keys[0];
-    const keyCoverage = updateCoverage.get(strKey)!;
+    const keyCoverage = updateCoverage.get(strKey);
+    if (!keyCoverage) return true; // No coverage info - cannot optimize
 
     for (let i = keyCoverage.length - 1; i >= 0; --i) {
       const { txid, updateSpec } = keyCoverage[i];
