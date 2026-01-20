@@ -98,15 +98,64 @@ The library must support multiple integration patterns:
 
 > **Note**: dexie-cloud-addon is a **library**, not an app. It must support various frameworks including Next.js, Vite, Svelte, SvelteKit, Capacitor, React Native, etc.
 
+### Backward Compatibility Requirements
+
+The implementation must be backward compatible in several scenarios:
+
+#### 1. Apps with Custom Login GUI (not using default-ui)
+
+Apps that implement their own login UI by subscribing to `db.cloud.userInteraction` must continue to work without changes. The new `DXCProviderSelection` type should only be emitted when:
+- The server has OAuth providers configured AND enabled
+- The client has NOT opted out via `db.cloud.configure({ socialAuth: false })`
+
+**Solution**: Fetch `/auth-providers` first. If it returns providers, emit `DXCProviderSelection`. If empty or fails, emit `DXCEmailPrompt` as before. Apps with custom GUIs that don't handle `DXCProviderSelection` can:
+- Add `socialAuth: false` to their config to disable it
+- Or update their UI to handle the new type
+
+#### 2. requireAuth with Unknown Server Capabilities
+
+When `requireAuth: true`, the client must authenticate before accessing the database. The `/auth-providers` endpoint must be accessible **without authentication** (public read-only endpoint) so the client can discover available auth methods.
+
+**Note**: The server already implements `/auth-providers` as a public endpoint (uses `readRateLimiter`, no auth required).
+
+#### 3. On-Prem Customers with Older Server Versions
+
+Customers running older dexie-cloud-server versions won't have the `/auth-providers` endpoint. The client must handle this gracefully:
+
+**Solution**: 
+- Catch 404/network errors from `/auth-providers`
+- Fall back to OTP-only flow (existing `DXCEmailPrompt` behavior)
+- Never emit `DXCProviderSelection` if endpoint unavailable
+- Log a debug message for troubleshooting
+
+#### 4. Client Opt-Out
+
+Even if the server has OAuth configured, apps may want to disable it client-side (e.g., during migration, or for specific deployments).
+
+**Solution**: Add `socialAuth` option to `DexieCloudOptions`:
+```typescript
+interface DexieCloudOptions {
+  // ... existing options
+  
+  /** Enable social/OAuth authentication.
+   * - true: Fetch providers from server, show if available (default)
+   * - false: Disable OAuth, always use OTP flow
+   */
+  socialAuth?: boolean;  // Default: true
+}
+```
+
 ### ✅ Completed
 
 - (None yet - work has not started on client side)
 
 ### 🔲 TODO
 
-#### Types and Interfaces
+#### Types in dexie-cloud-common
 
-- [ ] **Create `OAuthProviderInfo` type** (`src/types/OAuthProviderInfo.ts`)
+> Types that reflect server API data should be placed in `dexie-cloud-common` (shared between server and client).
+
+- [ ] **Create `OAuthProviderInfo` type** (`libs/dexie-cloud-common`)
   ```typescript
   interface OAuthProviderInfo {
     type: 'google' | 'github' | 'microsoft' | 'apple' | 'custom-oauth2';
@@ -115,19 +164,17 @@ The library must support multiple integration patterns:
     iconUrl?: string;       // URL to provider icon
     scopes?: string[];
   }
-  
+  ```
+
+- [ ] **Create `AuthProvidersResponse` type** (`libs/dexie-cloud-common`)
+  ```typescript
   interface AuthProvidersResponse {
     providers: OAuthProviderInfo[];
     otpEnabled: boolean;
   }
   ```
 
-- [ ] **Extend `LoginHints` interface** (`src/DexieCloudAPI.ts`)
-  - Add `provider?: string` - Provider name to initiate OAuth flow
-  - Add `oauthCode?: string` - Dexie auth code received from callback
-  - Keep existing `email`, `userId`, `grant_type`, `otpId`, `otp`
-
-- [ ] **Create `OAuthResultMessage` type**
+- [ ] **Create `OAuthResultMessage` type** (`libs/dexie-cloud-common`)
   ```typescript
   interface OAuthResultMessage {
     type: 'dexie:oauthResult';
@@ -138,12 +185,67 @@ The library must support multiple integration patterns:
   }
   ```
 
+- [ ] **Extend `TokenRequest` types** (`libs/dexie-cloud-common`)
+  - Add `AuthorizationCodeTokenRequest` type for `grant_type: "authorization_code"`
+
+#### Types and Interfaces in dexie-cloud-addon
+
+- [ ] **Extend `LoginHints` interface** (`src/DexieCloudAPI.ts`)
+  - Add `provider?: string` - Provider name to initiate OAuth flow
+  - Add `oauthCode?: string` - Dexie auth code received from callback
+  - Keep existing `email`, `userId`, `grant_type`, `otpId`, `otp`
+
+- [ ] **Add `DXCProviderSelection` to `DXCUserInteraction`** (`src/types/DXCUserInteraction.ts`)
+  
+  The current `DXCUserInteraction` only supports text input fields. For OAuth, we need clickable provider buttons. Add a new interaction type:
+  
+  ```typescript
+  /** When the system needs user to select a login method (OAuth provider or OTP) */
+  export interface DXCProviderSelection {
+    type: 'provider-selection';
+    title: string;
+    alerts: DXCAlert[];
+    providers: OAuthProviderInfo[];  // Available OAuth providers
+    otpEnabled: boolean;             // Whether email/OTP option is available
+    fields: {};                      // Empty - no text fields
+    submitLabel?: undefined;         // No submit button - provider buttons instead
+    cancelLabel: string;
+    onSelectProvider: (providerName: string) => void;
+    onSelectOtp: () => void;         // User chose email/OTP instead
+    onCancel: () => void;
+  }
+  ```
+  
+  Update the union type:
+  ```typescript
+  export type DXCUserInteraction =
+    | DXCGenericUserInteraction
+    | DXCEmailPrompt
+    | DXCOTPPrompt
+    | DXCMessageAlert
+    | DXCLogoutConfirmation
+    | DXCProviderSelection;  // NEW
+  ```
+
 #### Core Authentication Flow
 
 - [ ] **Create `fetchAuthProviders()` function** (`src/authentication/fetchAuthProviders.ts`)
   - Fetches `GET /auth-providers` from database URL
   - Returns `AuthProvidersResponse`
+  - **Handles failures gracefully**:
+    - 404 → Return `{ providers: [], otpEnabled: true }` (old server)
+    - Network error → Return `{ providers: [], otpEnabled: true }`
+    - Log debug message for troubleshooting
   - Cache result with TTL to avoid repeated requests
+  - Respects `socialAuth: false` option (returns empty providers without fetching)
+
+- [ ] **Update authentication flow to check providers first**
+  - Before prompting for email, call `fetchAuthProviders()`
+  - If `providers.length > 0`:
+    - Emit `DXCProviderSelection` interaction
+    - Wait for user to select provider or OTP
+  - If `providers.length === 0` or `otpEnabled` only:
+    - Emit `DXCEmailPrompt` as before (existing behavior)
 
 - [ ] **Create `oauthLogin()` function** (`src/authentication/oauthLogin.ts`)
   - Opens popup window to `/oauth/login/:provider`
@@ -177,6 +279,12 @@ The library must support multiple integration patterns:
 
 #### Default UI Components
 
+- [ ] **Create `ProviderSelectionDialog` component** (`src/default-ui/ProviderSelectionDialog.tsx`)
+  - Handles the new `DXCProviderSelection` interaction type
+  - Renders OAuth provider buttons
+  - Renders "Continue with email" button if `otpEnabled`
+  - Visual divider ("or") between options
+
 - [ ] **Create `AuthProviderButton` component** (`src/default-ui/AuthProviderButton.tsx`)
   - Renders button for a single OAuth provider
   - Displays provider icon and name
@@ -184,12 +292,11 @@ The library must support multiple integration patterns:
   - Supports light/dark mode
 
 - [ ] **Update `LoginDialog.tsx`**
-  - Fetch auth providers on mount
-  - Show OAuth provider buttons if any are enabled
-  - Show email/OTP input only if `otpEnabled` is true
-  - Add visual divider ("or") between OAuth and email login
-  - Handle OAuth popup flow when provider button clicked
-  - Handle loading/error states for provider fetch
+  - Handle OAuth popup flow when provider button clicked (via `onSelectProvider`)
+  - Handle loading/error states
+
+- [ ] **Update main dialog renderer** (`src/default-ui/index.tsx`)
+  - Render `ProviderSelectionDialog` when `type === 'provider-selection'`
 
 - [ ] **Update `Styles.ts`**
   - Add styles for OAuth provider buttons
@@ -214,8 +321,29 @@ The library must support multiple integration patterns:
   ```typescript
   interface DexieCloudOptions {
     // ... existing options
-    oauthRedirectUri?: string;  // For Capacitor/redirect flows
-    oauthPopup?: boolean;       // Default: true for web, false for Capacitor
+    
+    /** Enable social/OAuth authentication.
+     * - true (default): Fetch providers from server, show if available
+     * - false: Disable OAuth, always use OTP flow
+     * 
+     * Use `false` for backward compatibility if your custom login UI
+     * doesn't handle the `DXCProviderSelection` interaction type yet.
+     */
+    socialAuth?: boolean;
+    
+    /** Redirect URI for OAuth callback (Capacitor/redirect flows).
+     * For web popups, this is auto-detected from window.location.origin.
+     * Required for:
+     * - Capacitor apps: 'myapp://oauth-callback'
+     * - Full-page redirect flows: 'https://myapp.com/oauth-callback'
+     */
+    oauthRedirectUri?: string;
+    
+    /** Use popup window for OAuth flow.
+     * - true (default for web): Opens OAuth in popup, uses postMessage
+     * - false: Opens OAuth in same window or system browser (Capacitor)
+     */
+    oauthPopup?: boolean;
   }
   ```
 
@@ -375,18 +503,27 @@ if (code && provider) {
 
 ## Key Files to Create/Modify
 
-**New files:**
-- `src/types/OAuthProviderInfo.ts`
+**New files in dexie-cloud-common:**
+- `src/OAuthProviderInfo.ts`
+- `src/AuthProvidersResponse.ts`
+- `src/OAuthResultMessage.ts`
+- `src/AuthorizationCodeTokenRequest.ts`
+
+**New files in dexie-cloud-addon:**
+- `src/types/DXCUserInteraction.ts` - Add `DXCProviderSelection`
 - `src/authentication/fetchAuthProviders.ts`
 - `src/authentication/oauthLogin.ts`
 - `src/authentication/exchangeOAuthCode.ts`
 - `src/authentication/handleOAuthCallback.ts`
 - `src/errors/OAuthError.ts`
+- `src/default-ui/ProviderSelectionDialog.tsx`
 - `src/default-ui/AuthProviderButton.tsx`
 
 **Files to modify:**
 - `src/DexieCloudAPI.ts` - Extend `LoginHints`
 - `src/DexieCloudOptions.ts` - Add OAuth options
 - `src/authentication/login.ts` - Integrate OAuth flow
-- `src/default-ui/LoginDialog.tsx` - Show provider buttons
+- `src/authentication/interactWithUser.ts` - Add `promptForProvider()` helper
+- `src/default-ui/index.tsx` - Render `ProviderSelectionDialog`
+- `src/default-ui/LoginDialog.tsx` - Handle provider selection callbacks
 - `src/default-ui/Styles.ts` - Provider button styles
