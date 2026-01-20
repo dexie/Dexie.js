@@ -1,4 +1,5 @@
 import {
+  AuthorizationCodeTokenRequest,
   DemoTokenRequest,
   OTPTokenRequest1,
   OTPTokenRequest2,
@@ -9,8 +10,12 @@ import {
 } from 'dexie-cloud-common';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { HttpError } from '../errors/HttpError';
+import { OAuthError } from '../errors/OAuthError';
 import { FetchTokenCallback } from './authenticate';
-import { alertUser, promptForEmail, promptForOTP } from './interactWithUser';
+import { exchangeOAuthCode } from './exchangeOAuthCode';
+import { fetchAuthProviders } from './fetchAuthProviders';
+import { alertUser, promptForEmail, promptForOTP, promptForProvider } from './interactWithUser';
+import { oauthLogin } from './oauthLogin';
 
 export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
   const { userInteraction } = db.cloud;
@@ -18,6 +23,22 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
     let tokenRequest: TokenRequest;
     const url = db.cloud.options?.databaseUrl;
     if (!url) throw new Error(`No database URL given.`);
+    
+    // Handle OAuth code exchange (from redirect/deep link flows)
+    if (hints?.oauthCode && hints.provider) {
+      return await exchangeOAuthCode({
+        databaseUrl: url,
+        code: hints.oauthCode,
+        publicKey: public_key,
+        scopes: ['ACCESS_DB'],
+      });
+    }
+    
+    // Handle OAuth provider login (popup flow)
+    if (hints?.provider) {
+      return await handleOAuthFlow(db, public_key, hints.provider);
+    }
+    
     if (hints?.grant_type === 'demo') {
       const demo_user = await promptForEmail(
         userInteraction,
@@ -43,6 +64,26 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         public_key,
       } satisfies OTPTokenRequest2;
     } else {
+      // Check for available auth providers (OAuth + OTP)
+      const socialAuthEnabled = db.cloud.options?.socialAuth !== false;
+      const authProviders = await fetchAuthProviders(url, socialAuthEnabled);
+      
+      // If we have OAuth providers available, prompt for selection
+      if (authProviders.providers.length > 0) {
+        const selection = await promptForProvider(
+          userInteraction,
+          authProviders.providers,
+          authProviders.otpEnabled,
+          'Sign in',
+        );
+        
+        if (selection.type === 'provider') {
+          // User selected an OAuth provider
+          return await handleOAuthFlow(db, public_key, selection.provider);
+        }
+        // User chose OTP - continue with email prompt below
+      }
+      
       const email = await promptForEmail(
         userInteraction,
         'Enter email address',
@@ -125,4 +166,50 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       throw new Error(`Unexpected response from ${url}/token`);
     }
   };
+}
+
+/**
+ * Handles the OAuth popup flow and token exchange.
+ */
+async function handleOAuthFlow(
+  db: DexieCloudDB,
+  publicKey: string,
+  provider: string
+): Promise<TokenFinalResponse> {
+  const url = db.cloud.options?.databaseUrl;
+  if (!url) throw new Error(`No database URL given.`);
+  
+  const { userInteraction } = db.cloud;
+  const usePopup = db.cloud.options?.oauthPopup !== false;
+  const redirectUri = db.cloud.options?.oauthRedirectUri || 
+    (typeof window !== 'undefined' ? window.location.origin : undefined);
+  
+  try {
+    // Start OAuth popup flow
+    const result = await oauthLogin({
+      databaseUrl: url,
+      provider,
+      redirectUri,
+      usePopup,
+    });
+    
+    // Exchange the auth code for tokens
+    return await exchangeOAuthCode({
+      databaseUrl: url,
+      code: result.code,
+      publicKey,
+      scopes: ['ACCESS_DB'],
+    });
+  } catch (error) {
+    if (error instanceof OAuthError) {
+      // Show user-friendly error message
+      await alertUser(userInteraction, 'Authentication Failed', {
+        type: 'error',
+        messageCode: 'GENERIC_ERROR',
+        message: error.userMessage,
+        messageParams: {},
+      }).catch(() => {});
+    }
+    throw error;
+  }
 }

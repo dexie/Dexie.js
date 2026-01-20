@@ -156,7 +156,12 @@ interface DexieCloudOptions {
 
 ### ✅ Completed
 
-- (None yet - work has not started on client side)
+#### Types in dexie-cloud-common
+
+- [x] **Create `OAuthProviderInfo` type** (`libs/dexie-cloud-common/src/OAuthProviderInfo.ts`)
+- [x] **Create `AuthProvidersResponse` type** (`libs/dexie-cloud-common/src/AuthProvidersResponse.ts`)
+- [x] **Create `OAuthResultMessage` type** (`libs/dexie-cloud-common/src/OAuthResultMessage.ts`)
+- [x] **Extend `TokenRequest` types** - Added `AuthorizationCodeTokenRequest` (`libs/dexie-cloud-common/src/AuthorizationCodeTokenRequest.ts`)
 
 ### 🔲 TODO
 
@@ -164,7 +169,7 @@ interface DexieCloudOptions {
 
 > Types that reflect server API data should be placed in `dexie-cloud-common` (shared between server and client).
 
-- [ ] **Create `OAuthProviderInfo` type** (`libs/dexie-cloud-common`)
+- [x] **Create `OAuthProviderInfo` type** (`libs/dexie-cloud-common`)
   ```typescript
   interface OAuthProviderInfo {
     type: 'google' | 'github' | 'microsoft' | 'apple' | 'custom-oauth2';
@@ -175,7 +180,7 @@ interface DexieCloudOptions {
   }
   ```
 
-- [ ] **Create `AuthProvidersResponse` type** (`libs/dexie-cloud-common`)
+- [x] **Create `AuthProvidersResponse` type** (`libs/dexie-cloud-common`)
   ```typescript
   interface AuthProvidersResponse {
     providers: OAuthProviderInfo[];
@@ -183,7 +188,7 @@ interface DexieCloudOptions {
   }
   ```
 
-- [ ] **Create `OAuthResultMessage` type** (`libs/dexie-cloud-common`)
+- [x] **Create `OAuthResultMessage` type** (`libs/dexie-cloud-common`)
   ```typescript
   interface OAuthResultMessage {
     type: 'dexie:oauthResult';
@@ -194,17 +199,17 @@ interface DexieCloudOptions {
   }
   ```
 
-- [ ] **Extend `TokenRequest` types** (`libs/dexie-cloud-common`)
+- [x] **Extend `TokenRequest` types** (`libs/dexie-cloud-common`)
   - Add `AuthorizationCodeTokenRequest` type for `grant_type: "authorization_code"`
 
 #### Types and Interfaces in dexie-cloud-addon
 
-- [ ] **Extend `LoginHints` interface** (`src/DexieCloudAPI.ts`)
+- [x] **Extend `LoginHints` interface** (`src/DexieCloudAPI.ts`)
   - Add `provider?: string` - Provider name to initiate OAuth flow
   - Add `oauthCode?: string` - Dexie auth code received from callback
   - Keep existing `email`, `userId`, `grant_type`, `otpId`, `otp`
 
-- [ ] **Add `DXCProviderSelection` to `DXCUserInteraction`** (`src/types/DXCUserInteraction.ts`)
+- [x] **Add `DXCProviderSelection` to `DXCUserInteraction`** (`src/types/DXCUserInteraction.ts`)
   
   The current `DXCUserInteraction` only supports text input fields. For OAuth, we need clickable provider buttons. Add a new interaction type:
   
@@ -238,7 +243,7 @@ interface DexieCloudOptions {
 
 #### Core Authentication Flow
 
-- [ ] **Create `fetchAuthProviders()` function** (`src/authentication/fetchAuthProviders.ts`)
+- [x] **Create `fetchAuthProviders()` function** (`src/authentication/fetchAuthProviders.ts`)
   - Fetches `GET /auth-providers` from database URL
   - Returns `AuthProvidersResponse`
   - **Handles failures gracefully**:
@@ -248,7 +253,7 @@ interface DexieCloudOptions {
   - Cache result with TTL to avoid repeated requests
   - Respects `socialAuth: false` option (returns empty providers without fetching)
 
-- [ ] **Update authentication flow to check providers first**
+- [x] **Update authentication flow to check providers first**
   - Before prompting for email, call `fetchAuthProviders()`
   - If `providers.length > 0`:
     - Emit `DXCProviderSelection` interaction
@@ -256,14 +261,14 @@ interface DexieCloudOptions {
   - If `providers.length === 0` or `otpEnabled` only:
     - Emit `DXCEmailPrompt` as before (existing behavior)
 
-- [ ] **Create `oauthLogin()` function** (`src/authentication/oauthLogin.ts`)
+- [x] **Create `oauthLogin()` function** (`src/authentication/oauthLogin.ts`)
   - Opens popup window to `/oauth/login/:provider`
   - Listens for `postMessage` with `type: 'dexie:oauthResult'`
   - Validates message origin
   - Returns auth code or throws on error/cancel
   - Handles popup blocked scenario (fallback to redirect?)
   
-- [ ] **Create `exchangeOAuthCode()` function** (`src/authentication/exchangeOAuthCode.ts`)
+- [x] **Create `exchangeOAuthCode()` function** (`src/authentication/exchangeOAuthCode.ts`)
   - Sends `POST /token` with:
     ```json
     {
@@ -275,12 +280,12 @@ interface DexieCloudOptions {
     ```
   - Returns `TokenFinalResponse`
 
-- [ ] **Update `login()` function** (`src/authentication/login.ts`)
+- [x] **Update `login()` function** (`src/authentication/login.ts`)
   - If `hints.provider` is set, use OAuth flow instead of OTP
   - If `hints.oauthCode` is set, exchange code directly (for redirect/deep link flows)
   - Integrate with existing `authenticate()` flow
 
-- [ ] **Create `handleOAuthCallback()` function** (`src/authentication/handleOAuthCallback.ts`)
+- [x] **Create `handleOAuthCallback()` function** (`src/authentication/handleOAuthCallback.ts`)
   - For redirect/deep link flows where app needs to handle the callback
   - Parses `code`, `provider`, `state`, `error` from URL
   - Completes login flow by calling `login({ oauthCode, provider })`
@@ -288,45 +293,45 @@ interface DexieCloudOptions {
 
 #### Default UI Components
 
-- [ ] **Create `ProviderSelectionDialog` component** (`src/default-ui/ProviderSelectionDialog.tsx`)
+- [x] **Create `ProviderSelectionDialog` component** (`src/default-ui/ProviderSelectionDialog.tsx`)
   - Handles the new `DXCProviderSelection` interaction type
   - Renders OAuth provider buttons
   - Renders "Continue with email" button if `otpEnabled`
   - Visual divider ("or") between options
 
-- [ ] **Create `AuthProviderButton` component** (`src/default-ui/AuthProviderButton.tsx`)
+- [x] **Create `AuthProviderButton` component** (`src/default-ui/AuthProviderButton.tsx`)
   - Renders button for a single OAuth provider
   - Displays provider icon and name
   - Follows provider branding guidelines (Google, Apple, Microsoft have strict rules)
   - Supports light/dark mode
 
-- [ ] **Update `LoginDialog.tsx`**
+- [x] **Update `LoginDialog.tsx`**
   - Handle OAuth popup flow when provider button clicked (via `onSelectProvider`)
   - Handle loading/error states
 
-- [ ] **Update main dialog renderer** (`src/default-ui/index.tsx`)
+- [x] **Update main dialog renderer** (`src/default-ui/index.tsx`)
   - Render `ProviderSelectionDialog` when `type === 'provider-selection'`
 
-- [ ] **Update `Styles.ts`**
+- [x] **Update `Styles.ts`**
   - Add styles for OAuth provider buttons
   - Provider-specific button colors (Google blue, GitHub black, etc.)
   - Dark mode variants
 
 #### Capacitor / Mobile Support
 
-- [ ] **Document deep link handling** (not library code, but patterns)
+- [x] **Document deep link handling** (not library code, but patterns)
   - Show how apps should register custom URL scheme
   - Provide example of handling `appUrlOpen` event
   - Call `db.cloud.login({ oauthCode, provider })` from handler
 
-- [ ] **Support `redirect_uri` configuration**
+- [x] **Support `redirect_uri` configuration**
   - Allow apps to configure their redirect URI in `db.cloud.configure()`
   - Use for Capacitor apps with custom URL schemes
   - Use for full-page redirect flows
 
 #### DexieCloudOptions Extension
 
-- [ ] **Add OAuth-related options** (`src/DexieCloudOptions.ts`)
+- [x] **Add OAuth-related options** (`src/DexieCloudOptions.ts`)
   ```typescript
   interface DexieCloudOptions {
     // ... existing options
@@ -358,12 +363,12 @@ interface DexieCloudOptions {
 
 #### Error Handling
 
-- [ ] **Create `OAuthError` class** (`src/errors/OAuthError.ts`)
+- [x] **Create `OAuthError` class** (`src/errors/OAuthError.ts`)
   - Extends existing error handling
   - Error codes: `popup_blocked`, `popup_closed`, `access_denied`, `invalid_state`, `email_not_verified`, `expired_code`
   - User-friendly messages
 
-- [ ] **Handle common OAuth errors in UI**
+- [x] **Handle common OAuth errors in UI**
   - Popup blocked → show message with manual retry button
   - User cancelled → silent failure or subtle message
   - Provider error → show error alert

@@ -19,6 +19,10 @@ export interface LoginHints {
   grant_type?: 'demo' | 'otp';
   otpId?: string;
   otp?: string;
+  /** OAuth provider name to initiate OAuth flow (e.g., 'google', 'github') */
+  provider?: string;
+  /** Dexie Cloud authorization code received from OAuth callback */
+  oauthCode?: string;
 }
 
 export interface DexieCloudAPI {

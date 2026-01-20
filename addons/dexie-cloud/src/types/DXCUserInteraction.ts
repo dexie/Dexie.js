@@ -1,3 +1,4 @@
+import { OAuthProviderInfo } from 'dexie-cloud-common';
 import { DXCAlert } from './DXCAlert';
 import { DXCInputField } from './DXCInputField';
 
@@ -6,7 +7,8 @@ export type DXCUserInteraction =
   | DXCEmailPrompt
   | DXCOTPPrompt
   | DXCMessageAlert
-  | DXCLogoutConfirmation;
+  | DXCLogoutConfirmation
+  | DXCProviderSelection;
 
 export interface DXCGenericUserInteraction<Type extends string="generic", TFields extends {[name: string]: DXCInputField} = any> {
   type: Type;
@@ -84,5 +86,28 @@ export interface DXCLogoutConfirmation {
   submitLabel: string;
   cancelLabel: string;
   onSubmit: (params: { [paramName: string]: string }) => void;
+  onCancel: () => void;
+}
+
+/** When the system needs user to select a login method (OAuth provider or OTP).
+ * Emitted when the server has OAuth providers configured and enabled.
+ */
+export interface DXCProviderSelection {
+  type: 'provider-selection';
+  title: string;
+  alerts: DXCAlert[];
+  /** Available OAuth providers */
+  providers: OAuthProviderInfo[];
+  /** Whether email/OTP option is available */
+  otpEnabled: boolean;
+  /** Empty - no text fields for this interaction type */
+  fields: {};
+  /** No submit button - provider buttons instead */
+  submitLabel?: undefined;
+  cancelLabel: string;
+  /** Called when user selects an OAuth provider */
+  onSelectProvider: (providerName: string) => void;
+  /** Called when user chooses email/OTP instead */
+  onSelectOtp: () => void;
   onCancel: () => void;
 }

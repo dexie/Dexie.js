@@ -3,7 +3,8 @@ import "../extend-dexie-interface";
 import { h, Component } from "preact";
 import { from, Subscription } from "rxjs";
 import { LoginDialog } from './LoginDialog';
-import { DXCUserInteraction } from "../types/DXCUserInteraction";
+import { ProviderSelectionDialog } from './ProviderSelectionDialog';
+import { DXCUserInteraction, DXCProviderSelection } from "../types/DXCUserInteraction";
 import * as preact from "preact";
 
 export interface Props {
@@ -36,7 +37,13 @@ export default class LoginGui extends Component<Props, State> {
 
   render(props: Props, {userInteraction}: State) {
     if (!userInteraction) return null;
-    //if (props.db.cloud.userInteraction.observers.length > 1) return null; // Someone else subscribes.
+    
+    // Render appropriate dialog based on interaction type
+    if (userInteraction.type === 'provider-selection') {
+      return <ProviderSelectionDialog {...userInteraction as DXCProviderSelection} />;
+    }
+    
+    // Default to LoginDialog for other interaction types
     return <LoginDialog {...userInteraction} />;
   }
 }

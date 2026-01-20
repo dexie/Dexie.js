@@ -58,4 +58,27 @@ export interface DexieCloudOptions {
   }) => Promise<TokenFinalResponse>;
 
   awarenessProtocol?: typeof import('y-protocols/awareness');
+
+  /** Enable social/OAuth authentication.
+   * - true (default): Fetch providers from server, show if available
+   * - false: Disable OAuth, always use OTP flow
+   * 
+   * Use `false` for backward compatibility if your custom login UI
+   * doesn't handle the `DXCProviderSelection` interaction type yet.
+   */
+  socialAuth?: boolean;
+
+  /** Redirect URI for OAuth callback (Capacitor/redirect flows).
+   * For web popups, this is auto-detected from window.location.origin.
+   * Required for:
+   * - Capacitor apps: 'myapp://oauth-callback'
+   * - Full-page redirect flows: 'https://myapp.com/oauth-callback'
+   */
+  oauthRedirectUri?: string;
+
+  /** Use popup window for OAuth flow.
+   * - true (default for web): Opens OAuth in popup, uses postMessage
+   * - false: Opens OAuth in same window or system browser (Capacitor)
+   */
+  oauthPopup?: boolean;
 }

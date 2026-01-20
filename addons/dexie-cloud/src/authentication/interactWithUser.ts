@@ -1,10 +1,11 @@
 import Dexie from 'dexie';
+import type { OAuthProviderInfo } from 'dexie-cloud-common';
 import { BehaviorSubject } from 'rxjs';
 import { take } from 'rxjs/operators';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { DXCAlert } from '../types/DXCAlert';
 import { DXCInputField } from '../types/DXCInputField';
-import { DXCUserInteraction } from '../types/DXCUserInteraction';
+import { DXCUserInteraction, DXCProviderSelection } from '../types/DXCUserInteraction';
 
 export interface DXCUserInteractionRequest {
   type: DXCUserInteraction['type'];
@@ -182,4 +183,59 @@ export async function confirmLogout(
   })
     .then(() => true)
     .catch(() => false);
+}
+
+/** Result from provider selection prompt */
+export type ProviderSelectionResult =
+  | { type: 'provider'; provider: string }
+  | { type: 'otp' };
+
+/**
+ * Prompts the user to select an authentication method (OAuth provider or OTP).
+ * 
+ * @param userInteraction - The user interaction BehaviorSubject
+ * @param providers - Available OAuth providers
+ * @param otpEnabled - Whether OTP is available
+ * @param title - Dialog title
+ * @param alerts - Optional alerts to display
+ * @returns Promise resolving to the user's selection
+ */
+export function promptForProvider(
+  userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
+  providers: OAuthProviderInfo[],
+  otpEnabled: boolean,
+  title: string = 'Choose login method',
+  alerts: DXCAlert[] = []
+): Promise<ProviderSelectionResult> {
+  let done = false;
+  
+  return new Promise<ProviderSelectionResult>((resolve, reject) => {
+    const interactionProps: DXCProviderSelection = {
+      type: 'provider-selection',
+      title,
+      alerts,
+      providers,
+      otpEnabled,
+      fields: {},
+      submitLabel: undefined,
+      cancelLabel: 'Cancel',
+      onSelectProvider: (providerName: string) => {
+        userInteraction.next(undefined);
+        done = true;
+        resolve({ type: 'provider', provider: providerName });
+      },
+      onSelectOtp: () => {
+        userInteraction.next(undefined);
+        done = true;
+        resolve({ type: 'otp' });
+      },
+      onCancel: () => {
+        userInteraction.next(undefined);
+        done = true;
+        reject(new Dexie.AbortError('User cancelled'));
+      },
+    };
+    
+    userInteraction.next(interactionProps);
+  });
 }

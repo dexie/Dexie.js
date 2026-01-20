@@ -2,11 +2,14 @@ import { Dialog } from './Dialog';
 import { Styles } from './Styles';
 import { h, Fragment } from 'preact';
 import { useLayoutEffect, useRef, useState } from 'preact/hooks';
-import { DXCUserInteraction } from '../types/DXCUserInteraction';
+import { DXCUserInteraction, DXCProviderSelection } from '../types/DXCUserInteraction';
 import { resolveText } from '../helpers/resolveText';
 import { DXCInputField } from '../types/DXCInputField';
 
 const OTP_LENGTH = 8;
+
+/** User interactions that have the standard form-based structure */
+type FormBasedInteraction = Exclude<DXCUserInteraction, DXCProviderSelection>;
 
 export function LoginDialog({
   title,
@@ -17,7 +20,7 @@ export function LoginDialog({
   cancelLabel,
   onCancel,
   onSubmit,
-}: DXCUserInteraction) {
+}: FormBasedInteraction) {
   const [params, setParams] = useState<{ [param: string]: string }>({});
 
   const firstFieldRef = useRef<HTMLInputElement>(null);
