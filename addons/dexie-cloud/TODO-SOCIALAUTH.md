@@ -6,6 +6,15 @@ This feature adds support for OAuth 2.0 social login providers (Google, GitHub, 
 
 **Key Design Principle**: The Dexie Cloud server acts as an OAuth broker, handling all provider interactions including the OAuth callback. The client library (dexie-cloud-addon) never receives provider tokens - only Dexie Cloud authorization codes which are exchanged for Dexie Cloud tokens.
 
+### Related Files
+
+- **Detailed flow diagram**: [oauth_flow.md](oauth_flow.md) - Sequence diagrams and detailed protocol description
+- **Server implementation**: `/Users/daw/repos/dexie-cloud/libs/dexie-cloud-server`
+  - `src/api/oauth/registerOAuthEndpoints.ts` - OAuth endpoints
+  - `src/api/oauth/oauth-helpers.ts` - Provider exchange logic
+  - `src/api/registerTokenEndpoint.ts` - Token endpoint (authorization_code grant)
+  - `web-templates/oauth-callback.handlebars` - Callback page template
+
 ### Flow Summary
 
 1. **Client** fetches available auth providers from `GET /auth-providers`
@@ -369,6 +378,8 @@ interface DexieCloudOptions {
 - [ ] **Integration tests**
   - Test with mock OAuth callback page
   - Test token exchange
+
+**Testing tip**: The dexie-cloud-todo-app sample (`samples/dexie-cloud-todo-app`) can be used for manual testing. Configure OAuth providers in dexie-cloud-manager for your test database.
 
 #### Documentation
 
