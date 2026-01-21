@@ -50,6 +50,7 @@ import { loadAccessToken } from './authentication/authenticate';
 import { isEagerSyncDisabled } from './isEagerSyncDisabled';
 import { createYHandler } from "./yjs/createYHandler";
 import { DexieYProvider } from 'y-dexie';
+import { parseOAuthCallback, cleanupOAuthUrl } from './authentication/handleOAuthCallback';
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 export {
@@ -81,6 +82,9 @@ export function dexieCloud(dexie: Dexie) {
   const currentUserEmitter = getCurrentUserEmitter(dexie);
   const subscriptions: Subscription[] = [];
   let configuredProgramatically = false;
+  
+  // Pending OAuth auth code from dxc-auth redirect (detected in configure())
+  let pendingOAuthCode: { code: string; provider: string } | null = null;
 
   // local sync worker - used when there's no service worker.
   let localSyncWorker: { start: () => void; stop: () => void } | null = null;
@@ -157,6 +161,27 @@ export function dexieCloud(dexie: Dexie) {
         DexieCloudDB(dexie).reconfigure(); // Update observable from new dexie.name
       }
       updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
+      
+      // Check for OAuth callback (dxc-auth query parameter)
+      // Only check in DOM environment, not workers
+      if (typeof window !== 'undefined' && window.location) {
+        try {
+          const callback = parseOAuthCallback();
+          if (callback) {
+            // Clean up URL immediately (remove dxc-auth param)
+            cleanupOAuthUrl();
+            
+            // Store the pending auth code for processing when db is ready
+            pendingOAuthCode = { code: callback.code, provider: callback.provider };
+            console.debug('[dexie-cloud] OAuth callback detected, auth code stored for processing');
+          }
+        } catch (error) {
+          // parseOAuthCallback throws OAuthError on error callbacks
+          // Store null for code but log the error
+          console.warn('[dexie-cloud] OAuth callback error:', error);
+          cleanupOAuthUrl();
+        }
+      }
     },
     async logout({ force } = {}) {
       force
@@ -403,6 +428,20 @@ export function dexieCloud(dexie: Dexie) {
     // HERE: If requireAuth, do athentication now.
     let changedUser = false;
     const user = await db.getCurrentUser();
+    
+    // Process pending OAuth callback if present (from dxc-auth redirect)
+    if (pendingOAuthCode && !db.cloud.isServiceWorkerDB) {
+      const { code, provider } = pendingOAuthCode;
+      pendingOAuthCode = null; // Clear pending code
+      console.debug('[dexie-cloud] Processing OAuth callback, provider:', provider);
+      try {
+        changedUser = await login(db, { oauthCode: code, provider });
+      } catch (error) {
+        console.error('[dexie-cloud] OAuth login failed:', error);
+        // Continue with normal flow - user can try again
+      }
+    }
+    
     const requireAuth = db.cloud.options?.requireAuth;
     if (requireAuth) {
       if (db.cloud.isServiceWorkerDB) {

@@ -10,12 +10,11 @@ import {
 } from 'dexie-cloud-common';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { HttpError } from '../errors/HttpError';
-import { OAuthError } from '../errors/OAuthError';
 import { FetchTokenCallback } from './authenticate';
 import { exchangeOAuthCode } from './exchangeOAuthCode';
 import { fetchAuthProviders } from './fetchAuthProviders';
 import { alertUser, promptForEmail, promptForOTP, promptForProvider } from './interactWithUser';
-import { oauthLogin } from './oauthLogin';
+import { startOAuthRedirect } from './oauthLogin';
 
 export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
   const { userInteraction } = db.cloud;
@@ -34,9 +33,11 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       });
     }
     
-    // Handle OAuth provider login (popup flow)
+    // Handle OAuth provider login via redirect
     if (hints?.provider) {
-      return await handleOAuthFlow(db, public_key, hints.provider);
+      initiateOAuthRedirect(db, hints.provider);
+      // This function never returns - page navigates away
+      throw new Error('OAuth redirect initiated');
     }
     
     if (hints?.grant_type === 'demo') {
@@ -78,8 +79,10 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         );
         
         if (selection.type === 'provider') {
-          // User selected an OAuth provider
-          return await handleOAuthFlow(db, public_key, selection.provider);
+          // User selected an OAuth provider - initiate redirect
+          initiateOAuthRedirect(db, selection.provider);
+          // This function never returns - page navigates away
+          throw new Error('OAuth redirect initiated');
         }
         // User chose OTP - continue with email prompt below
       }
@@ -169,47 +172,26 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
 }
 
 /**
- * Handles the OAuth popup flow and token exchange.
+ * Initiates OAuth login via full page redirect.
+ * 
+ * The page will navigate away to the OAuth provider. After authentication,
+ * the user is redirected back with a dxc-auth query parameter that is
+ * automatically detected by db.cloud.configure().
  */
-async function handleOAuthFlow(
+function initiateOAuthRedirect(
   db: DexieCloudDB,
-  publicKey: string,
   provider: string
-): Promise<TokenFinalResponse> {
+): void {
   const url = db.cloud.options?.databaseUrl;
   if (!url) throw new Error(`No database URL given.`);
   
-  const { userInteraction } = db.cloud;
-  const usePopup = db.cloud.options?.oauthPopup !== false;
   const redirectUri = db.cloud.options?.oauthRedirectUri || 
-    (typeof window !== 'undefined' ? window.location.origin : undefined);
+    (typeof window !== 'undefined' ? window.location.href : undefined);
   
-  try {
-    // Start OAuth popup flow
-    const result = await oauthLogin({
-      databaseUrl: url,
-      provider,
-      redirectUri,
-      usePopup,
-    });
-    
-    // Exchange the auth code for tokens
-    return await exchangeOAuthCode({
-      databaseUrl: url,
-      code: result.code,
-      publicKey,
-      scopes: ['ACCESS_DB'],
-    });
-  } catch (error) {
-    if (error instanceof OAuthError) {
-      // Show user-friendly error message
-      await alertUser(userInteraction, 'Authentication Failed', {
-        type: 'error',
-        messageCode: 'GENERIC_ERROR',
-        message: error.userMessage,
-        messageParams: {},
-      }).catch(() => {});
-    }
-    throw error;
-  }
+  // Start OAuth redirect flow - page navigates away
+  startOAuthRedirect({
+    databaseUrl: url,
+    provider,
+    redirectUri,
+  });
 }

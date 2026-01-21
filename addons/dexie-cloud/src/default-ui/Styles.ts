@@ -138,7 +138,10 @@ export const Styles: { [styleAlias: string]: Partial<CSSStyleDeclaration> | any}
   ProviderButtonIcon: {
     width: "20px",
     height: "20px",
-    flexShrink: 0
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
   },
   ProviderButtonText: {
     flex: 1,

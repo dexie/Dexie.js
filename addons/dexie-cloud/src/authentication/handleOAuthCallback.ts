@@ -1,20 +1,41 @@
 import { OAuthError } from '../errors/OAuthError';
 
-/** Parsed OAuth callback parameters */
+/** Parsed OAuth callback parameters from dxc-auth query parameter */
 export interface OAuthCallbackParams {
   /** The Dexie Cloud authorization code */
   code: string;
   /** The OAuth provider that was used */
   provider: string;
-  /** The state parameter for CSRF validation */
+  /** The state parameter */
   state: string;
 }
 
+/** Decoded dxc-auth payload structure */
+interface DxcAuthPayload {
+  code?: string;
+  provider: string;
+  state: string;
+  error?: string;
+}
+
 /**
- * Parses OAuth callback parameters from the current URL.
+ * Decodes a base64url-encoded string to a regular string.
+ * Base64url uses - instead of + and _ instead of /, and may omit padding.
+ */
+function decodeBase64Url(encoded: string): string {
+  // Add padding if needed
+  const padded = encoded + '='.repeat((4 - (encoded.length % 4)) % 4);
+  // Convert base64url to base64
+  const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
+  return atob(base64);
+}
+
+/**
+ * Parses OAuth callback parameters from the dxc-auth query parameter.
  * 
- * Use this on your OAuth callback page (for redirect/deep link flows)
- * to extract the authorization code and complete the login.
+ * The dxc-auth parameter contains base64url-encoded JSON with the following structure:
+ * - On success: { "code": "...", "provider": "...", "state": "..." }
+ * - On error: { "error": "...", "provider": "...", "state": "..." }
  * 
  * @param url - The URL to parse (defaults to window.location.href)
  * @returns OAuthCallbackParams if valid callback, null otherwise
@@ -28,32 +49,39 @@ export function parseOAuthCallback(url?: string): OAuthCallbackParams | null {
   }
 
   const parsed = new URL(targetUrl);
-  const params = parsed.searchParams;
+  const encoded = parsed.searchParams.get('dxc-auth');
 
-  // Check for error first
-  const error = params.get('error');
-  if (error) {
-    const errorDescription = params.get('error_description') || error;
-    const provider = params.get('provider') || 'unknown';
-    
-    if (error === 'access_denied') {
-      throw new OAuthError('access_denied', provider, errorDescription);
-    }
-    if (errorDescription.toLowerCase().includes('email') && 
-        errorDescription.toLowerCase().includes('verif')) {
-      throw new OAuthError('email_not_verified', provider, errorDescription);
-    }
-    
-    throw new OAuthError('provider_error', provider, errorDescription);
+  if (!encoded) {
+    return null; // Not an OAuth callback URL
   }
 
-  // Check for required parameters
-  const code = params.get('code');
-  const provider = params.get('provider');
-  const state = params.get('state');
+  let payload: DxcAuthPayload;
+  try {
+    const json = decodeBase64Url(encoded);
+    payload = JSON.parse(json);
+  } catch (e) {
+    console.warn('[dexie-cloud] Failed to parse dxc-auth parameter:', e);
+    return null;
+  }
 
+  const { code, provider, state, error } = payload;
+
+  // Check for error first
+  if (error) {
+    if (error.toLowerCase().includes('access_denied') || error.toLowerCase().includes('access denied')) {
+      throw new OAuthError('access_denied', provider, error);
+    }
+    if (error.toLowerCase().includes('email') && error.toLowerCase().includes('verif')) {
+      throw new OAuthError('email_not_verified', provider, error);
+    }
+    
+    throw new OAuthError('provider_error', provider, error);
+  }
+
+  // Validate required fields for success case
   if (!code || !provider || !state) {
-    return null; // Not an OAuth callback URL
+    console.warn('[dexie-cloud] Invalid dxc-auth payload: missing required fields');
+    return null;
   }
 
   return { code, provider, state };
@@ -98,7 +126,7 @@ export function getStoredOAuthProvider(): string | null {
 }
 
 /**
- * Cleans up OAuth-related query parameters from the URL.
+ * Cleans up the dxc-auth query parameter from the URL.
  * Call this after successfully handling the callback to clean up the browser URL.
  */
 export function cleanupOAuthUrl(): void {
@@ -107,30 +135,25 @@ export function cleanupOAuthUrl(): void {
   }
 
   const url = new URL(window.location.href);
-  const params = url.searchParams;
   
-  // Remove OAuth-related parameters
-  const oauthParams = ['code', 'provider', 'state', 'error', 'error_description'];
-  let hasOAuthParams = false;
-  
-  for (const param of oauthParams) {
-    if (params.has(param)) {
-      params.delete(param);
-      hasOAuthParams = true;
-    }
+  if (!url.searchParams.has('dxc-auth')) {
+    return;
   }
 
-  if (hasOAuthParams) {
-    const cleanUrl = url.pathname + (params.toString() ? `?${params.toString()}` : '') + url.hash;
-    window.history.replaceState({}, '', cleanUrl);
-  }
+  url.searchParams.delete('dxc-auth');
+  const cleanUrl = url.pathname + (url.searchParams.toString() ? `?${url.searchParams.toString()}` : '') + url.hash;
+  window.history.replaceState(null, '', cleanUrl);
 }
 
 /**
- * Complete handler for OAuth callback pages.
+ * Complete handler for OAuth callback.
  * 
- * Parses the callback URL, validates state, and returns the parameters
+ * Parses the dxc-auth query parameter, validates state, and returns the parameters
  * needed to complete the login flow.
+ * 
+ * Note: For web SPAs using full page redirect, the dexie-cloud-addon automatically
+ * detects and processes the dxc-auth parameter when db.cloud.configure() is called.
+ * This function is primarily useful for Capacitor/native apps handling deep links.
  * 
  * @param url - The callback URL (defaults to window.location.href)
  * @returns OAuthCallbackParams if valid callback, null otherwise
@@ -138,12 +161,13 @@ export function cleanupOAuthUrl(): void {
  * 
  * @example
  * ```typescript
- * // On your OAuth callback page:
- * const callback = handleOAuthCallback();
- * if (callback) {
- *   await db.cloud.login({ oauthCode: callback.code, provider: callback.provider });
- *   cleanupOAuthUrl();
- * }
+ * // Capacitor deep link handler:
+ * App.addListener('appUrlOpen', async ({ url }) => {
+ *   const callback = handleOAuthCallback(url);
+ *   if (callback) {
+ *     await db.cloud.login({ oauthCode: callback.code, provider: callback.provider });
+ *   }
+ * });
  * ```
  */
 export function handleOAuthCallback(url?: string): OAuthCallbackParams | null {

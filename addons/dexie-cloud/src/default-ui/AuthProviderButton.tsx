@@ -1,4 +1,5 @@
 import { h } from 'preact';
+import { useState, useEffect } from 'preact/hooks';
 import type { OAuthProviderInfo } from 'dexie-cloud-common';
 import { Styles } from './Styles';
 
@@ -6,6 +7,9 @@ export interface AuthProviderButtonProps {
   provider: OAuthProviderInfo;
   onClick: () => void;
 }
+
+/** Cache for fetched SVG content to avoid re-fetching */
+const svgCache: Record<string, string> = {};
 
 /** Default SVG icons for built-in providers */
 const ProviderIcons: Record<string, string> = {
@@ -47,6 +51,97 @@ export function AuthProviderButton({ provider, onClick }: AuthProviderButtonProp
   // Get icon - use custom iconUrl if provided, otherwise use built-in SVG
   const iconSvg = ProviderIcons[type] || '';
   
+  // Check if iconUrl is an SVG (supports currentColor when inlined)
+  const isSvgIcon = iconUrl?.toLowerCase().endsWith('.svg');
+  
+  // State for fetched SVG content (for inline rendering with currentColor support)
+  const [fetchedSvg, setFetchedSvg] = useState<string | null>(
+    iconUrl && isSvgIcon ? (svgCache[iconUrl] || null) : null
+  );
+  
+  // Fetch SVG content if iconUrl points to an SVG file
+  useEffect(() => {
+    if (!iconUrl || !isSvgIcon) return;
+    
+    // Check cache first
+    if (svgCache[iconUrl]) {
+      setFetchedSvg(svgCache[iconUrl]);
+      return;
+    }
+    
+    // Fetch SVG and cache it
+    fetch(iconUrl)
+      .then(res => {
+        if (res.ok) {
+          return res.text();
+        }
+        return null;
+      })
+      .then(svg => {
+        if (svg) {
+          svgCache[iconUrl] = svg;
+          setFetchedSvg(svg);
+        }
+      })
+      .catch(() => {
+        // Silently fail - will show no icon
+      });
+  }, [iconUrl, isSvgIcon]);
+  
+  // Get the text color from the button style for SVG fill
+  const textColor = style.color || '#000000';
+  
+  // Process SVG to use the button's text color instead of currentColor
+  const processedSvg = fetchedSvg 
+    ? fetchedSvg
+        .replace(/fill="currentColor"/gi, `fill="${textColor}"`)
+        .replace(/fill='currentColor'/gi, `fill='${textColor}'`)
+    : null;
+  
+  // Debug log
+  if (fetchedSvg && iconUrl) {
+    console.log('Icon URL:', iconUrl);
+    console.log('Text color:', textColor);
+    console.log('Original SVG has currentColor:', fetchedSvg.includes('currentColor'));
+    console.log('Processed SVG has textColor:', processedSvg?.includes(textColor));
+  }
+  
+  // Render the appropriate icon
+  const renderIcon = () => {
+    // SVG fetched and inlined
+    if (processedSvg) {
+      return (
+        <span
+          style={Styles.ProviderButtonIcon}
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: processedSvg }}
+        />
+      );
+    }
+    // Non-SVG image (jpg, png, etc.) - use img tag
+    if (iconUrl && !isSvgIcon) {
+      return (
+        <img
+          src={iconUrl}
+          alt=""
+          style={Styles.ProviderButtonIcon}
+          aria-hidden="true"
+        />
+      );
+    }
+    // Built-in SVG icon
+    if (iconSvg) {
+      return (
+        <span
+          style={Styles.ProviderButtonIcon}
+          aria-hidden="true"
+          dangerouslySetInnerHTML={{ __html: iconSvg }}
+        />
+      );
+    }
+    return null;
+  };
+  
   return (
     <button
       type="button"
@@ -55,20 +150,7 @@ export function AuthProviderButton({ provider, onClick }: AuthProviderButtonProp
       class={`dxc-provider-btn dxc-provider-${type}`}
       aria-label={buttonText}
     >
-      {iconUrl ? (
-        <img 
-          src={iconUrl} 
-          alt="" 
-          style={Styles.ProviderButtonIcon}
-          aria-hidden="true"
-        />
-      ) : iconSvg ? (
-        <span
-          style={Styles.ProviderButtonIcon}
-          aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: iconSvg }}
-        />
-      ) : null}
+      {renderIcon()}
       <span style={Styles.ProviderButtonText}>{buttonText}</span>
     </button>
   );

@@ -68,17 +68,13 @@ export interface DexieCloudOptions {
    */
   socialAuth?: boolean;
 
-  /** Redirect URI for OAuth callback (Capacitor/redirect flows).
-   * For web popups, this is auto-detected from window.location.origin.
-   * Required for:
-   * - Capacitor apps: 'myapp://oauth-callback'
-   * - Full-page redirect flows: 'https://myapp.com/oauth-callback'
+  /** Redirect URI for OAuth callback.
+   * Defaults to window.location.href for web SPAs.
+   * 
+   * For Capacitor/native apps, set this to a custom URL scheme:
+   * ```
+   * oauthRedirectUri: 'myapp://'
+   * ```
    */
   oauthRedirectUri?: string;
-
-  /** Use popup window for OAuth flow.
-   * - true (default for web): Opens OAuth in popup, uses postMessage
-   * - false: Opens OAuth in same window or system browser (Capacitor)
-   */
-  oauthPopup?: boolean;
 }

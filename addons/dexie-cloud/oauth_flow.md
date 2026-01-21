@@ -5,7 +5,6 @@
 - **SPA** – Customer's frontend application
 - **Dexie Cloud** – Auth broker + database access control
 - **OAuth Provider** – Google, GitHub, Apple, Microsoft, etc.
-- **Popup Window** – Browser window initiated by the SPA
 
 ## Preconditions
 
@@ -40,35 +39,27 @@ No nonce or PKCE is created yet.
 
 Example: User selects **Google**
 
-The client initiates the OAuth flow. There are three ways to do this:
+The client initiates the OAuth flow. There are two ways to do this:
 
-#### 2a. Popup Flow (Recommended for Web SPAs)
+#### 2a. Full Page Redirect (Recommended for Web SPAs)
 
 ```js
-popup = window.open('about:blank');
-popup.location = `https://<db>.dexie.cloud/oauth/login/google?redirect_uri=${encodeURIComponent(window.location.origin)}`;
+window.location.href = `https://<db>.dexie.cloud/oauth/login/google?redirect_uri=${encodeURIComponent(location.href)}`;
 ```
 
-The `redirect_uri` parameter is used to determine the `targetOrigin` for postMessage.
+The `redirect_uri` parameter specifies where Dexie Cloud should redirect after authentication.
+This can be any page in your app - no dedicated callback route is needed.
 
 #### 2b. Custom URL Scheme (Capacitor / Native Apps)
 
 ```js
 // Open in system browser or in-app browser
 Browser.open({
-  url: `https://<db>.dexie.cloud/oauth/login/google?redirect_uri=${encodeURIComponent('myapp://oauth-callback')}`
+  url: `https://<db>.dexie.cloud/oauth/login/google?redirect_uri=${encodeURIComponent('myapp://')}`
 });
 ```
 
 The custom scheme `myapp://` tells Dexie Cloud to redirect back via deep link.
-
-#### 2c. Full Page Redirect (Web without Popup)
-
-```js
-window.location.href = `https://<db>.dexie.cloud/oauth/login/google?redirect_uri=${encodeURIComponent('https://myapp.com/oauth-callback')}`;
-```
-
-Used when popups are blocked or for a more traditional OAuth redirect flow.
 
 ---
 
@@ -80,7 +71,7 @@ Dexie Cloud receives `/oauth/login/google` and generates:
 - `code_verifier` (PKCE)
 - `code_challenge` (PKCE)
 
-Stores these in the challenges table, then redirects popup to provider:
+Stores these in the challenges table, then redirects the browser to provider:
 
 ```
 https://accounts.google.com/o/oauth2/v2/auth?
@@ -105,7 +96,7 @@ Provider authenticates the user and requests consent if needed.
 
 ### 5. Provider Callback to Dexie Cloud
 
-Provider redirects back to popup:
+Provider redirects back to Dexie Cloud:
 
 ```
 https://<db>.dexie.cloud/oauth/callback/google?code=CODE&state=STATE
@@ -125,95 +116,113 @@ Dexie Cloud:
 
 ### 6. Dexie Cloud Delivers Auth Code to Client
 
-Dexie Cloud returns HTML that delivers the authorization code back to the client.
-The delivery method depends on how the client initiated the login:
+Dexie Cloud issues an HTTP 302 redirect back to the client with the authorization code.
+The auth data is encapsulated in a single `dxc-auth` query parameter containing base64url-encoded JSON.
+This avoids collisions with the app's own query parameters.
 
-#### 6a. Popup Flow (Web SPAs)
+#### 6a. Full Page Redirect (Web SPAs)
 
-If `window.opener` exists, uses postMessage:
+If the client passed an http/https `redirect_uri`, Dexie Cloud redirects:
 
-```js
-window.opener.postMessage(
-  {
-    type: 'dexie:oauthResult',
-    code: DEXIE_AUTH_CODE,
-    provider: 'google',
-    state: STATE
-  },
-  targetOrigin // Origin captured from redirect_uri or referer
-);
-
-window.close();
 ```
+HTTP/1.1 302 Found
+Location: https://myapp.com/?dxc-auth=eyJjb2RlIjoiLi4uIiwicHJvdmlkZXIiOiJnb29nbGUiLCJzdGF0ZSI6Ii4uLiJ9
+```
+
+The `dxc-auth` parameter contains base64url-encoded JSON:
+
+```json
+{ "code": "DEXIE_AUTH_CODE", "provider": "google", "state": "STATE" }
+```
+
+Or in case of error:
+
+```json
+{ "error": "Error message", "provider": "google", "state": "STATE" }
+```
+
+The app doesn't need a dedicated OAuth callback route - the dexie-cloud client library
+detects and processes the `dxc-auth` parameter on any page load.
 
 #### 6b. Custom URL Scheme (Capacitor / Native Apps)
 
-If the client passed a `redirect_uri` with a custom scheme (e.g., `myapp://oauth-callback`),
-the callback page redirects to that URL:
+If the client passed a `redirect_uri` with a custom scheme (e.g., `myapp://`),
+Dexie Cloud redirects to that URL with the same `dxc-auth` parameter:
 
-```js
-window.location.href =
-  'myapp://oauth-callback?code=DEXIE_AUTH_CODE&provider=google&state=STATE';
+```
+HTTP/1.1 302 Found
+Location: myapp://?dxc-auth=eyJjb2RlIjoiLi4uIiwicHJvdmlkZXIiOiJnb29nbGUiLCJzdGF0ZSI6Ii4uLiJ9
 ```
 
-The native app intercepts this deep link and extracts the parameters.
+The native app intercepts this deep link and decodes the parameter.
 
-#### 6c. Full Page Redirect (Web without Popup)
+#### 6c. Error Case
 
-If there's no `window.opener` but the client passed an http/https `redirect_uri`,
-the callback page redirects back to the client URL:
-
-```js
-window.location.href =
-  'https://myapp.com/oauth-callback?code=DEXIE_AUTH_CODE&provider=google&state=STATE';
-```
-
-The client page at that URL handles the auth code from query parameters.
-
-#### 6d. Error Case
-
-If none of the above conditions are met (no opener, no redirect_uri), an error is displayed
+If no valid `redirect_uri` was provided, an error page is displayed
 explaining that the auth flow cannot complete.
 
 ---
 
 ### 7. Client Receives Authorization Code
 
-**For Popup Flow (6a):**
+**For Full Page Redirect (6a):**
 
-SPA listens for postMessage and verifies:
+The `dexie-cloud-addon` library handles OAuth callback detection automatically:
 
-- `type === "dexie:oauthResult"`
-- origin (implicit via postMessage)
-- provider
-- state (optional)
-- popup lifecycle
+1. When `db.cloud.configure()` is called, the addon checks for the `dxc-auth` query parameter
+2. This check only runs in DOM environments (not in Web Workers)
+3. If the parameter is present:
+   - The URL is immediately cleaned up using `history.replaceState()` to remove `dxc-auth`
+   - A `setTimeout(cb, 0)` is scheduled to initiate the token exchange
+   - The token exchange fetches from the configured `databaseUrl`
+   - The response is processed in the existing `db.on('ready')` callback when Dexie is ready
+
+```js
+// Pseudocode for dexie-cloud-addon implementation
+function configure(options) {
+  // Only check in DOM environment, not workers
+  if (typeof window !== 'undefined' && window.location) {
+    const encoded = new URLSearchParams(location.search).get('dxc-auth');
+    if (encoded) {
+      // Decode base64url (unpadded) to JSON
+      const padded = encoded + '='.repeat((4 - (encoded.length % 4)) % 4);
+      const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
+      const payload = JSON.parse(atob(base64));
+      const { code, provider, state, error } = payload;
+
+      // Clean up URL immediately (remove dxc-auth param)
+      const url = new URL(location.href);
+      url.searchParams.delete('dxc-auth');
+      history.replaceState(null, '', url.toString());
+
+      if (!error) {
+        // Schedule token exchange (processed in db.on('ready'))
+        setTimeout(() => {
+          // Perform token exchange with options.databaseUrl
+        }, 0);
+      }
+    }
+  }
+}
+```
 
 **For Capacitor/Native Apps (6b):**
 
-App registers a deep link handler for the custom URL scheme:
+App registers a deep link handler and decodes the same parameter:
 
 ```js
 // Capacitor example
 App.addListener('appUrlOpen', ({ url }) => {
-  const params = new URL(url).searchParams;
-  const code = params.get('code');
-  const provider = params.get('provider');
-  const state = params.get('state');
-  // Proceed to token exchange
+  const parsedUrl = new URL(url);
+  const encoded = parsedUrl.searchParams.get('dxc-auth');
+  if (encoded) {
+    const padded = encoded + '='.repeat((4 - (encoded.length % 4)) % 4);
+    const base64 = padded.replace(/-/g, '+').replace(/_/g, '/');
+    const payload = JSON.parse(atob(base64));
+    const { code, provider, state, error } = payload;
+    // Proceed to token exchange
+  }
 });
-```
-
-**For Full Page Redirect (6c):**
-
-Client page reads parameters from the URL:
-
-```js
-const params = new URLSearchParams(window.location.search);
-const code = params.get('code');
-const provider = params.get('provider');
-const state = params.get('state');
-// Proceed to token exchange
 ```
 
 Upon success, client proceeds to token exchange.
@@ -270,8 +279,7 @@ This completes authentication.
 
 ## Security Properties Achieved
 
-- 🛑 No JWTs exposed via popup or URL
-- 🛑 No refresh tokens in postMessage
+- 🛑 No JWTs exposed via URL fragments
 - 🛑 Provider tokens never reach SPA (only Dexie tokens)
 - 🛡 Single-use Dexie authorization code (5 min TTL)
 - 🛡 PKCE prevents provider code interception

@@ -1,7 +1,5 @@
 /** OAuth-specific error codes */
 export type OAuthErrorCode =
-  | 'popup_blocked'
-  | 'popup_closed'
   | 'access_denied'
   | 'invalid_state'
   | 'email_not_verified'
@@ -11,8 +9,6 @@ export type OAuthErrorCode =
 
 /** User-friendly messages for OAuth error codes */
 const ERROR_MESSAGES: Record<OAuthErrorCode, string> = {
-  popup_blocked: 'The login popup was blocked by your browser. Please allow popups for this site and try again.',
-  popup_closed: 'The login popup was closed before completing authentication.',
   access_denied: 'Access was denied by the authentication provider.',
   invalid_state: 'The authentication response could not be verified. Please try again.',
   email_not_verified: 'Your email address must be verified before you can log in.',

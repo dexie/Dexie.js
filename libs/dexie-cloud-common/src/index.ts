@@ -1,7 +1,6 @@
 export * from "./types.js";
 export * from "./OAuthProviderInfo.js";
 export * from "./AuthProvidersResponse.js";
-export * from "./OAuthResultMessage.js";
 export * from "./AuthorizationCodeTokenRequest.js";
 export * from "./BaseRevisionMapEntry.js"
 export * from "./SyncRequest.js"
