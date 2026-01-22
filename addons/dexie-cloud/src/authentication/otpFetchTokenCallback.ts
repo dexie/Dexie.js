@@ -15,6 +15,7 @@ import { exchangeOAuthCode } from './exchangeOAuthCode';
 import { fetchAuthProviders } from './fetchAuthProviders';
 import { alertUser, promptForEmail, promptForOTP, promptForProvider } from './interactWithUser';
 import { startOAuthRedirect } from './oauthLogin';
+import { OAuthRedirectError } from '../errors/OAuthRedirectError';
 
 export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
   const { userInteraction } = db.cloud;
@@ -37,7 +38,7 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
     if (hints?.provider) {
       initiateOAuthRedirect(db, hints.provider);
       // This function never returns - page navigates away
-      throw new Error('OAuth redirect initiated');
+      throw new OAuthRedirectError(hints.provider);
     }
     
     if (hints?.grant_type === 'demo') {
@@ -82,7 +83,7 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
           // User selected an OAuth provider - initiate redirect
           initiateOAuthRedirect(db, selection.provider);
           // This function never returns - page navigates away
-          throw new Error('OAuth redirect initiated');
+          throw new OAuthRedirectError(selection.provider);
         }
         // User chose OTP - continue with email prompt below
       }

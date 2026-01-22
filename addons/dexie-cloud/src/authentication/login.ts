@@ -40,13 +40,20 @@ export async function login(
     claims: {},
     lastLogin: new Date(0),
   });
-  await authenticate(
-    db.cloud.options!.databaseUrl,
-    context,
-    db.cloud.options!.fetchTokens || otpFetchTokenCallback(db),
-    db.cloud.userInteraction,
-    hints
-  );
+  try {
+    await authenticate(
+      db.cloud.options!.databaseUrl,
+      context,
+      db.cloud.options!.fetchTokens || otpFetchTokenCallback(db),
+      db.cloud.userInteraction,
+      hints
+    );
+  } catch (err) {
+    if (err.name === 'OAuthRedirectError') {
+      return false; // Page is redirecting for OAuth login
+    }
+    throw err;
+  }
   if (
     origUserId !== UNAUTHORIZED_USER.userId &&
     context.userId !== origUserId

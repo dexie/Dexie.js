@@ -150,8 +150,8 @@ export function LoginDialog({
       </>
       <div style={Styles.ButtonsDiv}>
         <>
-          {/* Only show submit button if there are fields */}
-          {hasFields && submitLabel && (
+          {/* Show submit button if there are fields, OR if there are no options and no fields (e.g., message alert) */}
+          {submitLabel && (hasFields || (!hasOptions && !hasFields)) && (
             <button
               type="submit"
               style={Styles.PrimaryButton}
