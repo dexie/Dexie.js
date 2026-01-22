@@ -1,6 +1,7 @@
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
+//import path from 'path'
 
 /*
  * TODO: Customize this starter template for your own Dexie Cloud PWA
@@ -26,9 +27,12 @@ export default defineConfig(({ command }) => {
       // (replaces process.env.BUILD_DATE with actual build timestamp - for logging)
       "process.env.BUILD_DATE": JSON.stringify(new Date().toISOString()),
     },
-    optimizeDeps: {
-      // Exclude workspace packages from pre-bundling to get live updates during dev
-      exclude: ['dexie', 'dexie-cloud-addon', 'dexie-react-hooks']
+    resolve: {
+      alias: {
+        // Unmark below row temporarily while developing dexie/dexie-cloud-addon/dexie-react-hooks/dexie-cloud-todo-app together:
+        // It will point dexie directly to ESM build to avoid import-wrapper.mjs issues with workspace links
+        //'dexie': path.resolve(__dirname, '../../dist/dexie.mjs')
+      }
     },
     build: {
       outDir: 'build',
