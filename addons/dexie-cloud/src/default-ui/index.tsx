@@ -3,8 +3,7 @@ import "../extend-dexie-interface";
 import { h, Component } from "preact";
 import { from, Subscription } from "rxjs";
 import { LoginDialog } from './LoginDialog';
-import { ProviderSelectionDialog } from './ProviderSelectionDialog';
-import { DXCUserInteraction, DXCProviderSelection } from "../types/DXCUserInteraction";
+import { DXCUserInteraction } from "../types/DXCUserInteraction";
 import * as preact from "preact";
 
 export interface Props {
@@ -38,13 +37,9 @@ export default class LoginGui extends Component<Props, State> {
   render(props: Props, {userInteraction}: State) {
     if (!userInteraction) return null;
     
-    // Render appropriate dialog based on interaction type
-    if (userInteraction.type === 'provider-selection') {
-      return <ProviderSelectionDialog {...userInteraction as DXCProviderSelection} />;
-    }
-    
-    // Default to LoginDialog for other interaction types
-    return <LoginDialog {...userInteraction} />;
+    // LoginDialog handles all interaction types uniformly
+    // (forms with fields, options, or both)
+    return <LoginDialog {...userInteraction as any} />;
   }
 }
 

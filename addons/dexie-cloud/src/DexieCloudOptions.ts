@@ -64,7 +64,7 @@ export interface DexieCloudOptions {
    * - false: Disable OAuth, always use OTP flow
    * 
    * Use `false` for backward compatibility if your custom login UI
-   * doesn't handle the `DXCProviderSelection` interaction type yet.
+   * doesn't handle the `DXCSelect` interaction type yet.
    */
   socialAuth?: boolean;
 

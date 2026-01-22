@@ -1,4 +1,3 @@
-import { OAuthProviderInfo } from 'dexie-cloud-common';
 import { DXCAlert } from './DXCAlert';
 import { DXCInputField } from './DXCInputField';
 
@@ -7,14 +6,41 @@ export type DXCUserInteraction =
   | DXCEmailPrompt
   | DXCOTPPrompt
   | DXCMessageAlert
-  | DXCLogoutConfirmation
-  | DXCProviderSelection;
+  | DXCLogoutConfirmation;
+
+/** A selectable option that can appear in any user interaction.
+ * 
+ * Similar to an HTML `<option>` element:
+ * - `name` identifies the field name in the result (like input name attribute)
+ * - `value` is the value to return when selected (like option value attribute)
+ * - `displayName` is the human-readable label
+ * 
+ * When an option is selected, call `onSubmit({ [option.name]: option.value })`.
+ */
+export interface DXCOption {
+  /** Field name for the result (like HTML input name attribute) */
+  name: string;
+  /** Value to return when selected (like HTML option value attribute) */
+  value: string;
+  /** Human-readable display label */
+  displayName: string;
+  /** URL to an icon image (mutually exclusive with iconSvg) */
+  iconUrl?: string;
+  /** Inline SVG markup for the icon (mutually exclusive with iconUrl) */
+  iconSvg?: string;
+  /** Optional style hint for the UI (e.g., 'google', 'github', 'microsoft', 'apple', 'otp') */
+  styleHint?: string;
+}
 
 export interface DXCGenericUserInteraction<Type extends string="generic", TFields extends {[name: string]: DXCInputField} = any> {
   type: Type;
   title: string;
   alerts: DXCAlert[];
   fields: TFields;
+  /** Optional selectable options. When present, render as clickable buttons.
+   * When user clicks an option, call `onSubmit({ [option.name]: option.value })`.
+   */
+  options?: DXCOption[];
   submitLabel: string;
   cancelLabel: string | null;
   onSubmit: (params: { [P in keyof TFields]: string} ) => void;
@@ -23,7 +49,9 @@ export interface DXCGenericUserInteraction<Type extends string="generic", TField
 
 /** When the system needs to prompt for an email address for login.
  * 
-*/
+ * May include `options` when social login providers are available.
+ * Options should be rendered as clickable buttons above the email field.
+ */
 export interface DXCEmailPrompt {
   type: 'email';
   title: string;
@@ -34,6 +62,8 @@ export interface DXCEmailPrompt {
       placeholder: string;
     };
   };
+  /** Optional OAuth provider options. Render as clickable buttons. */
+  options?: DXCOption[];
   submitLabel: string;
   cancelLabel: string;
   onSubmit: (params: { email: string } | { [paramName: string]: string }) => void;
@@ -86,28 +116,5 @@ export interface DXCLogoutConfirmation {
   submitLabel: string;
   cancelLabel: string;
   onSubmit: (params: { [paramName: string]: string }) => void;
-  onCancel: () => void;
-}
-
-/** When the system needs user to select a login method (OAuth provider or OTP).
- * Emitted when the server has OAuth providers configured and enabled.
- */
-export interface DXCProviderSelection {
-  type: 'provider-selection';
-  title: string;
-  alerts: DXCAlert[];
-  /** Available OAuth providers */
-  providers: OAuthProviderInfo[];
-  /** Whether email/OTP option is available */
-  otpEnabled: boolean;
-  /** Empty - no text fields for this interaction type */
-  fields: {};
-  /** No submit button - provider buttons instead */
-  submitLabel?: undefined;
-  cancelLabel: string;
-  /** Called when user selects an OAuth provider */
-  onSelectProvider: (providerName: string) => void;
-  /** Called when user chooses email/OTP instead */
-  onSelectOtp: () => void;
   onCancel: () => void;
 }
