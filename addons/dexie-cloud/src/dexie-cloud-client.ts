@@ -53,6 +53,7 @@ import { DexieYProvider } from 'y-dexie';
 import { parseOAuthCallback, cleanupOAuthUrl } from './authentication/handleOAuthCallback';
 import { OAuthError } from './errors/OAuthError';
 import { alertUser } from './authentication/interactWithUser';
+import { fetchAuthProviders } from './authentication/fetchAuthProviders';
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 export {
@@ -61,6 +62,8 @@ export {
   DBRealmRole,
   DBSyncedObject,
   DBPermissionSet,
+  AuthProvidersResponse,
+  OAuthProviderInfo,
 } from 'dexie-cloud-common';
 export { resolveText } from './helpers/resolveText';
 export { Invite } from './Invite';
@@ -196,6 +199,14 @@ export function dexieCloud(dexie: Dexie) {
       force
         ? await _logout(DexieCloudDB(dexie), { deleteUnsyncedData: true })
         : await logout(DexieCloudDB(dexie));
+    },
+    async getAuthProviders() {
+      const options = dexie.cloud.options;
+      if (!options?.databaseUrl) {
+        throw new Error('Dexie Cloud not configured. Call db.cloud.configure() first.');
+      }
+      const socialAuthEnabled = options.socialAuth !== false;
+      return fetchAuthProviders(options.databaseUrl, socialAuthEnabled);
     },
     async sync(
       { wait, purpose }: DexieCloudSyncOptions = { wait: true, purpose: 'push' }

@@ -1,5 +1,5 @@
 import { DexieCloudOptions } from './DexieCloudOptions';
-import { DBRealmRole, DexieCloudSchema } from 'dexie-cloud-common';
+import { DBRealmRole, DexieCloudSchema, AuthProvidersResponse } from 'dexie-cloud-common';
 import { UserLogin } from './db/entities/UserLogin';
 import { PersistedSyncState } from './db/entities/PersistedSyncState';
 import { SyncState } from './types/SyncState';
@@ -108,4 +108,16 @@ export interface DexieCloudAPI {
    * @param table Table name that the object was retrieved from
    */
    permissions<T>(obj: T, table: string): Observable<PermissionChecker<T, string>>;
+
+  /** Query available authentication providers from the server.
+   * 
+   * Returns information about which OAuth providers are configured
+   * and whether OTP (email) authentication is enabled.
+   * 
+   * Useful for apps that want to build their own login UI and show
+   * provider-specific buttons.
+   * 
+   * @returns Promise resolving to available auth providers
+   */
+  getAuthProviders(): Promise<AuthProvidersResponse>;
 }
