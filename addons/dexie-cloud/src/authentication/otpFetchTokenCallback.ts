@@ -65,6 +65,26 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         scopes: ['ACCESS_DB'],
         public_key,
       } satisfies OTPTokenRequest2;
+    } else if (hints?.grant_type === 'otp' || hints?.email) {
+      // User explicitly requested OTP flow - skip provider selection
+      const email = hints?.email || await promptForEmail(
+        userInteraction,
+        'Enter email address'
+      );
+      if (/@demo.local$/.test(email)) {
+        tokenRequest = {
+          demo_user: email,
+          grant_type: 'demo',
+          scopes: ['ACCESS_DB'],
+          public_key
+        } satisfies DemoTokenRequest;
+      } else {
+        tokenRequest = {
+          email,
+          grant_type: 'otp',
+          scopes: ['ACCESS_DB'],
+        } satisfies OTPTokenRequest1;
+      }
     } else {
       // Check for available auth providers (OAuth + OTP)
       const socialAuthEnabled = db.cloud.options?.socialAuth !== false;
