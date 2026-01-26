@@ -131,7 +131,8 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
     const res1 = await fetch(`${url}/token`, {
       body: JSON.stringify(tokenRequest),
       method: 'post',
-      headers: { 'Content-Type': 'application/json', mode: 'cors' },
+      headers: { 'Content-Type': 'application/json' },
+      mode: 'cors',
     });
     if (res1.status !== 200) {
       const errMsg = await res1.text();
