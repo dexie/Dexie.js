@@ -50,9 +50,8 @@ function buildOAuthLoginUrl(options: OAuthRedirectOptions): string {
  * ```
  */
 export function startOAuthRedirect(options: OAuthRedirectOptions): void {
-  // Store provider in sessionStorage for reference on callback
-  if (typeof sessionStorage !== 'undefined') {
-    sessionStorage.setItem('dexie-cloud-oauth-provider', options.provider);
+  if (typeof window === 'undefined') {
+    throw new Error('OAuth redirect requires a browser environment');
   }
   
   const loginUrl = buildOAuthLoginUrl(options);

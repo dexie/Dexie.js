@@ -49,10 +49,13 @@ export async function exchangeOAuthCode(
     });
 
     if (!res.ok) {
+      // Read body once as text to avoid stream consumption issues
+      const bodyText = await res.text().catch(() => res.statusText);
+      
       if (res.status === 400 || res.status === 401) {
-        // Try to parse error response
+        // Try to parse error response as JSON
         try {
-          const errorResponse: TokenErrorResponse = await res.json();
+          const errorResponse: TokenErrorResponse = JSON.parse(bodyText);
           if (errorResponse.type === 'error') {
             // Check for specific error codes
             if (errorResponse.messageCode === 'INVALID_OTP') {
@@ -69,8 +72,7 @@ export async function exchangeOAuthCode(
         }
       }
       
-      const errorText = await res.text().catch(() => res.statusText);
-      throw new OAuthError('provider_error', undefined, `Token exchange failed: ${res.status} ${errorText}`);
+      throw new OAuthError('provider_error', undefined, `Token exchange failed: ${res.status} ${bodyText}`);
     }
 
     const response: TokenFinalResponse | TokenErrorResponse = await res.json();

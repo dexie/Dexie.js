@@ -9,7 +9,7 @@ This feature adds support for OAuth 2.0 social login providers (Google, GitHub, 
 ### Related Files
 
 - **Detailed flow diagram**: [oauth_flow.md](oauth_flow.md) - Sequence diagrams and detailed protocol description
-- **Server implementation**: `/Users/daw/repos/dexie-cloud/libs/dexie-cloud-server`
+- **Server implementation**: See `dexie-cloud-server` repository
   - `src/api/oauth/registerOAuthEndpoints.ts` - OAuth endpoints
   - `src/api/oauth/oauth-helpers.ts` - Provider exchange logic
   - `src/api/registerTokenEndpoint.ts` - Token endpoint (authorization_code grant)

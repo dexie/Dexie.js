@@ -207,7 +207,12 @@ function initiateOAuthRedirect(
   if (!url) throw new Error(`No database URL given.`);
   
   const redirectUri = db.cloud.options?.oauthRedirectUri || 
-    (typeof window !== 'undefined' ? window.location.href : undefined);
+    (typeof location !== 'undefined' ? location.href : undefined);
+  
+  // CodeRabbit suggested to fail fast here, but the only situation where
+  // redirectUri would be undefined is in non-browser environments, and
+  // in those environments OAuth redirect does not make sense anyway
+  // and will fail fast in startOAuthRedirect().
   
   // Start OAuth redirect flow - page navigates away
   startOAuthRedirect({

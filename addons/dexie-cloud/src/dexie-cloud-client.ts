@@ -455,12 +455,17 @@ export function dexieCloud(dexie: Dexie) {
       pendingOAuthError = null; // Clear pending error
       console.debug('[dexie-cloud] Showing OAuth error:', error.message);
       // Show alert to user about the OAuth error
-      await alertUser(db.cloud.userInteraction, 'Authentication Error', {
-        type: 'error',
-        messageCode: 'GENERIC_ERROR',
-        message: error.message,
-        messageParams: { provider: error.provider || 'unknown' }
-      });
+      // Guard so UI errors don't abort initialization
+      try {
+        await alertUser(db.cloud.userInteraction, 'Authentication Error', {
+          type: 'error',
+          messageCode: 'GENERIC_ERROR',
+          message: error.message,
+          messageParams: { provider: error.provider || 'unknown' }
+        });
+      } catch (uiError) {
+        console.error('[dexie-cloud] Failed to show OAuth error alert:', uiError);
+      }
     }
     
     // Process pending OAuth callback if present (from dxc-auth redirect)

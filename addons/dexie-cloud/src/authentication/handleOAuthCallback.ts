@@ -96,7 +96,7 @@ export function parseOAuthCallback(url?: string): OAuthCallbackParams | null {
 export function validateOAuthState(receivedState: string): boolean {
   if (typeof sessionStorage === 'undefined') {
     console.warn('[dexie-cloud] sessionStorage not available, cannot validate OAuth state');
-    return true; // Skip validation if sessionStorage not available
+    return false; // Fail closed - reject if we cannot validate CSRF protection
   }
 
   const storedState = sessionStorage.getItem('dexie-cloud-oauth-state');
@@ -110,19 +110,6 @@ export function validateOAuthState(receivedState: string): boolean {
   sessionStorage.removeItem('dexie-cloud-oauth-state');
   
   return storedState === receivedState;
-}
-
-/**
- * Gets the OAuth provider from sessionStorage (for redirect flows).
- */
-export function getStoredOAuthProvider(): string | null {
-  if (typeof sessionStorage === 'undefined') {
-    return null;
-  }
-  
-  const provider = sessionStorage.getItem('dexie-cloud-oauth-provider');
-  sessionStorage.removeItem('dexie-cloud-oauth-provider');
-  return provider;
 }
 
 /**
