@@ -24,10 +24,8 @@ export interface DXCOption {
   value: string;
   /** Human-readable display label */
   displayName: string;
-  /** URL to an icon image (mutually exclusive with iconSvg) */
+  /** URL to an icon image (can be a regular URL or a data: URL for inline images) */
   iconUrl?: string;
-  /** Inline SVG markup for the icon (mutually exclusive with iconUrl) */
-  iconSvg?: string;
   /** Optional style hint for the UI (e.g., 'google', 'github', 'microsoft', 'apple', 'otp') */
   styleHint?: string;
 }

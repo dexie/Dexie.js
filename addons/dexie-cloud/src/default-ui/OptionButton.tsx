@@ -37,53 +37,11 @@ function getOptionStyle(styleHint?: string): Record<string, string> {
  * Generic button component for selectable options.
  * Displays the option's icon and display name.
  * 
- * The icon can be:
- * - Inline SVG (iconSvg) - rendered directly with dangerouslySetInnerHTML
- * - Image URL (iconUrl) - rendered as an img tag
- * 
  * Style is determined by the styleHint property for branding purposes.
  */
 export function OptionButton({ option, onClick }: OptionButtonProps) {
-  const { displayName, iconUrl, iconSvg, styleHint, value } = option;
+  const { displayName, iconUrl, styleHint } = option;
   const style = getOptionStyle(styleHint);
-  
-  // Get the text color from the button style for SVG fill processing
-  const textColor = style.color || '#000000';
-  
-  // Process SVG to replace currentColor with actual text color
-  const processedSvg = iconSvg 
-    ? iconSvg
-        .replace(/fill="currentColor"/gi, `fill="${textColor}"`)
-        .replace(/fill='currentColor'/gi, `fill='${textColor}'`)
-        .replace(/stroke="currentColor"/gi, `stroke="${textColor}"`)
-        .replace(/stroke='currentColor'/gi, `stroke='${textColor}'`)
-    : null;
-  
-  // Render the appropriate icon
-  const renderIcon = () => {
-    // Inline SVG
-    if (processedSvg) {
-      return (
-        <span
-          style={Styles.ProviderButtonIcon}
-          aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: processedSvg }}
-        />
-      );
-    }
-    // Image URL
-    if (iconUrl) {
-      return (
-        <img
-          src={iconUrl}
-          alt=""
-          style={Styles.ProviderButtonIcon}
-          aria-hidden="true"
-        />
-      );
-    }
-    return null;
-  };
   
   return (
     <button
@@ -93,7 +51,14 @@ export function OptionButton({ option, onClick }: OptionButtonProps) {
       class={`dxc-option-btn${styleHint ? ` dxc-option-${styleHint}` : ''}`}
       aria-label={displayName}
     >
-      {renderIcon()}
+      {iconUrl && (
+        <img
+          src={iconUrl}
+          alt=""
+          style={Styles.ProviderButtonIcon}
+          aria-hidden="true"
+        />
+      )}
       <span style={Styles.ProviderButtonText}>{displayName}</span>
     </button>
   );

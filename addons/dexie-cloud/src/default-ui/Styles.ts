@@ -154,13 +154,13 @@ export const Styles: { [styleAlias: string]: Partial<CSSStyleDeclaration> | any}
     color: "#3c4043"
   },
   ProviderGitHub: {
-    backgroundColor: "#24292e",
-    border: "1px solid #24292e",
-    color: "#ffffff"
+    backgroundColor: "#ffffff",
+    border: "1px solid #dadce0",
+    color: "#181717"
   },
   ProviderMicrosoft: {
     backgroundColor: "#ffffff",
-    border: "1px solid #8c8c8c",
+    border: "1px solid #dadce0",
     color: "#5e5e5e"
   },
   ProviderApple: {
@@ -169,9 +169,9 @@ export const Styles: { [styleAlias: string]: Partial<CSSStyleDeclaration> | any}
     color: "#ffffff"
   },
   ProviderCustom: {
-    backgroundColor: "#4f46e5",
-    border: "1px solid #4f46e5",
-    color: "#ffffff"
+    backgroundColor: "#ffffff",
+    border: "1px solid #dadce0",
+    color: "#181717"
   },
   // Divider styles
   Divider: {
