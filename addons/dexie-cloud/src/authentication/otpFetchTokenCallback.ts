@@ -36,7 +36,19 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
     
     // Handle OAuth provider login via redirect
     if (hints?.provider) {
-      initiateOAuthRedirect(db, hints.provider);
+      let resolvedRedirectUri: string | undefined = undefined;
+      if (hints.redirectPath) {
+        // If redirectPath is absolute, use as is. If relative, resolve against current location
+        if (/^https?:\/\//i.test(hints.redirectPath)) {
+          resolvedRedirectUri = hints.redirectPath;
+        } else if (typeof window !== 'undefined' && window.location) {
+          // Use URL constructor to resolve relative path
+          resolvedRedirectUri = new URL(hints.redirectPath, window.location.href).toString();
+        } else if (typeof location !== 'undefined' && location.href) {
+          resolvedRedirectUri = new URL(hints.redirectPath, location.href).toString();
+        }
+      }
+      initiateOAuthRedirect(db, hints.provider, resolvedRedirectUri);
       // This function never returns - page navigates away
       throw new OAuthRedirectError(hints.provider);
     }
@@ -202,12 +214,15 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
  */
 function initiateOAuthRedirect(
   db: DexieCloudDB,
-  provider: string
+  provider: string,
+  redirectUriOverride?: string
 ): void {
   const url = db.cloud.options?.databaseUrl;
   if (!url) throw new Error(`No database URL given.`);
   
-  const redirectUri = db.cloud.options?.oauthRedirectUri || 
+  const redirectUri =
+    redirectUriOverride ||
+    db.cloud.options?.oauthRedirectUri ||
     (typeof location !== 'undefined' ? location.href : undefined);
   
   // CodeRabbit suggested to fail fast here, but the only situation where

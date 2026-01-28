@@ -23,6 +23,8 @@ export interface LoginHints {
   provider?: string;
   /** Dexie Cloud authorization code received from OAuth callback */
   oauthCode?: string;
+  /** Optional redirect path (relative or absolute) to use for OAuth redirect URI. */
+  redirectPath?: string;
 }
 
 export interface DexieCloudAPI {
