@@ -450,14 +450,14 @@ importers:
   samples/dexie-cloud-todo-app:
     dependencies:
       dexie:
-        specifier: ^4.3.0
-        version: 4.3.0
+        specifier: workspace:*
+        version: link:../..
       dexie-cloud-addon:
-        specifier: ^4.3.3
-        version: 4.3.3(dexie@4.3.0)
+        specifier: workspace:*
+        version: link:../../addons/dexie-cloud
       dexie-react-hooks:
-        specifier: ^4.2.0
-        version: 4.2.0(@types/react@18.3.27)(dexie@4.3.0)(react@18.3.1)
+        specifier: workspace:*
+        version: link:../../libs/dexie-react-hooks
       lucide-react:
         specifier: ^0.554.0
         version: 0.554.0(react@18.3.1)
@@ -2817,27 +2817,8 @@ packages:
   devalue@5.6.1:
     resolution: {integrity: sha512-jDwizj+IlEZBunHcOuuFVBnIMPAEHvTsJj0BcIp94xYguLRVBcXO853px/MyIJvbVzWdsGvrRweIUWJw8hBP7A==}
 
-  dexie-cloud-addon@4.3.3:
-    resolution: {integrity: sha512-27dEGUuDLJmjNy8EqCen8z/EFyJvUty6Smay0PKm3ZCwcbjbb57IuMqMuaLReWIMZ1IwakUyIuF2b0S3YOZRQw==}
-    engines: {node: '>=14'}
-    peerDependencies:
-      dexie: ^4.3.0
-
-  dexie-cloud-common@1.0.57:
-    resolution: {integrity: sha512-zNvDYYeyG6uIHe6eQBDldQFys8YP4UPH8B0S2xth+VZflyjCP87KlJCZsGydDEq7MHbnM4xGuyqfPvyA0tgULQ==}
-
-  dexie-react-hooks@4.2.0:
-    resolution: {integrity: sha512-u7KqTX9JpBQK8+tEyA9X0yMGXlSCsbm5AU64N6gjvGk/IutYDpLBInMYEAEC83s3qhIvryFS+W+sqLZUBEvePQ==}
-    peerDependencies:
-      '@types/react': '>=16'
-      dexie: '>=4.2.0-alpha.1 <5.0.0'
-      react: '>=16'
-
   dexie@4.2.1:
     resolution: {integrity: sha512-Ckej0NS6jxQ4Po3OrSQBFddayRhTCic2DoCAG5zacOfOVB9P2Q5Xc5uL/nVa7ZVs+HdMnvUPzLFCB/JwpB6Csg==}
-
-  dexie@4.3.0:
-    resolution: {integrity: sha512-5EeoQpJvMKHe6zWt/FSIIuRa3CWlZeIl6zKXt+Lz7BU6RoRRLgX9dZEynRfXrkLcldKYCBiz7xekTEylnie1Ug==}
 
   di@0.0.1:
     resolution: {integrity: sha512-uJaamHkagcZtHPqCIHZxnFrXlunQXgBOsZSUOWwFw31QJCAbyTBoHMW75YOTur5ZNx8pIeAKgf6GWIgaqqiLhA==}
@@ -5895,13 +5876,6 @@ packages:
   xmlchars@2.2.0:
     resolution: {integrity: sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==}
 
-  y-dexie@4.2.2:
-    resolution: {integrity: sha512-nbUbIc8iL3Fpyyu13HkzU0djU4dUxI/SyySvTKQYd6wfSaodoiVKbf5ZqW7RAlXHg5nrtVLhjR7E7RZohrZ7lg==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      dexie: '>=4.2.0-alpha.1 <5.0.0'
-      yjs: ^13.6.27
-
   y-protocols@1.0.6:
     resolution: {integrity: sha512-vHRF2L6iT3rwj1jub/K5tYcTT/mEYDUppgNPXwp8fmLpui9f7Yeq3OEtTLVF012j39QnV+KEQpNqoN7CWU7Y9Q==}
     engines: {node: '>=16.0.0', npm: '>=8.0.0'}
@@ -8423,28 +8397,7 @@ snapshots:
 
   devalue@5.6.1: {}
 
-  dexie-cloud-addon@4.3.3(dexie@4.3.0):
-    dependencies:
-      dexie: 4.3.0
-      dexie-cloud-common: 1.0.57
-      rxjs: 7.8.2
-      y-dexie: 4.2.2(dexie@4.3.0)(yjs@13.6.27)
-      y-protocols: 1.0.6(yjs@13.6.27)
-      yjs: 13.6.27
-
-  dexie-cloud-common@1.0.57:
-    dependencies:
-      lib0: 0.2.114
-
-  dexie-react-hooks@4.2.0(@types/react@18.3.27)(dexie@4.3.0)(react@18.3.1):
-    dependencies:
-      '@types/react': 18.3.27
-      dexie: 4.3.0
-      react: 18.3.1
-
   dexie@4.2.1: {}
-
-  dexie@4.3.0: {}
 
   di@0.0.1: {}
 
@@ -11915,11 +11868,6 @@ snapshots:
   xml-name-validator@5.0.0: {}
 
   xmlchars@2.2.0: {}
-
-  y-dexie@4.2.2(dexie@4.3.0)(yjs@13.6.27):
-    dependencies:
-      dexie: 4.3.0
-      yjs: 13.6.27
 
   y-protocols@1.0.6(yjs@13.6.27):
     dependencies:
