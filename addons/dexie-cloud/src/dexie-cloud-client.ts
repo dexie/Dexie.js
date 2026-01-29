@@ -176,16 +176,12 @@ export function dexieCloud(dexie: Dexie) {
         try {
           const callback = parseOAuthCallback();
           if (callback) {
-            // Clean up URL immediately (remove dxc-auth param)
-            cleanupOAuthUrl();
-            
             // Store the pending auth code for processing when db is ready
             pendingOAuthCode = { code: callback.code, provider: callback.provider };
             console.debug('[dexie-cloud] OAuth callback detected, auth code stored for processing');
           }
         } catch (error) {
           // parseOAuthCallback throws OAuthError on error callbacks
-          cleanupOAuthUrl();
           if (error instanceof OAuthError) {
             pendingOAuthError = error;
             console.error('[dexie-cloud] OAuth callback error:', error.message);
@@ -463,6 +459,8 @@ export function dexieCloud(dexie: Dexie) {
           message: error.message,
           messageParams: { provider: error.provider || 'unknown' }
         });
+        // Clean up URL (remove dxc-auth param)
+        cleanupOAuthUrl();
       } catch (uiError) {
         console.error('[dexie-cloud] Failed to show OAuth error alert:', uiError);
       }
@@ -476,6 +474,8 @@ export function dexieCloud(dexie: Dexie) {
       try {
         changedUser = await login(db, { oauthCode: code, provider });
         user = await db.getCurrentUser();
+        // Clean up URL (remove dxc-auth param)
+        cleanupOAuthUrl();
       } catch (error) {
         console.error('[dexie-cloud] OAuth login failed:', error);
         // Continue with normal flow - user can try again
