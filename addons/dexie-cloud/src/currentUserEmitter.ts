@@ -2,11 +2,8 @@ import Dexie from "dexie";
 import { BehaviorSubject } from "rxjs";
 import { associate } from "./associate";
 import { UNAUTHORIZED_USER } from "./authentication/UNAUTHORIZED_USER";
+import { UserLogin } from "./dexie-cloud-client";
 
-const isOathCallback = typeof location !== 'undefined' && !!(new URL(location.href)).searchParams.get('dxc-auth');
-
-export const getCurrentUserEmitter = associate((db: Dexie) => new BehaviorSubject(
-  isOathCallback
-  ? {...UNAUTHORIZED_USER, oauthInProgress: true}
-  : UNAUTHORIZED_USER
+export const getCurrentUserEmitter = associate((db: Dexie) => new BehaviorSubject<UserLogin>(
+  {...UNAUTHORIZED_USER, isLoading: true}
 ));

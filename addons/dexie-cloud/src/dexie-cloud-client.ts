@@ -417,7 +417,14 @@ export function dexieCloud(dexie: Dexie) {
     throwIfClosed();
     if (!db.cloud.isServiceWorkerDB) {
       subscriptions.push(
-        liveQuery(() => db.getCurrentUser()).subscribe(currentUserEmitter)
+        liveQuery(() => db.getCurrentUser().then(user => {
+          if (!user.isLoggedIn && typeof location !== 'undefined' && /dxc-auth\=/.test(location.search)) {
+            // Still loading user because OAuth redirect just happened.
+            // Keep isLoading true.
+            return { ...user, isLoading: true };
+          }
+          return user;
+        })).subscribe(currentUserEmitter)
       );
       // Manage PersistendSyncState observable:
       subscriptions.push(
@@ -461,7 +468,6 @@ export function dexieCloud(dexie: Dexie) {
         });
         // Clean up URL (remove dxc-auth param)
         cleanupOAuthUrl();
-        currentUserEmitter.next({...currentUserEmitter.value, oauthInProgress: false});
       } catch (uiError) {
         console.error('[dexie-cloud] Failed to show OAuth error alert:', uiError);
       }
