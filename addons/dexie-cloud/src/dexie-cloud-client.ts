@@ -461,6 +461,7 @@ export function dexieCloud(dexie: Dexie) {
         });
         // Clean up URL (remove dxc-auth param)
         cleanupOAuthUrl();
+        currentUserEmitter.next({...currentUserEmitter.value, oauthInProgress: false});
       } catch (uiError) {
         console.error('[dexie-cloud] Failed to show OAuth error alert:', uiError);
       }

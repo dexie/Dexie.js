@@ -22,4 +22,5 @@ export interface UserLogin {
   publicKey?: CryptoKey;
   isLoggedIn?: boolean;
   data?: any; // From user data
+  oauthInProgress?: boolean; // true on unauthorized user if an OAuth callback is being processed
 }
