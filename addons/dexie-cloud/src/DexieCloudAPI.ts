@@ -1,5 +1,5 @@
 import { DexieCloudOptions } from './DexieCloudOptions';
-import { DBRealmRole, DexieCloudSchema } from 'dexie-cloud-common';
+import { DBRealmRole, DexieCloudSchema, AuthProvidersResponse } from 'dexie-cloud-common';
 import { UserLogin } from './db/entities/UserLogin';
 import { PersistedSyncState } from './db/entities/PersistedSyncState';
 import { SyncState } from './types/SyncState';
@@ -19,6 +19,12 @@ export interface LoginHints {
   grant_type?: 'demo' | 'otp';
   otpId?: string;
   otp?: string;
+  /** OAuth provider name to initiate OAuth flow (e.g., 'google', 'github') */
+  provider?: string;
+  /** Dexie Cloud authorization code received from OAuth callback */
+  oauthCode?: string;
+  /** Optional redirect path (relative or absolute) to use for OAuth redirect URI. */
+  redirectPath?: string;
 }
 
 export interface DexieCloudAPI {
@@ -104,4 +110,16 @@ export interface DexieCloudAPI {
    * @param table Table name that the object was retrieved from
    */
    permissions<T>(obj: T, table: string): Observable<PermissionChecker<T, string>>;
+
+  /** Query available authentication providers from the server.
+   * 
+   * Returns information about which OAuth providers are configured
+   * and whether OTP (email) authentication is enabled.
+   * 
+   * Useful for apps that want to build their own login UI and show
+   * provider-specific buttons.
+   * 
+   * @returns Promise resolving to available auth providers
+   */
+  getAuthProviders(): Promise<AuthProvidersResponse>;
 }

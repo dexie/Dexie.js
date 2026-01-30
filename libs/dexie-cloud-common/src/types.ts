@@ -1,9 +1,12 @@
+import { AuthorizationCodeTokenRequest } from './AuthorizationCodeTokenRequest.js';
+
 export type TokenRequest =
   | OTPTokenRequest1
   | OTPTokenRequest2
   | ClientCredentialsTokenRequest
   | RefreshTokenRequest
-  | DemoTokenRequest;
+  | DemoTokenRequest
+  | AuthorizationCodeTokenRequest;
 
 export type OTPTokenRequest = OTPTokenRequest1 | OTPTokenRequest2;
 export interface OTPTokenRequest1 {

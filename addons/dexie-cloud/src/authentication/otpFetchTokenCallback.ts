@@ -1,4 +1,5 @@
 import {
+  AuthorizationCodeTokenRequest,
   DemoTokenRequest,
   OTPTokenRequest1,
   OTPTokenRequest2,
@@ -10,7 +11,11 @@ import {
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { HttpError } from '../errors/HttpError';
 import { FetchTokenCallback } from './authenticate';
-import { alertUser, promptForEmail, promptForOTP } from './interactWithUser';
+import { exchangeOAuthCode } from './exchangeOAuthCode';
+import { fetchAuthProviders } from './fetchAuthProviders';
+import { alertUser, promptForEmail, promptForOTP, promptForProvider } from './interactWithUser';
+import { startOAuthRedirect } from './oauthLogin';
+import { OAuthRedirectError } from '../errors/OAuthRedirectError';
 
 export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
   const { userInteraction } = db.cloud;
@@ -18,6 +23,36 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
     let tokenRequest: TokenRequest;
     const url = db.cloud.options?.databaseUrl;
     if (!url) throw new Error(`No database URL given.`);
+    
+    // Handle OAuth code exchange (from redirect/deep link flows)
+    if (hints?.oauthCode && hints.provider) {
+      return await exchangeOAuthCode({
+        databaseUrl: url,
+        code: hints.oauthCode,
+        publicKey: public_key,
+        scopes: ['ACCESS_DB'],
+      });
+    }
+    
+    // Handle OAuth provider login via redirect
+    if (hints?.provider) {
+      let resolvedRedirectUri: string | undefined = undefined;
+      if (hints.redirectPath) {
+        // If redirectPath is absolute, use as is. If relative, resolve against current location
+        if (/^https?:\/\//i.test(hints.redirectPath)) {
+          resolvedRedirectUri = hints.redirectPath;
+        } else if (typeof window !== 'undefined' && window.location) {
+          // Use URL constructor to resolve relative path
+          resolvedRedirectUri = new URL(hints.redirectPath, window.location.href).toString();
+        } else if (typeof location !== 'undefined' && location.href) {
+          resolvedRedirectUri = new URL(hints.redirectPath, location.href).toString();
+        }
+      }
+      initiateOAuthRedirect(db, hints.provider, resolvedRedirectUri);
+      // This function never returns - page navigates away
+      throw new OAuthRedirectError(hints.provider);
+    }
+    
     if (hints?.grant_type === 'demo') {
       const demo_user = await promptForEmail(
         userInteraction,
@@ -42,7 +77,49 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         scopes: ['ACCESS_DB'],
         public_key,
       } satisfies OTPTokenRequest2;
+    } else if (hints?.grant_type === 'otp' || hints?.email) {
+      // User explicitly requested OTP flow - skip provider selection
+      const email = hints?.email || await promptForEmail(
+        userInteraction,
+        'Enter email address'
+      );
+      if (/@demo.local$/.test(email)) {
+        tokenRequest = {
+          demo_user: email,
+          grant_type: 'demo',
+          scopes: ['ACCESS_DB'],
+          public_key
+        } satisfies DemoTokenRequest;
+      } else {
+        tokenRequest = {
+          email,
+          grant_type: 'otp',
+          scopes: ['ACCESS_DB'],
+        } satisfies OTPTokenRequest1;
+      }
     } else {
+      // Check for available auth providers (OAuth + OTP)
+      const socialAuthEnabled = db.cloud.options?.socialAuth !== false;
+      const authProviders = await fetchAuthProviders(url, socialAuthEnabled);
+      
+      // If we have OAuth providers available, prompt for selection
+      if (authProviders.providers.length > 0) {
+        const selection = await promptForProvider(
+          userInteraction,
+          authProviders.providers,
+          authProviders.otpEnabled,
+          'Sign in',
+        );
+        
+        if (selection.type === 'provider') {
+          // User selected an OAuth provider - initiate redirect
+          initiateOAuthRedirect(db, selection.provider);
+          // This function never returns - page navigates away
+          throw new OAuthRedirectError(selection.provider);
+        }
+        // User chose OTP - continue with email prompt below
+      }
+      
       const email = await promptForEmail(
         userInteraction,
         'Enter email address',
@@ -66,7 +143,8 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
     const res1 = await fetch(`${url}/token`, {
       body: JSON.stringify(tokenRequest),
       method: 'post',
-      headers: { 'Content-Type': 'application/json', mode: 'cors' },
+      headers: { 'Content-Type': 'application/json' },
+      mode: 'cors',
     });
     if (res1.status !== 200) {
       const errMsg = await res1.text();
@@ -125,4 +203,37 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       throw new Error(`Unexpected response from ${url}/token`);
     }
   };
+}
+
+/**
+ * Initiates OAuth login via full page redirect.
+ * 
+ * The page will navigate away to the OAuth provider. After authentication,
+ * the user is redirected back with a dxc-auth query parameter that is
+ * automatically detected by db.cloud.configure().
+ */
+function initiateOAuthRedirect(
+  db: DexieCloudDB,
+  provider: string,
+  redirectUriOverride?: string
+): void {
+  const url = db.cloud.options?.databaseUrl;
+  if (!url) throw new Error(`No database URL given.`);
+  
+  const redirectUri =
+    redirectUriOverride ||
+    db.cloud.options?.oauthRedirectUri ||
+    (typeof location !== 'undefined' ? location.href : undefined);
+  
+  // CodeRabbit suggested to fail fast here, but the only situation where
+  // redirectUri would be undefined is in non-browser environments, and
+  // in those environments OAuth redirect does not make sense anyway
+  // and will fail fast in startOAuthRedirect().
+  
+  // Start OAuth redirect flow - page navigates away
+  startOAuthRedirect({
+    databaseUrl: url,
+    provider,
+    redirectUri,
+  });
 }

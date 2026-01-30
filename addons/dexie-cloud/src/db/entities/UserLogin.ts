@@ -22,4 +22,5 @@ export interface UserLogin {
   publicKey?: CryptoKey;
   isLoggedIn?: boolean;
   data?: any; // From user data
+  isLoading?: boolean; // true while we still are loading user info
 }

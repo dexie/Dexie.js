@@ -36,8 +36,10 @@ export default class LoginGui extends Component<Props, State> {
 
   render(props: Props, {userInteraction}: State) {
     if (!userInteraction) return null;
-    //if (props.db.cloud.userInteraction.observers.length > 1) return null; // Someone else subscribes.
-    return <LoginDialog {...userInteraction} />;
+    
+    // LoginDialog handles all interaction types uniformly
+    // (forms with fields, options, or both)
+    return <LoginDialog {...userInteraction as any} />;
   }
 }
 

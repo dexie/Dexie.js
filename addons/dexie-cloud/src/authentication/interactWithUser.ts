@@ -1,10 +1,27 @@
 import Dexie from 'dexie';
+import type { OAuthProviderInfo } from 'dexie-cloud-common';
 import { BehaviorSubject } from 'rxjs';
 import { take } from 'rxjs/operators';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { DXCAlert } from '../types/DXCAlert';
 import { DXCInputField } from '../types/DXCInputField';
-import { DXCUserInteraction } from '../types/DXCUserInteraction';
+import { DXCUserInteraction, DXCGenericUserInteraction, DXCOption } from '../types/DXCUserInteraction';
+
+/** Email/envelope icon data URL for OTP option */
+const EmailIcon = `data:image/svg+xml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#666666" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6L12 13 2 6"/></svg>')}`;
+
+/**
+ * Converts an OAuthProviderInfo to a generic DXCOption.
+ */
+function providerToOption(provider: OAuthProviderInfo): DXCOption {
+  return {
+    name: 'provider',
+    value: provider.name,
+    displayName: `Continue with ${provider.displayName}`,
+    iconUrl: provider.iconUrl,
+    styleHint: provider.type,
+  };
+}
 
 export interface DXCUserInteractionRequest {
   type: DXCUserInteraction['type'];
@@ -182,4 +199,77 @@ export async function confirmLogout(
   })
     .then(() => true)
     .catch(() => false);
+}
+
+/** Result from provider selection prompt */
+export type ProviderSelectionResult =
+  | { type: 'provider'; provider: string }
+  | { type: 'otp' };
+
+/**
+ * Prompts the user to select an authentication method (OAuth provider or OTP).
+ * 
+ * This function converts OAuth providers and OTP option into generic DXCOption[]
+ * for the DXCSelect interaction, handling icon fetching and style hints.
+ * 
+ * @param userInteraction - The user interaction BehaviorSubject
+ * @param providers - Available OAuth providers
+ * @param otpEnabled - Whether OTP is available
+ * @param title - Dialog title
+ * @param alerts - Optional alerts to display
+ * @returns Promise resolving to the user's selection
+ */
+export async function promptForProvider(
+  userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
+  providers: OAuthProviderInfo[],
+  otpEnabled: boolean,
+  title: string = 'Choose login method',
+  alerts: DXCAlert[] = []
+): Promise<ProviderSelectionResult> {
+  // Convert providers to generic options
+  const providerOptions = providers.map(providerToOption);
+  
+  // Build the options array
+  const options: DXCOption[] = [...providerOptions];
+  
+  // Add OTP option if enabled
+  if (otpEnabled) {
+    options.push({
+      name: 'otp',
+      value: 'email',
+      displayName: 'Continue with email',
+      iconUrl: EmailIcon,
+      styleHint: 'otp',
+    });
+  }
+  
+  return new Promise<ProviderSelectionResult>((resolve, reject) => {
+    const interactionProps: DXCGenericUserInteraction = {
+      type: 'generic',
+      title,
+      alerts,
+      options,
+      fields: {},
+      submitLabel: '', // No submit button - just options
+      cancelLabel: 'Cancel',
+      onSubmit: (params: { [key: string]: string }) => {
+        userInteraction.next(undefined);
+        // Check which option was selected
+        if ('otp' in params) {
+          resolve({ type: 'otp' });
+        } else if ('provider' in params) {
+          resolve({ type: 'provider', provider: params.provider });
+        } else {
+          // Unknown - default to OTP
+          resolve({ type: 'otp' });
+        }
+      },
+      onCancel: () => {
+        userInteraction.next(undefined);
+        reject(new Dexie.AbortError('User cancelled'));
+      },
+    };
+    
+    userInteraction.next(interactionProps);
+  });
 }

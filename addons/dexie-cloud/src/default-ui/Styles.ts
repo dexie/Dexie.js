@@ -116,5 +116,101 @@ export const Styles: { [styleAlias: string]: Partial<CSSStyleDeclaration> | any}
     color: "#333",
     borderBottom: "1px solid #eee",
     paddingBottom: "10px"
+  },
+  // OAuth Provider Button Styles
+  ProviderButton: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    padding: "12px 16px",
+    marginBottom: "10px",
+    border: "1px solid #d1d5db",
+    borderRadius: "6px",
+    backgroundColor: "#ffffff",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+    color: "#374151",
+    transition: "all 0.2s ease",
+    gap: "12px"
+  },
+  ProviderButtonIcon: {
+    width: "20px",
+    height: "20px",
+    flexShrink: 0,
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center"
+  },
+  ProviderButtonText: {
+    flex: 1,
+    textAlign: "left" as const
+  },
+  // Provider-specific colors
+  ProviderGoogle: {
+    backgroundColor: "#ffffff",
+    border: "1px solid #dadce0",
+    color: "#3c4043"
+  },
+  ProviderGitHub: {
+    backgroundColor: "#ffffff",
+    border: "1px solid #dadce0",
+    color: "#181717"
+  },
+  ProviderMicrosoft: {
+    backgroundColor: "#ffffff",
+    border: "1px solid #dadce0",
+    color: "#5e5e5e"
+  },
+  ProviderApple: {
+    backgroundColor: "#000000",
+    border: "1px solid #000000",
+    color: "#ffffff"
+  },
+  ProviderCustom: {
+    backgroundColor: "#ffffff",
+    border: "1px solid #dadce0",
+    color: "#181717"
+  },
+  // Divider styles
+  Divider: {
+    display: "flex",
+    alignItems: "center",
+    margin: "20px 0",
+    color: "#6b7280",
+    fontSize: "13px"
+  },
+  DividerLine: {
+    flex: 1,
+    height: "1px",
+    backgroundColor: "#e5e7eb"
+  },
+  DividerText: {
+    padding: "0 12px",
+    color: "#9ca3af"
+  },
+  // OTP Button (Continue with email)
+  OtpButton: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    width: "100%",
+    padding: "12px 16px",
+    border: "1px solid #d1d5db",
+    borderRadius: "6px",
+    backgroundColor: "#f9fafb",
+    cursor: "pointer",
+    fontSize: "14px",
+    fontWeight: "500",
+    color: "#374151",
+    transition: "all 0.2s ease",
+    gap: "12px"
+  },
+  // Cancel button for provider selection
+  CancelButtonRow: {
+    display: "flex",
+    justifyContent: "center",
+    marginTop: "16px"
   }
 };

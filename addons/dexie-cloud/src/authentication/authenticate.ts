@@ -17,6 +17,7 @@ import { TokenErrorResponseError } from './TokenErrorResponseError';
 import { alertUser, interactWithUser } from './interactWithUser';
 import { InvalidLicenseError } from '../InvalidLicenseError';
 import { LoginHints } from '../DexieCloudAPI';
+import { OAuthRedirectError } from '../errors/OAuthRedirectError';
 
 export type FetchTokenCallback = (tokenParams: {
   public_key: string;
@@ -229,7 +230,11 @@ async function userAuthenticate(
       });
     }
     return context;
-  } catch (error) {
+  } catch (error: any) {
+    // OAuth redirect is not an error - page is navigating away
+    if (error instanceof OAuthRedirectError || error?.name === 'OAuthRedirectError') {
+      throw error; // Re-throw without logging
+    }
     if (error instanceof TokenErrorResponseError) {
       await alertUser(userInteraction, error.title, {
         type: 'error',

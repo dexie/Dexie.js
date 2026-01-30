@@ -58,4 +58,23 @@ export interface DexieCloudOptions {
   }) => Promise<TokenFinalResponse>;
 
   awarenessProtocol?: typeof import('y-protocols/awareness');
+
+  /** Enable social/OAuth authentication.
+   * - true (default): Fetch providers from server, show if available
+   * - false: Disable OAuth, always use OTP flow
+   * 
+   * Use `false` for backward compatibility if your custom login UI
+   * doesn't handle the `DXCSelect` interaction type yet.
+   */
+  socialAuth?: boolean;
+
+  /** Redirect URI for OAuth callback.
+   * Defaults to window.location.href for web SPAs.
+   * 
+   * For Capacitor/native apps, set this to a custom URL scheme:
+   * ```
+   * oauthRedirectUri: 'myapp://'
+   * ```
+   */
+  oauthRedirectUri?: string;
 }
