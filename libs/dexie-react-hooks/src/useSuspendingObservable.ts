@@ -23,7 +23,7 @@ export function useSuspendingObservable<T>(
   for (const [key, value] of observableCache) {
     if (
       key.length === cacheKey.length &&
-      key.every((k, i) => k === cacheKey[i])
+      key.every((k, i) => Object.is(k, cacheKey[i]))
     ) {
       observable = value;
       break;
@@ -125,7 +125,7 @@ export function useSuspendingObservable<T>(
   React.useEffect(() => {
     const subscription = observable.subscribe({
       next: (val) => {
-        if (val !== value.current) {
+        if (!Object.is(val, value.current)) {
           value.current = val;
           rerender();
         }
