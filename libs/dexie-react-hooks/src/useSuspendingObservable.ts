@@ -1,6 +1,10 @@
+import { Observer, Subscribable, Unsubscribable } from 'dexie';
 import * as React from 'react';
-import { AnySubscription, InteropableObservable } from './useObservable';
 import { usePromise } from './usePromise';
+
+const observableCache = new Map<React.DependencyList, Subscribable<any>>();
+const promiseCache = new Map<Subscribable<any>, Promise<any>>();
+const valueCache = new Map<Subscribable<any>, any>();
 
 /**
  * Subscribes to an observable and returns the latest value.
@@ -10,140 +14,127 @@ import { usePromise } from './usePromise';
  * cacheKey must be globally unique.
  */
 export function useSuspendingObservable<T>(
-  getObservable: (() => InteropableObservable<T>) | InteropableObservable<T>,
+  getObservable: (() => Subscribable<T>) | Subscribable<T>,
   cacheKey: React.DependencyList
 ): T {
-  let observable: InteropableObservable<T>;
-  for (const [key, val] of OBSERVABLES.entries()) {
+  let observable: Subscribable<T> | undefined;
+
+  // Try to find an existing observable for this cache key
+  for (const [key, value] of observableCache) {
     if (
       key.length === cacheKey.length &&
-      key.every((k, i) => Object.is(k, cacheKey[i]))
+      key.every((k, i) => k === cacheKey[i])
     ) {
-      observable = val;
+      observable = value;
       break;
     }
   }
-  //@ts-ignore (because observable might be undefined here)
+
+  // If no observable was found, create a new one
   if (!observable) {
-    observable = typeof getObservable === 'function'
-      ? getObservable()
-      : getObservable;
-    OBSERVABLES.set(cacheKey, observable);
-  }
-  // At this point, observable is always set.
-
-  const incrementRef = () => {
-    const timeout = TIMEOUTS.get(observable);
-    if (timeout != null) clearTimeout(timeout);
-
-    let refCount = REF_COUNTS.get(observable) ?? 0;
-    refCount += 1;
-    REF_COUNTS.set(observable, refCount);
-  };
-
-  const decrementRef = () => {
-    let refCount = REF_COUNTS.get(observable)!;
-    refCount -= 1;
-    REF_COUNTS.set(observable, refCount);
-
-    if (refCount > 0) return;
-
-    const timeout = setTimeout(() => {
-      for (const [key, val] of OBSERVABLES.entries()) {
-        if (val === observable) {
-          OBSERVABLES.delete(key);
-          break;
+    // Create a multicast observable which subscribes to source at most once.
+    const source =
+      typeof getObservable === 'function' ? getObservable() : getObservable;
+    let subscription: Unsubscribable | undefined;
+    const observers = new Set<Observer<T>>();
+    let timeout: ReturnType<typeof setTimeout> | undefined;
+    const newObservable: Subscribable<T> = {
+      subscribe: (observer) => {
+        observers.add(observer);
+        // Cancel the cleanup timer if it's running
+        if (timeout) {
+          clearTimeout(timeout);
+          timeout = undefined;
         }
-      }
-      PROMISES.delete(observable);
-      VALUES.delete(observable);
-      TIMEOUTS.delete(observable);
-      REF_COUNTS.delete(observable);
-    }, 1000);
-    TIMEOUTS.set(observable, timeout);
-  };
+        // If this is the first subscriber, subscribe to the source observable
+        if (!subscription) {
+          subscription = source.subscribe({
+            next: (val) => {
+              valueCache.set(newObservable, val);
+              for (const obs of observers) obs.next?.(val);
+            },
+            error: (err) => {
+              for (const obs of observers) obs.error?.(err);
+            },
+            complete: () => {
+              for (const obs of observers) obs.complete?.();
+            },
+          });
+        }
+        // Otherwise, emit the current value to the new subscriber if any
+        else if (valueCache.has(newObservable)) {
+          observer.next?.(valueCache.get(newObservable)!);
+        }
+        // Return the unsubscriber
+        return {
+          unsubscribe: () => {
+            if (!observers.has(observer)) return;
+            observers.delete(observer);
+            // If this was the last subscriber, schedule cleanup
+            if (observers.size === 0) {
+              timeout = setTimeout(() => {
+                // Unsubscribe source
+                subscription?.unsubscribe();
+                subscription = undefined;
+                // Clean caches
+                valueCache.delete(newObservable);
+                promiseCache.delete(newObservable);
+                for (const [key, value] of observableCache) {
+                  if (value === observable) {
+                    observableCache.delete(key);
+                    break;
+                  }
+                }
+              }, 3000);
+            }
+          },
+        };
+      },
+    };
+    observable = newObservable;
+    observableCache.set(cacheKey, newObservable);
+  }
 
-  let promise: Promise<T> | undefined = PROMISES.get(observable);
+  // Get or initialize promise for first value
+  let promise = promiseCache.get(observable);
   if (!promise) {
     promise = new Promise<T>((resolve, reject) => {
-      if (VALUES.has(observable)) {
-        resolve(VALUES.get(observable)!);
-        return;
-      }
-
-      incrementRef();
-
-      let calledSynchronously = false;
-      let sub: AnySubscription;
-      sub = observable.subscribe(
-        (val) => {
+      const subscription = observable.subscribe({
+        next: (val) => {
           resolve(val);
-          VALUES.set(observable, val);
-          if (!sub) calledSynchronously = true;
-          else unsub(sub);
-          decrementRef();
+          // Unsubscribe in next tick because subscription might not be assigned yet
+          queueMicrotask(() => subscription.unsubscribe());
         },
-        (err) => {
-          reject(err);
-          if (!sub) calledSynchronously = true;
-          else unsub(sub);
-          decrementRef();
-        }
-      );
-      if (calledSynchronously) unsub(sub);
+        error: (err) => reject(err),
+      });
     });
-
-    PROMISES.set(observable, promise);
+    promiseCache.set(observable, promise);
   }
 
-  if (!VALUES.has(observable)) {
-    usePromise(promise);
-  }
+  const initialValue = usePromise(promise);
 
-  const [value, setValue] = React.useState<T>(VALUES.get(observable));
-  const [error, setError] = React.useState<any>(null);
+  const value = React.useRef<T>(initialValue);
+  const [error, setError] = React.useState<unknown>();
+  const rerender = React.useReducer((x) => x + 1, 0)[1];
 
+  // Set the value immediately on every render.
+  // This avoids waiting for effect to run.
+  value.current = valueCache.get(observable);
+
+  // Subscribe to live updates until the source observable changes.
   React.useEffect(() => {
-    incrementRef();
-
-    const sub = observable.subscribe(
-      (val) => {
-        VALUES.set(observable, val);
-        setValue(val);
+    const subscription = observable.subscribe({
+      next: (val) => {
+        if (val !== value.current) {
+          value.current = val;
+          rerender();
+        }
       },
-      (err) => {
-        setError(err);
-      }
-    );
-
-    return () => {
-      unsub(sub);
-      decrementRef();
-    };
+      error: (err) => setError(err),
+    });
+    return () => subscription.unsubscribe();
   }, [observable]);
 
   if (error) throw error;
-  return value;
-}
-
-const OBSERVABLES = new Map<React.DependencyList, InteropableObservable<any>>();
-
-const PROMISES = new WeakMap<InteropableObservable<any>, Promise<any>>();
-
-const VALUES = new WeakMap<InteropableObservable<any>, any>();
-
-const TIMEOUTS = new WeakMap<
-  InteropableObservable<any>,
-  ReturnType<typeof setTimeout>
->();
-
-const REF_COUNTS = new WeakMap<InteropableObservable<any>, number>();
-
-/** Unsubscribes from an observable */
-function unsub(sub: AnySubscription) {
-  if (typeof sub === 'function') {
-    sub();
-  } else {
-    sub.unsubscribe();
-  }
+  return value.current;
 }
