@@ -98,7 +98,7 @@ export function useSuspendingObservable<T>(
             subscription = undefined;
             // Remove this observable from cache
             for (const [key, value] of observableCache) {
-              if (value === observable) {
+              if (value === newObservable) {
                 observableCache.delete(key);
                 break;
               }
