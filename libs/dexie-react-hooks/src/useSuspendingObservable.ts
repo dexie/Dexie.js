@@ -3,8 +3,8 @@ import * as React from 'react';
 import { usePromise } from './usePromise';
 
 const observableCache = new Map<React.DependencyList, Subscribable<any>>();
-const promiseCache = new Map<Subscribable<any>, Promise<any>>();
-const valueCache = new Map<Subscribable<any>, any>();
+const promiseCache = new WeakMap<Subscribable<any>, Promise<any>>();
+const valueCache = new WeakMap<Subscribable<any>, any>();
 
 const CLEANUP_DELAY = 3000; // Time to wait before cleaning up unused observables
 
@@ -54,13 +54,17 @@ export function useSuspendingObservable<T>(
             next: (val) => {
               valueCache.set(newObservable, val);
               // Clone observers in case the list changes during emission
-              for (const obs of [...observers]) obs.next?.(val);
+              for (const obs of new Set(observers)) obs.next?.(val);
             },
             error: (err) => {
-              for (const obs of [...observers]) obs.error?.(err);
+              const lastObservers = new Set(observers);
+              handleFinalize();
+              for (const obs of lastObservers) obs.error?.(err);
             },
             complete: () => {
-              for (const obs of [...observers]) obs.complete?.();
+              const lastObservers = new Set(observers);
+              handleFinalize();
+              for (const obs of lastObservers) obs.complete?.();
             },
           });
         }
@@ -74,24 +78,32 @@ export function useSuspendingObservable<T>(
             if (!observers.has(observer)) return;
             observers.delete(observer);
             // If this was the last subscriber, schedule cleanup
-            if (observers.size === 0) {
-              timeout = setTimeout(() => {
-                // Unsubscribe source
-                subscription?.unsubscribe();
-                subscription = undefined;
-                // Clean caches
-                valueCache.delete(newObservable);
-                promiseCache.delete(newObservable);
-                for (const [key, value] of observableCache) {
-                  if (value === observable) {
-                    observableCache.delete(key);
-                    break;
-                  }
-                }
-              }, CLEANUP_DELAY);
-            }
+            if (observers.size === 0) scheduleCleanup();
           },
         };
+        function handleFinalize() {
+          // Reset this observable to the initial state
+          subscription = undefined;
+          observers.clear();
+          valueCache.delete(newObservable);
+          promiseCache.delete(newObservable);
+          // Schedule cleanup in case nobody subscribes again
+          scheduleCleanup();
+        }
+        function scheduleCleanup() {
+          timeout = setTimeout(() => {
+            // Unsubscribe source if any
+            subscription?.unsubscribe();
+            subscription = undefined;
+            // Remove this observable from cache
+            for (const [key, value] of observableCache) {
+              if (value === observable) {
+                observableCache.delete(key);
+                break;
+              }
+            }
+          }, CLEANUP_DELAY);
+        }
       },
     };
     observable = newObservable;
