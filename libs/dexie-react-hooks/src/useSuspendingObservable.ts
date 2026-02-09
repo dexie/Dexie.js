@@ -44,7 +44,7 @@ export function useSuspendingObservable<T>(
       subscribe: (observer) => {
         observers.add(observer);
         // Cancel the cleanup timer if it's running
-        if (timeout) {
+        if (timeout != null) {
           clearTimeout(timeout);
           timeout = undefined;
         }
@@ -91,6 +91,7 @@ export function useSuspendingObservable<T>(
           scheduleCleanup();
         }
         function scheduleCleanup() {
+          if (timeout != null) return; // Cleanup already scheduled
           timeout = setTimeout(() => {
             // Unsubscribe source if any
             subscription?.unsubscribe();
