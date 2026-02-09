@@ -6,12 +6,14 @@ const observableCache = new Map<React.DependencyList, Subscribable<any>>();
 const promiseCache = new Map<Subscribable<any>, Promise<any>>();
 const valueCache = new Map<Subscribable<any>, any>();
 
+const CLEANUP_DELAY = 3000; // Time to wait before cleaning up unused observables
+
 /**
  * Subscribes to an observable and returns the latest value.
  * Suspends until the first value is received.
  *
- * Calls with the same cacheKey will use the same observable.
- * cacheKey must be globally unique.
+ * Calls with the same cache key will reuse the same observable.
+ * Cache key must be globally unique.
  */
 export function useSuspendingObservable<T>(
   getObservable: (() => Subscribable<T>) | Subscribable<T>,
@@ -51,13 +53,14 @@ export function useSuspendingObservable<T>(
           subscription = source.subscribe({
             next: (val) => {
               valueCache.set(newObservable, val);
-              for (const obs of observers) obs.next?.(val);
+              // Clone observers in case the list changes during emission
+              for (const obs of [...observers]) obs.next?.(val);
             },
             error: (err) => {
-              for (const obs of observers) obs.error?.(err);
+              for (const obs of [...observers]) obs.error?.(err);
             },
             complete: () => {
-              for (const obs of observers) obs.complete?.();
+              for (const obs of [...observers]) obs.complete?.();
             },
           });
         }
@@ -85,7 +88,7 @@ export function useSuspendingObservable<T>(
                     break;
                   }
                 }
-              }, 3000);
+              }, CLEANUP_DELAY);
             }
           },
         };
@@ -119,7 +122,9 @@ export function useSuspendingObservable<T>(
 
   // Set the value immediately on every render.
   // This avoids waiting for effect to run.
-  value.current = valueCache.get(observable);
+  value.current = valueCache.has(observable)
+    ? valueCache.get(observable)!
+    : initialValue;
 
   // Subscribe to live updates until the source observable changes.
   React.useEffect(() => {
