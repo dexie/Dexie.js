@@ -3,7 +3,7 @@ import {
   DBCoreDeleteRequest,
   DBCoreIndex, DBCorePutRequest
 } from 'dexie';
-import { b64LexEncode } from 'dreambase-library/dist/common/b64lex';
+import { b64LexEncode } from 'dexie-cloud-common';
 
 const { toString } = {};
 export function toStringTag(o: Object) {

@@ -1,7 +1,7 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import { loadAccessToken } from '../authentication/authenticate';
-import { BISON, TSON } from '../TSON';
+import { TSON } from '../TSON';
 import { getSyncableTables } from '../helpers/getSyncableTables';
 import { BaseRevisionMapEntry } from '../db/entities/BaseRevisionMapEntry';
 import { HttpError } from '../errors/HttpError';
@@ -93,8 +93,9 @@ export async function syncWithServer(
 
   switch (res.headers.get('content-type')) {
     case 'application/x-bison':
-      return BISON.fromBinary(await res.blob());
-    case 'application/x-bison-stream': //return BisonWebStreamReader(BISON, res);
+    case 'application/x-bison-stream':
+      // BISON format deprecated - throw error if server sends it
+      throw new Error('BISON format no longer supported. Server should send application/json.');
     default:
     case 'application/json': {
       const text = await res.text();

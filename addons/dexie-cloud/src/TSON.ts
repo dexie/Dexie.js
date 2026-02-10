@@ -1,10 +1,11 @@
-import { TypesonSimplified } from 'dreambase-library/dist/typeson-simplified/TypesonSimplified';
-import { Bison } from 'dreambase-library/dist/typeson-simplified/Bison';
-import undefinedDef from 'dreambase-library/dist/typeson-simplified/types/undefined.js';
-import tsonBuiltinDefs from 'dreambase-library/dist/typeson-simplified/presets/builtin.js';
-import { TypeDefSet } from 'dreambase-library/dist/typeson-simplified/TypeDefSet';
+import { 
+  TypesonSimplified, 
+  undefinedTypeDef,
+  builtInTypeDefs,
+  TypeDefSet,
+  fileTypeDef
+} from 'dexie-cloud-common';
 import { PropModSpec, PropModification } from 'dexie';
-import FileDef from "dreambase-library/dist/typeson-simplified/types/File.js";
 
 // Since server revisions are stored in bigints, we need to handle clients without
 // bigint support to not fail when serverRevision is passed over to client.
@@ -70,9 +71,9 @@ const bigIntDef = hasBigIntSupport
     };
 
 const defs: TypeDefSet = {
-  ...undefinedDef,
+  ...undefinedTypeDef,
   ...bigIntDef,
-  ...FileDef,
+  ...fileTypeDef,
   PropModification: {
     test: (val: any) => val instanceof PropModification,
     replace: (propModification: any) => {
@@ -90,6 +91,4 @@ const defs: TypeDefSet = {
   },
 };
 
-export const TSON = TypesonSimplified(tsonBuiltinDefs, defs);
-
-export const BISON = Bison(defs);
+export const TSON = TypesonSimplified(builtInTypeDefs, defs);

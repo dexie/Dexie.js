@@ -1,4 +1,10 @@
 export * from "./types.js";
+
+// TSON - Typed JSON serialization (migrated from dreambase-library)
+export * from "./tson/index.js";
+export * from "./common/base64.js";
+export * from "./common/b64lex.js";
+export * from "./newId.js";
 export * from "./OAuthProviderInfo.js";
 export * from "./AuthProvidersResponse.js";
 export * from "./AuthorizationCodeTokenRequest.js";
