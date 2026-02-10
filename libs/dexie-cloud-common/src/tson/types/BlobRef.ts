@@ -100,7 +100,7 @@ export const arrayBufferBlobRefDef = {
       }
 
       // Check maxInlineSize if forceInline
-      if (ctx?.forceInline && ctx.maxInlineSize && ab.byteLength > ctx.maxInlineSize) {
+      if (ctx?.forceInline && ctx.maxInlineSize != null && ab.byteLength > ctx.maxInlineSize) {
         throw new Error(
           `ArrayBuffer size ${ab.byteLength} exceeds maxInlineSize ${ctx.maxInlineSize}`
         );
@@ -233,7 +233,7 @@ function createTypedArrayBlobRefDef(
           throw new Error('BlobStore.store() must be synchronous');
         }
 
-        if (ctx?.forceInline && ctx.maxInlineSize && buffer.byteLength > ctx.maxInlineSize) {
+        if (ctx?.forceInline && ctx.maxInlineSize != null && buffer.byteLength > ctx.maxInlineSize) {
           throw new Error(
             `${name} size ${buffer.byteLength} exceeds maxInlineSize ${ctx.maxInlineSize}`
           );
