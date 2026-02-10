@@ -192,6 +192,8 @@ function shouldSkipChunk(
   }
 
   // If we have a lastKey for this table, check if chunk is before it
+  // Server must guarantee keys arrive in lexicographically sorted order,
+  // matching their logical ordering (composite keys are pre-encoded/sorted server-side)  
   if (progress.lastKey && progress.lastKey.table === message.tbl) {
     const lastChunkKey = message.objects[message.objects.length - 1]?.key;
     if (lastChunkKey && lastChunkKey <= progress.lastKey.key) {
