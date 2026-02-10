@@ -1,4 +1,4 @@
-import { b64LexEncode, b64LexDecode } from "./common/b64lex.js";
+import { b64LexEncode } from "./common/b64lex.js";
 
 const getRandomValues: (buf: Uint8Array) => void =
   typeof crypto !== "undefined"
@@ -58,14 +58,5 @@ export function newId(): string {
   timePart[5] = time;
   const randomPart = new Uint8Array(a.buffer, 6);
   getRandomValues(randomPart);
-  //randomPart[0] = randomPart[0] & 0x0f | 0x04; // UUID version 4.
-  //randomPart[2] = randomPart[2] & 0x07 | 0x08; // Variant 1.
   return b64LexEncode(a);
 }
-
-/* Vi behöver hookar i Dexie som kan emulera andra typer.
-
-  * hook writing och hook reading
-  * hook transform-key och retransform-key
-
-*/

@@ -4,10 +4,9 @@ import { b64decode, b64encode } from "./base64.js";
 const HEX_PARSER_REGEXP = /[\da-f]{2}/gi;
 
 export function buf2bigint(buf: TypedArray | ArrayBuffer): bigint {
-  let bits = BigInt(8);
+  const bits = BigInt(8);
   let u8a: Uint8Array;
   if (ArrayBuffer.isView(buf)) {
-    bits = BigInt((buf as unknown as { BYTES_PER_ELEMENT: number }).BYTES_PER_ELEMENT * 8);
     u8a = new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength);
   } else {
     u8a = new Uint8Array(buf);

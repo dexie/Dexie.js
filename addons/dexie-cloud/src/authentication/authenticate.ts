@@ -247,7 +247,7 @@ async function userAuthenticate(
     let message = `We're having a problem authenticating right now.`;
     console.error (`Error authenticating`, error);
     if (error instanceof TypeError) {
-      const isOffline = typeof navigator !== undefined && !navigator.onLine;
+      const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
       if (isOffline) {
         message = `You seem to be offline. Please connect to the internet and try again.`;
       } else if (Dexie.debug || (typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1'))) {

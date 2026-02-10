@@ -32,7 +32,7 @@ export async function syncWithServer(
   // Push changes to server using fetch
   //
   const headers: HeadersInit = {
-    Accept: 'application/json, application/x-bison, application/x-bison-stream',
+    Accept: 'application/json',
     'Content-Type': 'application/tson',
   };
   const updatedUser = await loadAccessToken(db);
