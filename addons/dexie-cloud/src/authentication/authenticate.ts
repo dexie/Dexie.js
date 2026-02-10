@@ -4,7 +4,7 @@ import type {
   TokenErrorResponse,
   TokenFinalResponse,
 } from 'dexie-cloud-common';
-import { b64encode } from 'dreambase-library/dist/common/base64';
+import { b64encode } from 'dexie-cloud-common';
 import { BehaviorSubject } from 'rxjs';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { UserLogin } from '../db/entities/UserLogin';

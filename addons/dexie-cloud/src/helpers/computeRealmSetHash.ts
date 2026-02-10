@@ -1,5 +1,5 @@
 import { PersistedSyncState } from '../db/entities/PersistedSyncState';
-import { b64encode } from 'dreambase-library/dist/common/base64';
+import { b64encode } from 'dexie-cloud-common';
 
 export async function computeRealmSetHash({
   realms,
