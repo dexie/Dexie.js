@@ -1,0 +1,42 @@
+name: dexie-cloud-common Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - master
+    paths:
+      - 'libs/dexie-cloud-common/**'
+      - '.github/workflows/dexie-cloud-common.yml'
+  pull_request:
+    types: [opened, synchronize, reopened]
+    paths:
+      - 'libs/dexie-cloud-common/**'
+      - '.github/workflows/dexie-cloud-common.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --no-frozen-lockfile
+
+      - name: Build dexie-cloud-common
+        run: pnpm --filter dexie-cloud-common run build
+
+      - name: Run tests
+        run: pnpm --filter dexie-cloud-common test
