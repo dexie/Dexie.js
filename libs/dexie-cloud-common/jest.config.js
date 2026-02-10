@@ -4,5 +4,8 @@ export default {
   transform: {
     "^.+.tsx?$": ["ts-jest",{}],
   },
-  testPathIgnorePatterns: ["/dist/"]
+  testPathIgnorePatterns: ["/dist/"],
+  moduleNameMapper: {
+    "^(\\.{1,2}/.*)\\.js$": "$1"
+  }
 };
