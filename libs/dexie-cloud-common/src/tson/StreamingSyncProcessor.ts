@@ -233,11 +233,15 @@ export async function processStreamingSync(
   };
 
   let footer: StreamSyncFooter | null = null;
+  let finished = false;
 
   try {
     while (true) {
       const { done, value } = await reader.read();
-      if (done) break;
+      if (done) {
+        finished = true;
+        break;
+      }
 
       // Append to buffer and process complete lines
       buffer += decoder.decode(value, { stream: true });
@@ -321,6 +325,9 @@ export async function processStreamingSync(
 
     return footer;
   } finally {
+    if (!finished) {
+      await reader.cancel().catch(()=>{});
+    }
     reader.releaseLock();
   }
 }
