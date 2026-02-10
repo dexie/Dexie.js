@@ -28,6 +28,55 @@ describe('TypesonSimplified', () => {
     test('handles null', () => {
       expect(TSON.parse(TSON.stringify(null))).toBe(null);
     });
+
+    test('stringifies plain objects same as JSON', () => {
+      const plainObject = { foo: "bar" };
+      const tson = TSON.stringify(plainObject);
+      expect(tson).toBe(JSON.stringify(plainObject));
+      expect(TSON.parse(tson)).toStrictEqual(plainObject);
+    });
+
+    test('stringifies plain arrays same as JSON', () => {
+      const plainArray = [{ foo: "bar" }, 5, "dfd"];
+      const tson = TSON.stringify(plainArray);
+      expect(tson).toBe(JSON.stringify(plainArray));
+      expect(TSON.parse(tson)).toStrictEqual(plainArray);
+    });
+
+    test('stringifies object with null value', () => {
+      const objWithNullValue = { foo: null };
+      const tson = TSON.stringify(objWithNullValue);
+      expect(tson).toBe(JSON.stringify(objWithNullValue));
+      expect(TSON.parse(tson)).toStrictEqual(objWithNullValue);
+    });
+
+    test('should not stringify undefined in objects (default behavior)', () => {
+      // Without undefined type def, undefined properties are omitted (like JSON)
+      expect(TSON.stringify({ foo: null, bar: undefined })).toBe(
+        JSON.stringify({ foo: null }),
+      );
+    });
+  });
+
+  describe('$ escaping', () => {
+    test('escapes props named $t', () => {
+      const input = { $t: "fakeType" };
+      const tson = TSON.stringify(input);
+      expect(tson).toBe(JSON.stringify({ $$t: "fakeType" }));
+      expect(TSON.parse(tson)).toStrictEqual(input);
+    });
+
+    test('escapes props starting with $', () => {
+      const tson = TSON.stringify({ $hello: "world" });
+      expect(tson).toBe(JSON.stringify({ $$hello: "world" }));
+      expect(TSON.parse(tson)).toStrictEqual({ $hello: "world" });
+    });
+
+    test('escapes props named $', () => {
+      const tson = TSON.stringify({ $: 3 });
+      expect(tson).toBe(JSON.stringify({ $$: 3 }));
+      expect(TSON.parse(tson)).toStrictEqual({ $: 3 });
+    });
   });
 
   describe('Date', () => {
@@ -45,6 +94,29 @@ describe('TypesonSimplified', () => {
       expect(result.created).toBeInstanceOf(Date);
       expect(result.name).toBe('test');
     });
+
+    test('handles epoch date', () => {
+      const date = new Date(0);
+      const tson = TSON.stringify(date);
+      expect(tson).toBe(JSON.stringify({ $t: "Date", v: "1970-01-01T00:00:00.000Z" }));
+      expect(TSON.parse(tson)).toStrictEqual(date);
+    });
+
+    test('handles invalid Date', () => {
+      const invalidDate = new Date(NaN);
+      const tson = TSON.stringify(invalidDate);
+      expect(tson).toBe(JSON.stringify({ $t: "Date", v: "NaN" }));
+      expect(TSON.parse(tson).getTime()).toBeNaN();
+    });
+
+    test('handles Date in object with invalid Date', () => {
+      const date = new Date(0);
+      const invalidDate = new Date(NaN);
+      const plainObject = { foo: date, bar: invalidDate };
+      const tson = TSON.stringify(plainObject);
+      expect(TSON.parse(tson).foo).toStrictEqual(plainObject.foo);
+      expect(TSON.parse(tson).bar.getTime()).toBeNaN();
+    });
   });
 
   describe('BigInt', () => {
@@ -58,6 +130,21 @@ describe('TypesonSimplified', () => {
     test('handles negative BigInt', () => {
       const bigint = BigInt('-123456789012345678901234567890');
       expect(TSON.parse(TSON.stringify(bigint))).toBe(bigint);
+    });
+
+    test('handles array of BigInts including special values', () => {
+      const golem96 =
+        (BigInt(0xabcd_1234) << BigInt(64)) |
+        (BigInt(0x0000_9876) << BigInt(32)) |
+        BigInt(0x8888_7776);
+      const input = [BigInt(0), BigInt(1), BigInt(-1), BigInt(16), golem96];
+      const tson = TSON.stringify(input);
+      const back: typeof input = TSON.parse(tson);
+      expect(back[0]).toBe(BigInt(0));
+      expect(back[1]).toBe(BigInt(1));
+      expect(back[2]).toBe(BigInt(-1));
+      expect(back[3]).toBe(BigInt(16));
+      expect(back[4]).toBe(golem96);
     });
   });
 
@@ -121,6 +208,19 @@ describe('TypesonSimplified', () => {
       expect(result).toBeInstanceOf(Map);
       expect(result.size).toBe(0);
     });
+
+    test('handles Map with nested special types', () => {
+      const m = new Map<string, { foo: Array<number> }>();
+      m.set("foo", { foo: [1, 2, 3, Infinity] });
+      const tson = TSON.stringify(m);
+      expect(tson).toBe(
+        JSON.stringify({
+          $t: "Map",
+          v: [["foo", { foo: [1, 2, 3, { $t: "number", v: "Infinity" }] }]],
+        }),
+      );
+      expect(TSON.parse(tson)).toStrictEqual(m);
+    });
   });
 
   describe('TypedArrays', () => {
@@ -183,6 +283,14 @@ describe('TypesonSimplified', () => {
       expect(result[0]).toBe(Math.PI);
       expect(result[1]).toBe(Math.E);
       expect(result[2]).toBe(Number.MAX_VALUE);
+    });
+
+    test('round-trips Float64Array with specific value', () => {
+      const fa = new Float64Array([19.6]);
+      const fa2 = new Float64Array([19.6]);
+      const tson = TSON.stringify(fa);
+      const back = TSON.parse(tson);
+      expect(back).toStrictEqual(fa2);
     });
 
     test('round-trips BigInt64Array', () => {
