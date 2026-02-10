@@ -334,9 +334,9 @@ export async function processStreamingSync(
  */
 export function buildSyncAcceptHeader(supportsStreaming: boolean): string {
   if (supportsStreaming) {
-    return 'application/x-ndjson-stream, application/x-bison, application/json';
+    return 'application/x-ndjson-stream, application/json';
   }
-  return 'application/json, application/x-bison';
+  return 'application/json';
 }
 
 /**

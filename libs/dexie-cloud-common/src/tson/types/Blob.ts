@@ -21,7 +21,7 @@ export const blobTypeDef = {
         ? (ab.buffer as ArrayBuffer)
         : (ab.buffer as ArrayBuffer).slice(ab.byteOffset, ab.byteOffset + ab.byteLength);
       return typeof Blob !== "undefined"
-        ? new Blob([new Uint8Array(buf)])
+        ? new Blob([new Uint8Array(buf)], { type })
         : new FakeBlob(buf, type);
     },
   },
