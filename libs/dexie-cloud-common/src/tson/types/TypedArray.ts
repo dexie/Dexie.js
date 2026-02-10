@@ -18,7 +18,7 @@ export const typedArrayTypeDefs = [
   (specs, typeName) => ({
     ...specs,
     [typeName]: {
-      // Replace passes the the typed array into $t, buffer so that
+      // Replace passes the typed array into $t, buffer so that
       // the ArrayBuffer typedef takes care of further handling of the buffer:
       // {$t:"Uint8Array",buffer:{$t:"ArrayBuffer",idx:0}}
       // CHANGED ABOVE! Now shortcutting that for more sparse format of the typed arrays
