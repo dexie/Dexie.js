@@ -81,8 +81,18 @@ export class TSONRef<T extends ArrayBuffer | Blob | Uint8Array = ArrayBuffer> {
 
   /**
    * Reconstruct the original type from ArrayBuffer.
+   * Validates byte alignment for TypedArrays that require it.
    */
   reconstruct(data: ArrayBuffer): ArrayBuffer | Blob | Uint8Array {
+    // Helper to validate alignment for multi-byte TypedArrays
+    const validateAlignment = (bytesPerElement: number, typeName: string) => {
+      if (data.byteLength % bytesPerElement !== 0) {
+        throw new RangeError(
+          `Buffer length ${data.byteLength} is not aligned to ${bytesPerElement} bytes for ${typeName}`
+        );
+      }
+    };
+
     switch (this.type) {
       case 'ArrayBuffer':
         return data;
@@ -93,26 +103,34 @@ export class TSONRef<T extends ArrayBuffer | Blob | Uint8Array = ArrayBuffer> {
       case 'Blob':
         return new Blob([data], { type: this.contentType });
 
-      // Handle other TypedArrays
+      // Handle other TypedArrays with alignment validation
       case 'Int8Array':
         return new Int8Array(data) as unknown as Uint8Array;
       case 'Uint8ClampedArray':
         return new Uint8ClampedArray(data) as unknown as Uint8Array;
       case 'Int16Array':
+        validateAlignment(2, 'Int16Array');
         return new Int16Array(data) as unknown as Uint8Array;
       case 'Uint16Array':
+        validateAlignment(2, 'Uint16Array');
         return new Uint16Array(data) as unknown as Uint8Array;
       case 'Int32Array':
+        validateAlignment(4, 'Int32Array');
         return new Int32Array(data) as unknown as Uint8Array;
       case 'Uint32Array':
+        validateAlignment(4, 'Uint32Array');
         return new Uint32Array(data) as unknown as Uint8Array;
       case 'Float32Array':
+        validateAlignment(4, 'Float32Array');
         return new Float32Array(data) as unknown as Uint8Array;
       case 'Float64Array':
+        validateAlignment(8, 'Float64Array');
         return new Float64Array(data) as unknown as Uint8Array;
       case 'BigInt64Array':
+        validateAlignment(8, 'BigInt64Array');
         return new BigInt64Array(data) as unknown as Uint8Array;
       case 'BigUint64Array':
+        validateAlignment(8, 'BigUint64Array');
         return new BigUint64Array(data) as unknown as Uint8Array;
 
       default:
@@ -225,18 +243,22 @@ export function collectTSONRefs(obj: unknown, refs: TSONRef[] = []): TSONRef[] {
 
 /**
  * Replace TSONRef instances with resolved data in-place.
+ * 
+ * Note: If the root object itself is a TSONRef, it cannot be replaced in-place.
+ * In that case, use the returned value instead.
  *
  * @param obj - Object tree to process
  * @param resolver - Function to fetch blob data
  * @param concurrency - Max concurrent fetches (default 5)
+ * @returns The resolved value if root is a TSONRef, otherwise undefined
  */
 export async function replaceTSONRefs(
   obj: unknown,
   resolver: TSONRefResolver,
   concurrency = 5
-): Promise<void> {
+): Promise<ArrayBuffer | Blob | Uint8Array | undefined> {
   const refs = collectTSONRefs(obj);
-  if (refs.length === 0) return;
+  if (refs.length === 0) return undefined;
 
   // Fetch all unique refs with concurrency limit
   const resolved = new Map<string, ArrayBuffer>();
@@ -252,8 +274,20 @@ export async function replaceTSONRefs(
     );
   }
 
-  // Replace refs with resolved data
+  // Handle root-level TSONRef - cannot replace in-place, return resolved value
+  if (TSONRef.isTSONRef(obj)) {
+    const data = resolved.get(obj.ref);
+    return data ? obj.reconstruct(data) : undefined;
+  }
+  if (TSONRef.isTSONRefData(obj)) {
+    const ref = TSONRef.fromData(obj);
+    const data = resolved.get(ref.ref);
+    return data ? ref.reconstruct(data) : undefined;
+  }
+
+  // Replace refs with resolved data in nested objects
   replaceRefsInPlace(obj, resolved);
+  return undefined;
 }
 
 function replaceRefsInPlace(

@@ -6,7 +6,7 @@ export type TypeDefSet = {
   number?: TypeDef<number>;
   undefined?: TypeDef<undefined>;
   bigint?: TypeDef<bigint>;
-  symbol?: TypeDef<Symbol>;
+  symbol?: TypeDef<symbol>;
   function?: TypeDef<Function>;
   ArrayBuffer?: TypeDef<ArrayBuffer>;
   Date?: TypeDef<Date>;
