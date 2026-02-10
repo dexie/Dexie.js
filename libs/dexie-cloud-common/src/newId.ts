@@ -11,7 +11,7 @@ const getRandomValues: (buf: Uint8Array) => void =
 
 let time = 0;
 /**
- * Generates a valid version 4 UUID but replacing bytes 0-6 with a timestampish value
+ * Generates unique ID where bytes 0-6 represents a timestampish value
  * instead of random, similary to UUID version 1 but with random istead of MAC address.
  *
  * With "timestampish" we mean milliseconds from 1970 approximately, as in bulk-creation
