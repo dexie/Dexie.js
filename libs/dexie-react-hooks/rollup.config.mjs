@@ -26,7 +26,10 @@ export default {
   }],
   external: ['dexie', 'react', 'react-dom'],
   plugins: [
-    typescript(),
+    typescript({
+      module: 'esnext',
+      target: 'es2022'
+    }),
     nodeResolve({
       browser: true,
       preferBuiltins: false
