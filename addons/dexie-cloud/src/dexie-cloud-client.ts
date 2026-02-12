@@ -19,6 +19,7 @@ import { throwVersionIncrementNeeded } from './helpers/throwVersionIncrementNeed
 import { createIdGenerationMiddleware } from './middlewares/createIdGenerationMiddleware';
 import { createImplicitPropSetterMiddleware } from './middlewares/createImplicitPropSetterMiddleware';
 import { createMutationTrackingMiddleware } from './middlewares/createMutationTrackingMiddleware';
+import { createBlobResolveMiddleware } from './middlewares/blobResolveMiddleware';
 //import { dexieCloudSyncProtocol } from "./dexieCloudSyncProtocol";
 import { overrideParseStoresSpec } from './overrideParseStoresSpec';
 import { performInitialSync } from './performInitialSync';
@@ -290,6 +291,7 @@ export function dexieCloud(dexie: Dexie) {
   );
   dexie.use(createImplicitPropSetterMiddleware(DexieCloudDB(dexie)));
   dexie.use(createIdGenerationMiddleware(DexieCloudDB(dexie)));
+  dexie.use(createBlobResolveMiddleware(DexieCloudDB(dexie)));
 
   async function onDbReady(dexie: Dexie) {
     closed = false; // As Dexie calls us, we are not closed anymore. Maybe reopened? Remember db.ready event is registered with sticky flag!

@@ -1,0 +1,145 @@
+/**
+ * DBCore Middleware for resolving BlobRefs on read
+ * 
+ * This middleware intercepts read operations and resolves any BlobRefs
+ * found in objects marked with $unresolved.
+ * 
+ * Important: Avoids async/await to preserve Dexie's Promise.PSD context.
+ * Uses Dexie.waitFor() only for explicit rw transactions to keep them alive.
+ * For readonly or implicit transactions, resolves directly (no waitFor needed).
+ */
+
+import Dexie, { DBCore, DBCoreGetManyRequest, DBCoreGetRequest, DBCoreQueryRequest, DBCoreTable, DBCoreTransaction } from 'dexie';
+import { DexieCloudDB } from '../db/DexieCloudDB';
+import { hasUnresolvedBlobRefs, resolveAllBlobRefs } from '../sync/blobResolve';
+
+export function createBlobResolveMiddleware(db: DexieCloudDB) {
+  return {
+    stack: 'dbcore' as const,
+    name: 'blobResolve',
+    create(downlevelDatabase: DBCore): DBCore {
+      return {
+        ...downlevelDatabase,
+        table(tableName: string): DBCoreTable {
+          const downlevelTable = downlevelDatabase.table(tableName);
+          
+          // Skip internal tables
+          if (tableName.startsWith('$')) {
+            return downlevelTable;
+          }
+
+          return {
+            ...downlevelTable,
+
+            get(req: DBCoreGetRequest) {
+              return downlevelTable.get(req).then(result => {
+                if (result && hasUnresolvedBlobRefs(result)) {
+                  return resolveAndSave(db, downlevelTable, req.trans, result);
+                }
+                return result;
+              });
+            },
+
+            getMany(req: DBCoreGetManyRequest) {
+              return downlevelTable.getMany(req).then(results => {
+                // Check if any results need resolution
+                const needsResolution = results.some(r => r && hasUnresolvedBlobRefs(r));
+                if (!needsResolution) return results;
+                
+                return Dexie.Promise.all(
+                  results.map(result => {
+                    if (result && hasUnresolvedBlobRefs(result)) {
+                      return resolveAndSave(db, downlevelTable, req.trans, result);
+                    }
+                    return result;
+                  })
+                );
+              });
+            },
+
+            query(req: DBCoreQueryRequest) {
+              return downlevelTable.query(req).then(result => {
+                if (!result.result || !Array.isArray(result.result)) return result;
+                
+                // Check if any results need resolution
+                const needsResolution = result.result.some(r => r && hasUnresolvedBlobRefs(r));
+                if (!needsResolution) return result;
+                
+                return Dexie.Promise.all(
+                  result.result.map(item => {
+                    if (item && hasUnresolvedBlobRefs(item)) {
+                      return resolveAndSave(db, downlevelTable, req.trans, item);
+                    }
+                    return item;
+                  })
+                ).then(resolved => ({ ...result, result: resolved }));
+              });
+            },
+          };
+        },
+      };
+    },
+  };
+}
+
+/**
+ * Resolve BlobRefs in an object and save the resolved version back to DB.
+ * 
+ * Uses Dexie.waitFor() only when needed:
+ * - Skip waitFor for readonly ('r') transactions
+ * - Skip waitFor for implicit transactions (most common in liveQuery)
+ * - Use waitFor only for explicit rw transactions that need to stay alive
+ * 
+ * Returns Dexie.Promise to preserve PSD context.
+ */
+function resolveAndSave(
+  db: DexieCloudDB,
+  table: DBCoreTable,
+  trans: DBCoreTransaction,
+  obj: any
+): PromiseLike<any> {
+  const accessToken = db.cloud.currentUser.value?.accessToken;
+  if (!accessToken) {
+    console.warn('No access token available for blob resolution');
+    return Dexie.Promise.resolve(obj);
+  }
+
+  // Determine if we need waitFor:
+  // - Only for explicit transactions (currentTransaction exists and has idbtrans)
+  // - Only for readwrite mode (not 'readonly')
+  const currentTx = Dexie.currentTransaction;
+  const isExplicitRwTransaction = currentTx && 
+    currentTx.idbtrans && 
+    currentTx.mode !== 'readonly';
+
+  // Create the resolution promise
+  const resolutionPromise = resolveAllBlobRefs(obj, accessToken);
+  
+  // Wrap with waitFor only if needed to keep explicit rw transaction alive
+  const resolvePromise = isExplicitRwTransaction
+    ? Dexie.waitFor(resolutionPromise)
+    : Dexie.Promise.resolve(resolutionPromise);
+
+  return resolvePromise.then(resolved => {
+    // Get primary key from the object
+    const primaryKey = table.schema.primaryKey;
+    const key = primaryKey.keyPath 
+      ? Dexie.getByKeyPath(obj, primaryKey.keyPath as string)
+      : undefined;
+
+    if (key !== undefined) {
+      // Save the resolved object back to DB in a separate microtask
+      // to avoid blocking the read operation
+      queueMicrotask(() => {
+        db.table(table.name).put(resolved).catch(err => {
+          console.warn(`Failed to save resolved blob for ${table.name}:${key}:`, err);
+        });
+      });
+    }
+
+    return resolved;
+  }).catch(err => {
+    console.error('Failed to resolve BlobRefs:', err);
+    return obj; // Return original object on error
+  });
+}
