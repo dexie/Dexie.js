@@ -5,6 +5,8 @@ import {
   getDbNameFromDbUrl,
 } from 'dexie-cloud-common';
 import { BehaviorSubject, combineLatest, firstValueFrom, from, fromEvent, Subject } from 'rxjs';
+import { createBlobProgress } from './sync/blobProgress';
+import { downloadUnresolvedBlobs } from './sync/eagerBlobDownloader';
 import { filter, map, skip, startWith, switchMap, take } from 'rxjs/operators';
 import { login } from './authentication/login';
 import { UNAUTHORIZED_USER } from './authentication/UNAUTHORIZED_USER';
@@ -148,6 +150,7 @@ export function dexieCloud(dexie: Dexie) {
     persistedSyncState: new BehaviorSubject<PersistedSyncState | undefined>(
       undefined
     ),
+    blobProgress: createBlobProgress(),
     userInteraction: new BehaviorSubject<DXCUserInteraction | undefined>(
       undefined
     ),
@@ -308,6 +311,23 @@ export function dexieCloud(dexie: Dexie) {
 
     // Forward db.syncCompleteEvent to be publicly consumable via db.cloud.events.syncComplete:
     subscriptions.push(db.syncCompleteEvent.subscribe(syncComplete));
+
+    // Eager blob download: When blobMode='eager' (default), download unresolved blobs after sync
+    subscriptions.push(
+      db.syncCompleteEvent.subscribe(async () => {
+        const blobMode = db.cloud.options?.blobMode ?? 'eager';
+        if (blobMode !== 'eager') return;
+
+        const accessToken = db.cloud.currentUser.value?.accessToken;
+        if (!accessToken) return;
+
+        try {
+          await downloadUnresolvedBlobs(db, accessToken, dexie.cloud.blobProgress);
+        } catch (err) {
+          console.error('[dexie-cloud] Eager blob download failed:', err);
+        }
+      })
+    );
 
     //verifyConfig(db.cloud.options); Not needed (yet at least!)
     // Verify the user has allowed version increment.

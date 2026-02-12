@@ -10,6 +10,24 @@ import { DexieCloudSyncOptions } from "./DexieCloudSyncOptions";
 import { Invite } from './Invite';
 import { BehaviorSubject, Observable } from 'rxjs';
 
+/** Progress state for blob downloads */
+export interface BlobProgress {
+  /** Whether blob downloads are currently in progress */
+  isDownloading: boolean;
+  
+  /** Number of blobs remaining to download */
+  blobsRemaining: number;
+  
+  /** Total bytes remaining to download (estimated from BlobRef.$size) */
+  bytesRemaining: number;
+  
+  /** Total bytes already downloaded in current session */
+  bytesDownloaded: number;
+  
+  /** Number of blobs downloaded in current session */
+  blobsDownloaded: number;
+}
+
 /** The API of db.cloud, where `db` is an instance of Dexie with dexie-cloud-addon active.
  */
 
@@ -52,6 +70,15 @@ export interface DexieCloudAPI {
 
   // Observable of persisted sync state
   persistedSyncState: BehaviorSubject<PersistedSyncState | undefined>;
+
+  /** Observable of blob download progress.
+   * 
+   * Shows the current state of background blob downloads (when blobMode='eager')
+   * or provides insight into unresolved blobs (when blobMode='lazy').
+   * 
+   * Use this to show progress indicators or "downloading for offline" status.
+   */
+  blobProgress: BehaviorSubject<BlobProgress>;
 
   events: {
     syncComplete: Observable<void>;
