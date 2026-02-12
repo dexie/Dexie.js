@@ -5,7 +5,7 @@
  * and resolving BlobRefs when reading from the database.
  */
 
-import { newId } from 'dexie-cloud-common';
+import { newId, DBOperationsSet, DBOperation } from 'dexie-cloud-common';
 
 // Blobs >= 4KB are offloaded to blob storage
 const BLOB_OFFLOAD_THRESHOLD = 4096;
@@ -223,4 +223,139 @@ export async function resolveBlobs(
   }
   
   return obj;
+}
+
+/**
+ * Process a DBOperationsSet and offload any large blobs
+ * Returns a new DBOperationsSet with blobs replaced by BlobRefs
+ */
+export async function offloadBlobsInOperations(
+  operations: DBOperationsSet,
+  databaseUrl: string,
+  accessToken: string
+): Promise<DBOperationsSet> {
+  const result: DBOperationsSet = [];
+  
+  for (const tableOps of operations) {
+    const processedMuts: DBOperation[] = [];
+    
+    for (const mut of tableOps.muts) {
+      const processedMut = await offloadBlobsInOperation(mut, databaseUrl, accessToken);
+      processedMuts.push(processedMut);
+    }
+    
+    result.push({
+      table: tableOps.table,
+      muts: processedMuts,
+    });
+  }
+  
+  return result;
+}
+
+async function offloadBlobsInOperation(
+  op: DBOperation,
+  databaseUrl: string,
+  accessToken: string
+): Promise<DBOperation> {
+  switch (op.type) {
+    case 'insert':
+    case 'upsert': {
+      const processedValues = await Promise.all(
+        op.values.map(value => offloadBlobs(value, databaseUrl, accessToken))
+      );
+      return {
+        ...op,
+        values: processedValues,
+      };
+    }
+    
+    case 'update': {
+      const processedChangeSpecs = await Promise.all(
+        op.changeSpecs.map(spec => offloadBlobs(spec, databaseUrl, accessToken))
+      );
+      return {
+        ...op,
+        changeSpecs: processedChangeSpecs as { [keyPath: string]: any }[],
+      };
+    }
+    
+    case 'modify': {
+      const processedChangeSpec = await offloadBlobs(op.changeSpec, databaseUrl, accessToken);
+      return {
+        ...op,
+        changeSpec: processedChangeSpec as { [keyPath: string]: any },
+      };
+    }
+    
+    case 'delete':
+      // No blobs in delete operations
+      return op;
+    
+    default:
+      return op;
+  }
+}
+
+/**
+ * Check if there are any large blobs in the operations that need offloading
+ * This is a quick check to avoid unnecessary processing
+ */
+export function hasLargeBlobsInOperations(operations: DBOperationsSet): boolean {
+  for (const tableOps of operations) {
+    for (const mut of tableOps.muts) {
+      if (hasLargeBlobsInOperation(mut)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
+function hasLargeBlobsInOperation(op: DBOperation): boolean {
+  switch (op.type) {
+    case 'insert':
+    case 'upsert':
+      return op.values.some(value => hasLargeBlobs(value));
+    case 'update':
+      return op.changeSpecs.some(spec => hasLargeBlobs(spec));
+    case 'modify':
+      return hasLargeBlobs(op.changeSpec);
+    default:
+      return false;
+  }
+}
+
+function hasLargeBlobs(obj: unknown, visited = new WeakSet()): boolean {
+  if (obj === null || obj === undefined) {
+    return false;
+  }
+  
+  if (shouldOffloadBlob(obj)) {
+    return true;
+  }
+  
+  if (Array.isArray(obj)) {
+    return obj.some(item => hasLargeBlobs(item, visited));
+  }
+  
+  if (typeof obj === 'object') {
+    if (visited.has(obj)) {
+      return false;
+    }
+    visited.add(obj);
+    
+    if (obj instanceof Date || obj instanceof RegExp) {
+      return false;
+    }
+    
+    // Small blobs don't need offloading
+    if (obj instanceof Blob || obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
+      return false;
+    }
+    
+    return Object.values(obj).some(value => hasLargeBlobs(value, visited));
+  }
+  
+  return false;
 }
