@@ -18,6 +18,8 @@ jobs:
     # Only run if the triggering workflow succeeded
     if: ${{ github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
+    env:
+      NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -67,23 +69,18 @@ jobs:
 
       - name: Publish dexie with CI tag
         run: pnpm publish --filter dexie --tag ci --no-git-checks --access public
-        continue-on-error: true  # Don't fail if already published
 
       - name: Publish dexie-cloud-common with CI tag
         run: pnpm publish --filter dexie-cloud-common --tag ci --no-git-checks --access public
-        continue-on-error: true
 
       - name: Publish y-dexie with CI tag
         run: pnpm publish --filter y-dexie --tag ci --no-git-checks --access public
-        continue-on-error: true
 
       - name: Publish dexie-react-hooks with CI tag
         run: pnpm publish --filter dexie-react-hooks --tag ci --no-git-checks --access public
-        continue-on-error: true
 
       - name: Publish dexie-cloud-addon with CI tag
         run: pnpm publish --filter dexie-cloud-addon --tag ci --no-git-checks --access public
-        continue-on-error: true
 
       - name: Summary
         run: |
