@@ -37,7 +37,7 @@ jobs:
           cache: 'pnpm'
 
       - name: Install dependencies
-        run: pnpm install --no-frozen-lockfile
+        run: pnpm install
 
       - name: Build all packages
         run: |
@@ -63,8 +63,7 @@ jobs:
       - name: Update versions for CI publish
         run: |
           # Update all package versions with CI suffix
-          # This uses pnpm's built-in version command with prerelease identifier
-          pnpm -r exec -- npm version prerelease --preid=${{ steps.version.outputs.suffix }} --no-git-tag-version || true
+          pnpm -r exec -- npm version prerelease --preid=${{ steps.version.outputs.suffix }} --no-git-tag-version
 
       - name: Publish dexie with CI tag
         run: pnpm publish --filter dexie --tag ci --no-git-checks --access public
