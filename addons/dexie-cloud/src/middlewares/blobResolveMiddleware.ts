@@ -105,18 +105,31 @@ function resolveAndSave(
   }
 
   // Determine if we need waitFor:
-  // - Only for explicit transactions (currentTransaction exists and has idbtrans)
-  // - Only for readwrite mode (not 'readonly')
+  // Skip waitFor ONLY if BOTH conditions are met:
+  //   1. readonly transaction
+  //   2. implicit (non-explicit) transaction
+  // 
+  // Implicit transactions are auto-created by Dexie for single operations.
+  // They don't need waitFor because Dexie will handle the async automatically.
+  // 
+  // Explicit transactions (db.transaction()) need waitFor to keep the
+  // IDB transaction alive during the async blob fetch.
+  //
+  // Detection: If idbtrans exists, the transaction is active and explicit.
+  // If mode is 'readonly' and no idbtrans yet, it's an implicit readonly.
   const currentTx = Dexie.currentTransaction;
-  const isExplicitRwTransaction = currentTx && 
-    currentTx.idbtrans && 
-    currentTx.mode !== 'readonly';
+  const isReadonly = currentTx?.mode === 'readonly';
+  const hasActiveIdbTrans = currentTx?.idbtrans != null;
+  
+  // Skip waitFor only for implicit readonly (most common case: liveQuery)
+  const skipWaitFor = isReadonly && !hasActiveIdbTrans;
+  const needsWaitFor = currentTx && !skipWaitFor;
 
   // Create the resolution promise
   const resolutionPromise = resolveAllBlobRefs(obj, accessToken);
   
-  // Wrap with waitFor only if needed to keep explicit rw transaction alive
-  const resolvePromise = isExplicitRwTransaction
+  // Wrap with waitFor to keep transaction alive during fetch
+  const resolvePromise = needsWaitFor
     ? Dexie.waitFor(resolutionPromise)
     : Dexie.Promise.resolve(resolutionPromise);
 
