@@ -7,13 +7,20 @@
  * Important: Avoids async/await to preserve Dexie's Promise.PSD context.
  * Uses Dexie.waitFor() only for explicit rw transactions to keep them alive.
  * For readonly or implicit transactions, resolves directly (no waitFor needed).
+ * 
+ * Resolved blobs are queued for saving via BlobSavingQueue, which uses
+ * setTimeout(fn, 0) to completely isolate from Dexie's transaction context.
  */
 
 import Dexie, { DBCore, DBCoreGetManyRequest, DBCoreGetRequest, DBCoreQueryRequest, DBCoreTable, DBCoreTransaction } from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { hasUnresolvedBlobRefs, resolveAllBlobRefs } from '../sync/blobResolve';
+import { BlobSavingQueue } from '../sync/BlobSavingQueue';
 
 export function createBlobResolveMiddleware(db: DexieCloudDB) {
+  // Create a single queue instance for this database
+  const blobSavingQueue = new BlobSavingQueue(db);
+  
   return {
     stack: 'dbcore' as const,
     name: 'blobResolve',
@@ -34,7 +41,7 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
             get(req: DBCoreGetRequest) {
               return downlevelTable.get(req).then(result => {
                 if (result && hasUnresolvedBlobRefs(result)) {
-                  return resolveAndSave(db, downlevelTable, req.trans, result);
+                  return resolveAndSave(db, downlevelTable, req.trans, result, blobSavingQueue);
                 }
                 return result;
               });
@@ -49,7 +56,7 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
                 return Dexie.Promise.all(
                   results.map(result => {
                     if (result && hasUnresolvedBlobRefs(result)) {
-                      return resolveAndSave(db, downlevelTable, req.trans, result);
+                      return resolveAndSave(db, downlevelTable, req.trans, result, blobSavingQueue);
                     }
                     return result;
                   })
@@ -68,7 +75,7 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
                 return Dexie.Promise.all(
                   result.result.map(item => {
                     if (item && hasUnresolvedBlobRefs(item)) {
-                      return resolveAndSave(db, downlevelTable, req.trans, item);
+                      return resolveAndSave(db, downlevelTable, req.trans, item, blobSavingQueue);
                     }
                     return item;
                   })
@@ -83,7 +90,7 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
 }
 
 /**
- * Resolve BlobRefs in an object and save the resolved version back to DB.
+ * Resolve BlobRefs in an object and queue the resolved version for saving.
  * 
  * Uses Dexie.waitFor() only when needed:
  * - Skip waitFor for readonly ('r') transactions
@@ -96,7 +103,8 @@ function resolveAndSave(
   db: DexieCloudDB,
   table: DBCoreTable,
   trans: DBCoreTransaction,
-  obj: any
+  obj: any,
+  blobSavingQueue: BlobSavingQueue
 ): PromiseLike<any> {
   const accessToken = db.cloud.currentUser.value?.accessToken;
   if (!accessToken) {
@@ -136,13 +144,10 @@ function resolveAndSave(
       : undefined;
 
     if (key !== undefined) {
-      // Save the resolved object back to DB in a separate microtask
-      // to avoid blocking the read operation
-      queueMicrotask(() => {
-        db.table(table.name).put(resolved).catch(err => {
-          console.warn(`Failed to save resolved blob for ${table.name}:${key}:`, err);
-        });
-      });
+      // Queue the resolved object for saving via BlobSavingQueue
+      // This uses setTimeout(fn, 0) to completely isolate from 
+      // Dexie's transaction context (avoids inheriting PSD)
+      blobSavingQueue.saveBlob(table.name, resolved, key);
     }
 
     return resolved;
