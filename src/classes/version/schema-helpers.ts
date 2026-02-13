@@ -462,7 +462,16 @@ export function adjustToExistingIndexNames(db: Dexie, schema: DbSchema, idbtrans
 }
 
 export function parseIndexSyntax(primKeyAndIndexes: string): IndexSpec[] {
-  return primKeyAndIndexes.split(',').map((index, indexNum) => {
+  // Filter out empty entries first to handle template strings with leading newlines.
+  // This ensures the first non-empty entry gets indexNum === 0 (primary key).
+  const entries = primKeyAndIndexes.split(',').filter(s => s.trim());
+  
+  // Handle empty string case for backward compatibility (parseIndexSyntax("")[0] should return a spec)
+  if (entries.length === 0) {
+    return [createIndexSpec('', null, false, false, false, false, true, undefined)];
+  }
+
+  return entries.map((index, indexNum) => {
     const typeSplit = index.split(':');
     const type = typeSplit[1]?.trim();
     index = typeSplit[0].trim();

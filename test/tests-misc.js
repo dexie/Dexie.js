@@ -497,3 +497,35 @@ promisedTest("Issue #1890 - BigInt64Array getting corrupted after an update", as
     val = await db.foo.get(1);
     ok(val.cols[0].values instanceof BigInt64Array, "cols[0].values is still a BigInt64Array after update");
 });
+
+promisedTest("Template string schema with leading newline should work", async () => {
+    // Test that schema can be declared with template strings that have leading newlines
+    // This is a common pattern when using multiline template strings for readability
+    const testDb = new Dexie("TestTemplateStringSchema");
+    try {
+        testDb.version(1).stores({
+            items: `
+                ++id,
+                name,
+                category
+            `
+        });
+        await testDb.open();
+        
+        // Verify the schema was parsed correctly
+        const schema = testDb.table('items').schema;
+        equal(schema.primKey.name, 'id', "Primary key should be 'id'");
+        equal(schema.primKey.auto, true, "Primary key should be auto-increment");
+        ok(schema.indexes.some(idx => idx.name === 'name'), "Should have 'name' index");
+        ok(schema.indexes.some(idx => idx.name === 'category'), "Should have 'category' index");
+        
+        // Test that we can actually add items
+        const insertedId = await testDb.items.add({ name: 'Test', category: 'A' });
+        ok(insertedId > 0, "Should be able to add items with auto-generated id");
+        
+        const item = await testDb.items.get(insertedId);
+        equal(item.name, 'Test', "Item should have correct name");
+    } finally {
+        await testDb.delete();
+    }
+});
