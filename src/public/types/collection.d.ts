@@ -43,6 +43,6 @@ export interface Collection<T=any, TKey=IndexableType, TInsertType=T> {
   until(filter: (value: T) => boolean, includeStopEntry?: boolean): Collection<T, TKey, TInsertType>;
   // Mutating methods
   delete(): PromiseExtended<number>;
-  modify(changeCallback: (obj: T, ctx:{value: TInsertType}) => void | boolean): PromiseExtended<number>;
+  modify(changeCallback: (obj: T, ctx:{value: TInsertType}) => any): PromiseExtended<number>;
   modify(changes: UpdateSpec<TInsertType>): PromiseExtended<number>;
 }
