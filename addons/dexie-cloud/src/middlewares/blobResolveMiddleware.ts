@@ -97,7 +97,7 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
             openCursor(req: DBCoreOpenCursorRequest) {
               return downlevelTable.openCursor(req).then(cursor => {
                 if (!cursor) return cursor;
-                return createBlobResolvingCursor(cursor, db, downlevelTable, req.trans, blobSavingQueue);
+                return createBlobResolvingCursor(cursor, downlevelTable, blobSavingQueue);
               });
             },
           };
@@ -116,9 +116,7 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
  */
 function createBlobResolvingCursor(
   cursor: DBCoreCursor,
-  db: DexieCloudDB,
   table: DBCoreTable,
-  trans: DBCoreTransaction,
   blobSavingQueue: BlobSavingQueue
 ): DBCoreCursor {
   // Cache for resolved value - null means not yet checked/resolved
