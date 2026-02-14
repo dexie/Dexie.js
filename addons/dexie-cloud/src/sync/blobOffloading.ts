@@ -137,6 +137,16 @@ export async function offloadBlobs(
     return uploadBlob(databaseUrl, accessToken, obj);
   }
   
+  if (typeof obj !== 'object') {
+    return obj;
+  }
+  
+  // Avoid circular references - check BEFORE processing
+  if (visited.has(obj)) {
+    return obj;
+  }
+  visited.add(obj);
+  
   // Handle arrays
   if (Array.isArray(obj)) {
     const result: unknown[] = [];
@@ -146,32 +156,26 @@ export async function offloadBlobs(
     return result;
   }
   
-  // Handle objects
-  if (typeof obj === 'object') {
-    // Avoid circular references
-    if (visited.has(obj)) {
-      return obj;
-    }
-    visited.add(obj);
-    
-    // Skip special objects
-    if (obj instanceof Date || obj instanceof RegExp) {
-      return obj;
-    }
-    
-    // Skip small blobs
-    if (obj instanceof Blob || obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
-      return obj;
-    }
-    
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = await offloadBlobs(value, databaseUrl, accessToken, visited);
-    }
-    return result;
+  // Skip special objects
+  if (obj instanceof Date || obj instanceof RegExp) {
+    return obj;
   }
   
-  return obj;
+  // Skip small blobs
+  if (obj instanceof Blob || obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
+    return obj;
+  }
+  
+  // Only traverse POJOs
+  if (obj.constructor !== Object) {
+    return obj;
+  }
+  
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[key] = await offloadBlobs(value, databaseUrl, accessToken, visited);
+  }
+  return result;
 }
 
 /**
@@ -193,6 +197,16 @@ export async function resolveBlobs(
     return downloadBlob(obj);
   }
   
+  if (typeof obj !== 'object') {
+    return obj;
+  }
+  
+  // Avoid circular references - check BEFORE processing
+  if (visited.has(obj)) {
+    return obj;
+  }
+  visited.add(obj);
+  
   // Handle arrays
   if (Array.isArray(obj)) {
     const result: unknown[] = [];
@@ -202,27 +216,24 @@ export async function resolveBlobs(
     return result;
   }
   
-  // Handle objects
-  if (typeof obj === 'object') {
-    // Avoid circular references
-    if (visited.has(obj)) {
-      return obj;
-    }
-    visited.add(obj);
-    
-    // Skip special objects
-    if (obj instanceof Date || obj instanceof RegExp || obj instanceof Blob) {
-      return obj;
-    }
-    
-    const result: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(obj)) {
-      result[key] = await resolveBlobs(value, visited);
-    }
-    return result;
+  // Skip special objects
+  if (obj instanceof Date || obj instanceof RegExp || obj instanceof Blob) {
+    return obj;
+  }
+  if (obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
+    return obj;
   }
   
-  return obj;
+  // Only traverse POJOs
+  if (obj.constructor !== Object) {
+    return obj;
+  }
+  
+  const result: Record<string, unknown> = {};
+  for (const [key, value] of Object.entries(obj)) {
+    result[key] = await resolveBlobs(value, visited);
+  }
+  return result;
 }
 
 /**
@@ -335,25 +346,31 @@ function hasLargeBlobs(obj: unknown, visited = new WeakSet()): boolean {
     return true;
   }
   
+  if (typeof obj !== 'object') {
+    return false;
+  }
+  
+  // Avoid circular references - check BEFORE processing
+  if (visited.has(obj)) {
+    return false;
+  }
+  visited.add(obj);
+  
+  if (obj instanceof Date || obj instanceof RegExp) {
+    return false;
+  }
+  
+  // Small blobs don't need offloading
+  if (obj instanceof Blob || obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
+    return false;
+  }
+  
   if (Array.isArray(obj)) {
     return obj.some(item => hasLargeBlobs(item, visited));
   }
   
-  if (typeof obj === 'object') {
-    if (visited.has(obj)) {
-      return false;
-    }
-    visited.add(obj);
-    
-    if (obj instanceof Date || obj instanceof RegExp) {
-      return false;
-    }
-    
-    // Small blobs don't need offloading
-    if (obj instanceof Blob || obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
-      return false;
-    }
-    
+  // Only traverse POJOs
+  if (obj.constructor === Object) {
     return Object.values(obj).some(value => hasLargeBlobs(value, visited));
   }
   
