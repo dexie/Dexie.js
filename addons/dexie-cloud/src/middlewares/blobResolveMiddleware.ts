@@ -96,7 +96,8 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
 
             openCursor(req: DBCoreOpenCursorRequest) {
               return downlevelTable.openCursor(req).then(cursor => {
-                if (!cursor) return cursor;
+                if (!cursor) return cursor; // No results, so no resolution needed
+                if (!req.values) return cursor; // No values requested, so no resolution needed
                 return createBlobResolvingCursor(cursor, downlevelTable, blobSavingQueue);
               });
             },
@@ -126,7 +127,7 @@ function createBlobResolvingCursor(
   // Helper to resolve value and queue for saving
   function resolveValue(rawValue: any): PromiseLike<any> {
     const resolvedBlobs: ResolvedBlob[] = [];
-    return Dexie.Promise.resolve(resolveAllBlobRefs(rawValue, resolvedBlobs)).then(resolved => {
+    return resolveAllBlobRefs(rawValue, resolvedBlobs).then(resolved => {
       // Queue blobs for atomic saving
       for (const blob of resolvedBlobs) {
         blobSavingQueue.saveBlob(table.name, cursor.primaryKey, blob.keyPath, blob.data);
@@ -151,7 +152,7 @@ function createBlobResolvingCursor(
             onNext();
             return;
           }
-          resolveValue(rawValue).then(resolved => {
+          Dexie.waitFor(resolveValue(rawValue)).then(resolved => {
             wrappedCursor.value = resolved;
             onNext();
           }, err => {
