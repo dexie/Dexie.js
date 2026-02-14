@@ -113,7 +113,7 @@ export async function resolveAllBlobRefs(
   currentPath: string = '',
   visited = new WeakMap()
 ): Promise<unknown> {
-  if (obj === null || obj === undefined) {
+  if (obj == null) { // null or undefined
     return obj;
   }
 
@@ -126,27 +126,24 @@ export async function resolveAllBlobRefs(
 
   // Handle arrays
   if (Array.isArray(obj)) {
+    // Avoid circular references
+    if (visited.has(obj)) {
+      return visited.get(obj);
+    }
     const result: unknown[] = [];
     for (let i = 0; i < obj.length; i++) {
       const itemPath = currentPath ? `${currentPath}.${i}` : `${i}`;
       result.push(await resolveAllBlobRefs(obj[i], resolvedBlobs, itemPath, visited));
     }
+    visited.set(obj, result);
     return result;
   }
 
-  // Handle objects
-  if (typeof obj === 'object') {
+  // Handle POJO objects only (not Date, RegExp, Blob, ArrayBuffer, etc.)
+  if (typeof obj === 'object' && obj.constructor === Object) {
     // Avoid circular references
     if (visited.has(obj)) {
       return visited.get(obj);
-    }
-
-    // Skip special objects that can't contain BlobRefs
-    if (obj instanceof Date || obj instanceof RegExp || obj instanceof Blob) {
-      return obj;
-    }
-    if (obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
-      return obj;
     }
 
     const result: Record<string, unknown> = {};
