@@ -14,7 +14,16 @@
  * avoid race conditions with other property changes.
  */
 
-import Dexie, { DBCore, DBCoreGetManyRequest, DBCoreGetRequest, DBCoreQueryRequest, DBCoreTable, DBCoreTransaction } from 'dexie';
+import Dexie, { 
+  DBCore, 
+  DBCoreGetManyRequest, 
+  DBCoreGetRequest, 
+  DBCoreQueryRequest, 
+  DBCoreOpenCursorRequest,
+  DBCoreCursor,
+  DBCoreTable, 
+  DBCoreTransaction 
+} from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { hasUnresolvedBlobRefs, resolveAllBlobRefs, ResolvedBlob } from '../sync/blobResolve';
 import { BlobSavingQueue } from '../sync/BlobSavingQueue';
@@ -84,11 +93,139 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
                 ).then(resolved => ({ ...result, result: resolved }));
               });
             },
+
+            openCursor(req: DBCoreOpenCursorRequest) {
+              return downlevelTable.openCursor(req).then(cursor => {
+                if (!cursor) return cursor;
+                return createBlobResolvingCursor(cursor, db, downlevelTable, req.trans, blobSavingQueue);
+              });
+            },
           };
         },
       };
     },
   };
+}
+
+/**
+ * Create a cursor wrapper that resolves BlobRefs in values lazily.
+ * 
+ * The cursor wraps the underlying cursor and intercepts value access
+ * to resolve any BlobRefs. Resolution happens on first access to value
+ * and the resolved value is cached.
+ */
+function createBlobResolvingCursor(
+  cursor: DBCoreCursor,
+  db: DexieCloudDB,
+  table: DBCoreTable,
+  trans: DBCoreTransaction,
+  blobSavingQueue: BlobSavingQueue
+): DBCoreCursor {
+  // Cache for resolved value - null means not yet checked/resolved
+  let resolvedValue: any = null;
+  let valueResolved = false;
+  let resolutionPromise: Promise<any> | null = null;
+
+  const wrappedCursor: DBCoreCursor = {
+    get trans() {
+      return cursor.trans;
+    },
+    get key() {
+      return cursor.key;
+    },
+    get primaryKey() {
+      return cursor.primaryKey;
+    },
+    get value() {
+      // Return cached value if already resolved
+      if (valueResolved) {
+        return resolvedValue;
+      }
+      
+      const rawValue = cursor.value;
+      
+      // Check if value needs resolution
+      if (!rawValue || !hasUnresolvedBlobRefs(rawValue)) {
+        resolvedValue = rawValue;
+        valueResolved = true;
+        return rawValue;
+      }
+      
+      // Start async resolution but return raw value for now
+      // The resolution will be cached for subsequent accesses
+      // and saved to DB via BlobSavingQueue
+      if (!resolutionPromise) {
+        const resolvedBlobs: ResolvedBlob[] = [];
+        resolutionPromise = resolveAllBlobRefs(rawValue, resolvedBlobs)
+          .then(resolved => {
+            resolvedValue = resolved;
+            valueResolved = true;
+            
+            // Queue blobs for atomic saving
+            const primaryKey = table.schema.primaryKey;
+            const key = primaryKey.keyPath 
+              ? Dexie.getByKeyPath(rawValue, primaryKey.keyPath as string)
+              : cursor.primaryKey;
+              
+            if (key !== undefined && resolvedBlobs.length > 0) {
+              for (const blob of resolvedBlobs) {
+                blobSavingQueue.saveBlob(table.name, key, blob.keyPath, blob.data);
+              }
+            }
+            
+            return resolved;
+          })
+          .catch(err => {
+            console.error('Failed to resolve BlobRefs in cursor:', err);
+            resolvedValue = rawValue;
+            valueResolved = true;
+            return rawValue;
+          });
+      }
+      
+      // Return raw value - caller should use cursor.value after await if needed
+      return rawValue;
+    },
+    continue(key?: any) {
+      // Reset cache for next iteration
+      resolvedValue = null;
+      valueResolved = false;
+      resolutionPromise = null;
+      return cursor.continue(key);
+    },
+    continuePrimaryKey(key: any, primaryKey: any) {
+      // Reset cache for next iteration
+      resolvedValue = null;
+      valueResolved = false;
+      resolutionPromise = null;
+      return cursor.continuePrimaryKey(key, primaryKey);
+    },
+    advance(count: number) {
+      // Reset cache for next iteration
+      resolvedValue = null;
+      valueResolved = false;
+      resolutionPromise = null;
+      return cursor.advance(count);
+    },
+    start(onNext: () => void): Promise<any> {
+      return cursor.start(onNext);
+    },
+    stop(value?: any) {
+      return cursor.stop(value);
+    },
+    next() {
+      // Reset cache for next iteration
+      resolvedValue = null;
+      valueResolved = false;
+      resolutionPromise = null;
+      return cursor.next();
+    },
+    fail(error: Error) {
+      return cursor.fail(error);
+    },
+  };
+
+  return wrappedCursor;
 }
 
 /**
