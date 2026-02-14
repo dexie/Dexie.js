@@ -318,11 +318,8 @@ export function dexieCloud(dexie: Dexie) {
         const blobMode = db.cloud.options?.blobMode ?? 'eager';
         if (blobMode !== 'eager') return;
 
-        const accessToken = db.cloud.currentUser.value?.accessToken;
-        if (!accessToken) return;
-
         try {
-          await downloadUnresolvedBlobs(db, dexie.cloud.blobProgress);
+          await downloadUnresolvedBlobs(db.dx, dexie.cloud.blobProgress);
         } catch (err) {
           console.error('[dexie-cloud] Eager blob download failed:', err);
         }
