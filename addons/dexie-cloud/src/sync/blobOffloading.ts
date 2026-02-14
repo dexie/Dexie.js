@@ -137,12 +137,8 @@ export async function offloadBlobs(
     return uploadBlob(databaseUrl, accessToken, obj);
   }
   
-  // Handle arrays - check visited BEFORE iterating
+  // Handle arrays
   if (Array.isArray(obj)) {
-    if (visited.has(obj)) {
-      return obj; // Return original to avoid infinite loop
-    }
-    visited.add(obj);
     const result: unknown[] = [];
     for (const item of obj) {
       result.push(await offloadBlobs(item, databaseUrl, accessToken, visited));
@@ -165,11 +161,6 @@ export async function offloadBlobs(
     
     // Skip small blobs
     if (obj instanceof Blob || obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
-      return obj;
-    }
-    
-    // Only traverse POJOs
-    if (obj.constructor !== Object) {
       return obj;
     }
     
@@ -202,12 +193,8 @@ export async function resolveBlobs(
     return downloadBlob(obj);
   }
   
-  // Handle arrays - check visited BEFORE iterating
+  // Handle arrays
   if (Array.isArray(obj)) {
-    if (visited.has(obj)) {
-      return obj;
-    }
-    visited.add(obj);
     const result: unknown[] = [];
     for (const item of obj) {
       result.push(await resolveBlobs(item, visited));
@@ -225,14 +212,6 @@ export async function resolveBlobs(
     
     // Skip special objects
     if (obj instanceof Date || obj instanceof RegExp || obj instanceof Blob) {
-      return obj;
-    }
-    if (obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
-      return obj;
-    }
-    
-    // Only traverse POJOs
-    if (obj.constructor !== Object) {
       return obj;
     }
     
@@ -356,31 +335,25 @@ function hasLargeBlobs(obj: unknown, visited = new WeakSet()): boolean {
     return true;
   }
   
-  if (typeof obj !== 'object') {
-    return false;
-  }
-  
-  // Avoid circular references - check BEFORE processing
-  if (visited.has(obj)) {
-    return false;
-  }
-  visited.add(obj);
-  
-  if (obj instanceof Date || obj instanceof RegExp) {
-    return false;
-  }
-  
-  // Small blobs don't need offloading
-  if (obj instanceof Blob || obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
-    return false;
-  }
-  
   if (Array.isArray(obj)) {
     return obj.some(item => hasLargeBlobs(item, visited));
   }
   
-  // Only traverse POJOs
-  if (obj.constructor === Object) {
+  if (typeof obj === 'object') {
+    if (visited.has(obj)) {
+      return false;
+    }
+    visited.add(obj);
+    
+    if (obj instanceof Date || obj instanceof RegExp) {
+      return false;
+    }
+    
+    // Small blobs don't need offloading
+    if (obj instanceof Blob || obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
+      return false;
+    }
+    
     return Object.values(obj).some(value => hasLargeBlobs(value, visited));
   }
   
