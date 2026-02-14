@@ -114,14 +114,14 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
  * - start(): Resolves BlobRefs before calling the callback
  * - value: Getter that returns the resolved value
  * 
- * Returns a Promise that resolves the first value before returning the cursor,
- * ensuring cursor.value is always synchronously available.
+ * Returns the cursor synchronously. Resolution happens in start() before
+ * each onNext callback, ensuring cursor.value is always available.
  */
 function createBlobResolvingCursor(
   cursor: DBCoreCursor,
   table: DBCoreTable,
   blobSavingQueue: BlobSavingQueue
-): PromiseLike<DBCoreCursor | null> {
+): DBCoreCursor {
   
   // Resolved value storage
   let resolvedValue: any = cursor.value;
@@ -151,7 +151,7 @@ function createBlobResolvingCursor(
   }
 
   // Create wrapped cursor using Object.create() - inherits everything
-  const wrappedCursor: DBCoreCursor = Object.create(cursor, {
+  return Object.create(cursor, {
     value: {
       get() {
         return resolvedValue;
@@ -170,12 +170,6 @@ function createBlobResolvingCursor(
         });
       }
     }
-  });
-
-  // Resolve first value before returning cursor
-  return resolveValue(cursor.value).then(resolved => {
-    resolvedValue = resolved;
-    return wrappedCursor;
   });
 }
 
