@@ -29,13 +29,13 @@ import { hasUnresolvedBlobRefs, resolveAllBlobRefs, ResolvedBlob } from '../sync
 import { BlobSavingQueue } from '../sync/BlobSavingQueue';
 
 export function createBlobResolveMiddleware(db: DexieCloudDB) {
-  // Create a single queue instance for this database
-  const blobSavingQueue = new BlobSavingQueue(db);
-  
   return {
     stack: 'dbcore' as const,
     name: 'blobResolve',
     create(downlevelDatabase: DBCore): DBCore {
+      // Create a single queue instance for this database
+      const blobSavingQueue = new BlobSavingQueue(downlevelDatabase);
+
       return {
         ...downlevelDatabase,
         table(tableName: string): DBCoreTable {
@@ -52,7 +52,7 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
             get(req: DBCoreGetRequest) {
               return downlevelTable.get(req).then(result => {
                 if (result && hasUnresolvedBlobRefs(result)) {
-                  return resolveAndSave(db, downlevelTable, req.trans, result, blobSavingQueue);
+                  return resolveAndSave(downlevelTable, req.trans, result, blobSavingQueue);
                 }
                 return result;
               });
@@ -67,7 +67,7 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
                 return Dexie.Promise.all(
                   results.map(result => {
                     if (result && hasUnresolvedBlobRefs(result)) {
-                      return resolveAndSave(db, downlevelTable, req.trans, result, blobSavingQueue);
+                      return resolveAndSave(downlevelTable, req.trans, result, blobSavingQueue);
                     }
                     return result;
                   })
@@ -86,7 +86,7 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
                 return Dexie.Promise.all(
                   result.result.map(item => {
                     if (item && hasUnresolvedBlobRefs(item)) {
-                      return resolveAndSave(db, downlevelTable, req.trans, item, blobSavingQueue);
+                      return resolveAndSave(downlevelTable, req.trans, item, blobSavingQueue);
                     }
                     return item;
                   })
@@ -237,12 +237,11 @@ function createBlobResolvingCursor(
  * - Use waitFor only for explicit rw transactions that need to stay alive
  * 
  * Each resolved blob is queued individually with its keyPath for atomic
- * update using Table.update() - this avoids race conditions.
+ * update using downCore transaction with the specific keyPath - this avoids race conditions.
  * 
  * Returns Dexie.Promise to preserve PSD context.
  */
 function resolveAndSave(
-  db: DexieCloudDB,
   table: DBCoreTable,
   trans: DBCoreTransaction,
   obj: any,
