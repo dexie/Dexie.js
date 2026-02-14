@@ -288,7 +288,17 @@ function resolveAndSave(
       // This uses setTimeout(fn, 0) to completely isolate from 
       // Dexie's transaction context (avoids inheriting PSD)
       for (const blob of resolvedBlobs) {
-        blobSavingQueue.saveBlob(table.name, key, blob.keyPath, blob.data);
+        if (isReadonly) {
+          blobSavingQueue.saveBlob(table.name, key, blob.keyPath, blob.data);
+        } else {
+          // For rw transactions, we can save directly without queueing
+          // since we're still in the same transaction context
+          const updateObj: any = {};
+          Dexie.setByKeyPath(updateObj, blob.keyPath, blob.data);
+          table.mutate({ type: 'put', keys: [key], values: [updateObj], trans }).catch(err => {
+            console.error('Failed to save resolved blob:', err);
+          });
+        }
       }
     }
 
