@@ -7,7 +7,7 @@
 import { BehaviorSubject } from 'rxjs';
 import Dexie from 'dexie';
 import { BlobProgress } from '../DexieCloudAPI';
-import { BlobRef } from './blobResolve';
+import { BlobRef, isBlobRef } from './blobResolve';
 
 const initialProgress: BlobProgress = {
   isDownloading: false,
@@ -59,7 +59,7 @@ export async function updateBlobProgress(
       for (const obj of unresolvedObjects) {
         const blobs = findBlobRefs(obj);
         blobsRemaining += blobs.length;
-        bytesRemaining += blobs.reduce((sum, blob) => sum + (blob.$size || 0), 0);
+        bytesRemaining += blobs.reduce((sum, blob) => sum + (blob.size || 0), 0);
       }
     } catch {
       // Table might not have $unresolved index - skip
@@ -136,13 +136,4 @@ function findBlobRefs(obj: unknown): BlobRef[] {
 
   scan(obj);
   return refs;
-}
-
-function isBlobRef(value: unknown): value is BlobRef {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as any).$t === 'Blob' &&
-    typeof (value as any).$url === 'string'
-  );
 }

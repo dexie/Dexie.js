@@ -88,7 +88,7 @@ export const arrayBufferBlobRefDef = {
         const blobId = ctx!.blobStore!.store(ab);
         // Handle both sync and async store
         if (typeof blobId === 'string') {
-          return { $t: 'ArrayBuffer', $ref: blobId, $size: ab.byteLength };
+          return { $t: 'ArrayBuffer', ref: blobId, size: ab.byteLength };
         }
         // For async, we need to await - but replace is sync!
         // This means blobStore.store() must be sync for serialization.
@@ -106,33 +106,33 @@ export const arrayBufferBlobRefDef = {
         );
       }
 
-      return { $t: 'ArrayBuffer', $v: b64LexEncode(ab) };
+      return { $t: 'ArrayBuffer', v: b64LexEncode(ab) };
     },
 
     revive: (
-      val: { $v?: string; $ref?: string; $size?: number },
+      val: { v?: string; ref?: string; size?: number },
       _ctx: unknown,
       _typeDefs: TypeDefSet
     ): ArrayBuffer => {
       // Blob reference - return TSONRef for lazy resolution
       // TSONRef is cast to ArrayBuffer since it's a stand-in that will be resolved later
-      if (val.$ref) {
+      if (val.ref) {
         return new TSONRef<ArrayBuffer>(
           'ArrayBuffer',
-          val.$ref,
-          val.$size ?? 0
+          val.ref,
+          val.size ?? 0
         ) as unknown as ArrayBuffer;
       }
 
       // Inline data
-      if (val.$v) {
-        const ba = b64LexDecode(val.$v);
+      if (val.v) {
+        const ba = b64LexDecode(val.v);
         return ba.buffer.byteLength === ba.byteLength
           ? (ba.buffer as ArrayBuffer)
           : (ba.buffer as ArrayBuffer).slice(ba.byteOffset, ba.byteOffset + ba.byteLength);
       }
 
-      throw new Error('Invalid ArrayBuffer encoding: missing $v or $ref');
+      throw new Error('Invalid ArrayBuffer encoding: missing v or ref');
     },
   },
 };
@@ -157,27 +157,27 @@ export const blobBlobRefDef = {
     },
 
     revive: (
-      val: { $v?: string; $ref?: string; $size?: number; $ct?: string },
+      val: { v?: string; ref?: string; size?: number; ct?: string },
       _ctx: unknown,
       _typeDefs: TypeDefSet
     ): Blob => {
       // Blob reference - return TSONRef cast to Blob for lazy resolution
-      if (val.$ref) {
+      if (val.ref) {
         return new TSONRef<Blob>(
           'Blob',
-          val.$ref,
-          val.$size ?? 0,
-          val.$ct
+          val.ref,
+          val.size ?? 0,
+          val.ct
         ) as unknown as Blob;
       }
 
       // Inline data - use normal base64 (not b64Lex) since Blobs are never indexed
-      if (val.$v) {
-        const ba = b64decode(val.$v);
-        return new Blob([new Uint8Array(ba.buffer as ArrayBuffer, ba.byteOffset, ba.byteLength)], { type: val.$ct });
+      if (val.v) {
+        const ba = b64decode(val.v);
+        return new Blob([new Uint8Array(ba.buffer as ArrayBuffer, ba.byteOffset, ba.byteLength)], { type: val.ct });
       }
 
-      throw new Error('Invalid Blob encoding: missing $v or $ref');
+      throw new Error('Invalid Blob encoding: missing v or ref');
     },
   },
 };
@@ -228,7 +228,7 @@ function createTypedArrayBlobRefDef(
         if (shouldUseBlobRef(buffer.byteLength, ctx)) {
           const blobId = ctx!.blobStore!.store(buffer);
           if (typeof blobId === 'string') {
-            return { $t: name, $ref: blobId, $size: buffer.byteLength };
+            return { $t: name, ref: blobId, size: buffer.byteLength };
           }
           throw new Error('BlobStore.store() must be synchronous');
         }
@@ -239,21 +239,21 @@ function createTypedArrayBlobRefDef(
           );
         }
 
-        return { $t: name, $v: b64LexEncode(buffer) };
+        return { $t: name, v: b64LexEncode(buffer) };
       },
 
       revive: (
-        val: { $v?: string; $ref?: string; $size?: number },
+        val: { v?: string; ref?: string; size?: number },
         _ctx: unknown,
         _typeDefs: TypeDefSet
       ): InstanceType<TypedArrayConstructor> => {
         // TSONRef is cast to TypedArray since it's a stand-in for lazy resolution
-        if (val.$ref) {
-          return new TSONRef(name, val.$ref, val.$size ?? 0) as unknown as InstanceType<TypedArrayConstructor>;
+        if (val.ref) {
+          return new TSONRef(name, val.ref, val.size ?? 0) as unknown as InstanceType<TypedArrayConstructor>;
         }
 
-        if (val.$v) {
-          const ba = b64LexDecode(val.$v);
+        if (val.v) {
+          const ba = b64LexDecode(val.v);
           return new Ctor(
             ba.buffer as ArrayBuffer,
             ba.byteOffset,
@@ -261,7 +261,7 @@ function createTypedArrayBlobRefDef(
           );
         }
 
-        throw new Error(`Invalid ${name} encoding: missing $v or $ref`);
+        throw new Error(`Invalid ${name} encoding: missing v or ref`);
       },
     },
   };

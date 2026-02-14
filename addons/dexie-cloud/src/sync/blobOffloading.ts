@@ -6,34 +6,35 @@
  */
 
 import { newId, DBOperationsSet, DBOperation } from 'dexie-cloud-common';
+import { BlobRef, BlobRefOrigType, isBlobRef as isBlobRefFromResolve } from './blobResolve';
 
 // Blobs >= 4KB are offloaded to blob storage
 const BLOB_OFFLOAD_THRESHOLD = 4096;
 
-export interface BlobRef {
-  $t: 'Blob';
-  $url: string;
-  $size: number;
-  $ct: string; // content-type
+// Re-export BlobRef type
+export type { BlobRef, BlobRefOrigType };
+
+// Re-export isBlobRef from blobResolve
+export const isBlobRef = isBlobRefFromResolve;
+
+/**
+ * Get the original type name for a value
+ */
+function getOrigType(value: Blob | ArrayBuffer | ArrayBufferView): BlobRefOrigType {
+  if (value instanceof Blob) return 'Blob';
+  if (value instanceof ArrayBuffer) return 'ArrayBuffer';
+  // TypedArrays and DataView
+  return value.constructor.name as BlobRefOrigType;
 }
 
-export function isBlobRef(value: unknown): value is BlobRef {
-  return (
-    typeof value === 'object' &&
-    value !== null &&
-    (value as any).$t === 'Blob' &&
-    typeof (value as any).$url === 'string'
-  );
-}
-
-export function shouldOffloadBlob(value: unknown): value is Blob | ArrayBuffer | Uint8Array {
+export function shouldOffloadBlob(value: unknown): value is Blob | ArrayBuffer | ArrayBufferView {
   if (value instanceof Blob) {
     return value.size >= BLOB_OFFLOAD_THRESHOLD;
   }
   if (value instanceof ArrayBuffer) {
     return value.byteLength >= BLOB_OFFLOAD_THRESHOLD;
   }
-  if (value instanceof Uint8Array) {
+  if (ArrayBuffer.isView(value)) {
     return value.byteLength >= BLOB_OFFLOAD_THRESHOLD;
   }
   return false;
@@ -45,7 +46,7 @@ export function shouldOffloadBlob(value: unknown): value is Blob | ArrayBuffer |
 export async function uploadBlob(
   databaseUrl: string,
   accessToken: string,
-  blob: Blob | ArrayBuffer | Uint8Array
+  blob: Blob | ArrayBuffer | ArrayBufferView
 ): Promise<BlobRef> {
   const blobId = newId();
   // URL format: {databaseUrl}/blob/{blobId}
@@ -54,6 +55,7 @@ export async function uploadBlob(
   let body: Blob | ArrayBuffer;
   let contentType: string;
   let size: number;
+  const origType = getOrigType(blob);
   
   if (blob instanceof Blob) {
     body = blob;
@@ -64,9 +66,9 @@ export async function uploadBlob(
     contentType = 'application/octet-stream';
     size = blob.byteLength;
   } else {
-    // Uint8Array - create a proper ArrayBuffer copy
+    // ArrayBufferView (TypedArray or DataView) - create a proper ArrayBuffer copy
     const arrayBuffer = new ArrayBuffer(blob.byteLength);
-    new Uint8Array(arrayBuffer).set(blob);
+    new Uint8Array(arrayBuffer).set(new Uint8Array(blob.buffer, blob.byteOffset, blob.byteLength));
     body = arrayBuffer;
     contentType = 'application/octet-stream';
     size = blob.byteLength;
@@ -91,11 +93,13 @@ export async function uploadBlob(
   // The server returns the canonical URL
   const result = await response.json();
   
+  // Return BlobRef with original type preserved in $t
   return {
-    $t: 'Blob',
-    $url: result.url || url,
-    $size: size,
-    $ct: contentType,
+    $t: origType,
+    ref: blobId,
+    url: result.url || url,
+    size: size,
+    ct: origType === 'Blob' ? contentType : undefined,
   };
 }
 
@@ -104,7 +108,8 @@ export async function uploadBlob(
  * The URL is a signed URL (SAS token) that already contains authentication
  */
 export async function downloadBlob(blobRef: BlobRef): Promise<Blob> {
-  const response = await fetch(blobRef.$url);
+  const downloadUrl = blobRef.url || blobRef.ref;
+  const response = await fetch(downloadUrl);
   
   if (!response.ok) {
     throw new Error(`Failed to download blob: ${response.status} ${response.statusText}`);

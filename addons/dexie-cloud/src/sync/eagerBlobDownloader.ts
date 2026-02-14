@@ -124,7 +124,7 @@ function calculateBlobBytes(obj: unknown): number {
     if (typeof value !== 'object') return;
 
     if (isBlobRef(value)) {
-      total += value.$size || 0;
+      total += value.size || 0;
       return;
     }
 

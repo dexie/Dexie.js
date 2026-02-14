@@ -15,7 +15,7 @@ interface QueuedBlob {
   tableName: string;
   primaryKey: any;
   blobKeyPath: string;
-  blobData: Uint8Array | Blob;
+  blobData: Blob | ArrayBuffer | ArrayBufferView;
 }
 
 export class BlobSavingQueue {
@@ -31,7 +31,7 @@ export class BlobSavingQueue {
    * Queue a resolved blob for saving.
    * Only the specific blob property will be updated atomically.
    */
-  saveBlob(tableName: string, primaryKey: any, blobKeyPath: string, blobData: Uint8Array | Blob): void {
+  saveBlob(tableName: string, primaryKey: any, blobKeyPath: string, blobData: Blob | ArrayBuffer | ArrayBufferView): void {
     this.queue.push({ tableName, primaryKey, blobKeyPath, blobData });
     this.startConsumer();
   }
