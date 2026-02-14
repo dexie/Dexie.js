@@ -10,11 +10,13 @@
  * 
  * Resolved blobs are queued for saving via BlobSavingQueue, which uses
  * setTimeout(fn, 0) to completely isolate from Dexie's transaction context.
+ * Each blob is saved atomically using Table.update() with its keyPath to
+ * avoid race conditions with other property changes.
  */
 
 import Dexie, { DBCore, DBCoreGetManyRequest, DBCoreGetRequest, DBCoreQueryRequest, DBCoreTable, DBCoreTransaction } from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { hasUnresolvedBlobRefs, resolveAllBlobRefs } from '../sync/blobResolve';
+import { hasUnresolvedBlobRefs, resolveAllBlobRefs, ResolvedBlob } from '../sync/blobResolve';
 import { BlobSavingQueue } from '../sync/BlobSavingQueue';
 
 export function createBlobResolveMiddleware(db: DexieCloudDB) {
@@ -90,12 +92,15 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
 }
 
 /**
- * Resolve BlobRefs in an object and queue the resolved version for saving.
+ * Resolve BlobRefs in an object and queue each blob for atomic saving.
  * 
  * Uses Dexie.waitFor() only when needed:
  * - Skip waitFor for readonly ('r') transactions
  * - Skip waitFor for implicit transactions (most common in liveQuery)
  * - Use waitFor only for explicit rw transactions that need to stay alive
+ * 
+ * Each resolved blob is queued individually with its keyPath for atomic
+ * update using Table.update() - this avoids race conditions.
  * 
  * Returns Dexie.Promise to preserve PSD context.
  */
@@ -122,9 +127,12 @@ function resolveAndSave(
   const skipWaitFor = isReadonly && !isExplicit;
   const needsWaitFor = currentTx && !skipWaitFor;
 
+  // Collect resolved blobs with their keyPaths
+  const resolvedBlobs: ResolvedBlob[] = [];
+  
   // Create the resolution promise
   // BlobRef URLs are signed (SAS tokens) so no auth needed
-  const resolutionPromise = resolveAllBlobRefs(obj);
+  const resolutionPromise = resolveAllBlobRefs(obj, resolvedBlobs);
   
   // Wrap with waitFor to keep transaction alive during fetch
   const resolvePromise = needsWaitFor
@@ -138,11 +146,13 @@ function resolveAndSave(
       ? Dexie.getByKeyPath(obj, primaryKey.keyPath as string)
       : undefined;
 
-    if (key !== undefined) {
-      // Queue the resolved object for saving via BlobSavingQueue
+    if (key !== undefined && resolvedBlobs.length > 0) {
+      // Queue each resolved blob individually for atomic update
       // This uses setTimeout(fn, 0) to completely isolate from 
       // Dexie's transaction context (avoids inheriting PSD)
-      blobSavingQueue.saveBlob(table.name, resolved, key);
+      for (const blob of resolvedBlobs) {
+        blobSavingQueue.saveBlob(table.name, key, blob.keyPath, blob.data);
+      }
     }
 
     return resolved;

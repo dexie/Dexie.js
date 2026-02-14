@@ -13,6 +13,7 @@ import {
   isBlobRef,
   hasBlobRefs,
   resolveAllBlobRefs,
+  ResolvedBlob,
 } from './blobResolve';
 import {
   updateBlobProgress,
@@ -25,6 +26,8 @@ import {
  * 
  * This is called when blobMode='eager' (default) after sync completes.
  * BlobRef URLs are signed (SAS tokens) so no auth header needed.
+ * 
+ * Each blob is saved atomically using Table.update() to avoid race conditions.
  */
 export async function downloadUnresolvedBlobs(
   db: Dexie,
@@ -82,14 +85,19 @@ export async function downloadUnresolvedBlobs(
           // Calculate bytes to download for this object
           const bytesToDownload = calculateBlobBytes(obj);
 
-          // Resolve all BlobRefs in this object (URLs are signed, no auth needed)
-          const resolved = await resolveAllBlobRefs(obj);
+          // Resolve all BlobRefs and collect them with their keyPaths
+          const resolvedBlobs: ResolvedBlob[] = [];
+          await resolveAllBlobRefs(obj, resolvedBlobs);
 
-          // Remove the $unresolved marker
-          delete (resolved as any).$unresolved;
+          // Save each blob atomically using update()
+          for (const blob of resolvedBlobs) {
+            await table.update(key, {
+              [blob.keyPath]: blob.data
+            });
+          }
 
-          // Save resolved object back to database
-          await table.put(resolved, key);
+          // Clear the $unresolved marker
+          await table.update(key, { $unresolved: undefined });
 
           // Update progress
           reportBlobDownloaded(progress$, bytesToDownload);

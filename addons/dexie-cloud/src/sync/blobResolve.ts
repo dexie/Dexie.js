@@ -7,12 +7,21 @@
  */
 
 import Dexie from 'dexie';
+import { BlobSavingQueue } from './BlobSavingQueue';
 
 export interface BlobRef {
   $t: 'Blob';
   $url: string;
   $size: number;
   $ct: string; // content-type
+}
+
+/**
+ * Resolved blob with its keyPath for queueing
+ */
+export interface ResolvedBlob {
+  keyPath: string;
+  data: Uint8Array;
 }
 
 /**
@@ -92,29 +101,35 @@ export async function downloadBlob(blobRef: BlobRef): Promise<Uint8Array> {
 }
 
 /**
- * Recursively resolve all BlobRefs in an object
- * Returns a new object with BlobRefs replaced by actual Uint8Array data
+ * Recursively resolve all BlobRefs in an object and collect them for queueing.
+ * Returns a new object with BlobRefs replaced by actual Uint8Array data,
+ * and populates the resolvedBlobs array with keyPath info for each blob.
  * 
  * BlobRef URLs are signed (SAS tokens) so no auth header needed
  */
 export async function resolveAllBlobRefs(
   obj: unknown,
+  resolvedBlobs: ResolvedBlob[] = [],
+  currentPath: string = '',
   visited = new WeakMap()
 ): Promise<unknown> {
   if (obj === null || obj === undefined) {
     return obj;
   }
 
-  // Check if this is a BlobRef - resolve it
+  // Check if this is a BlobRef - resolve it and track it
   if (isBlobRef(obj)) {
-    return downloadBlob(obj);
+    const data = await downloadBlob(obj);
+    resolvedBlobs.push({ keyPath: currentPath, data });
+    return data;
   }
 
   // Handle arrays
   if (Array.isArray(obj)) {
     const result: unknown[] = [];
-    for (const item of obj) {
-      result.push(await resolveAllBlobRefs(item, visited));
+    for (let i = 0; i < obj.length; i++) {
+      const itemPath = currentPath ? `${currentPath}.${i}` : `${i}`;
+      result.push(await resolveAllBlobRefs(obj[i], resolvedBlobs, itemPath, visited));
     }
     return result;
   }
@@ -142,7 +157,8 @@ export async function resolveAllBlobRefs(
       if (key === '$unresolved') {
         continue;
       }
-      result[key] = await resolveAllBlobRefs(value, visited);
+      const propPath = currentPath ? `${currentPath}.${key}` : key;
+      result[key] = await resolveAllBlobRefs(value, resolvedBlobs, propPath, visited);
     }
 
     return result;
