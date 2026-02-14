@@ -140,6 +140,7 @@ function createBlobResolvingCursor(
     value: {
       value: cursor.value,
       enumerable: true,
+      writable: true
     },
     start: {
       value(onNext: () => void): Promise<any> {
