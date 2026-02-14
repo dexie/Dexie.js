@@ -82,25 +82,30 @@ export function hasBlobRefs(obj: unknown, visited = new WeakSet()): boolean {
     return true;
   }
 
+  if (typeof obj !== 'object') {
+    return false;
+  }
+
+  // Avoid circular references - check BEFORE processing
+  if (visited.has(obj)) {
+    return false;
+  }
+  visited.add(obj);
+
+  // Skip special objects that can't contain BlobRefs
+  if (obj instanceof Date || obj instanceof RegExp || obj instanceof Blob) {
+    return false;
+  }
+  if (obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
+    return false;
+  }
+
   if (Array.isArray(obj)) {
     return obj.some(item => hasBlobRefs(item, visited));
   }
 
-  if (typeof obj === 'object') {
-    // Avoid circular references
-    if (visited.has(obj)) {
-      return false;
-    }
-    visited.add(obj);
-
-    // Skip special objects
-    if (obj instanceof Date || obj instanceof RegExp || obj instanceof Blob) {
-      return false;
-    }
-    if (obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
-      return false;
-    }
-
+  // Plain objects - check POJO only to avoid traversing class instances
+  if (obj.constructor === Object) {
     return Object.values(obj).some(value => hasBlobRefs(value, visited));
   }
 
@@ -209,16 +214,16 @@ export async function resolveAllBlobRefs(
 
   // Handle arrays
   if (Array.isArray(obj)) {
-    // Avoid circular references
+    // Avoid circular references - check and set BEFORE iterating
     if (visited.has(obj)) {
       return visited.get(obj);
     }
     const result: unknown[] = [];
+    visited.set(obj, result);  // Set before iterating to handle self-references
     for (let i = 0; i < obj.length; i++) {
       const itemPath = currentPath ? `${currentPath}.${i}` : `${i}`;
       result.push(await resolveAllBlobRefs(obj[i], resolvedBlobs, itemPath, visited));
     }
-    visited.set(obj, result);
     return result;
   }
 
