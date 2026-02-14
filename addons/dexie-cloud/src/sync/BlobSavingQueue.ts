@@ -5,11 +5,11 @@
  * from Dexie's Promise.PSD context. This prevents the save operation
  * from inheriting any ongoing transaction.
  * 
- * Each blob is saved atomically using Table.update() with the specific
+ * Each blob is saved atomically using downCore transaction with the specific
  * keyPath to avoid race conditions with other property changes.
  */
 
-import { DexieCloudDB } from '../db/DexieCloudDB';
+import Dexie, { DBCore } from 'dexie';
 
 interface QueuedBlob {
   tableName: string;
@@ -21,10 +21,10 @@ interface QueuedBlob {
 export class BlobSavingQueue {
   private queue: QueuedBlob[] = [];
   private isProcessing = false;
-  private db: DexieCloudDB;
+  private dbCore: DBCore;
 
-  constructor(db: DexieCloudDB) {
-    this.db = db;
+  constructor(dbCore: DBCore) {
+    this.dbCore = dbCore;
   }
 
   /**
@@ -58,23 +58,34 @@ export class BlobSavingQueue {
    * Runs in a completely isolated context (no inherited transaction).
    * Uses atomic updates to avoid race conditions.
    */
-  private async processQueue(): Promise<void> {
-    while (this.queue.length > 0) {
-      const item = this.queue.shift()!;
-      
-      try {
-        // Atomic update of just the blob property
-        await this.db.table(item.tableName).update(item.primaryKey, {
-          [item.blobKeyPath]: item.blobData
-        });
-      } catch (err) {
-        console.warn(
-          `Failed to save resolved blob for ${item.tableName}:${item.primaryKey}:${item.blobKeyPath}:`,
-          err
-        );
-      }
+  private processQueue(): void {
+    const item = this.queue.shift();
+    if (!item) {
+      this.isProcessing = false;
+      return;
     }
-    
-    this.isProcessing = false;
+
+    // Atomic update of just the blob property
+    const tx = this.dbCore.transaction([item.tableName], 'readwrite');
+    const coreTable = this.dbCore.table(item.tableName);
+    coreTable.get({
+      key: item.primaryKey,
+      trans: tx
+    }).then((obj) => {
+      if (!obj) {
+        // Object might have been deleted, skip if not found
+        return;
+      }
+      Dexie.setByKeyPath(obj, item.blobKeyPath, item.blobData);
+      return coreTable.mutate({ type: 'put', keys: [item.primaryKey], values: [obj], trans: tx });
+    }).then(() => {
+       this.processQueue();
+    }).catch((err) => {
+      console.warn(
+        `Failed to save resolved blob for ${item.tableName}:${item.primaryKey}:${item.blobKeyPath}:`,
+        err
+      );
+      this.processQueue();
+    });
   }
 }
