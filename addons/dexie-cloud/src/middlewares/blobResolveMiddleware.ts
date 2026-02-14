@@ -122,55 +122,47 @@ function createBlobResolvingCursor(
   table: DBCoreTable,
   blobSavingQueue: BlobSavingQueue
 ): DBCoreCursor {
-  
-  // Resolved value storage
-  let resolvedValue: any = cursor.value;
-  
+    
   // Helper to resolve value and queue for saving
   function resolveValue(rawValue: any): PromiseLike<any> {
-    if (!rawValue || !hasUnresolvedBlobRefs(rawValue)) {
-      return Dexie.Promise.resolve(rawValue);
-    }
-    
     const resolvedBlobs: ResolvedBlob[] = [];
     return Dexie.Promise.resolve(resolveAllBlobRefs(rawValue, resolvedBlobs)).then(resolved => {
       // Queue blobs for atomic saving
-      const primaryKey = table.schema.primaryKey;
-      const key = primaryKey.keyPath 
-        ? Dexie.getByKeyPath(rawValue, primaryKey.keyPath as string)
-        : cursor.primaryKey;
-        
-      if (key !== undefined && resolvedBlobs.length > 0) {
-        for (const blob of resolvedBlobs) {
-          blobSavingQueue.saveBlob(table.name, key, blob.keyPath, blob.data);
-        }
-      }
-      
+      for (const blob of resolvedBlobs) {
+        blobSavingQueue.saveBlob(table.name, cursor.primaryKey, blob.keyPath, blob.data);
+      }      
       return resolved;
     });
   }
 
   // Create wrapped cursor using Object.create() - inherits everything
-  return Object.create(cursor, {
+  const wrappedCursor = Object.create(cursor, {
     value: {
-      get() {
-        return resolvedValue;
-      },
-      enumerable: true
+      value: cursor.value,
+      enumerable: true,
     },
     start: {
       value(onNext: () => void): Promise<any> {
         // Override start to resolve BlobRefs before each callback
         return cursor.start(() => {
           const rawValue = cursor.value;
-          return resolveValue(rawValue).then(resolved => {
-            resolvedValue = resolved;
+          if (!rawValue || !hasUnresolvedBlobRefs(rawValue)) {
+            onNext();
+            return;
+          }
+          resolveValue(rawValue).then(resolved => {
+            wrappedCursor.value = resolved;
+            onNext();
+          }, err => {
+            console.error('Failed to resolve BlobRefs for cursor value:', err);
+            wrappedCursor.value = rawValue;
             onNext();
           });
         });
       }
     }
   });
+  return wrappedCursor;
 }
 
 /**
