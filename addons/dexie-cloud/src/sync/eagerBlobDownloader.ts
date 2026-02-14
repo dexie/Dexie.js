@@ -24,10 +24,10 @@ import {
  * Download all unresolved blobs in the background.
  * 
  * This is called when blobMode='eager' (default) after sync completes.
+ * BlobRef URLs are signed (SAS tokens) so no auth header needed.
  */
 export async function downloadUnresolvedBlobs(
   db: Dexie,
-  accessToken: string,
   progress$: BehaviorSubject<BlobProgress>,
   signal?: AbortSignal
 ): Promise<void> {
@@ -82,8 +82,8 @@ export async function downloadUnresolvedBlobs(
           // Calculate bytes to download for this object
           const bytesToDownload = calculateBlobBytes(obj);
 
-          // Resolve all BlobRefs in this object
-          const resolved = await resolveAllBlobRefs(obj, accessToken);
+          // Resolve all BlobRefs in this object (URLs are signed, no auth needed)
+          const resolved = await resolveAllBlobRefs(obj);
 
           // Remove the $unresolved marker
           delete (resolved as any).$unresolved;

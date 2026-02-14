@@ -78,16 +78,10 @@ export function markUnresolvedBlobRefs<T extends object>(obj: T): boolean {
 
 /**
  * Download blob data from a BlobRef URL
+ * The URL is a signed URL (SAS token) that already contains authentication
  */
-export async function downloadBlob(
-  blobRef: BlobRef,
-  accessToken: string
-): Promise<Uint8Array> {
-  const response = await fetch(blobRef.$url, {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-    },
-  });
+export async function downloadBlob(blobRef: BlobRef): Promise<Uint8Array> {
+  const response = await fetch(blobRef.$url);
 
   if (!response.ok) {
     throw new Error(`Failed to download blob: ${response.status} ${response.statusText}`);
@@ -100,10 +94,11 @@ export async function downloadBlob(
 /**
  * Recursively resolve all BlobRefs in an object
  * Returns a new object with BlobRefs replaced by actual Uint8Array data
+ * 
+ * BlobRef URLs are signed (SAS tokens) so no auth header needed
  */
 export async function resolveAllBlobRefs(
   obj: unknown,
-  accessToken: string,
   visited = new WeakMap()
 ): Promise<unknown> {
   if (obj === null || obj === undefined) {
@@ -112,14 +107,14 @@ export async function resolveAllBlobRefs(
 
   // Check if this is a BlobRef - resolve it
   if (isBlobRef(obj)) {
-    return downloadBlob(obj, accessToken);
+    return downloadBlob(obj);
   }
 
   // Handle arrays
   if (Array.isArray(obj)) {
     const result: unknown[] = [];
     for (const item of obj) {
-      result.push(await resolveAllBlobRefs(item, accessToken, visited));
+      result.push(await resolveAllBlobRefs(item, visited));
     }
     return result;
   }
@@ -147,7 +142,7 @@ export async function resolveAllBlobRefs(
       if (key === '$unresolved') {
         continue;
       }
-      result[key] = await resolveAllBlobRefs(value, accessToken, visited);
+      result[key] = await resolveAllBlobRefs(value, visited);
     }
 
     return result;

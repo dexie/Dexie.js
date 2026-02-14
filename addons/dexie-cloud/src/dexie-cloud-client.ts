@@ -322,7 +322,7 @@ export function dexieCloud(dexie: Dexie) {
         if (!accessToken) return;
 
         try {
-          await downloadUnresolvedBlobs(db, accessToken, dexie.cloud.blobProgress);
+          await downloadUnresolvedBlobs(db, dexie.cloud.blobProgress);
         } catch (err) {
           console.error('[dexie-cloud] Eager blob download failed:', err);
         }

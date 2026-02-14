@@ -101,16 +101,10 @@ export async function uploadBlob(
 
 /**
  * Download blob data from a BlobRef
+ * The URL is a signed URL (SAS token) that already contains authentication
  */
-export async function downloadBlob(
-  blobRef: BlobRef,
-  accessToken: string
-): Promise<Blob> {
-  const response = await fetch(blobRef.$url, {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-    },
-  });
+export async function downloadBlob(blobRef: BlobRef): Promise<Blob> {
+  const response = await fetch(blobRef.$url);
   
   if (!response.ok) {
     throw new Error(`Failed to download blob: ${response.status} ${response.statusText}`);
@@ -178,10 +172,11 @@ export async function offloadBlobs(
 /**
  * Recursively resolve BlobRefs in an object
  * Returns a new object with BlobRefs replaced by actual Blob data
+ * 
+ * BlobRef URLs are signed (SAS tokens) so no auth needed
  */
 export async function resolveBlobs(
   obj: unknown,
-  accessToken: string,
   visited = new WeakSet()
 ): Promise<unknown> {
   if (obj === null || obj === undefined) {
@@ -190,14 +185,14 @@ export async function resolveBlobs(
   
   // Check if this is a BlobRef
   if (isBlobRef(obj)) {
-    return downloadBlob(obj, accessToken);
+    return downloadBlob(obj);
   }
   
   // Handle arrays
   if (Array.isArray(obj)) {
     const result: unknown[] = [];
     for (const item of obj) {
-      result.push(await resolveBlobs(item, accessToken, visited));
+      result.push(await resolveBlobs(item, visited));
     }
     return result;
   }
@@ -217,7 +212,7 @@ export async function resolveBlobs(
     
     const result: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(obj)) {
-      result[key] = await resolveBlobs(value, accessToken, visited);
+      result[key] = await resolveBlobs(value, visited);
     }
     return result;
   }

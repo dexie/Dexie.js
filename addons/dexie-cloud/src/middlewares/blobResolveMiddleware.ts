@@ -106,12 +106,6 @@ function resolveAndSave(
   obj: any,
   blobSavingQueue: BlobSavingQueue
 ): PromiseLike<any> {
-  const accessToken = db.cloud.currentUser.value?.accessToken;
-  if (!accessToken) {
-    console.warn('No access token available for blob resolution');
-    return Dexie.Promise.resolve(obj);
-  }
-
   // Determine if we need waitFor:
   // Skip waitFor ONLY if BOTH conditions are met:
   //   1. readonly transaction
@@ -129,7 +123,8 @@ function resolveAndSave(
   const needsWaitFor = currentTx && !skipWaitFor;
 
   // Create the resolution promise
-  const resolutionPromise = resolveAllBlobRefs(obj, accessToken);
+  // BlobRef URLs are signed (SAS tokens) so no auth needed
+  const resolutionPromise = resolveAllBlobRefs(obj);
   
   // Wrap with waitFor to keep transaction alive during fetch
   const resolvePromise = needsWaitFor
