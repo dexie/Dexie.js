@@ -12,6 +12,9 @@
  * setTimeout(fn, 0) to completely isolate from Dexie's transaction context.
  * Each blob is saved atomically using Table.update() with its keyPath to
  * avoid race conditions with other property changes.
+ * 
+ * Blob downloads use Authorization header (same as sync) via the server
+ * proxy endpoint: GET /blob/{ref}
  */
 
 import Dexie, { 
@@ -36,6 +39,15 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
       // Create a single queue instance for this database
       const blobSavingQueue = new BlobSavingQueue(downlevelDatabase);
 
+      // Helper to get current db URL and access token
+      function getAuthInfo(): { dbUrl: string; accessToken: string } | null {
+        const currentUser = db.cloud.currentUser.value;
+        if (!currentUser?.accessToken) return null;
+        const dbUrl = db.cloud.options?.databaseUrl;
+        if (!dbUrl) return null;
+        return { dbUrl, accessToken: currentUser.accessToken };
+      }
+
       return {
         ...downlevelDatabase,
         table(tableName: string): DBCoreTable {
@@ -52,7 +64,9 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
             get(req: DBCoreGetRequest) {
               return downlevelTable.get(req).then(result => {
                 if (result && hasUnresolvedBlobRefs(result)) {
-                  return resolveAndSave(downlevelTable, req.trans, result, blobSavingQueue);
+                  const authInfo = getAuthInfo();
+                  if (!authInfo) return result; // Can't resolve without auth
+                  return resolveAndSave(downlevelTable, req.trans, result, blobSavingQueue, authInfo.dbUrl, authInfo.accessToken);
                 }
                 return result;
               });
@@ -64,10 +78,13 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
                 const needsResolution = results.some(r => r && hasUnresolvedBlobRefs(r));
                 if (!needsResolution) return results;
                 
+                const authInfo = getAuthInfo();
+                if (!authInfo) return results; // Can't resolve without auth
+                
                 return Dexie.Promise.all(
                   results.map(result => {
                     if (result && hasUnresolvedBlobRefs(result)) {
-                      return resolveAndSave(downlevelTable, req.trans, result, blobSavingQueue);
+                      return resolveAndSave(downlevelTable, req.trans, result, blobSavingQueue, authInfo.dbUrl, authInfo.accessToken);
                     }
                     return result;
                   })
@@ -83,10 +100,13 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
                 const needsResolution = result.result.some(r => r && hasUnresolvedBlobRefs(r));
                 if (!needsResolution) return result;
                 
+                const authInfo = getAuthInfo();
+                if (!authInfo) return result; // Can't resolve without auth
+                
                 return Dexie.Promise.all(
                   result.result.map(item => {
                     if (item && hasUnresolvedBlobRefs(item)) {
-                      return resolveAndSave(downlevelTable, req.trans, item, blobSavingQueue);
+                      return resolveAndSave(downlevelTable, req.trans, item, blobSavingQueue, authInfo.dbUrl, authInfo.accessToken);
                     }
                     return item;
                   })
@@ -98,7 +118,9 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
               return downlevelTable.openCursor(req).then(cursor => {
                 if (!cursor) return cursor; // No results, so no resolution needed
                 if (!req.values) return cursor; // No values requested, so no resolution needed
-                return createBlobResolvingCursor(cursor, downlevelTable, blobSavingQueue);
+                const authInfo = getAuthInfo();
+                if (!authInfo) return cursor; // Can't resolve without auth
+                return createBlobResolvingCursor(cursor, downlevelTable, blobSavingQueue, authInfo.dbUrl, authInfo.accessToken);
               });
             },
           };
@@ -121,13 +143,15 @@ export function createBlobResolveMiddleware(db: DexieCloudDB) {
 function createBlobResolvingCursor(
   cursor: DBCoreCursor,
   table: DBCoreTable,
-  blobSavingQueue: BlobSavingQueue
+  blobSavingQueue: BlobSavingQueue,
+  dbUrl: string,
+  accessToken: string
 ): DBCoreCursor {
     
   // Helper to resolve value and queue for saving
   function resolveValue(rawValue: any): PromiseLike<any> {
     const resolvedBlobs: ResolvedBlob[] = [];
-    return resolveAllBlobRefs(rawValue, resolvedBlobs).then(resolved => {
+    return resolveAllBlobRefs(rawValue, dbUrl, accessToken, resolvedBlobs).then(resolved => {
       // Queue blobs for atomic saving
       for (const blob of resolvedBlobs) {
         blobSavingQueue.saveBlob(table.name, cursor.primaryKey, blob.keyPath, blob.data);
@@ -184,7 +208,9 @@ function resolveAndSave(
   table: DBCoreTable,
   trans: DBCoreTransaction,
   obj: any,
-  blobSavingQueue: BlobSavingQueue
+  blobSavingQueue: BlobSavingQueue,
+  dbUrl: string,
+  accessToken: string
 ): PromiseLike<any> {
   // Determine if we need waitFor:
   // Skip waitFor ONLY if BOTH conditions are met:
@@ -205,9 +231,8 @@ function resolveAndSave(
   // Collect resolved blobs with their keyPaths
   const resolvedBlobs: ResolvedBlob[] = [];
   
-  // Create the resolution promise
-  // BlobRef URLs are signed (SAS tokens) so no auth needed
-  const resolutionPromise = resolveAllBlobRefs(obj, resolvedBlobs);
+  // Create the resolution promise with auth info
+  const resolutionPromise = resolveAllBlobRefs(obj, dbUrl, accessToken, resolvedBlobs);
   
   // Wrap with waitFor to keep transaction alive during fetch
   const resolvePromise = needsWaitFor

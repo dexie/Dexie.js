@@ -6,10 +6,12 @@
  * They get resolved on-demand when the object is read.
  * 
  * The server sends offloaded binary data in the format:
- * { $t: 'Uint8Array', ref: 'blobId', size: 1234 }
- * { $t: 'Blob', ref: 'blobId', size: 1234, ct: 'image/png' }
+ * { $t: 'Uint8Array', ref: '1:blobId', size: 1234 }
+ * { $t: 'Blob', ref: '1:blobId', size: 1234, ct: 'image/png' }
  * 
  * The $t field preserves the original JavaScript type.
+ * The ref format is '{version}:{blobId}' where version identifies
+ * the storage backend configuration.
  */
 
 import Dexie from 'dexie';
@@ -42,10 +44,9 @@ export type BlobRefOrigType =
  */
 export interface BlobRef {
   $t: BlobRefOrigType;
-  ref: string;           // Blob ID (will be expanded to full URL)
+  ref: string;           // Versioned ref: '{version}:{blobId}'
   size: number;          // Size in bytes
   ct?: string;           // Content-type (only for Blob type)
-  url?: string;          // Full signed URL (set by server or client)
 }
 
 /**
@@ -125,12 +126,24 @@ export function markUnresolvedBlobRefs<T extends object>(obj: T): boolean {
 }
 
 /**
- * Download blob data from a BlobRef URL
- * The URL is a signed URL (SAS token) that already contains authentication
+ * Download blob data from server via proxy endpoint.
+ * Uses auth header for authentication (same as sync).
+ * 
+ * @param blobRef - The BlobRef to download
+ * @param dbUrl - Base URL for the database (e.g., 'https://mydb.dexie.cloud')
+ * @param accessToken - Access token for authentication
  */
-export async function downloadBlob(blobRef: BlobRef): Promise<Uint8Array> {
-  const downloadUrl = blobRef.url || blobRef.ref;
-  const response = await fetch(downloadUrl);
+export async function downloadBlob(
+  blobRef: BlobRef, 
+  dbUrl: string, 
+  accessToken: string
+): Promise<Uint8Array> {
+  const downloadUrl = `${dbUrl}/blob/${blobRef.ref}`;
+  const response = await fetch(downloadUrl, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`
+    }
+  });
 
   if (!response.ok) {
     throw new Error(`Failed to download blob: ${response.status} ${response.statusText}`);
@@ -192,10 +205,17 @@ export function convertToOriginalType(
  * Returns a new object with BlobRefs replaced by their original type data,
  * and populates the resolvedBlobs array with keyPath info for each blob.
  * 
- * BlobRef URLs are signed (SAS tokens) so no auth header needed
+ * @param obj - Object to resolve
+ * @param dbUrl - Base URL for the database
+ * @param accessToken - Access token for blob downloads
+ * @param resolvedBlobs - Array to collect resolved blob info
+ * @param currentPath - Current property path (for tracking)
+ * @param visited - WeakMap for circular reference detection
  */
 export async function resolveAllBlobRefs(
   obj: unknown,
+  dbUrl: string,
+  accessToken: string,
   resolvedBlobs: ResolvedBlob[] = [],
   currentPath: string = '',
   visited = new WeakMap()
@@ -206,7 +226,7 @@ export async function resolveAllBlobRefs(
 
   // Check if this is a BlobRef - resolve it and track it
   if (isBlobRef(obj)) {
-    const rawData = await downloadBlob(obj);
+    const rawData = await downloadBlob(obj, dbUrl, accessToken);
     const data = convertToOriginalType(rawData, obj);
     resolvedBlobs.push({ keyPath: currentPath, data });
     return data;
@@ -222,7 +242,7 @@ export async function resolveAllBlobRefs(
     visited.set(obj, result);  // Set before iterating to handle self-references
     for (let i = 0; i < obj.length; i++) {
       const itemPath = currentPath ? `${currentPath}.${i}` : `${i}`;
-      result.push(await resolveAllBlobRefs(obj[i], resolvedBlobs, itemPath, visited));
+      result.push(await resolveAllBlobRefs(obj[i], dbUrl, accessToken, resolvedBlobs, itemPath, visited));
     }
     return result;
   }
@@ -243,7 +263,7 @@ export async function resolveAllBlobRefs(
         continue;
       }
       const propPath = currentPath ? `${currentPath}.${key}` : key;
-      result[key] = await resolveAllBlobRefs(value, resolvedBlobs, propPath, visited);
+      result[key] = await resolveAllBlobRefs(value, dbUrl, accessToken, resolvedBlobs, propPath, visited);
     }
 
     return result;
