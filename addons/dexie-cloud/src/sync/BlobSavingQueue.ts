@@ -9,30 +9,32 @@
  * keyPath to avoid race conditions with other property changes.
  */
 
-import Dexie, { DBCore } from 'dexie';
+import Dexie, { UpdateSpec } from 'dexie';
+import { isBlobRef, ResolvedBlob } from './blobResolve';
+import { DexieCloudDB } from '../db/DexieCloudDB';
+import { TXExpandos } from '../types/TXExpandos';
 
 interface QueuedBlob {
   tableName: string;
   primaryKey: any;
-  blobKeyPath: string;
-  blobData: Blob | ArrayBuffer | ArrayBufferView;
+  resolvedBlobs: ResolvedBlob[];
 }
 
 export class BlobSavingQueue {
   private queue: QueuedBlob[] = [];
   private isProcessing = false;
-  private dbCore: DBCore;
+  private db: DexieCloudDB;
 
-  constructor(dbCore: DBCore) {
-    this.dbCore = dbCore;
+  constructor(db: DexieCloudDB) {
+    this.db = db;
   }
 
   /**
    * Queue a resolved blob for saving.
    * Only the specific blob property will be updated atomically.
    */
-  saveBlob(tableName: string, primaryKey: any, blobKeyPath: string, blobData: Blob | ArrayBuffer | ArrayBufferView): void {
-    this.queue.push({ tableName, primaryKey, blobKeyPath, blobData });
+  saveBlobs(tableName: string, primaryKey: any, resolvedBlobs: ResolvedBlob[]): void {
+    this.queue.push({ tableName, primaryKey, resolvedBlobs });
     this.startConsumer();
   }
 
@@ -66,26 +68,41 @@ export class BlobSavingQueue {
     }
 
     // Atomic update of just the blob property
-    const tx = this.dbCore.transaction([item.tableName], 'readwrite');
-    const coreTable = this.dbCore.table(item.tableName);
-    coreTable.get({
-      key: item.primaryKey,
-      trans: tx
-    }).then((obj) => {
-      if (!obj) {
-        // Object might have been deleted, skip if not found
-        return;
+    this.db.transaction('rw', item.tableName, (tx) => {
+      const trans = tx.idbtrans as IDBTransaction & TXExpandos;
+      trans.disableChangeTracking = true; // Don't regard this as a change for sync purposes
+      trans.disableAccessControl = true; // Bypass any access control checks since this is an internal operation
+      trans.disableBlobResolve = true; // Custom flag to skip blob resolve middleware during this transaction
+      const updateSpec: UpdateSpec<any> = {};
+      for (const blob of item.resolvedBlobs) {
+        updateSpec[blob.keyPath] = blob.data;
       }
-      Dexie.setByKeyPath(obj, item.blobKeyPath, item.blobData);
-      return coreTable.mutate({ type: 'put', keys: [item.primaryKey], values: [obj], trans: tx });
-    }).then(() => {
-       this.processQueue();
-    }).catch((err) => {
-      console.warn(
-        `Failed to save resolved blob for ${item.tableName}:${item.primaryKey}:${item.blobKeyPath}:`,
-        err
-      );
-      this.processQueue();
+      tx.table(item.tableName).update(item.primaryKey, obj => {
+        // Check that object still has the same unresolved blob refs before applying update (i.e. it hasn't been modified since we read it)
+        for (const blob of item.resolvedBlobs) {
+          // Verify atomicity - none of the blob properties has been modified since we read it. If any of them was modified, skip updating this item to avoid overwriting user changes.
+          const currentValue = Dexie.getByKeyPath(obj, blob.keyPath);
+          if (currentValue === undefined) {
+            // Blob property was removed - skip updating this blob
+            continue;
+          }
+          if (!isBlobRef(currentValue)) {
+            // Blob property was modified to a non-blob-ref value - skip updating this blob
+            continue;
+          }
+          if (currentValue.ref !== blob.ref) {
+            // Blob property was modified - skip updating this blob
+            return; // Stop. Another items has been queued to fully fix the object.
+          }
+          Dexie.setByKeyPath(obj, blob.keyPath, blob.data);
+        }
+        delete obj.$unresolved; // Clear the $unresolved marker if all refs was resolved.
+      });
+    }).catch((error) => {
+      console.error(`Error saving resolved blobs on ${item.tableName}:${item.primaryKey}:`, error);
+    }).finally(() => {
+      // Process next item in the queue
+      return this.processQueue();
     });
   }
 }

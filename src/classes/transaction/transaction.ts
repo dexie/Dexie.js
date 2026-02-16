@@ -213,11 +213,11 @@ export class Transaction implements ITransaction {
       root._waitingFor = promise;
       root._waitingQueue = [];
       // Start interacting with indexedDB until promise completes:
-      var store = root.idbtrans.objectStore(root.storeNames[0]);
+      var store: IDBObjectStore = root.idbtrans.objectStore(root.storeNames[0]);
       (function spin() {
         ++root._spinCount; // For debugging only
         while (root._waitingQueue.length) (root._waitingQueue.shift())();
-        if (root._waitingFor) store.get(-Infinity).onsuccess = spin;
+        if (root._waitingFor) store.count().onsuccess = spin;
       }());
     }
     var currentWaitPromise = root._waitingFor;

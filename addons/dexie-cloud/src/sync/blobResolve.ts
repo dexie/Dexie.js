@@ -55,6 +55,7 @@ export interface BlobRef {
 export interface ResolvedBlob {
   keyPath: string;
   data: Blob | ArrayBuffer | ArrayBufferView;
+  ref: string;
 }
 
 /**
@@ -228,7 +229,7 @@ export async function resolveAllBlobRefs(
   if (isBlobRef(obj)) {
     const rawData = await downloadBlob(obj, dbUrl, accessToken);
     const data = convertToOriginalType(rawData, obj);
-    resolvedBlobs.push({ keyPath: currentPath, data });
+    resolvedBlobs.push({ keyPath: currentPath, data, ref: obj.ref });
     return data;
   }
 
@@ -257,13 +258,13 @@ export async function resolveAllBlobRefs(
     const result: Record<string, unknown> = {};
     visited.set(obj, result);
 
-    for (const [key, value] of Object.entries(obj)) {
+    for (const [propName, value] of Object.entries(obj)) {
       // Skip the $unresolved marker itself
-      if (key === '$unresolved') {
+      if (propName === '$unresolved') {
         continue;
       }
-      const propPath = currentPath ? `${currentPath}.${key}` : key;
-      result[key] = await resolveAllBlobRefs(value, dbUrl, accessToken, resolvedBlobs, propPath, visited);
+      const propPath = currentPath ? `${currentPath}.${propName}` : propName;
+      result[propName] = await resolveAllBlobRefs(value, dbUrl, accessToken, resolvedBlobs, propPath, visited);
     }
 
     return result;
