@@ -132,7 +132,9 @@ export class ItemListComponent {
   // Computed signal that depends on todoList input
   private todoListId = computed(() => this.todoList().id);
 
-  // LiveQuery as signal - reacts to todoListId changes
+  // LiveQuery as signal - updates when database changes
+  // Note: liveQuery tracks Dexie reads, not signal changes.
+  // This works because @for track ensures each component instance has a fixed todoListId.
   items = toSignal(
     from(liveQuery(() => 
       db.todoItems.where({ todoListId: this.todoListId() }).toArray()
