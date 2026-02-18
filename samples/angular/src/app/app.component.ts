@@ -1,4 +1,4 @@
-// app.component.ts - Main app component (standalone)
+// app.component.ts - Main app component (standalone, zoneless)
 import { Component } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -17,6 +17,8 @@ import { ItemListComponent } from './item-list.component';
 
       @for (list of todoLists(); track list.id) {
         <app-item-list [todoList]="list" />
+      } @empty {
+        <p class="empty-state">No lists yet. Add one below!</p>
       }
 
       <form (ngSubmit)="addNewList()">
@@ -36,6 +38,11 @@ import { ItemListComponent } from './item-list.component';
       margin: 2rem auto;
       padding: 1rem;
       font-family: system-ui, sans-serif;
+    }
+    .empty-state {
+      color: #666;
+      font-style: italic;
+      margin: 1rem 0;
     }
     form {
       margin-top: 2rem;
@@ -71,8 +78,9 @@ export class AppComponent {
   );
 
   async addNewList() {
-    if (!this.newListName.trim()) return;
-    await db.todoLists.add({ title: this.newListName });
+    const title = this.newListName.trim();
+    if (!title) return;
+    await db.todoLists.add({ title });
     this.newListName = '';
   }
 }
