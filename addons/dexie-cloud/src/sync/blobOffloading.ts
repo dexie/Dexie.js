@@ -356,15 +356,6 @@ function hasLargeBlobs(obj: unknown, visited = new WeakSet()): boolean {
   }
   visited.add(obj);
   
-  if (obj instanceof Date || obj instanceof RegExp) {
-    return false;
-  }
-  
-  // Small blobs don't need offloading
-  if (obj instanceof Blob || obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
-    return false;
-  }
-  
   if (Array.isArray(obj)) {
     return obj.some(item => hasLargeBlobs(item, visited));
   }
