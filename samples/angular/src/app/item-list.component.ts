@@ -1,4 +1,4 @@
-// item-list.component.ts - Todo list component (standalone)
+// item-list.component.ts - Todo list component (standalone, zoneless)
 import { Component, computed, input } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { toSignal } from '@angular/core/rxjs-interop';
@@ -135,16 +135,17 @@ export class ItemListComponent {
   // LiveQuery as signal - reacts to todoListId changes
   items = toSignal(
     from(liveQuery(() => 
-      db.todoItems.where({ todoListId: this.todoList().id }).toArray()
+      db.todoItems.where({ todoListId: this.todoListId() }).toArray()
     )),
     { initialValue: [] as TodoItem[] }
   );
 
   async addItem() {
-    if (!this.newItemTitle.trim()) return;
+    const title = this.newItemTitle.trim();
+    if (!title) return;
     await db.todoItems.add({
       todoListId: this.todoListId(),
-      title: this.newItemTitle,
+      title,
       done: false,
     });
     this.newItemTitle = '';
@@ -159,8 +160,10 @@ export class ItemListComponent {
   }
 
   async deleteList() {
-    // Delete all items in this list, then the list itself
-    await db.todoItems.where({ todoListId: this.todoListId() }).delete();
-    await db.todoLists.delete(this.todoListId());
+    // Delete all items in this list, then the list itself (atomically)
+    await db.transaction('rw', db.todoItems, db.todoLists, async () => {
+      await db.todoItems.where({ todoListId: this.todoListId() }).delete();
+      await db.todoLists.delete(this.todoListId());
+    });
   }
 }
