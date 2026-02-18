@@ -5,9 +5,10 @@
  */
 
 import { BehaviorSubject } from 'rxjs';
-import Dexie from 'dexie';
 import { BlobProgress } from '../DexieCloudAPI';
 import { BlobRef, isBlobRef } from './blobResolve';
+import { getSyncableTables } from '../helpers/getSyncableTables';
+import { DexieCloudDB } from '../db/DexieCloudDB';
 
 const initialProgress: BlobProgress = {
   isDownloading: false,
@@ -28,26 +29,19 @@ export function createBlobProgress(): BehaviorSubject<BlobProgress> {
  * Scan database for unresolved BlobRefs and update progress.
  */
 export async function updateBlobProgress(
-  db: Dexie,
+  db: DexieCloudDB,
   progress$: BehaviorSubject<BlobProgress>
 ): Promise<void> {
   let blobsRemaining = 0;
   let bytesRemaining = 0;
 
   // Get synced tables (exclude internal tables)
-  const unsyncedTables = (db as any).cloud?.options?.unsyncedTables || [];
-  const internalTables = ['$syncState', '$jobs', '$baseRevs', '$logins'];
-  const syncedTables = db.tables.filter(
-    (table) => 
-      !unsyncedTables.includes(table.name) &&
-      !internalTables.includes(table.name) &&
-      !table.name.endsWith('_mutations')
-  );
+  const syncedTables = getSyncableTables(db);
 
   for (const table of syncedTables) {
     try {
       // Check if table has $unresolved index
-      const hasIndex = table.schema.indexes.some(idx => idx.name === '$unresolved');
+      const hasIndex = !!table.schema.idxByName['$unresolved'];
       if (!hasIndex) continue;
 
       // Query objects with $unresolved marker
@@ -129,7 +123,7 @@ function findBlobRefs(obj: unknown): BlobRef[] {
 
     if (Array.isArray(value)) {
       value.forEach(scan);
-    } else {
+    } else if (value.constructor === Object) {
       Object.values(value).forEach(scan);
     }
   }

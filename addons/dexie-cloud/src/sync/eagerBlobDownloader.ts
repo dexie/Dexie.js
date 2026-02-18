@@ -15,11 +15,14 @@ import {
   resolveAllBlobRefs,
   ResolvedBlob,
 } from './blobResolve';
+import { loadCachedAccessToken } from './loadCachedAccessToken';
 import {
   updateBlobProgress,
   reportBlobDownloaded,
   setDownloadingState,
 } from './blobProgress';
+import { DexieCloudDB } from '../db/DexieCloudDB';
+import { getSyncableTables } from '../helpers/getSyncableTables';
 
 /**
  * Download all unresolved blobs in the background.
@@ -30,7 +33,7 @@ import {
  * Each blob is saved atomically using Table.update() to avoid race conditions.
  */
 export async function downloadUnresolvedBlobs(
-  db: Dexie,
+  db: DexieCloudDB,
   progress$: BehaviorSubject<BlobProgress>,
   signal?: AbortSignal
 ): Promise<void> {
@@ -45,15 +48,9 @@ export async function downloadUnresolvedBlobs(
 
   try {
     // Get synced tables (exclude internal tables that don't have $unresolved)
-    const unsyncedTables = (db as any).cloud.options?.unsyncedTables || [];
-    const internalTables = ['$syncState', '$jobs', '$baseRevs', '$logins'];
-    const syncedTables = db.tables.filter(
-      (table) => 
-        !unsyncedTables.includes(table.name) &&
-        !internalTables.includes(table.name) &&
-        !table.name.endsWith('_mutations') // Skip mutation tables
-    );
-
+    // Get synced tables (exclude internal tables)
+    const syncedTables = getSyncableTables(db);
+  
     for (const table of syncedTables) {
       if (signal?.aborted) break;
 
@@ -71,7 +68,7 @@ export async function downloadUnresolvedBlobs(
         for (const obj of unresolvedObjects) {
           if (signal?.aborted) break;
 
-          // Skip if no BlobRefs (shouldn't happen but be safe)
+          // Skip if no BlobRefs (shouldn't happen but be safe - we're not in transaction)
           if (!hasBlobRefs(obj)) continue;
 
           // Get primary key
@@ -87,7 +84,11 @@ export async function downloadUnresolvedBlobs(
 
           // Resolve all BlobRefs and collect them with their keyPaths
           const resolvedBlobs: ResolvedBlob[] = [];
-          await resolveAllBlobRefs(obj, resolvedBlobs);
+          const accessToken = await loadCachedAccessToken(db);
+          const databaseUrl = db.cloud.options?.databaseUrl;
+          if (!databaseUrl) throw new Error('Database URL is required to download blobs');
+          if (!accessToken) throw new Error('Access token is required to download blobs');
+          await resolveAllBlobRefs(obj, databaseUrl, accessToken, resolvedBlobs);
 
           // Save each blob atomically using update()
           for (const blob of resolvedBlobs) {

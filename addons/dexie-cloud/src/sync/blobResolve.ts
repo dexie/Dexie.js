@@ -14,8 +14,6 @@
  * the storage backend configuration.
  */
 
-import Dexie from 'dexie';
-import { BlobSavingQueue } from './BlobSavingQueue';
 
 /**
  * Original type that was offloaded to blob storage.
@@ -283,3 +281,5 @@ export function hasUnresolvedBlobRefs(obj: unknown): boolean {
     (obj as any).$unresolved === 1
   );
 }
+
+

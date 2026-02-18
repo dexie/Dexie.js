@@ -25,22 +25,23 @@ import Dexie, {
   DBCoreOpenCursorRequest,
   DBCoreCursor,
   DBCoreTable, 
-  DBCoreTransaction 
+  DBCoreTransaction, 
+  Middleware
 } from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { hasUnresolvedBlobRefs, resolveAllBlobRefs, ResolvedBlob } from '../sync/blobResolve';
+import { loadCachedAccessToken } from '../sync/loadCachedAccessToken';
 import { BlobSavingQueue } from '../sync/BlobSavingQueue';
-import { loadAccessToken } from '../authentication/authenticate';
 import { get } from 'http';
 import { TXExpandos } from '../types/TXExpandos';
 import { UserLogin } from '../dexie-cloud-client';
-import { MINUTES } from '../helpers/date-constants';
 
-export function createBlobResolveMiddleware(db: DexieCloudDB) {
+export function createBlobResolveMiddleware(db: DexieCloudDB): Middleware<DBCore> {
   const dbUrl = db.cloud.options?.databaseUrl;
   return {
     stack: 'dbcore' as const,
     name: 'blobResolve',
+    level: -2, // Run below other middlewares and after sync and caching middlewares
     create(downlevelDatabase: DBCore): DBCore {
       // Create a single queue instance for this database
       const blobSavingQueue = new BlobSavingQueue(db);
@@ -177,16 +178,6 @@ function createBlobResolvingCursor(
   return wrappedCursor;
 }
 
-
-export function loadCachedAccessToken(db: DexieCloudDB): Promise<string | null> {
-  const cached = db.cloud.currentUser.value;
-  if (cached && cached.accessToken && (cached.accessTokenExpiration?.getTime() ?? Infinity) > Date.now() + 5 * MINUTES) {
-    return Promise.resolve(cached.accessToken);
-  }
-  return Dexie.ignoreTransaction(()=>loadAccessToken(db).then(user => {
-    return user?.accessToken || null;
-  }));
-}
 
 /**
  * Resolve BlobRefs in an object and queue each blob for atomic saving.
