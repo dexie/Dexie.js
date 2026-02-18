@@ -286,6 +286,7 @@ export function dexieCloud(dexie: Dexie) {
     return this.db.cloud.schema?.[this.name]?.idPrefix || '';
   };
 
+  dexie.use(createBlobResolveMiddleware(DexieCloudDB(dexie)));
   dexie.use(
     createMutationTrackingMiddleware({
       currentUserObservable: dexie.cloud.currentUser,
@@ -294,7 +295,6 @@ export function dexieCloud(dexie: Dexie) {
   );
   dexie.use(createImplicitPropSetterMiddleware(DexieCloudDB(dexie)));
   dexie.use(createIdGenerationMiddleware(DexieCloudDB(dexie)));
-  dexie.use(createBlobResolveMiddleware(DexieCloudDB(dexie)));
 
   async function onDbReady(dexie: Dexie) {
     closed = false; // As Dexie calls us, we are not closed anymore. Maybe reopened? Remember db.ready event is registered with sticky flag!
@@ -313,18 +313,18 @@ export function dexieCloud(dexie: Dexie) {
     subscriptions.push(db.syncCompleteEvent.subscribe(syncComplete));
 
     // Eager blob download: When blobMode='eager' (default), download unresolved blobs after sync
-    subscriptions.push(
-      db.syncCompleteEvent.subscribe(async () => {
-        const blobMode = db.cloud.options?.blobMode ?? 'eager';
-        if (blobMode !== 'eager') return;
-
-        try {
-          await downloadUnresolvedBlobs(db.dx, dexie.cloud.blobProgress);
-        } catch (err) {
+    const blobMode = db.cloud.options?.blobMode ?? 'eager';
+    if (blobMode === 'eager') {
+      const downloadBlobs = () => {
+        Dexie.ignoreTransaction(() => downloadUnresolvedBlobs(db, dexie.cloud.blobProgress)).catch(err => {
           console.error('[dexie-cloud] Eager blob download failed:', err);
-        }
-      })
-    );
+        });
+      };
+      setTimeout(downloadBlobs, 0); // Don't block ready event. Start downloading blobs in the background right after.
+      // And also after every sync completes:
+      subscriptions.push(db.syncCompleteEvent.subscribe(downloadBlobs));
+    }
+
 
     //verifyConfig(db.cloud.options); Not needed (yet at least!)
     // Verify the user has allowed version increment.
