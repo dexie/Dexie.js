@@ -20,10 +20,10 @@
 - [v] samples/dexie-cloud-todo-app/src/db/TodoDB.ts
 - [v] addons/dexie-cloud/src/sync/blobProgress.ts
 - [v] addons/dexie-cloud/src/sync/syncWithServer.ts ()
-- [ ] addons/dexie-cloud/src/sync/applyServerChanges.ts (light)
-- [ ] addons/dexie-cloud/src/sync/sync.ts (medium)
-- [ ] addons/dexie-cloud/src/sync/blobOffloading.ts (extensive)
-- [ ] docs/CI-PUBLISHING.md
+- [v] addons/dexie-cloud/src/sync/applyServerChanges.ts (light)
+- [v] addons/dexie-cloud/src/sync/blobOffloading.ts (extensive)
+- [v] addons/dexie-cloud/src/sync/sync.ts (medium)
+- [v] docs/CI-PUBLISHING.md
 
 # Optimize middleware to skip intercepting when not nescessary:
 
@@ -32,5 +32,11 @@
 - [ ] in dexie-cloud-client, on-ready event, populate the memory set from sync state.
 - [ ] In middleware, skip doing the blob dance if the requested table isn't listed in the memory set.
 
-# Things to solve on the server instead:
-- [ ] markUnresolvedBlobRefs(). Let server send $unresolved in the changes. Why? because ALL objects are deeply walked on initial load otherwise. Server knows when when a BlobRef is set. Persist $unresolved in the DB. Useful in REST API as well so that REST clients doesn't need to check it either.
+# Refactoring To-dos
+- [ ] Rename `$unresolved` to `$hasBlobRefs` as it is more explanatory
+- [ ] Move Blob-offloading code in dexie-cloud-addon into its own sub directory to collect this feature into a single place
+
+# Beware-ofs
+
+- If exception happens during blob uploading phase in sync.ts, the entire flow will be forgotten even if some blobs were uploaded. Could there be a risk of eternal loop if some object causes a failure and the client keeps uploading blobs over and over with new IDs? If so, can could handle partial failures specifically? For example, to catch each operation in the loop in offloadBlobsInOperations() and if that specific situation occurs only (some succeed and then failure), update the "XXX_changes" with the BlobRef entries uploaded so far. Next sync would then continue to retry with the failed ones only. Don't know if this could be a real problem or not. Probably the common case is network failure during upload and a re-upload eternal loop might not even be a problem unless we have a bug in the code triggered by certain data.
+

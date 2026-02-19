@@ -113,18 +113,6 @@ export function hasBlobRefs(obj: unknown, visited = new WeakSet()): boolean {
 }
 
 /**
- * Mark an object as having unresolved BlobRefs
- * Returns true if the object was marked (had BlobRefs)
- */
-export function markUnresolvedBlobRefs<T extends object>(obj: T): boolean {
-  if (hasBlobRefs(obj)) {
-    (obj as any).$unresolved = 1;
-    return true;
-  }
-  return false;
-}
-
-/**
  * Download blob data from server via proxy endpoint.
  * Uses auth header for authentication (same as sync).
  * 

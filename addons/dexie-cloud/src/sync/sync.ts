@@ -32,6 +32,7 @@ import { hasLargeBlobsInOperations, offloadBlobsInOperations } from './blobOfflo
 import { updateYSyncStates } from '../yjs/updateYSyncStates';
 import { downloadYDocsFromServer } from '../yjs/downloadYDocsFromServer';
 import { UpdateSpec } from 'dexie';
+import { loadCachedAccessToken } from './loadCachedAccessToken';
 
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 
@@ -207,12 +208,12 @@ async function _sync(
   // Offload large blobs to blob storage before sync
   //
   let processedChangeSet = clientChangeSet;
-  if (currentUser.accessToken && hasLargeBlobsInOperations(clientChangeSet)) {
+  if (hasLargeBlobsInOperations(clientChangeSet)) {
     console.debug('Offloading large blobs before sync...');
     processedChangeSet = await offloadBlobsInOperations(
       clientChangeSet,
       databaseUrl,
-      currentUser.accessToken
+      () => loadCachedAccessToken(db)
     );
     console.debug('Blob offloading complete');
   }

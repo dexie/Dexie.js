@@ -45,9 +45,14 @@ export function shouldOffloadBlob(value: unknown): value is Blob | ArrayBuffer |
  */
 export async function uploadBlob(
   databaseUrl: string,
-  accessToken: string,
+  getCachedAccessToken: () => Promise<string | null>,
   blob: Blob | ArrayBuffer | ArrayBufferView
 ): Promise<BlobRef> {
+  const accessToken = await getCachedAccessToken();
+  if (!accessToken) {
+    throw new Error('Failed to load access token for blob upload');
+  }
+
   const blobId = newId();
   // URL format: {databaseUrl}/blob/{blobId}
   const url = `${databaseUrl}/blob/${blobId}`;
@@ -90,32 +95,31 @@ export async function uploadBlob(
     throw new Error(`Failed to upload blob: ${response.status} ${response.statusText}`);
   }
   
-  // The server returns the canonical URL
-  const result = await response.json();
+  // The server returns the canonical URL but we only store the blobId since the URL can be reconstructed and we want to avoid storing the databaseUrl in the BlobRef
+  await response.json();
   
   // Return BlobRef with original type preserved in $t
   return {
     $t: origType,
     ref: blobId,
-    url: result.url || url,
     size: size,
-    ct: origType === 'Blob' ? contentType : undefined,
+    ...(origType === 'Blob' ? { ct: contentType } : {}) // Only include content type for Blobs
   };
 }
 
-/**
- * Download blob data from a BlobRef
- * The URL is a signed URL (SAS token) that already contains authentication
- */
-export async function downloadBlob(blobRef: BlobRef): Promise<Blob> {
-  const downloadUrl = blobRef.url || blobRef.ref;
-  const response = await fetch(downloadUrl);
-  
-  if (!response.ok) {
-    throw new Error(`Failed to download blob: ${response.status} ${response.statusText}`);
+export async function offloadBlobsAndMarkDirty(
+  obj: unknown,
+  databaseUrl: string,
+  getCachedAccessToken: () => Promise<string | null>
+): Promise<unknown> {
+  const dirtyFlag = { dirty: false };
+  const result = await offloadBlobs(obj, databaseUrl, getCachedAccessToken, dirtyFlag);  
+  // Mark the object as dirty for sync if any blobs were offloaded
+  if (dirtyFlag.dirty && typeof result === 'object' && result !== null && result.constructor === Object) {
+    (result as any).$unresolved = 1;
   }
   
-  return response.blob();
+  return result;
 }
 
 /**
@@ -125,7 +129,8 @@ export async function downloadBlob(blobRef: BlobRef): Promise<Blob> {
 export async function offloadBlobs(
   obj: unknown,
   databaseUrl: string,
-  accessToken: string,
+  getCachedAccessToken: () => Promise<string | null>,
+  dirtyFlag = { dirty: false },
   visited = new WeakSet()
 ): Promise<unknown> {
   if (obj === null || obj === undefined) {
@@ -134,7 +139,8 @@ export async function offloadBlobs(
   
   // Check if this is a blob that should be offloaded
   if (shouldOffloadBlob(obj)) {
-    return uploadBlob(databaseUrl, accessToken, obj);
+    dirtyFlag.dirty = true;
+    return uploadBlob(databaseUrl, getCachedAccessToken, obj);
   }
   
   if (typeof obj !== 'object') {
@@ -151,21 +157,11 @@ export async function offloadBlobs(
   if (Array.isArray(obj)) {
     const result: unknown[] = [];
     for (const item of obj) {
-      result.push(await offloadBlobs(item, databaseUrl, accessToken, visited));
+      result.push(await offloadBlobs(item, databaseUrl, getCachedAccessToken, dirtyFlag, visited));
     }
     return result;
   }
-  
-  // Skip special objects
-  if (obj instanceof Date || obj instanceof RegExp) {
-    return obj;
-  }
-  
-  // Skip small blobs
-  if (obj instanceof Blob || obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
-    return obj;
-  }
-  
+    
   // Only traverse POJOs
   if (obj.constructor !== Object) {
     return obj;
@@ -173,65 +169,7 @@ export async function offloadBlobs(
   
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
-    result[key] = await offloadBlobs(value, databaseUrl, accessToken, visited);
-  }
-  return result;
-}
-
-/**
- * Recursively resolve BlobRefs in an object
- * Returns a new object with BlobRefs replaced by actual Blob data
- * 
- * BlobRef URLs are signed (SAS tokens) so no auth needed
- */
-export async function resolveBlobs(
-  obj: unknown,
-  visited = new WeakSet()
-): Promise<unknown> {
-  if (obj === null || obj === undefined) {
-    return obj;
-  }
-  
-  // Check if this is a BlobRef
-  if (isBlobRef(obj)) {
-    return downloadBlob(obj);
-  }
-  
-  if (typeof obj !== 'object') {
-    return obj;
-  }
-  
-  // Avoid circular references - check BEFORE processing
-  if (visited.has(obj)) {
-    return obj;
-  }
-  visited.add(obj);
-  
-  // Handle arrays
-  if (Array.isArray(obj)) {
-    const result: unknown[] = [];
-    for (const item of obj) {
-      result.push(await resolveBlobs(item, visited));
-    }
-    return result;
-  }
-  
-  // Skip special objects
-  if (obj instanceof Date || obj instanceof RegExp || obj instanceof Blob) {
-    return obj;
-  }
-  if (obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
-    return obj;
-  }
-  
-  // Only traverse POJOs
-  if (obj.constructor !== Object) {
-    return obj;
-  }
-  
-  const result: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(obj)) {
-    result[key] = await resolveBlobs(value, visited);
+    result[key] = await offloadBlobs(value, databaseUrl, getCachedAccessToken, dirtyFlag, visited);
   }
   return result;
 }
@@ -243,7 +181,7 @@ export async function resolveBlobs(
 export async function offloadBlobsInOperations(
   operations: DBOperationsSet,
   databaseUrl: string,
-  accessToken: string
+  getCachedAccessToken: () => Promise<string | null>
 ): Promise<DBOperationsSet> {
   const result: DBOperationsSet = [];
   
@@ -251,7 +189,7 @@ export async function offloadBlobsInOperations(
     const processedMuts: DBOperation[] = [];
     
     for (const mut of tableOps.muts) {
-      const processedMut = await offloadBlobsInOperation(mut, databaseUrl, accessToken);
+      const processedMut = await offloadBlobsInOperation(mut, databaseUrl, getCachedAccessToken);
       processedMuts.push(processedMut);
     }
     
@@ -267,13 +205,13 @@ export async function offloadBlobsInOperations(
 async function offloadBlobsInOperation(
   op: DBOperation,
   databaseUrl: string,
-  accessToken: string
+  getCachedAccessToken: ()=> Promise<string | null>
 ): Promise<DBOperation> {
   switch (op.type) {
     case 'insert':
     case 'upsert': {
       const processedValues = await Promise.all(
-        op.values.map(value => offloadBlobs(value, databaseUrl, accessToken))
+        op.values.map(value => offloadBlobsAndMarkDirty(value, databaseUrl, getCachedAccessToken))
       );
       return {
         ...op,
@@ -283,7 +221,7 @@ async function offloadBlobsInOperation(
     
     case 'update': {
       const processedChangeSpecs = await Promise.all(
-        op.changeSpecs.map(spec => offloadBlobs(spec, databaseUrl, accessToken))
+        op.changeSpecs.map(spec => offloadBlobsAndMarkDirty(spec, databaseUrl, getCachedAccessToken))
       );
       return {
         ...op,
@@ -292,7 +230,7 @@ async function offloadBlobsInOperation(
     }
     
     case 'modify': {
-      const processedChangeSpec = await offloadBlobs(op.changeSpec, databaseUrl, accessToken);
+      const processedChangeSpec = await offloadBlobsAndMarkDirty(op.changeSpec, databaseUrl, getCachedAccessToken);
       return {
         ...op,
         changeSpec: processedChangeSpec as { [keyPath: string]: any },

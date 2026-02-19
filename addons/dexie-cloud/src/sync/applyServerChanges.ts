@@ -2,24 +2,12 @@ import { DexieCloudDB } from '../db/DexieCloudDB';
 import Dexie from 'dexie';
 import { bulkUpdate } from '../helpers/bulkUpdate';
 import { DBOperationsSet } from 'dexie-cloud-common';
-import { markUnresolvedBlobRefs } from './blobResolve';
 
 export async function applyServerChanges(
   changes: DBOperationsSet<string>,
   db: DexieCloudDB
 ) {
   console.debug('Applying server changes', changes, Dexie.currentTransaction);
-  
-  // Mark objects with BlobRefs as unresolved
-  for (const { muts } of changes) {
-    for (const mut of muts) {
-      if (mut.type === 'insert' || mut.type === 'upsert') {
-        for (const value of mut.values) {
-          markUnresolvedBlobRefs(value);
-        }
-      }
-    }
-  }
   for (const { table: tableName, muts } of changes) {
     if (!db.dx._allTables[tableName]) {
       console.debug(
