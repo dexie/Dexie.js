@@ -245,8 +245,8 @@ export async function resolveAllBlobRefs(
     visited.set(obj, result);
 
     for (const [propName, value] of Object.entries(obj)) {
-      // Skip the $unresolved marker itself
-      if (propName === '$unresolved') {
+      // Skip the $hasBlobRefs marker itself
+      if (propName === '$hasBlobRefs') {
         continue;
       }
       const propPath = currentPath ? `${currentPath}.${propName}` : propName;
@@ -266,7 +266,7 @@ export function hasUnresolvedBlobRefs(obj: unknown): boolean {
   return (
     typeof obj === 'object' &&
     obj !== null &&
-    (obj as any).$unresolved === 1
+    (obj as any).$hasBlobRefs === 1
   );
 }
 

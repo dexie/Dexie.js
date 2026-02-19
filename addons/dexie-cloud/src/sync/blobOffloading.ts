@@ -116,7 +116,7 @@ export async function offloadBlobsAndMarkDirty(
   const result = await offloadBlobs(obj, databaseUrl, getCachedAccessToken, dirtyFlag);  
   // Mark the object as dirty for sync if any blobs were offloaded
   if (dirtyFlag.dirty && typeof result === 'object' && result !== null && result.constructor === Object) {
-    (result as any).$unresolved = 1;
+    (result as any).$hasBlobRefs = 1;
   }
   
   return result;

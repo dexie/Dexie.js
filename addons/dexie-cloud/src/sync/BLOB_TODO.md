@@ -33,7 +33,7 @@
 - [ ] In middleware, skip doing the blob dance if the requested table isn't listed in the memory set.
 
 # Refactoring To-dos
-- [ ] Rename `$unresolved` to `$hasBlobRefs` as it is more explanatory
+- [v] Rename `$unresolved` to `$hasBlobRefs` as it is more explanatory
 - [ ] Move Blob-offloading code in dexie-cloud-addon into its own sub directory to collect this feature into a single place
 
 # Beware-ofs

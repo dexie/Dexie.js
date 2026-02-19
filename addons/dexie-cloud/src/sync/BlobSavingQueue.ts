@@ -96,7 +96,7 @@ export class BlobSavingQueue {
           }
           Dexie.setByKeyPath(obj, blob.keyPath, blob.data);
         }
-        delete obj.$unresolved; // Clear the $unresolved marker if all refs was resolved.
+        delete obj.$hasBlobRefs; // Clear the $hasBlobRefs marker if all refs was resolved.
       });
     }).catch((error) => {
       console.error(`Error saving resolved blobs on ${item.tableName}:${item.primaryKey}:`, error);

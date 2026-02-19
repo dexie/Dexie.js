@@ -2,7 +2,7 @@
  * DBCore Middleware for resolving BlobRefs on read
  * 
  * This middleware intercepts read operations and resolves any BlobRefs
- * found in objects marked with $unresolved.
+ * found in objects marked with $hasBlobRefs.
  * 
  * Important: Avoids async/await to preserve Dexie's Promise.PSD context.
  * Uses Dexie.waitFor() only for explicit rw transactions to keep them alive.

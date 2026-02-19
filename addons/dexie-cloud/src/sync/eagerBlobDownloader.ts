@@ -47,7 +47,7 @@ export async function downloadUnresolvedBlobs(
   setDownloadingState(progress$, true);
 
   try {
-    // Get synced tables (exclude internal tables that don't have $unresolved)
+    // Get synced tables (exclude internal tables that don't have $hasBlobRefs)
     // Get synced tables (exclude internal tables)
     const syncedTables = getSyncableTables(db);
   
@@ -55,13 +55,13 @@ export async function downloadUnresolvedBlobs(
       if (signal?.aborted) break;
 
       try {
-        // Check if table has $unresolved index
-        const hasIndex = table.schema.indexes.some(idx => idx.name === '$unresolved');
+        // Check if table has $hasBlobRefs index
+        const hasIndex = table.schema.indexes.some(idx => idx.name === '$hasBlobRefs');
         if (!hasIndex) continue;
 
-        // Query objects with $unresolved marker
+        // Query objects with $hasBlobRefs marker
         const unresolvedObjects = await table
-          .where('$unresolved')
+          .where('$hasBlobRefs')
           .equals(1)
           .toArray();
 
@@ -97,14 +97,14 @@ export async function downloadUnresolvedBlobs(
             });
           }
 
-          // Clear the $unresolved marker
-          await table.update(key, { $unresolved: undefined });
+          // Clear the $hasBlobRefs marker
+          await table.update(key, { $hasBlobRefs: undefined });
 
           // Update progress
           reportBlobDownloaded(progress$, bytesToDownload);
         }
       } catch (err) {
-        // Table might not have $unresolved index or other issues - skip silently
+        // Table might not have $hasBlobRefs index or other issues - skip silently
       }
     }
   } finally {

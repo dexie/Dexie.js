@@ -61,10 +61,10 @@ export function overrideParseStoresSpec(origFunc: Function, dexie: Dexie) {
           storesClone[`$${tableName}_mutations`] = '++rev';
           cloudTableSchema.markedForSync = true;
           
-          // Add sparse index for $unresolved (for BlobRef resolution tracking)
+          // Add sparse index for $hasBlobRefs (for BlobRef resolution tracking)
           // IndexedDB sparse indexes have zero overhead when the property doesn't exist
-          if (!storesClone[tableName].includes('$unresolved')) {
-            storesClone[tableName] += ',$unresolved';
+          if (!storesClone[tableName].includes('$hasBlobRefs')) {
+            storesClone[tableName] += ',$hasBlobRefs';
           }
         }
         if (cloudTableSchema.deleted) {

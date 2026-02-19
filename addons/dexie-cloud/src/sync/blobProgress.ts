@@ -40,13 +40,13 @@ export async function updateBlobProgress(
 
   for (const table of syncedTables) {
     try {
-      // Check if table has $unresolved index
-      const hasIndex = !!table.schema.idxByName['$unresolved'];
+      // Check if table has $hasBlobRefs index
+      const hasIndex = !!table.schema.idxByName['$hasBlobRefs'];
       if (!hasIndex) continue;
 
-      // Query objects with $unresolved marker
+      // Query objects with $hasBlobRefs marker
       const unresolvedObjects = await table
-        .where('$unresolved')
+        .where('$hasBlobRefs')
         .equals(1)
         .toArray();
 
@@ -56,7 +56,7 @@ export async function updateBlobProgress(
         bytesRemaining += blobs.reduce((sum, blob) => sum + (blob.size || 0), 0);
       }
     } catch {
-      // Table might not have $unresolved index - skip
+      // Table might not have $hasBlobRefs index - skip
     }
   }
 
