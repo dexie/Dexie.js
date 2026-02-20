@@ -5,7 +5,7 @@
  * Called after sync completes to prefetch blobs for offline access.
  */
 
-import Dexie from 'dexie';
+import Dexie, { UpdateSpec } from 'dexie';
 import { BehaviorSubject } from 'rxjs';
 import { BlobProgress } from '../DexieCloudAPI';
 import {
@@ -91,14 +91,15 @@ export async function downloadUnresolvedBlobs(
           await resolveAllBlobRefs(obj, databaseUrl, accessToken, resolvedBlobs);
 
           // Save each blob atomically using update()
+          const updateSpec: UpdateSpec<any> = {
+            $hasBlobRefs: undefined, // Clear the $hasBlobRefs marker
+          };
           for (const blob of resolvedBlobs) {
-            await table.update(key, {
-              [blob.keyPath]: blob.data
-            });
+            updateSpec[blob.keyPath] = blob.data;
           }
 
           // Clear the $hasBlobRefs marker
-          await table.update(key, { $hasBlobRefs: undefined });
+          await table.update(key, updateSpec);
 
           // Update progress
           reportBlobDownloaded(progress$, bytesToDownload);
