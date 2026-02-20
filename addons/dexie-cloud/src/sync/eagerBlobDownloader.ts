@@ -88,21 +88,37 @@ export async function downloadUnresolvedBlobs(
           const databaseUrl = db.cloud.options?.databaseUrl;
           if (!databaseUrl) throw new Error('Database URL is required to download blobs');
           if (!accessToken) throw new Error('Access token is required to download blobs');
-          await resolveAllBlobRefs(obj, databaseUrl, accessToken, resolvedBlobs);
+          try {
+            await resolveAllBlobRefs(obj, databaseUrl, accessToken, resolvedBlobs);
 
-          // Save each blob atomically using update()
-          const updateSpec: UpdateSpec<any> = {
-            $hasBlobRefs: undefined, // Clear the $hasBlobRefs marker
-          };
-          for (const blob of resolvedBlobs) {
-            updateSpec[blob.keyPath] = blob.data;
+            // Save each blob atomically using update()
+            const updateSpec: UpdateSpec<any> = {
+              $hasBlobRefs: undefined, // Clear the $hasBlobRefs marker
+            };
+            for (const blob of resolvedBlobs) {
+              updateSpec[blob.keyPath] = blob.data;
+            }
+
+            // Clear the $hasBlobRefs marker
+            await table.update(key, updateSpec);
+
+            // Update progress
+            reportBlobDownloaded(progress$, bytesToDownload);
+          } catch (err) {
+            console.error(`Failed to download blobs for ${table.name}:${key}:`, err);
+            // If download fails, we can choose to either:
+            // - Leave the $hasBlobRefs marker so it will be retried next time
+            // - Clear the $hasBlobRefs marker to avoid blocking other blobs from downloading
+            // Here we choose to clear the marker to avoid blocking, but in a real implementation you might want to track failures and retry logic.
+
+            // TODO: FIXTHIS:
+            //  If error is a 4xx, we should stop retying. Set $hasBlobRefs to undefined to avoid retrying on next sync, since it will likely fail again.
+            //  If error is a 5xx, we should no nothing here except possibly increment a retry count
+            //  If error is network error, we should throw here to cancel the entire loop.
+            //  If error is anything else, it's unexpected and we should log it, clear the marker or maybe retry a few times before clearing the marker, but not throw.
+            
+            //await table.update(key, { $hasBlobRefs: undefined });
           }
-
-          // Clear the $hasBlobRefs marker
-          await table.update(key, updateSpec);
-
-          // Update progress
-          reportBlobDownloaded(progress$, bytesToDownload);
         }
       } catch (err) {
         // Table might not have $hasBlobRefs index or other issues - skip silently

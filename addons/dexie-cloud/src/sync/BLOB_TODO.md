@@ -25,6 +25,9 @@
 - [v] addons/dexie-cloud/src/sync/sync.ts (medium)
 - [v] docs/CI-PUBLISHING.md
 
+# Error handling
+- [ ] eagerBlobDownloader: see line 114 TODO. Depending on error, retry or stop trying. Maybe only retry N times over a time period of T. Right now, it will continue with next object and retry next time over and over.
+
 # Optimize middleware to skip intercepting when not nescessary:
 
 - [ ] In applyServerChanges transaction, let syncState reflect which tables that have unresolved blobs, also let this momentarily be reflected in a memory set.
