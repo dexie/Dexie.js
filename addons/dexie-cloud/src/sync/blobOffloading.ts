@@ -151,13 +151,13 @@ export async function uploadBlob(
     throw new Error(`Failed to upload blob: ${response.status} ${response.statusText}`);
   }
   
-  // The server returns the canonical URL but we only store the blobId since the URL can be reconstructed and we want to avoid storing the databaseUrl in the BlobRef
-  await response.json();
+  // The server returns the ref with version prefix (e.g., "1:blobId")
+  const result = await response.json();
   
-  // Return BlobRef with original type preserved in $t
+  // Return BlobRef with server's ref (includes version) and original type preserved in $t
   return {
     $t: origType,
-    ref: blobId,
+    ref: result.ref,
     size: size,
     ...(origType === 'Blob' ? { ct: contentType } : {}) // Only include content type for Blobs
   };
