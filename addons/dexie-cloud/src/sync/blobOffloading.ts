@@ -18,80 +18,77 @@ export type { BlobRef, BlobRefOrigType };
 export const isBlobRef = isBlobRefFromResolve;
 
 /**
- * Cross-realm type detection helpers
+ * Cross-realm type detection helpers (performance-optimized)
  * 
  * When code runs in different JavaScript realms (e.g., Service Worker context),
  * `instanceof` checks can fail because each realm has its own global constructors.
- * These helpers use Object.prototype.toString which works reliably across realms.
+ * We use Object.prototype.toString which works reliably across realms.
+ * 
+ * Performance considerations (this is a hot path - every property is checked):
+ * - Early return for primitives via typeof
+ * - Static Set for O(1) TypedArray tag lookup
+ * - Single typeTag call per check
  */
+
+// Static Set for O(1) lookup of binary type tags
+const BINARY_TYPE_TAGS = new Set([
+  'Blob', 'File', 'ArrayBuffer',
+  'Int8Array', 'Uint8Array', 'Uint8ClampedArray',
+  'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array',
+  'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array',
+  'DataView'
+]);
+
+// TypedArray/DataView tags for size check
+const ARRAYBUFFER_VIEW_TAGS = new Set([
+  'Int8Array', 'Uint8Array', 'Uint8ClampedArray',
+  'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array',
+  'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array',
+  'DataView'
+]);
 
 /**
  * Get the [[Class]] internal property via Object.prototype.toString
- * Returns strings like "Blob", "ArrayBuffer", "Uint8Array", etc.
  */
 function getTypeTag(value: unknown): string {
   return Object.prototype.toString.call(value).slice(8, -1);
 }
 
 /**
- * Check if value is a Blob (works across realms)
- */
-function isBlobLike(value: unknown): value is Blob {
-  if (value instanceof Blob) return true;
-  const tag = getTypeTag(value);
-  return tag === 'Blob' || tag === 'File';
-}
-
-/**
- * Check if value is an ArrayBuffer (works across realms)
- */
-function isArrayBufferLike(value: unknown): value is ArrayBuffer {
-  if (value instanceof ArrayBuffer) return true;
-  return getTypeTag(value) === 'ArrayBuffer';
-}
-
-/**
- * Check if value is an ArrayBufferView (TypedArray or DataView) - works across realms
- */
-function isArrayBufferViewLike(value: unknown): value is ArrayBufferView {
-  if (ArrayBuffer.isView(value)) return true;
-  const tag = getTypeTag(value);
-  // Check for TypedArray types and DataView
-  return ['Int8Array', 'Uint8Array', 'Uint8ClampedArray', 'Int16Array', 
-          'Uint16Array', 'Int32Array', 'Uint32Array', 'Float32Array', 
-          'Float64Array', 'BigInt64Array', 'BigUint64Array', 'DataView'].includes(tag);
-}
-
-/**
- * Get the original type name for a value (works across realms)
+ * Get the original type name for a value
  */
 function getOrigType(value: Blob | ArrayBuffer | ArrayBufferView): BlobRefOrigType {
-  // Use type tag for cross-realm compatibility
   const tag = getTypeTag(value);
   if (tag === 'Blob' || tag === 'File') return 'Blob';
   if (tag === 'ArrayBuffer') return 'ArrayBuffer';
-  // TypedArrays and DataView - return the actual type name
   return tag as BlobRefOrigType;
 }
 
 /**
  * Check if a value should be offloaded to blob storage
- * Uses cross-realm compatible type checks for Service Worker support
+ * Performance-optimized for hot path traversal.
  */
 export function shouldOffloadBlob(value: unknown): value is Blob | ArrayBuffer | ArrayBufferView {
-  // Check Blob (cross-realm compatible)
-  if (isBlobLike(value)) {
-    return value.size >= BLOB_OFFLOAD_THRESHOLD;
+  // Fast path: primitives (most common case)
+  // typeof returns: "string", "number", "boolean", "undefined", "symbol", "bigint", "function", "object"
+  const t = typeof value;
+  if (t !== 'object' || value === null) return false;
+  
+  // Get type tag once (cross-realm safe)
+  const tag = getTypeTag(value);
+  
+  // Quick check: is this even a binary type?
+  if (!BINARY_TYPE_TAGS.has(tag)) return false;
+  
+  // Check size threshold based on type
+  if (tag === 'Blob' || tag === 'File') {
+    return (value as Blob).size >= BLOB_OFFLOAD_THRESHOLD;
   }
-  // Check ArrayBuffer (cross-realm compatible)
-  if (isArrayBufferLike(value)) {
-    return value.byteLength >= BLOB_OFFLOAD_THRESHOLD;
+  if (tag === 'ArrayBuffer') {
+    return (value as ArrayBuffer).byteLength >= BLOB_OFFLOAD_THRESHOLD;
   }
-  // Check ArrayBufferView (cross-realm compatible)
-  if (isArrayBufferViewLike(value)) {
-    return value.byteLength >= BLOB_OFFLOAD_THRESHOLD;
-  }
-  return false;
+  // TypedArray or DataView
+  return (value as ArrayBufferView).byteLength >= BLOB_OFFLOAD_THRESHOLD;
 }
 
 /**
@@ -116,24 +113,26 @@ export async function uploadBlob(
   let size: number;
   const origType = getOrigType(blob);
   
-  // Use cross-realm compatible checks
-  if (isBlobLike(blob)) {
-    body = blob;
-    contentType = blob.type || 'application/octet-stream';
-    size = blob.size;
-  } else if (isArrayBufferLike(blob)) {
-    body = blob;
+  // Use type tag for cross-realm compatible checks
+  const tag = getTypeTag(blob);
+  if (tag === 'Blob' || tag === 'File') {
+    body = blob as Blob;
+    contentType = (blob as Blob).type || 'application/octet-stream';
+    size = (blob as Blob).size;
+  } else if (tag === 'ArrayBuffer') {
+    body = blob as ArrayBuffer;
     contentType = 'application/octet-stream';
-    size = blob.byteLength;
-  } else if (isArrayBufferViewLike(blob)) {
+    size = (blob as ArrayBuffer).byteLength;
+  } else if (ARRAYBUFFER_VIEW_TAGS.has(tag)) {
     // ArrayBufferView (TypedArray or DataView) - create a proper ArrayBuffer copy
-    const arrayBuffer = new ArrayBuffer(blob.byteLength);
-    new Uint8Array(arrayBuffer).set(new Uint8Array(blob.buffer, blob.byteOffset, blob.byteLength));
+    const view = blob as ArrayBufferView;
+    const arrayBuffer = new ArrayBuffer(view.byteLength);
+    new Uint8Array(arrayBuffer).set(new Uint8Array(view.buffer, view.byteOffset, view.byteLength));
     body = arrayBuffer;
     contentType = 'application/octet-stream';
-    size = blob.byteLength;
+    size = view.byteLength;
   } else {
-    throw new Error(`Unsupported blob type: ${getTypeTag(blob)}`);
+    throw new Error(`Unsupported blob type: ${tag}`);
   }
   
   // Add content type as query param for the server to store
