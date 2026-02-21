@@ -2,6 +2,19 @@ import { DexieCloudDB } from '../db/DexieCloudDB';
 import Dexie from 'dexie';
 import { bulkUpdate } from '../helpers/bulkUpdate';
 import { DBOperationsSet } from 'dexie-cloud-common';
+import { hasBlobRefs } from './blobResolve';
+
+/**
+ * Mark object with $hasBlobRefs = 1 if it contains any BlobRefs.
+ * This enables eager blob downloading and lazy resolution to find these objects.
+ */
+function markBlobRefs(value: unknown): void {
+  if (value && typeof value === 'object' && (value as any).constructor === Object) {
+    if (hasBlobRefs(value)) {
+      (value as any).$hasBlobRefs = 1;
+    }
+  }
+}
 
 export async function applyServerChanges(
   changes: DBOperationsSet<string>,
@@ -44,6 +57,8 @@ export async function applyServerChanges(
       const keys = mut.keys.map(keyDecoder);
       switch (mut.type) {
         case 'insert':
+          // Mark objects that contain BlobRefs for lazy/eager resolution
+          mut.values.forEach(markBlobRefs);
           if (primaryKey.outbound) {
             await table.bulkAdd(mut.values, keys);
           } else {
@@ -55,6 +70,8 @@ export async function applyServerChanges(
           }
           break;
         case 'upsert':
+          // Mark objects that contain BlobRefs for lazy/eager resolution
+          mut.values.forEach(markBlobRefs);
           if (primaryKey.outbound) {
             await table.bulkPut(mut.values, keys);
           } else {

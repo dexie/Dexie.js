@@ -70,6 +70,61 @@ const bigIntDef = hasBigIntSupport
       },
     };
 
+/**
+ * BlobRef-aware type definitions for binary types.
+ * 
+ * When server sends BlobRefs ({$t, ref, size}) instead of inline data ({$t, v}),
+ * we preserve the BlobRef as a POJO for later lazy/eager resolution.
+ * This is critical for blob offloading to work across sync.
+ */
+const blobRefAwareTypeDefs: TypeDefSet = {
+  // Override ArrayBuffer to handle BlobRefs
+  ArrayBuffer: {
+    replace: builtInTypeDefs.ArrayBuffer!.replace,
+    revive: (val: { v?: string; ref?: string; size?: number; $t?: string }, ctx: any, typeDefs: any) => {
+      // If this is a BlobRef, preserve it as-is for later resolution
+      if (val.ref !== undefined) {
+        return val as any; // Return BlobRef POJO
+      }
+      // Otherwise use standard inline revive
+      return builtInTypeDefs.ArrayBuffer!.revive(val as any, ctx, typeDefs);
+    },
+  },
+  // Override Blob to handle BlobRefs
+  Blob: {
+    ...builtInTypeDefs.Blob!,
+    revive: (val: { v?: string; ref?: string; size?: number; ct?: string; $t?: string }, ctx: any, typeDefs: any) => {
+      if (val.ref !== undefined) {
+        return val as any; // Return BlobRef POJO
+      }
+      return builtInTypeDefs.Blob!.revive(val as any, ctx, typeDefs);
+    },
+  },
+};
+
+// Override TypedArray types to handle BlobRefs
+const typedArrayNames = [
+  'Int8Array', 'Uint8Array', 'Uint8ClampedArray',
+  'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array',
+  'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array',
+  'DataView'
+];
+
+for (const name of typedArrayNames) {
+  const typeDef = builtInTypeDefs[name];
+  if (typeDef) {
+    blobRefAwareTypeDefs[name] = {
+      ...typeDef,
+      revive: (val: { v?: string; ref?: string; size?: number; $t?: string }, ctx: any, typeDefs: any) => {
+        if (val.ref !== undefined) {
+          return val as any; // Return BlobRef POJO
+        }
+        return typeDef.revive(val as any, ctx, typeDefs);
+      },
+    };
+  }
+}
+
 const defs: TypeDefSet = {
   ...undefinedTypeDef,
   ...bigIntDef,
@@ -91,4 +146,5 @@ const defs: TypeDefSet = {
   },
 };
 
-export const TSON = TypesonSimplified(builtInTypeDefs, defs);
+// Use BlobRef-aware typedefs to handle both inline data and BlobRefs from server
+export const TSON = TypesonSimplified(builtInTypeDefs, blobRefAwareTypeDefs, defs);
