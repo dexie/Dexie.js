@@ -99,8 +99,11 @@ export async function downloadUnresolvedBlobs(
               updateSpec[blob.keyPath] = blob.data;
             }
 
+            console.log(`[dexie-cloud] Eager download: Updating ${table.name}:${key} with ${resolvedBlobs.length} blobs, keyPaths: ${resolvedBlobs.map(b => b.keyPath).join(', ')}`);
+
             // Clear the $hasBlobRefs marker
-            await table.update(key, updateSpec);
+            const updated = await table.update(key, updateSpec);
+            console.log(`[dexie-cloud] Eager download: Update result for ${table.name}:${key}: ${updated} rows affected`);
 
             // Update progress
             reportBlobDownloaded(progress$, bytesToDownload);
