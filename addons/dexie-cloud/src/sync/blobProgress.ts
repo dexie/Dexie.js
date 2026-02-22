@@ -32,16 +32,25 @@ export async function updateBlobProgress(
   db: DexieCloudDB,
   progress$: BehaviorSubject<BlobProgress>
 ): Promise<void> {
+  const debugLog = (msg: string) => {
+    console.log(`[dexie-cloud] ${msg}`);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('dexie-cloud-debug', { detail: msg }));
+    }
+  };
+  
   let blobsRemaining = 0;
   let bytesRemaining = 0;
 
   // Get synced tables (exclude internal tables)
   const syncedTables = getSyncableTables(db);
+  debugLog(`BlobProgress: Found ${syncedTables.length} syncable tables: ${syncedTables.map(t => t.name).join(', ')}`);
 
   for (const table of syncedTables) {
     try {
       // Check if table has $hasBlobRefs index
       const hasIndex = !!table.schema.idxByName['$hasBlobRefs'];
+      debugLog(`BlobProgress: Table ${table.name} has $hasBlobRefs index: ${hasIndex}`);
       if (!hasIndex) continue;
 
       // Query objects with $hasBlobRefs marker
@@ -50,12 +59,15 @@ export async function updateBlobProgress(
         .equals(1)
         .toArray();
 
+      debugLog(`BlobProgress: Table ${table.name} has ${unresolvedObjects.length} unresolved objects`);
+
       for (const obj of unresolvedObjects) {
         const blobs = findBlobRefs(obj);
         blobsRemaining += blobs.length;
         bytesRemaining += blobs.reduce((sum, blob) => sum + (blob.size || 0), 0);
       }
-    } catch {
+    } catch (err) {
+      debugLog(`BlobProgress: Error querying table ${table.name}: ${err}`);
       // Table might not have $hasBlobRefs index - skip
     }
   }
