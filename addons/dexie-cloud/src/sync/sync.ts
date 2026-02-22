@@ -188,6 +188,14 @@ async function _sync(
   const pushSyncIsNeeded = clientChangeSet.some((set) =>
     set.muts.some((mut) => mut.keys.length > 0)
   ) || yMessages.some(m => m.type === 'u-c');
+  console.log('[BLOB-DEBUG] pushSyncIsNeeded:', pushSyncIsNeeded, 'purpose:', purpose, 'clientChangeSet length:', clientChangeSet.length);
+  if (clientChangeSet.length > 0) {
+    console.log('[BLOB-DEBUG] First changeset table:', clientChangeSet[0].table, 'muts:', clientChangeSet[0].muts.length);
+    if (clientChangeSet[0].muts.length > 0) {
+      const mut = clientChangeSet[0].muts[0];
+      console.log('[BLOB-DEBUG] First mut type:', mut.type, 'keys:', mut.keys?.length);
+    }
+  }
   if (justCheckIfNeeded) {
     console.debug('Sync is needed:', pushSyncIsNeeded);
     return pushSyncIsNeeded;
