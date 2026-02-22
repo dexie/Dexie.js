@@ -100,6 +100,23 @@ export async function syncWithServer(
     case 'application/json': {
       const text = await res.text();
       const syncRes = TSON.parse(text);
+      // Debug: Check if blob refs were properly parsed
+      if (syncRes.changes) {
+        for (const change of syncRes.changes) {
+          for (const mut of change.muts || []) {
+            for (const val of mut.values || []) {
+              if (val && typeof val === 'object') {
+                for (const [k, v] of Object.entries(val)) {
+                  if (v && typeof v === 'object' && ('ref' in v || '$t' in v)) {
+                    console.log(`DEXIE-CLOUD DEBUG syncWithServer: ${change.table}.${k}`, 
+                      { type: (v as any).constructor?.name, keys: Object.keys(v) });
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
       return syncRes;
     }
   }

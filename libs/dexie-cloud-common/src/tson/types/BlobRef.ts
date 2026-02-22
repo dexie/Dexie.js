@@ -249,6 +249,7 @@ function createTypedArrayBlobRefDef(
       ): InstanceType<TypedArrayConstructor> => {
         // TSONRef is cast to TypedArray since it's a stand-in for lazy resolution
         if (val.ref) {
+          console.log(`DEXIE-CLOUD DEBUG: ${name}.revive creating TSONRef for ref=${val.ref}`);
           return new TSONRef(name, val.ref, val.size ?? 0) as unknown as InstanceType<TypedArrayConstructor>;
         }
 
