@@ -37,15 +37,23 @@ export async function downloadUnresolvedBlobs(
   progress$: BehaviorSubject<BlobProgress>,
   signal?: AbortSignal
 ): Promise<void> {
-  console.log('[dexie-cloud] Eager download: Starting...');
+  // Use both console.log AND dispatchEvent for debugging
+  const debugLog = (msg: string) => {
+    console.log(`[dexie-cloud] ${msg}`);
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('dexie-cloud-debug', { detail: msg }));
+    }
+  };
+  
+  debugLog('Eager download: Starting...');
   
   // First, update progress to get accurate counts
   await updateBlobProgress(db, progress$);
 
-  console.log(`[dexie-cloud] Eager download: blobsRemaining=${progress$.value.blobsRemaining}`);
+  debugLog(`Eager download: blobsRemaining=${progress$.value.blobsRemaining}`);
   
   if (progress$.value.blobsRemaining === 0) {
-    console.log('[dexie-cloud] Eager download: No blobs remaining, exiting');
+    debugLog('Eager download: No blobs remaining, exiting');
     return;
   }
 
@@ -55,7 +63,7 @@ export async function downloadUnresolvedBlobs(
     // Get synced tables (exclude internal tables that don't have $hasBlobRefs)
     // Get synced tables (exclude internal tables)
     const syncedTables = getSyncableTables(db);
-    console.log(`[dexie-cloud] Eager download: Found ${syncedTables.length} syncable tables: ${syncedTables.map(t => t.name).join(', ')}`);
+    debugLog(`Eager download: Found ${syncedTables.length} syncable tables: ${syncedTables.map(t => t.name).join(', ')}`);
   
     for (const table of syncedTables) {
       if (signal?.aborted) break;
@@ -71,7 +79,7 @@ export async function downloadUnresolvedBlobs(
           .equals(1)
           .toArray();
 
-        console.log(`[dexie-cloud] Eager download: Table ${table.name} has ${unresolvedObjects.length} unresolved objects`);
+        debugLog(`Eager download: Table ${table.name} has ${unresolvedObjects.length} unresolved objects`);
 
         for (const obj of unresolvedObjects) {
           if (signal?.aborted) break;
@@ -107,11 +115,11 @@ export async function downloadUnresolvedBlobs(
               updateSpec[blob.keyPath] = blob.data;
             }
 
-            console.log(`[dexie-cloud] Eager download: Updating ${table.name}:${key} with ${resolvedBlobs.length} blobs, keyPaths: ${resolvedBlobs.map(b => b.keyPath).join(', ')}`);
+            debugLog(`Eager download: Updating ${table.name}:${key} with ${resolvedBlobs.length} blobs, keyPaths: ${resolvedBlobs.map(b => b.keyPath).join(', ')}`);
 
             // Clear the $hasBlobRefs marker
             const updated = await table.update(key, updateSpec);
-            console.log(`[dexie-cloud] Eager download: Update result for ${table.name}:${key}: ${updated} rows affected`);
+            debugLog(`Eager download: Update result for ${table.name}:${key}: ${updated} rows affected`);
 
             // Update progress
             reportBlobDownloaded(progress$, bytesToDownload);
