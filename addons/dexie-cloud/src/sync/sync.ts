@@ -209,9 +209,9 @@ async function _sync(
   //
   let processedChangeSet = clientChangeSet;
   const hasLargeBlobs = hasLargeBlobsInOperations(clientChangeSet);
-  console.debug('[dexie-cloud] hasLargeBlobsInOperations:', hasLargeBlobs, 'changeSet tables:', clientChangeSet.map(c => c.table));
+  console.log('[BLOB-DEBUG] hasLargeBlobsInOperations:', hasLargeBlobs, 'tables:', clientChangeSet.map(c => c.table));
   if (hasLargeBlobs) {
-    console.debug('Offloading large blobs before sync...');
+    console.log('[BLOB-DEBUG] Offloading large blobs before sync...');
     processedChangeSet = await offloadBlobsInOperations(
       clientChangeSet,
       databaseUrl,
