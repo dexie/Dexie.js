@@ -28,6 +28,7 @@ export async function syncWithServer(
   clientIdentity: string,
   currentUser: UserLogin
 ): Promise<SyncResponse> {
+  console.log('DEXIE-CLOUD DEBUG: ======== syncWithServer CALLED ========');
   //
   // Push changes to server using fetch
   //
