@@ -218,8 +218,10 @@ export async function offloadBlobs(
     return result;
   }
     
-  // Only traverse POJOs
-  if (obj.constructor !== Object) {
+  // Traverse plain objects (POJO-like) - use prototype check since IndexedDB
+  // may return objects where constructor !== Object
+  const proto = Object.getPrototypeOf(obj);
+  if (proto !== Object.prototype && proto !== null) {
     return obj;
   }
   
@@ -354,8 +356,10 @@ function hasLargeBlobs(obj: unknown, visited = new WeakSet()): boolean {
     return obj.some(item => hasLargeBlobs(item, visited));
   }
   
-  // Only traverse POJOs
-  if (obj.constructor === Object) {
+  // Traverse plain objects (POJO-like) - use duck typing since IndexedDB
+  // may return objects where constructor !== Object
+  const proto = Object.getPrototypeOf(obj);
+  if (proto === Object.prototype || proto === null) {
     return Object.values(obj).some(value => hasLargeBlobs(value, visited));
   }
   
