@@ -217,16 +217,17 @@ async function _sync(
   // Offload large blobs to blob storage before sync
   //
   let processedChangeSet = clientChangeSet;
+  console.log('🔵 SYNC: About to check hasLargeBlobsInOperations, clientChangeSet.length:', clientChangeSet.length);
   const hasLargeBlobs = hasLargeBlobsInOperations(clientChangeSet);
-  console.log('[DEBUG] hasLargeBlobsInOperations:', hasLargeBlobs, 'tables:', clientChangeSet.map(c => c.table));
+  console.log('🔵 SYNC: hasLargeBlobs:', hasLargeBlobs);
   if (hasLargeBlobs) {
-    console.log('[DEBUG] Offloading large blobs before sync...');
+    console.log('🔵 SYNC: Offloading large blobs before sync...');
     processedChangeSet = await offloadBlobsInOperations(
       clientChangeSet,
       databaseUrl,
       () => loadCachedAccessToken(db)
     );
-    console.log('[DEBUG] Blob offloading complete');
+    console.log('🔵 SYNC: Blob offloading complete');
   }
 
   //
