@@ -139,13 +139,17 @@ export function setDownloadingState(
  */
 function findBlobRefs(obj: unknown): RefInfo[] {
   const refs: RefInfo[] = [];
+  let debugChecks = 0;
 
   function scan(value: unknown): void {
     if (value === null || value === undefined) return;
     if (typeof value !== 'object') return;
 
+    debugChecks++;
+    
     // Check for live TSONRef instance (before IndexedDB storage)
     if (TSONRef.isTSONRef(value)) {
+      debugLog(`BlobProgress: Found live TSONRef: ref=${(value as any).ref}`);
       refs.push({ ref: value.ref, size: value.size });
       return;
     }
@@ -153,14 +157,22 @@ function findBlobRefs(obj: unknown): RefInfo[] {
     // Check for serialized TSONRef (after IndexedDB structured clone - Symbol is lost)
     if (isSerializedTSONRef(value)) {
       const obj = value as { type: string; ref: string; size: number };
+      debugLog(`BlobProgress: Found serialized TSONRef: ref=${obj.ref}`);
       refs.push({ ref: obj.ref, size: obj.size });
       return;
     }
 
     // Check for raw BlobRef (from older code paths or before TSON parsing)
     if (isBlobRef(value)) {
+      debugLog(`BlobProgress: Found raw BlobRef: ref=${value.ref}, $t=${value.$t}`);
       refs.push({ ref: value.ref, size: value.size || 0 });
       return;
+    }
+
+    // Log what we're seeing if it looks blob-like
+    const v = value as any;
+    if (v.ref || v.$t || v.type) {
+      debugLog(`BlobProgress: Saw blob-like object but didn't match: keys=${Object.keys(v)}, $t=${v.$t}, type=${v.type}, ref=${typeof v.ref}`);
     }
 
     if (Array.isArray(value)) {
@@ -171,5 +183,6 @@ function findBlobRefs(obj: unknown): RefInfo[] {
   }
 
   scan(obj);
+  debugLog(`BlobProgress: findBlobRefs scanned ${debugChecks} objects, found ${refs.length} refs`);
   return refs;
 }
