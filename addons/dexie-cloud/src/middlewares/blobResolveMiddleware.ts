@@ -243,7 +243,7 @@ function resolveAndSave(
       // This uses setTimeout(fn, 0) to completely isolate from 
       // Dexie's transaction context (avoids inheriting PSD)
       if (isReadonly) {
-        blobSavingQueue.saveBlobs(table.name, key, resolved);
+        blobSavingQueue.saveBlobs(table.name, key, resolvedBlobs);
       } else {
         // For rw transactions, we can save directly without queueing
         // since we're still in the same transaction context

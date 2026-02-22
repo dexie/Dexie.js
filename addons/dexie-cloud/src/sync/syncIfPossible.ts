@@ -69,13 +69,14 @@ export function syncIfPossible(
 
   async function _syncIfPossible() {
     try {
+      console.log('[DEBUG] _syncIfPossible: starting sync');
       // Check if should delay sync due to ratelimit:
       await checkSyncRateLimitDelay(db);      
       await performGuardedJob(db, CURRENT_SYNC_WORKER, () =>
         sync(db, cloudOptions, cloudSchema, options)
       );
       ongoingSyncs.delete(db);
-      console.debug('Done sync');
+      console.log('[DEBUG] _syncIfPossible: Done sync');
     } catch (error) {
       ongoingSyncs.delete(db);
       console.error(`Failed to sync client changes`, error);

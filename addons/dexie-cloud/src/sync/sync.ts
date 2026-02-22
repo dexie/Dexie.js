@@ -105,7 +105,7 @@ async function _sync(
     isInitialSync: false,
   }
 ): Promise<boolean> {
-  console.log('[BLOB-DEBUG] _sync() called with purpose:', purpose);
+  console.log('[DEBUG] _sync() ENTRY - purpose:', purpose, 'isInitialSync:', isInitialSync);
   if (!justCheckIfNeeded) {
     console.debug('SYNC STARTED', { isInitialSync, purpose });
   }
@@ -218,15 +218,15 @@ async function _sync(
   //
   let processedChangeSet = clientChangeSet;
   const hasLargeBlobs = hasLargeBlobsInOperations(clientChangeSet);
-  console.log('[BLOB-DEBUG] hasLargeBlobsInOperations:', hasLargeBlobs, 'tables:', clientChangeSet.map(c => c.table));
+  console.log('[DEBUG] hasLargeBlobsInOperations:', hasLargeBlobs, 'tables:', clientChangeSet.map(c => c.table));
   if (hasLargeBlobs) {
-    console.log('[BLOB-DEBUG] Offloading large blobs before sync...');
+    console.log('[DEBUG] Offloading large blobs before sync...');
     processedChangeSet = await offloadBlobsInOperations(
       clientChangeSet,
       databaseUrl,
       () => loadCachedAccessToken(db)
     );
-    console.debug('Blob offloading complete');
+    console.log('[DEBUG] Blob offloading complete');
   }
 
   //
