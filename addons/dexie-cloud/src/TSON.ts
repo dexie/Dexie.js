@@ -1,15 +1,61 @@
 import { 
   TypesonSimplified, 
   undefinedTypeDef,
-  blobRefTypeDefs,
+  blobTypeDef,
+  typedArrayBlobRefDefs,
+  arrayBufferBlobRefDef,
+  blobBlobRefDef,
+  TSONRef,
   TypeDefSet,
   fileTypeDef,
   dateTypeDef,
   setTypeDef,
   mapTypeDef,
   numberTypeDef,
+  b64decode,
 } from 'dexie-cloud-common';
 import { PropModSpec, PropModification } from 'dexie';
+
+/**
+ * Hybrid Blob type definition for client-side TSON.
+ * - replace: Use original blobTypeDef to serialize Blobs inline as base64
+ * - revive: Handle both inline data (v) AND blob references (ref)
+ */
+const hybridBlobDef = {
+  Blob: {
+    // Use original test from blobTypeDef
+    test: blobTypeDef.Blob.test,
+    // Use original replace for inline serialization
+    replace: blobTypeDef.Blob.replace,
+    // Custom revive that handles both inline and references
+    revive: (
+      val: { v?: string; ref?: string; size?: number; ct?: string; type?: string },
+      _ctx: unknown,
+      _typeDefs: TypeDefSet
+    ): Blob => {
+      // Blob reference - return TSONRef cast to Blob for lazy resolution
+      if (val.ref) {
+        return new TSONRef<Blob>(
+          'Blob',
+          val.ref,
+          val.size ?? 0,
+          val.ct
+        ) as unknown as Blob;
+      }
+
+      // Inline data - use normal base64 (not b64Lex) since Blobs are never indexed
+      if (val.v) {
+        const ba = b64decode(val.v);
+        const buf = ba.buffer.byteLength === ba.byteLength
+          ? (ba.buffer as ArrayBuffer)
+          : (ba.buffer as ArrayBuffer).slice(ba.byteOffset, ba.byteOffset + ba.byteLength);
+        return new Blob([new Uint8Array(buf)], { type: val.type || val.ct || '' });
+      }
+
+      throw new Error('Invalid Blob encoding: missing v or ref');
+    },
+  },
+};
 
 // Since server revisions are stored in bigints, we need to handle clients without
 // bigint support to not fail when serverRevision is passed over to client.
@@ -96,9 +142,12 @@ const defs: TypeDefSet = {
 };
 
 export const TSON = TypesonSimplified(
-  // Use blob-ref-aware type definitions for binary types (ArrayBuffer, Uint8Array, Blob, etc.)
+  // Use blob-ref-aware type definitions for TypedArrays and ArrayBuffer
   // These handle both inline data (v property) and blob references (ref property)
-  blobRefTypeDefs,
+  typedArrayBlobRefDefs,
+  arrayBufferBlobRefDef,
+  // Use hybrid Blob handler: original serialization + ref-aware deserialization
+  hybridBlobDef,
   // Include non-binary built-in types
   numberTypeDef,
   dateTypeDef,
