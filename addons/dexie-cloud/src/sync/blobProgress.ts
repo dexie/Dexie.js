@@ -55,43 +55,38 @@ export async function updateBlobProgress(
   const syncedTables = getSyncableTables(db);
   debugLog(`BlobProgress: Found ${syncedTables.length} syncable tables: ${syncedTables.map(t => t.name).join(', ')}`);
 
-  // Use table.core directly to bypass all middleware (including blobResolveMiddleware)
-  // This ensures we get raw data with BlobRefs intact
-  const tableNames = syncedTables.map(t => t.name);
-  const trans = db.dx.core.transaction(tableNames, 'readonly');
-  
-  for (const table of syncedTables) {
-    try {
-      // Check if table has $hasBlobRefs index
-      const coreTable = table.core;
-      const blobRefsIndex = coreTable.schema.indexes.find(idx => idx.name === '$hasBlobRefs');
-      debugLog(`BlobProgress: Table ${table.name} has $hasBlobRefs index: ${!!blobRefsIndex}`);
-      if (!blobRefsIndex) continue;
+  // Use a transaction with disableBlobResolve to read raw data without triggering lazy download
+  await db.dx.transaction('r', syncedTables, async (tx) => {
+    // Set flag on the underlying IDBTransaction to disable blob resolution
+    (tx.idbtrans as any).disableBlobResolve = true;
+    
+    for (const table of syncedTables) {
+      try {
+        // Check if table has $hasBlobRefs index
+        const hasIndex = !!table.schema.idxByName['$hasBlobRefs'];
+        debugLog(`BlobProgress: Table ${table.name} has $hasBlobRefs index: ${hasIndex}`);
+        if (!hasIndex) continue;
 
-      // Use core.query to bypass middleware and get raw objects
-      const queryResult = await coreTable.query({
-        trans,
-        values: true,
-        query: {
-          index: blobRefsIndex,
-          range: { type: 1 /* DBCoreRangeType.Equal */, lower: 1, lowerOpen: false, upper: 1, upperOpen: false }
+        // Query objects with $hasBlobRefs marker - middleware will skip resolution due to flag
+        const unresolvedObjects = await table
+          .where('$hasBlobRefs')
+          .equals(1)
+          .toArray();
+
+        debugLog(`BlobProgress: Table ${table.name} has ${unresolvedObjects.length} unresolved objects`);
+
+        for (const obj of unresolvedObjects) {
+          const blobs = findBlobRefs(obj);
+          debugLog(`BlobProgress: Object has ${blobs.length} BlobRefs`);
+          blobsRemaining += blobs.length;
+          bytesRemaining += blobs.reduce((sum, blob) => sum + (blob.size || 0), 0);
         }
-      });
-
-      const unresolvedObjects = queryResult.result;
-      debugLog(`BlobProgress: Table ${table.name} has ${unresolvedObjects.length} unresolved objects`);
-
-      for (const obj of unresolvedObjects) {
-        const blobs = findBlobRefs(obj);
-        debugLog(`BlobProgress: Object has ${blobs.length} BlobRefs`);
-        blobsRemaining += blobs.length;
-        bytesRemaining += blobs.reduce((sum, blob) => sum + (blob.size || 0), 0);
+      } catch (err) {
+        debugLog(`BlobProgress: Error querying table ${table.name}: ${err}`);
+        // Table might not have $hasBlobRefs index - skip
       }
-    } catch (err) {
-      debugLog(`BlobProgress: Error querying table ${table.name}: ${err}`);
-      // Table might not have $hasBlobRefs index - skip
     }
-  }
+  });
 
   const current = progress$.value;
   progress$.next({
