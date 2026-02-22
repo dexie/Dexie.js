@@ -1,19 +1,24 @@
 /**
  * BlobRef Resolution for Dexie Cloud
  * 
- * Handles lazy resolution of BlobRefs when reading from the database.
- * BlobRefs are symbolic references to blobs stored in blob storage.
+ * Handles lazy resolution of BlobRefs and TSONRefs when reading from the database.
+ * These are symbolic references to blobs stored in blob storage.
  * They get resolved on-demand when the object is read.
  * 
  * The server sends offloaded binary data in the format:
  * { $t: 'Uint8Array', ref: '1:blobId', size: 1234 }
  * { $t: 'Blob', ref: '1:blobId', size: 1234, ct: 'image/png' }
  * 
- * The $t field preserves the original JavaScript type.
+ * After TSON parsing with blobRefTypeDefs, these become TSONRef objects:
+ * new TSONRef('Uint8Array', '1:blobId', 1234)
+ * new TSONRef('Blob', '1:blobId', 1234, 'image/png')
+ * 
+ * The $t/type field preserves the original JavaScript type.
  * The ref format is '{version}:{blobId}' where version identifies
  * the storage backend configuration.
  */
 
+import { TSONRef } from 'dexie-cloud-common';
 
 /**
  * Original type that was offloaded to blob storage.
@@ -57,8 +62,11 @@ export interface ResolvedBlob {
 }
 
 /**
- * Check if a value is a BlobRef (offloaded binary data)
+ * Check if a value is a raw BlobRef object (offloaded binary data)
  * A BlobRef has $t (type), ref (blob ID), but no v (inline data)
+ * 
+ * Note: After TSON parsing with blobRefTypeDefs, BlobRefs become TSONRef objects.
+ * Use isUnresolvedRef() to check for both.
  */
 export function isBlobRef(value: unknown): value is BlobRef {
   if (typeof value !== 'object' || value === null) return false;
@@ -71,7 +79,16 @@ export function isBlobRef(value: unknown): value is BlobRef {
 }
 
 /**
- * Recursively check if an object contains any BlobRefs
+ * Check if a value is an unresolved blob reference (BlobRef or TSONRef)
+ */
+export function isUnresolvedRef(value: unknown): boolean {
+  return isBlobRef(value) || TSONRef.isTSONRef(value);
+}
+
+/**
+ * Recursively check if an object contains any BlobRefs (raw format)
+ * 
+ * Note: For checking TSONRef objects (after TSON parsing), use hasTSONRefs from dexie-cloud-common.
  */
 export function hasBlobRefs(obj: unknown, visited = new WeakSet()): boolean {
   if (obj === null || obj === undefined) {
@@ -113,19 +130,61 @@ export function hasBlobRefs(obj: unknown, visited = new WeakSet()): boolean {
 }
 
 /**
+ * Recursively check if an object contains any unresolved refs (BlobRef or TSONRef)
+ */
+export function hasUnresolvedRefs(obj: unknown, visited = new WeakSet()): boolean {
+  if (obj === null || obj === undefined) {
+    return false;
+  }
+
+  if (isUnresolvedRef(obj)) {
+    return true;
+  }
+
+  if (typeof obj !== 'object') {
+    return false;
+  }
+
+  // Avoid circular references
+  if (visited.has(obj)) {
+    return false;
+  }
+  visited.add(obj);
+
+  // Skip special objects that can't contain refs
+  if (obj instanceof Date || obj instanceof RegExp || obj instanceof Blob) {
+    return false;
+  }
+  if (obj instanceof ArrayBuffer || ArrayBuffer.isView(obj)) {
+    return false;
+  }
+
+  if (Array.isArray(obj)) {
+    return obj.some(item => hasUnresolvedRefs(item, visited));
+  }
+
+  // Only traverse POJOs
+  if (obj.constructor === Object) {
+    return Object.values(obj).some(value => hasUnresolvedRefs(value, visited));
+  }
+
+  return false;
+}
+
+/**
  * Download blob data from server via proxy endpoint.
  * Uses auth header for authentication (same as sync).
  * 
- * @param blobRef - The BlobRef to download
+ * @param refId - The blob reference ID (e.g., '1:uuid')
  * @param dbUrl - Base URL for the database (e.g., 'https://mydb.dexie.cloud')
  * @param accessToken - Access token for authentication
  */
-export async function downloadBlob(
-  blobRef: BlobRef, 
+export async function downloadBlobByRef(
+  refId: string, 
   dbUrl: string, 
   accessToken: string
-): Promise<Uint8Array> {
-  const downloadUrl = `${dbUrl}/blob/${blobRef.ref}`;
+): Promise<ArrayBuffer> {
+  const downloadUrl = `${dbUrl}/blob/${refId}`;
   const response = await fetch(downloadUrl, {
     headers: {
       'Authorization': `Bearer ${accessToken}`
@@ -136,7 +195,24 @@ export async function downloadBlob(
     throw new Error(`Failed to download blob: ${response.status} ${response.statusText}`);
   }
 
-  const arrayBuffer = await response.arrayBuffer();
+  return response.arrayBuffer();
+}
+
+/**
+ * Download blob data from server via proxy endpoint.
+ * Uses auth header for authentication (same as sync).
+ * 
+ * @param blobRef - The BlobRef to download
+ * @param dbUrl - Base URL for the database (e.g., 'https://mydb.dexie.cloud')
+ * @param accessToken - Access token for authentication
+ * @deprecated Use downloadBlobByRef instead
+ */
+export async function downloadBlob(
+  blobRef: BlobRef, 
+  dbUrl: string, 
+  accessToken: string
+): Promise<Uint8Array> {
+  const arrayBuffer = await downloadBlobByRef(blobRef.ref, dbUrl, accessToken);
   return new Uint8Array(arrayBuffer);
 }
 
@@ -188,8 +264,8 @@ export function convertToOriginalType(
 }
 
 /**
- * Recursively resolve all BlobRefs in an object and collect them for queueing.
- * Returns a new object with BlobRefs replaced by their original type data,
+ * Recursively resolve all BlobRefs and TSONRefs in an object and collect them for queueing.
+ * Returns a new object with refs replaced by their original type data,
  * and populates the resolvedBlobs array with keyPath info for each blob.
  * 
  * @param obj - Object to resolve
@@ -211,7 +287,15 @@ export async function resolveAllBlobRefs(
     return obj;
   }
 
-  // Check if this is a BlobRef - resolve it and track it
+  // Check if this is a TSONRef - resolve it and track it
+  if (TSONRef.isTSONRef(obj)) {
+    const arrayBuffer = await downloadBlobByRef(obj.ref, dbUrl, accessToken);
+    const data = obj.reconstruct(arrayBuffer);
+    resolvedBlobs.push({ keyPath: currentPath, data, ref: obj.ref });
+    return data;
+  }
+
+  // Check if this is a raw BlobRef - resolve it and track it
   if (isBlobRef(obj)) {
     const rawData = await downloadBlob(obj, dbUrl, accessToken);
     const data = convertToOriginalType(rawData, obj);
@@ -260,7 +344,7 @@ export async function resolveAllBlobRefs(
 }
 
 /**
- * Check if an object has unresolved BlobRefs
+ * Check if an object has unresolved BlobRefs (marked with $hasBlobRefs)
  */
 export function hasUnresolvedBlobRefs(obj: unknown): boolean {
   return (
@@ -269,5 +353,3 @@ export function hasUnresolvedBlobRefs(obj: unknown): boolean {
     (obj as any).$hasBlobRefs === 1
   );
 }
-
-

@@ -1,9 +1,13 @@
 import { 
   TypesonSimplified, 
   undefinedTypeDef,
-  builtInTypeDefs,
+  blobRefTypeDefs,
   TypeDefSet,
-  fileTypeDef
+  fileTypeDef,
+  dateTypeDef,
+  setTypeDef,
+  mapTypeDef,
+  numberTypeDef,
 } from 'dexie-cloud-common';
 import { PropModSpec, PropModification } from 'dexie';
 
@@ -91,4 +95,15 @@ const defs: TypeDefSet = {
   },
 };
 
-export const TSON = TypesonSimplified(builtInTypeDefs, defs);
+export const TSON = TypesonSimplified(
+  // Use blob-ref-aware type definitions for binary types (ArrayBuffer, Uint8Array, Blob, etc.)
+  // These handle both inline data (v property) and blob references (ref property)
+  blobRefTypeDefs,
+  // Include non-binary built-in types
+  numberTypeDef,
+  dateTypeDef,
+  setTypeDef,
+  mapTypeDef,
+  // Custom type definitions
+  defs
+);

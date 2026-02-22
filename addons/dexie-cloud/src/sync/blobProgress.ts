@@ -6,9 +6,18 @@
 
 import { BehaviorSubject } from 'rxjs';
 import { BlobProgress } from '../DexieCloudAPI';
-import { BlobRef, isBlobRef } from './blobResolve';
+import { BlobRef, isBlobRef, isUnresolvedRef } from './blobResolve';
 import { getSyncableTables } from '../helpers/getSyncableTables';
 import { DexieCloudDB } from '../db/DexieCloudDB';
+import { TSONRef } from 'dexie-cloud-common';
+
+/**
+ * Unified reference info for both BlobRef and TSONRef
+ */
+interface RefInfo {
+  ref: string;
+  size: number;
+}
 
 const initialProgress: BlobProgress = {
   isDownloading: false,
@@ -46,31 +55,37 @@ export async function updateBlobProgress(
   const syncedTables = getSyncableTables(db);
   debugLog(`BlobProgress: Found ${syncedTables.length} syncable tables: ${syncedTables.map(t => t.name).join(', ')}`);
 
-  for (const table of syncedTables) {
-    try {
-      // Check if table has $hasBlobRefs index
-      const hasIndex = !!table.schema.idxByName['$hasBlobRefs'];
-      debugLog(`BlobProgress: Table ${table.name} has $hasBlobRefs index: ${hasIndex}`);
-      if (!hasIndex) continue;
+  // Use a transaction with disableBlobResolve to read raw data without triggering lazy download
+  await db.dx.transaction('r', syncedTables, async (trans: any) => {
+    trans.disableBlobResolve = true; // Prevent middleware from resolving BlobRefs during this query
+    
+    for (const table of syncedTables) {
+      try {
+        // Check if table has $hasBlobRefs index
+        const hasIndex = !!table.schema.idxByName['$hasBlobRefs'];
+        debugLog(`BlobProgress: Table ${table.name} has $hasBlobRefs index: ${hasIndex}`);
+        if (!hasIndex) continue;
 
-      // Query objects with $hasBlobRefs marker
-      const unresolvedObjects = await table
-        .where('$hasBlobRefs')
-        .equals(1)
-        .toArray();
+        // Query objects with $hasBlobRefs marker
+        const unresolvedObjects = await table
+          .where('$hasBlobRefs')
+          .equals(1)
+          .toArray();
 
-      debugLog(`BlobProgress: Table ${table.name} has ${unresolvedObjects.length} unresolved objects`);
+        debugLog(`BlobProgress: Table ${table.name} has ${unresolvedObjects.length} unresolved objects`);
 
-      for (const obj of unresolvedObjects) {
-        const blobs = findBlobRefs(obj);
-        blobsRemaining += blobs.length;
-        bytesRemaining += blobs.reduce((sum, blob) => sum + (blob.size || 0), 0);
+        for (const obj of unresolvedObjects) {
+          const blobs = findBlobRefs(obj);
+          debugLog(`BlobProgress: Object has ${blobs.length} BlobRefs`);
+          blobsRemaining += blobs.length;
+          bytesRemaining += blobs.reduce((sum, blob) => sum + (blob.size || 0), 0);
+        }
+      } catch (err) {
+        debugLog(`BlobProgress: Error querying table ${table.name}: ${err}`);
+        // Table might not have $hasBlobRefs index - skip
       }
-    } catch (err) {
-      debugLog(`BlobProgress: Error querying table ${table.name}: ${err}`);
-      // Table might not have $hasBlobRefs index - skip
     }
-  }
+  });
 
   const current = progress$.value;
   progress$.next({
@@ -119,17 +134,24 @@ export function setDownloadingState(
 }
 
 /**
- * Find all BlobRefs in an object (recursive).
+ * Find all unresolved refs (BlobRef or TSONRef) in an object (recursive).
  */
-function findBlobRefs(obj: unknown): BlobRef[] {
-  const refs: BlobRef[] = [];
+function findBlobRefs(obj: unknown): RefInfo[] {
+  const refs: RefInfo[] = [];
 
   function scan(value: unknown): void {
     if (value === null || value === undefined) return;
     if (typeof value !== 'object') return;
 
+    // Check for TSONRef (after TSON parsing with blobRefTypeDefs)
+    if (TSONRef.isTSONRef(value)) {
+      refs.push({ ref: value.ref, size: value.size });
+      return;
+    }
+
+    // Check for raw BlobRef (from older code paths or before TSON parsing)
     if (isBlobRef(value)) {
-      refs.push(value);
+      refs.push({ ref: value.ref, size: value.size || 0 });
       return;
     }
 

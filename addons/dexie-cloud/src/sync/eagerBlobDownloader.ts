@@ -8,10 +8,12 @@
 import Dexie, { UpdateSpec } from 'dexie';
 import { BehaviorSubject } from 'rxjs';
 import { BlobProgress } from '../DexieCloudAPI';
+import { TSONRef, hasTSONRefs } from 'dexie-cloud-common';
 import {
   BlobRef,
   isBlobRef,
   hasBlobRefs,
+  hasUnresolvedRefs,
   resolveAllBlobRefs,
   ResolvedBlob,
 } from './blobResolve';
@@ -84,8 +86,8 @@ export async function downloadUnresolvedBlobs(
         for (const obj of unresolvedObjects) {
           if (signal?.aborted) break;
 
-          // Skip if no BlobRefs (shouldn't happen but be safe - we're not in transaction)
-          if (!hasBlobRefs(obj)) continue;
+          // Skip if no unresolved refs (shouldn't happen but be safe - we're not in transaction)
+          if (!hasUnresolvedRefs(obj)) continue;
 
           // Get primary key
           const primaryKey = table.schema.primKey;
@@ -151,7 +153,7 @@ export async function downloadUnresolvedBlobs(
 }
 
 /**
- * Calculate total blob bytes in an object.
+ * Calculate total blob bytes in an object (counts both BlobRef and TSONRef).
  */
 function calculateBlobBytes(obj: unknown): number {
   let total = 0;
@@ -160,6 +162,13 @@ function calculateBlobBytes(obj: unknown): number {
     if (value === null || value === undefined) return;
     if (typeof value !== 'object') return;
 
+    // Check for TSONRef (after TSON parsing)
+    if (TSONRef.isTSONRef(value)) {
+      total += value.size || 0;
+      return;
+    }
+
+    // Check for raw BlobRef
     if (isBlobRef(value)) {
       total += value.size || 0;
       return;
