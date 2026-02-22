@@ -79,10 +79,39 @@ export function isBlobRef(value: unknown): value is BlobRef {
 }
 
 /**
- * Check if a value is an unresolved blob reference (BlobRef or TSONRef)
+ * Serialized TSONRef shape (after IndexedDB structured clone).
+ * The Symbol is lost but properties remain.
+ */
+export interface SerializedTSONRef {
+  type: string;  // 'Uint8Array', 'Blob', etc.
+  ref: string;   // Blob reference ID
+  size: number;  // Size in bytes
+  contentType?: string;  // Content-Type (for Blob type)
+}
+
+/**
+ * Check if an object looks like a serialized TSONRef.
+ * After IndexedDB structured clone, the Symbol is lost but properties remain.
+ * 
+ * TSONRef has: type (string), ref (string), size (number)
+ * BlobRef has: $t (string), ref (string), size (number)
+ */
+export function isSerializedTSONRef(value: unknown): value is SerializedTSONRef {
+  if (typeof value !== 'object' || value === null) return false;
+  const obj = value as any;
+  return (
+    typeof obj.type === 'string' &&
+    typeof obj.ref === 'string' &&
+    typeof obj.size === 'number' &&
+    obj.$t === undefined  // Not a raw BlobRef
+  );
+}
+
+/**
+ * Check if a value is an unresolved blob reference (BlobRef, TSONRef, or serialized TSONRef)
  */
 export function isUnresolvedRef(value: unknown): boolean {
-  return isBlobRef(value) || TSONRef.isTSONRef(value);
+  return isBlobRef(value) || TSONRef.isTSONRef(value) || isSerializedTSONRef(value);
 }
 
 /**
@@ -264,6 +293,49 @@ export function convertToOriginalType(
 }
 
 /**
+ * Reconstruct the original type from a serialized TSONRef and downloaded data.
+ * Similar to TSONRef.reconstruct() but works with plain objects after IndexedDB.
+ */
+export function reconstructFromSerializedTSONRef(
+  ref: SerializedTSONRef,
+  data: ArrayBuffer
+): Blob | ArrayBuffer | ArrayBufferView {
+  switch (ref.type) {
+    case 'Blob':
+      return new Blob([data], { type: ref.contentType || '' });
+    case 'ArrayBuffer':
+      return data;
+    case 'Uint8Array':
+      return new Uint8Array(data);
+    case 'Int8Array':
+      return new Int8Array(data);
+    case 'Uint8ClampedArray':
+      return new Uint8ClampedArray(data);
+    case 'Int16Array':
+      return new Int16Array(data);
+    case 'Uint16Array':
+      return new Uint16Array(data);
+    case 'Int32Array':
+      return new Int32Array(data);
+    case 'Uint32Array':
+      return new Uint32Array(data);
+    case 'Float32Array':
+      return new Float32Array(data);
+    case 'Float64Array':
+      return new Float64Array(data);
+    case 'BigInt64Array':
+      return new BigInt64Array(data);
+    case 'BigUint64Array':
+      return new BigUint64Array(data);
+    case 'DataView':
+      return new DataView(data);
+    default:
+      // Fallback to Uint8Array for unknown types
+      return new Uint8Array(data);
+  }
+}
+
+/**
  * Recursively resolve all BlobRefs and TSONRefs in an object and collect them for queueing.
  * Returns a new object with refs replaced by their original type data,
  * and populates the resolvedBlobs array with keyPath info for each blob.
@@ -291,6 +363,14 @@ export async function resolveAllBlobRefs(
   if (TSONRef.isTSONRef(obj)) {
     const arrayBuffer = await downloadBlobByRef(obj.ref, dbUrl, accessToken);
     const data = obj.reconstruct(arrayBuffer);
+    resolvedBlobs.push({ keyPath: currentPath, data, ref: obj.ref });
+    return data;
+  }
+
+  // Check if this is a serialized TSONRef (after IndexedDB) - resolve it
+  if (isSerializedTSONRef(obj)) {
+    const arrayBuffer = await downloadBlobByRef(obj.ref, dbUrl, accessToken);
+    const data = reconstructFromSerializedTSONRef(obj, arrayBuffer);
     resolvedBlobs.push({ keyPath: currentPath, data, ref: obj.ref });
     return data;
   }

@@ -6,7 +6,7 @@
 
 import { BehaviorSubject } from 'rxjs';
 import { BlobProgress } from '../DexieCloudAPI';
-import { BlobRef, isBlobRef, isUnresolvedRef } from './blobResolve';
+import { BlobRef, isBlobRef, isUnresolvedRef, isSerializedTSONRef } from './blobResolve';
 import { getSyncableTables } from '../helpers/getSyncableTables';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { TSONRef } from 'dexie-cloud-common';
@@ -135,6 +135,7 @@ export function setDownloadingState(
 
 /**
  * Find all unresolved refs (BlobRef or TSONRef) in an object (recursive).
+ * Handles both live TSONRef instances and serialized TSONRefs (after IndexedDB).
  */
 function findBlobRefs(obj: unknown): RefInfo[] {
   const refs: RefInfo[] = [];
@@ -143,9 +144,16 @@ function findBlobRefs(obj: unknown): RefInfo[] {
     if (value === null || value === undefined) return;
     if (typeof value !== 'object') return;
 
-    // Check for TSONRef (after TSON parsing with blobRefTypeDefs)
+    // Check for live TSONRef instance (before IndexedDB storage)
     if (TSONRef.isTSONRef(value)) {
       refs.push({ ref: value.ref, size: value.size });
+      return;
+    }
+
+    // Check for serialized TSONRef (after IndexedDB structured clone - Symbol is lost)
+    if (isSerializedTSONRef(value)) {
+      const obj = value as { type: string; ref: string; size: number };
+      refs.push({ ref: obj.ref, size: obj.size });
       return;
     }
 

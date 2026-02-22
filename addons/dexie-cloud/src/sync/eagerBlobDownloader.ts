@@ -14,6 +14,7 @@ import {
   isBlobRef,
   hasBlobRefs,
   hasUnresolvedRefs,
+  isSerializedTSONRef,
   resolveAllBlobRefs,
   ResolvedBlob,
 } from './blobResolve';
@@ -153,7 +154,7 @@ export async function downloadUnresolvedBlobs(
 }
 
 /**
- * Calculate total blob bytes in an object (counts both BlobRef and TSONRef).
+ * Calculate total blob bytes in an object (counts BlobRef, TSONRef, and serialized TSONRef).
  */
 function calculateBlobBytes(obj: unknown): number {
   let total = 0;
@@ -162,8 +163,14 @@ function calculateBlobBytes(obj: unknown): number {
     if (value === null || value === undefined) return;
     if (typeof value !== 'object') return;
 
-    // Check for TSONRef (after TSON parsing)
+    // Check for TSONRef (before IndexedDB storage)
     if (TSONRef.isTSONRef(value)) {
+      total += value.size || 0;
+      return;
+    }
+
+    // Check for serialized TSONRef (after IndexedDB structured clone)
+    if (isSerializedTSONRef(value)) {
       total += value.size || 0;
       return;
     }
