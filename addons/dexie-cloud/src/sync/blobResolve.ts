@@ -71,6 +71,32 @@ export function isBlobRef(value: unknown): value is BlobRef {
 }
 
 /**
+ * Serialized TSONRef shape (after IndexedDB structured clone).
+ * The Symbol is lost but properties remain.
+ */
+export interface SerializedTSONRef {
+  type: string;  // 'Uint8Array', 'Blob', etc.
+  ref: string;   // '1:blobId'
+  size: number;
+  contentType?: string;
+}
+
+/**
+ * Check if a value is a serialized TSONRef (after IndexedDB storage)
+ * Has 'type' instead of '$t', and no Symbol marker
+ */
+export function isSerializedTSONRef(value: unknown): value is SerializedTSONRef {
+  if (typeof value !== 'object' || value === null) return false;
+  const obj = value as any;
+  return (
+    typeof obj.type === 'string' &&
+    typeof obj.ref === 'string' &&
+    typeof obj.size === 'number' &&
+    obj.$t === undefined  // Not a raw BlobRef
+  );
+}
+
+/**
  * Recursively check if an object contains any BlobRefs
  */
 export function hasBlobRefs(obj: unknown, visited = new WeakSet()): boolean {
