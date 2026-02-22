@@ -105,6 +105,7 @@ async function _sync(
     isInitialSync: false,
   }
 ): Promise<boolean> {
+  console.log('[BLOB-DEBUG] _sync() called with purpose:', purpose);
   if (!justCheckIfNeeded) {
     console.debug('SYNC STARTED', { isInitialSync, purpose });
   }
