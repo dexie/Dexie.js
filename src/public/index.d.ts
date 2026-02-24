@@ -39,7 +39,7 @@ interface _Collection<T,TKey> extends Collection<T,TKey> {}
 
 // Besides being the only exported value, let Dexie also be
 // a namespace for types...
-declare module Dexie {
+declare namespace Dexie {
   // The "Dexie.Promise" type.
   type Promise<T=any> = PromiseExtended<T> // Because many samples have been Dexie.Promise.
   // The "Dexie.Table" interface. Same as named exported interface Table.
