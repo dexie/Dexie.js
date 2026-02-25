@@ -41,6 +41,7 @@ export interface Dexie {
   ) => Transaction;
 
   readonly _novip: Dexie;
+  _trackConnection: boolean;
 
   _dbSchema: DbSchema;
 
