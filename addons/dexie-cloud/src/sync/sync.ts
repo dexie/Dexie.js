@@ -105,6 +105,7 @@ async function _sync(
     isInitialSync: false,
   }
 ): Promise<boolean> {
+  console.log('[DEBUG] _sync() ENTRY - purpose:', purpose, 'isInitialSync:', isInitialSync);
   if (!justCheckIfNeeded) {
     console.debug('SYNC STARTED', { isInitialSync, purpose });
   }
@@ -188,6 +189,14 @@ async function _sync(
   const pushSyncIsNeeded = clientChangeSet.some((set) =>
     set.muts.some((mut) => mut.keys.length > 0)
   ) || yMessages.some(m => m.type === 'u-c');
+  console.log('[BLOB-DEBUG] pushSyncIsNeeded:', pushSyncIsNeeded, 'purpose:', purpose, 'clientChangeSet length:', clientChangeSet.length);
+  if (clientChangeSet.length > 0) {
+    console.log('[BLOB-DEBUG] First changeset table:', clientChangeSet[0].table, 'muts:', clientChangeSet[0].muts.length);
+    if (clientChangeSet[0].muts.length > 0) {
+      const mut = clientChangeSet[0].muts[0];
+      console.log('[BLOB-DEBUG] First mut type:', mut.type, 'keys:', mut.keys?.length);
+    }
+  }
   if (justCheckIfNeeded) {
     console.debug('Sync is needed:', pushSyncIsNeeded);
     return pushSyncIsNeeded;
@@ -208,14 +217,17 @@ async function _sync(
   // Offload large blobs to blob storage before sync
   //
   let processedChangeSet = clientChangeSet;
-  if (hasLargeBlobsInOperations(clientChangeSet)) {
-    console.debug('Offloading large blobs before sync...');
+  console.log('🔵 SYNC: About to check hasLargeBlobsInOperations, clientChangeSet.length:', clientChangeSet.length);
+  const hasLargeBlobs = hasLargeBlobsInOperations(clientChangeSet);
+  console.log('🔵 SYNC: hasLargeBlobs:', hasLargeBlobs);
+  if (hasLargeBlobs) {
+    console.log('🔵 SYNC: Offloading large blobs before sync...');
     processedChangeSet = await offloadBlobsInOperations(
       clientChangeSet,
       databaseUrl,
       () => loadCachedAccessToken(db)
     );
-    console.debug('Blob offloading complete');
+    console.log('🔵 SYNC: Blob offloading complete');
   }
 
   //
