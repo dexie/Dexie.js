@@ -6,7 +6,7 @@
 
 import { BehaviorSubject } from 'rxjs';
 import { BlobProgress } from '../DexieCloudAPI';
-import { BlobRef, isBlobRef, isUnresolvedRef, isSerializedTSONRef } from './blobResolve';
+import { BlobRef, isBlobRef, isSerializedTSONRef } from './blobResolve';
 import { getSyncableTables } from '../helpers/getSyncableTables';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { TSONRef } from 'dexie-cloud-common';
