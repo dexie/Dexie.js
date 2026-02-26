@@ -26,7 +26,7 @@ import Promise, { PSD, globalPSD } from '../../helpers/promise';
 import { extend, override, keys, hasOwn } from '../../functions/utils';
 import Events from '../../helpers/Events';
 import { maxString, connections, READONLY, READWRITE } from '../../globals/constants';
-import { getMaxKey } from '../../functions/quirks';
+import { getMaxKey, isModernChrome } from '../../functions/quirks';
 import { exceptions } from '../../errors';
 import { lowerVersionFirst } from '../version/schema-helpers';
 import { dexieOpen } from './dexie-open';
@@ -77,6 +77,7 @@ export class Dexie implements IDexie {
   _middlewares: {[StackName in keyof DexieStacks]?: Middleware<DexieStacks[StackName]>[]} = {};
   _vip?: boolean;
   _novip: Dexie;// db._novip is to escape to orig db from db.vip.
+  _trackConnection: boolean;
   core: DBCore;
 
   name: string;
@@ -112,6 +113,7 @@ export class Dexie implements IDexie {
     const {
       addons,
     } = options;
+    this._trackConnection = !isModernChrome;
     this._dbSchema = {};
     this._versions = [];
     this._storeNames = [];
