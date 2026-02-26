@@ -10,29 +10,49 @@ type DexieYProvider = import('y-dexie').DexieYProvider;
 type DexieYProviderConstructor = typeof import('y-dexie').DexieYProvider;
 type YDoc = import('yjs').Doc;
 
-const gracePeriod = 100 // 100 ms = grace period to optimize for unload/reload scenarios
+const DEFAULT_GRACE_PERIOD = 100; // 100 ms = grace period to optimize for unload/reload scenarios
 
-const fr = typeof FinalizationRegistry !== 'undefined' && new FinalizationRegistry((doc: YDoc) => {
-  // If coming here, react effect never ran. This is a fallback cleanup mechanism.
-  const DexieYProvider = Dexie['DexieYProvider'] as DexieYProviderConstructor;
-  if (DexieYProvider) DexieYProvider.release(doc);
-});
+const fr =
+  typeof FinalizationRegistry !== 'undefined' &&
+  new FinalizationRegistry((doc: YDoc) => {
+    // If coming here, react effect never ran. This is a fallback cleanup mechanism.
+    const DexieYProvider = Dexie['DexieYProvider'] as DexieYProviderConstructor;
+    if (DexieYProvider) DexieYProvider.release(doc);
+  });
+
+export interface UseDocumentOptions {
+  gracePeriod?: number; // Grace period to optimize for unload/reload scenarios
+  onError?: (error: Error) => void;
+}
 
 export function useDocument(
-  doc: YDoc | null | undefined
+  doc: YDoc | null | undefined,
+  options?: UseDocumentOptions
 ): DexieYProvider | null {
   if (!fr) throw new TypeError('FinalizationRegistry not supported.');
   const providerRef = React.useRef<DexieYProvider | null>(null);
+  const onErrorRef = React.useRef<UseDocumentOptions["onError"]>();
   const DexieYProvider = Dexie['DexieYProvider'] as DexieYProviderConstructor;
   if (!DexieYProvider) {
-    throw new Error('DexieYProvider is not available. Make sure `y-dexie` is installed and imported.');
+    throw new Error(
+      'DexieYProvider is not available. Make sure `y-dexie` is installed and imported.'
+    );
   }
   let unregisterToken: object | undefined = undefined;
   if (doc) {
+    if (onErrorRef.current && providerRef.current) {
+      providerRef.current.off('error', onErrorRef.current);
+    }
     if (doc !== providerRef.current?.doc) {
-      providerRef.current = DexieYProvider.load(doc, { gracePeriod });
+      providerRef.current = DexieYProvider.load(doc, {
+        gracePeriod: options?.gracePeriod ?? DEFAULT_GRACE_PERIOD,
+      });
       unregisterToken = Object.create(null);
       fr.register(providerRef, doc, unregisterToken);
+      if (options?.onError) {
+        onErrorRef.current = options.onError;
+        providerRef.current.on('error', onErrorRef.current);
+      }
     }
   } else if (providerRef.current?.doc) {
     providerRef.current = null;
@@ -52,12 +72,17 @@ export function useDocument(
       if (provider) {
         return () => {
           DexieYProvider.release(doc);
-        }
+          if (onErrorRef.current) {
+            provider!.off('error', onErrorRef.current);
+          }
+        };
       } else {
         // Maybe the doc was destroyed in the meantime.
         // Can not happen if React and FinalizationRegistry works as we expect them to.
         // Except if a user had called DexieYProvider.release() on the doc
-        throw new Error(`FATAL. DexieYProvider.release() has been called somewhere in application code, making us lose the document.`);
+        throw new Error(
+          `FATAL. DexieYProvider.release() has been called somewhere in application code, making us lose the document.`
+        );
       }
     }
   }, [doc, unregisterToken]);
