@@ -30,6 +30,7 @@ export class TodoDB extends Dexie {
       databaseUrl: import.meta.env.VITE_DBURL!,
       tryUseServiceWorker: true,
       requireAuth: false,
+      blobMode: (import.meta.env.VITE_BLOB_MODE as 'eager' | 'lazy') || 'eager',
     });
   }
 }

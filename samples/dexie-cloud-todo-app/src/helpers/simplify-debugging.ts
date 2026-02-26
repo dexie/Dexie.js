@@ -1,8 +1,9 @@
 import Dexie from "dexie";
+import dexieCloud from "dexie-cloud-addon";
 
 //
-// Put Dexie on window.
-// (makes it possible to use Dexie in devtools console)
+// Put Dexie and dexieCloud on window.
+// (makes it possible to use Dexie in devtools console and enables E2E tests)
 //
 // Enables an easy way of seeing which version is used and inspect the database:
 //
@@ -11,13 +12,15 @@ import Dexie from "dexie";
 //  > Dexie.Cloud.version
 //  "1.0.0-beta.6"
 //  > await Dexie.getDatabaseNames()
-//  (2) ["TodoDBCloud", "TodoDBCloud-z0lesejpr"]
+//  (2) ["TodoDBCloud", "TodoDBCloud-z0lesejpr"]
 //  > db = await new Dexie("TodoDBCloud-z0lesejpr").open()
 //  > db.tables
-//  (14) [{…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}]
+//  (14) [{…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}]
 //  > await db.table('todoItems').toArray()
-//  (8) [{…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}]
+//  (8) [{…}, {…}, {…}, {…}, {…}, {…}, {…}, {…}]
 
 //@ts-ignore
-window.Dexie = Dexie; 
+window.Dexie = Dexie;
+//@ts-ignore
+window.dexieCloud = dexieCloud;
 Dexie.debug = true;

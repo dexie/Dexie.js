@@ -77,4 +77,14 @@ export interface DexieCloudOptions {
    * ```
    */
   oauthRedirectUri?: string;
+
+  /** How to handle blob downloads from cloud storage.
+   * 
+   * - 'eager' (default): Download blobs in background immediately after sync.
+   *   Best for offline-first apps that need all data available offline ASAP.
+   * 
+   * - 'lazy': Download blobs on-demand when accessed.
+   *   Best for apps with large media that may not all be needed offline.
+   */
+  blobMode?: 'eager' | 'lazy';
 }

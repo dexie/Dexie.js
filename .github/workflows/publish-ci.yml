@@ -1,0 +1,99 @@
+name: Publish CI Packages
+
+# Publishes packages with --tag ci after successful tests on master
+# These pre-release versions can be used by E2E tests in other repos
+
+on:
+  workflow_run:
+    workflows: ["Build and Test"]
+    branches: [master]
+    types: [completed]
+
+permissions:
+  contents: read
+  id-token: write  # Required for OIDC trusted publishing
+
+jobs:
+  publish-ci:
+    # Only run if the triggering workflow succeeded
+    if: ${{ github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.workflow_run.head_sha }}
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 9
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: 'https://registry.npmjs.org'
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build all packages
+        run: |
+          # Build in dependency order
+          # Step 1: dexie (root package)
+          pnpm run build
+          
+          # Step 2: packages that only depend on dexie
+          pnpm --filter dexie-cloud-common run build
+          pnpm --filter y-dexie run build
+          
+          # Step 3: packages that depend on step 2 packages
+          pnpm --filter dexie-react-hooks run build
+          pnpm --filter dexie-cloud-addon run build
+
+      - name: Generate CI version suffix
+        id: version
+        run: |
+          SHORT_SHA=$(echo "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          echo "suffix=ci.${TIMESTAMP}.${SHORT_SHA}" >> $GITHUB_OUTPUT
+
+      - name: Update versions for CI publish
+        run: |
+          # Update all package versions with CI suffix
+          pnpm -r exec -- npm version prerelease --preid=${{ steps.version.outputs.suffix }} --no-git-tag-version
+
+      - name: Publish dexie with CI tag
+        run: pnpm publish --filter dexie --tag ci --no-git-checks --access public --provenance
+
+      - name: Publish dexie-cloud-common with CI tag
+        run: pnpm publish --filter dexie-cloud-common --tag ci --no-git-checks --access public --provenance
+
+      - name: Publish y-dexie with CI tag
+        run: pnpm publish --filter y-dexie --tag ci --no-git-checks --access public --provenance
+
+      - name: Publish dexie-react-hooks with CI tag
+        run: pnpm publish --filter dexie-react-hooks --tag ci --no-git-checks --access public --provenance
+
+      - name: Publish dexie-cloud-addon with CI tag
+        run: pnpm publish --filter dexie-cloud-addon --tag ci --no-git-checks --access public --provenance
+
+      - name: Summary
+        run: |
+          echo "## CI Packages Published" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Version suffix: \`${{ steps.version.outputs.suffix }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Packages:" >> $GITHUB_STEP_SUMMARY
+          echo "- dexie" >> $GITHUB_STEP_SUMMARY
+          echo "- dexie-cloud-common" >> $GITHUB_STEP_SUMMARY
+          echo "- y-dexie" >> $GITHUB_STEP_SUMMARY
+          echo "- dexie-react-hooks" >> $GITHUB_STEP_SUMMARY
+          echo "- dexie-cloud-addon" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Install with:" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "npm install dexie@ci dexie-cloud-addon@ci" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY

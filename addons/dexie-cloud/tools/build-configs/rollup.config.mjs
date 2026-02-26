@@ -72,7 +72,7 @@ export function createRollupConfigs(entry, outputName) {
   const PRODUCTION_BUILD_PLUGINS = [
     terser({
       compress: {
-        drop_console: true,
+        drop_console: false,
         drop_debugger: true,
       },
       mangle: true,

@@ -28,9 +28,11 @@ import { applyServerChanges } from './applyServerChanges';
 import { checkSyncRateLimitDelay } from './ratelimit';
 import { listYClientMessagesAndStateVector } from '../yjs/listYClientMessagesAndStateVector';
 import { applyYServerMessages } from '../yjs/applyYMessages';
+import { hasLargeBlobsInOperations, offloadBlobsInOperations } from './blobOffloading';
 import { updateYSyncStates } from '../yjs/updateYSyncStates';
 import { downloadYDocsFromServer } from '../yjs/downloadYDocsFromServer';
 import { UpdateSpec } from 'dexie';
+import { loadCachedAccessToken } from './loadCachedAccessToken';
 
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 
@@ -103,6 +105,7 @@ async function _sync(
     isInitialSync: false,
   }
 ): Promise<boolean> {
+  console.log('[DEBUG] _sync() ENTRY - purpose:', purpose, 'isInitialSync:', isInitialSync);
   if (!justCheckIfNeeded) {
     console.debug('SYNC STARTED', { isInitialSync, purpose });
   }
@@ -186,6 +189,14 @@ async function _sync(
   const pushSyncIsNeeded = clientChangeSet.some((set) =>
     set.muts.some((mut) => mut.keys.length > 0)
   ) || yMessages.some(m => m.type === 'u-c');
+  console.log('[BLOB-DEBUG] pushSyncIsNeeded:', pushSyncIsNeeded, 'purpose:', purpose, 'clientChangeSet length:', clientChangeSet.length);
+  if (clientChangeSet.length > 0) {
+    console.log('[BLOB-DEBUG] First changeset table:', clientChangeSet[0].table, 'muts:', clientChangeSet[0].muts.length);
+    if (clientChangeSet[0].muts.length > 0) {
+      const mut = clientChangeSet[0].muts[0];
+      console.log('[BLOB-DEBUG] First mut type:', mut.type, 'keys:', mut.keys?.length);
+    }
+  }
   if (justCheckIfNeeded) {
     console.debug('Sync is needed:', pushSyncIsNeeded);
     return pushSyncIsNeeded;
@@ -203,11 +214,28 @@ async function _sync(
   const clientIdentity = syncState?.clientIdentity || randomString(16);
 
   //
+  // Offload large blobs to blob storage before sync
+  //
+  let processedChangeSet = clientChangeSet;
+  console.log('🔵 SYNC: About to check hasLargeBlobsInOperations, clientChangeSet.length:', clientChangeSet.length);
+  const hasLargeBlobs = hasLargeBlobsInOperations(clientChangeSet);
+  console.log('🔵 SYNC: hasLargeBlobs:', hasLargeBlobs);
+  if (hasLargeBlobs) {
+    console.log('🔵 SYNC: Offloading large blobs before sync...');
+    processedChangeSet = await offloadBlobsInOperations(
+      clientChangeSet,
+      databaseUrl,
+      () => loadCachedAccessToken(db)
+    );
+    console.log('🔵 SYNC: Blob offloading complete');
+  }
+
+  //
   // Push changes to server
   //
   throwIfCancelled(cancelToken);
   const res = await syncWithServer(
-    clientChangeSet,
+    processedChangeSet,
     yMessages,
     syncState,
     baseRevs,

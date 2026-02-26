@@ -5,6 +5,8 @@ import {
   getDbNameFromDbUrl,
 } from 'dexie-cloud-common';
 import { BehaviorSubject, combineLatest, firstValueFrom, from, fromEvent, Subject } from 'rxjs';
+import { createBlobProgress } from './sync/blobProgress';
+import { downloadUnresolvedBlobs } from './sync/eagerBlobDownloader';
 import { filter, map, skip, startWith, switchMap, take } from 'rxjs/operators';
 import { login } from './authentication/login';
 import { UNAUTHORIZED_USER } from './authentication/UNAUTHORIZED_USER';
@@ -19,6 +21,7 @@ import { throwVersionIncrementNeeded } from './helpers/throwVersionIncrementNeed
 import { createIdGenerationMiddleware } from './middlewares/createIdGenerationMiddleware';
 import { createImplicitPropSetterMiddleware } from './middlewares/createImplicitPropSetterMiddleware';
 import { createMutationTrackingMiddleware } from './middlewares/createMutationTrackingMiddleware';
+import { createBlobResolveMiddleware } from './middlewares/blobResolveMiddleware';
 //import { dexieCloudSyncProtocol } from "./dexieCloudSyncProtocol";
 import { overrideParseStoresSpec } from './overrideParseStoresSpec';
 import { performInitialSync } from './performInitialSync';
@@ -147,6 +150,7 @@ export function dexieCloud(dexie: Dexie) {
     persistedSyncState: new BehaviorSubject<PersistedSyncState | undefined>(
       undefined
     ),
+    blobProgress: createBlobProgress(),
     userInteraction: new BehaviorSubject<DXCUserInteraction | undefined>(
       undefined
     ),
@@ -282,6 +286,7 @@ export function dexieCloud(dexie: Dexie) {
     return this.db.cloud.schema?.[this.name]?.idPrefix || '';
   };
 
+  dexie.use(createBlobResolveMiddleware(DexieCloudDB(dexie)));
   dexie.use(
     createMutationTrackingMiddleware({
       currentUserObservable: dexie.cloud.currentUser,
@@ -306,6 +311,20 @@ export function dexieCloud(dexie: Dexie) {
 
     // Forward db.syncCompleteEvent to be publicly consumable via db.cloud.events.syncComplete:
     subscriptions.push(db.syncCompleteEvent.subscribe(syncComplete));
+
+    // Eager blob download: When blobMode='eager' (default), download unresolved blobs after sync
+    const blobMode = db.cloud.options?.blobMode ?? 'eager';
+    if (blobMode === 'eager') {
+      const downloadBlobs = () => {
+        Dexie.ignoreTransaction(() => downloadUnresolvedBlobs(db, dexie.cloud.blobProgress)).catch(err => {
+          console.error('[dexie-cloud] Eager blob download failed:', err);
+        });
+      };
+      setTimeout(downloadBlobs, 0); // Don't block ready event. Start downloading blobs in the background right after.
+      // And also after every sync completes:
+      subscriptions.push(db.syncCompleteEvent.subscribe(downloadBlobs));
+    }
+
 
     //verifyConfig(db.cloud.options); Not needed (yet at least!)
     // Verify the user has allowed version increment.

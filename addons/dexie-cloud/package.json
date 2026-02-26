@@ -3,7 +3,7 @@
   "version": "4.3.9",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "type": "module",
-  "module": "dist/modern/dexie-cloud-addon.min.js",
+  "module": "dist/modern/dexie-cloud-addon.js",
   "homepage": "https://dexie.org/cloud/docs/dexie-cloud-addon",
   "exports": {
     ".": {

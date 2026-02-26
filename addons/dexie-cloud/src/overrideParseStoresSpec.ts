@@ -45,7 +45,7 @@ export function overrideParseStoresSpec(origFunc: Function, dexie: Dexie) {
     });
 
     // Populate dexie.cloud.schema
-    const cloudSchema = dexie.cloud.schema || (dexie.cloud.schema = {});
+    const cloudSchema = dexie.cloud.schema || (dexie.cloud.schema = {});
     const allPrefixes = new Set<string>();
     Object.keys(storesClone).forEach(tableName => {
       const schemaSrc = storesClone[tableName]?.trim(); 
@@ -60,6 +60,12 @@ export function overrideParseStoresSpec(origFunc: Function, dexie: Dexie) {
         if (!/^\$/.test(tableName)) {
           storesClone[`$${tableName}_mutations`] = '++rev';
           cloudTableSchema.markedForSync = true;
+          
+          // Add sparse index for $hasBlobRefs (for BlobRef resolution tracking)
+          // IndexedDB sparse indexes have zero overhead when the property doesn't exist
+          if (!storesClone[tableName].includes('$hasBlobRefs')) {
+            storesClone[tableName] += ',$hasBlobRefs';
+          }
         }
         if (cloudTableSchema.deleted) {
           cloudTableSchema.deleted = false;
