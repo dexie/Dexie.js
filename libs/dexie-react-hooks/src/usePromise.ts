@@ -1,8 +1,10 @@
 import * as React from 'react';
 
 /** {@link React.use} if supported, else fallback */
+const reactUse = Reflect.get(React, 'use');
+
 export const usePromise: <T>(promise: PromiseLike<T>) => T =
-  React.use ?? fallbackUsePromise;
+  reactUse ?? fallbackUsePromise;
 
 /** Fallback for `React.use` with promise */
 function fallbackUsePromise<T>(promise: PromiseLike<T>): T {
