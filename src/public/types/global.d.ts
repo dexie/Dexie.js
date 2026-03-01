@@ -11,3 +11,27 @@ interface IDBTransactionOptions {
 interface IDBDatabase {
     transaction(storeNames: string | string[], mode?: IDBTransactionMode, options?: IDBTransactionOptions): IDBTransaction
 }
+
+/**
+ * Type definitions for IndexedDB getAllRecords() API (Interop 2026)
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAllRecords
+ */
+interface IDBGetAllRecordsOptions {
+    query?: IDBKeyRange | IDBValidKey | null;
+    count?: number;
+    direction?: IDBCursorDirection;
+}
+
+interface IDBRecord<T = any> {
+    key: IDBValidKey;
+    primaryKey: IDBValidKey;
+    value: T;
+}
+
+interface IDBObjectStore {
+    getAllRecords?(options?: IDBGetAllRecordsOptions): IDBRequest<IDBRecord[]>;
+}
+
+interface IDBIndex {
+    getAllRecords?(options?: IDBGetAllRecordsOptions): IDBRequest<IDBRecord[]>;
+}

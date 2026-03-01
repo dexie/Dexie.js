@@ -167,15 +167,15 @@ export class Collection implements ICollection {
   toArray(cb?): PromiseExtended<any[]> {
     return this._read(trans => {
       var ctx = this._ctx;
-      if (ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
-        // Special optimation if we could use IDBObjectStore.getAll() or
-        // IDBKeyRange.getAll():
+      if (isPlainKeyRange(ctx, true) && ctx.limit > 0) {
+        // Special optimation if we could use IDBObjectStore.getAll() / getAllRecords():
         const {valueMapper} = ctx;
         const index = getIndexOrStore(ctx, ctx.table.core.schema);
         return ctx.table.core.query({
           trans,
           limit: ctx.limit,
           values: true,
+          reverse: ctx.dir === 'prev',
           query: {
             index,
             range: ctx.range
@@ -381,15 +381,16 @@ export class Collection implements ICollection {
    **/
   primaryKeys(cb?) : PromiseExtended<IndexableType[]> {
     var ctx = this._ctx;
-    if (ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
-      // Special optimation if we could use IDBObjectStore.getAllKeys() or
-      // IDBKeyRange.getAllKeys():
+    if (isPlainKeyRange(ctx, true) && ctx.limit > 0) {
+      // Special optimation if we could use IDBObjectStore.getAllKeys() /
+      // IDBKeyRange.getAllKeys() / getAllRecords():
       return this._read(trans => {
         var index = getIndexOrStore(ctx, ctx.table.core.schema);
         return ctx.table.core.query({
           trans,
           values: false,
           limit: ctx.limit,
+          reverse: ctx.dir === 'prev',
           query: {
             index,
             range: ctx.range

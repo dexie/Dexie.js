@@ -15,7 +15,7 @@ import {
 import { isArray } from '../functions/utils';
 import { eventRejectHandler, preventDefault } from '../functions/event-wrappers';
 import { wrap } from '../helpers/promise';
-import { getMaxKey } from '../functions/quirks';
+import { getMaxKey, hasGetAllRecords } from '../functions/quirks';
 import { getKeyExtractor } from './get-key-extractor';
 
 export function arrayify<T>(arrayLike: {length: number, [index: number]: T}): T[] {
@@ -288,14 +288,46 @@ export function createDBCore (
       return (request: DBCoreQueryRequest) => {
         return new Promise<DBCoreQueryResponse>((resolve, reject) => {
           resolve = wrap(resolve);
-          const {trans, values, limit, query} = request;
+          const {trans, values, limit, query, reverse} = request;
           const nonInfinitLimit = limit === Infinity ? undefined : limit;
           const {index, range} = query;
           const store = (trans as IDBTransaction).objectStore(tableName);
           const source = index.isPrimaryKey ? store : store.index(index.name);
           const idbKeyRange = makeIDBKeyRange(range);
           if (limit === 0) return resolve({result: []});
-          if (hasGetAll) {
+          
+          // Use getAllRecords() for reverse queries when available (2-5x faster)
+          if (reverse && hasGetAllRecords) {
+            const req = (source as any).getAllRecords({
+              query: idbKeyRange,
+              count: nonInfinitLimit,
+              direction: 'prev'
+            });
+            req.onsuccess = event => {
+              const records = event.target.result;
+              resolve({
+                result: values 
+                  ? records.map(r => r.value) 
+                  : records.map(r => r.primaryKey)
+              });
+            };
+            req.onerror = eventRejectHandler(reject);
+          } else if (reverse) {
+            // Fallback: use cursor for reverse when getAllRecords() not available
+            let count = 0;
+            const req = values || !('openKeyCursor' in source) ?
+              source.openCursor(idbKeyRange, 'prev') :
+              source.openKeyCursor(idbKeyRange, 'prev');
+            const result = [];
+            req.onsuccess = event => {
+              const cursor = req.result as IDBCursorWithValue;
+              if (!cursor) return resolve({result});
+              result.push(values ? cursor.value : cursor.primaryKey);
+              if (++count === limit) return resolve({result});
+              cursor.continue();
+            };
+            req.onerror = eventRejectHandler(reject);
+          } else if (hasGetAll) {
             const req = values ?
                 (source as any).getAll(idbKeyRange, nonInfinitLimit) :
                 (source as any).getAllKeys(idbKeyRange, nonInfinitLimit);

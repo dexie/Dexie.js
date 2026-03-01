@@ -109,6 +109,7 @@ export interface DBCoreQueryRequest {
   values?: boolean;
   limit?: number;
   query: DBCoreQuery;
+  reverse?: boolean;
   obsSet?: ObservabilitySet
 
 }
