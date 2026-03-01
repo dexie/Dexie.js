@@ -21,10 +21,11 @@ export let getMaxKey = (IdbKeyRange: typeof IDBKeyRange) => {
 }
 
 /**
- * Check if getAllRecords() is supported.
- * getAllRecords() is a new IndexedDB API (Interop 2026) that provides
- * 2-5x faster reads, especially for reverse iteration.
- * @see https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAllRecords
+ * Check if IndexedDB 3.0 features are supported.
+ * IDB 3.0 adds direction parameter to getAll()/getAllKeys() options.
+ * We detect this by checking for getAllRecords() which is also part of IDB 3.0.
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAll
+ * @see https://w3c.github.io/IndexedDB/
  */
-export const hasGetAllRecords = typeof IDBObjectStore !== 'undefined' &&
+export const hasIdb3Features = typeof IDBObjectStore !== 'undefined' &&
   typeof IDBObjectStore.prototype.getAllRecords === 'function';

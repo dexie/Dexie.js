@@ -13,10 +13,13 @@ interface IDBDatabase {
 }
 
 /**
- * Type definitions for IndexedDB getAllRecords() API (Interop 2026)
- * @see https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAllRecords
+ * Type definitions for IndexedDB 3.0 features (Interop 2026)
+ * - getAll(options) and getAllKeys(options) with direction parameter
+ * - getAllRecords() for retrieving records with keys
+ * @see https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAll
+ * @see https://w3c.github.io/IndexedDB/
  */
-interface IDBGetAllRecordsOptions {
+interface IDBGetAllOptions {
     query?: IDBKeyRange | IDBValidKey | null;
     count?: number;
     direction?: IDBCursorDirection;
@@ -29,9 +32,17 @@ interface IDBRecord<T = any> {
 }
 
 interface IDBObjectStore {
-    getAllRecords?(options?: IDBGetAllRecordsOptions): IDBRequest<IDBRecord[]>;
+    // IDB 3.0: getAll/getAllKeys with options object including direction
+    getAll(options: IDBGetAllOptions): IDBRequest<any[]>;
+    getAllKeys(options: IDBGetAllOptions): IDBRequest<IDBValidKey[]>;
+    // getAllRecords is used for feature detection
+    getAllRecords?(options?: IDBGetAllOptions): IDBRequest<IDBRecord[]>;
 }
 
 interface IDBIndex {
-    getAllRecords?(options?: IDBGetAllRecordsOptions): IDBRequest<IDBRecord[]>;
+    // IDB 3.0: getAll/getAllKeys with options object including direction
+    getAll(options: IDBGetAllOptions): IDBRequest<any[]>;
+    getAllKeys(options: IDBGetAllOptions): IDBRequest<IDBValidKey[]>;
+    // getAllRecords is used for feature detection  
+    getAllRecords?(options?: IDBGetAllOptions): IDBRequest<IDBRecord[]>;
 }

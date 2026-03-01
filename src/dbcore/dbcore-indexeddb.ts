@@ -15,7 +15,7 @@ import {
 import { isArray } from '../functions/utils';
 import { eventRejectHandler, preventDefault } from '../functions/event-wrappers';
 import { wrap } from '../helpers/promise';
-import { getMaxKey, hasGetAllRecords } from '../functions/quirks';
+import { getMaxKey, hasIdb3Features } from '../functions/quirks';
 import { getKeyExtractor } from './get-key-extractor';
 
 export function arrayify<T>(arrayLike: {length: number, [index: number]: T}): T[] {
@@ -296,24 +296,21 @@ export function createDBCore (
           const idbKeyRange = makeIDBKeyRange(range);
           if (limit === 0) return resolve({result: []});
           
-          // Use getAllRecords() for reverse queries when available (2-5x faster)
-          if (reverse && hasGetAllRecords) {
-            const req = (source as any).getAllRecords({
+          // Use getAll/getAllKeys with direction option for reverse queries (IDB 3.0)
+          // This is 2-5x faster than cursor iteration
+          if (reverse && hasIdb3Features) {
+            const options = {
               query: idbKeyRange,
               count: nonInfinitLimit,
-              direction: 'prev'
-            });
-            req.onsuccess = event => {
-              const records = event.target.result;
-              resolve({
-                result: values 
-                  ? records.map(r => r.value) 
-                  : records.map(r => r.primaryKey)
-              });
+              direction: 'prev' as IDBCursorDirection
             };
+            const req = values ?
+                (source as any).getAll(options) :
+                (source as any).getAllKeys(options);
+            req.onsuccess = event => resolve({result: event.target.result});
             req.onerror = eventRejectHandler(reject);
           } else if (reverse) {
-            // Fallback: use cursor for reverse when getAllRecords() not available
+            // Fallback: use cursor for reverse when IDB 3.0 features not available
             let count = 0;
             const req = values || !('openKeyCursor' in source) ?
               source.openCursor(idbKeyRange, 'prev') :

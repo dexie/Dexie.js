@@ -1,5 +1,5 @@
 /**
- * Tests for getAllRecords() optimization
+ * Tests for IDB 3.0 getAll/getAllKeys direction optimization
  * @see https://github.com/dexie/Dexie.js/issues/2183
  */
 import Dexie from 'dexie';
