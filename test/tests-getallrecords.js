@@ -64,11 +64,11 @@ spawnedTest("reverse primaryKeys() should work correctly", function* () {
         { name: 'Charlie' }
     ], { allKeys: true });
     
-    // Test forward primaryKeys
-    const forwardKeys = yield db.items.primaryKeys();
+    // Test forward primaryKeys (via toCollection())
+    const forwardKeys = yield db.items.toCollection().primaryKeys();
     deepEqual(forwardKeys, ids, "Forward primaryKeys returns correct order");
     
-    // Test reverse primaryKeys - should use getAllRecords() when available
+    // Test reverse primaryKeys - uses cursor iteration
     const reverseKeys = yield db.items.reverse().primaryKeys();
     deepEqual(reverseKeys, [...ids].reverse(), "Reverse primaryKeys returns reversed order");
     
