@@ -15,7 +15,7 @@ import {
 import { isArray } from '../functions/utils';
 import { eventRejectHandler, preventDefault } from '../functions/event-wrappers';
 import { wrap } from '../helpers/promise';
-import { getMaxKey, hasIdb3Features } from '../functions/quirks';
+import { getMaxKey } from '../functions/quirks';
 import { getKeyExtractor } from './get-key-extractor';
 
 export function arrayify<T>(arrayLike: {length: number, [index: number]: T}): T[] {
@@ -42,8 +42,11 @@ export function createDBCore (
   IdbKeyRange: typeof IDBKeyRange,
   tmpTrans: IDBTransaction) : DBCore
 {
-  function extractSchema(db: IDBDatabase, trans: IDBTransaction) : {schema: DBCoreSchema, hasGetAll: boolean} {
+  function extractSchema(db: IDBDatabase, trans: IDBTransaction) : {schema: DBCoreSchema, hasGetAll: boolean, hasIdb3Features: boolean} {
     const tables = arrayify(db.objectStoreNames);
+    const tempStore: Partial<{getAll: any, getAllRecords: any}> = tables.length > 0
+      ? trans.objectStore(tables[0])
+      : {};
     return {
       schema: {
         name: db.name,
@@ -88,10 +91,11 @@ export function createDBCore (
           return result;
         })
       },
-      hasGetAll: tables.length > 0 && ('getAll' in trans.objectStore(tables[0])) &&
+      hasGetAll: tables.length > 0 && ('getAll' in tempStore) &&
         !(typeof navigator !== 'undefined' && /Safari/.test(navigator.userAgent) &&
         !/(Chrome\/|Edge\/)/.test(navigator.userAgent) &&
-        [].concat(navigator.userAgent.match(/Safari\/(\d*)/))[1] < 604) // Bug with getAll() on Safari ver<604. See discussion following PR #579
+        [].concat(navigator.userAgent.match(/Safari\/(\d*)/))[1] < 604), // Bug with getAll() on Safari ver<604. See discussion following PR #579
+      hasIdb3Features: 'getAllRecords' in tempStore
     };
   }
 
@@ -401,7 +405,7 @@ export function createDBCore (
     };
   }
 
-  const {schema, hasGetAll} = extractSchema(db, tmpTrans);
+  const {schema, hasGetAll, hasIdb3Features} = extractSchema(db, tmpTrans);
   const tables = schema.tables.map(tableSchema => createDbCoreTable(tableSchema));
   const tableMap: {[name: string]: DBCoreTable} = {};
   tables.forEach(table => tableMap[table.name] = table);
