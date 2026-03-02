@@ -16,9 +16,9 @@ const ltBrowsers = {
   },
   remote_chrome: {
     browserName: "Chrome",
-    browserVersion: "118",
+    browserVersion: "144",
     'LT:Options': {
-      platformName: 'Windows 10'
+      platformName: 'Windows 11'
     }
   },
   remote_safari: {

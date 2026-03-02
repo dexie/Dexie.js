@@ -110,9 +110,14 @@ export function applyOptimisticOps(
   if (finalResult === result) return result;
 
   // Sort the result on sortIndex:
-  finalResult.sort((a, b) =>
+  const sorter: (a: any, b: any) => number = (a, b) =>
     cmp(extractLowLevelIndex(a), extractLowLevelIndex(b)) ||
-    cmp(extractPrimKey(a), extractPrimKey(b))
+    cmp(extractPrimKey(a), extractPrimKey(b));
+  
+  // If direction is 'prev' or 'prevunique', sort in descending order
+  finalResult.sort(req.direction === 'prev' || req.direction === 'prevunique'
+    ? (a, b) => sorter(b, a)
+    : sorter
   );
 
   // If we have a limit we need to respect it:
