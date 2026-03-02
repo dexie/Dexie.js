@@ -26,7 +26,12 @@ const karmaCommon = {
     'karma-mocha-reporter',
     'karma-chrome-launcher',
     'karma-firefox-launcher',
-    'karma-webdriver-launcher'
+    // karma-webdriver-launcher depends on 'wd' which runs a build script (node
+    // scripts/build-browser-scripts) during install. pnpm v10+ skips arbitrary
+    // install scripts by default, so 'wd/build/' won't exist on a fresh install
+    // and the plugin will fail to load. Only include it when actually running
+    // remote WebDriver tests (LambdaTest CI).
+    ...(process.env.LT_USERNAME ? ['karma-webdriver-launcher'] : []),
   ],
 
   files: [
