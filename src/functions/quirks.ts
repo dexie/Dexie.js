@@ -19,13 +19,3 @@ export let getMaxKey = (IdbKeyRange: typeof IDBKeyRange) => {
     return maxString;
   }
 }
-
-/**
- * Check if IndexedDB 3.0 features are supported.
- * IDB 3.0 adds direction parameter to getAll()/getAllKeys() options.
- * We detect this by checking for getAllRecords() which is also part of IDB 3.0.
- * @see https://developer.mozilla.org/en-US/docs/Web/API/IDBIndex/getAll
- * @see https://w3c.github.io/IndexedDB/
- */
-export const hasIdb3Features = typeof IDBObjectStore !== 'undefined' &&
-  typeof IDBObjectStore.prototype.getAllRecords === 'function';

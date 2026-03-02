@@ -6,19 +6,19 @@ import Dexie from 'dexie';
 import { module, stop, start, asyncTest, ok, equal, deepEqual } from 'QUnit';
 import { spawnedTest } from './dexie-unittest-utils';
 
-module("getAllRecords", {
+module("IndexedDB 3.0 features", {
     setup: function () {
         stop();
-        Dexie.delete("TestDB-getAllRecords").then(start);
+        Dexie.delete("TestDB-idb30").then(start);
     },
     teardown: function () {
         stop();
-        Dexie.delete("TestDB-getAllRecords").then(start);
+        Dexie.delete("TestDB-idb30").then(start);
     }
 });
 
 spawnedTest("reverse toArray() should work correctly", function* () {
-    const db = new Dexie("TestDB-getAllRecords");
+    const db = new Dexie("TestDB-idb30");
     db.version(1).stores({
         items: '++id, name'
     });
@@ -40,7 +40,7 @@ spawnedTest("reverse toArray() should work correctly", function* () {
     equal(forward[0].name, 'Alice', "First item is Alice");
     equal(forward[4].name, 'Eve', "Last item is Eve");
     
-    // Test reverse toArray - this should now use getAllRecords() when available
+    // Test reverse toArray - this should now use getAll() when IDB 3.0 's support for reverse direction is available
     const reverse = yield db.items.reverse().toArray();
     equal(reverse.length, 5, "Reverse toArray returns 5 items");
     equal(reverse[0].name, 'Eve', "First item in reverse is Eve");
@@ -50,7 +50,7 @@ spawnedTest("reverse toArray() should work correctly", function* () {
 });
 
 spawnedTest("reverse primaryKeys() should work correctly", function* () {
-    const db = new Dexie("TestDB-getAllRecords");
+    const db = new Dexie("TestDB-idb30");
     db.version(1).stores({
         items: '++id, name'
     });
@@ -76,7 +76,7 @@ spawnedTest("reverse primaryKeys() should work correctly", function* () {
 });
 
 spawnedTest("reverse toArray() with limit should work correctly", function* () {
-    const db = new Dexie("TestDB-getAllRecords");
+    const db = new Dexie("TestDB-idb30");
     db.version(1).stores({
         items: '++id, value'
     });
@@ -99,7 +99,7 @@ spawnedTest("reverse toArray() with limit should work correctly", function* () {
 });
 
 spawnedTest("reverse on index should work correctly", function* () {
-    const db = new Dexie("TestDB-getAllRecords");
+    const db = new Dexie("TestDB-idb30");
     db.version(1).stores({
         items: '++id, name'
     });
