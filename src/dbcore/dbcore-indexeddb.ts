@@ -309,34 +309,20 @@ export function createDBCore (
                 (source as any).getAllKeys(options);
             req.onsuccess = event => resolve({result: event.target.result});
             req.onerror = eventRejectHandler(reject);
-          } else if (direction && direction !== 'next') {
+          } else if (hasGetAll && (!direction || direction === 'next')) {
+            const req = values ?
+                (source as any).getAll(idbKeyRange, nonInfinitLimit) :
+                (source as any).getAllKeys(idbKeyRange, nonInfinitLimit);
+            req.onsuccess = (event: any) => resolve({result: event.target.result});
+            req.onerror = eventRejectHandler(reject);
+          } else {
             // Fallback: use cursor for non-default direction when IDB 3.0 features not available
             let count = 0;
             const req = values || !('openKeyCursor' in source) ?
               source.openCursor(idbKeyRange, direction) :
               source.openKeyCursor(idbKeyRange, direction);
             const result = [];
-            req.onsuccess = event => {
-              const cursor = req.result as IDBCursorWithValue;
-              if (!cursor) return resolve({result});
-              result.push(values ? cursor.value : cursor.primaryKey);
-              if (++count === limit) return resolve({result});
-              cursor.continue();
-            };
-            req.onerror = eventRejectHandler(reject);
-          } else if (hasGetAll) {
-            const req = values ?
-                (source as any).getAll(idbKeyRange, nonInfinitLimit) :
-                (source as any).getAllKeys(idbKeyRange, nonInfinitLimit);
-            req.onsuccess = event => resolve({result: event.target.result});
-            req.onerror = eventRejectHandler(reject);
-          } else {
-            let count = 0;
-            const req = values || !('openKeyCursor' in source) ?
-              source.openCursor(idbKeyRange) :
-              source.openKeyCursor(idbKeyRange)
-            const result = [];
-            req.onsuccess = event => {
+            req.onsuccess = () => {
               const cursor = req.result as IDBCursorWithValue;
               if (!cursor) return resolve({result});
               result.push(values ? cursor.value : cursor.primaryKey);
