@@ -114,8 +114,9 @@ export function applyOptimisticOps(
     cmp(extractLowLevelIndex(a), extractLowLevelIndex(b)) ||
     cmp(extractPrimKey(a), extractPrimKey(b));
   
-  finalResult.sort(req.reverse
-    ? (a, b) => sorter(b, a) // If reverse is requested, sort in descending order
+  // If direction is 'prev' or 'prevunique', sort in descending order
+  finalResult.sort(req.direction === 'prev' || req.direction === 'prevunique'
+    ? (a, b) => sorter(b, a)
     : sorter
   );
 

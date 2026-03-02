@@ -176,7 +176,7 @@ export class Collection implements ICollection {
           trans,
           limit: ctx.limit,
           values: true,
-          reverse: ctx.dir === 'prev',
+          direction: ctx.dir === 'prev' ? 'prev' : undefined,
           query: {
             index,
             range: ctx.range
@@ -391,7 +391,7 @@ export class Collection implements ICollection {
           trans,
           values: false,
           limit: ctx.limit,
-          reverse: ctx.dir === 'prev',
+          direction: ctx.dir === 'prev' ? 'prev' : undefined,
           query: {
             index,
             range: ctx.range

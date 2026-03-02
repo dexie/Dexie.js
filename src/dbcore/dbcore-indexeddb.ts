@@ -288,7 +288,7 @@ export function createDBCore (
       return (request: DBCoreQueryRequest) => {
         return new Promise<DBCoreQueryResponse>((resolve, reject) => {
           resolve = wrap(resolve);
-          const {trans, values, limit, query, reverse} = request;
+          const {trans, values, limit, query, direction} = request;
           const nonInfinitLimit = limit === Infinity ? undefined : limit;
           const {index, range} = query;
           const store = (trans as IDBTransaction).objectStore(tableName);
@@ -296,25 +296,25 @@ export function createDBCore (
           const idbKeyRange = makeIDBKeyRange(range);
           if (limit === 0) return resolve({result: []});
           
-          // Use getAll/getAllKeys with direction option for reverse queries (IDB 3.0)
-          // This is 2-5x faster than cursor iteration
-          if (reverse && hasIdb3Features) {
+          // Use getAll/getAllKeys with direction option (IDB 3.0)
+          // This is 2-5x faster than cursor iteration for reverse queries
+          if (hasIdb3Features) {
             const options = {
               query: idbKeyRange,
               count: nonInfinitLimit,
-              direction: 'prev' as IDBCursorDirection
+              direction: direction || 'next'
             };
             const req = values ?
                 (source as any).getAll(options) :
                 (source as any).getAllKeys(options);
             req.onsuccess = event => resolve({result: event.target.result});
             req.onerror = eventRejectHandler(reject);
-          } else if (reverse) {
-            // Fallback: use cursor for reverse when IDB 3.0 features not available
+          } else if (direction && direction !== 'next') {
+            // Fallback: use cursor for non-default direction when IDB 3.0 features not available
             let count = 0;
             const req = values || !('openKeyCursor' in source) ?
-              source.openCursor(idbKeyRange, 'prev') :
-              source.openKeyCursor(idbKeyRange, 'prev');
+              source.openCursor(idbKeyRange, direction) :
+              source.openKeyCursor(idbKeyRange, direction);
             const result = [];
             req.onsuccess = event => {
               const cursor = req.result as IDBCursorWithValue;

@@ -109,7 +109,7 @@ export interface DBCoreQueryRequest {
   values?: boolean;
   limit?: number;
   query: DBCoreQuery;
-  reverse?: boolean;
+  direction?: "next" | "nextunique" | "prev" | "prevunique";
   obsSet?: ObservabilitySet
 
 }
