@@ -1,7 +1,7 @@
 {
   "compilerOptions": {
     "allowJs": true,
-    "target": "es5",
+    "target": "es2020",
     "module": "es2015",
     "importHelpers": true,
     "strictNullChecks": false,
@@ -15,5 +15,8 @@
   },
   "dirs": [
     "."
+  ],
+  "exclude": [
+    "next"
   ]
 }

@@ -24,6 +24,8 @@ import { extendObservabilitySet } from '../../live-query/extend-observability-se
 import { domDeps } from './dexie-dom-dependencies';
 import { cmp } from '../../functions/cmp';
 import { cache } from '../../live-query/cache/cache';
+import { obsSetsOverlap } from '../../live-query/obs-sets-overlap';
+import { AnyRange, NeverRange } from '../../dbcore/keyrange';
 
 /* (Dexie) is an instance of DexieConstructor, as defined in public/types/dexie-constructor.d.ts
 *  (new Dexie()) is an instance of Dexie, as defined in public/types/dexie.d.ts
@@ -181,6 +183,7 @@ props(Dexie, {
   on: globalEvents,
   liveQuery,
   extendObservabilitySet,
+  obsSetsOverlap,
   // Utilities
   getByKeyPath: getByKeyPath,
   setByKeyPath: setByKeyPath,
@@ -192,6 +195,8 @@ props(Dexie, {
   asap: asap,
   //maxKey: new Dexie('',{addons:[]})._maxKey,
   minKey: minKey,
+  AnyRange,
+  NeverRange,
   // Addon registry
   addons: [],
   // Global DB connection list

@@ -10,6 +10,7 @@ import { DexieDOMDependencies } from "./dexie-dom-dependencies";
 import { GlobalDexieEvents, ObservabilitySet } from "./db-events";
 import { Observable } from "./observable";
 import { GlobalQueryCache } from "./cache";
+import { DBCoreKeyRange } from "./dbcore";
 
 export type ChromeTransactionDurability = 'default' | 'strict' | 'relaxed'
 
@@ -42,6 +43,7 @@ export interface DexieConstructor extends DexieExceptionClasses {
   disableBfCache?: boolean;
   liveQuery<T>(fn: () => T | Promise<T>): Observable<T>;
   extendObservabilitySet (target: ObservabilitySet, newSet: ObservabilitySet): ObservabilitySet;
+  obsSetsOverlap(set1: ObservabilitySet, set2: ObservabilitySet): boolean;
   override<F> (origFunc:F, overridedFactory: (fn:any)=>any) : F; // ?
   getByKeyPath(obj: Object, keyPath: string | string[]): any;
   setByKeyPath(obj: Object, keyPath: string | string[], value: any): void;
@@ -51,6 +53,8 @@ export interface DexieConstructor extends DexieExceptionClasses {
   asap(fn: Function) : void; //?
   maxKey: Array<Array<void>> | string;
   minKey: number;
+  AnyRange: DBCoreKeyRange;
+  NeverRange: DBCoreKeyRange
   exists(dbName: string) : Promise<boolean>;
   delete(dbName: string): Promise<void>;
   dependencies: DexieDOMDependencies;
