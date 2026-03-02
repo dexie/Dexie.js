@@ -292,7 +292,9 @@ export function createDBCore (
       return (request: DBCoreQueryRequest) => {
         return new Promise<DBCoreQueryResponse>((resolve, reject) => {
           resolve = wrap(resolve);
-          const {trans, values, limit, query, direction} = request;
+          const {trans, values, limit, query} = request;
+          // Normalize direction once - undefined means 'next'
+          const direction = request.direction ?? 'next';
           const nonInfinitLimit = limit === Infinity ? undefined : limit;
           const {index, range} = query;
           const store = (trans as IDBTransaction).objectStore(tableName);
@@ -306,14 +308,14 @@ export function createDBCore (
             const options = {
               query: idbKeyRange,
               count: nonInfinitLimit,
-              direction: direction || 'next'
+              direction
             };
             const req = values ?
                 (source as any).getAll(options) :
                 (source as any).getAllKeys(options);
             req.onsuccess = event => resolve({result: event.target.result});
             req.onerror = eventRejectHandler(reject);
-          } else if (hasGetAll && (!direction || direction === 'next')) {
+          } else if (hasGetAll && direction === 'next') {
             const req = values ?
                 (source as any).getAll(idbKeyRange, nonInfinitLimit) :
                 (source as any).getAllKeys(idbKeyRange, nonInfinitLimit);
