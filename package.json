@@ -145,6 +145,11 @@
     "yjs": "^13.6.27"
   },
   "pnpm": {
-    "onlyBuiltDependencies": ["wd"]
+    "onlyBuiltDependencies": [
+      "core-js-bundle",
+      "esbuild",
+      "unrs-resolver",
+      "wd"
+    ]
   }
 }
