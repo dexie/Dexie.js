@@ -110,10 +110,18 @@ export function applyOptimisticOps(
   if (finalResult === result) return result;
 
   // Sort the result on sortIndex:
-  finalResult.sort((a, b) =>
-    cmp(extractLowLevelIndex(a), extractLowLevelIndex(b)) ||
-    cmp(extractPrimKey(a), extractPrimKey(b))
-  );
+  // If reverse is requested, sort in descending order
+  if (req.reverse) {
+    finalResult.sort((a, b) =>
+      cmp(extractLowLevelIndex(b), extractLowLevelIndex(a)) ||
+      cmp(extractPrimKey(b), extractPrimKey(a))
+    );
+  } else {
+    finalResult.sort((a, b) =>
+      cmp(extractLowLevelIndex(a), extractLowLevelIndex(b)) ||
+      cmp(extractPrimKey(a), extractPrimKey(b))
+    );
+  }
 
   // If we have a limit we need to respect it:
   if (req.limit && req.limit < Infinity) {

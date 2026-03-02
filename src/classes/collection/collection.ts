@@ -167,16 +167,16 @@ export class Collection implements ICollection {
   toArray(cb?): PromiseExtended<any[]> {
     return this._read(trans => {
       var ctx = this._ctx;
-      if (ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
+      if (isPlainKeyRange(ctx, true) && ctx.limit > 0) {
         // Special optimization using IDBObjectStore.getAll() or IDBKeyRange.getAll().
-        // For reverse queries, we fall back to cursor iteration until IDB 3.0
-        // getAll(options) with direction is widely supported.
+        // For reverse queries on IDB 3.0+ browsers, uses getAll(options) with direction.
         const {valueMapper} = ctx;
         const index = getIndexOrStore(ctx, ctx.table.core.schema);
         return ctx.table.core.query({
           trans,
           limit: ctx.limit,
           values: true,
+          reverse: ctx.dir === 'prev',
           query: {
             index,
             range: ctx.range
@@ -382,16 +382,16 @@ export class Collection implements ICollection {
    **/
   primaryKeys(cb?) : PromiseExtended<IndexableType[]> {
     var ctx = this._ctx;
-    if (ctx.dir === 'next' && isPlainKeyRange(ctx, true) && ctx.limit > 0) {
+    if (isPlainKeyRange(ctx, true) && ctx.limit > 0) {
       // Special optimization using IDBObjectStore.getAllKeys() or IDBKeyRange.getAllKeys().
-      // For reverse queries, we fall back to cursor iteration until IDB 3.0
-      // getAllKeys(options) with direction is widely supported.
+      // For reverse queries on IDB 3.0+ browsers, uses getAllKeys(options) with direction.
       return this._read(trans => {
         var index = getIndexOrStore(ctx, ctx.table.core.schema);
         return ctx.table.core.query({
           trans,
           values: false,
           limit: ctx.limit,
+          reverse: ctx.dir === 'prev',
           query: {
             index,
             range: ctx.range

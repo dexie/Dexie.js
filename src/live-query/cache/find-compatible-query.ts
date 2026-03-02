@@ -39,6 +39,7 @@ export function findCompatibleQuery(
         (entry) =>
           (entry.req as DBCoreQueryRequest).limit === req.limit &&
           (entry.req as DBCoreQueryRequest).values === req.values &&
+          (entry.req as DBCoreQueryRequest).reverse === req.reverse &&
           areRangesEqual(entry.req.query.range, req.query.range)
       );
       if (equalEntry)
@@ -52,6 +53,7 @@ export function findCompatibleQuery(
         const limit = 'limit' in entry.req ? entry.req.limit : Infinity;
         return (
           limit >= req.limit &&
+          (entry.req as DBCoreQueryRequest).reverse === req.reverse &&
           (req.values ? (entry.req as DBCoreQueryRequest).values : true) &&
           isSuperRange(entry.req.query.range, req.query.range)
         );
