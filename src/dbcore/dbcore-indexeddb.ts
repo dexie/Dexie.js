@@ -288,7 +288,7 @@ export function createDBCore (
       });
     }
   
-    function query (hasGetAll: boolean) {
+    function query (hasGetAll: boolean, hasIdb3Features: boolean) {
       return (request: DBCoreQueryRequest) => {
         return new Promise<DBCoreQueryResponse>((resolve, reject) => {
           resolve = wrap(resolve);
@@ -389,7 +389,7 @@ export function createDBCore (
         });
       },
 
-      query: query(hasGetAll),
+      query: query(hasGetAll, hasIdb3Features),
       
       openCursor,
 
