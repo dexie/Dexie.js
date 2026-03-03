@@ -119,7 +119,9 @@ export type DexieErrors = {
   QuotaExceeded: 'QuotaExceededError',
 
   // https://dexie.org/docs/DexieErrors/Dexie.DataCloneError
-  DataClone: 'DataCloneError'
+  DataClone: 'DataCloneError',
+
+  MaxConnectionsReached: 'MaxConnectionsReachedError'
 }
 
 /** ModifyError

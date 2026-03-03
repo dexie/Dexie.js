@@ -25,7 +25,7 @@ import { nop, promisableChain } from '../../functions/chaining-functions';
 import Promise, { PSD, globalPSD } from '../../helpers/promise';
 import { extend, override, keys, hasOwn } from '../../functions/utils';
 import Events from '../../helpers/Events';
-import { maxString, connections, READONLY, READWRITE } from '../../globals/constants';
+import { maxString, connections, READONLY, READWRITE, DEFAULT_MAX_CONNECTIONS } from '../../globals/constants';
 import { getMaxKey } from '../../functions/quirks';
 import { exceptions } from '../../errors';
 import { lowerVersionFirst } from '../version/schema-helpers';
@@ -92,6 +92,7 @@ export class Dexie implements IDexie {
   Version: VersionConstructor;
   Transaction: TransactionConstructor;
   static disableBfCache?: boolean;
+  static maxConnections = DEFAULT_MAX_CONNECTIONS;
 
   constructor(name: string, options?: DexieOptions) {
     const deps = (Dexie as any as DexieConstructor).dependencies;
@@ -326,8 +327,7 @@ export class Dexie implements IDexie {
   _close(): void {
     this.on.close.fire(new CustomEvent('close'));
     const state = this._state;
-    const idx = connections.indexOf(this);
-    if (idx >= 0) connections.splice(idx, 1);
+    connections.delete(this);
     if (this.idbdb) {
       try { this.idbdb.close(); } catch (e) { }
       this.idbdb = null;

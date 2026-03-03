@@ -111,8 +111,12 @@ export function dexieOpen (db: Dexie) {
           // as well as absurd upgrade version quirk for Safari.
         }
         
-        connections.push(db); // Used for emulating versionchange event on IE/Edge/Safari.
-        
+        if (connections.length >= Dexie.maxConnections) {
+          throw new exceptions.MaxConnectionsReached();
+        }
+
+        connections.push(db);
+
         idbdb.onversionchange = wrap(ev => {
             state.vcFired = true; // detect implementations that not support versionchange (IE/Edge/Safari)
             db.on("versionchange").fire(ev);

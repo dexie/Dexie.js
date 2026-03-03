@@ -51,6 +51,7 @@ export interface DexieConstructor extends DexieExceptionClasses {
   asap(fn: Function) : void; //?
   maxKey: Array<Array<void>> | string;
   minKey: number;
+  maxConnections: number;
   exists(dbName: string) : Promise<boolean>;
   delete(dbName: string): Promise<void>;
   dependencies: DexieDOMDependencies;

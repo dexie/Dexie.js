@@ -11,7 +11,9 @@ if (typeof addEventListener !== 'undefined') {
     if (!Dexie.disableBfCache && event.persisted) {
       if (debug) console.debug('Dexie: handling persisted pagehide');
       bc?.close();
-      for (const db of connections) {
+      // Use [...connections] to iterate on a copy of the connections array,
+      // since the original array will be modified during iteration.
+      for (const db of [...connections]) {
         db.close({disableAutoOpen: false});
       }
     }
