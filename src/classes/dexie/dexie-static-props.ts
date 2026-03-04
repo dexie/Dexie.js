@@ -24,7 +24,7 @@ import { extendObservabilitySet } from '../../live-query/extend-observability-se
 import { domDeps } from './dexie-dom-dependencies';
 import { cmp } from '../../functions/cmp';
 import { cache } from '../../live-query/cache/cache';
-import { getConnectionsArray } from '../../globals/connections';
+import { connections } from '../../globals/connections';
 
 /* (Dexie) is an instance of DexieConstructor, as defined in public/types/dexie-constructor.d.ts
 *  (new Dexie()) is an instance of Dexie, as defined in public/types/dexie.d.ts
@@ -197,7 +197,7 @@ props(Dexie, {
   addons: [],
   // Global DB connection list
   connections: {
-    get: getConnectionsArray
+    get: connections.toArray
   },
 
   //MultiModifyError: exceptions.Modify, // Obsolete!

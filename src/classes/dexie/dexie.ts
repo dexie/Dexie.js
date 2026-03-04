@@ -46,7 +46,7 @@ import { observabilityMiddleware } from '../../live-query/observability-middlewa
 import { cacheExistingValuesMiddleware } from '../../dbcore/cache-existing-values-middleware';
 import { cacheMiddleware } from "../../live-query/cache/cache-middleware";
 import { vipify } from "../../helpers/vipify";
-import { getConnectionsArray, removeConnection } from "../../globals/connections";
+import { connections } from "../../globals/connections";
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -228,7 +228,7 @@ export class Dexie implements IDexie {
       this.on("blocked").fire(ev);
       // Workaround (not fully*) for missing "versionchange" event in IE,Edge and Safari:
       // TODO: Should be safe to remove this workaround below! Do it in another PR.
-      getConnectionsArray()
+      connections.toArray()
         .filter(c => c.name === this.name && c !== this && !c._state.vcFired)
         .map(c => c.on("versionchange").fire(ev));
     }
@@ -329,7 +329,7 @@ export class Dexie implements IDexie {
   _close(): void {
     this.on.close.fire(new CustomEvent('close'));
     const state = this._state;
-    removeConnection(this);
+    connections.remove(this);
     if (this.idbdb) {
       try { this.idbdb.close(); } catch (e) { }
       this.idbdb = null;

@@ -4,7 +4,7 @@ import { rejection } from '../../helpers/promise';
 import { exceptions } from '../../errors';
 import { eventRejectHandler, preventDefault } from '../../functions/event-wrappers';
 import Promise, { wrap } from '../../helpers/promise';
-import { addConnection, removeConnection } from '../../globals/connections';
+import { connections } from '../../globals/connections';
 import { runUpgraders, readGlobalSchema, adjustToExistingIndexNames, verifyInstalledSchema, patchCurrentVersion } from '../version/schema-helpers';
 import { safariMultiStoreFix } from '../../functions/quirks';
 import { _onDatabaseCreated } from '../../helpers/database-enumerator';
@@ -111,7 +111,7 @@ export function dexieOpen (db: Dexie) {
           // as well as absurd upgrade version quirk for Safari.
         }
         
-        addConnection(db);
+        connections.add(db);
 
         idbdb.onversionchange = wrap(ev => {
             state.vcFired = true; // detect implementations that not support versionchange (IE/Edge/Safari)

@@ -1,5 +1,5 @@
 import { Dexie } from "./classes/dexie";
-import { getConnectionsArray } from "./globals/connections";
+import { connections } from "./globals/connections";
 import { debug } from "./helpers/debug";
 import { RangeSet } from "./helpers/rangeset";
 import { bc, createBC } from "./live-query/enable-broadcast";
@@ -11,9 +11,7 @@ if (typeof addEventListener !== 'undefined') {
     if (!Dexie.disableBfCache && event.persisted) {
       if (debug) console.debug('Dexie: handling persisted pagehide');
       bc?.close();
-      // Use [...connections] to iterate on a copy of the connections array,
-      // since the original array will be modified during iteration.
-      for (const db of getConnectionsArray()) {
+      for (const db of connections.toArray()) {
         db.close({disableAutoOpen: false});
       }
     }
