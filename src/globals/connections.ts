@@ -4,7 +4,6 @@ export const connections = createConnectionsManager();
 
 function createConnectionsManager() {
   if (typeof FinalizationRegistry !== 'undefined' && typeof WeakRef !== 'undefined') {
-    let _array: Dexie[] = null;
     const _refs = new Set<WeakRef<Dexie>>();
     const _registry = new FinalizationRegistry((ref: WeakRef<Dexie>) => {
       _refs.delete(ref);
@@ -12,15 +11,12 @@ function createConnectionsManager() {
 
 
     const toArray = (): ReadonlyArray<Dexie> => {
-      if (_array) return _array;
-      _array = Array.from(_refs)
+      return Array.from(_refs)
         .map(ref => ref.deref())
         .filter((db): db is Dexie => db !== undefined);
-      return _array;
     }
 
     const add = (db: Dexie) => {
-      _array = null;
       const ref = new WeakRef(db._novip);
       _refs.add(ref);
       _registry.register(db._novip, ref, ref);
@@ -34,7 +30,6 @@ function createConnectionsManager() {
 
     const remove = (db: Dexie | undefined) => {
       if (!db) return;
-      _array = null;
       const iterator = _refs.values();
       let result = iterator.next();
 
