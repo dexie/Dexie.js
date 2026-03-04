@@ -25,6 +25,7 @@ export function addConnection(db: Dexie) {
 }
 
 export function removeConnection(db: Dexie | undefined) {
+  if (!db) return;
   const iterator = _refs.values();
   let result = iterator.next();
 
