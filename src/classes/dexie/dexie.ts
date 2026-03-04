@@ -25,7 +25,7 @@ import { nop, promisableChain } from '../../functions/chaining-functions';
 import Promise, { PSD, globalPSD } from '../../helpers/promise';
 import { extend, override, keys, hasOwn } from '../../functions/utils';
 import Events from '../../helpers/Events';
-import { maxString, connections, READONLY, READWRITE, DEFAULT_MAX_CONNECTIONS } from '../../globals/constants';
+import { maxString, READONLY, READWRITE, DEFAULT_MAX_CONNECTIONS } from '../../globals/constants';
 import { getMaxKey } from '../../functions/quirks';
 import { exceptions } from '../../errors';
 import { lowerVersionFirst } from '../version/schema-helpers';
@@ -46,6 +46,7 @@ import { observabilityMiddleware } from '../../live-query/observability-middlewa
 import { cacheExistingValuesMiddleware } from '../../dbcore/cache-existing-values-middleware';
 import { cacheMiddleware } from "../../live-query/cache/cache-middleware";
 import { vipify } from "../../helpers/vipify";
+import { getConnectionsArray, removeConnection } from "../../globals/connections";
 
 export interface DbReadyState {
   dbOpenError: any;
@@ -92,7 +93,6 @@ export class Dexie implements IDexie {
   Version: VersionConstructor;
   Transaction: TransactionConstructor;
   static disableBfCache?: boolean;
-  static maxConnections = DEFAULT_MAX_CONNECTIONS;
 
   constructor(name: string, options?: DexieOptions) {
     const deps = (Dexie as any as DexieConstructor).dependencies;
@@ -104,6 +104,7 @@ export class Dexie implements IDexie {
       indexedDB: deps.indexedDB,      // Backend IndexedDB api. Default to browser env.
       IDBKeyRange: deps.IDBKeyRange,  // Backend IDBKeyRange api. Default to browser env.
       cache: 'cloned', // Default to cloned for backward compatibility. For best performance and least memory consumption use 'immutable'.
+      maxConnections: DEFAULT_MAX_CONNECTIONS, // Default max connections
       ...options
     };  
     this._deps = {
@@ -226,7 +227,8 @@ export class Dexie implements IDexie {
     this._fireOnBlocked = ev => {
       this.on("blocked").fire(ev);
       // Workaround (not fully*) for missing "versionchange" event in IE,Edge and Safari:
-      connections
+      // TODO: Should be safe to remove this workaround below! Do it in another PR.
+      getConnectionsArray()
         .filter(c => c.name === this.name && c !== this && !c._state.vcFired)
         .map(c => c.on("versionchange").fire(ev));
     }
@@ -327,7 +329,7 @@ export class Dexie implements IDexie {
   _close(): void {
     this.on.close.fire(new CustomEvent('close'));
     const state = this._state;
-    connections.delete(this);
+    removeConnection(this);
     if (this.idbdb) {
       try { this.idbdb.close(); } catch (e) { }
       this.idbdb = null;

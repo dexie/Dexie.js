@@ -1,5 +1,5 @@
 import { Dexie } from "./classes/dexie";
-import { connections } from "./globals/constants";
+import { getConnectionsArray } from "./globals/connections";
 import { debug } from "./helpers/debug";
 import { RangeSet } from "./helpers/rangeset";
 import { bc, createBC } from "./live-query/enable-broadcast";
@@ -13,7 +13,7 @@ if (typeof addEventListener !== 'undefined') {
       bc?.close();
       // Use [...connections] to iterate on a copy of the connections array,
       // since the original array will be modified during iteration.
-      for (const db of [...connections]) {
+      for (const db of getConnectionsArray()) {
         db.close({disableAutoOpen: false});
       }
     }

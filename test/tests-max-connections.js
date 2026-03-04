@@ -11,20 +11,18 @@ module("maxConnections", {
         equal(Dexie.connections.length, 0, "No connections initially");
     },
     teardown: function* () {
-        Dexie.maxConnections = DEFAULT_MAX_CONNECTIONS; // Restore default
         yield Dexie.delete("TestDB");
     }
 });
 
 spawnedTest("Should limit the number of connections", function* () {
     const max = 3;
-    Dexie.maxConnections = max;
     const dbs = [];
     try {
         equal(dbs.length, 0, "No connections initially");
         
         for (let i = 0; i < max; ++i) {
-            const db = new Dexie("TestDB");
+            const db = new Dexie("TestDB", { maxConnections: max });
             db.version(1).stores({foo: 'id'});
             yield db.open();
             dbs.push(db);
@@ -32,14 +30,14 @@ spawnedTest("Should limit the number of connections", function* () {
 
         equal(Dexie.connections.length, max, "Should have reached max connections");
 
-        const extraDb = new Dexie("TestDB");
+        const extraDb = new Dexie("TestDB", { maxConnections: max });
         extraDb.version(1).stores({foo: 'id'});
         
         try {
             yield extraDb.open();
-            ok(false, "Should have thrown MaxConnectionsReachedError");
+            equal(Dexie.connections.length, max, "Should not have exceeded max connections");
         } catch (e) {
-            equal(e.name, "MaxConnectionsReachedError", "Should throw MaxConnectionsReachedError: " + e.message);
+            equal(e.name, "MaxConnectionsReachedError", "Could throw MaxConnectionsReachedError: " + e.message);
         } finally {
             yield extraDb.close();
         }
@@ -62,14 +60,13 @@ spawnedTest("Open connections should be tracked", function* () {
     }
 
     const max = 20;
-    Dexie.maxConnections = max;
     const dbs = [];
     
     try {
         equal(Dexie.connections.length, 0, "No tracked connections initially");
 
         for (let i = 0; i < 5; ++i) {
-            const db = new Dexie("TestDB");
+            const db = new Dexie("TestDB", { maxConnections: max });
             db.version(1).stores({foo: 'id'});
             yield db.open();
             dbs.push(db);

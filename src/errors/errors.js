@@ -16,8 +16,7 @@ var dexieErrorNames = [
     'Internal',
     'DatabaseClosed',
     'PrematureCommit',
-    'ForeignAwait',
-    'MaxConnectionsReached'
+    'ForeignAwait'
 ];
 
 var idbDomErrorNames = [
