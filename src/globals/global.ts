@@ -1,5 +1,3 @@
-import { Dexie } from "../classes/dexie";
-
 declare var global;
 export const _global: any =
     typeof globalThis !== 'undefined' ? globalThis :
