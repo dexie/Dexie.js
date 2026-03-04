@@ -23,7 +23,7 @@ function createConnectionsManager() {
       _array = null;
       const ref = new WeakRef(db._novip);
       _refs.add(ref);
-      _registry.register(db, ref, ref);
+      _registry.register(db._novip, ref, ref);
       if (_refs.size > db._options.maxConnections) {
         // Remove the oldest connection (the one that was added first)
         const oldestRef = _refs.values().next().value;
@@ -53,11 +53,11 @@ function createConnectionsManager() {
     const connections: Dexie[] = [];
     const toArray = (): ReadonlyArray<Dexie> => connections;
     const add = (db: Dexie) => {
-      connections.push(db);
+      connections.push(db._novip);
     };
     const remove = (db: Dexie | undefined) => {
       if (!db) return;
-      const index = connections.indexOf(db);
+      const index = connections.indexOf(db._novip);
       if (index !== -1) {
         connections.splice(index, 1);
       }
