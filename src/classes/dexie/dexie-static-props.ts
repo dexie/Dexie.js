@@ -12,7 +12,7 @@ import { rejection } from '../../helpers/promise';
 import { awaitIterator } from '../../helpers/yield-support';
 import Promise from '../../helpers/promise';
 import * as Debug from '../../helpers/debug';
-import { dexieStackFrameFilter, minKey, connections, DEXIE_VERSION } from '../../globals/constants';
+import { dexieStackFrameFilter, minKey, DEXIE_VERSION } from '../../globals/constants';
 import Events from '../../helpers/Events';
 import { exceptions } from '../../errors';
 import { errnames } from '../../errors';
@@ -24,6 +24,7 @@ import { extendObservabilitySet } from '../../live-query/extend-observability-se
 import { domDeps } from './dexie-dom-dependencies';
 import { cmp } from '../../functions/cmp';
 import { cache } from '../../live-query/cache/cache';
+import { connections } from '../../globals/connections';
 
 /* (Dexie) is an instance of DexieConstructor, as defined in public/types/dexie-constructor.d.ts
 *  (new Dexie()) is an instance of Dexie, as defined in public/types/dexie.d.ts
@@ -195,7 +196,9 @@ props(Dexie, {
   // Addon registry
   addons: [],
   // Global DB connection list
-  connections: connections,
+  connections: {
+    get: connections.toArray
+  },
 
   //MultiModifyError: exceptions.Modify, // Obsolete!
   errnames: errnames,

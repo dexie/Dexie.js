@@ -1,5 +1,5 @@
 import { Dexie } from "./classes/dexie";
-import { connections } from "./globals/constants";
+import { connections } from "./globals/connections";
 import { debug } from "./helpers/debug";
 import { RangeSet } from "./helpers/rangeset";
 import { bc, createBC } from "./live-query/enable-broadcast";
@@ -11,7 +11,7 @@ if (typeof addEventListener !== 'undefined') {
     if (!Dexie.disableBfCache && event.persisted) {
       if (debug) console.debug('Dexie: handling persisted pagehide');
       bc?.close();
-      for (const db of connections) {
+      for (const db of connections.toArray()) {
         db.close({disableAutoOpen: false});
       }
     }

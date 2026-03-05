@@ -3,7 +3,7 @@ import { DexieConstructor } from './public/types/dexie-constructor';
 import { DexiePromise } from './helpers/promise';
 import { mapError } from './errors';
 import * as Debug from './helpers/debug';
-import { dexieStackFrameFilter } from './globals/constants';
+import { dexieStackFrameFilter, DEFAULT_MAX_CONNECTIONS } from './globals/constants';
 
 // Generate all static properties such as Dexie.maxKey etc
 // (implement interface DexieConstructor):
@@ -27,7 +27,7 @@ DexiePromise.rejectionMapper = mapError;
 Debug.setDebug(Debug.debug, dexieStackFrameFilter);
 
 export { RangeSet, mergeRanges, rangesOverlap } from "./helpers/rangeset";
-export { Dexie, liveQuery }; // Comply with public/index.d.ts.
+export { Dexie, liveQuery, DEFAULT_MAX_CONNECTIONS }; // Comply with public/index.d.ts.
 export { Entity };
 export { cmp };
 export { PropModification, replacePrefix, add, remove };
