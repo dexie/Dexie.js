@@ -30,21 +30,20 @@ export const isBlobRef = isBlobRefFromResolve;
  * - Single typeTag call per check
  */
 
-// Static Set for O(1) lookup of binary type tags
-const BINARY_TYPE_TAGS = new Set([
-  'Blob', 'File', 'ArrayBuffer',
-  'Int8Array', 'Uint8Array', 'Uint8ClampedArray',
-  'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array',
-  'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array',
-  'DataView'
-]);
-
 // TypedArray/DataView tags for size check
 const ARRAYBUFFER_VIEW_TAGS = new Set([
   'Int8Array', 'Uint8Array', 'Uint8ClampedArray',
   'Int16Array', 'Uint16Array', 'Int32Array', 'Uint32Array',
   'Float32Array', 'Float64Array', 'BigInt64Array', 'BigUint64Array',
   'DataView'
+]);
+
+// Static Set for O(1) lookup of binary type tags
+const BINARY_TYPE_TAGS = new Set([
+  'Blob',
+  'File',
+  'ArrayBuffer',
+  ...ARRAYBUFFER_VIEW_TAGS,
 ]);
 
 /**
