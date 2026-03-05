@@ -1,24 +1,8 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import Dexie from 'dexie';
 import { bulkUpdate } from '../helpers/bulkUpdate';
-import { DBOperationsSet, hasTSONRefs } from 'dexie-cloud-common';
-import { hasBlobRefs } from './blobResolve';
+import { DBOperationsSet } from 'dexie-cloud-common';
 
-/**
- * Mark object with $hasBlobRefs = 1 if it contains any BlobRefs or TSONRefs.
- * This enables eager blob downloading and lazy resolution to find these objects.
- * 
- * After TSON parsing with blobRefTypeDefs, large blobs are represented as TSONRef
- * objects. We need to detect both raw BlobRefs (from older code paths) and TSONRefs.
- */
-function markBlobRefs(value: unknown): void {
-  if (value && typeof value === 'object' && (value as any).constructor === Object) {
-    // Check for TSONRef (from TSON parsing with blobRefTypeDefs) or raw BlobRef objects
-    if (hasTSONRefs(value) || hasBlobRefs(value)) {
-      (value as any).$hasBlobRefs = 1;
-    }
-  }
-}
 
 export async function applyServerChanges(
   changes: DBOperationsSet<string>,
@@ -61,8 +45,6 @@ export async function applyServerChanges(
       const keys = mut.keys.map(keyDecoder);
       switch (mut.type) {
         case 'insert':
-          // Mark objects that contain BlobRefs for lazy/eager resolution
-          mut.values.forEach(markBlobRefs);
           if (primaryKey.outbound) {
             await table.bulkAdd(mut.values, keys);
           } else {
@@ -74,8 +56,6 @@ export async function applyServerChanges(
           }
           break;
         case 'upsert':
-          // Mark objects that contain BlobRefs for lazy/eager resolution
-          mut.values.forEach(markBlobRefs);
           if (primaryKey.outbound) {
             await table.bulkPut(mut.values, keys);
           } else {
