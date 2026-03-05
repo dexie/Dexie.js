@@ -40,13 +40,7 @@ export async function downloadUnresolvedBlobs(
   progress$: BehaviorSubject<BlobProgress>,
   signal?: AbortSignal
 ): Promise<void> {
-  // Use both console.log AND dispatchEvent for debugging
-  const debugLog = (msg: string) => {
-    console.log(`[dexie-cloud] ${msg}`);
-    if (typeof window !== 'undefined') {
-      window.dispatchEvent(new CustomEvent('dexie-cloud-debug', { detail: msg }));
-    }
-  };
+  const debugLog = (msg: string) => console.debug(`[dexie-cloud] ${msg}`);
   
   debugLog('Eager download: Starting...');
   

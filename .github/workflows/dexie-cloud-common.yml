@@ -7,11 +7,13 @@ on:
       - master
     paths:
       - 'libs/dexie-cloud-common/**'
+      - 'addons/dexie-cloud/**'
       - '.github/workflows/dexie-cloud-common.yml'
   pull_request:
     types: [opened, synchronize, reopened]
     paths:
       - 'libs/dexie-cloud-common/**'
+      - 'addons/dexie-cloud/**'
       - '.github/workflows/dexie-cloud-common.yml'
 
 jobs:

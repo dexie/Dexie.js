@@ -72,7 +72,8 @@ export function createRollupConfigs(entry, outputName) {
   const PRODUCTION_BUILD_PLUGINS = [
     terser({
       compress: {
-        drop_console: false,
+        // Set DEXIE_CLOUD_DEBUG=1 to preserve console.log (useful for E2E test builds)
+        drop_console: !process.env.DEXIE_CLOUD_DEBUG,
         drop_debugger: true,
       },
       mangle: true,

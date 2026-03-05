@@ -28,7 +28,6 @@ export async function syncWithServer(
   clientIdentity: string,
   currentUser: UserLogin
 ): Promise<SyncResponse> {
-  console.log('DEXIE-CLOUD DEBUG: ======== syncWithServer CALLED ========');
   //
   // Push changes to server using fetch
   //
@@ -100,33 +99,7 @@ export async function syncWithServer(
     default:
     case 'application/json': {
       const text = await res.text();
-      // Debug: Log raw response size and check for blob refs in raw JSON
-      const hasRawBlobRef = text.includes('"ref":') && text.includes('"$t":');
-      console.log(`DEXIE-CLOUD DEBUG syncWithServer: Raw response size=${text.length}, hasRawBlobRef=${hasRawBlobRef}`);
-      
       const syncRes = TSON.parse(text);
-      
-      // Debug: Check changes count
-      const changesCount = syncRes.changes?.length || 0;
-      console.log(`DEXIE-CLOUD DEBUG syncWithServer: changesCount=${changesCount}`);
-      
-      // Debug: Check if blob refs were properly parsed
-      if (syncRes.changes) {
-        for (const change of syncRes.changes) {
-          for (const mut of change.muts || []) {
-            for (const val of mut.values || []) {
-              if (val && typeof val === 'object') {
-                for (const [k, v] of Object.entries(val)) {
-                  if (v && typeof v === 'object' && ('ref' in v || '$t' in v || 'type' in v)) {
-                    console.log(`DEXIE-CLOUD DEBUG syncWithServer: ${change.table}.${k}`, 
-                      { type: (v as any).constructor?.name, keys: Object.keys(v) });
-                  }
-                }
-              }
-            }
-          }
-        }
-      }
       return syncRes;
     }
   }
