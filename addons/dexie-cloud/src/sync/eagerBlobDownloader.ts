@@ -13,7 +13,7 @@ import {
   BlobRef,
   isBlobRef,
   hasBlobRefs,
-  hasUnresolvedRefs,
+  hasUnresolvedBlobRefs,
   isSerializedTSONRef,
   resolveAllBlobRefs,
   ResolvedBlob,
@@ -88,7 +88,7 @@ export async function downloadUnresolvedBlobs(
           if (signal?.aborted) break;
 
           // Skip if no unresolved refs (shouldn't happen but be safe - we're not in transaction)
-          if (!hasUnresolvedRefs(obj)) continue;
+          if (!hasUnresolvedBlobRefs(obj)) continue;
 
           // Get primary key
           const primaryKey = table.schema.primKey;
