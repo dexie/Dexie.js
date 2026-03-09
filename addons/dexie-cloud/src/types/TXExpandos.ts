@@ -8,6 +8,7 @@ export interface TXExpandos {
   schema: DexieCloudSchema
   disableChangeTracking?: boolean;
   disableAccessControl?: boolean;
+  disableBlobResolve?: boolean;
   mutationsAdded?: boolean;
   opCount: number;
 }

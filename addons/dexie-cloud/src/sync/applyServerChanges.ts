@@ -3,6 +3,7 @@ import Dexie from 'dexie';
 import { bulkUpdate } from '../helpers/bulkUpdate';
 import { DBOperationsSet } from 'dexie-cloud-common';
 
+
 export async function applyServerChanges(
   changes: DBOperationsSet<string>,
   db: DexieCloudDB

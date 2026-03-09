@@ -3,7 +3,7 @@
   "version": "4.3.9",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "type": "module",
-  "module": "dist/modern/dexie-cloud-addon.min.js",
+  "module": "dist/modern/dexie-cloud-addon.js",
   "homepage": "https://dexie.org/cloud/docs/dexie-cloud-addon",
   "exports": {
     ".": {
@@ -57,7 +57,8 @@
     "test-unit": "karma start test/unit/karma.conf.cjs --single-run",
     "build": "rollup -c tools/build-configs/rollup.config.mjs",
     "watch": "rollup -c tools/build-configs/rollup.config.mjs --watch",
-    "clean": "rm -rf tools/tmp dist test/unit/bundle.*"
+    "clean": "rm -rf tools/tmp dist test/unit/bundle.*",
+    "prepack": "pnpm run build"
   },
   "just-build": {
     "default": [

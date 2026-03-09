@@ -12,14 +12,10 @@ export { setTypeDef } from "./Set.js";
 export { typedArrayTypeDefs } from "./TypedArray.js";
 export { undefinedTypeDef } from "./undefined.js";
 
-// Blob reference type definitions (for blob offloading)
+// Blob reference context (for blob offloading serialization)
 export {
   BLOB_THRESHOLD,
   BlobStore,
   BlobRefContext,
   createBlobRefContext,
-  arrayBufferBlobRefDef,
-  blobBlobRefDef,
-  typedArrayBlobRefDefs,
-  blobRefTypeDefs,
 } from "./BlobRef.js";
