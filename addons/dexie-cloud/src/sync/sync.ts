@@ -28,9 +28,11 @@ import { applyServerChanges } from './applyServerChanges';
 import { checkSyncRateLimitDelay } from './ratelimit';
 import { listYClientMessagesAndStateVector } from '../yjs/listYClientMessagesAndStateVector';
 import { applyYServerMessages } from '../yjs/applyYMessages';
+import { hasLargeBlobsInOperations, offloadBlobsInOperations } from './blobOffloading';
 import { updateYSyncStates } from '../yjs/updateYSyncStates';
 import { downloadYDocsFromServer } from '../yjs/downloadYDocsFromServer';
 import { UpdateSpec } from 'dexie';
+import { loadCachedAccessToken } from './loadCachedAccessToken';
 
 export const CURRENT_SYNC_WORKER = 'currentSyncWorker';
 
@@ -203,11 +205,24 @@ async function _sync(
   const clientIdentity = syncState?.clientIdentity || randomString(16);
 
   //
+  // Offload large blobs to blob storage before sync
+  //
+  let processedChangeSet = clientChangeSet;
+  const hasLargeBlobs = hasLargeBlobsInOperations(clientChangeSet);
+  if (hasLargeBlobs) {
+    processedChangeSet = await offloadBlobsInOperations(
+      clientChangeSet,
+      databaseUrl,
+      () => loadCachedAccessToken(db)
+    );
+  }
+
+  //
   // Push changes to server
   //
   throwIfCancelled(cancelToken);
   const res = await syncWithServer(
-    clientChangeSet,
+    processedChangeSet,
     yMessages,
     syncState,
     baseRevs,

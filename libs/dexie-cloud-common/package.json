@@ -9,6 +9,7 @@
   "scripts": {
     "build": "tsc",
     "prepare": "tsc",
+    "prepack": "pnpm run build",
     "test": "jest",
     "tsver": "tsc --version"
   },

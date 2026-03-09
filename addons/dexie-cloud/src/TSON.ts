@@ -1,10 +1,16 @@
 import { 
   TypesonSimplified, 
   undefinedTypeDef,
-  builtInTypeDefs,
-  TypeDefSet,
-  fileTypeDef
+  blobTypeDef,
+  typedArrayTypeDefs,
+  arrayBufferTypeDef,
+  fileTypeDef,
+  dateTypeDef,
+  setTypeDef,
+  mapTypeDef,
+  numberTypeDef,
 } from 'dexie-cloud-common';
+import { TypeDefSet } from 'dexie-cloud-common';
 import { PropModSpec, PropModification } from 'dexie';
 
 // Since server revisions are stored in bigints, we need to handle clients without
@@ -91,4 +97,17 @@ const defs: TypeDefSet = {
   },
 };
 
-export const TSON = TypesonSimplified(builtInTypeDefs, defs);
+export const TSON = TypesonSimplified(
+  // Standard type definitions - TSON is transparent to BlobRefs
+  // BlobRefs use _bt convention and are handled by blobResolveMiddleware, not TSON
+  typedArrayTypeDefs,
+  arrayBufferTypeDef,
+  blobTypeDef,
+  // Non-binary built-in types
+  numberTypeDef,
+  dateTypeDef,
+  setTypeDef,
+  mapTypeDef,
+  // Custom type definitions
+  defs
+);

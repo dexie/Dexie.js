@@ -75,7 +75,6 @@ export function syncIfPossible(
         sync(db, cloudOptions, cloudSchema, options)
       );
       ongoingSyncs.delete(db);
-      console.debug('Done sync');
     } catch (error) {
       ongoingSyncs.delete(db);
       console.error(`Failed to sync client changes`, error);

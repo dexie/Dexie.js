@@ -11,21 +11,25 @@ describe('TypesonSimplified', () => {
       expect(TSON.parse(json)).toBe(input);
     });
 
-    test('handles numbers', () => {
+    test('handles plain numbers same as JSON', () => {
+      expect(TSON.stringify(88)).toBe(JSON.stringify(88));
+      expect(TSON.parse('88')).toBe(88);
       expect(TSON.parse(TSON.stringify(42))).toBe(42);
       expect(TSON.parse(TSON.stringify(3.14159))).toBe(3.14159);
-      // Note: -0 becomes 0 in JSON (standard JSON limitation)
-      expect(TSON.parse(TSON.stringify(Infinity))).toBe(Infinity);
-      expect(TSON.parse(TSON.stringify(-Infinity))).toBe(-Infinity);
-      expect(Number.isNaN(TSON.parse(TSON.stringify(NaN)))).toBe(true);
     });
 
-    test('handles booleans', () => {
-      expect(TSON.parse(TSON.stringify(true))).toBe(true);
-      expect(TSON.parse(TSON.stringify(false))).toBe(false);
+    test('handles booleans same as JSON', () => {
+      expect(TSON.stringify(false)).toBe(JSON.stringify(false));
+      expect(TSON.stringify(true)).toBe(JSON.stringify(true));
+      expect(TSON.parse('false')).toStrictEqual(false);
+      expect(TSON.parse('true')).toStrictEqual(true);
     });
 
-    test('handles null', () => {
+    test('handles null same as JSON', () => {
+      expect(TSON.stringify(null)).toBe('null');
+      expect(TSON.parse('null')).toBeNull();
+      const objWithNullValue = { foo: null };
+      expect(TSON.stringify(objWithNullValue)).toBe(JSON.stringify(objWithNullValue));
       expect(TSON.parse(TSON.stringify(null))).toBe(null);
     });
 
@@ -119,6 +123,26 @@ describe('TypesonSimplified', () => {
     });
   });
 
+  describe('special numbers', () => {
+    test('stringifies NaN with exact output', () => {
+      const tson = TSON.stringify(NaN);
+      expect(tson).toBe(JSON.stringify({ $t: 'number', v: 'NaN' }));
+      expect(Number.isNaN(TSON.parse(tson))).toBe(true);
+    });
+
+    test('stringifies Infinity with exact output', () => {
+      const tson = TSON.stringify(Infinity);
+      expect(tson).toBe(JSON.stringify({ $t: 'number', v: 'Infinity' }));
+      expect(TSON.parse(tson)).toBe(Infinity);
+    });
+
+    test('stringifies -Infinity with exact output', () => {
+      const tson = TSON.stringify(-Infinity);
+      expect(tson).toBe(JSON.stringify({ $t: 'number', v: '-Infinity' }));
+      expect(TSON.parse(tson)).toBe(-Infinity);
+    });
+  });
+
   describe('BigInt', () => {
     test('round-trips BigInt values', () => {
       const bigint = BigInt('9007199254740993'); // Larger than MAX_SAFE_INTEGER
@@ -145,6 +169,15 @@ describe('TypesonSimplified', () => {
       expect(back[2]).toBe(BigInt(-1));
       expect(back[3]).toBe(BigInt(16));
       expect(back[4]).toBe(golem96);
+      expect(tson).toBe(
+        JSON.stringify([
+          { $t: 'bigint', v: '0' },
+          { $t: 'bigint', v: '1' },
+          { $t: 'bigint', v: '-1' },
+          { $t: 'bigint', v: '16' },
+          { $t: 'bigint', v: '53169852434298556854127064950' },
+        ]),
+      );
     });
   });
 
@@ -385,6 +418,67 @@ describe('TypesonSimplified', () => {
       expect(result.id).toBe('test');
       expect(result.data).toBeInstanceOf(Uint8Array);
       expect(result.metadata.floats).toBeInstanceOf(Float64Array);
+    });
+  });
+
+  describe('TSON transparency (TSON through TSON)', () => {
+    // TSON must be 100% transparent: a POJO that happens to have a $t property
+    // matching a registered type must survive a TSON round-trip as a plain object,
+    // not be revived as that type. This is critical for blob offloading where the
+    // server stores BlobRefs as {$t: "Uint8Array", ref: "...", size: ...} and
+    // those POJOs must pass through TSON unchanged.
+
+    test('POJO with $t: "Date" is NOT revived as Date', () => {
+      const input = { $t: 'Date', foo: 'bar' };
+      const result = TSON.parse(TSON.stringify(input));
+      expect(result).toStrictEqual(input);
+      expect(result).not.toBeInstanceOf(Date);
+    });
+
+    test('POJO with $t: "ArrayBuffer" is NOT revived as ArrayBuffer', () => {
+      const input = { $t: 'ArrayBuffer', ref: 'abc123', size: 1024 };
+      const result = TSON.parse(TSON.stringify(input));
+      expect(result).toStrictEqual(input);
+      expect(result).not.toBeInstanceOf(ArrayBuffer);
+    });
+
+    test('POJO with $t: "Uint8Array" (BlobRef format) is NOT revived as Uint8Array', () => {
+      const input = { $t: 'Uint8Array', ref: '1:abc123', size: 4096 };
+      const result = TSON.parse(TSON.stringify(input));
+      expect(result).toStrictEqual(input);
+      expect(result).not.toBeInstanceOf(Uint8Array);
+    });
+
+    test('POJO with $t: "Blob" (BlobRef format) is NOT revived as Blob', () => {
+      const input = { $t: 'Blob', ref: '1:abc123', size: 8192, ct: 'image/png' };
+      const result = TSON.parse(TSON.stringify(input));
+      expect(result).toStrictEqual(input);
+    });
+
+    test('object containing BlobRef survives TSON round-trip unchanged', () => {
+      const input = {
+        id: 'doc1',
+        name: 'photo',
+        image: { $t: 'Uint8Array', ref: '1:blobid', size: 65536 },
+        $hasBlobRefs: 1,
+      };
+      const result = TSON.parse(TSON.stringify(input));
+      expect(result).toStrictEqual(input);
+      expect(result.image).not.toBeInstanceOf(Uint8Array);
+      expect(result.$hasBlobRefs).toBe(1);
+    });
+
+    test('running TSON.stringify output through TSON.parse again yields same result', () => {
+      // A real Uint8Array serialized by TSON, then passed through TSON again as a POJO
+      const arr = new Uint8Array([1, 2, 3]);
+      const tson1 = TSON.stringify(arr); // produces {"$t":"Uint8Array","$v":"AQID"}
+      const pojo = JSON.parse(tson1);     // plain POJO: {$t: "Uint8Array", $v: "AQID"}
+      // Now this POJO goes through TSON (simulating server→client scenario)
+      const tson2 = TSON.stringify(pojo);
+      const result = TSON.parse(tson2);
+      // Must come back as the same POJO, not a Uint8Array
+      expect(result).toStrictEqual(pojo);
+      expect(result).not.toBeInstanceOf(Uint8Array);
     });
   });
 

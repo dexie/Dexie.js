@@ -18,6 +18,7 @@ import { alertUser, interactWithUser } from './interactWithUser';
 import { InvalidLicenseError } from '../InvalidLicenseError';
 import { LoginHints } from '../DexieCloudAPI';
 import { OAuthRedirectError } from '../errors/OAuthRedirectError';
+import { MINUTES } from '../helpers/date-constants';
 
 export type FetchTokenCallback = (tokenParams: {
   public_key: string;
@@ -37,7 +38,7 @@ export async function loadAccessToken(
   } = currentUser;
   if (!accessToken) return null;
   const expTime = accessTokenExpiration?.getTime() ?? Infinity;
-  if (expTime > Date.now() && (currentUser.license?.status || 'ok') === 'ok') {
+  if (expTime > (Date.now() + 5 * MINUTES) && (currentUser.license?.status || 'ok') === 'ok') {
     return currentUser;
   }
   if (!refreshToken) {

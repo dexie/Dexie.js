@@ -52,7 +52,7 @@ export async function syncWithServer(
   }
 
   const syncRequest: SyncRequest = {
-    v: 2,
+    v: 3, // v3 = supports BlobRef
     dbID: syncState?.remoteDbId,
     clientIdentity,
     schema: schema || {},
