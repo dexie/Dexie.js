@@ -79,10 +79,14 @@ export function shouldOffloadBlob(value: unknown): value is Blob | ArrayBuffer |
   // Quick check: is this even a binary type?
   if (!BINARY_TYPE_TAGS.has(tag)) return false;
   
-  // Check size threshold based on type
+  // Blob/File: always offload regardless of size.
+  // This ensures blobs are never stored inline in IndexedDB, which avoids
+  // issues with synchronous blob reading (e.g. in service workers where
+  // XMLHttpRequest is unavailable — see #2182).
   if (tag === 'Blob' || tag === 'File') {
-    return (value as Blob).size >= BLOB_OFFLOAD_THRESHOLD;
+    return true;
   }
+  // ArrayBuffer/TypedArray/DataView: only offload above threshold
   if (tag === 'ArrayBuffer') {
     return (value as ArrayBuffer).byteLength >= BLOB_OFFLOAD_THRESHOLD;
   }
