@@ -126,3 +126,39 @@ promisedTest("export-format", async() => {
 
   await Dexie.delete(DATABASE_NAME);
 });
+
+// Regression test for https://github.com/dexie/Dexie.js/issues/2105
+// Non-ASCII (Chinese/Japanese) strings were corrupted during import because
+// blob slicing by byte offset could split multi-byte UTF-8 sequences at chunk
+// boundaries, producing replacement characters (U+FFFD / ��).
+promisedTest("unicode-roundtrip-no-corruption", async () => {
+  const UNICODE_DB = "dexie-export-import-unicode-test";
+  await Dexie.delete(UNICODE_DB);
+  const db = new Dexie(UNICODE_DB);
+  db.version(1).stores({ items: "++id,text" });
+
+  // Each Chinese character is 3 bytes in UTF-8, so 1000 repetitions × 1000 rows
+  // guarantees chunk boundaries fall inside multi-byte sequences for small chunk sizes.
+  const chineseText = "让我们说中文\n".repeat(1000);
+  const rows = Array.from({ length: 1000 }, (_, i) => ({ id: i + 1, text: chineseText }));
+  await db.table("items").bulkAdd(rows);
+
+  // Export then import with a tiny chunk size to force many boundary crossings.
+  const blob = await (db as any).export();
+  db.close();
+  await Dexie.delete(UNICODE_DB);
+
+  const importedDB = await Dexie.import(blob, {
+    chunkSizeBytes: 1024, // 1 KB — maximises chunk boundary splits
+  });
+
+  const importedRows = await importedDB.table("items").toArray();
+  equal(importedRows.length, 1000, "Should have 1000 rows after import");
+  let corrupted = 0;
+  for (const row of importedRows) {
+    if (row.text.includes("\uFFFD")) corrupted++;
+  }
+  equal(corrupted, 0, "No rows should contain replacement characters (U+FFFD) after import");
+  importedDB.close();
+  await Dexie.delete(UNICODE_DB);
+});

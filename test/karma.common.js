@@ -21,6 +21,13 @@ const karmaCommon = {
   processKillTimeout: 10000,
   browserSocketTimeout: 20000,
 
+  customLaunchers: {
+    ChromeNoSandbox: {
+      base: 'Chrome',
+      flags: ['--no-sandbox', '--disable-setuid-sandbox', '--headless', '--disable-gpu'],
+    },
+  },
+
   plugins: [
     'karma-qunit',
     'karma-mocha-reporter',

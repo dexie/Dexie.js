@@ -7,7 +7,8 @@
 
 module.exports = {
     // On developers machines, Chrome is most likely to be installed.
-    local: ['Chrome'],
+    // When running as root (e.g. CI containers), use ChromeNoSandbox instead.
+    local: [process.getuid && process.getuid() === 0 ? 'ChromeNoSandbox' : 'Chrome'],
 
     // When Lambdatest credentials aren't available, use Chrome and Firefox on Github Actions:
     ciLocal: ['Chrome', 'Firefox'],

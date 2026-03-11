@@ -12,12 +12,18 @@ export interface JsonStream<T> {
 export function JsonStream<T>(blob: Blob):  JsonStream<T> {
   let pos = 0;
   const parser = JsonParser(true);
+  // Use TextDecoder in streaming mode so that multi-byte UTF-8 sequences
+  // split across chunk boundaries are handled correctly (fixes #2105).
+  const decoder = new TextDecoder('utf-8', { fatal: true });
 
   const rv = {
     async pullAsync(numBytes: number): Promise<Partial<T>> {
       const slize = blob.slice(pos, pos + numBytes);
       pos += numBytes;
-      const jsonPart = await readBlobAsync(slize, 'text');
+      const buf = await readBlobAsync(slize, 'binary');
+      // stream: true tells the decoder to keep incomplete multi-byte sequences
+      // buffered until the next chunk rather than emitting a replacement char.
+      const jsonPart = decoder.decode(buf, { stream: pos < blob.size });
       const result = parser.write(jsonPart);
       rv.result = result || {};
       return result;
@@ -25,7 +31,8 @@ export function JsonStream<T>(blob: Blob):  JsonStream<T> {
     pullSync(numBytes: number): Partial<T> {
       const slize = blob.slice(pos, pos + numBytes);
       pos += numBytes;
-      const jsonPart = readBlobSync(slize, 'text');
+      const buf = readBlobSync(slize, 'binary');
+      const jsonPart = decoder.decode(buf, { stream: pos < blob.size });
       const result = parser.write(jsonPart);
       rv.result = result || {};
       return result;
