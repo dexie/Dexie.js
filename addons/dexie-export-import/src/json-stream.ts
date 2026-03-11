@@ -14,7 +14,7 @@ export function JsonStream<T>(blob: Blob):  JsonStream<T> {
   const parser = JsonParser(true);
   // Use TextDecoder in streaming mode so that multi-byte UTF-8 sequences
   // split across chunk boundaries are handled correctly (fixes #2105).
-  const decoder = new TextDecoder('utf-8', { fatal: false });
+  const decoder = new TextDecoder('utf-8', { fatal: true });
 
   const rv = {
     async pullAsync(numBytes: number): Promise<Partial<T>> {
