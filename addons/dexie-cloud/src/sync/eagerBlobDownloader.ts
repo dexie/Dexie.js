@@ -3,11 +3,13 @@
  * 
  * Downloads unresolved blobs in the background when blobMode='eager'.
  * Called after sync completes to prefetch blobs for offline access.
+ * 
+ * Progress is tracked automatically via liveQuery in blobProgress.ts —
+ * no manual progress reporting needed here.
  */
 
 import Dexie, { UpdateSpec } from 'dexie';
 import { BehaviorSubject } from 'rxjs';
-import { BlobProgress } from '../DexieCloudAPI';
 import { TSONRef, hasTSONRefs } from 'dexie-cloud-common';
 import {
   BlobRef,
@@ -19,11 +21,7 @@ import {
   ResolvedBlob,
 } from './blobResolve';
 import { loadCachedAccessToken } from './loadCachedAccessToken';
-import {
-  updateBlobProgress,
-  reportBlobDownloaded,
-  setDownloadingState,
-} from './blobProgress';
+import { setDownloadingState } from './blobProgress';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { getSyncableTables } from '../helpers/getSyncableTables';
 
@@ -37,29 +35,39 @@ import { getSyncableTables } from '../helpers/getSyncableTables';
  */
 export async function downloadUnresolvedBlobs(
   db: DexieCloudDB,
-  progress$: BehaviorSubject<BlobProgress>,
+  downloading$: BehaviorSubject<boolean>,
   signal?: AbortSignal
 ): Promise<void> {
   const debugLog = (msg: string) => console.debug(`[dexie-cloud] ${msg}`);
   
   debugLog('Eager download: Starting...');
-  
-  // First, update progress to get accurate counts
-  await updateBlobProgress(db, progress$);
 
-  debugLog(`Eager download: blobsRemaining=${progress$.value.blobsRemaining}`);
-  
-  if (progress$.value.blobsRemaining === 0) {
+  // Scan for unresolved blobs
+  const syncedTables = getSyncableTables(db);
+  let hasWork = false;
+
+  for (const table of syncedTables) {
+    try {
+      const hasIndex = !!table.schema.idxByName['_hasBlobRefs'];
+      if (!hasIndex) continue;
+      const count = await table.where('_hasBlobRefs').equals(1).count();
+      if (count > 0) {
+        hasWork = true;
+        break;
+      }
+    } catch {
+      // skip
+    }
+  }
+
+  if (!hasWork) {
     debugLog('Eager download: No blobs remaining, exiting');
     return;
   }
 
-  setDownloadingState(progress$, true);
+  setDownloadingState(downloading$, true);
 
   try {
-    // Get synced tables (exclude internal tables that don't have _hasBlobRefs)
-    // Get synced tables (exclude internal tables)
-    const syncedTables = getSyncableTables(db);
     debugLog(`Eager download: Found ${syncedTables.length} syncable tables: ${syncedTables.map(t => t.name).join(', ')}`);
   
     for (const table of syncedTables) {
@@ -101,7 +109,6 @@ export async function downloadUnresolvedBlobs(
             if (signal?.aborted) return;
             const obj = pending[i++];
             const key = Dexie.getByKeyPath(obj, primaryKey.keyPath as string);
-            const bytesToDownload = calculateBlobBytes(obj);
 
             try {
               // Refresh token per object — cheap (returns cached) but ensures
@@ -121,14 +128,9 @@ export async function downloadUnresolvedBlobs(
 
               debugLog(`Eager download: Updating ${table.name}:${key} with ${resolvedBlobs.length} blobs`);
               await table.update(key, updateSpec);
-
-              reportBlobDownloaded(progress$, bytesToDownload);
+              // liveQuery in blobProgress.ts auto-detects this change
             } catch (err) {
               console.error(`Failed to download blobs for ${table.name}:${key}:`, err);
-              // TODO: Differentiate error types:
-              //  4xx → clear marker (won't succeed on retry)
-              //  5xx → leave marker for retry, possibly increment count
-              //  Network error → throw to cancel entire loop
             }
           }
         };
@@ -144,47 +146,6 @@ export async function downloadUnresolvedBlobs(
       }
     }
   } finally {
-    setDownloadingState(progress$, false);
-    // Final progress update
-    await updateBlobProgress(db, progress$);
+    setDownloadingState(downloading$, false);
   }
-}
-
-/**
- * Calculate total blob bytes in an object (counts BlobRef, TSONRef, and serialized TSONRef).
- */
-function calculateBlobBytes(obj: unknown): number {
-  let total = 0;
-
-  function scan(value: unknown): void {
-    if (value === null || value === undefined) return;
-    if (typeof value !== 'object') return;
-
-    // Check for TSONRef (before IndexedDB storage)
-    if (TSONRef.isTSONRef(value)) {
-      total += value.size || 0;
-      return;
-    }
-
-    // Check for serialized TSONRef (after IndexedDB structured clone)
-    if (isSerializedTSONRef(value)) {
-      total += value.size || 0;
-      return;
-    }
-
-    // Check for raw BlobRef
-    if (isBlobRef(value)) {
-      total += value.size || 0;
-      return;
-    }
-
-    if (Array.isArray(value)) {
-      value.forEach(scan);
-    } else {
-      Object.values(value).forEach(scan);
-    }
-  }
-
-  scan(obj);
-  return total;
 }

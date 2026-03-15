@@ -1,12 +1,16 @@
 /**
  * Blob Progress Tracking
- * 
- * Tracks blob download progress for the db.cloud.blobProgress observable.
+ *
+ * Uses liveQuery to reactively track unresolved blob refs.
+ * Any change to _hasBlobRefs in any syncable table automatically
+ * triggers a re-scan — no manual updateBlobProgress() needed.
  */
 
-import { BehaviorSubject } from 'rxjs';
+import { BehaviorSubject, Observable, combineLatest, from } from 'rxjs';
+import { map } from 'rxjs/operators';
+import { liveQuery } from 'dexie';
 import { BlobProgress } from '../DexieCloudAPI';
-import { BlobRef, isBlobRef, isSerializedTSONRef } from './blobResolve';
+import { isBlobRef, isSerializedTSONRef } from './blobResolve';
 import { getSyncableTables } from '../helpers/getSyncableTables';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { TSONRef } from 'dexie-cloud-common';
@@ -19,106 +23,78 @@ interface RefInfo {
   size: number;
 }
 
-const initialProgress: BlobProgress = {
-  isDownloading: false,
-  blobsRemaining: 0,
-  bytesRemaining: 0,
-  bytesDownloaded: 0,
-  blobsDownloaded: 0,
-};
-
 /**
- * Create a BlobProgress BehaviorSubject for a database.
+ * BehaviorSubject for the isDownloading flag, controlled by eagerBlobDownloader.
  */
-export function createBlobProgress(): BehaviorSubject<BlobProgress> {
-  return new BehaviorSubject<BlobProgress>({ ...initialProgress });
-}
-
-/**
- * Scan database for unresolved BlobRefs and update progress.
- */
-export async function updateBlobProgress(
-  db: DexieCloudDB,
-  progress$: BehaviorSubject<BlobProgress>
-): Promise<void> {
-  let blobsRemaining = 0;
-  let bytesRemaining = 0;
-
-  // Get synced tables (exclude internal tables)
-  const syncedTables = getSyncableTables(db);
-
-  // Use a transaction with disableBlobResolve to read raw data without triggering lazy download
-  await db.dx.transaction('r', syncedTables, async (tx) => {
-    // Set flag on the underlying IDBTransaction to disable blob resolution
-    (tx.idbtrans as any).disableBlobResolve = true;
-    
-    for (const table of syncedTables) {
-      try {
-        // Check if table has _hasBlobRefs index
-        const hasIndex = !!table.schema.idxByName['_hasBlobRefs'];
-        if (!hasIndex) continue;
-
-        // Query objects with _hasBlobRefs marker - middleware will skip resolution due to flag
-        const unresolvedObjects = await table
-          .where('_hasBlobRefs')
-          .equals(1)
-          .toArray();
-
-        for (const obj of unresolvedObjects) {
-          const blobs = findBlobRefs(obj);
-          blobsRemaining += blobs.length;
-          bytesRemaining += blobs.reduce((sum, blob) => sum + (blob.size || 0), 0);
-        }
-      } catch {
-        // Table might not have _hasBlobRefs index - skip
-      }
-    }
-  });
-
-  const current = progress$.value;
-  progress$.next({
-    ...current,
-    blobsRemaining,
-    bytesRemaining,
-    isDownloading: current.isDownloading && blobsRemaining > 0,
-  });
-}
-
-/**
- * Report that a blob download has completed.
- */
-export function reportBlobDownloaded(
-  progress$: BehaviorSubject<BlobProgress>,
-  bytesDownloaded: number
-): void {
-  const current = progress$.value;
-  progress$.next({
-    ...current,
-    blobsDownloaded: current.blobsDownloaded + 1,
-    bytesDownloaded: current.bytesDownloaded + bytesDownloaded,
-    blobsRemaining: Math.max(0, current.blobsRemaining - 1),
-    bytesRemaining: Math.max(0, current.bytesRemaining - bytesDownloaded),
-  });
+export function createDownloadingState(): BehaviorSubject<boolean> {
+  return new BehaviorSubject<boolean>(false);
 }
 
 /**
  * Set downloading state.
  */
 export function setDownloadingState(
-  progress$: BehaviorSubject<BlobProgress>,
+  downloading$: BehaviorSubject<boolean>,
   isDownloading: boolean
 ): void {
-  const current = progress$.value;
-  if (current.isDownloading !== isDownloading) {
-    progress$.next({
-      ...current,
-      isDownloading,
-      // Reset session counters when starting new download batch
-      ...(isDownloading && !current.isDownloading
-        ? { blobsDownloaded: 0, bytesDownloaded: 0 }
-        : {}),
-    });
+  if (downloading$.value !== isDownloading) {
+    downloading$.next(isDownloading);
   }
+}
+
+/**
+ * Create a liveQuery-based Observable<BlobProgress>.
+ *
+ * Combines a liveQuery (blobsRemaining, bytesRemaining) with an external
+ * isDownloading flag controlled by the eager downloader.
+ */
+export function observeBlobProgress(
+  db: DexieCloudDB,
+  downloading$: BehaviorSubject<boolean>
+): Observable<BlobProgress> {
+  const blobStats$ = from(liveQuery(async () => {
+    let blobsRemaining = 0;
+    let bytesRemaining = 0;
+
+    const syncedTables = getSyncableTables(db);
+
+    await db.dx.transaction('r', syncedTables, async (tx) => {
+      (tx.idbtrans as any).disableBlobResolve = true;
+
+      for (const table of syncedTables) {
+        try {
+          const hasIndex = !!table.schema.idxByName['_hasBlobRefs'];
+          if (!hasIndex) continue;
+
+          const unresolvedObjects = await table
+            .where('_hasBlobRefs')
+            .equals(1)
+            .toArray();
+
+          for (const obj of unresolvedObjects) {
+            const blobs = findBlobRefs(obj);
+            blobsRemaining += blobs.length;
+            bytesRemaining += blobs.reduce(
+              (sum, blob) => sum + (blob.size || 0),
+              0
+            );
+          }
+        } catch {
+          // Table might not have _hasBlobRefs index - skip
+        }
+      }
+    });
+
+    return { blobsRemaining, bytesRemaining };
+  }));
+
+  return combineLatest([blobStats$, downloading$]).pipe(
+    map(([stats, isDownloading]) => ({
+      isDownloading: isDownloading && stats.blobsRemaining > 0,
+      blobsRemaining: stats.blobsRemaining,
+      bytesRemaining: stats.bytesRemaining,
+    }))
+  );
 }
 
 /**
@@ -132,20 +108,17 @@ function findBlobRefs(obj: unknown): RefInfo[] {
     if (value === null || value === undefined) return;
     if (typeof value !== 'object') return;
 
-    // Check for live TSONRef instance (before IndexedDB storage)
     if (TSONRef.isTSONRef(value)) {
       refs.push({ ref: value.ref, size: value.size });
       return;
     }
 
-    // Check for serialized TSONRef (after IndexedDB structured clone - Symbol is lost)
     if (isSerializedTSONRef(value)) {
       const obj = value as { type: string; ref: string; size: number };
       refs.push({ ref: obj.ref, size: obj.size });
       return;
     }
 
-    // Check for raw BlobRef (from older code paths or before TSON parsing)
     if (isBlobRef(value)) {
       refs.push({ ref: value.ref, size: value.size || 0 });
       return;
