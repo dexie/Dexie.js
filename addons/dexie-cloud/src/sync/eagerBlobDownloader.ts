@@ -70,11 +70,16 @@ export async function downloadUnresolvedBlobs(
         const hasIndex = table.schema.indexes.some(idx => idx.name === '_hasBlobRefs');
         if (!hasIndex) continue;
 
-        // Query objects with _hasBlobRefs marker
-        const unresolvedObjects = await table
-          .where('_hasBlobRefs')
-          .equals(1)
-          .toArray();
+        // Query objects with _hasBlobRefs marker.
+        // Use disableBlobResolve to bypass the blob resolve middleware,
+        // so we get raw BlobRef objects that we can resolve ourselves.
+        const unresolvedObjects = await db.dx.transaction('r', table, async (tx) => {
+          (tx.idbtrans as any).disableBlobResolve = true;
+          return await table
+            .where('_hasBlobRefs')
+            .equals(1)
+            .toArray();
+        });
 
         debugLog(`Eager download: Table ${table.name} has ${unresolvedObjects.length} unresolved objects`);
 
