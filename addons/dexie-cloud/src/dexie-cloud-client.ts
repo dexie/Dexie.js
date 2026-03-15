@@ -5,7 +5,7 @@ import {
   getDbNameFromDbUrl,
 } from 'dexie-cloud-common';
 import { BehaviorSubject, combineLatest, firstValueFrom, from, fromEvent, Subject } from 'rxjs';
-import { createBlobProgress } from './sync/blobProgress';
+import { createDownloadingState, observeBlobProgress } from './sync/blobProgress';
 import { downloadUnresolvedBlobs } from './sync/eagerBlobDownloader';
 import { filter, map, skip, startWith, switchMap, take } from 'rxjs/operators';
 import { login } from './authentication/login';
@@ -128,6 +128,7 @@ export function dexieCloud(dexie: Dexie) {
   });
 
   const syncComplete = new Subject<void>();
+  const downloading$ = createDownloadingState();
 
   dexie.cloud = {
     // @ts-ignore
@@ -150,7 +151,7 @@ export function dexieCloud(dexie: Dexie) {
     persistedSyncState: new BehaviorSubject<PersistedSyncState | undefined>(
       undefined
     ),
-    blobProgress: createBlobProgress(),
+    blobProgress: observeBlobProgress(DexieCloudDB(dexie), downloading$),
     userInteraction: new BehaviorSubject<DXCUserInteraction | undefined>(
       undefined
     ),
@@ -319,7 +320,7 @@ export function dexieCloud(dexie: Dexie) {
       const downloadBlobs = () => {
         if (eagerBlobDownloadInFlight) return;
         eagerBlobDownloadInFlight = Dexie.ignoreTransaction(
-          () => downloadUnresolvedBlobs(db, dexie.cloud.blobProgress)
+          () => downloadUnresolvedBlobs(db, downloading$)
         )
           .catch(err => {
             console.error('[dexie-cloud] Eager blob download failed:', err);

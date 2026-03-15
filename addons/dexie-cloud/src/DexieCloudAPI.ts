@@ -20,12 +20,6 @@ export interface BlobProgress {
   
   /** Total bytes remaining to download (estimated from BlobRef.$size) */
   bytesRemaining: number;
-  
-  /** Total bytes already downloaded in current session */
-  bytesDownloaded: number;
-  
-  /** Number of blobs downloaded in current session */
-  blobsDownloaded: number;
 }
 
 /** The API of db.cloud, where `db` is an instance of Dexie with dexie-cloud-addon active.
@@ -78,7 +72,7 @@ export interface DexieCloudAPI {
    * 
    * Use this to show progress indicators or "downloading for offline" status.
    */
-  blobProgress: BehaviorSubject<BlobProgress>;
+  blobProgress: Observable<BlobProgress>;
 
   events: {
     syncComplete: Observable<void>;
