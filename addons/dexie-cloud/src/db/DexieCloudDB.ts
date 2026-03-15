@@ -16,6 +16,7 @@ import { BroadcastedAndLocalEvent } from '../helpers/BroadcastedAndLocalEvent';
 import { SyncState, SyncStatePhase } from '../types/SyncState';
 import { MessagesFromServerConsumer } from '../sync/messagesFromServerQueue';
 import { YClientMessage } from 'dexie-cloud-common';
+import { BlobDownloadTracker } from '../sync/BlobDownloadTracker';
 
 /*export interface DexieCloudDB extends Dexie {
   table(name: string): Table<any, any>;
@@ -68,6 +69,7 @@ export interface DexieCloudDB extends DexieCloudDBBase {
   reconfigure(): void;
   messageConsumer: MessagesFromServerConsumer;
   messageProducer: Subject<YClientMessage>;
+  blobDownloadTracker: BlobDownloadTracker;
 }
 
 const wm = new WeakMap<object, DexieCloudDB>();
@@ -196,6 +198,7 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
     Object.assign(db, helperMethods);
     db.messageConsumer = MessagesFromServerConsumer(db);
     db.messageProducer = new Subject<YClientMessage>();
+    db.blobDownloadTracker = new BlobDownloadTracker();
     wm.set(dx.cloud, db);
   }
   return db;

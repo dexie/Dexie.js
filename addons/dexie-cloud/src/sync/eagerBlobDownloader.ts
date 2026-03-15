@@ -110,7 +110,7 @@ export async function downloadUnresolvedBlobs(
               if (!accessToken) throw new Error('Access token is required to download blobs');
 
               const resolvedBlobs: ResolvedBlob[] = [];
-              await resolveAllBlobRefs(obj, databaseUrl, accessToken, resolvedBlobs);
+              await resolveAllBlobRefs(obj, databaseUrl, accessToken, resolvedBlobs, '', new WeakMap(), db.blobDownloadTracker);
 
               const updateSpec: UpdateSpec<any> = {
                 _hasBlobRefs: undefined,

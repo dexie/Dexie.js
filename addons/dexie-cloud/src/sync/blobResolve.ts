@@ -1,3 +1,5 @@
+import { BlobDownloadTracker } from './BlobDownloadTracker';
+
 /**
  * BlobRef Resolution for Dexie Cloud
  * 
@@ -231,7 +233,8 @@ export async function resolveAllBlobRefs(
   accessToken: string,
   resolvedBlobs: ResolvedBlob[] = [],
   currentPath: string = '',
-  visited = new WeakMap()
+  visited = new WeakMap(),
+  tracker?: BlobDownloadTracker
 ): Promise<unknown> {
   if (obj == null) { // null or undefined
     return obj;
@@ -239,7 +242,8 @@ export async function resolveAllBlobRefs(
 
   // Check if this is a BlobRef - resolve it and track it
   if (isBlobRef(obj)) {
-    const rawData = await downloadBlob(obj, dbUrl, accessToken);
+    const doFetch = () => downloadBlob(obj, dbUrl, accessToken);
+    const rawData = tracker ? await tracker.download(obj.ref, doFetch) : await doFetch();
     const data = convertToOriginalType(rawData, obj);
     resolvedBlobs.push({ keyPath: currentPath, data, ref: obj.ref });
     return data;
@@ -255,7 +259,7 @@ export async function resolveAllBlobRefs(
     visited.set(obj, result);  // Set before iterating to handle self-references
     for (let i = 0; i < obj.length; i++) {
       const itemPath = currentPath ? `${currentPath}.${i}` : `${i}`;
-      result.push(await resolveAllBlobRefs(obj[i], dbUrl, accessToken, resolvedBlobs, itemPath, visited));
+      result.push(await resolveAllBlobRefs(obj[i], dbUrl, accessToken, resolvedBlobs, itemPath, visited, tracker));
     }
     return result;
   }
@@ -276,7 +280,7 @@ export async function resolveAllBlobRefs(
         continue;
       }
       const propPath = currentPath ? `${currentPath}.${propName}` : propName;
-      result[propName] = await resolveAllBlobRefs(value, dbUrl, accessToken, resolvedBlobs, propPath, visited);
+      result[propName] = await resolveAllBlobRefs(value, dbUrl, accessToken, resolvedBlobs, propPath, visited, tracker);
     }
 
     return result;
