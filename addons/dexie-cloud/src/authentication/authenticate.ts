@@ -251,7 +251,7 @@ async function userAuthenticate(
       const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
       if (isOffline) {
         message = `You seem to be offline. Please connect to the internet and try again.`;
-      } else if (Dexie.debug || (typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1'))) {
+      } else if (typeof location !== 'undefined' && (Dexie.debug || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
         // The audience is most likely the developer. Suggest to whitelist the localhost origin:
         const whitelistCommand = `npx dexie-cloud whitelist ${location.origin}`;
         message = `Could not connect to server. Please verify that your origin '${location.origin}' is whitelisted using \`npx dexie-cloud whitelist\``;

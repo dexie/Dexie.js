@@ -206,18 +206,13 @@ function CopyButton({ text }: { text: string }) {
   };
 
   const handleClick = () => {
-    navigator.clipboard.writeText(text).then(scheduleCopiedReset).catch(() => {
-      // Fallback for older browsers
-      const textarea = document.createElement('textarea');
-      textarea.value = text;
-      textarea.style.position = 'fixed';
-      textarea.style.opacity = '0';
-      document.body.appendChild(textarea);
-      textarea.select();
-      document.execCommand('copy');
-      document.body.removeChild(textarea);
-      scheduleCopiedReset();
-    });
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(scheduleCopiedReset).catch(() => {
+        fallbackCopy(text, scheduleCopiedReset);
+      });
+    } else {
+      fallbackCopy(text, scheduleCopiedReset);
+    }
   };
 
   return (
@@ -230,4 +225,16 @@ function CopyButton({ text }: { text: string }) {
       {copied ? '✓ Copied!' : `📋 ${text}`}
     </button>
   );
+}
+
+function fallbackCopy(text: string, onSuccess: () => void) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const success = document.execCommand('copy');
+  document.body.removeChild(textarea);
+  if (success) onSuccess();
 }
