@@ -62,25 +62,21 @@ export function observeBlobProgress(
       (tx.idbtrans as any).disableBlobResolve = true;
 
       for (const table of syncedTables) {
-        try {
-          const hasIndex = !!table.schema.idxByName['_hasBlobRefs'];
-          if (!hasIndex) continue;
+        const hasIndex = !!table.schema.idxByName['_hasBlobRefs'];
+        if (!hasIndex) continue;
 
-          const unresolvedObjects = await table
-            .where('_hasBlobRefs')
-            .equals(1)
-            .toArray();
+        const unresolvedObjects = await table
+          .where('_hasBlobRefs')
+          .equals(1)
+          .toArray();
 
-          for (const obj of unresolvedObjects) {
-            const blobs = findBlobRefs(obj);
-            blobsRemaining += blobs.length;
-            bytesRemaining += blobs.reduce(
-              (sum, blob) => sum + (blob.size || 0),
-              0
-            );
-          }
-        } catch {
-          // Table might not have _hasBlobRefs index - skip
+        for (const obj of unresolvedObjects) {
+          const blobs = findBlobRefs(obj);
+          blobsRemaining += blobs.length;
+          bytesRemaining += blobs.reduce(
+            (sum, blob) => sum + (blob.size || 0),
+            0
+          );
         }
       }
     });
