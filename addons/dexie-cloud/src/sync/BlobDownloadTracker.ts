@@ -1,3 +1,7 @@
+import type { DexieCloudDB } from "../db/DexieCloudDB";
+import { BlobRef } from "./blobResolve";
+import { loadCachedAccessToken } from "./loadCachedAccessToken";
+
 /**
  * Deduplicates in-flight blob downloads.
  *
@@ -10,19 +14,57 @@
  */
 export class BlobDownloadTracker {
   private inFlight = new Map<string, Promise<Uint8Array>>();
+  private db: DexieCloudDB;
+
+  constructor (db: DexieCloudDB) {
+    this.db = db;
+  }
 
   /**
    * Download a blob, deduplicating concurrent requests for the same ref.
    *
-   * @param ref   - Blob ref string (e.g. '1:blobId')
-   * @param doFetch - The actual fetch function to call if no download is in progress
+   * @param blobRef - The BlobRef to download
+   * @param dbUrl - Base URL for the database (e.g., 'https://mydb.dexie.cloud')
    */
-  download(ref: string, doFetch: () => Promise<Uint8Array>): Promise<Uint8Array> {
-    let promise = this.inFlight.get(ref);
+  download(blobRef: BlobRef, dbUrl: string): Promise<Uint8Array> {
+    let promise = this.inFlight.get(blobRef.ref);
     if (!promise) {
-      promise = doFetch().finally(() => this.inFlight.delete(ref));
-      this.inFlight.set(ref, promise);
+      promise = loadCachedAccessToken(this.db).then(accessToken => {
+        if (!accessToken) throw new Error("No access token available for blob download");
+        return downloadBlob(blobRef, dbUrl, accessToken);
+      }).finally(() => this.inFlight.delete(blobRef.ref));
+      // When the promise settles (either fulfilled or rejected), remove it from the in-flight map
+      this.inFlight.set(blobRef.ref, promise);
     }
     return promise;
   }
 }
+/**
+ * Download blob data from server via proxy endpoint.
+ * Uses auth header for authentication (same as sync).
+ *
+ * @param blobRef - The BlobRef to download
+ * @param dbUrl - Base URL for the database (e.g., 'https://mydb.dexie.cloud')
+ * @param accessToken - Access token for authentication
+ */
+
+export async function downloadBlob(
+  blobRef: BlobRef,
+  dbUrl: string,
+  accessToken: string
+): Promise<Uint8Array> {
+  const downloadUrl = `${dbUrl}/blob/${blobRef.ref}`;
+  const response = await fetch(downloadUrl, {
+    headers: {
+      'Authorization': `Bearer ${accessToken}`
+    }
+  });
+
+  if (!response.ok) {
+    throw new Error(`Failed to download blob ${blobRef.ref}: ${response.status} ${response.statusText}`);
+  }
+
+  const arrayBuffer = await response.arrayBuffer();
+  return new Uint8Array(arrayBuffer);
+}
+

@@ -198,7 +198,7 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
     Object.assign(db, helperMethods);
     db.messageConsumer = MessagesFromServerConsumer(db);
     db.messageProducer = new Subject<YClientMessage>();
-    db.blobDownloadTracker = new BlobDownloadTracker();
+    db.blobDownloadTracker = new BlobDownloadTracker(db);
     wm.set(dx.cloud, db);
   }
   return db;

@@ -222,9 +222,7 @@ function resolveAndSave(
   const resolvedBlobs: ResolvedBlob[] = [];
   
   // Create the resolution promise with auth info
-  const resolutionPromise = loadCachedAccessToken(db).then(accessToken => accessToken
-    ? resolveAllBlobRefs(obj, dbUrl, accessToken, resolvedBlobs, '', new WeakMap(), db.blobDownloadTracker)
-    : obj) // Can't resolve without access token, return original object (if user is logged out, for example)
+  const resolutionPromise = resolveAllBlobRefs(obj, dbUrl, resolvedBlobs, '', new WeakMap(), db.blobDownloadTracker)
   
   // Wrap with waitFor to keep transaction alive during fetch
   const resolvePromise = needsWaitFor
