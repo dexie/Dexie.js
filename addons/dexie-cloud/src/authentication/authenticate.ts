@@ -253,16 +253,24 @@ async function userAuthenticate(
         message = `You seem to be offline. Please connect to the internet and try again.`;
       } else if (Dexie.debug || (typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1'))) {
         // The audience is most likely the developer. Suggest to whitelist the localhost origin:
+        const whitelistCommand = `npx dexie-cloud whitelist ${location.origin}`;
         message = `Could not connect to server. Please verify that your origin '${location.origin}' is whitelisted using \`npx dexie-cloud whitelist\``;
+        await alertUser(userInteraction, 'Authentication Failed', {
+          type: 'error',
+          messageCode: 'GENERIC_ERROR',
+          message,
+          messageParams: {},
+          copyText: whitelistCommand,
+        }).catch(() => {});
       } else {
         message = `Could not connect to server. Please verify the connection.`;
-      }
-      await alertUser(userInteraction, 'Authentication Failed', {
-        type: 'error',
-        messageCode: 'GENERIC_ERROR',
-        message,
-        messageParams: {},
-      }).catch(() => {});  
+        await alertUser(userInteraction, 'Authentication Failed', {
+          type: 'error',
+          messageCode: 'GENERIC_ERROR',
+          message,
+          messageParams: {},
+        }).catch(() => {});
+      }  
     }
 
     throw error;
