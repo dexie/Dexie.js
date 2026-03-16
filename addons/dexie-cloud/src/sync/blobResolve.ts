@@ -141,34 +141,6 @@ export function hasBlobRefs(obj: unknown, visited = new WeakSet()): boolean {
 }
 
 /**
- * Download blob data from server via proxy endpoint.
- * Uses auth header for authentication (same as sync).
- * 
- * @param blobRef - The BlobRef to download
- * @param dbUrl - Base URL for the database (e.g., 'https://mydb.dexie.cloud')
- * @param accessToken - Access token for authentication
- */
-export async function downloadBlob(
-  blobRef: BlobRef, 
-  dbUrl: string, 
-  accessToken: string
-): Promise<Uint8Array> {
-  const downloadUrl = `${dbUrl}/blob/${blobRef.ref}`;
-  const response = await fetch(downloadUrl, {
-    headers: {
-      'Authorization': `Bearer ${accessToken}`
-    }
-  });
-
-  if (!response.ok) {
-    throw new Error(`Failed to download blob: ${response.status} ${response.statusText}`);
-  }
-
-  const arrayBuffer = await response.arrayBuffer();
-  return new Uint8Array(arrayBuffer);
-}
-
-/**
  * Convert downloaded Uint8Array to the original type specified in BlobRef
  */
 export function convertToOriginalType(
@@ -230,11 +202,10 @@ export function convertToOriginalType(
 export async function resolveAllBlobRefs(
   obj: unknown,
   dbUrl: string,
-  accessToken: string,
   resolvedBlobs: ResolvedBlob[] = [],
   currentPath: string = '',
   visited = new WeakMap(),
-  tracker?: BlobDownloadTracker
+  tracker: BlobDownloadTracker
 ): Promise<unknown> {
   if (obj == null) { // null or undefined
     return obj;
@@ -242,8 +213,7 @@ export async function resolveAllBlobRefs(
 
   // Check if this is a BlobRef - resolve it and track it
   if (isBlobRef(obj)) {
-    const doFetch = () => downloadBlob(obj, dbUrl, accessToken);
-    const rawData = tracker ? await tracker.download(obj.ref, doFetch) : await doFetch();
+    const rawData = await tracker.download(obj, dbUrl);
     const data = convertToOriginalType(rawData, obj);
     resolvedBlobs.push({ keyPath: currentPath, data, ref: obj.ref });
     return data;
@@ -259,7 +229,7 @@ export async function resolveAllBlobRefs(
     visited.set(obj, result);  // Set before iterating to handle self-references
     for (let i = 0; i < obj.length; i++) {
       const itemPath = currentPath ? `${currentPath}.${i}` : `${i}`;
-      result.push(await resolveAllBlobRefs(obj[i], dbUrl, accessToken, resolvedBlobs, itemPath, visited, tracker));
+      result.push(await resolveAllBlobRefs(obj[i], dbUrl, resolvedBlobs, itemPath, visited, tracker));
     }
     return result;
   }
@@ -280,7 +250,7 @@ export async function resolveAllBlobRefs(
         continue;
       }
       const propPath = currentPath ? `${currentPath}.${propName}` : propName;
-      result[propName] = await resolveAllBlobRefs(value, dbUrl, accessToken, resolvedBlobs, propPath, visited, tracker);
+      result[propName] = await resolveAllBlobRefs(value, dbUrl, resolvedBlobs, propPath, visited, tracker);
     }
 
     return result;

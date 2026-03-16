@@ -113,11 +113,8 @@ export async function downloadUnresolvedBlobs(
             try {
               // Refresh token per object — cheap (returns cached) but ensures
               // we pick up renewed tokens during long download sessions.
-              const accessToken = await loadCachedAccessToken(db);
-              if (!accessToken) throw new Error('Access token is required to download blobs');
-
               const resolvedBlobs: ResolvedBlob[] = [];
-              await resolveAllBlobRefs(obj, databaseUrl, accessToken, resolvedBlobs, '', new WeakMap(), db.blobDownloadTracker);
+              await resolveAllBlobRefs(obj, databaseUrl, resolvedBlobs, '', new WeakMap(), db.blobDownloadTracker);
 
               const updateSpec: UpdateSpec<any> = {
                 _hasBlobRefs: undefined,
