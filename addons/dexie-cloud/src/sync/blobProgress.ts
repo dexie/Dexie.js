@@ -6,8 +6,8 @@
  * triggers a re-scan — no manual updateBlobProgress() needed.
  */
 
-import { BehaviorSubject, Observable, combineLatest, from } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { BehaviorSubject, Observable, combineLatest, from, timer } from 'rxjs';
+import { map, share } from 'rxjs/operators';
 import { liveQuery } from 'dexie';
 import { BlobProgress } from '../DexieCloudAPI';
 import { isBlobRef, isSerializedTSONRef } from './blobResolve';
@@ -93,7 +93,8 @@ export function observeBlobProgress(
       isDownloading: isDownloading && stats.blobsRemaining > 0,
       blobsRemaining: stats.blobsRemaining,
       bytesRemaining: stats.bytesRemaining,
-    }))
+    })),
+    share({ resetOnRefCountZero: () => timer(2000) }) // Keep alive for 2s after last unsubscription to avoid rapid re-subscriptions during UI updates  
   );
 }
 
