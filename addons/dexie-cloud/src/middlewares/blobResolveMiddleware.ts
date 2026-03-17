@@ -222,6 +222,7 @@ function resolveAndSave(
   const resolvedBlobs: ResolvedBlob[] = [];
   
   // Create the resolution promise with auth info
+  console.debug(`[dexie-cloud:blobResolve] Resolving blobs for ${table.name}, dbUrl: ${dbUrl ? 'set' : 'NOT SET'}`);
   const resolutionPromise = resolveAllBlobRefs(obj, dbUrl, resolvedBlobs, '', new WeakMap(), db.blobDownloadTracker)
   
   // Wrap with waitFor to keep transaction alive during fetch

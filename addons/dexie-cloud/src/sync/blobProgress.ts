@@ -57,18 +57,24 @@ export function observeBlobProgress(
     let bytesRemaining = 0;
 
     const syncedTables = getSyncableTables(db);
+    console.debug('[dexie-cloud:blobProgress] liveQuery scan starting, tables:', syncedTables.map(t => t.name).join(', '));
 
     await db.dx.transaction('r', syncedTables, async (tx) => {
       (tx.idbtrans as any).disableBlobResolve = true;
 
       for (const table of syncedTables) {
         const hasIndex = !!table.schema.idxByName['_hasBlobRefs'];
-        if (!hasIndex) continue;
+        if (!hasIndex) {
+          console.debug(`[dexie-cloud:blobProgress] Table ${table.name}: no _hasBlobRefs index, skipping`);
+          continue;
+        }
 
         const unresolvedObjects = await table
           .where('_hasBlobRefs')
           .equals(1)
           .toArray();
+
+        console.debug(`[dexie-cloud:blobProgress] Table ${table.name}: ${unresolvedObjects.length} unresolved objects`);
 
         for (const obj of unresolvedObjects) {
           const blobs = findBlobRefs(obj);
@@ -81,6 +87,7 @@ export function observeBlobProgress(
       }
     });
 
+    console.debug(`[dexie-cloud:blobProgress] liveQuery result: ${blobsRemaining} blobs, ${bytesRemaining} bytes remaining`);
     return { blobsRemaining, bytesRemaining };
   }));
 

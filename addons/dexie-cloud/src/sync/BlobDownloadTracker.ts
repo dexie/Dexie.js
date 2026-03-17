@@ -29,12 +29,18 @@ export class BlobDownloadTracker {
   download(blobRef: BlobRef, dbUrl: string): Promise<Uint8Array> {
     let promise = this.inFlight.get(blobRef.ref);
     if (!promise) {
+      console.debug(`[dexie-cloud:BlobDownloadTracker] Starting download: ${blobRef.ref} (${blobRef.size || '?'} bytes)`);
       promise = loadCachedAccessToken(this.db).then(accessToken => {
         if (!accessToken) throw new Error("No access token available for blob download");
+        console.debug(`[dexie-cloud:BlobDownloadTracker] Got access token, fetching: ${blobRef.ref}`);
         return downloadBlob(blobRef, dbUrl, accessToken);
+      }).then(data => {
+        console.debug(`[dexie-cloud:BlobDownloadTracker] Downloaded: ${blobRef.ref} (${data.length} bytes)`);
+        return data;
       }).finally(() => this.inFlight.delete(blobRef.ref));
-      // When the promise settles (either fulfilled or rejected), remove it from the in-flight map
       this.inFlight.set(blobRef.ref, promise);
+    } else {
+      console.debug(`[dexie-cloud:BlobDownloadTracker] Deduped: ${blobRef.ref} (already in-flight)`);
     }
     return promise;
   }
