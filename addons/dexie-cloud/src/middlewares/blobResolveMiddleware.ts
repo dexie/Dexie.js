@@ -47,6 +47,11 @@ export function createBlobResolveMiddleware(db: DexieCloudDB): Middleware<DBCore
       return {
         ...downlevelDatabase,
         table(tableName: string): DBCoreTable {
+          if (!db.cloud) {
+            console.error(`[dexie-cloud:blobResolve] CRITICAL: db.cloud is undefined in table('${tableName}')! db.name=${db.name}`);
+            // Fall through to downlevel table to avoid crash
+            return downlevelDatabase.table(tableName);
+          }
           const dbUrl = db.cloud.options?.databaseUrl;
           const downlevelTable = downlevelDatabase.table(tableName);
           
