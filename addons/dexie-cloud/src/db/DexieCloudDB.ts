@@ -87,7 +87,7 @@ export const DEXIE_CLOUD_SCHEMA = {
 let static_counter = 0;
 export function DexieCloudDB(dx: Dexie): DexieCloudDB {
   if ('vip' in dx) dx = dx['vip']; // Avoid race condition. Always map to a vipped dexie that don't block during db.on.ready().
-  let db = wm.get(dx.cloud);
+  let db = wm.get(dx);
   if (!db) {
     const localSyncEvent = new Subject<{ purpose: 'push' | 'pull' }>();
     let syncStateChangedEvent =
@@ -199,7 +199,7 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
     db.messageConsumer = MessagesFromServerConsumer(db);
     db.messageProducer = new Subject<YClientMessage>();
     db.blobDownloadTracker = new BlobDownloadTracker(db);
-    wm.set(dx.cloud, db);
+    wm.set(dx, db);
   }
   return db;
 }
