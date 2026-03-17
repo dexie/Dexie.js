@@ -111,7 +111,9 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
       get tables() {
         return dx.tables;
       },
-      cloud: dx.cloud,
+      get cloud() {
+        return dx.cloud;
+      },
       get $jobs() {
         return dx.table('$jobs') as Table<GuardedJob, string>;
       },
