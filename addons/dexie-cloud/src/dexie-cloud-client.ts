@@ -103,7 +103,9 @@ export function dexieCloud(dexie: Dexie) {
     'ready',
     async (dexie: Dexie) => {
       try {
+        console.debug('[dexie-cloud] on(ready) triggered, calling onDbReady...');
         await onDbReady(dexie);
+        console.debug('[dexie-cloud] onDbReady() complete');
       } catch (error) {
         console.error(error);
         // Make sure to succeed with database open even if network is down.
@@ -130,6 +132,7 @@ export function dexieCloud(dexie: Dexie) {
   const syncComplete = new Subject<void>();
   const downloading$ = createDownloadingState();
 
+  console.debug('[dexie-cloud] Setting up dexie.cloud properties...');
   dexie.cloud = {
     // @ts-ignore
     version: __VERSION__,
@@ -174,6 +177,7 @@ export function dexieCloud(dexie: Dexie) {
         DexieCloudDB(dexie).reconfigure(); // Update observable from new dexie.name
       }
       updateSchemaFromOptions(dexie.cloud.schema, dexie.cloud.options);
+      console.debug('[dexie-cloud] configure() complete, databaseUrl:', options.databaseUrl ? 'set' : 'NOT SET');
       
       // Check for OAuth callback (dxc-auth query parameter)
       // Only check in DOM environment, not workers
@@ -298,6 +302,7 @@ export function dexieCloud(dexie: Dexie) {
   dexie.use(createIdGenerationMiddleware(DexieCloudDB(dexie)));
 
   async function onDbReady(dexie: Dexie) {
+    console.debug('[dexie-cloud] onDbReady: start');
     closed = false; // As Dexie calls us, we are not closed anymore. Maybe reopened? Remember db.ready event is registered with sticky flag!
     const db = DexieCloudDB(dexie);
     // Setup default GUI:
@@ -313,6 +318,7 @@ export function dexieCloud(dexie: Dexie) {
     // Forward db.syncCompleteEvent to be publicly consumable via db.cloud.events.syncComplete:
     subscriptions.push(db.syncCompleteEvent.subscribe(syncComplete));
 
+    console.debug('[dexie-cloud] onDbReady: before eager blob download setup');
     // Eager blob download: When blobMode='eager' (default), download unresolved blobs after sync
     const blobMode = db.cloud.options?.blobMode ?? 'eager';
     if (blobMode === 'eager') {
@@ -335,6 +341,7 @@ export function dexieCloud(dexie: Dexie) {
     }
 
 
+    console.debug('[dexie-cloud] onDbReady: after eager blob download setup');
     //verifyConfig(db.cloud.options); Not needed (yet at least!)
     // Verify the user has allowed version increment.
     if (!db.tables.every((table) => table.core)) {
@@ -345,6 +352,7 @@ export function dexieCloud(dexie: Dexie) {
         ? await navigator.serviceWorker.getRegistrations()
         : [];
 
+    console.debug('[dexie-cloud] onDbReady: before initial transaction');
     const [initiallySynced, lastSyncedRealms] = await db.transaction(
       'rw',
       db.$syncState,

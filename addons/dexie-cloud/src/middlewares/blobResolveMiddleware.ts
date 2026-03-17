@@ -35,6 +35,7 @@ import { TXExpandos } from '../types/TXExpandos';
 import { UserLogin } from '../dexie-cloud-client';
 
 export function createBlobResolveMiddleware(db: DexieCloudDB): Middleware<DBCore> {
+  console.debug('[dexie-cloud:blobResolve] Creating middleware, cloud:', db.cloud ? 'exists' : 'UNDEFINED');
   return {
     stack: 'dbcore' as const,
     name: 'blobResolve',
