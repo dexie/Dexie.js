@@ -207,6 +207,38 @@ export const Styles: { [styleAlias: string]: Partial<CSSStyleDeclaration> | any}
     transition: "all 0.2s ease",
     gap: "12px"
   },
+  // Copy button for alerts with copyText
+  CopyButton: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    padding: "4px 10px",
+    marginTop: "8px",
+    border: "1px solid #d1d5db",
+    borderRadius: "4px",
+    backgroundColor: "#f9fafb",
+    cursor: "pointer",
+    fontSize: "12px",
+    fontWeight: "500",
+    color: "#374151",
+    transition: "all 0.15s ease",
+    fontFamily: "monospace"
+  },
+  CopyButtonCopied: {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: "4px",
+    padding: "4px 10px",
+    marginTop: "8px",
+    border: "1px solid #22c55e",
+    borderRadius: "4px",
+    backgroundColor: "#f0fdf4",
+    cursor: "default",
+    fontSize: "12px",
+    fontWeight: "500",
+    color: "#16a34a",
+    fontFamily: "monospace"
+  },
   // Cancel button for provider selection
   CancelButtonRow: {
     display: "flex",

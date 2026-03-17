@@ -6,6 +6,8 @@ export interface DXCErrorAlert {
   messageCode: 'INVALID_OTP' | 'INVALID_EMAIL' | 'LICENSE_LIMIT_REACHED' | 'GENERIC_ERROR';
   message: string;
   messageParams: { [paramName: string]: string; };
+  /** Optional text that users can copy to clipboard (e.g. a CLI command) */
+  copyText?: string;
 }
 
 export interface DXCWarningAlert {
@@ -13,6 +15,8 @@ export interface DXCWarningAlert {
   messageCode: 'GENERIC_WARNING' | 'LOGOUT_CONFIRMATION';
   message: string;
   messageParams: { [paramName: string]: string; };
+  /** Optional text that users can copy to clipboard (e.g. a CLI command) */
+  copyText?: string;
 }
 
 export interface DXCInfoAlert {
@@ -20,4 +24,6 @@ export interface DXCInfoAlert {
   messageCode: 'GENERIC_INFO' | 'OTP_SENT';
   message: string;
   messageParams: { [paramName: string]: string; };
+  /** Optional text that users can copy to clipboard (e.g. a CLI command) */
+  copyText?: string;
 }

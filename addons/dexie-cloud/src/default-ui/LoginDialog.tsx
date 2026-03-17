@@ -72,7 +72,10 @@ export function LoginDialog({
       <>
         <h3 style={Styles.WindowHeader}>{title}</h3>
         {alerts.map((alert, idx) => (
-          <p key={idx} style={Styles.Alert[alert.type]}>{resolveText(alert)}</p>
+          <div key={idx}>
+            <p style={Styles.Alert[alert.type]}>{resolveText(alert)}</p>
+            {alert.copyText && <CopyButton text={alert.copyText} />}
+          </div>
         ))}
 
         {/* Render options if present */}
@@ -180,4 +183,58 @@ function valueTransformer(type: string, value: string) {
     default:
       return value;
   }
+}
+
+function CopyButton({ text }: { text: string }) {
+  const [copied, setCopied] = useState(false);
+  const timeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup timeout on unmount
+  useLayoutEffect(() => {
+    return () => {
+      if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
+    };
+  }, []);
+
+  const scheduleCopiedReset = () => {
+    if (timeoutRef.current !== null) clearTimeout(timeoutRef.current);
+    setCopied(true);
+    timeoutRef.current = setTimeout(() => {
+      timeoutRef.current = null;
+      setCopied(false);
+    }, 2000);
+  };
+
+  const handleClick = () => {
+    if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+      navigator.clipboard.writeText(text).then(scheduleCopiedReset).catch(() => {
+        fallbackCopy(text, scheduleCopiedReset);
+      });
+    } else {
+      fallbackCopy(text, scheduleCopiedReset);
+    }
+  };
+
+  return (
+    <button
+      type="button"
+      style={copied ? Styles.CopyButtonCopied : Styles.CopyButton}
+      onClick={handleClick}
+      title="Copy to clipboard"
+    >
+      {copied ? '✓ Copied!' : `📋 ${text}`}
+    </button>
+  );
+}
+
+function fallbackCopy(text: string, onSuccess: () => void) {
+  const textarea = document.createElement('textarea');
+  textarea.value = text;
+  textarea.style.position = 'fixed';
+  textarea.style.opacity = '0';
+  document.body.appendChild(textarea);
+  textarea.select();
+  const success = document.execCommand('copy');
+  document.body.removeChild(textarea);
+  if (success) onSuccess();
 }
