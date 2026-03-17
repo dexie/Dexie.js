@@ -35,7 +35,6 @@ import { TXExpandos } from '../types/TXExpandos';
 import { UserLogin } from '../dexie-cloud-client';
 
 export function createBlobResolveMiddleware(db: DexieCloudDB): Middleware<DBCore> {
-  console.debug('[dexie-cloud:blobResolve] Creating middleware, cloud:', db.cloud ? 'exists' : 'UNDEFINED');
   return {
     stack: 'dbcore' as const,
     name: 'blobResolve',
@@ -48,7 +47,7 @@ export function createBlobResolveMiddleware(db: DexieCloudDB): Middleware<DBCore
         ...downlevelDatabase,
         table(tableName: string): DBCoreTable {
           if (!db.cloud) {
-            console.error(`[dexie-cloud:blobResolve] CRITICAL: db.cloud is undefined in table('${tableName}')! db.name=${db.name}`);
+            // db.cloud not yet initialized - skip blob resolution
             // Fall through to downlevel table to avoid crash
             return downlevelDatabase.table(tableName);
           }
