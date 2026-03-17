@@ -11,6 +11,10 @@ import { BlobRef, BlobRefOrigType, isBlobRef as isBlobRefFromResolve } from './b
 // Blobs >= 4KB are offloaded to blob storage
 const BLOB_OFFLOAD_THRESHOLD = 4096;
 
+// Cache: once we know the server doesn't support blob storage, skip future uploads.
+// Maps databaseUrl → boolean (true = supported, false = not supported).
+const blobEndpointSupported = new Map<string, boolean>();
+
 // Re-export BlobRef type
 export type { BlobRef, BlobRefOrigType };
 
@@ -101,7 +105,7 @@ export async function uploadBlob(
   databaseUrl: string,
   getCachedAccessToken: () => Promise<string | null>,
   blob: Blob | ArrayBuffer | ArrayBufferView
-): Promise<BlobRef> {
+): Promise<BlobRef | null> {
   const accessToken = await getCachedAccessToken();
   if (!accessToken) {
     throw new Error('Failed to load access token for blob upload');
@@ -151,6 +155,11 @@ export async function uploadBlob(
   });
   
   if (!response.ok) {
+    if (response.status === 404 || response.status === 405) {
+      // Server doesn't support blob storage endpoint — fall back to inline storage.
+      // This happens when a new client connects to an older server (pre-3.0).
+      return null;
+    }
     throw new Error(`Failed to upload blob: ${response.status} ${response.statusText}`);
   }
   
@@ -198,8 +207,19 @@ export async function offloadBlobs(
   
   // Check if this is a blob that should be offloaded
   if (shouldOffloadBlob(obj)) {
+    if (blobEndpointSupported.get(databaseUrl) === false) {
+      // Server known to not support blob storage — keep inline
+      return obj;
+    }
+    const blobRef = await uploadBlob(databaseUrl, getCachedAccessToken, obj);
+    if (blobRef === null) {
+      // Server doesn't support blob storage — keep original inline
+      blobEndpointSupported.set(databaseUrl, false);
+      return obj;
+    }
+    blobEndpointSupported.set(databaseUrl, true);
     dirtyFlag.dirty = true;
-    return uploadBlob(databaseUrl, getCachedAccessToken, obj);
+    return blobRef;
   }
   
   if (typeof obj !== 'object') {
