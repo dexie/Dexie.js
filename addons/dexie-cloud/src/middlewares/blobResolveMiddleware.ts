@@ -30,9 +30,7 @@ import Dexie, {
 } from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { hasUnresolvedBlobRefs, resolveAllBlobRefs, ResolvedBlob } from '../sync/blobResolve';
-import { loadCachedAccessToken } from '../sync/loadCachedAccessToken';
 import { BlobSavingQueue } from '../sync/BlobSavingQueue';
-import { get } from 'http';
 import { TXExpandos } from '../types/TXExpandos';
 import { UserLogin } from '../dexie-cloud-client';
 
@@ -201,59 +199,64 @@ function resolveAndSave(
   db: DexieCloudDB,
   isCursorValue: boolean = false // Flag to indicate if we're resolving a cursor value (which may not have a primary key)
 ): Promise<any> {
-  // Determine if we need waitFor:
-  // Skip waitFor ONLY if BOTH conditions are met:
-  //   1. readonly transaction
-  //   2. implicit (non-explicit) transaction
-  // 
-  // Transaction.explicit is true when user called db.transaction() explicitly.
-  // For implicit transactions (auto-created for single operations), 
-  // Dexie handles async automatically so no waitFor needed.
-  const currentTx = Dexie.currentTransaction;
-  const isReadonly = currentTx?.mode === 'readonly';
-  const isExplicit = currentTx?.explicit === true;
-  
-  // Skip waitFor only for implicit readonly (most common case: liveQuery)
-  const skipWaitFor = isReadonly && !isExplicit && !isCursorValue;
-  const needsWaitFor = currentTx && !skipWaitFor;
-  const dbUrl = db.cloud.options?.databaseUrl || '';
+  try {
+    // Determine if we need waitFor:
+    // Skip waitFor ONLY if BOTH conditions are met:
+    //   1. readonly transaction
+    //   2. implicit (non-explicit) transaction
+    //
+    // Transaction.explicit is true when user called db.transaction() explicitly.
+    // For implicit transactions (auto-created for single operations),
+    // Dexie handles async automatically so no waitFor needed.
+    const currentTx = Dexie.currentTransaction;
+    const isReadonly = currentTx?.mode === 'readonly';
+    const isExplicit = currentTx?.explicit === true;
 
-  // Collect resolved blobs with their keyPaths
-  const resolvedBlobs: ResolvedBlob[] = [];
-  
-  // Create the resolution promise with auth info
-  const resolutionPromise = resolveAllBlobRefs(obj, dbUrl, resolvedBlobs, '', new WeakMap(), db.blobDownloadTracker)
-  
-  // Wrap with waitFor to keep transaction alive during fetch
-  const resolvePromise = needsWaitFor
-    ? Dexie.waitFor(resolutionPromise)
-    : Dexie.Promise.resolve(resolutionPromise);
+    // Skip waitFor only for implicit readonly (most common case: liveQuery)
+    const skipWaitFor = isReadonly && !isExplicit && !isCursorValue;
+    const needsWaitFor = currentTx && !skipWaitFor;
+    const dbUrl = db.cloud.options?.databaseUrl || '';
 
-  return resolvePromise.then(resolved => {
-    // Get primary key from the object
-    const primaryKey = table.schema.primaryKey;
-    const key = pKey !== undefined ? pKey : primaryKey.keyPath 
-      ? Dexie.getByKeyPath(obj, primaryKey.keyPath as string)
-      : undefined;
+    // Collect resolved blobs with their keyPaths
+    const resolvedBlobs: ResolvedBlob[] = [];
 
-    if (key !== undefined) {
-      // Queue each resolved blob individually for atomic update
-      // This uses setTimeout(fn, 0) to completely isolate from 
-      // Dexie's transaction context (avoids inheriting PSD)
-      if (isReadonly) {
-        blobSavingQueue.saveBlobs(table.name, key, resolvedBlobs);
-      } else {
-        // For rw transactions, we can save directly without queueing
-        // since we're still in the same transaction context
-        table.mutate({ type: 'put', keys: [key], values: [resolved], trans }).catch(err => {
-          console.error(`Failed to save resolved blob on ${table.name}:${key}:`, err);
-        });
+    // Create the resolution promise with auth info
+    const resolutionPromise = resolveAllBlobRefs(obj, dbUrl, resolvedBlobs, '', new WeakMap(), db.blobDownloadTracker)
+
+    // Wrap with waitFor to keep transaction alive during fetch
+    const resolvePromise = needsWaitFor
+      ? Dexie.waitFor(resolutionPromise)
+      : Dexie.Promise.resolve(resolutionPromise);
+
+    return resolvePromise.then(resolved => {
+      // Get primary key from the object
+      const primaryKey = table.schema.primaryKey;
+      const key = pKey !== undefined ? pKey : primaryKey.keyPath
+        ? Dexie.getByKeyPath(obj, primaryKey.keyPath as string)
+        : undefined;
+
+      if (key !== undefined) {
+        // Queue each resolved blob individually for atomic update
+        // This uses setTimeout(fn, 0) to completely isolate from
+        // Dexie's transaction context (avoids inheriting PSD)
+        if (isReadonly) {
+          blobSavingQueue.saveBlobs(table.name, key, resolvedBlobs);
+        } else {
+          // For rw transactions, we can save directly without queueing
+          // since we're still in the same transaction context
+          table.mutate({ type: 'put', keys: [key], values: [resolved], trans }).catch(err => {
+            console.error(`Failed to save resolved blob on ${table.name}:${key}:`, err);
+          });
+        }
       }
-    }
 
-    return resolved;
-  }).catch(err => {
-    console.error('Failed to resolve BlobRefs:', err);
-    return obj; // Return original object on error
-  });
+      return resolved;
+    }).catch(err => {
+      console.error(`[dexie-cloud:blobResolve] Failed to resolve BlobRefs on ${table.name}:`, err);
+      return obj; // Return original object on error - never block the read pipeline
+    });
+  } catch (err) {
+    console.error(`[dexie-cloud:blobResolve] Sync error in resolveAndSave on ${table.name}:`, err);
+    return Dexie.Promise.resolve(obj); // Never block reads
+  }
 }
