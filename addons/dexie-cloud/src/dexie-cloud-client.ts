@@ -164,6 +164,10 @@ export function dexieCloud(dexie: Dexie) {
     invites: getInvitesObservable(dexie),
     roles: getGlobalRolesObservable(dexie),
     configure(options: DexieCloudOptions) {
+      // Validate maxStringLength — must not exceed server limit (32768)
+      if (options.maxStringLength !== undefined && options.maxStringLength !== Infinity && options.maxStringLength > 32768) {
+        throw new Error(`maxStringLength cannot exceed 32768. Got: ${options.maxStringLength}`);
+      }
       options = dexie.cloud.options = { ...dexie.cloud.options, ...options };
       configuredProgramatically = true;
       if (options.databaseUrl && options.nameSuffix) {
