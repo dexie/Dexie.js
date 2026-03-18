@@ -35,7 +35,8 @@ export type BlobRefOrigType =
   | 'Float64Array'
   | 'BigInt64Array'
   | 'BigUint64Array'
-  | 'DataView';
+  | 'DataView'
+  | 'string';
 
 /**
  * BlobRef represents a reference to binary data stored in blob storage.
@@ -54,7 +55,7 @@ export interface BlobRef {
  */
 export interface ResolvedBlob {
   keyPath: string;
-  data: Blob | ArrayBuffer | ArrayBufferView;
+  data: Blob | ArrayBuffer | ArrayBufferView | string;
   ref: string;
 }
 
@@ -146,7 +147,12 @@ export function hasBlobRefs(obj: unknown, visited = new WeakSet()): boolean {
 export function convertToOriginalType(
   data: Uint8Array, 
   ref: BlobRef
-): Blob | ArrayBuffer | ArrayBufferView {
+): Blob | ArrayBuffer | ArrayBufferView | string {
+  // String type: decode UTF-8 back to string
+  if (ref._bt === 'string') {
+    return new TextDecoder().decode(data);
+  }
+
   // Get the underlying ArrayBuffer (handle shared buffer case)
   const buffer = data.buffer.byteLength === data.byteLength
     ? data.buffer as ArrayBuffer
