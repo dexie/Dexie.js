@@ -12,7 +12,7 @@ But also:
 
 * Dexie.js is widely used by 100,000 of web sites, apps and other projects and supports all browsers, Electron for Desktop apps, Capacitor for iOS / Android apps and of course pure PWAs.
 * Dexie.js works around bugs in the IndexedDB implementations, giving a more stable user experience.
-* It's an easy step to [make it sync](https://dexie.org/#sync).
+* Need sync? [Dexie Cloud](https://dexie.org/cloud/) adds real-time sync, auth, and collaboration on top of Dexie.js — no backend needed.
 
 #### Hello World (vanilla JS)
 
@@ -213,11 +213,39 @@ This is a mix of methods from [WhereClause](https://dexie.org/docs/WhereClause/W
 
 ## Dexie Cloud
 
-[Dexie Cloud](https://dexie.org/cloud/) is a commercial offering that can be used as an add-on to Dexie.js. It syncs a Dexie database with a server and enables developers to build apps without having to care about backend or database layer else than the frontend code with Dexie.js as the sole database layer.
+[Dexie Cloud](https://dexie.org/cloud/) is the easiest way to add sync, authentication, and real-time collaboration to your Dexie app. You keep writing frontend code with Dexie.js — Dexie Cloud handles the rest.
 
-Source for a sample Dexie Cloud app: [Dexie Cloud To-do app](https://github.com/dexie/Dexie.js/tree/master/samples/dexie-cloud-todo-app)
+**What you get:**
+- 🔄 **Sync across devices** — changes propagate in real time, no polling needed
+- 🔐 **Authentication** — built-in user auth, no identity provider required
+- 🛡️ **Access control** — share data between users with fine-grained permissions
+- 📁 **File & blob storage** — store attachments alongside your structured data
+- ✈️ **Offline-first** — works fully offline, syncs when back online
 
-See the sample Dexie Cloud app in action: https://dexie.github.io/Dexie.js/dexie-cloud-todo-app/
+**Getting started is just a few lines:**
+
+```bash
+npm install dexie-cloud-addon
+```
+
+```ts
+import Dexie from 'dexie';
+import dexieCloud from 'dexie-cloud-addon';
+
+const db = new Dexie('MyDatabase', { addons: [dexieCloud] });
+db.version(1).stores({ items: '@id, title' });
+db.cloud.configure({ databaseUrl: 'https://<your-db>.dexie.cloud' });
+```
+
+That's it. Your existing Dexie app now syncs. Hosted cloud or self-hosted on your own infrastructure. 👋
+
+→ [Quickstart guide](https://dexie.org/cloud/docs/quickstart)
+
+**Sample app:**
+
+Source: [Dexie Cloud To-do app](https://github.com/dexie/Dexie.js/tree/master/samples/dexie-cloud-todo-app)
+
+Live demo: https://dexie.github.io/Dexie.js/dexie-cloud-todo-app/
 
 ## Samples
 
