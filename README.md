@@ -237,7 +237,7 @@ db.version(1).stores({ items: '@id, title' });
 db.cloud.configure({ databaseUrl: 'https://<your-db>.dexie.cloud' });
 ```
 
-That's it. Your existing Dexie app now syncs. 👋
+That's it. Your existing Dexie app now syncs. Hosted cloud or self-hosted on your own infrastructure. 👋
 
 → [Quickstart guide](https://dexie.org/cloud/docs/quickstart)
 
