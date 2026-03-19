@@ -94,6 +94,8 @@ export interface DexieCloudOptions {
    * reducing sync payload size. The original string is kept intact in IndexedDB.
    * 
    * Set to `Infinity` to disable string offloading.
+   * Minimum value is 100 to prevent accidental offloading of primary keys.
+   * Maximum value is 32768 (server limit).
    * 
    * @default 32768
    */
