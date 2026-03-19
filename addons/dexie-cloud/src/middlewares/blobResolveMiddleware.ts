@@ -38,7 +38,7 @@ export function createBlobResolveMiddleware(db: DexieCloudDB): Middleware<DBCore
   return {
     stack: 'dbcore' as const,
     name: 'blobResolve',
-    level: -2, // Run below other middlewares and after sync and caching middlewares
+    level: 2, // Run above cache (0) and other middlewares (1) to resolve BlobRefs from cached data
     create(downlevelDatabase: DBCore): DBCore {
       // Create a single queue instance for this database
       const blobSavingQueue = new BlobSavingQueue(db);
