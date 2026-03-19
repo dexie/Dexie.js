@@ -128,7 +128,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
             //triggerSync(db, 'pull');
             await db.cloud.sync({ purpose: 'pull', wait: true });
             break;
-          case 'changes':
+          case 'changes': {
             console.debug('changes');
             if (db.cloud.syncState.value?.phase === 'error') {
               triggerSync(db, 'pull');
@@ -251,6 +251,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
               db.syncCompleteEvent.next();
             }
             break;
+          }
         }
       } catch (error) {
         console.error(`Error in msg queue`, error);
