@@ -87,4 +87,15 @@ export interface DexieCloudOptions {
    *   Best for apps with large media that may not all be needed offline.
    */
   blobMode?: 'eager' | 'lazy';
+
+  /** Maximum string length (in characters) before offloading to blob storage during sync.
+   * 
+   * Strings longer than this threshold are uploaded as blobs during sync,
+   * reducing sync payload size. The original string is kept intact in IndexedDB.
+   * 
+   * Set to `Infinity` to disable string offloading.
+   * 
+   * @default 32768
+   */
+  maxStringLength?: number;
 }

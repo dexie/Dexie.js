@@ -208,12 +208,14 @@ async function _sync(
   // Offload large blobs to blob storage before sync
   //
   let processedChangeSet = clientChangeSet;
-  const hasLargeBlobs = hasLargeBlobsInOperations(clientChangeSet);
+  const maxStringLength = db.cloud.options?.maxStringLength ?? 32768;
+  const hasLargeBlobs = hasLargeBlobsInOperations(clientChangeSet, maxStringLength);
   if (hasLargeBlobs) {
     processedChangeSet = await offloadBlobsInOperations(
       clientChangeSet,
       databaseUrl,
-      () => loadCachedAccessToken(db)
+      () => loadCachedAccessToken(db),
+      maxStringLength
     );
   }
 

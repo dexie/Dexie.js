@@ -164,6 +164,20 @@ export function dexieCloud(dexie: Dexie) {
     invites: getInvitesObservable(dexie),
     roles: getGlobalRolesObservable(dexie),
     configure(options: DexieCloudOptions) {
+      // Validate maxStringLength — Infinity disables offloading, otherwise must be
+      // a finite positive number not exceeding the server limit (32768).
+      const MAX_SERVER_STRING_LENGTH = 32768;
+      if (
+        options.maxStringLength !== undefined &&
+        options.maxStringLength !== Infinity &&
+        (!Number.isFinite(options.maxStringLength) ||
+          options.maxStringLength < 0 ||
+          options.maxStringLength > MAX_SERVER_STRING_LENGTH)
+      ) {
+        throw new Error(
+          `maxStringLength must be Infinity or a finite number in [0, ${MAX_SERVER_STRING_LENGTH}]. Got: ${options.maxStringLength}`
+        );
+      }
       options = dexie.cloud.options = { ...dexie.cloud.options, ...options };
       configuredProgramatically = true;
       if (options.databaseUrl && options.nameSuffix) {

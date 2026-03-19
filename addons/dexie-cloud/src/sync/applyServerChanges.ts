@@ -2,6 +2,23 @@ import { DexieCloudDB } from '../db/DexieCloudDB';
 import Dexie from 'dexie';
 import { bulkUpdate } from '../helpers/bulkUpdate';
 import { DBOperationsSet } from 'dexie-cloud-common';
+import { hasBlobRefs } from './blobResolve';
+
+/**
+ * If the incoming value contains BlobRefs (e.g. offloaded strings or binaries),
+ * mark it with _hasBlobRefs = 1 so the blobResolveMiddleware will resolve them
+ * on the next read.
+ */
+function markIfHasBlobRefs(obj: unknown): void {
+  if (
+    obj !== null &&
+    typeof obj === 'object' &&
+    (obj as any).constructor === Object &&
+    hasBlobRefs(obj)
+  ) {
+    (obj as any)._hasBlobRefs = 1;
+  }
+}
 
 
 export async function applyServerChanges(
@@ -45,6 +62,7 @@ export async function applyServerChanges(
       const keys = mut.keys.map(keyDecoder);
       switch (mut.type) {
         case 'insert':
+          mut.values.forEach(markIfHasBlobRefs);
           if (primaryKey.outbound) {
             await table.bulkAdd(mut.values, keys);
           } else {
@@ -56,6 +74,7 @@ export async function applyServerChanges(
           }
           break;
         case 'upsert':
+          mut.values.forEach(markIfHasBlobRefs);
           if (primaryKey.outbound) {
             await table.bulkPut(mut.values, keys);
           } else {

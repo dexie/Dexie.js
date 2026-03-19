@@ -11,6 +11,9 @@ import { BlobRef, BlobRefOrigType, isBlobRef as isBlobRefFromResolve } from './b
 // Blobs >= 4KB are offloaded to blob storage
 const BLOB_OFFLOAD_THRESHOLD = 4096;
 
+// Default max string length before offloading (32KB characters)
+export const DEFAULT_MAX_STRING_LENGTH = 32768;
+
 // Cache: once we know the server doesn't support blob storage, skip future uploads.
 // Maps databaseUrl → boolean (true = supported, false = not supported).
 const blobEndpointSupported = new Map<string, boolean>();
@@ -178,10 +181,11 @@ export async function uploadBlob(
 export async function offloadBlobsAndMarkDirty(
   obj: unknown,
   databaseUrl: string,
-  getCachedAccessToken: () => Promise<string | null>
+  getCachedAccessToken: () => Promise<string | null>,
+  maxStringLength = DEFAULT_MAX_STRING_LENGTH
 ): Promise<unknown> {
   const dirtyFlag = { dirty: false };
-  const result = await offloadBlobs(obj, databaseUrl, getCachedAccessToken, dirtyFlag);  
+  const result = await offloadBlobs(obj, databaseUrl, getCachedAccessToken, maxStringLength, dirtyFlag);  
   // Mark the object as dirty for sync if any blobs were offloaded
   if (dirtyFlag.dirty && typeof result === 'object' && result !== null && result.constructor === Object) {
     (result as any)._hasBlobRefs = 1;
@@ -198,6 +202,7 @@ export async function offloadBlobs(
   obj: unknown,
   databaseUrl: string,
   getCachedAccessToken: () => Promise<string | null>,
+  maxStringLength = DEFAULT_MAX_STRING_LENGTH,
   dirtyFlag = { dirty: false },
   visited = new WeakSet()
 ): Promise<unknown> {
@@ -205,6 +210,26 @@ export async function offloadBlobs(
     return obj;
   }
   
+  // Check if this is a long string that should be offloaded
+  if (typeof obj === 'string' && obj.length > maxStringLength && maxStringLength !== Infinity) {
+    if (blobEndpointSupported.get(databaseUrl) === false) {
+      return obj;
+    }
+    const blob = new Blob([obj], { type: 'text/plain;charset=utf-8' });
+    const blobRef = await uploadBlob(databaseUrl, getCachedAccessToken, blob);
+    if (blobRef === null) {
+      blobEndpointSupported.set(databaseUrl, false);
+      return obj;
+    }
+    blobEndpointSupported.set(databaseUrl, true);
+    dirtyFlag.dirty = true;
+    // Mark as string type so it's resolved back to string, not Blob
+    return {
+      ...blobRef,
+      _bt: 'string',
+    };
+  }
+
   // Check if this is a blob that should be offloaded
   if (shouldOffloadBlob(obj)) {
     if (blobEndpointSupported.get(databaseUrl) === false) {
@@ -236,7 +261,7 @@ export async function offloadBlobs(
   if (Array.isArray(obj)) {
     const result: unknown[] = [];
     for (const item of obj) {
-      result.push(await offloadBlobs(item, databaseUrl, getCachedAccessToken, dirtyFlag, visited));
+      result.push(await offloadBlobs(item, databaseUrl, getCachedAccessToken, maxStringLength, dirtyFlag, visited));
     }
     return result;
   }
@@ -250,7 +275,7 @@ export async function offloadBlobs(
   
   const result: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(obj)) {
-    result[key] = await offloadBlobs(value, databaseUrl, getCachedAccessToken, dirtyFlag, visited);
+    result[key] = await offloadBlobs(value, databaseUrl, getCachedAccessToken, maxStringLength, dirtyFlag, visited);
   }
   return result;
 }
@@ -262,7 +287,8 @@ export async function offloadBlobs(
 export async function offloadBlobsInOperations(
   operations: DBOperationsSet,
   databaseUrl: string,
-  getCachedAccessToken: () => Promise<string | null>
+  getCachedAccessToken: () => Promise<string | null>,
+  maxStringLength = DEFAULT_MAX_STRING_LENGTH
 ): Promise<DBOperationsSet> {
   const result: DBOperationsSet = [];
   
@@ -270,7 +296,7 @@ export async function offloadBlobsInOperations(
     const processedMuts: DBOperation[] = [];
     
     for (const mut of tableOps.muts) {
-      const processedMut = await offloadBlobsInOperation(mut, databaseUrl, getCachedAccessToken);
+      const processedMut = await offloadBlobsInOperation(mut, databaseUrl, getCachedAccessToken, maxStringLength);
       processedMuts.push(processedMut);
     }
     
@@ -286,13 +312,14 @@ export async function offloadBlobsInOperations(
 async function offloadBlobsInOperation(
   op: DBOperation,
   databaseUrl: string,
-  getCachedAccessToken: ()=> Promise<string | null>
+  getCachedAccessToken: ()=> Promise<string | null>,
+  maxStringLength = DEFAULT_MAX_STRING_LENGTH
 ): Promise<DBOperation> {
   switch (op.type) {
     case 'insert':
     case 'upsert': {
       const processedValues = await Promise.all(
-        op.values.map(value => offloadBlobsAndMarkDirty(value, databaseUrl, getCachedAccessToken))
+        op.values.map(value => offloadBlobsAndMarkDirty(value, databaseUrl, getCachedAccessToken, maxStringLength))
       );
       return {
         ...op,
@@ -302,7 +329,7 @@ async function offloadBlobsInOperation(
     
     case 'update': {
       const processedChangeSpecs = await Promise.all(
-        op.changeSpecs.map(spec => offloadBlobsAndMarkDirty(spec, databaseUrl, getCachedAccessToken))
+        op.changeSpecs.map(spec => offloadBlobsAndMarkDirty(spec, databaseUrl, getCachedAccessToken, maxStringLength))
       );
       return {
         ...op,
@@ -311,7 +338,7 @@ async function offloadBlobsInOperation(
     }
     
     case 'modify': {
-      const processedChangeSpec = await offloadBlobsAndMarkDirty(op.changeSpec, databaseUrl, getCachedAccessToken);
+      const processedChangeSpec = await offloadBlobsAndMarkDirty(op.changeSpec, databaseUrl, getCachedAccessToken, maxStringLength);
       return {
         ...op,
         changeSpec: processedChangeSpec as { [keyPath: string]: any },
@@ -331,10 +358,10 @@ async function offloadBlobsInOperation(
  * Check if there are any large blobs in the operations that need offloading
  * This is a quick check to avoid unnecessary processing
  */
-export function hasLargeBlobsInOperations(operations: DBOperationsSet): boolean {
+export function hasLargeBlobsInOperations(operations: DBOperationsSet, maxStringLength = DEFAULT_MAX_STRING_LENGTH): boolean {
   for (const tableOps of operations) {
     for (const mut of tableOps.muts) {
-      if (hasLargeBlobsInOperation(mut)) {
+      if (hasLargeBlobsInOperation(mut, maxStringLength)) {
         return true;
       }
     }
@@ -342,23 +369,28 @@ export function hasLargeBlobsInOperations(operations: DBOperationsSet): boolean 
   return false;
 }
 
-function hasLargeBlobsInOperation(op: DBOperation): boolean {
+function hasLargeBlobsInOperation(op: DBOperation, maxStringLength: number): boolean {
   switch (op.type) {
     case 'insert':
     case 'upsert':
-      return op.values.some(value => hasLargeBlobs(value));
+      return op.values.some(value => hasLargeBlobs(value, maxStringLength));
     case 'update':
-      return op.changeSpecs.some(spec => hasLargeBlobs(spec));
+      return op.changeSpecs.some(spec => hasLargeBlobs(spec, maxStringLength));
     case 'modify':
-      return hasLargeBlobs(op.changeSpec);
+      return hasLargeBlobs(op.changeSpec, maxStringLength);
     default:
       return false;
   }
 }
 
-function hasLargeBlobs(obj: unknown, visited = new WeakSet()): boolean {
+function hasLargeBlobs(obj: unknown, maxStringLength: number, visited = new WeakSet()): boolean {
   if (obj === null || obj === undefined) {
     return false;
+  }
+  
+  // Check long strings
+  if (typeof obj === 'string' && obj.length > maxStringLength && maxStringLength !== Infinity) {
+    return true;
   }
   
   if (shouldOffloadBlob(obj)) {
@@ -376,14 +408,14 @@ function hasLargeBlobs(obj: unknown, visited = new WeakSet()): boolean {
   visited.add(obj);
   
   if (Array.isArray(obj)) {
-    return obj.some(item => hasLargeBlobs(item, visited));
+    return obj.some(item => hasLargeBlobs(item, maxStringLength, visited));
   }
   
   // Traverse plain objects (POJO-like) - use duck typing since IndexedDB
   // may return objects where constructor !== Object
   const proto = Object.getPrototypeOf(obj);
   if (proto === Object.prototype || proto === null) {
-    return Object.values(obj).some(value => hasLargeBlobs(value, visited));
+    return Object.values(obj).some(value => hasLargeBlobs(value, maxStringLength, visited));
   }
   
   return false;
