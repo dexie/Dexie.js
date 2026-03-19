@@ -134,7 +134,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
               triggerSync(db, 'pull');
               break;
             }
-            await db.transaction('rw', db.dx.tables, async (tx) => {
+            const didApplyChanges = await db.transaction('rw', db.dx.tables, async (tx) => {
               // @ts-ignore
               tx.idbtrans.disableChangeTracking = true;
               // @ts-ignore
@@ -151,7 +151,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
                   schema,
                   currentUser,
                 });
-                return; // Initial sync must have taken place - otherwise, ignore this.
+                return false; // Initial sync must have taken place - otherwise, ignore this.
               }
               // Verify again in ACID tx that we're on same server revision.
               if (msg.baseRev !== syncState.serverRevision) {
@@ -175,7 +175,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
                   // If we don't do a sync request now, we could stuck in an endless loop.
                   triggerSync(db, 'pull');
                 }
-                return; // Ignore message
+                return false; // Ignore message
               }
               // Verify also that the message is based on the exact same set of realms
               const ourRealmSetHash = await Dexie.waitFor(
@@ -188,7 +188,7 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
                 triggerSync(db, 'pull');
                 // The message isn't based on the same realms.
                 // Trigger a sync instead to resolve all things up.
-                return;
+                return false;
               }
 
               // Get clientChanges
@@ -241,8 +241,15 @@ export function MessagesFromServerConsumer(db: DexieCloudDB) {
               //
               console.debug('Updating syncState', syncState);
               await db.$syncState.put(syncState, 'syncState');
+              return true;
             });
             console.debug('msg queue: done with rw transaction');
+            // Trigger eager blob download for any BlobRefs received via WebSocket.
+            // This mirrors the behavior after normal HTTP sync (syncCompleteEvent).
+            // Only emit if changes were actually applied (not on early returns).
+            if (didApplyChanges && msg.changes.length > 0) {
+              db.syncCompleteEvent.next();
+            }
             break;
         }
       } catch (error) {
