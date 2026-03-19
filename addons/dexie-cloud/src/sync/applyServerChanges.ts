@@ -20,6 +20,32 @@ function markIfHasBlobRefs(obj: unknown): void {
   }
 }
 
+/**
+ * For changeSpecs (partial updates from modify/update operations),
+ * check if any value in the spec contains BlobRefs. If so, add
+ * _hasBlobRefs = 1 to the changeSpec so it gets merged into the
+ * existing object in IDB.
+ */
+function markChangeSpecIfHasBlobRefs(changeSpec: {[key: string]: any}): void {
+  for (const key of Object.keys(changeSpec)) {
+    const value = changeSpec[key];
+    if (value !== null && typeof value === 'object' && hasBlobRefs(value)) {
+      changeSpec._hasBlobRefs = 1;
+      return;
+    }
+    // Also check if the value itself is a BlobRef
+    if (
+      value !== null &&
+      typeof value === 'object' &&
+      typeof (value as any)._bt === 'string' &&
+      typeof (value as any).ref === 'string'
+    ) {
+      changeSpec._hasBlobRefs = 1;
+      return;
+    }
+  }
+}
+
 
 export async function applyServerChanges(
   changes: DBOperationsSet<string>,
@@ -86,6 +112,7 @@ export async function applyServerChanges(
           }
           break;
         case 'modify':
+          markChangeSpecIfHasBlobRefs(mut.changeSpec);
           if (keys.length === 1) {
             await table.update(keys[0], mut.changeSpec);
           } else {
@@ -93,6 +120,7 @@ export async function applyServerChanges(
           }
           break;
         case 'update':
+          mut.changeSpecs.forEach(markChangeSpecIfHasBlobRefs);
           await bulkUpdate(table, keys, mut.changeSpecs);
           break;
         case 'delete':
