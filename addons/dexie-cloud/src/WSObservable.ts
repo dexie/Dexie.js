@@ -283,7 +283,7 @@ export class WSConnection extends Subscription {
     wsUrl.protocol = wsUrl.protocol === 'http:' ? 'ws' : 'wss';
     const searchParams = new URLSearchParams();
     if (this.subscriber.closed) return;
-    searchParams.set('v', '2');
+    searchParams.set('v', '3'); // v3 = supports BlobRef (blob offloading)
     if (this.rev) searchParams.set('rev', this.rev);
     if (this.yrev) searchParams.set('yrev', this.yrev);
     searchParams.set('realmsHash', this.realmSetHash);
