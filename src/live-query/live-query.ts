@@ -117,6 +117,17 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         trans: null // Make the scope transactionless (don't reuse transaction from outer scope of the caller of subscribe())
       }
       const ret = execute(ctx);
+
+      // Register mutation listener before the async gap so that storagemutated
+      // events that fire while the query is blocked (e.g. by a long rw transaction)
+      // are captured in accumMuts. shouldNotify() is safe to call with empty
+      // currentObs — it will return false, just accumulating mutations until the
+      // query completes and populates currentObs.
+      if (!startedListening) {
+        globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
+        startedListening = true;
+      }
+
       Promise.resolve(ret).then(
         (result) => {
           hasValue = true;
@@ -130,14 +141,22 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
             // and we must not base currentObs on the half-baked subscr.
             return;
           }
-          accumMuts = {};
-          // Update what we are subscribing for based on this last run:
-          currentObs = subscr;
-          if (!objectIsEmpty(currentObs) && !startedListening) {
-            globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
-            startedListening = true;
+          // Check if mutations arrived during the query that overlap with the
+          // OLD observation set. If so, re-query immediately.
+          if (shouldNotify()) {
+            doQuery();
+          } else {
+            // Update what we are subscribing for based on this last run:
+            currentObs = subscr;
+            // Re-check with the NEW observation set — mutations that arrived during
+            // the query might overlap with tables we now care about but didn't before.
+            if (shouldNotify()) {
+              doQuery();
+            } else {
+              accumMuts = {};
+              execInGlobalContext(()=>!closed && observer.next && observer.next(result));
+            }
           }
-          execInGlobalContext(()=>!closed && observer.next && observer.next(result));
         },
         (err) => {
           hasValue = false;
