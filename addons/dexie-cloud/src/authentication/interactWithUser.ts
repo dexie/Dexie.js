@@ -6,6 +6,7 @@ import { DexieCloudDB } from '../db/DexieCloudDB';
 import { DXCAlert } from '../types/DXCAlert';
 import { DXCInputField } from '../types/DXCInputField';
 import { DXCUserInteraction, DXCGenericUserInteraction, DXCOption } from '../types/DXCUserInteraction';
+import type { PolicyRejectionError } from '../errors/PolicyRejectionError';
 
 /** Email/envelope icon data URL for OTP option */
 const EmailIcon = `data:image/svg+xml;base64,${btoa('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="#666666" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M22 6L12 13 2 6"/></svg>')}`;
@@ -272,4 +273,110 @@ export async function promptForProvider(
     
     userInteraction.next(interactionProps);
   });
+}
+
+/**
+ * Shows a policy rejection error to the user as a DXCUserInteraction challenge.
+ *
+ * The challenge includes:
+ * - An error alert with the rejection message and machine-readable `code`
+ * - The same auth UI that was shown before the rejection:
+ *   - Social providers → provider buttons (so user can try a different account)
+ *   - OTP only → email field (so user can try a different email)
+ *   - Neither → a plain message-alert with just an OK button
+ *
+ * The returned promise resolves with `{ retry: true }` when the user submits
+ * (clicks a provider button or submits an email). The `retry` flag tells the
+ * caller to restart the auth flow with the new credentials.
+ *
+ * Throws `Dexie.AbortError` if the user cancels.
+ */
+export async function promptWithPolicyError(
+  userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
+  error: PolicyRejectionError,
+  opts: {
+    providers?: OAuthProviderInfo[];
+    otpEnabled?: boolean;
+  }
+): Promise<{ retryEmail?: string; retryProvider?: string }> {
+  const errorAlert: DXCAlert = {
+    type: 'error',
+    messageCode: error.code,
+    message: error.message,
+    messageParams: {},
+  };
+
+  const { providers = [], otpEnabled = false } = opts;
+
+  if (providers.length > 0) {
+    // Show provider buttons + error alert. The user can pick a provider to retry.
+    const providerOptions = providers.map(providerToOption);
+    if (otpEnabled) {
+      providerOptions.push({
+        name: 'otp',
+        value: 'email',
+        displayName: 'Continue with email',
+        iconUrl: EmailIcon,
+        styleHint: 'otp',
+      });
+    }
+
+    return new Promise<{ retryProvider?: string; retryEmail?: string }>((resolve, reject) => {
+      const interactionProps: DXCGenericUserInteraction = {
+        type: 'generic',
+        title: 'Sign in',
+        alerts: [errorAlert],
+        options: providerOptions,
+        fields: {},
+        submitLabel: '',
+        cancelLabel: 'Cancel',
+        onSubmit: (params) => {
+          userInteraction.next(undefined);
+          if ('provider' in params) {
+            resolve({ retryProvider: params.provider });
+          } else {
+            // OTP selected — caller must follow up with promptForEmail
+            resolve({ retryEmail: undefined });
+          }
+        },
+        onCancel: () => {
+          userInteraction.next(undefined);
+          reject(new Dexie.AbortError('User cancelled'));
+        },
+      };
+      userInteraction.next(interactionProps);
+    });
+  } else if (otpEnabled) {
+    // Show email field with error alert.
+    let email = '';
+    while (!email || !/^[\w-+.]+@([\w-]+\.)+[\w-]{2,10}(\sas\s[\w-+.]+@([\w-]+\.)+[\w-]{2,10})?$/.test(email)) {
+      const alerts: DXCAlert[] = [errorAlert];
+      if (email) {
+        alerts.push({
+          type: 'error',
+          messageCode: 'INVALID_EMAIL',
+          message: 'Please enter a valid email address',
+          messageParams: {},
+        });
+      }
+      email = (
+        await interactWithUser(userInteraction, {
+          type: 'email',
+          title: 'Sign in',
+          alerts,
+          fields: {
+            email: {
+              type: 'email',
+              placeholder: 'you@somedomain.com',
+            },
+          },
+        })
+      ).email;
+    }
+    return { retryEmail: email };
+  } else {
+    // No auth UI configured — show a plain message-alert with OK button.
+    await alertUser(userInteraction, 'Access Denied', errorAlert);
+    throw new Dexie.AbortError(error.message);
+  }
 }

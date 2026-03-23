@@ -10,10 +10,11 @@ import {
 } from 'dexie-cloud-common';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { HttpError } from '../errors/HttpError';
+import { PolicyRejectionError, isPolicyErrorBody } from '../errors/PolicyRejectionError';
 import { FetchTokenCallback } from './authenticate';
 import { exchangeOAuthCode } from './exchangeOAuthCode';
 import { fetchAuthProviders } from './fetchAuthProviders';
-import { alertUser, promptForEmail, promptForOTP, promptForProvider } from './interactWithUser';
+import { alertUser, promptForEmail, promptForOTP, promptForProvider, promptWithPolicyError } from './interactWithUser';
 import { startOAuthRedirect } from './oauthLogin';
 import { OAuthRedirectError } from '../errors/OAuthRedirectError';
 
@@ -147,6 +148,7 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       mode: 'cors',
     });
     if (res1.status !== 200) {
+      await throwOrHandlePolicyError(res1, url, userInteraction);
       const errMsg = await res1.text();
       await alertUser(userInteraction, "Token request failed", {
         type: 'error',
@@ -194,6 +196,7 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         });
       }
       if (res2.status !== 200) {
+        await throwOrHandlePolicyError(res2, url, userInteraction);
         const errMsg = await res2.text();
         throw new HttpError(res2, errMsg);
       }
@@ -236,4 +239,51 @@ function initiateOAuthRedirect(
     provider,
     redirectUri,
   });
+}
+
+/**
+ * Parses a failed fetch Response and, if it contains a structured PolicyError
+ * body from the server, shows it as a DXCUserInteraction challenge and then
+ * re-throws a PolicyRejectionError so the outer try/catch knows it was a
+ * policy rejection and not a network / generic error.
+ *
+ * Must be called *before* consuming the response body via res.text() in the
+ * caller, because this function reads the body once.
+ */
+async function throwOrHandlePolicyError(
+  res: Response,
+  url: string,
+  userInteraction: import('rxjs').BehaviorSubject<import('../types/DXCUserInteraction').DXCUserInteraction | undefined>
+) {
+  // Only handle 403 responses — other status codes are not policy errors
+  if (res.status !== 403) return;
+
+  let body: unknown;
+  try {
+    body = await res.clone().json();
+  } catch {
+    return; // Not JSON — let the caller handle as plain text
+  }
+
+  if (!isPolicyErrorBody(body)) return;
+
+  const policyError = new PolicyRejectionError(body);
+
+  // Fetch auth providers to know what UI to show alongside the error
+  let providers: import('dexie-cloud-common').OAuthProviderInfo[] = [];
+  let otpEnabled = false;
+  try {
+    const { providers: p, otpEnabled: otp } = await fetchAuthProviders(url, true);
+    providers = p;
+    otpEnabled = otp;
+  } catch {
+    // If we cannot fetch providers, fall back to plain alert
+  }
+
+  // Show the error alongside the appropriate auth UI.
+  // promptWithPolicyError throws AbortError on cancel, or returns retry info.
+  await promptWithPolicyError(userInteraction, policyError, { providers, otpEnabled });
+
+  // Re-throw so callers can handle the rejection distinctly if needed.
+  throw policyError;
 }

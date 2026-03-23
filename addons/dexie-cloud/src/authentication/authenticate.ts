@@ -18,6 +18,7 @@ import { alertUser, interactWithUser } from './interactWithUser';
 import { InvalidLicenseError } from '../InvalidLicenseError';
 import { LoginHints } from '../DexieCloudAPI';
 import { OAuthRedirectError } from '../errors/OAuthRedirectError';
+import { PolicyRejectionError } from '../errors/PolicyRejectionError';
 import { MINUTES } from '../helpers/date-constants';
 
 export type FetchTokenCallback = (tokenParams: {
@@ -235,6 +236,10 @@ async function userAuthenticate(
     // OAuth redirect is not an error - page is navigating away
     if (error instanceof OAuthRedirectError || error?.name === 'OAuthRedirectError') {
       throw error; // Re-throw without logging
+    }
+    // Policy rejections have already been shown to the user as a challenge
+    if (error instanceof PolicyRejectionError || error?.name === 'PolicyRejectionError') {
+      throw error;
     }
     if (error instanceof TokenErrorResponseError) {
       await alertUser(userInteraction, error.title, {

@@ -5,6 +5,7 @@ import type {
 } from 'dexie-cloud-common';
 import { OAuthError } from '../errors/OAuthError';
 import { TokenErrorResponseError } from './TokenErrorResponseError';
+import { PolicyRejectionError, isPolicyErrorBody } from '../errors/PolicyRejectionError';
 
 /** Options for exchanging an OAuth code */
 export interface ExchangeOAuthCodeOptions {
@@ -51,6 +52,19 @@ export async function exchangeOAuthCode(
     if (!res.ok) {
       // Read body once as text to avoid stream consumption issues
       const bodyText = await res.text().catch(() => res.statusText);
+
+      // Check for structured policy rejection (403 with JSON body)
+      if (res.status === 403) {
+        try {
+          const body = JSON.parse(bodyText);
+          if (isPolicyErrorBody(body)) {
+            throw new PolicyRejectionError(body);
+          }
+        } catch (e) {
+          if (e instanceof PolicyRejectionError) throw e;
+          // Fall through to generic error
+        }
+      }
       
       if (res.status === 400 || res.status === 401) {
         // Try to parse error response as JSON
