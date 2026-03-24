@@ -17,6 +17,8 @@ export interface ExchangeOAuthCodeOptions {
   publicKey: string;
   /** Requested scopes (defaults to ['ACCESS_DB']) */
   scopes?: string[];
+  /** Optional login intent — see LoginHints.intent for semantics. */
+  intent?: 'login' | 'register';
 }
 
 /**
@@ -32,13 +34,14 @@ export interface ExchangeOAuthCodeOptions {
 export async function exchangeOAuthCode(
   options: ExchangeOAuthCodeOptions
 ): Promise<TokenFinalResponse> {
-  const { databaseUrl, code, publicKey, scopes = ['ACCESS_DB'] } = options;
+  const { databaseUrl, code, publicKey, scopes = ['ACCESS_DB'], intent } = options;
 
   const tokenRequest: AuthorizationCodeTokenRequest = {
     grant_type: 'authorization_code',
     code,
     public_key: publicKey,
     scopes,
+    ...(intent !== undefined ? { intent } : {}),
   };
 
   try {

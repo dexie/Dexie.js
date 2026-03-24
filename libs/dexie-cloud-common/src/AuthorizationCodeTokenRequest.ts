@@ -7,4 +7,6 @@ export interface AuthorizationCodeTokenRequest {
   public_key?: string;
   /** Requested scopes */
   scopes: string[];
+  /** Optional login intent — see LoginHints.intent for semantics. */
+  intent?: 'login' | 'register';
 }

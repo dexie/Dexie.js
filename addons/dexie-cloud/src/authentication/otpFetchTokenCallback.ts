@@ -39,6 +39,7 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
     let tokenRequest: TokenRequest;
     const url = db.cloud.options?.databaseUrl;
     if (!url) throw new Error(`No database URL given.`);
+    const intent = hints?.intent as 'login' | 'register' | undefined;
 
     // ── Non-interactive paths ──────────────────────────────────────────────
     // These paths POST directly without prompting the user. If a policyAlert
@@ -57,6 +58,7 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
           code: hints.oauthCode,
           publicKey: public_key,
           scopes: ['ACCESS_DB'],
+          intent,
         });
       } catch (err) {
         if (err instanceof PolicyRejectionError) {
@@ -137,6 +139,7 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
           email,
           grant_type: 'otp',
           scopes: ['ACCESS_DB'],
+          ...(intent !== undefined ? { intent } : {}),
         } satisfies OTPTokenRequest1;
       }
     } else {
@@ -182,6 +185,7 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
           email,
           grant_type: 'otp',
           scopes: ['ACCESS_DB'],
+          ...(intent !== undefined ? { intent } : {}),
         } satisfies OTPTokenRequest1;
       }
     }
