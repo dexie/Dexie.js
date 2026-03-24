@@ -71,10 +71,8 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
     // Handle OAuth provider login via redirect (programmatic, no interaction)
     if (hints?.provider) {
       if (policyAlert) {
-        // A previous OAuth attempt was rejected. Show the error and let the
-        // user decide: retry (same/different provider) or cancel.
-        await alertUser(userInteraction, 'Access Denied', policyAlert);
-        // alertUser resolves on OK — fall through to the interactive flow below
+        // A previous OAuth attempt was rejected. Fall through to the
+        // interactive flow — policyAlert will be shown inside the prompt.
         return await otpAuthenticate({ public_key, hints: undefined }, policyAlert);
       }
       let resolvedRedirectUri: string | undefined = undefined;

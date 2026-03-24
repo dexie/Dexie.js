@@ -13,7 +13,7 @@ export interface DXCErrorAlert {
     | 'USER_NOT_REGISTERED'
     | 'USER_NOT_ACCEPTED'
     | 'NO_SEATS_AVAILABLE'
-    | 'USER_NOT_ACCEPTED'
+    | 'USER_DEACTIVATED'
     | 'WEBHOOK_ERROR';
   message: string;
   messageParams: { [paramName: string]: string; };
