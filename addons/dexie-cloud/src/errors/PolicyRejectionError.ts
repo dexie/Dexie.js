@@ -5,7 +5,7 @@
  */
 export type PolicyErrorCode =
   | 'USER_NOT_REGISTERED'
-  | 'EMAIL_NOT_ALLOWED'
+  | 'USER_NOT_ACCEPTED'
   | 'NO_SEATS_AVAILABLE'
   | 'USER_NOT_ACCEPTED'
   | 'WEBHOOK_ERROR';

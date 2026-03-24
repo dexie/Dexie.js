@@ -46,7 +46,6 @@ export interface LoginHints {
    *                 normally get USER_NOT_REGISTERED will instead get
    *                 USER_NOT_ACCEPTED (i.e. the policy blocked them, not the
    *                 fact that registration isn't supported here).
-   *                 EMAIL_NOT_ALLOWED is also mapped to USER_NOT_ACCEPTED.
    * - `undefined`:  Default behaviour — the server returns whatever code the
    *                 user policy dictates.
    */

@@ -11,7 +11,7 @@ export interface DXCErrorAlert {
     // Policy rejection codes — returned by server as structured 403 responses.
     // Use these in a switch statement to display translated or custom messages.
     | 'USER_NOT_REGISTERED'
-    | 'EMAIL_NOT_ALLOWED'
+    | 'USER_NOT_ACCEPTED'
     | 'NO_SEATS_AVAILABLE'
     | 'USER_NOT_ACCEPTED'
     | 'WEBHOOK_ERROR';
