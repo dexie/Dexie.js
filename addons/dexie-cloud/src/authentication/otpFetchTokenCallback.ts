@@ -14,63 +14,105 @@ import { PolicyRejectionError, isPolicyErrorBody } from '../errors/PolicyRejecti
 import { FetchTokenCallback } from './authenticate';
 import { exchangeOAuthCode } from './exchangeOAuthCode';
 import { fetchAuthProviders } from './fetchAuthProviders';
-import { alertUser, promptForEmail, promptForOTP, promptForProvider, promptWithPolicyError } from './interactWithUser';
+import { alertUser, promptForEmail, promptForOTP, promptForProvider } from './interactWithUser';
 import { startOAuthRedirect } from './oauthLogin';
 import { OAuthRedirectError } from '../errors/OAuthRedirectError';
+import { DXCAlert } from '../types/DXCAlert';
 
 export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
   const { userInteraction } = db.cloud;
-  return async function otpAuthenticate({ public_key, hints }) {
+
+  /**
+   * Core authentication function.
+   *
+   * @param public_key - RSA public key PEM for the session
+   * @param hints      - Optional login hints from the caller
+   * @param policyAlert - When set, a previous attempt was rejected by a server
+   *                      policy rule. The alert is injected into the first
+   *                      interactive prompt so the user sees why they were
+   *                      rejected without changing any other flow logic.
+   */
+  async function otpAuthenticate(
+    { public_key, hints }: { public_key: string; hints?: any },
+    policyAlert?: DXCAlert
+  ): Promise<TokenFinalResponse | TokenErrorResponse> {
     let tokenRequest: TokenRequest;
     const url = db.cloud.options?.databaseUrl;
     if (!url) throw new Error(`No database URL given.`);
-    
+
+    // ── Non-interactive paths ──────────────────────────────────────────────
+    // These paths POST directly without prompting the user. If a policyAlert
+    // exists (from a previous rejected attempt), show it with a message-alert
+    // before proceeding so the user understands what happened.
+
     // Handle OAuth code exchange (from redirect/deep link flows)
     if (hints?.oauthCode && hints.provider) {
-      return await exchangeOAuthCode({
-        databaseUrl: url,
-        code: hints.oauthCode,
-        publicKey: public_key,
-        scopes: ['ACCESS_DB'],
-      });
+      if (policyAlert) {
+        // Coming back from OAuth redirect with a pre-existing policy error
+        // is only possible if the error was already shown. Just proceed.
+      }
+      try {
+        return await exchangeOAuthCode({
+          databaseUrl: url,
+          code: hints.oauthCode,
+          publicKey: public_key,
+          scopes: ['ACCESS_DB'],
+        });
+      } catch (err) {
+        if (err instanceof PolicyRejectionError) {
+          return await otpAuthenticate({ public_key, hints: undefined }, toPolicyAlert(err));
+        }
+        throw err;
+      }
     }
-    
-    // Handle OAuth provider login via redirect
+
+    // Handle OAuth provider login via redirect (programmatic, no interaction)
     if (hints?.provider) {
+      if (policyAlert) {
+        // A previous OAuth attempt was rejected. Show the error and let the
+        // user decide: retry (same/different provider) or cancel.
+        await alertUser(userInteraction, 'Access Denied', policyAlert);
+        // alertUser resolves on OK — fall through to the interactive flow below
+        return await otpAuthenticate({ public_key, hints: undefined }, policyAlert);
+      }
       let resolvedRedirectUri: string | undefined = undefined;
       if (hints.redirectPath) {
-        // If redirectPath is absolute, use as is. If relative, resolve against current location
         if (/^https?:\/\//i.test(hints.redirectPath)) {
           resolvedRedirectUri = hints.redirectPath;
         } else if (typeof window !== 'undefined' && window.location) {
-          // Use URL constructor to resolve relative path
           resolvedRedirectUri = new URL(hints.redirectPath, window.location.href).toString();
         } else if (typeof location !== 'undefined' && location.href) {
           resolvedRedirectUri = new URL(hints.redirectPath, location.href).toString();
         }
       }
       initiateOAuthRedirect(db, hints.provider, resolvedRedirectUri);
-      // This function never returns - page navigates away
       throw new OAuthRedirectError(hints.provider);
     }
-    
+
+    // ── Interactive paths ──────────────────────────────────────────────────
+    // policyAlert (if set) is injected into the first prompt so the user sees
+    // it alongside the normal auth UI — no separate error screen needed.
+
     if (hints?.grant_type === 'demo') {
       const demo_user = await promptForEmail(
         userInteraction,
         'Enter a demo user email',
-        hints?.email || hints?.userId
+        hints?.email || hints?.userId,
+        policyAlert
       );
       tokenRequest = {
         demo_user,
         grant_type: 'demo',
         scopes: ['ACCESS_DB'],
-        public_key
+        public_key,
       } satisfies DemoTokenRequest;
     } else if (hints?.otpId && hints.otp) {
-      // User provided OTP ID and OTP code. This means that the OTP email
-      // has already gone out and the user may have clicked a magic link
-      // in the email with otp and otpId in query and the app has picked
-      // up those values and passed them to db.cloud.login().
+      // Magic-link flow: OTP already supplied by the caller (e.g. from email).
+      // No interaction — show alert as a plain message if there is one.
+      if (policyAlert) {
+        await alertUser(userInteraction, 'Access Denied', policyAlert);
+        return await otpAuthenticate({ public_key, hints: undefined }, policyAlert);
+      }
       tokenRequest = {
         grant_type: 'otp',
         otp_id: hints.otpId,
@@ -79,17 +121,16 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         public_key,
       } satisfies OTPTokenRequest2;
     } else if (hints?.grant_type === 'otp' || hints?.email) {
-      // User explicitly requested OTP flow - skip provider selection
-      const email = hints?.email || await promptForEmail(
-        userInteraction,
-        'Enter email address'
-      );
+      // Caller explicitly requested OTP — skip provider selection.
+      const email =
+        hints?.email ||
+        (await promptForEmail(userInteraction, 'Enter email address', undefined, policyAlert));
       if (/@demo.local$/.test(email)) {
         tokenRequest = {
           demo_user: email,
           grant_type: 'demo',
           scopes: ['ACCESS_DB'],
-          public_key
+          public_key,
         } satisfies DemoTokenRequest;
       } else {
         tokenRequest = {
@@ -99,39 +140,42 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         } satisfies OTPTokenRequest1;
       }
     } else {
-      // Check for available auth providers (OAuth + OTP)
+      // Default path: check for OAuth providers, then fall back to OTP.
       const socialAuthEnabled = db.cloud.options?.socialAuth !== false;
       const authProviders = await fetchAuthProviders(url, socialAuthEnabled);
-      
-      // If we have OAuth providers available, prompt for selection
+
       if (authProviders.providers.length > 0) {
+        const providerAlerts = policyAlert ? [policyAlert] : [];
         const selection = await promptForProvider(
           userInteraction,
           authProviders.providers,
           authProviders.otpEnabled,
           'Sign in',
+          providerAlerts
         );
-        
+
         if (selection.type === 'provider') {
-          // User selected an OAuth provider - initiate redirect
           initiateOAuthRedirect(db, selection.provider);
-          // This function never returns - page navigates away
           throw new OAuthRedirectError(selection.provider);
         }
-        // User chose OTP - continue with email prompt below
+        // User chose OTP — fall through to email prompt (no policyAlert here;
+        // it was already shown in the provider prompt above).
       }
-      
+
       const email = await promptForEmail(
         userInteraction,
         'Enter email address',
-        hints?.email
+        hints?.email,
+        // Show policyAlert in email prompt only if there were no providers
+        // (otherwise it was already shown in the provider selection above).
+        authProviders.providers.length === 0 ? policyAlert : undefined
       );
       if (/@demo.local$/.test(email)) {
         tokenRequest = {
           demo_user: email,
           grant_type: 'demo',
           scopes: ['ACCESS_DB'],
-          public_key
+          public_key,
         } satisfies DemoTokenRequest;
       } else {
         tokenRequest = {
@@ -141,39 +185,47 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         } satisfies OTPTokenRequest1;
       }
     }
+
+    // ── POST /token (step 1) ───────────────────────────────────────────────
     const res1 = await fetch(`${url}/token`, {
       body: JSON.stringify(tokenRequest),
       method: 'post',
       headers: { 'Content-Type': 'application/json' },
       mode: 'cors',
     });
+
     if (res1.status !== 200) {
-      await throwOrHandlePolicyError(res1, url, userInteraction);
+      const alert = await tryParsePolicyAlert(res1);
+      if (alert) {
+        // Policy rejection — restart the flow with the error injected.
+        return await otpAuthenticate({ public_key, hints: undefined }, alert);
+      }
       const errMsg = await res1.text();
-      await alertUser(userInteraction, "Token request failed", {
+      await alertUser(userInteraction, 'Token request failed', {
         type: 'error',
         messageCode: 'GENERIC_ERROR',
         message: errMsg,
-        messageParams: {}
-      }).catch(()=>{});
+        messageParams: {},
+      }).catch(() => {});
       throw new HttpError(res1, errMsg);
     }
+
     const response: TokenResponse = await res1.json();
     if (response.type === 'tokens' || response.type === 'error') {
-      // Demo user request can get a "tokens" response right away
-      // Error can also be returned right away.
       return response;
     } else if (tokenRequest.grant_type === 'otp' && 'email' in tokenRequest) {
       if (response.type !== 'otp-sent')
         throw new Error(`Unexpected response from ${url}/token`);
+
       const otp = await promptForOTP(userInteraction, tokenRequest.email);
       const tokenRequest2 = {
         ...tokenRequest,
         otp: otp || '',
         otp_id: response.otp_id,
-        public_key
+        public_key,
       } satisfies OTPTokenRequest2;
 
+      // ── POST /token (step 2: OTP verification) ─────────────────────────
       let res2 = await fetch(`${url}/token`, {
         body: JSON.stringify(tokenRequest2),
         method: 'post',
@@ -186,7 +238,7 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
           type: 'error',
           messageCode: 'INVALID_OTP',
           message: errorText,
-          messageParams: {}
+          messageParams: {},
         });
         res2 = await fetch(`${url}/token`, {
           body: JSON.stringify(tokenRequest2),
@@ -195,25 +247,28 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
           mode: 'cors',
         });
       }
+
       if (res2.status !== 200) {
-        await throwOrHandlePolicyError(res2, url, userInteraction);
+        const alert = await tryParsePolicyAlert(res2);
+        if (alert) {
+          return await otpAuthenticate({ public_key, hints: undefined }, alert);
+        }
         const errMsg = await res2.text();
         throw new HttpError(res2, errMsg);
       }
+
       const response2: TokenFinalResponse | TokenErrorResponse = await res2.json();
       return response2;
     } else {
       throw new Error(`Unexpected response from ${url}/token`);
     }
-  };
+  }
+
+  return ({ public_key, hints }) => otpAuthenticate({ public_key, hints });
 }
 
 /**
  * Initiates OAuth login via full page redirect.
- * 
- * The page will navigate away to the OAuth provider. After authentication,
- * the user is redirected back with a dxc-auth query parameter that is
- * automatically detected by db.cloud.configure().
  */
 function initiateOAuthRedirect(
   db: DexieCloudDB,
@@ -222,18 +277,12 @@ function initiateOAuthRedirect(
 ): void {
   const url = db.cloud.options?.databaseUrl;
   if (!url) throw new Error(`No database URL given.`);
-  
+
   const redirectUri =
     redirectUriOverride ||
     db.cloud.options?.oauthRedirectUri ||
     (typeof location !== 'undefined' ? location.href : undefined);
-  
-  // CodeRabbit suggested to fail fast here, but the only situation where
-  // redirectUri would be undefined is in non-browser environments, and
-  // in those environments OAuth redirect does not make sense anyway
-  // and will fail fast in startOAuthRedirect().
-  
-  // Start OAuth redirect flow - page navigates away
+
   startOAuthRedirect({
     databaseUrl: url,
     provider,
@@ -242,48 +291,31 @@ function initiateOAuthRedirect(
 }
 
 /**
- * Parses a failed fetch Response and, if it contains a structured PolicyError
- * body from the server, shows it as a DXCUserInteraction challenge and then
- * re-throws a PolicyRejectionError so the outer try/catch knows it was a
- * policy rejection and not a network / generic error.
- *
- * Must be called *before* consuming the response body via res.text() in the
- * caller, because this function reads the body once.
+ * Converts a PolicyRejectionError to a DXCAlert for injection into prompts.
  */
-async function throwOrHandlePolicyError(
-  res: Response,
-  url: string,
-  userInteraction: import('rxjs').BehaviorSubject<import('../types/DXCUserInteraction').DXCUserInteraction | undefined>
-) {
-  // Only handle 403 responses — other status codes are not policy errors
-  if (res.status !== 403) return;
+function toPolicyAlert(err: PolicyRejectionError): DXCAlert {
+  return {
+    type: 'error',
+    messageCode: err.code,
+    message: err.message,
+    messageParams: {},
+  };
+}
 
-  let body: unknown;
+/**
+ * Tries to parse a failed Response as a structured PolicyError body.
+ * Returns a DXCAlert if it is one, otherwise returns null.
+ * Safe to call: reads body via clone() so the original Response is untouched.
+ */
+async function tryParsePolicyAlert(res: Response): Promise<DXCAlert | null> {
+  if (res.status !== 403) return null;
   try {
-    body = await res.clone().json();
+    const body = await res.clone().json();
+    if (isPolicyErrorBody(body)) {
+      return toPolicyAlert(new PolicyRejectionError(body));
+    }
   } catch {
-    return; // Not JSON — let the caller handle as plain text
+    // Not JSON
   }
-
-  if (!isPolicyErrorBody(body)) return;
-
-  const policyError = new PolicyRejectionError(body);
-
-  // Fetch auth providers to know what UI to show alongside the error
-  let providers: import('dexie-cloud-common').OAuthProviderInfo[] = [];
-  let otpEnabled = false;
-  try {
-    const { providers: p, otpEnabled: otp } = await fetchAuthProviders(url, true);
-    providers = p;
-    otpEnabled = otp;
-  } catch {
-    // If we cannot fetch providers, fall back to plain alert
-  }
-
-  // Show the error alongside the appropriate auth UI.
-  // promptWithPolicyError throws AbortError on cancel, or returns retry info.
-  await promptWithPolicyError(userInteraction, policyError, { providers, otpEnabled });
-
-  // Re-throw so callers can handle the rejection distinctly if needed.
-  throw policyError;
+  return null;
 }
