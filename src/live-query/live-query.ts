@@ -1,4 +1,9 @@
-import { _global, isAsyncFunction, keys, objectIsEmpty } from '../functions/utils';
+import {
+  _global,
+  isAsyncFunction,
+  keys,
+  objectIsEmpty,
+} from '../functions/utils';
 import {
   globalEvents,
   DEXIE_STORAGE_MUTATED_EVENT_NAME,
@@ -71,7 +76,8 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         if (closed) return;
         closed = true;
         if (abortController) abortController.abort();
-        if (startedListening) globalEvents.storagemutated.unsubscribe(mutationListener);
+        if (startedListening)
+          globalEvents.storagemutated.unsubscribe(mutationListener);
       },
     };
 
@@ -95,7 +101,8 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
     const _doQuery = () => {
       if (
         closed || // closed - don't run!
-        !domDeps.indexedDB) // SSR in sveltekit, nextjs etc
+        !domDeps.indexedDB
+      ) // SSR in sveltekit, nextjs etc
       {
         return;
       }
@@ -108,15 +115,26 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       //    (they will remain in memory for a short time and if noone needs them again, they will eventually be freed up)
       if (abortController) abortController.abort(); // Cancel previous query. Last query will be cancelled on unsubscribe().
       abortController = new AbortController();
-      
+
       const ctx: LiveQueryContext = {
         subscr,
         signal: abortController.signal,
         requery: doQuery,
         querier,
-        trans: null // Make the scope transactionless (don't reuse transaction from outer scope of the caller of subscribe())
-      }
+        trans: null, // Make the scope transactionless (don't reuse transaction from outer scope of the caller of subscribe())
+      };
       const ret = execute(ctx);
+
+      // Register mutation listener before the async gap so that storagemutated
+      // events that fire while the query is blocked (e.g. by a long rw transaction)
+      // are captured in accumMuts. shouldNotify() is safe to call with empty
+      // currentObs — it will return false, just accumulating mutations until the
+      // query completes and populates currentObs.
+      if (!startedListening) {
+        globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
+        startedListening = true;
+      }
+
       Promise.resolve(ret).then(
         (result) => {
           hasValue = true;
@@ -130,22 +148,33 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
             // and we must not base currentObs on the half-baked subscr.
             return;
           }
-          accumMuts = {};
-          // Update what we are subscribing for based on this last run:
-          currentObs = subscr;
-          if (!objectIsEmpty(currentObs) && !startedListening) {
-            globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
-            startedListening = true;
+          // Check if mutations arrived during the query that overlap with the
+          // OLD observation set. If so, re-query immediately.
+          if (shouldNotify()) {
+            doQuery();
+          } else {
+            // Update what we are subscribing for based on this last run:
+            currentObs = subscr;
+            // Re-check with the NEW observation set — mutations that arrived during
+            // the query might overlap with tables we now care about but didn't before.
+            if (shouldNotify()) {
+              doQuery();
+            } else {
+              accumMuts = {};
+              execInGlobalContext(
+                () => !closed && observer.next && observer.next(result)
+              );
+            }
           }
-          execInGlobalContext(()=>!closed && observer.next && observer.next(result));
         },
         (err) => {
           hasValue = false;
           if (!['DatabaseClosedError', 'AbortError'].includes(err?.name)) {
-            if (!closed) execInGlobalContext(()=>{
-              if (closed) return;
-              observer.error && observer.error(err);
-            });
+            if (!closed)
+              execInGlobalContext(() => {
+                if (closed) return;
+                observer.error && observer.error(err);
+              });
           }
         }
       );
