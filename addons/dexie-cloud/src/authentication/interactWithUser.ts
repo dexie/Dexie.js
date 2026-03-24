@@ -90,9 +90,11 @@ export function alertUser(
 export async function promptForEmail(
   userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
   title: string,
-  emailHint?: string
+  emailHint?: string,
+  initialAlert?: DXCAlert
 ) {
   let email = emailHint || '';
+  let firstPrompt = true;
   // Regular expression for email validation
   // ^[\w-+.]+@([\w-]+\.)+[\w-]{2,10}(\sas\s[\w-+.]+@([\w-]+\.)+[\w-]{2,10})?$
   //
@@ -115,20 +117,20 @@ export async function promptForEmail(
   // and GLOBAL_WRITE permissions on the database. The email will be checked on the server before
   // allowing it and giving out a token for email2, using the OTP sent to email1.
   while (!email || !/^[\w-+.]+@([\w-]+\.)+[\w-]{2,10}(\sas\s[\w-+.]+@([\w-]+\.)+[\w-]{2,10})?$/.test(email)) {
+    const alerts: DXCAlert[] = [];
+    if (firstPrompt && initialAlert) alerts.push(initialAlert);
+    if (email) alerts.push({
+      type: 'error',
+      messageCode: 'INVALID_EMAIL',
+      message: 'Please enter a valid email address',
+      messageParams: {},
+    });
+    firstPrompt = false;
     email = (
       await interactWithUser(userInteraction, {
         type: 'email',
         title,
-        alerts: email
-          ? [
-              {
-                type: 'error',
-                messageCode: 'INVALID_EMAIL',
-                message: 'Please enter a valid email address',
-                messageParams: {},
-              },
-            ]
-          : [],
+        alerts,
         fields: {
           email: {
             type: 'email',

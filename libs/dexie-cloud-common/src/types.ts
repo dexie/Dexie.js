@@ -13,6 +13,8 @@ export interface OTPTokenRequest1 {
   grant_type: 'otp';
   email: string;
   scopes: string[]; // TODO use CLIENT_SCOPE type.
+  /** Optional login intent — see LoginHints.intent for semantics. */
+  intent?: 'login' | 'register';
 }
 
 export interface OTPTokenRequest2 {

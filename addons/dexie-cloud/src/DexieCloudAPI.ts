@@ -37,6 +37,19 @@ export interface LoginHints {
   oauthCode?: string;
   /** Optional redirect path (relative or absolute) to use for OAuth redirect URI. */
   redirectPath?: string;
+  /**
+   * Optional login intent hint.
+   *
+   * - `"login"`:    Only existing users are accepted. Unknown users always get
+   *                 USER_NOT_REGISTERED regardless of the database user policy.
+   * - `"register"`: New-user registration is intended. Unknown users that would
+   *                 normally get USER_NOT_REGISTERED will instead get
+   *                 USER_NOT_ACCEPTED (i.e. the policy blocked them, not the
+   *                 fact that registration isn't supported here).
+   * - `undefined`:  Default behaviour — the server returns whatever code the
+   *                 user policy dictates.
+   */
+  intent?: 'login' | 'register';
 }
 
 export interface DexieCloudAPI {

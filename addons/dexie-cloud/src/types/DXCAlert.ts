@@ -3,7 +3,18 @@ export type DXCAlert = DXCErrorAlert | DXCWarningAlert | DXCInfoAlert;
 
 export interface DXCErrorAlert {
   type: 'error';
-  messageCode: 'INVALID_OTP' | 'INVALID_EMAIL' | 'LICENSE_LIMIT_REACHED' | 'GENERIC_ERROR';
+  messageCode:
+    | 'INVALID_OTP'
+    | 'INVALID_EMAIL'
+    | 'LICENSE_LIMIT_REACHED'
+    | 'GENERIC_ERROR'
+    // Policy rejection codes — returned by server as structured 403 responses.
+    // Use these in a switch statement to display translated or custom messages.
+    | 'USER_NOT_REGISTERED'
+    | 'USER_NOT_ACCEPTED'
+    | 'NO_SEATS_AVAILABLE'
+    | 'USER_DEACTIVATED'
+    | 'WEBHOOK_ERROR';
   message: string;
   messageParams: { [paramName: string]: string; };
   /** Optional text that users can copy to clipboard (e.g. a CLI command) */
