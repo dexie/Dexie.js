@@ -25,7 +25,7 @@ declare module 'dexie' {
   }
 
   interface Table {
-    newId(options: NewIdOptions): string;
+    newId(options?: NewIdOptions): string;
     idPrefix(): string;
   }
 
