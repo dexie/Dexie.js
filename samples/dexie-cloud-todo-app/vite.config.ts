@@ -29,9 +29,8 @@ export default defineConfig(({ command }) => {
     },
     resolve: {
       alias: {
-        // Unmark below row temporarily while developing dexie/dexie-cloud-addon/dexie-react-hooks/dexie-cloud-todo-app together:
-        // It will point dexie directly to ESM build to avoid import-wrapper.mjs issues with workspace links
-        //'dexie': path.resolve(__dirname, '../../dist/dexie.mjs')
+        // Point dexie directly to ESM build to avoid import-wrapper.mjs issues with workspace links
+        'dexie': new URL('../../dist/dexie.mjs', import.meta.url).pathname
       }
     },
     build: {
