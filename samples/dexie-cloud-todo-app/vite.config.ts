@@ -29,8 +29,9 @@ export default defineConfig(({ command }) => {
     },
     resolve: {
       alias: {
-        // Point dexie directly to ESM build to avoid import-wrapper.mjs issues with workspace links
-        'dexie': new URL('../../dist/dexie.mjs', import.meta.url).pathname
+        // Unmark below row temporarily while developing dexie/dexie-cloud-addon/dexie-react-hooks/dexie-cloud-todo-app together:
+        // It will point dexie directly to ESM build to avoid import-wrapper.mjs issues with workspace links
+        //'dexie': path.resolve(__dirname, '../../dist/dexie.mjs')
       }
     },
     build: {
@@ -40,8 +41,7 @@ export default defineConfig(({ command }) => {
     },
     server: {
       port: 3000,
-      open: true,
-      allowedHosts: true
+      open: true
     },
     preview: {
       port: 3001
