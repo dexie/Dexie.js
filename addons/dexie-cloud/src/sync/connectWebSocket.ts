@@ -1,4 +1,12 @@
-import { BehaviorSubject, firstValueFrom, from, Observable, of, throwError, merge } from 'rxjs';
+import {
+  BehaviorSubject,
+  firstValueFrom,
+  from,
+  Observable,
+  of,
+  throwError,
+  merge,
+} from 'rxjs';
 import {
   catchError,
   combineLatestAll,
@@ -53,22 +61,24 @@ export function connectWebSocket(db: DexieCloudDB) {
 
   const readyForChangesMessage = db.messageConsumer.readyToServe.pipe(
     filter((isReady) => isReady), // When consumer is ready for new messages, produce such a message to inform server about it
-    switchMap(() => db.cloud.persistedSyncState.pipe(
-      filter((syncState) => !!(syncState && syncState.serverRevision)),
-      take(1)
-    )), // Wait reactively for syncState with serverRevision (avoids race with logout/re-sync)
-    switchMap<PersistedSyncState, Promise<ReadyForChangesMessage>>(async (syncState) => ({
-      // Produce the message to trigger server to send us new messages to consume:
-      type: 'ready',
-      rev: syncState.serverRevision,
-      realmSetHash: await computeRealmSetHash(syncState)
-    } satisfies ReadyForChangesMessage))
+    switchMap(() =>
+      db.cloud.persistedSyncState.pipe(
+        filter((syncState) => !!(syncState && syncState.serverRevision)),
+        take(1)
+      )
+    ), // Wait reactively for syncState with serverRevision (avoids race with logout/re-sync)
+    switchMap<PersistedSyncState, Promise<ReadyForChangesMessage>>(
+      async (syncState) =>
+        ({
+          // Produce the message to trigger server to send us new messages to consume:
+          type: 'ready',
+          rev: syncState.serverRevision,
+          realmSetHash: await computeRealmSetHash(syncState),
+        }) satisfies ReadyForChangesMessage
+    )
   );
 
-  const messageProducer = merge(
-    readyForChangesMessage,
-    db.messageProducer
-  );
+  const messageProducer = merge(readyForChangesMessage, db.messageProducer);
 
   function createObservable(): Observable<WSConnectionMsg | null> {
     return db.cloud.persistedSyncState.pipe(
@@ -88,12 +98,18 @@ export function connectWebSocket(db: DexieCloudDB) {
         );
       }),
       switchMap(([userLogin, syncState]) => {
-        if (userLogin?.isLoggedIn && !syncState?.realms.includes(userLogin.userId!)) {
+        if (
+          userLogin?.isLoggedIn &&
+          !syncState?.realms.includes(userLogin.userId!)
+        ) {
           // We're in an in-between state when user is logged in but the user's realms are not yet synced.
           // Don't make this change reconnect the websocket just yet. Wait till syncState is updated
           // to iclude the user's realm.
           return db.cloud.persistedSyncState.pipe(
-            filter((syncState) => syncState?.realms.includes(userLogin!.userId!) || false),
+            filter(
+              (syncState) =>
+                syncState?.realms.includes(userLogin!.userId!) || false
+            ),
             take(1),
             map((syncState) => [userLogin, syncState] as const)
           );
@@ -104,7 +120,10 @@ export function connectWebSocket(db: DexieCloudDB) {
         async ([userLogin, syncState]) =>
           [userLogin, await computeRealmSetHash(syncState!)] as const
       ),
-      distinctUntilChanged(([prevUser, prevHash], [currUser, currHash]) => prevUser === currUser && prevHash === currHash ),
+      distinctUntilChanged(
+        ([prevUser, prevHash], [currUser, currHash]) =>
+          prevUser === currUser && prevHash === currHash
+      ),
       switchMap(([userLogin, realmSetHash]) => {
         if (!db.cloud.persistedSyncState?.value) {
           // Restart the flow if persistedSyncState is not yet available.
@@ -115,18 +134,19 @@ export function connectWebSocket(db: DexieCloudDB) {
         // and the baseRev of the last from same client-ID.
         if (userLogin) {
           return new WSObservable(
-              db,
-              db.cloud.persistedSyncState!.value!.serverRevision,
-              db.cloud.persistedSyncState!.value!.yServerRevision,
-              realmSetHash,
-              db.cloud.persistedSyncState!.value!.clientIdentity,
-              messageProducer,
-              db.cloud.webSocketStatus,
-              userLogin
-            );
+            db,
+            db.cloud.persistedSyncState!.value!.serverRevision,
+            db.cloud.persistedSyncState!.value!.yServerRevision,
+            realmSetHash,
+            db.cloud.persistedSyncState!.value!.clientIdentity,
+            messageProducer,
+            db.cloud.webSocketStatus,
+            userLogin
+          );
         } else {
           return from([] as WSConnectionMsg[]);
-        }}),
+        }
+      }),
       catchError((error) => {
         if (error?.name === 'TokenExpiredError') {
           console.debug(
@@ -146,17 +166,17 @@ export function connectWebSocket(db: DexieCloudDB) {
                 accessTokenExpiration: refreshedLogin.accessTokenExpiration,
                 claims: refreshedLogin.claims,
                 license: refreshedLogin.license,
-                data: refreshedLogin.data
+                data: refreshedLogin.data,
               });
             }),
             switchMap(() => createObservable())
           );
         } else {
-          return throwError(()=>error);
+          return throwError(() => error);
         }
       }),
       catchError((error) => {
-        db.cloud.webSocketStatus.next("error");
+        db.cloud.webSocketStatus.next('error');
         if (error instanceof InvalidLicenseError) {
           // Don't retry. Just throw and don't try connect again.
           return throwError(() => error);

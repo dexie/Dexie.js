@@ -27,52 +27,51 @@ export function LocalSyncWorker(
         cancelToken,
         retryImmediatelyOnFetchError: true, // workaround for "net::ERR_NETWORK_CHANGED" in chrome.
         purpose,
-      }).then(()=>{
-        if (cancelToken.cancelled) {
-          stop();
-        } else {
-          if (pullSignalled || pushSignalled) {
-            // If we have signalled for more sync, do it now.
-            // Note: don't reset flags here - syncAndRetry reads them in setTimeout
-            return syncAndRetry();
+      })
+        .then(() => {
+          if (cancelToken.cancelled) {
+            stop();
+          } else {
+            if (pullSignalled || pushSignalled) {
+              // If we have signalled for more sync, do it now.
+              // Note: don't reset flags here - syncAndRetry reads them in setTimeout
+              return syncAndRetry();
+            }
           }
-        }
-        ongoingSync = false;
-        nextRetryTime = 0;
-        syncStartTime = 0;
-      }).catch((error: unknown) => {
-        console.error('error in syncIfPossible()', error);
-        if (cancelToken.cancelled) {
-          stop();
           ongoingSync = false;
           nextRetryTime = 0;
           syncStartTime = 0;
-        } else if (retryNum < 5) {
-          // Mimic service worker sync event but a bit more eager: retry 4 times
-          // * first retry after 20 seconds
-          // * second retry 40 seconds later
-          // * third retry 5 minutes later
-          // * last retry 15 minutes later
-          const retryIn = [0, 20, 40, 300, 900][retryNum] * SECONDS
-          nextRetryTime = Date.now() + retryIn;
-          syncStartTime = 0;
-          setTimeout(
-            () => syncAndRetry(retryNum + 1),
-            retryIn
-          );
-        } else {
-          ongoingSync = false;
-          nextRetryTime = 0;
-          syncStartTime = 0;
-        }
-      });
+        })
+        .catch((error: unknown) => {
+          console.error('error in syncIfPossible()', error);
+          if (cancelToken.cancelled) {
+            stop();
+            ongoingSync = false;
+            nextRetryTime = 0;
+            syncStartTime = 0;
+          } else if (retryNum < 5) {
+            // Mimic service worker sync event but a bit more eager: retry 4 times
+            // * first retry after 20 seconds
+            // * second retry 40 seconds later
+            // * third retry 5 minutes later
+            // * last retry 15 minutes later
+            const retryIn = [0, 20, 40, 300, 900][retryNum] * SECONDS;
+            nextRetryTime = Date.now() + retryIn;
+            syncStartTime = 0;
+            setTimeout(() => syncAndRetry(retryNum + 1), retryIn);
+          } else {
+            ongoingSync = false;
+            nextRetryTime = 0;
+            syncStartTime = 0;
+          }
+        });
     }, 0);
   }
 
   let pullSignalled = false;
   let pushSignalled = false;
   let ongoingSync = false;
-  const consumer = (purpose: 'pull' | 'push') =>{
+  const consumer = (purpose: 'pull' | 'push') => {
     if (cancelToken.cancelled) return;
     if (purpose === 'pull') {
       pullSignalled = true;
@@ -82,9 +81,16 @@ export function LocalSyncWorker(
     }
     if (ongoingSync) {
       if (nextRetryTime) {
-        console.debug(`Sync is paused until ${new Date(nextRetryTime).toISOString()} due to error in last sync attempt`);
-      } else if (syncStartTime > 0 && Date.now() - syncStartTime > 20 * SECONDS) {
-        console.debug(`An existing sync operation is taking more than 20 seconds. Will resync when done.`)
+        console.debug(
+          `Sync is paused until ${new Date(nextRetryTime).toISOString()} due to error in last sync attempt`
+        );
+      } else if (
+        syncStartTime > 0 &&
+        Date.now() - syncStartTime > 20 * SECONDS
+      ) {
+        console.debug(
+          `An existing sync operation is taking more than 20 seconds. Will resync when done.`
+        );
       }
       return;
     }
