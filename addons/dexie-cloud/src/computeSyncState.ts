@@ -7,44 +7,29 @@ import { SyncState } from './types/SyncState';
 import { userIsActive, userIsReallyActive } from './userIsActive';
 
 export function computeSyncState(db: DexieCloudDB): Observable<SyncState> {
-  let _prevStatus = db.cloud.webSocketStatus.value;
+  // Throttle WS status changes to avoid distracting the user with transient states.
+  // "connected" always passes through immediately (good news shouldn't be delayed).
+  // All other states are debounced by 500ms so that brief disconnected→connecting→connected
+  // transitions don't flash intermediate icons.
   const lazyWebSocketStatus = db.cloud.webSocketStatus.pipe(
-    switchMap((status) => {
-      const prevStatus = _prevStatus;
-      _prevStatus = status;
-      const rv = of(status);
-      switch (status) {
-        // A normal scenario is that the WS reconnects and falls shortly in disconnected-->connection-->connected.
-        // Don't distract user with this unless these things take more time than normal:
-
-        // Only show disconnected if disconnected more than 500ms, or if we can
-        // see that the user is indeed not active.
-        case 'disconnected':
-          return userIsActive.value ? rv.pipe(debounceTime(500)) : rv;
-
-        // Only show connecting if previous state was 'not-started' or 'error', or if
-        // the time it takes to connect goes beyond 4 seconds.
-        case 'connecting':
-          return prevStatus === 'not-started' || prevStatus === 'error'
-            ? rv
-            : rv.pipe(debounceTime(4000));
-        default:
-          return rv;
-      }
-    })
+    switchMap((status) =>
+      status === 'connected' ? of(status) : of(status).pipe(debounceTime(500))
+    )
   );
   return combineLatest([
     lazyWebSocketStatus,
-    db.syncStateChangedEvent.pipe(startWith({ phase: 'initial' } as SyncStateChangedEventData)),
+    db.syncStateChangedEvent.pipe(
+      startWith({ phase: 'initial' } as SyncStateChangedEventData)
+    ),
     getCurrentUserEmitter(db.dx._novip),
-    userIsReallyActive
+    userIsReallyActive,
   ]).pipe(
     map(([status, syncState, user, userIsActive]) => {
       if (user.license?.status && user.license.status !== 'ok') {
         return {
           phase: 'offline',
           status: 'offline',
-          license: user.license.status
+          license: user.license.status,
         } satisfies SyncState;
       }
       let { phase, error, progress } = syncState;
@@ -61,17 +46,20 @@ export function computeSyncState(db: DexieCloudDB): Observable<SyncState> {
         if (phase === 'pushing' || phase === 'pulling') {
           adjustedStatus = 'connecting';
         }
-      }      
+      }
       const previousPhase = db.cloud.syncState.value.phase;
       //const previousStatus = db.cloud.syncState.value.status;
-      if (previousPhase === 'error' && (syncState.phase === 'pushing' || syncState.phase === 'pulling')) {
+      if (
+        previousPhase === 'error' &&
+        (syncState.phase === 'pushing' || syncState.phase === 'pulling')
+      ) {
         // We were in an errored state but is now doing sync. Show "connecting" icon.
         adjustedStatus = 'connecting';
       }
       /*if (syncState.phase === 'in-sync' && adjustedStatus === 'connecting') {
         adjustedStatus = 'connected';
       }*/
-        
+
       if (!userIsActive) {
         adjustedStatus = 'disconnected';
       }
@@ -81,7 +69,7 @@ export function computeSyncState(db: DexieCloudDB): Observable<SyncState> {
         error,
         progress,
         status: isOnline ? adjustedStatus : 'offline',
-        license: 'ok'
+        license: 'ok',
       };
 
       return retState;
