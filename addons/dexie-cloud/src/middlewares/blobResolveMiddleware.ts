@@ -163,6 +163,7 @@ function createBlobResolvingCursor(
         return cursor.start(() => {
           const rawValue = cursor.value;
           if (!rawValue || !hasUnresolvedBlobRefs(rawValue)) {
+            wrappedCursor.value = rawValue;
             onNext();
             return;
           }
@@ -171,6 +172,7 @@ function createBlobResolvingCursor(
             onNext();
           }, err => {
             console.error('Failed to resolve BlobRefs for cursor value:', err);
+            wrappedCursor.value = rawValue;
             onNext();
           });
         });
