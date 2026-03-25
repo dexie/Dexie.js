@@ -65,7 +65,7 @@ export async function _logout(
       }
       for (const table of db.dx.tables) {
         if (table.name !== '$jobs' && table.name !== '$syncState') {
-          table.clear();
+          await table.clear();
         }
       }
       return [sumUnSynced, true];
