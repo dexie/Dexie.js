@@ -1,4 +1,5 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
+import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import { TXExpandos } from '../types/TXExpandos';
 import { confirmLogout } from './interactWithUser';
 import { UNAUTHORIZED_USER } from './UNAUTHORIZED_USER';
@@ -55,7 +56,9 @@ export async function _logout(
       // so that serverRevision, clientIdentity, and initiallySynced survive logout.
       // This avoids a full re-sync and prevents race conditions where the WebSocket
       // pipeline can't produce a "ready" message due to missing serverRevision.
-      const syncState = await db.$syncState.get('syncState');
+      const syncState = (await db.$syncState.get('syncState')) as
+        | PersistedSyncState
+        | undefined;
       if (syncState) {
         syncState.realms = [];
         syncState.inviteRealms = [];
