@@ -20,6 +20,8 @@ export function LocalSyncWorker(
     // break free from possible active transaction:
     setTimeout(() => {
       const purpose = pullSignalled ? 'pull' : 'push';
+      pullSignalled = false;
+      pushSignalled = false;
       syncStartTime = Date.now();
       syncIfPossible(db, cloudOptions, cloudSchema, {
         cancelToken,
@@ -31,8 +33,7 @@ export function LocalSyncWorker(
         } else {
           if (pullSignalled || pushSignalled) {
             // If we have signalled for more sync, do it now.
-            pullSignalled = false;
-            pushSignalled = false;
+            // Note: don't reset flags here - syncAndRetry reads them in setTimeout
             return syncAndRetry();
           }
         }
