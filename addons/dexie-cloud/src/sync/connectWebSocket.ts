@@ -59,17 +59,11 @@ export function connectWebSocket(db: DexieCloudDB) {
   }
 
   const readyForChangesMessage = db.messageConsumer.readyToServe.pipe(
-    filter((isReady) => isReady), // When consumer is ready for new messages, produce such a message to inform server about it
+    filter((isReady) => isReady),
     switchMap(() =>
       db.cloud.persistedSyncState.pipe(
-        // Wait for initial sync to set serverRevision, then only re-emit
-        // when realms change (not on every serverRevision bump):
         filter((syncState) => !!(syncState && syncState.serverRevision)),
-        distinctUntilChanged(
-          (prev, curr) =>
-            prev?.realms?.join(',') === curr?.realms?.join(',') &&
-            prev?.inviteRealms?.join(',') === curr?.inviteRealms?.join(',')
-        )
+        take(1)
       )
     ),
     switchMap<PersistedSyncState, Promise<ReadyForChangesMessage>>(
@@ -87,70 +81,57 @@ export function connectWebSocket(db: DexieCloudDB) {
 
   function createObservable(): Observable<WSConnectionMsg | null> {
     return db.cloud.persistedSyncState.pipe(
-      filter((syncState) => syncState?.serverRevision), // Don't connect before there's no initial sync performed.
-      take(1), // Don't continue waking up whenever syncState change
+      filter((syncState) => !!(syncState?.serverRevision)), // Don't connect before initial sync performed.
+      // Small debounce to let realms settle (e.g. initial sync emits 1 realm, then 3 in rapid succession)
+      debounceTime(50),
+      // Compute realm set hash reactively - reconnects when realms change
+      // (which happens on login, logout, user switch, sharing changes)
       switchMap((syncState) =>
-        db.cloud.currentUser.pipe(
-          map((userLogin) => [userLogin, syncState] as const)
+        from(computeRealmSetHash(syncState!)).pipe(
+          map((hash) => [syncState!, hash] as const)
         )
       ),
-      switchMap(([userLogin, syncState]) => {
-        /*if (userLogin.license?.status && userLogin.license.status !== 'ok') {
-          throw new InvalidLicenseError();
-        }*/
-        return userIsReallyActive.pipe(
-          map((isActive) => [isActive ? userLogin : null, syncState] as const)
-        );
-      }),
-      switchMap(([userLogin, syncState]) => {
+      distinctUntilChanged(
+        ([, prevHash], [, currHash]) => prevHash === currHash
+      ),
+      switchMap(([syncState, realmSetHash]) => {
+        // Get current user imperatively - realms already tell us about access changes
+        const userLogin = db.cloud.currentUser.value;
         if (
           userLogin?.isLoggedIn &&
-          !syncState?.realms.includes(userLogin.userId!)
+          !syncState.realms.includes(userLogin.userId!)
         ) {
-          // We're in an in-between state when user is logged in but the user's realms are not yet synced.
-          // Don't make this change reconnect the websocket just yet. Wait till syncState is updated
-          // to iclude the user's realm.
+          // In-between state: user logged in but realms not yet synced.
+          // Wait for realms to include the user.
           return db.cloud.persistedSyncState.pipe(
             filter(
-              (syncState) =>
-                syncState?.realms.includes(userLogin!.userId!) || false
+              (ss) => ss?.realms.includes(userLogin!.userId!) || false
             ),
             take(1),
-            map((syncState) => [userLogin, syncState] as const)
+            map((ss) => [userLogin, ss!, realmSetHash] as const)
           );
         }
-        return new BehaviorSubject([userLogin, syncState] as const);
+        return of([userLogin, syncState, realmSetHash] as const);
       }),
-      switchMap(
-        async ([userLogin, syncState]) =>
-          [userLogin, await computeRealmSetHash(syncState!)] as const
-      ),
-      distinctUntilChanged(
-        ([prevUser, prevHash], [currUser, currHash]) =>
-          prevUser === currUser && prevHash === currHash
-      ),
-      switchMap(([userLogin, realmSetHash]) => {
-        if (!db.cloud.persistedSyncState?.value) {
-          // Restart the flow if persistedSyncState is not yet available.
-          return createObservable();
-        }
-        // Let server end query changes from last entry of same client-ID and forward.
-        // If no new entries, server won't bother the client. If new entries, server sends only those
-        // and the baseRev of the last from same client-ID.
-        if (userLogin) {
-          return new WSObservable(
-            db,
-            db.cloud.persistedSyncState!.value!.serverRevision,
-            db.cloud.persistedSyncState!.value!.yServerRevision,
-            realmSetHash,
-            db.cloud.persistedSyncState!.value!.clientIdentity,
-            messageProducer,
-            db.cloud.webSocketStatus,
-            userLogin
-          );
-        } else {
-          return from([] as WSConnectionMsg[]);
-        }
+      switchMap(([userLogin, syncState, realmSetHash]) => {
+        const effectiveUser = userLogin?.isLoggedIn ? userLogin : db.cloud.currentUser.value;
+        return userIsReallyActive.pipe(
+          switchMap((isActive) => {
+            if (!isActive) {
+              return from([] as WSConnectionMsg[]);
+            }
+            return new WSObservable(
+              db,
+              syncState.serverRevision,
+              syncState.yServerRevision,
+              realmSetHash,
+              syncState.clientIdentity,
+              messageProducer,
+              db.cloud.webSocketStatus,
+              effectiveUser
+            );
+          })
+        );
       }),
       catchError((error) => {
         if (error?.name === 'TokenExpiredError') {
