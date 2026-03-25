@@ -67,8 +67,8 @@ export function connectWebSocket(db: DexieCloudDB) {
         filter((syncState) => !!(syncState && syncState.serverRevision)),
         distinctUntilChanged(
           (prev, curr) =>
-            prev.realms?.join(',') === curr.realms?.join(',') &&
-            prev.inviteRealms?.join(',') === curr.inviteRealms?.join(',')
+            prev?.realms?.join(',') === curr?.realms?.join(',') &&
+            prev?.inviteRealms?.join(',') === curr?.inviteRealms?.join(',')
         )
       )
     ),
