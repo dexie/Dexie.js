@@ -1,5 +1,4 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import { TXExpandos } from '../types/TXExpandos';
 import { confirmLogout } from './interactWithUser';
 import { UNAUTHORIZED_USER } from './UNAUTHORIZED_USER';
@@ -51,24 +50,12 @@ export async function _logout(
       }
 
       // Either there are no unsynched changes, or caller provided flag deleteUnsynchedData = true.
-      // Clear all tables except $jobs and $syncState.
-      // Keep syncState but strip user-specific fields (realms, inviteRealms, yDownloadedRealms)
-      // so that serverRevision, clientIdentity, and initiallySynced survive logout.
-      // This avoids a full re-sync and prevents race conditions where the WebSocket
-      // pipeline can't produce a "ready" message due to missing serverRevision.
-      const syncState = (await db.$syncState.get('syncState')) as
-        | PersistedSyncState
-        | undefined;
-      if (syncState) {
-        syncState.realms = [];
-        syncState.inviteRealms = [];
-        delete syncState.yDownloadedRealms;
-        syncState.latestRevisions = {};
-        await db.$syncState.put(syncState, 'syncState');
-      }
+      // Clear all tables except $jobs and $syncState (except the persisted sync state which is
+      // also cleared because we're going to rebuild it using a fresh sync).
+      db.$syncState.delete('syncState');
       for (const table of db.dx.tables) {
         if (table.name !== '$jobs' && table.name !== '$syncState') {
-          await table.clear();
+          table.clear();
         }
       }
       return [sumUnSynced, true];
