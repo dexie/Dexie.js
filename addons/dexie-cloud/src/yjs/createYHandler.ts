@@ -25,6 +25,7 @@ export function createYHandler(db: DexieCloudDB) {
     }
     let awareness: import('y-protocols/awareness').Awareness;
     Object.defineProperty(provider, 'awareness', {
+      configurable: true,
       get() {
         if (awareness) return awareness;
         awareness = createAwareness(db, doc, provider);
