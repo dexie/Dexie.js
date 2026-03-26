@@ -24,6 +24,17 @@ export function createYHandler(db: DexieCloudDB) {
       return; // The table that holds the doc is not marked for sync - leave it to dexie. No syncing, no awareness.
     }
     let awareness: import('y-protocols/awareness').Awareness;
+    const existingDescriptor = Object.getOwnPropertyDescriptor(provider, 'awareness');
+    if (existingDescriptor) {
+      // Provider already initialized — likely a leaked handler from a previous db instance
+      // (e.g. HMR where db.close() didn't fire). Destroy the stale awareness so the new
+      // handler can take over cleanly.
+      const staleAwareness = provider.awareness as import('y-protocols/awareness').Awareness | undefined;
+      if (staleAwareness) {
+        staleAwareness.destroy();
+        awarenessWeakMap.delete(doc);
+      }
+    }
     Object.defineProperty(provider, 'awareness', {
       configurable: true,
       get() {
