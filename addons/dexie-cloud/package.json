@@ -1,6 +1,6 @@
 {
   "name": "dexie-cloud-addon",
-  "version": "4.4.6",
+  "version": "4.4.7",
   "description": "Dexie addon that syncs with to Dexie Cloud",
   "type": "module",
   "module": "dist/modern/dexie-cloud-addon.js",
@@ -28,7 +28,7 @@
         "import": "./dist/modern/service-worker.js",
         "require": "./dist/umd/service-worker.js",
         "default": "./dist/umd/service-worker.js",
-         "types": "./dist/modern/service-worker.d.ts"
+        "types": "./dist/modern/service-worker.d.ts"
       },
       "production": {
         "import": "./dist/modern/service-worker.min.js",
