@@ -23,6 +23,7 @@ export interface DexieOptions {
   modifyChunkSize?: number | { [key: string]: number };
   chromeTransactionDurability?: ChromeTransactionDurability;
   cache?: 'immutable' | 'cloned' | 'disabled';
+  maxConnections?: number;
 }
 
 export interface DexieConstructor extends DexieExceptionClasses {
