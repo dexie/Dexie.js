@@ -26,7 +26,6 @@ import * as Debug from '../../helpers/debug';
 import {
   dexieStackFrameFilter,
   minKey,
-  connections,
   DEXIE_VERSION,
 } from '../../globals/constants';
 import Events from '../../helpers/Events';
@@ -42,6 +41,7 @@ import { cmp } from '../../functions/cmp';
 import { cache } from '../../live-query/cache/cache';
 import { obsSetsOverlap } from '../../live-query/obs-sets-overlap';
 import { AnyRange, NeverRange } from '../../dbcore/keyrange';
+import { connections } from '../../globals/connections';
 
 /* (Dexie) is an instance of DexieConstructor, as defined in public/types/dexie-constructor.d.ts
 *  (new Dexie()) is an instance of Dexie, as defined in public/types/dexie.d.ts
@@ -217,7 +217,9 @@ props(Dexie, {
   // Addon registry
   addons: [],
   // Global DB connection list
-  connections: connections,
+  connections: {
+    get: connections.toArray,
+  },
 
   //MultiModifyError: exceptions.Modify, // Obsolete!
   errnames: errnames,
