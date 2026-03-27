@@ -1,6 +1,10 @@
 import type { DexieCloudDB } from '../db/DexieCloudDB';
 import { BlobRef } from './blobResolve';
 import { loadCachedAccessToken } from './loadCachedAccessToken';
+import {
+  fetchWithStallTimeout,
+  DEFAULT_FETCH_STALL_TIMEOUT,
+} from '../helpers/fetchWithStallTimeout';
 
 /**
  * Deduplicates in-flight blob downloads.
@@ -33,7 +37,12 @@ export class BlobDownloadTracker {
         .then((accessToken) => {
           if (!accessToken)
             throw new Error('No access token available for blob download');
-          return downloadBlob(blobRef, dbUrl, accessToken);
+          return downloadBlob(
+            blobRef,
+            dbUrl,
+            accessToken,
+            this.db.cloud.options?.fetchStallTimeout
+          );
         })
         .finally(() => this.inFlight.delete(blobRef.ref));
       // When the promise settles (either fulfilled or rejected), remove it from the in-flight map
@@ -54,14 +63,19 @@ export class BlobDownloadTracker {
 export async function downloadBlob(
   blobRef: BlobRef,
   dbUrl: string,
-  accessToken: string
+  accessToken: string,
+  fetchStallTimeout?: number
 ): Promise<Uint8Array> {
   const downloadUrl = `${dbUrl}/blob/${blobRef.ref}`;
-  const response = await fetch(downloadUrl, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
+  const response = await fetchWithStallTimeout(
+    downloadUrl,
+    {
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+      },
     },
-  });
+    fetchStallTimeout ?? DEFAULT_FETCH_STALL_TIMEOUT
+  );
 
   if (!response.ok) {
     throw new Error(

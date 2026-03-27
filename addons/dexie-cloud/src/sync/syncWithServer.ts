@@ -15,6 +15,7 @@ import {
 import { encodeIdsForServer } from './encodeIdsForServer';
 import { UserLogin } from '../db/entities/UserLogin';
 import { updateSyncRateLimitDelays } from './ratelimit';
+import { fetchWithStallTimeout, DEFAULT_FETCH_STALL_TIMEOUT } from '../helpers/fetchWithStallTimeout';
 //import {BisonWebStreamReader} from "dreambase-library/dist/typeson-simplified/BisonWebStreamReader";
 
 export async function syncWithServer(
@@ -26,7 +27,8 @@ export async function syncWithServer(
   databaseUrl: string,
   schema: DexieCloudSchema | null,
   clientIdentity: string,
-  currentUser: UserLogin
+  currentUser: UserLogin,
+  fetchStallTimeout?: number
 ): Promise<SyncResponse> {
   //
   // Push changes to server using fetch
@@ -74,12 +76,12 @@ export async function syncWithServer(
     phase: 'pushing',
   });
   const body = TSON.stringify(syncRequest);
-  const res = await fetch(`${databaseUrl}/sync`, {
+  const res = await fetchWithStallTimeout(`${databaseUrl}/sync`, {
     method: 'post',
     headers,
     credentials: 'include', // For Arr Affinity cookie only, for better Rate-Limit counting only.
     body,
-  });
+  }, fetchStallTimeout ?? DEFAULT_FETCH_STALL_TIMEOUT);
   //const contentLength = Number(res.headers.get('content-length'));
   db.syncStateChangedEvent.next({
     phase: 'pulling',

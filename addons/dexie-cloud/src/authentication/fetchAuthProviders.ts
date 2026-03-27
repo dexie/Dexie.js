@@ -1,4 +1,5 @@
 import type { AuthProvidersResponse } from 'dexie-cloud-common';
+import { fetchWithStallTimeout, DEFAULT_FETCH_STALL_TIMEOUT } from '../helpers/fetchWithStallTimeout';
 
 /** Default response when OAuth is disabled or unavailable */
 const OTP_ONLY_RESPONSE: AuthProvidersResponse = {
@@ -20,7 +21,8 @@ const OTP_ONLY_RESPONSE: AuthProvidersResponse = {
  */
 export async function fetchAuthProviders(
   databaseUrl: string,
-  socialAuthEnabled: boolean = true
+  socialAuthEnabled: boolean = true,
+  fetchStallTimeout?: number
 ): Promise<AuthProvidersResponse> {
   // If social auth is disabled, return OTP-only without fetching
   if (!socialAuthEnabled) {
@@ -28,11 +30,11 @@ export async function fetchAuthProviders(
   }
 
   try {
-    const res = await fetch(`${databaseUrl}/auth-providers`, {
+    const res = await fetchWithStallTimeout(`${databaseUrl}/auth-providers`, {
       method: 'GET',
       headers: { Accept: 'application/json' },
       mode: 'cors',
-    });
+    }, fetchStallTimeout ?? DEFAULT_FETCH_STALL_TIMEOUT);
 
     if (res.status === 404) {
       // Old server version without OAuth support

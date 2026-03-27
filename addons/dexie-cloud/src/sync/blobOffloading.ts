@@ -11,6 +11,10 @@ import {
   BlobRefOrigType,
   isBlobRef as isBlobRefFromResolve,
 } from './blobResolve';
+import {
+  fetchWithStallTimeout,
+  DEFAULT_FETCH_STALL_TIMEOUT,
+} from '../helpers/fetchWithStallTimeout';
 
 // Blobs >= 4KB are offloaded to blob storage
 const BLOB_OFFLOAD_THRESHOLD = 4096;
@@ -123,7 +127,8 @@ export function shouldOffloadBlob(
 export async function uploadBlob(
   databaseUrl: string,
   getCachedAccessToken: () => Promise<string | null>,
-  blob: Blob | ArrayBuffer | ArrayBufferView
+  blob: Blob | ArrayBuffer | ArrayBufferView,
+  fetchStallTimeout?: number
 ): Promise<BlobRef | null> {
   const accessToken = await getCachedAccessToken();
   if (!accessToken) {
@@ -166,14 +171,18 @@ export async function uploadBlob(
   // Add content type as query param for the server to store
   const uploadUrl = `${url}?ct=${encodeURIComponent(contentType)}`;
 
-  const response = await fetch(uploadUrl, {
-    method: 'PUT',
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-      'Content-Type': contentType,
+  const response = await fetchWithStallTimeout(
+    uploadUrl,
+    {
+      method: 'PUT',
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        'Content-Type': contentType,
+      },
+      body,
     },
-    body,
-  });
+    fetchStallTimeout ?? DEFAULT_FETCH_STALL_TIMEOUT
+  );
 
   if (!response.ok) {
     if (response.status === 404 || response.status === 405) {
@@ -202,7 +211,8 @@ export async function offloadBlobsAndMarkDirty(
   obj: unknown,
   databaseUrl: string,
   getCachedAccessToken: () => Promise<string | null>,
-  maxStringLength = DEFAULT_MAX_STRING_LENGTH
+  maxStringLength = DEFAULT_MAX_STRING_LENGTH,
+  fetchStallTimeout?: number
 ): Promise<unknown> {
   const dirtyFlag = { dirty: false };
   const result = await offloadBlobs(
@@ -210,7 +220,9 @@ export async function offloadBlobsAndMarkDirty(
     databaseUrl,
     getCachedAccessToken,
     maxStringLength,
-    dirtyFlag
+    dirtyFlag,
+    undefined,
+    fetchStallTimeout
   );
   // Mark the object as dirty for sync if any blobs were offloaded
   if (
@@ -235,7 +247,8 @@ export async function offloadBlobs(
   getCachedAccessToken: () => Promise<string | null>,
   maxStringLength = DEFAULT_MAX_STRING_LENGTH,
   dirtyFlag = { dirty: false },
-  visited = new WeakSet()
+  visited = new WeakSet(),
+  fetchStallTimeout?: number
 ): Promise<unknown> {
   if (obj === null || obj === undefined) {
     return obj;
@@ -251,7 +264,12 @@ export async function offloadBlobs(
       return obj;
     }
     const blob = new Blob([obj], { type: 'text/plain;charset=utf-8' });
-    const blobRef = await uploadBlob(databaseUrl, getCachedAccessToken, blob);
+    const blobRef = await uploadBlob(
+      databaseUrl,
+      getCachedAccessToken,
+      blob,
+      fetchStallTimeout
+    );
     if (blobRef === null) {
       blobEndpointSupported.set(databaseUrl, false);
       return obj;
@@ -271,7 +289,12 @@ export async function offloadBlobs(
       // Server known to not support blob storage — keep inline
       return obj;
     }
-    const blobRef = await uploadBlob(databaseUrl, getCachedAccessToken, obj);
+    const blobRef = await uploadBlob(
+      databaseUrl,
+      getCachedAccessToken,
+      obj,
+      fetchStallTimeout
+    );
     if (blobRef === null) {
       // Server doesn't support blob storage — keep original inline
       blobEndpointSupported.set(databaseUrl, false);
@@ -303,7 +326,8 @@ export async function offloadBlobs(
           getCachedAccessToken,
           maxStringLength,
           dirtyFlag,
-          visited
+          visited,
+          fetchStallTimeout
         )
       );
     }
@@ -325,7 +349,8 @@ export async function offloadBlobs(
       getCachedAccessToken,
       maxStringLength,
       dirtyFlag,
-      visited
+      visited,
+      fetchStallTimeout
     );
   }
   return result;
@@ -339,7 +364,8 @@ export async function offloadBlobsInOperations(
   operations: DBOperationsSet,
   databaseUrl: string,
   getCachedAccessToken: () => Promise<string | null>,
-  maxStringLength = DEFAULT_MAX_STRING_LENGTH
+  maxStringLength = DEFAULT_MAX_STRING_LENGTH,
+  fetchStallTimeout?: number
 ): Promise<DBOperationsSet> {
   const result: DBOperationsSet = [];
 
@@ -351,7 +377,8 @@ export async function offloadBlobsInOperations(
         mut,
         databaseUrl,
         getCachedAccessToken,
-        maxStringLength
+        maxStringLength,
+        fetchStallTimeout
       );
       processedMuts.push(processedMut);
     }
@@ -369,7 +396,8 @@ async function offloadBlobsInOperation(
   op: DBOperation,
   databaseUrl: string,
   getCachedAccessToken: () => Promise<string | null>,
-  maxStringLength = DEFAULT_MAX_STRING_LENGTH
+  maxStringLength = DEFAULT_MAX_STRING_LENGTH,
+  fetchStallTimeout?: number
 ): Promise<DBOperation> {
   switch (op.type) {
     case 'insert':
@@ -380,7 +408,8 @@ async function offloadBlobsInOperation(
             value,
             databaseUrl,
             getCachedAccessToken,
-            maxStringLength
+            maxStringLength,
+            fetchStallTimeout
           )
         )
       );
@@ -397,7 +426,8 @@ async function offloadBlobsInOperation(
             spec,
             databaseUrl,
             getCachedAccessToken,
-            maxStringLength
+            maxStringLength,
+            fetchStallTimeout
           )
         )
       );
@@ -412,7 +442,8 @@ async function offloadBlobsInOperation(
         op.changeSpec,
         databaseUrl,
         getCachedAccessToken,
-        maxStringLength
+        maxStringLength,
+        fetchStallTimeout
       );
       return {
         ...op,

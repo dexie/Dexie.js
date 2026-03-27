@@ -26,6 +26,8 @@ export type FetchTokenCallback = (tokenParams: {
   hints?: LoginHints;
 }) => Promise<TokenFinalResponse | TokenErrorResponse>;
 
+import { fetchWithStallTimeout, DEFAULT_FETCH_STALL_TIMEOUT } from '../helpers/fetchWithStallTimeout';
+
 export async function loadAccessToken(
   db: DexieCloudDB
 ): Promise<UserLogin | null> {
@@ -54,7 +56,8 @@ export async function loadAccessToken(
   }
   const refreshedLogin = await refreshAccessToken(
     db.cloud.options!.databaseUrl,
-    currentUser
+    currentUser,
+    db.cloud.options?.fetchStallTimeout
   );
   await db.table('$logins').update(claims.sub, {
     accessToken: refreshedLogin.accessToken,
@@ -71,7 +74,8 @@ export async function authenticate(
   context: UserLogin,
   fetchToken: FetchTokenCallback,
   userInteraction: BehaviorSubject<DXCUserInteraction | undefined>,
-  hints?: LoginHints
+  hints?: LoginHints,
+  fetchStallTimeout?: number
 ): Promise<UserLogin> {
   if (
     context.accessToken &&
@@ -83,7 +87,7 @@ export async function authenticate(
     (!context.refreshTokenExpiration ||
       context.refreshTokenExpiration.getTime() > Date.now())
   ) {
-    return await refreshAccessToken(url, context);
+    return await refreshAccessToken(url, context, fetchStallTimeout);
   } else {
     return await userAuthenticate(context, fetchToken, userInteraction, hints);
   }
@@ -91,7 +95,8 @@ export async function authenticate(
 
 export async function refreshAccessToken(
   url: string,
-  login: UserLogin
+  login: UserLogin,
+  fetchStallTimeout?: number
 ): Promise<UserLogin> {
   if (!login.refreshToken)
     throw new Error(`Cannot refresh token - refresh token is missing.`);
@@ -119,12 +124,12 @@ export async function refreshAccessToken(
     signing_algorithm,
     time_stamp,
   };
-  const res = await fetch(`${url}/token`, {
+  const res = await fetchWithStallTimeout(`${url}/token`, {
     body: JSON.stringify(tokenRequest),
     method: 'post',
     headers: { 'Content-Type': 'application/json' },
     mode: 'cors',
-  });
+  }, fetchStallTimeout ?? DEFAULT_FETCH_STALL_TIMEOUT);
   if (res.status !== 200)
     throw new Error(`RefreshToken: Status ${res.status} from ${url}/token`);
   const response: TokenFinalResponse | TokenErrorResponse = await res.json();

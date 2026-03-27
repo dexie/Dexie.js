@@ -43,7 +43,8 @@ export async function login(db: DexieCloudDB, hints?: LoginHints) {
       context,
       db.cloud.options!.fetchTokens || otpFetchTokenCallback(db),
       db.cloud.userInteraction,
-      hints
+      hints,
+      db.cloud.options?.fetchStallTimeout
     );
   } catch (err) {
     if (err.name === 'OAuthRedirectError') {

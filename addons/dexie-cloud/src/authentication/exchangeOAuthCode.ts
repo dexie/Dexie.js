@@ -9,6 +9,10 @@ import {
   PolicyRejectionError,
   isPolicyErrorBody,
 } from '../errors/PolicyRejectionError';
+import {
+  fetchWithStallTimeout,
+  DEFAULT_FETCH_STALL_TIMEOUT,
+} from '../helpers/fetchWithStallTimeout';
 
 /** Options for exchanging an OAuth code */
 export interface ExchangeOAuthCodeOptions {
@@ -22,6 +26,8 @@ export interface ExchangeOAuthCodeOptions {
   scopes?: string[];
   /** Optional login intent — see LoginHints.intent for semantics. */
   intent?: 'login' | 'register';
+  /** Fetch stall timeout in ms */
+  fetchStallTimeout?: number;
 }
 
 /**
@@ -43,6 +49,7 @@ export async function exchangeOAuthCode(
     publicKey,
     scopes = ['ACCESS_DB'],
     intent,
+    fetchStallTimeout,
   } = options;
 
   const tokenRequest: AuthorizationCodeTokenRequest = {
@@ -54,12 +61,16 @@ export async function exchangeOAuthCode(
   };
 
   try {
-    const res = await fetch(`${databaseUrl}/token`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(tokenRequest),
-      mode: 'cors',
-    });
+    const res = await fetchWithStallTimeout(
+      `${databaseUrl}/token`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(tokenRequest),
+        mode: 'cors',
+      },
+      fetchStallTimeout ?? DEFAULT_FETCH_STALL_TIMEOUT
+    );
 
     if (!res.ok) {
       // Read body once as text to avoid stream consumption issues
