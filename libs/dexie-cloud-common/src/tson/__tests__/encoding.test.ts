@@ -1,6 +1,11 @@
 import { b64encode, b64decode } from '../../common/base64';
 import { b64LexEncode, b64LexDecode } from '../../common/b64lex';
-import { buf2bigint, bigint2Buf, bigint2B64, b64ToBigInt } from '../../common/bigint-conversion';
+import {
+  buf2bigint,
+  bigint2Buf,
+  bigint2B64,
+  b64ToBigInt,
+} from '../../common/bigint-conversion';
 
 describe('base64', () => {
   describe('b64encode/b64decode', () => {
@@ -129,7 +134,7 @@ describe('bigint-conversion', () => {
       const buf = bigint2Buf(bigint);
       expect(buf.length).toBe(8);
       expect(buf[0]).toBe(0x12);
-      expect(buf[7]).toBe(0xF0);
+      expect(buf[7]).toBe(0xf0);
     });
 
     test('throws on negative BigInt', () => {

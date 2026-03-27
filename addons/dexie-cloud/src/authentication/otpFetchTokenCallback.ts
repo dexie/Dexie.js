@@ -10,11 +10,19 @@ import {
 } from 'dexie-cloud-common';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { HttpError } from '../errors/HttpError';
-import { PolicyRejectionError, isPolicyErrorBody } from '../errors/PolicyRejectionError';
+import {
+  PolicyRejectionError,
+  isPolicyErrorBody,
+} from '../errors/PolicyRejectionError';
 import { FetchTokenCallback } from './authenticate';
 import { exchangeOAuthCode } from './exchangeOAuthCode';
 import { fetchAuthProviders } from './fetchAuthProviders';
-import { alertUser, promptForEmail, promptForOTP, promptForProvider } from './interactWithUser';
+import {
+  alertUser,
+  promptForEmail,
+  promptForOTP,
+  promptForProvider,
+} from './interactWithUser';
 import { startOAuthRedirect } from './oauthLogin';
 import { OAuthRedirectError } from '../errors/OAuthRedirectError';
 import { DXCAlert } from '../types/DXCAlert';
@@ -62,7 +70,10 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         });
       } catch (err) {
         if (err instanceof PolicyRejectionError) {
-          return await otpAuthenticate({ public_key, hints: undefined }, toPolicyAlert(err));
+          return await otpAuthenticate(
+            { public_key, hints: undefined },
+            toPolicyAlert(err)
+          );
         }
         throw err;
       }
@@ -73,16 +84,25 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       if (policyAlert) {
         // A previous OAuth attempt was rejected. Fall through to the
         // interactive flow — policyAlert will be shown inside the prompt.
-        return await otpAuthenticate({ public_key, hints: undefined }, policyAlert);
+        return await otpAuthenticate(
+          { public_key, hints: undefined },
+          policyAlert
+        );
       }
       let resolvedRedirectUri: string | undefined = undefined;
       if (hints.redirectPath) {
         if (/^https?:\/\//i.test(hints.redirectPath)) {
           resolvedRedirectUri = hints.redirectPath;
         } else if (typeof window !== 'undefined' && window.location) {
-          resolvedRedirectUri = new URL(hints.redirectPath, window.location.href).toString();
+          resolvedRedirectUri = new URL(
+            hints.redirectPath,
+            window.location.href
+          ).toString();
         } else if (typeof location !== 'undefined' && location.href) {
-          resolvedRedirectUri = new URL(hints.redirectPath, location.href).toString();
+          resolvedRedirectUri = new URL(
+            hints.redirectPath,
+            location.href
+          ).toString();
         }
       }
       initiateOAuthRedirect(db, hints.provider, resolvedRedirectUri);
@@ -111,7 +131,10 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       // No interaction — show alert as a plain message if there is one.
       if (policyAlert) {
         await alertUser(userInteraction, 'Access Denied', policyAlert);
-        return await otpAuthenticate({ public_key, hints: undefined }, policyAlert);
+        return await otpAuthenticate(
+          { public_key, hints: undefined },
+          policyAlert
+        );
       }
       tokenRequest = {
         grant_type: 'otp',
@@ -124,7 +147,12 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       // Caller explicitly requested OTP — skip provider selection.
       const email =
         hints?.email ||
-        (await promptForEmail(userInteraction, 'Enter email address', undefined, policyAlert));
+        (await promptForEmail(
+          userInteraction,
+          'Enter email address',
+          undefined,
+          policyAlert
+        ));
       if (/@demo.local$/.test(email)) {
         tokenRequest = {
           demo_user: email,
@@ -236,12 +264,16 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       });
       while (res2.status === 401) {
         const errorText = await res2.text();
-        tokenRequest2.otp = await promptForOTP(userInteraction, tokenRequest.email, {
-          type: 'error',
-          messageCode: 'INVALID_OTP',
-          message: errorText,
-          messageParams: {},
-        });
+        tokenRequest2.otp = await promptForOTP(
+          userInteraction,
+          tokenRequest.email,
+          {
+            type: 'error',
+            messageCode: 'INVALID_OTP',
+            message: errorText,
+            messageParams: {},
+          }
+        );
         res2 = await fetch(`${url}/token`, {
           body: JSON.stringify(tokenRequest2),
           method: 'post',
@@ -259,7 +291,8 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
         throw new HttpError(res2, errMsg);
       }
 
-      const response2: TokenFinalResponse | TokenErrorResponse = await res2.json();
+      const response2: TokenFinalResponse | TokenErrorResponse =
+        await res2.json();
       return response2;
     } else {
       throw new Error(`Unexpected response from ${url}/token`);

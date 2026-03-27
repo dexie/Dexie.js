@@ -1,12 +1,10 @@
 import Dexie from 'dexie';
 import '../../src/Dexie.Syncable';
-import {module, test, strictEqual, raises} from 'QUnit';
+import { module, test, strictEqual, raises } from 'QUnit';
 
 module('registerSyncProtocol', {
-  setup: () => {
-  },
-  teardown: () => {
-  }
+  setup: () => {},
+  teardown: () => {},
 });
 
 test('should set partialsThreshold to Infinity if no threshold was given', () => {
@@ -15,17 +13,23 @@ test('should set partialsThreshold to Infinity if no threshold was given', () =>
     sync() {},
   });
 
-  strictEqual(Dexie.Syncable.registeredProtocols[protocolName].partialsThreshold, Infinity);
+  strictEqual(
+    Dexie.Syncable.registeredProtocols[protocolName].partialsThreshold,
+    Infinity
+  );
 });
 
 test('should save the given partialsThreshold', () => {
   const protocolName = 'foo';
   Dexie.Syncable.registerSyncProtocol(protocolName, {
     sync() {},
-    partialsThreshold: 1000
+    partialsThreshold: 1000,
   });
 
-  strictEqual(Dexie.Syncable.registeredProtocols[protocolName].partialsThreshold, 1000);
+  strictEqual(
+    Dexie.Syncable.registeredProtocols[protocolName].partialsThreshold,
+    1000
+  );
 });
 
 test('should throw an error if the partialsThreshold is NaN or smaller 0', () => {
@@ -34,7 +38,7 @@ test('should throw an error if the partialsThreshold is NaN or smaller 0', () =>
   function fn1() {
     Dexie.Syncable.registerSyncProtocol(protocolName, {
       sync() {},
-      partialsThreshold: NaN
+      partialsThreshold: NaN,
     });
   }
 
@@ -43,7 +47,7 @@ test('should throw an error if the partialsThreshold is NaN or smaller 0', () =>
   function fn2() {
     Dexie.Syncable.registerSyncProtocol(protocolName, {
       sync() {},
-      partialsThreshold: -10
+      partialsThreshold: -10,
     });
   }
 

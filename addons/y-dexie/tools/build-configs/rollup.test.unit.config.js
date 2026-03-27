@@ -6,42 +6,42 @@ import replace from '@rollup/plugin-replace';
 // @ts-ignore: requires tsconfig settings that we don't need for the web build but is ok here in the build config.
 import pkg from '../../package.json' with { type: 'json' };
 
-const ERRORS_TO_IGNORE = [
-  "THIS_IS_UNDEFINED",
-];
+const ERRORS_TO_IGNORE = ['THIS_IS_UNDEFINED'];
 
 export default {
   input: 'tools/tmp/test/unit/index.js',
-  output: [{
-    file: 'test/unit/bundle.js',
-    format: 'umd',
-    globals: {
-      dexie: "Dexie",
-      qunit: "QUnit"
+  output: [
+    {
+      file: 'test/unit/bundle.js',
+      format: 'umd',
+      globals: {
+        dexie: 'Dexie',
+        qunit: 'QUnit',
+      },
+      name: 'YDexieTestBundle',
+      sourcemap: true,
+      exports: 'named',
     },
-    name: 'YDexieTestBundle',
-    sourcemap: true,
-    exports: 'named'
-  }],
-  external: ['dexie', "qunit"],
+  ],
+  external: ['dexie', 'qunit'],
   plugins: [
     sourcemaps(),
-    nodeResolve({browser: true, preferBuiltins: false}),
+    nodeResolve({ browser: true, preferBuiltins: false }),
     commonjs(),
-      replace({
-        preventAssignment: true,
-        values: {
-          __VERSION__: JSON.stringify(pkg.version),
-        },
-      })
+    replace({
+      preventAssignment: true,
+      values: {
+        __VERSION__: JSON.stringify(pkg.version),
+      },
+    }),
   ],
-  onwarn ({loc, frame, code, message}) {
+  onwarn({ loc, frame, code, message }) {
     if (ERRORS_TO_IGNORE.includes(code)) return;
-    if ( loc ) {
-      console.warn( `${loc.file} (${loc.line}:${loc.column}) ${message}` );
-      if ( frame ) console.warn( frame );
+    if (loc) {
+      console.warn(`${loc.file} (${loc.line}:${loc.column}) ${message}`);
+      if (frame) console.warn(frame);
     } else {
       console.warn(`${code} ${message}`);
-    }    
-  }
+    }
+  },
 };

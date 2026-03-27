@@ -10,6 +10,6 @@ export function arrayBuffer2String(buf: ArrayBuffer): string {
   // TODO: Optimize
   return new Uint8Array(buf).reduce(
     (s, byte) => s + String.fromCharCode(byte),
-    ""
+    ''
   );
 }

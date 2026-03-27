@@ -1,7 +1,9 @@
 import { arrayToObject, derive } from './utils';
 
-
-export function makeClassConstructor<TConstructor> (prototype: Object, constructor: Function) {
+export function makeClassConstructor<TConstructor>(
+  prototype: Object,
+  constructor: Function
+) {
   /*const propertyDescriptorMap = arrayToObject(
     Object.getOwnPropertyNames(prototype),
     propKey => [propKey, Object.getOwnPropertyDescriptor(prototype, propKey)]);
@@ -18,6 +20,6 @@ export function makeClassConstructor<TConstructor> (prototype: Object, construct
   // Reason would be optimization of property access.
   // The code below will only create a prototypal inheritance from given constructor function
   // to given prototype.
-  derive(constructor).from({prototype});
-  return constructor as any as TConstructor;  
+  derive(constructor).from({ prototype });
+  return constructor as any as TConstructor;
 }

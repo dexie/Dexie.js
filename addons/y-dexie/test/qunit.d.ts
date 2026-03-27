@@ -2,11 +2,14 @@ declare module 'qunit' {
   interface Assert {
     async(): () => void;
   }
-  
-  function module(name: string, options?: {
-    setup?: () => void;
-    teardown?: () => void
-  });
+
+  function module(
+    name: string,
+    options?: {
+      setup?: () => void;
+      teardown?: () => void;
+    }
+  );
   function test(name: string, fn: (assert: Assert) => void): void;
   function test(name: string, fn: () => void): void;
   function asyncTest(name: string, fn: () => void);

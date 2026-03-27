@@ -1,7 +1,11 @@
 import { KeyPaths } from 'dexie';
 import { DBPermissionSet } from 'dexie-cloud-common';
 
-type TableName<T> = T extends {table: ()=>infer TABLE} ? TABLE extends string ? TABLE : string : string;
+type TableName<T> = T extends { table: () => infer TABLE }
+  ? TABLE extends string
+    ? TABLE
+    : string
+  : string;
 
 export class PermissionChecker<T, TableNames extends string = TableName<T>> {
   private permissions: DBPermissionSet;
@@ -13,7 +17,7 @@ export class PermissionChecker<T, TableNames extends string = TableName<T>> {
     tableName: TableNames,
     isOwner: boolean
   ) {
-    this.permissions = permissions || {};
+    this.permissions = permissions || {};
     this.tableName = tableName;
     this.isOwner = isOwner;
   }

@@ -9,7 +9,6 @@ import {
 } from './dbcore';
 import { IntervalTree } from './rangeset';
 
-
 export type GlobalQueryCache = {
   // TODO: Change to parts: {[part: string]: TblQueryCache}
   //       och unsignaledParts: ObservabilitySet;
@@ -18,9 +17,9 @@ export type GlobalQueryCache = {
 
 export interface TblQueryCache {
   queries: {
-    query: {[indexName: string]: CacheEntry[]};
-    count: {[indexName: string]: CacheEntry[]};
-  },
+    query: { [indexName: string]: CacheEntry[] };
+    count: { [indexName: string]: CacheEntry[] };
+  };
   objs: Map<string | number, object>;
   optimisticOps: DBCoreMutateRequest[];
   unsignaledParts: ObservabilitySet;

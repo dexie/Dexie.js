@@ -2,26 +2,25 @@ import { BlobDownloadTracker } from './BlobDownloadTracker';
 
 /**
  * BlobRef Resolution for Dexie Cloud
- * 
+ *
  * Handles lazy resolution of BlobRefs when reading from the database.
  * BlobRefs are symbolic references to blobs stored in blob storage.
  * They get resolved on-demand when the object is read.
- * 
+ *
  * The server sends offloaded binary data in the format:
  * { _bt: 'Uint8Array', ref: '1:blobId', size: 1234 }
  * { _bt: 'Blob', ref: '1:blobId', size: 1234, ct: 'image/png' }
- * 
+ *
  * The _bt field preserves the original JavaScript type.
  * The ref format is '{version}:{blobId}' where version identifies
  * the storage backend configuration.
  */
 
-
 /**
  * Original type that was offloaded to blob storage.
  * Matches the TSON type names.
  */
-export type BlobRefOrigType = 
+export type BlobRefOrigType =
   | 'Blob'
   | 'ArrayBuffer'
   | 'Uint8Array'
@@ -45,9 +44,9 @@ export type BlobRefOrigType =
  */
 export interface BlobRef {
   _bt: BlobRefOrigType;
-  ref: string;           // Versioned ref: '{version}:{blobId}'
-  size: number;          // Size in bytes
-  ct?: string;           // Content-type (only for Blob type)
+  ref: string; // Versioned ref: '{version}:{blobId}'
+  size: number; // Size in bytes
+  ct?: string; // Content-type (only for Blob type)
 }
 
 /**
@@ -69,7 +68,7 @@ export function isBlobRef(value: unknown): value is BlobRef {
   return (
     typeof obj._bt === 'string' &&
     typeof obj.ref === 'string' &&
-    obj.v === undefined  // No inline data = it's a reference
+    obj.v === undefined // No inline data = it's a reference
   );
 }
 
@@ -78,8 +77,8 @@ export function isBlobRef(value: unknown): value is BlobRef {
  * The Symbol is lost but properties remain.
  */
 export interface SerializedTSONRef {
-  type: string;  // 'Uint8Array', 'Blob', etc.
-  ref: string;   // '1:blobId'
+  type: string; // 'Uint8Array', 'Blob', etc.
+  ref: string; // '1:blobId'
   size: number;
   contentType?: string;
 }
@@ -88,14 +87,16 @@ export interface SerializedTSONRef {
  * Check if a value is a serialized TSONRef (after IndexedDB storage)
  * Has 'type' instead of '$t', and no Symbol marker
  */
-export function isSerializedTSONRef(value: unknown): value is SerializedTSONRef {
+export function isSerializedTSONRef(
+  value: unknown
+): value is SerializedTSONRef {
   if (typeof value !== 'object' || value === null) return false;
   const obj = value as any;
   return (
     typeof obj.type === 'string' &&
     typeof obj.ref === 'string' &&
     typeof obj.size === 'number' &&
-    obj._bt === undefined  // Not a raw BlobRef
+    obj._bt === undefined // Not a raw BlobRef
   );
 }
 
@@ -130,12 +131,12 @@ export function hasBlobRefs(obj: unknown, visited = new WeakSet()): boolean {
   }
 
   if (Array.isArray(obj)) {
-    return obj.some(item => hasBlobRefs(item, visited));
+    return obj.some((item) => hasBlobRefs(item, visited));
   }
 
   // Only traverse POJOs
   if (obj.constructor === Object) {
-    return Object.values(obj).some(value => hasBlobRefs(value, visited));
+    return Object.values(obj).some((value) => hasBlobRefs(value, visited));
   }
 
   return false;
@@ -145,7 +146,7 @@ export function hasBlobRefs(obj: unknown, visited = new WeakSet()): boolean {
  * Convert downloaded Uint8Array to the original type specified in BlobRef
  */
 export function convertToOriginalType(
-  data: Uint8Array, 
+  data: Uint8Array,
   ref: BlobRef
 ): Blob | ArrayBuffer | ArrayBufferView | string {
   // String type: decode UTF-8 back to string
@@ -154,10 +155,14 @@ export function convertToOriginalType(
   }
 
   // Get the underlying ArrayBuffer (handle shared buffer case)
-  const buffer = data.buffer.byteLength === data.byteLength
-    ? data.buffer as ArrayBuffer
-    : data.buffer.slice(data.byteOffset, data.byteOffset + data.byteLength) as ArrayBuffer;
-  
+  const buffer =
+    data.buffer.byteLength === data.byteLength
+      ? (data.buffer as ArrayBuffer)
+      : (data.buffer.slice(
+          data.byteOffset,
+          data.byteOffset + data.byteLength
+        ) as ArrayBuffer);
+
   switch (ref._bt) {
     case 'Blob':
       return new Blob([new Uint8Array(buffer)], { type: ref.ct || '' });
@@ -197,7 +202,7 @@ export function convertToOriginalType(
  * Recursively resolve all BlobRefs in an object and collect them for queueing.
  * Returns a new object with BlobRefs replaced by their original type data,
  * and populates the resolvedBlobs array with keyPath info for each blob.
- * 
+ *
  * @param obj - Object to resolve
  * @param dbUrl - Base URL for the database
  * @param accessToken - Access token for blob downloads
@@ -213,7 +218,8 @@ export async function resolveAllBlobRefs(
   visited = new WeakMap(),
   tracker: BlobDownloadTracker
 ): Promise<unknown> {
-  if (obj == null) { // null or undefined
+  if (obj == null) {
+    // null or undefined
     return obj;
   }
 
@@ -232,10 +238,19 @@ export async function resolveAllBlobRefs(
       return visited.get(obj);
     }
     const result: unknown[] = [];
-    visited.set(obj, result);  // Set before iterating to handle self-references
+    visited.set(obj, result); // Set before iterating to handle self-references
     for (let i = 0; i < obj.length; i++) {
       const itemPath = currentPath ? `${currentPath}.${i}` : `${i}`;
-      result.push(await resolveAllBlobRefs(obj[i], dbUrl, resolvedBlobs, itemPath, visited, tracker));
+      result.push(
+        await resolveAllBlobRefs(
+          obj[i],
+          dbUrl,
+          resolvedBlobs,
+          itemPath,
+          visited,
+          tracker
+        )
+      );
     }
     return result;
   }
@@ -256,7 +271,14 @@ export async function resolveAllBlobRefs(
         continue;
       }
       const propPath = currentPath ? `${currentPath}.${propName}` : propName;
-      result[propName] = await resolveAllBlobRefs(value, dbUrl, resolvedBlobs, propPath, visited, tracker);
+      result[propName] = await resolveAllBlobRefs(
+        value,
+        dbUrl,
+        resolvedBlobs,
+        propPath,
+        visited,
+        tracker
+      );
     }
 
     return result;
@@ -270,10 +292,6 @@ export async function resolveAllBlobRefs(
  */
 export function hasUnresolvedBlobRefs(obj: unknown): boolean {
   return (
-    typeof obj === 'object' &&
-    obj !== null &&
-    (obj as any)._hasBlobRefs === 1
+    typeof obj === 'object' && obj !== null && (obj as any)._hasBlobRefs === 1
   );
 }
-
-

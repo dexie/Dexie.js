@@ -8,7 +8,7 @@ import { EntityCommon } from '../db/entities/EntityCommon';
 import type { YSyncState } from 'y-dexie';
 
 /** Queries the local database for YMessages to send to server.
- * 
+ *
  * There are 2 messages that this function can provide:
  *   YUpdateFromClientRequest ( for local updates )
  *   YStateVector ( for state vector of foreign updates so that server can reduce the number of udpates to send back )
@@ -19,16 +19,19 @@ import type { YSyncState } from 'y-dexie';
  * been sent and that the client failed to receive the ack. However, if this happens it does not matter - the change
  * would be sent again and Yjs handles duplicate changes anyway. And it's rare so we earn the cost of roundtrips by
  * avoiding the step1 sync and instead keep track of this in the `unsentFrom` property of the SyncState.
- * 
- * @param db 
- * @returns 
+ *
+ * @param db
+ * @returns
  */
 export async function listYClientMessagesAndStateVector(
   db: DexieCloudDB,
   tablesToSync: Table<EntityCommon>[]
-): Promise<{yMessages: YClientMessage[], lastUpdateIds: {[yTable: string]: number}}> {
+): Promise<{
+  yMessages: YClientMessage[];
+  lastUpdateIds: { [yTable: string]: number };
+}> {
   const result: YClientMessage[] = [];
-  const lastUpdateIds: {[yTable: string]: number} = {};
+  const lastUpdateIds: { [yTable: string]: number } = {};
   for (const table of tablesToSync) {
     if (table.schema.yProps) {
       for (const yProp of table.schema.yProps) {
@@ -45,7 +48,8 @@ export async function listYClientMessagesAndStateVector(
         const unsyncedFrom = Math.min(unsentFrom, receivedUntil + 1);
         // Query all these updates for all docs of this table+prop combination
         const updates = await listUpdatesSince(yTable, unsyncedFrom);
-        if (updates.length > 0) lastUpdateIds[yTable.name] = updates[updates.length -1].i;
+        if (updates.length > 0)
+          lastUpdateIds[yTable.name] = updates[updates.length - 1].i;
 
         // Now sort them by document and whether they are local or not + ignore local updates already sent:
         const perDoc: {
@@ -109,6 +113,6 @@ export async function listYClientMessagesAndStateVector(
   }
   return {
     yMessages: result,
-    lastUpdateIds
+    lastUpdateIds,
   };
 }

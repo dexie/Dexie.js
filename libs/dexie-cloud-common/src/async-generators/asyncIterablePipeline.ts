@@ -1,4 +1,3 @@
-
 // TODO: When upgraded to Typescript 5.6 or later,
 // do better typings for this function. ChatGPT suggests the following:
 /*
@@ -16,8 +15,13 @@ async function pipeline<Input, Output>(
 ): Promise<void>
 */
 type AsyncSourceGeneratorFn<Output> = () => AsyncGenerator<Output>;
-type AsyncGeneratorFn<Input, Output> = (input: AsyncGenerator<Input>) => AsyncGenerator<Output>;
-export async function asyncIterablePipeline(source: AsyncSourceGeneratorFn<any>, ...stages: AsyncGeneratorFn<any,any>[]) { 
+type AsyncGeneratorFn<Input, Output> = (
+  input: AsyncGenerator<Input>
+) => AsyncGenerator<Output>;
+export async function asyncIterablePipeline(
+  source: AsyncSourceGeneratorFn<any>,
+  ...stages: AsyncGeneratorFn<any, any>[]
+) {
   // Chain generators by sending outdata from one to another
   let result = source(); // Start with the source generator
 
@@ -27,5 +31,6 @@ export async function asyncIterablePipeline(source: AsyncSourceGeneratorFn<any>,
 
   // Start running the machine. If the last stage is a sink, it will consume the data and never emit anything
   // to us here...
-  for await (const chunk of result) {}
+  for await (const chunk of result) {
+  }
 }

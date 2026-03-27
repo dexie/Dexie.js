@@ -70,7 +70,7 @@ export function syncIfPossible(
   async function _syncIfPossible() {
     try {
       // Check if should delay sync due to ratelimit:
-      await checkSyncRateLimitDelay(db);      
+      await checkSyncRateLimitDelay(db);
       await performGuardedJob(db, CURRENT_SYNC_WORKER, () =>
         sync(db, cloudOptions, cloudSchema, options)
       );

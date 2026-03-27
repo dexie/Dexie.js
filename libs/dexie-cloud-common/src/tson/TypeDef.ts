@@ -1,4 +1,4 @@
-import { TypeDefSet } from "./TypeDefSet.js";
+import { TypeDefSet } from './TypeDefSet.js';
 
 export interface TypeDef<T = unknown, TReplaced = unknown> {
   test?: (val: T, toStringTag: string) => boolean;

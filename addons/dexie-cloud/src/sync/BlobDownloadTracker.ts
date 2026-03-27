@@ -1,6 +1,6 @@
-import type { DexieCloudDB } from "../db/DexieCloudDB";
-import { BlobRef } from "./blobResolve";
-import { loadCachedAccessToken } from "./loadCachedAccessToken";
+import type { DexieCloudDB } from '../db/DexieCloudDB';
+import { BlobRef } from './blobResolve';
+import { loadCachedAccessToken } from './loadCachedAccessToken';
 
 /**
  * Deduplicates in-flight blob downloads.
@@ -16,7 +16,7 @@ export class BlobDownloadTracker {
   private inFlight = new Map<string, Promise<Uint8Array>>();
   private db: DexieCloudDB;
 
-  constructor (db: DexieCloudDB) {
+  constructor(db: DexieCloudDB) {
     this.db = db;
   }
 
@@ -29,10 +29,13 @@ export class BlobDownloadTracker {
   download(blobRef: BlobRef, dbUrl: string): Promise<Uint8Array> {
     let promise = this.inFlight.get(blobRef.ref);
     if (!promise) {
-      promise = loadCachedAccessToken(this.db).then(accessToken => {
-        if (!accessToken) throw new Error("No access token available for blob download");
-        return downloadBlob(blobRef, dbUrl, accessToken);
-      }).finally(() => this.inFlight.delete(blobRef.ref));
+      promise = loadCachedAccessToken(this.db)
+        .then((accessToken) => {
+          if (!accessToken)
+            throw new Error('No access token available for blob download');
+          return downloadBlob(blobRef, dbUrl, accessToken);
+        })
+        .finally(() => this.inFlight.delete(blobRef.ref));
       // When the promise settles (either fulfilled or rejected), remove it from the in-flight map
       this.inFlight.set(blobRef.ref, promise);
     }
@@ -56,15 +59,16 @@ export async function downloadBlob(
   const downloadUrl = `${dbUrl}/blob/${blobRef.ref}`;
   const response = await fetch(downloadUrl, {
     headers: {
-      'Authorization': `Bearer ${accessToken}`
-    }
+      Authorization: `Bearer ${accessToken}`,
+    },
   });
 
   if (!response.ok) {
-    throw new Error(`Failed to download blob ${blobRef.ref}: ${response.status} ${response.statusText}`);
+    throw new Error(
+      `Failed to download blob ${blobRef.ref}: ${response.status} ${response.statusText}`
+    );
   }
 
   const arrayBuffer = await response.arrayBuffer();
   return new Uint8Array(arrayBuffer);
 }
-

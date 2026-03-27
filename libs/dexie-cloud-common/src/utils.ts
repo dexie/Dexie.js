@@ -4,7 +4,7 @@ export function assert(b: boolean): asserts b is true {
 
 const _hasOwn = {}.hasOwnProperty;
 export function hasOwn(obj, prop) {
-    return _hasOwn.call(obj, prop);
+  return _hasOwn.call(obj, prop);
 }
 
 type SetByKeyPathTarget =
@@ -40,7 +40,8 @@ export function setByKeyPath(
         //@ts-ignore: even if currentKeyPath would be numeric string and obj would be array - it works.
         var innerObj = obj[currentKeyPath];
         //@ts-ignore: even if currentKeyPath would be numeric string and obj would be array - it works.
-        if (!innerObj || !hasOwn(obj, currentKeyPath)) innerObj = (obj[currentKeyPath] = {});
+        if (!innerObj || !hasOwn(obj, currentKeyPath))
+          innerObj = obj[currentKeyPath] = {};
         setByKeyPath(innerObj, remainingKeyPath, value);
       }
     } else {
@@ -48,7 +49,7 @@ export function setByKeyPath(
         if (Array.isArray(obj) && !isNaN(parseInt(keyPath)))
           // @ts-ignore: even if currentKeyPath would be numeric string and obj would be array - it works.
           obj.splice(keyPath, 1);
-          //@ts-ignore: even if currentKeyPath would be numeric string and obj would be array - it works.
+        //@ts-ignore: even if currentKeyPath would be numeric string and obj would be array - it works.
         else delete obj[keyPath];
         //@ts-ignore: even if currentKeyPath would be numeric string and obj would be array - it works.
       } else obj[keyPath] = value;
@@ -56,20 +57,35 @@ export function setByKeyPath(
   }
 }
 
-export const randomString = typeof self !== 'undefined' && typeof crypto !== 'undefined' ? (bytes: number, randomFill: ((buf: Uint8Array) => void)=crypto.getRandomValues.bind(crypto)) => {
-  // Web
-  const buf = new Uint8Array(bytes);
-  randomFill(buf);
-  return self.btoa(String.fromCharCode.apply(null, buf as any));
-} : typeof Buffer !== 'undefined' ? (bytes: number, randomFill:((buf: Uint8Array) => void)=simpleRandomFill) => {
-  // Node
-  const buf = Buffer.alloc(bytes);
-  randomFill(buf);
-  return buf.toString("base64");
-} : ()=>{throw new Error("No implementation of randomString was found");}
+export const randomString =
+  typeof self !== 'undefined' && typeof crypto !== 'undefined'
+    ? (
+        bytes: number,
+        randomFill: (buf: Uint8Array) => void = crypto.getRandomValues.bind(
+          crypto
+        )
+      ) => {
+        // Web
+        const buf = new Uint8Array(bytes);
+        randomFill(buf);
+        return self.btoa(String.fromCharCode.apply(null, buf as any));
+      }
+    : typeof Buffer !== 'undefined'
+      ? (
+          bytes: number,
+          randomFill: (buf: Uint8Array) => void = simpleRandomFill
+        ) => {
+          // Node
+          const buf = Buffer.alloc(bytes);
+          randomFill(buf);
+          return buf.toString('base64');
+        }
+      : () => {
+          throw new Error('No implementation of randomString was found');
+        };
 
 function simpleRandomFill(buf: Uint8Array) {
-  for (let i=0; i<buf.length; ++i) {
+  for (let i = 0; i < buf.length; ++i) {
     buf[i] = Math.floor(Math.random() * 256);
   }
 }

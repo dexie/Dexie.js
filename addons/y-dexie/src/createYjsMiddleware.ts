@@ -92,7 +92,7 @@ export function createYjsMiddleware(dbSchema: DbSchema) {
                         k: res.results![iter],
                         u,
                         f: 1, // Flag as local update (to be included when syncing)
-                      } satisfies Omit<YUpdateRow, 'i'>)
+                      }) satisfies Omit<YUpdateRow, 'i'>
                   );
                   return updatesTable.mutate({
                     type: 'add',
@@ -106,5 +106,5 @@ export function createYjsMiddleware(dbSchema: DbSchema) {
         };
         return tableMiddleware;
       },
-    } satisfies DBCore);
+    }) satisfies DBCore;
 }

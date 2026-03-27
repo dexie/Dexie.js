@@ -1,2 +1,1 @@
-module.exports = {Stream: function(){}};
-
+module.exports = { Stream: function () {} };

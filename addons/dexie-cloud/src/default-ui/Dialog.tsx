@@ -1,7 +1,13 @@
 import { Styles } from './Styles';
 import { ComponentChildren, h } from 'preact';
 
-export function Dialog({ children, className }: { children?: ComponentChildren, className?: string }) {
+export function Dialog({
+  children,
+  className,
+}: {
+  children?: ComponentChildren;
+  className?: string;
+}) {
   return (
     <div className={`dexie-dialog ${className || ''}`}>
       <div style={Styles.Darken} />

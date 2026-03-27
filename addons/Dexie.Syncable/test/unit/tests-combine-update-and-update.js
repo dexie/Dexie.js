@@ -1,11 +1,9 @@
-import {module, test, deepEqual, ok} from 'QUnit';
+import { module, test, deepEqual, ok } from 'QUnit';
 import combineUpdateAndUpdate from '../../src/combine-update-and-update';
 
 module('combineUpdateAndUpdate', {
-  setup: () => {
-  },
-  teardown: () => {
-  }
+  setup: () => {},
+  teardown: () => {},
 });
 
 test('should combine the keys of nextChange.mods and prevChange.mods', () => {
@@ -21,7 +19,7 @@ test('should combine the keys of nextChange.mods and prevChange.mods', () => {
   };
 
   const res = combineUpdateAndUpdate(prevChange, nextChange);
-  deepEqual(res.mods, {foo: 'bar', bar: 'baz'});
+  deepEqual(res.mods, { foo: 'bar', bar: 'baz' });
 });
 
 test('should leave the original object untouched', () => {
@@ -37,7 +35,7 @@ test('should leave the original object untouched', () => {
   };
 
   combineUpdateAndUpdate(prevChange, nextChange);
-  deepEqual(prevChange, {mods: {foo: 'bar'}});
+  deepEqual(prevChange, { mods: { foo: 'bar' } });
 });
 
 test('should overwrite a previous change with the same key', () => {
@@ -53,13 +51,13 @@ test('should overwrite a previous change with the same key', () => {
   };
 
   const res = combineUpdateAndUpdate(prevChange, nextChange);
-  deepEqual(res.mods, {foo: 'baz'});
+  deepEqual(res.mods, { foo: 'baz' });
 });
 
 test('should ignore a previous change which changed a parent object of the next change', () => {
   const prevChange = {
     mods: {
-      'foo': {bar: 'baz', baz: 'bar'},
+      foo: { bar: 'baz', baz: 'bar' },
     },
   };
   const nextChange = {
@@ -69,7 +67,7 @@ test('should ignore a previous change which changed a parent object of the next 
   };
 
   const res = combineUpdateAndUpdate(prevChange, nextChange);
-  deepEqual(res, {mods: {foo: {bar: 'foobar', baz: 'bar'}}});
+  deepEqual(res, { mods: { foo: { bar: 'foobar', baz: 'bar' } } });
 });
 
 test('should ignore a previous change which changed a sub value of the nextChange', () => {
@@ -80,10 +78,10 @@ test('should ignore a previous change which changed a sub value of the nextChang
   };
   const nextChange = {
     mods: {
-      'foo': {bar: 'baz'},
+      foo: { bar: 'baz' },
     },
   };
 
   const res = combineUpdateAndUpdate(prevChange, nextChange);
-  deepEqual(res, {mods: {'foo': {bar: 'baz'}}});
+  deepEqual(res, { mods: { foo: { bar: 'baz' } } });
 });

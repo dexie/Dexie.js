@@ -44,10 +44,7 @@ export function compareArrays(a: any[], b: any[]): number {
   return al === bl ? 0 : al < bl ? -1 : 1;
 }
 
-export function compareUint8Arrays(
-  a: Uint8Array,
-  b: Uint8Array
-) {
+export function compareUint8Arrays(a: Uint8Array, b: Uint8Array) {
   const al = a.length;
   const bl = b.length;
   const l = al < bl ? al : bl;
@@ -79,7 +76,7 @@ type BinaryType =
   | Int32Array
   | Float32Array
   | Float64Array
-  | BigInt64Array 
+  | BigInt64Array
   | BigUint64Array;
 
 function getUint8Array(a: BinaryType): Uint8Array {

@@ -16,5 +16,5 @@ export default function initPersistedContext(node) {
         return node.save();
       });
     }
-  }
+  };
 }

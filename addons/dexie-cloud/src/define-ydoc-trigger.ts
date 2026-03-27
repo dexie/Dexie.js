@@ -17,8 +17,8 @@ const ydocTriggers: {
 
 const middlewares = new WeakMap<Dexie, Middleware<DBCore>>();
 let subscribedToProviderBeforeUnload = false;
-const txRunner = TriggerRunner("tx"); // Trigger registry for transaction completion. Avoids open docs.
-const unloadRunner = TriggerRunner("unload"); // Trigger registry for unload. Runs when a document is closed.
+const txRunner = TriggerRunner('tx'); // Trigger registry for transaction completion. Avoids open docs.
+const unloadRunner = TriggerRunner('unload'); // Trigger registry for unload. Runs when a document is closed.
 
 type TriggerRegistry = Map<
   string,
@@ -80,21 +80,24 @@ function TriggerRunner(name: string) {
   return {
     name,
     async run() {
-      console.log(`Running trigger (${name})?`, triggerScheduled, registry.size, !!triggerExecPromise);
+      console.log(
+        `Running trigger (${name})?`,
+        triggerScheduled,
+        registry.size,
+        !!triggerExecPromise
+      );
       if (!triggerScheduled && registry.size > 0) {
         triggerScheduled = true;
         if (triggerExecPromise) await triggerExecPromise.catch(() => {});
         setTimeout(() => {
           // setTimeout() is to escape from Promise.PSD zones and never run within liveQueries or transaction scopes
-          console.log("Running trigger really!", name);
+          console.log('Running trigger really!', name);
           triggerScheduled = false;
           const registryCopy = registry;
           registry = new Map();
-          triggerExecPromise = execute(registryCopy).finally(
-            () => {
-              triggerExecPromise = null;
-            }
-          );
+          triggerExecPromise = execute(registryCopy).finally(() => {
+            triggerExecPromise = null;
+          });
         }, 0);
       }
     },

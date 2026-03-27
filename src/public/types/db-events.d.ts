@@ -1,8 +1,8 @@
-import { DexieEventSet } from "./dexie-event-set";
-import { DexieEvent } from "./dexie-event";
-import { Transaction } from "./transaction";
-import { Dexie } from "./dexie";
-import { IntervalTree } from "./rangeset";
+import { DexieEventSet } from './dexie-event-set';
+import { DexieEvent } from './dexie-event';
+import { Transaction } from './transaction';
+import { Dexie } from './dexie';
+import { IntervalTree } from './rangeset';
 export interface DexieOnReadyEvent {
   subscribe(fn: (vipDb: Dexie) => any, bSticky: boolean): void;
   unsubscribe(fn: (vipDb: Dexie) => any): void;
@@ -29,12 +29,22 @@ export interface DexieCloseEvent {
 
 export interface DbEventFns {
   (eventName: 'populate', subscriber: (trans: Transaction) => any): void;
-  (eventName: 'blocked', subscriber: (event: IDBVersionChangeEvent) => any): void;
-  (eventName: 'versionchange', subscriber: (event: IDBVersionChangeEvent) => any): void;
+  (
+    eventName: 'blocked',
+    subscriber: (event: IDBVersionChangeEvent) => any
+  ): void;
+  (
+    eventName: 'versionchange',
+    subscriber: (event: IDBVersionChangeEvent) => any
+  ): void;
   (eventName: 'close', subscriber: (event: Event) => any): void;
 }
 export interface DbEvents extends DbEventFns, DexieEventSet {
-  (eventName: 'ready', subscriber: (vipDb: Dexie) => any, bSticky?: boolean): void;
+  (
+    eventName: 'ready',
+    subscriber: (vipDb: Dexie) => any,
+    bSticky?: boolean
+  ): void;
   ready: DexieOnReadyEvent;
   populate: DexiePopulateEvent;
   blocked: DexieEvent;
@@ -46,14 +56,14 @@ export interface DbEvents extends DbEventFns, DexieEventSet {
  */
 export type ObservabilitySet = {
   /** Database part having been mutated.
-   * 
+   *
    * This structure is produced in observability-middleware.ts
    * and consumed in live-query.ts.
-   * 
+   *
    * Format of 'part':
-   * 
+   *
    *   `idb://${dbName}/${tableName}/${indexName}`
-   * 
+   *
    * * dbName is the database name
    * * tableName is the table name
    * * indexName is any of:
@@ -62,7 +72,7 @@ export type ObservabilitySet = {
    *    3. The keyPath of an index, such as "name", "age" or "address.city" -
    *       represents indexes that, if used in a query, might affect the
    *       result of that query.
-   * 
+   *
    * IntervalTree
    *    * See definition of IntervalTree type in rangeset.d.ts
    *    * See rangesOverlap() in rangeset.ts that can be used to compare two
@@ -80,6 +90,9 @@ export interface DexieOnStorageMutatedEvent {
 }
 
 export interface GlobalDexieEvents extends DexieEventSet {
-  (eventName: 'storagemutated', subscriber: (parts: ObservabilitySet) => any): void;
+  (
+    eventName: 'storagemutated',
+    subscriber: (parts: ObservabilitySet) => any
+  ): void;
   storagemutated: DexieOnStorageMutatedEvent;
 }

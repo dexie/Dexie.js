@@ -1,11 +1,9 @@
-import {module, test, strictEqual, deepEqual, ok} from 'QUnit';
+import { module, test, strictEqual, deepEqual, ok } from 'QUnit';
 import initOverrideOpen from '../../src/override-open';
 
 module('override-open', {
-  setup: () => {
-  },
-  teardown: () => {
-  }
+  setup: () => {},
+  teardown: () => {},
 });
 
 test('should call the given original function', () => {
@@ -15,10 +13,14 @@ test('should call the given original function', () => {
   }
 
   const db = {
-    _allTables: {}
+    _allTables: {},
   };
 
-  initOverrideOpen(db, function SyncNode() {}, function crudMonitor() {})(origFn)();
+  initOverrideOpen(
+    db,
+    function SyncNode() {},
+    function crudMonitor() {}
+  )(origFn)();
   ok(wasCalled);
 });
 
@@ -33,13 +35,13 @@ test('should call the crudMonitor function for every observable table', () => {
       foo: {
         // TableSchema: for more info see https://github.com/dfahlander/Dexie.js/wiki/TableSchema
         schema: {
-          observable: true
-        }
+          observable: true,
+        },
       },
       _bar: {
-        schema: {}
-      }
-    }
+        schema: {},
+      },
+    },
   };
 
   initOverrideOpen(db, function SyncNode() {}, crudMonitor)(() => {})();
@@ -56,11 +58,11 @@ test('should call mapToClass for the _syncNodes table', () => {
         mapToClass(cls) {
           calledWithClass = cls;
         },
-        schema: {}
-      }
-    }
+        schema: {},
+      },
+    },
   };
 
-  initOverrideOpen(db, SyncNode, function crudMonitor(){})(() => {})();
+  initOverrideOpen(db, SyncNode, function crudMonitor() {})(() => {})();
   strictEqual(calledWithClass, SyncNode);
 });

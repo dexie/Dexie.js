@@ -1,4 +1,4 @@
-import { cmp } from "../functions/cmp";
+import { cmp } from '../functions/cmp';
 import { extend, iteratorSymbol, props } from '../functions/utils';
 import { IndexableType } from '../public';
 import {
@@ -7,28 +7,35 @@ import {
   IntervalTreeNode,
   RangeSetConstructor,
   RangeSetPrototype,
-} from "../public/types/rangeset";
+} from '../public/types/rangeset';
 
 /* An interval tree implementation to efficiently detect overlapping ranges of queried indexes.
  *
  * https://en.wikipedia.org/wiki/Interval_tree
- * 
+ *
  */
 
-function isEmptyRange(node: IntervalTree | {from: IndexableType, to: IndexableType}): node is EmptyRange {
-  return !("from" in node);
+function isEmptyRange(
+  node: IntervalTree | { from: IndexableType; to: IndexableType }
+): node is EmptyRange {
+  return !('from' in node);
 }
 
 export type RangeSet = RangeSetPrototype & IntervalTree;
 
-export const RangeSet = function(fromOrTree: any, to?: any) {
+export const RangeSet = function (fromOrTree: any, to?: any) {
   if (this) {
     // Called with new()
-    extend(this, arguments.length ? {d:1, from: fromOrTree, to: arguments.length > 1 ? to : fromOrTree} : {d:0});
+    extend(
+      this,
+      arguments.length
+        ? { d: 1, from: fromOrTree, to: arguments.length > 1 ? to : fromOrTree }
+        : { d: 0 }
+    );
   } else {
     // Called without new()
     const rv = new RangeSet();
-    if (fromOrTree && ("d" in fromOrTree)) {
+    if (fromOrTree && 'd' in fromOrTree) {
       extend(rv, fromOrTree);
     }
     return rv;
@@ -36,7 +43,7 @@ export const RangeSet = function(fromOrTree: any, to?: any) {
 } as RangeSetConstructor;
 
 props(RangeSet.prototype, {
-  add(rangeSet: IntervalTree | {from: IndexableType, to: IndexableType}) {
+  add(rangeSet: IntervalTree | { from: IndexableType; to: IndexableType }) {
     mergeRanges(this, rangeSet);
     return this;
   },
@@ -45,7 +52,7 @@ props(RangeSet.prototype, {
     return this;
   },
   addKeys(keys: IndexableType[]) {
-    keys.forEach(key => addRange(this, key, key));
+    keys.forEach((key) => addRange(this, key, key));
     return this;
   },
   hasKey(key: IndexableType) {
@@ -53,12 +60,20 @@ props(RangeSet.prototype, {
     return node && cmp(node.from, key) <= 0 && cmp(node.to, key) >= 0;
   },
 
-  [iteratorSymbol](): Iterator<IntervalTreeNode, undefined, IndexableType | undefined> {
+  [iteratorSymbol](): Iterator<
+    IntervalTreeNode,
+    undefined,
+    IndexableType | undefined
+  > {
     return getRangeSetIterator(this);
-  }
+  },
 });
 
-function addRange(target: IntervalTree, from: IndexableType, to: IndexableType) {
+function addRange(
+  target: IntervalTree,
+  from: IndexableType,
+  to: IndexableType
+) {
   const diff = cmp(from, to);
   // cmp() returns NaN if one of the args are IDB-invalid keys.
   // Avoid storing invalid keys in rangeset:
@@ -66,7 +81,7 @@ function addRange(target: IntervalTree, from: IndexableType, to: IndexableType) 
 
   // Caller is trying to add a range where from is greater than to:
   if (diff > 0) throw RangeError();
-  
+
   if (isEmptyRange(target)) return extend(target, { from, to, d: 1 });
   const left = target.l;
   const right = target.r;
@@ -111,40 +126,50 @@ function addRange(target: IntervalTree, from: IndexableType, to: IndexableType) 
   }
 }
 
-export function mergeRanges(target: IntervalTree, newSet: IntervalTree | {from: IndexableType, to: IndexableType}) {
+export function mergeRanges(
+  target: IntervalTree,
+  newSet: IntervalTree | { from: IndexableType; to: IndexableType }
+) {
   function _addRangeSet(
     target: IntervalTree,
-    { from, to, l, r }: IntervalTreeNode | {from: IndexableType, to: IndexableType, l?: undefined, r?: undefined}
+    {
+      from,
+      to,
+      l,
+      r,
+    }:
+      | IntervalTreeNode
+      | { from: IndexableType; to: IndexableType; l?: undefined; r?: undefined }
   ) {
     addRange(target, from, to);
     if (l) _addRangeSet(target, l);
     if (r) _addRangeSet(target, r);
   }
 
-  if(!isEmptyRange(newSet)) _addRangeSet(target, newSet);
+  if (!isEmptyRange(newSet)) _addRangeSet(target, newSet);
 }
 
 export function rangesOverlap(
   rangeSet1: IntervalTree,
   rangeSet2: IntervalTree
 ): boolean {
-    // Start iterating other from scratch.
-    const i1 = getRangeSetIterator(rangeSet2);
-    let nextResult1 = i1.next();
-    if (nextResult1.done) return false;
-    let a = nextResult1.value;
+  // Start iterating other from scratch.
+  const i1 = getRangeSetIterator(rangeSet2);
+  let nextResult1 = i1.next();
+  if (nextResult1.done) return false;
+  let a = nextResult1.value;
 
-    // Start iterating this from start of other
-    const i2 = getRangeSetIterator(rangeSet1);
-    let nextResult2 = i2.next(a.from); // Start from beginning of other range
-    let b = nextResult2.value;
+  // Start iterating this from start of other
+  const i2 = getRangeSetIterator(rangeSet1);
+  let nextResult2 = i2.next(a.from); // Start from beginning of other range
+  let b = nextResult2.value;
 
-    while (!nextResult1.done && !nextResult2.done) {
-      if (cmp(b!.from, a.to) <= 0 && cmp(b!.to, a.from) >= 0) return true;
-      cmp(a.from, b!.from) < 0
-        ? (a = (nextResult1 = i1.next(b!.from)).value!) // a is behind. forward it to beginning of next b-range
-        : (b = (nextResult2 = i2.next(a.from)).value); // b is behind. forward it to beginning of next a-range
-    }
+  while (!nextResult1.done && !nextResult2.done) {
+    if (cmp(b!.from, a.to) <= 0 && cmp(b!.to, a.from) >= 0) return true;
+    cmp(a.from, b!.from) < 0
+      ? (a = (nextResult1 = i1.next(b!.from)).value!) // a is behind. forward it to beginning of next b-range
+      : (b = (nextResult2 = i2.next(a.from)).value); // b is behind. forward it to beginning of next a-range
+  }
   return false;
 }
 
@@ -159,7 +184,9 @@ type RangeSetIteratorState =
 export function getRangeSetIterator(
   node: EmptyRange | IntervalTreeNode
 ): Generator<IntervalTreeNode, undefined, IndexableType | undefined> {
-  let state: RangeSetIteratorState = isEmptyRange(node) ? null : { s: 0, n: node };
+  let state: RangeSetIteratorState = isEmptyRange(node)
+    ? null
+    : { s: 0, n: node };
 
   return {
     next(key?) {
@@ -201,22 +228,21 @@ export function getRangeSetIterator(
 
 function rebalance(target: IntervalTreeNode) {
   const diff = (target.r?.d || 0) - (target.l?.d || 0);
-  const r = diff > 1 ? "r" : diff < -1 ? "l" : "";
+  const r = diff > 1 ? 'r' : diff < -1 ? 'l' : '';
   if (r) {
-
     // Rotate (https://en.wikipedia.org/wiki/Tree_rotation)
     //
-    // 
+    //
     //                    [OLDROOT]
     //       [OLDROOT.L]            [NEWROOT]
     //                        [NEWROOT.L] [NEWROOT.R]
     //
     // Is going to become:
     //
-    // 
+    //
     //                    [NEWROOT]
     //        [OLDROOT]             [NEWROOT.R]
-    // [OLDROOT.L] [NEWROOT.L]  
+    // [OLDROOT.L] [NEWROOT.L]
 
     // * clone now has the props of OLDROOT
     // Plan:
@@ -224,12 +250,12 @@ function rebalance(target: IntervalTreeNode) {
     // * target[l] must point to a new OLDROOT
     // * target[r] must point to NEWROOT.R
     // * OLDROOT[r] must point to NEWROOT.L
-    const l = r === "r" ? "l" : "r"; // Support both left/right rotation
+    const l = r === 'r' ? 'l' : 'r'; // Support both left/right rotation
     const rootClone = { ...target };
     // We're gonna copy props from target's right node into target so that target will
     // have same range as old target[r] (instead of changing pointers, we copy values.
     // that way we do not need to adjust pointers in parents).
-    const oldRootRight = target[r]; 
+    const oldRootRight = target[r];
     target.from = oldRootRight.from;
     target.to = oldRootRight.to;
     target[r] = oldRootRight[r];
@@ -240,6 +266,6 @@ function rebalance(target: IntervalTreeNode) {
   target.d = computeDepth(target);
 }
 
-function computeDepth({ r, l }: Pick<IntervalTreeNode, "l" | "r">) {
+function computeDepth({ r, l }: Pick<IntervalTreeNode, 'l' | 'r'>) {
   return (r ? (l ? Math.max(r.d, l.d) : r.d) : l ? l.d : 0) + 1;
 }

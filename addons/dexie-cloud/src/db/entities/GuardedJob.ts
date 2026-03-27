@@ -1,4 +1,3 @@
-
 export interface GuardedJob {
   nodeId: string;
   started: Date;

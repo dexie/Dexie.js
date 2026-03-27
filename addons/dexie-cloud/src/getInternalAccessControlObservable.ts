@@ -29,7 +29,8 @@ export const getInternalAccessControlObservable = associate((db: Dexie) => {
           )
         )
       )
-    ), {
+    ),
+    {
       selfMembers: [],
       realms: [],
       get userId() {

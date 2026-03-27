@@ -37,10 +37,10 @@ export async function* readableStreamIterator(
       // Base case: reading 0 bytes returns empty Blob
       if (num === 0) return new Blob([]);
       if (bytesLeft() < num) throw new Error(`Tried to read too much`);
-      
+
       const currentChunk = chunks[chunk];
       if (!currentChunk) throw new Error(`Chunk ${chunk} is null or undefined`);
-      
+
       const readableAmount = currentChunk.size - posInChunk;
       if (num < readableAmount) {
         const part = currentChunk.slice(posInChunk, posInChunk + num);

@@ -1,4 +1,6 @@
-export function associate<T extends object,M>(factory: (x: T)=>M): (x: T) => M {
+export function associate<T extends object, M>(
+  factory: (x: T) => M
+): (x: T) => M {
   const wm = new WeakMap<T, M>();
   return (x: T) => {
     let rv = wm.get(x);
@@ -7,5 +9,5 @@ export function associate<T extends object,M>(factory: (x: T)=>M): (x: T) => M {
       wm.set(x, rv);
     }
     return rv;
-  }
+  };
 }

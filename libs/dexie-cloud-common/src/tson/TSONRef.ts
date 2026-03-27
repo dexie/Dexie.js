@@ -134,7 +134,9 @@ export class TSONRef<T extends ArrayBuffer | Blob | Uint8Array = ArrayBuffer> {
         return new BigUint64Array(data) as unknown as Uint8Array;
 
       default:
-        console.warn(`Unknown TSONRef type: ${this.type}, returning ArrayBuffer`);
+        console.warn(
+          `Unknown TSONRef type: ${this.type}, returning ArrayBuffer`
+        );
         return data;
     }
   }
@@ -243,7 +245,7 @@ export function collectTSONRefs(obj: unknown, refs: TSONRef[] = []): TSONRef[] {
 
 /**
  * Replace TSONRef instances with resolved data in-place.
- * 
+ *
  * Note: If the root object itself is a TSONRef, it cannot be replaced in-place.
  * In that case, use the returned value instead.
  *
@@ -340,7 +342,10 @@ function replaceRefsInPlace(
  * Resolve all TSONRef instances in an object tree.
  * Convenience function that uses TSONRef.resolver.
  */
-export async function resolveAllRefs(obj: unknown, concurrency = 5): Promise<void> {
+export async function resolveAllRefs(
+  obj: unknown,
+  concurrency = 5
+): Promise<void> {
   if (!TSONRef.resolver) {
     throw new Error('TSONRef.resolver not configured');
   }

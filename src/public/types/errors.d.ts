@@ -1,12 +1,12 @@
-import { IndexableTypeArrayReadonly } from "./indexable-type";
+import { IndexableTypeArrayReadonly } from './indexable-type';
 
 /** DexieError
- * 
+ *
  * Common base class for all errors originating from Dexie.js except TypeError,
  * SyntaxError and RangeError.
- * 
+ *
  * https://dexie.org/docs/DexieErrors/DexieError
- * 
+ *
  */
 export interface DexieError extends Error {
   name: string;
@@ -19,14 +19,14 @@ export interface DexieError extends Error {
 /**
  * List of the names of auto-generated error classes that extends DexieError
  * and shares the interface of DexieError.
- * 
+ *
  * Each error should be documented at https://dexie.org/docs/DexieErrors/Dexie.<errname>
- * 
+ *
  * The generic type DexieExceptionClasses is a map of full error name to
  * error constructor. The DexieExceptionClasses is mixed in into Dexie,
  * so that it is always possible to throw or catch certain errors via
  * Dexie.ErrorName. Example:
- * 
+ *
  * try {
  *   throw new Dexie.InvalidTableError("Invalid table foo", innerError?);
  * } catch (err) {
@@ -41,89 +41,89 @@ export interface DexieError extends Error {
  */
 export type DexieErrors = {
   // https://dexie.org/docs/DexieErrors/Dexie.OpenFailedError
-  OpenFailed: 'OpenFailedError',
+  OpenFailed: 'OpenFailedError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.VersionChangeError
-  VersionChange: 'VersionChangeError',
+  VersionChange: 'VersionChangeError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.SchemaError
-  Schema: 'SchemaError',
+  Schema: 'SchemaError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.UpgradeError
-  Upgrade: 'UpgradeError',
+  Upgrade: 'UpgradeError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.InvalidTableError
-  InvalidTable: 'InvalidTableError',
+  InvalidTable: 'InvalidTableError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.MissingAPIError
-  MissingAPI: 'MissingAPIError',
+  MissingAPI: 'MissingAPIError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.NoSuchDatabaseError
-  NoSuchDatabase: 'NoSuchDatabaseError',
+  NoSuchDatabase: 'NoSuchDatabaseError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.InvalidArgumentError
-  InvalidArgument: 'InvalidArgumentError',
+  InvalidArgument: 'InvalidArgumentError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.SubTransactionError
-  SubTransaction: 'SubTransactionError',
+  SubTransaction: 'SubTransactionError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.UnsupportedError
-  Unsupported: 'UnsupportedError',
+  Unsupported: 'UnsupportedError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.InternalError
-  Internal: 'InternalError',
+  Internal: 'InternalError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.DatabaseClosedError
-  DatabaseClosed: 'DatabaseClosedError',
+  DatabaseClosed: 'DatabaseClosedError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.PrematureCommitError
-  PrematureCommit: 'PrematureCommitError',
+  PrematureCommit: 'PrematureCommitError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.ForeignAwaitError
-  ForeignAwait: 'ForeignAwaitError',
+  ForeignAwait: 'ForeignAwaitError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.UnknownError
-  Unknown: 'UnknownError',
+  Unknown: 'UnknownError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.ConstraintError
-  Constraint: 'ConstraintError',
+  Constraint: 'ConstraintError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.DataError
-  Data: 'DataError',
+  Data: 'DataError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.TransactionInactiveError
-  TransactionInactive: 'TransactionInactiveError',
+  TransactionInactive: 'TransactionInactiveError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.ReadOnlyError
-  ReadOnly: 'ReadOnlyError',
-  
+  ReadOnly: 'ReadOnlyError';
+
   // https://dexie.org/docs/DexieErrors/Dexie.VersionError
-  Version: 'VersionError',
+  Version: 'VersionError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.NotFoundError
-  NotFound: 'NotFoundError',
+  NotFound: 'NotFoundError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.InvalidStateError
-  InvalidState: 'InvalidStateError',
+  InvalidState: 'InvalidStateError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.InvalidAccessError
-  InvalidAccess: 'InvalidAccessError',
+  InvalidAccess: 'InvalidAccessError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.AbortError
-  Abort: 'AbortError',
+  Abort: 'AbortError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.TimeoutError
-  Timeout: 'TimeoutError',
+  Timeout: 'TimeoutError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.QuotaExceededError
-  QuotaExceeded: 'QuotaExceededError',
+  QuotaExceeded: 'QuotaExceededError';
 
   // https://dexie.org/docs/DexieErrors/Dexie.DataCloneError
-  DataClone: 'DataCloneError'
-}
+  DataClone: 'DataCloneError';
+};
 
 /** ModifyError
- * 
+ *
  * https://dexie.org/docs/DexieErrors/Dexie.ModifyError
  */
 export interface ModifyError extends DexieError {
@@ -133,44 +133,52 @@ export interface ModifyError extends DexieError {
 }
 
 /** BulkError
- * 
+ *
  * https://dexie.org/docs/DexieErrors/Dexie.BulkError
  */
 export interface BulkError extends DexieError {
   failures: Error[];
-  failuresByPos: {[operationNumber: number]: Error};
+  failuresByPos: { [operationNumber: number]: Error };
 }
 
 export interface DexieErrorConstructor {
-  new(msg?: string, inner?: Object) : DexieError;
-  new(inner: Object): DexieError;
+  new (msg?: string, inner?: Object): DexieError;
+  new (inner: Object): DexieError;
   prototype: DexieError;
 }
 
 export interface ModifyErrorConstructor {
   new (
-    msg?:string,
+    msg?: string,
     failures?: any[],
     successCount?: number,
-    failedKeys?: IndexableTypeArrayReadonly) : ModifyError;
+    failedKeys?: IndexableTypeArrayReadonly
+  ): ModifyError;
   prototype: ModifyError;
 }
 
 export interface BulkErrorConstructor {
-  new (msg?:string, failures?: {[operationNumber: number]: Error}) : BulkError;
+  new (
+    msg?: string,
+    failures?: { [operationNumber: number]: Error }
+  ): BulkError;
   prototype: BulkError;
 }
 
-export type ExceptionAliasSet = {[ShortName in keyof DexieErrors]: DexieErrorConstructor} & {
-  Dexie: DexieErrorConstructor,
+export type ExceptionAliasSet = {
+  [ShortName in keyof DexieErrors]: DexieErrorConstructor;
+} & {
+  Dexie: DexieErrorConstructor;
   Modify: ModifyErrorConstructor;
   Bulk: BulkErrorConstructor;
-}
+};
 
-export type ExceptionSet = {[P in DexieErrors[keyof DexieErrors]]: DexieErrorConstructor};
+export type ExceptionSet = {
+  [P in DexieErrors[keyof DexieErrors]]: DexieErrorConstructor;
+};
 
 export type DexieExceptionClasses = ExceptionSet & {
-  DexieError: DexieErrorConstructor,
+  DexieError: DexieErrorConstructor;
   ModifyError: ModifyErrorConstructor;
   BulkError: BulkErrorConstructor;
-}
+};

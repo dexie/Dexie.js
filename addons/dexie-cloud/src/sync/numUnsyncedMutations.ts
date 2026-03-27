@@ -1,9 +1,9 @@
-import Dexie, { liveQuery } from "dexie";
-import { getMutationTable } from "../helpers/getMutationTable";
-import { getSyncableTables } from "../helpers/getSyncableTables";
-import { combineLatest, forkJoin, from } from "rxjs";
-import { distinctUntilChanged, filter, map } from "rxjs/operators";
-import { DexieCloudDB } from "../db/DexieCloudDB";
+import Dexie, { liveQuery } from 'dexie';
+import { getMutationTable } from '../helpers/getMutationTable';
+import { getSyncableTables } from '../helpers/getSyncableTables';
+import { combineLatest, forkJoin, from } from 'rxjs';
+import { distinctUntilChanged, filter, map } from 'rxjs/operators';
+import { DexieCloudDB } from '../db/DexieCloudDB';
 
 export function getNumUnsyncedMutationsObservable(db: DexieCloudDB) {
   const syncableTables = getSyncableTables(db);

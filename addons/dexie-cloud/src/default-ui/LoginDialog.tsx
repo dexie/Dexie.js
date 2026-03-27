@@ -27,7 +27,7 @@ interface LoginDialogProps {
  * - Form fields (text inputs)
  * - Selectable options (buttons)
  * - Or both together
- * 
+ *
  * When an option is clicked, calls onSubmit({ [option.name]: option.value }).
  * This unified approach means the same callback handles both form submission
  * and option selection.
@@ -47,7 +47,10 @@ export function LoginDialog({
   const firstFieldRef = useRef<HTMLInputElement>(null);
   useLayoutEffect(() => firstFieldRef.current?.focus(), []);
 
-  const fieldEntries = Object.entries(fields || {}) as [string, DXCInputField][];
+  const fieldEntries = Object.entries(fields || {}) as [
+    string,
+    DXCInputField,
+  ][];
   const hasFields = fieldEntries.length > 0;
   const hasOptions = options && options.length > 0;
 
@@ -81,30 +84,30 @@ export function LoginDialog({
         {/* Render options if present */}
         {hasOptions && (
           <div class="dxc-options">
-            {hasMultipleGroups ? (
-              // Render with dividers between groups
-              Array.from(optionGroups.entries()).map(([groupName, groupOptions], groupIdx) => (
-                <Fragment key={groupName}>
-                  {groupIdx > 0 && <Divider />}
-                  {groupOptions!.map((option) => (
-                    <OptionButton
-                      key={`${option.name}-${option.value}`}
-                      option={option}
-                      onClick={() => handleOptionClick(option)}
-                    />
-                  ))}
-                </Fragment>
-              ))
-            ) : (
-              // Simple case: all options in one group
-              options!.map((option) => (
-                <OptionButton
-                  key={`${option.name}-${option.value}`}
-                  option={option}
-                  onClick={() => handleOptionClick(option)}
-                />
-              ))
-            )}
+            {hasMultipleGroups
+              ? // Render with dividers between groups
+                Array.from(optionGroups.entries()).map(
+                  ([groupName, groupOptions], groupIdx) => (
+                    <Fragment key={groupName}>
+                      {groupIdx > 0 && <Divider />}
+                      {groupOptions!.map((option) => (
+                        <OptionButton
+                          key={`${option.name}-${option.value}`}
+                          option={option}
+                          onClick={() => handleOptionClick(option)}
+                        />
+                      ))}
+                    </Fragment>
+                  )
+                )
+              : // Simple case: all options in one group
+                options!.map((option) => (
+                  <OptionButton
+                    key={`${option.name}-${option.value}`}
+                    option={option}
+                    onClick={() => handleOptionClick(option)}
+                  />
+                ))}
           </div>
         )}
 
@@ -133,13 +136,19 @@ export function LoginDialog({
                     placeholder={placeholder}
                     value={params[fieldName] || ''}
                     onInput={(ev) => {
-                      const value = valueTransformer(type, ev.target?.['value']);
+                      const value = valueTransformer(
+                        type,
+                        ev.target?.['value']
+                      );
                       let updatedParams = {
                         ...params,
                         [fieldName]: value,
                       };
                       setParams(updatedParams);
-                      if (type === 'otp' && value?.trim().length === OTP_LENGTH) {
+                      if (
+                        type === 'otp' &&
+                        value?.trim().length === OTP_LENGTH
+                      ) {
                         // Auto-submit when OTP is filled in.
                         onSubmit(updatedParams);
                       }
@@ -207,9 +216,12 @@ function CopyButton({ text }: { text: string }) {
 
   const handleClick = () => {
     if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
-      navigator.clipboard.writeText(text).then(scheduleCopiedReset).catch(() => {
-        fallbackCopy(text, scheduleCopiedReset);
-      });
+      navigator.clipboard
+        .writeText(text)
+        .then(scheduleCopiedReset)
+        .catch(() => {
+          fallbackCopy(text, scheduleCopiedReset);
+        });
     } else {
       fallbackCopy(text, scheduleCopiedReset);
     }

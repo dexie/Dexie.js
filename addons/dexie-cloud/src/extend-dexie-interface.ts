@@ -1,9 +1,5 @@
 import { IndexableType, TableProp } from 'dexie';
-import {
-  DBRealm,
-  DBRealmMember,
-  DBRealmRole,
-} from 'dexie-cloud-common';
+import { DBRealm, DBRealmMember, DBRealmRole } from 'dexie-cloud-common';
 import { Member } from './db/entities/Member';
 import { Role } from './db/entities/Role';
 import { EntityCommon } from './db/entities/EntityCommon';
@@ -20,7 +16,11 @@ declare module 'dexie' {
   interface Dexie {
     cloud: DexieCloudAPI;
     realms: Table<DBRealm, string, Optional<DBRealm, 'realmId' | 'owner'>>;
-    members: Table<DBRealmMember, string, Optional<DBRealmMember, 'id' | 'owner'>>;
+    members: Table<
+      DBRealmMember,
+      string,
+      Optional<DBRealmMember, 'id' | 'owner'>
+    >;
     roles: Table<DBRealmRole, [string, string], Optional<DBRealmRole, 'owner'>>;
   }
 

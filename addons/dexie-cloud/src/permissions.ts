@@ -43,7 +43,9 @@ export function permissions(
     return new PermissionChecker(
       realm.permissions,
       tableName!,
-      realmId === undefined || realmId === dexie.cloud.currentUserId || owner === dexie.cloud.currentUserId
+      realmId === undefined ||
+        realmId === dexie.cloud.currentUserId ||
+        owner === dexie.cloud.currentUserId
     );
   };
   const o = source.pipe(map(mapper)) as Observable<PermissionChecker<any>> & {

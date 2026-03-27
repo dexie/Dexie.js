@@ -1,13 +1,13 @@
 import { UserLogin } from '../db/entities/UserLogin';
 
 export const UNAUTHORIZED_USER: UserLogin = {
-  userId: "unauthorized",
-  name: "Unauthorized",
+  userId: 'unauthorized',
+  name: 'Unauthorized',
   claims: {
-    sub: "unauthorized",
+    sub: 'unauthorized',
   },
-  lastLogin: new Date(0)
-}
+  lastLogin: new Date(0),
+};
 
 try {
   Object.freeze(UNAUTHORIZED_USER);

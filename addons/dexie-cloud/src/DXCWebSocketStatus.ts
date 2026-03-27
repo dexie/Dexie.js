@@ -1,2 +1,6 @@
-export type DXCWebSocketStatus = "not-started" | "connecting" | "connected" | "disconnected" | "error";
-
+export type DXCWebSocketStatus =
+  | 'not-started'
+  | 'connecting'
+  | 'connected'
+  | 'disconnected'
+  | 'error';

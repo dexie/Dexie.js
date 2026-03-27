@@ -3,7 +3,11 @@ import { DbSchema } from '../../public/types/db-schema';
 import { extend, keys } from '../../functions/utils';
 import { Dexie } from '../dexie';
 import { Transaction } from '../transaction';
-import { removeTablesApi, setApiOnPlace, parseIndexSyntax } from './schema-helpers';
+import {
+  removeTablesApi,
+  setApiOnPlace,
+  parseIndexSyntax,
+} from './schema-helpers';
 import { exceptions } from '../../errors';
 import { createTableSchema } from '../../helpers/table-schema';
 import { nop, promisableChain } from '../../functions/chaining-functions';
@@ -65,11 +69,7 @@ export class Version implements IVersion {
               'Index must have a name and cannot be an empty string'
             );
         });
-        const tblSchema = this._createTableSchema(
-          tableName,
-          primKey,
-          indexes
-        );
+        const tblSchema = this._createTableSchema(tableName, primKey, indexes);
         outSchema[tableName] = tblSchema;
       }
     });

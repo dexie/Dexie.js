@@ -32,7 +32,7 @@ export function createSharedValueObservable<T>(
       },
       complete() {
         observer.complete();
-      }
+      },
     });
     if (!didEmit && !subscription.closed) {
       observer.next(currentValue);

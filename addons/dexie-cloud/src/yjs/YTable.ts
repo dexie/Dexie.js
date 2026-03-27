@@ -1,4 +1,4 @@
-import { EntityTable } from "dexie";
-import type { YUpdateRow } from "y-dexie";
+import { EntityTable } from 'dexie';
+import type { YUpdateRow } from 'y-dexie';
 
-export type YTable = EntityTable<YUpdateRow, "i">;
+export type YTable = EntityTable<YUpdateRow, 'i'>;

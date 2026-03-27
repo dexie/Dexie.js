@@ -1,5 +1,5 @@
 import { getByKeyPath, keys, setByKeyPath } from './utils';
-import { PropModification } from "../helpers/prop-modification";
+import { PropModification } from '../helpers/prop-modification';
 
 export function applyUpdateSpec(
   obj: any,

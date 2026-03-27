@@ -19,8 +19,8 @@ export function adjustOptimisticFromFailures(
   const numBulkOps = req.keys
     ? req.keys.length
     : 'values' in req && req.values
-    ? req.values.length
-    : 1;
+      ? req.values.length
+      : 1;
   if (res.numFailures === numBulkOps) {
     // Same number of failures as the number of ops. This means that all ops failed.
     return null;

@@ -1,8 +1,11 @@
-import { getSyncableTables } from "../helpers/getSyncableTables";
-import { DexieCloudDB } from "../db/DexieCloudDB";
-import { PersistedSyncState } from "../db/entities/PersistedSyncState";
+import { getSyncableTables } from '../helpers/getSyncableTables';
+import { DexieCloudDB } from '../db/DexieCloudDB';
+import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 
-export function getTablesToSyncify(db: DexieCloudDB, syncState: PersistedSyncState | undefined) {
+export function getTablesToSyncify(
+  db: DexieCloudDB,
+  syncState: PersistedSyncState | undefined
+) {
   const syncedTables = syncState?.syncedTables || [];
   const syncableTables = getSyncableTables(db);
   const tablesToSyncify = syncableTables.filter(

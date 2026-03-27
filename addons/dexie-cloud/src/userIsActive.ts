@@ -36,9 +36,9 @@ userIsActive
           ? of(true).pipe(delay(ACTIVE_WAIT_TIME))
           : of(true)
         : INACTIVE_WAIT_TIME
-        ? of(false).pipe(delay(INACTIVE_WAIT_TIME))
-        : of(false);}
-    ),
+          ? of(false).pipe(delay(INACTIVE_WAIT_TIME))
+          : of(false);
+    }),
     distinctUntilChanged()
   )
   .subscribe(userIsReallyActive);

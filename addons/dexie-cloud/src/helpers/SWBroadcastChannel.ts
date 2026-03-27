@@ -1,6 +1,9 @@
 const swHolder: { registration?: ServiceWorkerRegistration } = {};
-const swContainer = typeof self !== 'undefined' && self.document && // self.document is to verify we're not the SW ourself
-                    typeof navigator !== 'undefined' && navigator.serviceWorker; 
+const swContainer =
+  typeof self !== 'undefined' &&
+  self.document && // self.document is to verify we're not the SW ourself
+  typeof navigator !== 'undefined' &&
+  navigator.serviceWorker;
 if (swContainer)
   swContainer.ready.then(
     (registration) => (swHolder.registration = registration)

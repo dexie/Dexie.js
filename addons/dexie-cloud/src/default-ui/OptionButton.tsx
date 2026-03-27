@@ -10,11 +10,11 @@ export interface OptionButtonProps {
 /** Get style based on styleHint (for provider branding, etc.) */
 function getOptionStyle(styleHint?: string): Record<string, string> {
   const baseStyle = { ...Styles.ProviderButton };
-  
+
   if (!styleHint) {
     return baseStyle;
   }
-  
+
   switch (styleHint) {
     case 'google':
       return { ...baseStyle, ...Styles.ProviderGoogle };
@@ -36,13 +36,13 @@ function getOptionStyle(styleHint?: string): Record<string, string> {
 /**
  * Generic button component for selectable options.
  * Displays the option's icon and display name.
- * 
+ *
  * Style is determined by the styleHint property for branding purposes.
  */
 export function OptionButton({ option, onClick }: OptionButtonProps) {
   const { displayName, iconUrl, styleHint } = option;
   const style = getOptionStyle(styleHint);
-  
+
   return (
     <button
       type="button"

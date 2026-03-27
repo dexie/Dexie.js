@@ -20,7 +20,7 @@ describe('newId', () => {
     // Generate many IDs to ensure time progresses or sequence increments
     for (let i = 0; i < 100; i++) newId();
     const id2 = newId();
-    
+
     expect(id1 < id2).toBe(true);
   });
 
@@ -29,7 +29,7 @@ describe('newId', () => {
     for (let i = 0; i < 100; i++) {
       ids.push(newId());
     }
-    
+
     const sorted = [...ids].sort();
     expect(ids).toEqual(sorted);
   });

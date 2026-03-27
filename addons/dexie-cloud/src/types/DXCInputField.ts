@@ -1,4 +1,3 @@
-
 export type DXCInputField = DXCTextField | DXCPasswordField;
 
 export interface DXCTextField {

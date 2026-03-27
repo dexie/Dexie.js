@@ -1,2 +1,2 @@
-import "./basic-tests";
-import "./edge-cases";
+import './basic-tests';
+import './edge-cases';

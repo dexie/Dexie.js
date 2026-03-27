@@ -3,7 +3,10 @@ import { DexieConstructor } from './public/types/dexie-constructor';
 import { DexiePromise } from './helpers/promise';
 import { mapError } from './errors';
 import * as Debug from './helpers/debug';
-import { dexieStackFrameFilter, DEFAULT_MAX_CONNECTIONS } from './globals/constants';
+import {
+  dexieStackFrameFilter,
+  DEFAULT_MAX_CONNECTIONS,
+} from './globals/constants';
 
 // Generate all static properties such as Dexie.maxKey etc
 // (implement interface DexieConstructor):
@@ -16,7 +19,6 @@ import { cmp } from './functions/cmp';
 import { PropModification } from './helpers/prop-modification';
 import { replacePrefix, add, remove } from './functions/propmods';
 
-
 // Set rejectionMapper of DexiePromise so that it generally tries to map
 // DOMErrors and DOMExceptions to a DexieError instance with same name but with
 // async stack support and with a prototypal inheritance from DexieError and Error.
@@ -26,7 +28,7 @@ DexiePromise.rejectionMapper = mapError;
 // Let the async stack filter focus on app code and filter away frames from dexie.min.js:
 Debug.setDebug(Debug.debug, dexieStackFrameFilter);
 
-export { RangeSet, mergeRanges, rangesOverlap } from "./helpers/rangeset";
+export { RangeSet, mergeRanges, rangesOverlap } from './helpers/rangeset';
 export { Dexie, liveQuery, DEFAULT_MAX_CONNECTIONS }; // Comply with public/index.d.ts.
 export { Entity };
 export { cmp };

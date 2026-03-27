@@ -1,4 +1,4 @@
-import type { Dexie } from "dexie";
+import type { Dexie } from 'dexie';
 
 export interface DexieYDocMeta {
   db: Dexie;

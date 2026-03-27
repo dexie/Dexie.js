@@ -1,40 +1,46 @@
 /**
  * DBCore Middleware for resolving BlobRefs on read
- * 
+ *
  * This middleware intercepts read operations and resolves any BlobRefs
  * found in objects marked with _hasBlobRefs.
- * 
+ *
  * Important: Avoids async/await to preserve Dexie's Promise.PSD context.
  * Uses Dexie.waitFor() only for explicit rw transactions to keep them alive.
  * For readonly or implicit transactions, resolves directly (no waitFor needed).
- * 
+ *
  * Resolved blobs are queued for saving via BlobSavingQueue, which uses
  * setTimeout(fn, 0) to completely isolate from Dexie's transaction context.
  * Each blob is saved atomically using Table.update() with its keyPath to
  * avoid race conditions with other property changes.
- * 
+ *
  * Blob downloads use Authorization header (same as sync) via the server
  * proxy endpoint: GET /blob/{ref}
  */
 
-import Dexie, { 
-  DBCore, 
-  DBCoreGetManyRequest, 
-  DBCoreGetRequest, 
-  DBCoreQueryRequest, 
+import Dexie, {
+  DBCore,
+  DBCoreGetManyRequest,
+  DBCoreGetRequest,
+  DBCoreQueryRequest,
   DBCoreOpenCursorRequest,
   DBCoreCursor,
-  DBCoreTable, 
-  DBCoreTransaction, 
-  Middleware
+  DBCoreTable,
+  DBCoreTransaction,
+  Middleware,
 } from 'dexie';
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { hasUnresolvedBlobRefs, resolveAllBlobRefs, ResolvedBlob } from '../sync/blobResolve';
+import {
+  hasUnresolvedBlobRefs,
+  resolveAllBlobRefs,
+  ResolvedBlob,
+} from '../sync/blobResolve';
 import { BlobSavingQueue } from '../sync/BlobSavingQueue';
 import { TXExpandos } from '../types/TXExpandos';
 import { UserLogin } from '../dexie-cloud-client';
 
-export function createBlobResolveMiddleware(db: DexieCloudDB): Middleware<DBCore> {
+export function createBlobResolveMiddleware(
+  db: DexieCloudDB
+): Middleware<DBCore> {
   return {
     stack: 'dbcore' as const,
     name: 'blobResolve',
@@ -53,7 +59,7 @@ export function createBlobResolveMiddleware(db: DexieCloudDB): Middleware<DBCore
           }
           const dbUrl = db.cloud.options?.databaseUrl;
           const downlevelTable = downlevelDatabase.table(tableName);
-          
+
           // Skip internal tables
           if (tableName.startsWith('$')) {
             return downlevelTable;
@@ -63,30 +69,52 @@ export function createBlobResolveMiddleware(db: DexieCloudDB): Middleware<DBCore
             ...downlevelTable,
 
             get(req: DBCoreGetRequest) {
-              if ((req.trans as DBCoreTransaction & TXExpandos)?.disableBlobResolve) {
+              if (
+                (req.trans as DBCoreTransaction & TXExpandos)
+                  ?.disableBlobResolve
+              ) {
                 return downlevelTable.get(req);
               }
-              return downlevelTable.get(req).then(result => {
+              return downlevelTable.get(req).then((result) => {
                 if (result && hasUnresolvedBlobRefs(result)) {
-                  return resolveAndSave(downlevelTable, req.trans, req.key, result, blobSavingQueue, db);
+                  return resolveAndSave(
+                    downlevelTable,
+                    req.trans,
+                    req.key,
+                    result,
+                    blobSavingQueue,
+                    db
+                  );
                 }
                 return result;
               });
             },
 
             getMany(req: DBCoreGetManyRequest) {
-              if ((req.trans as DBCoreTransaction & TXExpandos)?.disableBlobResolve) {
+              if (
+                (req.trans as DBCoreTransaction & TXExpandos)
+                  ?.disableBlobResolve
+              ) {
                 return downlevelTable.getMany(req);
               }
-              return downlevelTable.getMany(req).then(results => {
+              return downlevelTable.getMany(req).then((results) => {
                 // Check if any results need resolution
-                const needsResolution = results.some(r => r && hasUnresolvedBlobRefs(r));
+                const needsResolution = results.some(
+                  (r) => r && hasUnresolvedBlobRefs(r)
+                );
                 if (!needsResolution) return results;
-                
+
                 return Dexie.Promise.all(
                   results.map((result, index) => {
                     if (result && hasUnresolvedBlobRefs(result)) {
-                      return resolveAndSave(downlevelTable, req.trans, req.keys[index], result, blobSavingQueue, db);
+                      return resolveAndSave(
+                        downlevelTable,
+                        req.trans,
+                        req.keys[index],
+                        result,
+                        blobSavingQueue,
+                        db
+                      );
                     }
                     return result;
                   })
@@ -95,36 +123,57 @@ export function createBlobResolveMiddleware(db: DexieCloudDB): Middleware<DBCore
             },
 
             query(req: DBCoreQueryRequest) {
-              if ((req.trans as DBCoreTransaction & TXExpandos)?.disableBlobResolve) {
+              if (
+                (req.trans as DBCoreTransaction & TXExpandos)
+                  ?.disableBlobResolve
+              ) {
                 return downlevelTable.query(req);
               }
-              return downlevelTable.query(req).then(result => {
-                if (!result.result || !Array.isArray(result.result)) return result;
-                
+              return downlevelTable.query(req).then((result) => {
+                if (!result.result || !Array.isArray(result.result))
+                  return result;
+
                 // Check if any results need resolution
-                const needsResolution = result.result.some(r => r && hasUnresolvedBlobRefs(r));
+                const needsResolution = result.result.some(
+                  (r) => r && hasUnresolvedBlobRefs(r)
+                );
                 if (!needsResolution) return result;
-                                
+
                 return Dexie.Promise.all(
-                  result.result.map(item => {
+                  result.result.map((item) => {
                     if (item && hasUnresolvedBlobRefs(item)) {
-                      return resolveAndSave(downlevelTable, req.trans, undefined, item, blobSavingQueue, db);
+                      return resolveAndSave(
+                        downlevelTable,
+                        req.trans,
+                        undefined,
+                        item,
+                        blobSavingQueue,
+                        db
+                      );
                     }
                     return item;
                   })
-                ).then(resolved => ({ ...result, result: resolved }));
+                ).then((resolved) => ({ ...result, result: resolved }));
               });
             },
 
             openCursor(req: DBCoreOpenCursorRequest) {
-              if ((req.trans as DBCoreTransaction & TXExpandos)?.disableBlobResolve) {
+              if (
+                (req.trans as DBCoreTransaction & TXExpandos)
+                  ?.disableBlobResolve
+              ) {
                 return downlevelTable.openCursor(req);
               }
-              return downlevelTable.openCursor(req).then(cursor => {
+              return downlevelTable.openCursor(req).then((cursor) => {
                 if (!cursor) return cursor; // No results, so no resolution needed
                 if (!req.values) return cursor; // No values requested, so no resolution needed
                 if (!dbUrl) return cursor; // No database URL configured, can't resolve blobs
-                return createBlobResolvingCursor(cursor, downlevelTable, blobSavingQueue, db);
+                return createBlobResolvingCursor(
+                  cursor,
+                  downlevelTable,
+                  blobSavingQueue,
+                  db
+                );
               });
             },
           };
@@ -136,11 +185,11 @@ export function createBlobResolveMiddleware(db: DexieCloudDB): Middleware<DBCore
 
 /**
  * Create a cursor wrapper that resolves BlobRefs in values synchronously.
- * 
+ *
  * Uses Object.create() to inherit all cursor methods, only overriding:
  * - start(): Resolves BlobRefs before calling the callback
  * - value: Getter that returns the resolved value
- * 
+ *
  * Returns the cursor synchronously. Resolution happens in start() before
  * each onNext callback, ensuring cursor.value is always available.
  */
@@ -155,7 +204,7 @@ function createBlobResolvingCursor(
     value: {
       value: cursor.value,
       enumerable: true,
-      writable: true
+      writable: true,
     },
     start: {
       value(onNext: () => void): Promise<any> {
@@ -167,34 +216,47 @@ function createBlobResolvingCursor(
             onNext();
             return;
           }
-          resolveAndSave(table, cursor.trans, cursor.primaryKey, rawValue, blobSavingQueue, db, true).then(resolved => {
-            wrappedCursor.value = resolved;
-            onNext();
-          }, err => {
-            console.error('Failed to resolve BlobRefs for cursor value:', err);
-            wrappedCursor.value = rawValue;
-            onNext();
-          });
+          resolveAndSave(
+            table,
+            cursor.trans,
+            cursor.primaryKey,
+            rawValue,
+            blobSavingQueue,
+            db,
+            true
+          ).then(
+            (resolved) => {
+              wrappedCursor.value = resolved;
+              onNext();
+            },
+            (err) => {
+              console.error(
+                'Failed to resolve BlobRefs for cursor value:',
+                err
+              );
+              wrappedCursor.value = rawValue;
+              onNext();
+            }
+          );
         });
-      }
-    }
+      },
+    },
   });
 
   return wrappedCursor;
 }
 
-
 /**
  * Resolve BlobRefs in an object and queue each blob for atomic saving.
- * 
+ *
  * Uses Dexie.waitFor() only when needed:
  * - Skip waitFor for readonly ('r') transactions
  * - Skip waitFor for implicit transactions (most common in liveQuery)
  * - Use waitFor only for explicit rw transactions that need to stay alive
- * 
+ *
  * Each resolved blob is queued individually with its keyPath for atomic
  * update using downCore transaction with the specific keyPath - this avoids race conditions.
- * 
+ *
  * Returns Dexie.Promise to preserve PSD context.
  */
 function resolveAndSave(
@@ -228,42 +290,65 @@ function resolveAndSave(
     const resolvedBlobs: ResolvedBlob[] = [];
 
     // Create the resolution promise with auth info
-    const resolutionPromise = resolveAllBlobRefs(obj, dbUrl, resolvedBlobs, '', new WeakMap(), db.blobDownloadTracker)
+    const resolutionPromise = resolveAllBlobRefs(
+      obj,
+      dbUrl,
+      resolvedBlobs,
+      '',
+      new WeakMap(),
+      db.blobDownloadTracker
+    );
 
     // Wrap with waitFor to keep transaction alive during fetch
     const resolvePromise = needsWaitFor
       ? Dexie.waitFor(resolutionPromise)
       : Dexie.Promise.resolve(resolutionPromise);
 
-    return resolvePromise.then(resolved => {
-      // Get primary key from the object
-      const primaryKey = table.schema.primaryKey;
-      const key = pKey !== undefined ? pKey : primaryKey.keyPath
-        ? Dexie.getByKeyPath(obj, primaryKey.keyPath as string)
-        : undefined;
+    return resolvePromise
+      .then((resolved) => {
+        // Get primary key from the object
+        const primaryKey = table.schema.primaryKey;
+        const key =
+          pKey !== undefined
+            ? pKey
+            : primaryKey.keyPath
+              ? Dexie.getByKeyPath(obj, primaryKey.keyPath as string)
+              : undefined;
 
-      if (key !== undefined) {
-        // Queue each resolved blob individually for atomic update
-        // This uses setTimeout(fn, 0) to completely isolate from
-        // Dexie's transaction context (avoids inheriting PSD)
-        if (isReadonly) {
-          blobSavingQueue.saveBlobs(table.name, key, resolvedBlobs);
-        } else {
-          // For rw transactions, we can save directly without queueing
-          // since we're still in the same transaction context
-          table.mutate({ type: 'put', keys: [key], values: [resolved], trans }).catch(err => {
-            console.error(`Failed to save resolved blob on ${table.name}:${key}:`, err);
-          });
+        if (key !== undefined) {
+          // Queue each resolved blob individually for atomic update
+          // This uses setTimeout(fn, 0) to completely isolate from
+          // Dexie's transaction context (avoids inheriting PSD)
+          if (isReadonly) {
+            blobSavingQueue.saveBlobs(table.name, key, resolvedBlobs);
+          } else {
+            // For rw transactions, we can save directly without queueing
+            // since we're still in the same transaction context
+            table
+              .mutate({ type: 'put', keys: [key], values: [resolved], trans })
+              .catch((err) => {
+                console.error(
+                  `Failed to save resolved blob on ${table.name}:${key}:`,
+                  err
+                );
+              });
+          }
         }
-      }
 
-      return resolved;
-    }).catch(err => {
-      console.error(`[dexie-cloud:blobResolve] Failed to resolve BlobRefs on ${table.name}:`, err);
-      return obj; // Return original object on error - never block the read pipeline
-    });
+        return resolved;
+      })
+      .catch((err) => {
+        console.error(
+          `[dexie-cloud:blobResolve] Failed to resolve BlobRefs on ${table.name}:`,
+          err
+        );
+        return obj; // Return original object on error - never block the read pipeline
+      });
   } catch (err) {
-    console.error(`[dexie-cloud:blobResolve] Sync error in resolveAndSave on ${table.name}:`, err);
+    console.error(
+      `[dexie-cloud:blobResolve] Sync error in resolveAndSave on ${table.name}:`,
+      err
+    );
     return Dexie.Promise.resolve(obj); // Never block reads
   }
 }

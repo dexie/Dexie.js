@@ -44,7 +44,7 @@ export const getInvitesObservable = associate((db: Dexie) => {
                 async reject() {
                   await db.members.update(invite.id!, { rejected: new Date() });
                 },
-              } satisfies Invite)
+              }) satisfies Invite
           );
       })
     ),

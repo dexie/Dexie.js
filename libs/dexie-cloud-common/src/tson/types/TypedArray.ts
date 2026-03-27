@@ -1,19 +1,19 @@
-import { _global } from "../../common/_global.js";
-import { TypeDef } from "../TypeDef.js";
+import { _global } from '../../common/_global.js';
+import { TypeDef } from '../TypeDef.js';
 
 export const typedArrayTypeDefs = [
-  "Int8Array",
-  "Uint8Array",
-  "Uint8ClampedArray",
-  "Int16Array",
-  "Uint16Array",
-  "Int32Array",
-  "Uint32Array",
-  "Float32Array",
-  "Float64Array",
-  "DataView",
-  "BigInt64Array",
-  "BigUint64Array",
+  'Int8Array',
+  'Uint8Array',
+  'Uint8ClampedArray',
+  'Int16Array',
+  'Uint16Array',
+  'Int32Array',
+  'Uint32Array',
+  'Float32Array',
+  'Float64Array',
+  'DataView',
+  'BigInt64Array',
+  'BigUint64Array',
 ].reduce(
   (specs, typeName) => ({
     ...specs,
@@ -26,12 +26,13 @@ export const typedArrayTypeDefs = [
       replace: (
         a: ArrayBufferView,
         _: any,
-        typeDefs: { ArrayBuffer: TypeDef<ArrayBuffer, { v: string }> },
+        typeDefs: { ArrayBuffer: TypeDef<ArrayBuffer, { v: string }> }
       ) => {
         const buffer = a.buffer as ArrayBuffer;
-        const slicedBuffer = a.byteOffset === 0 && a.byteLength === buffer.byteLength
-          ? buffer
-          : buffer.slice(a.byteOffset, a.byteOffset + a.byteLength);
+        const slicedBuffer =
+          a.byteOffset === 0 && a.byteLength === buffer.byteLength
+            ? buffer
+            : buffer.slice(a.byteOffset, a.byteOffset + a.byteLength);
         const result = {
           $t: typeName,
           v: typeDefs.ArrayBuffer.replace(slicedBuffer, _, typeDefs as any).v,
@@ -41,7 +42,7 @@ export const typedArrayTypeDefs = [
       revive: (
         { v }: { v: string },
         _: any,
-        typeDefs: { ArrayBuffer: TypeDef<ArrayBuffer, { v: string }> },
+        typeDefs: { ArrayBuffer: TypeDef<ArrayBuffer, { v: string }> }
       ) => {
         const TypedArray = _global[typeName];
         return (
@@ -51,7 +52,7 @@ export const typedArrayTypeDefs = [
       },
     },
   }),
-  {},
+  {}
 );
 
 export default typedArrayTypeDefs;

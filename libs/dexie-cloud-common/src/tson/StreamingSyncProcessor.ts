@@ -115,7 +115,10 @@ export interface StreamingSyncCallbacks {
   /** Called when header is received */
   onHeader?: (header: StreamSyncHeader) => void;
   /** Write objects to database */
-  bulkPut: (table: string, objects: Array<{ key: string; value: unknown }>) => Promise<void>;
+  bulkPut: (
+    table: string,
+    objects: Array<{ key: string; value: unknown }>
+  ) => Promise<void>;
   /** Called when a realm is complete */
   onRealmComplete?: (realmId: string) => void;
   /** Called with progress updates */
@@ -193,7 +196,7 @@ function shouldSkipChunk(
 
   // If we have a lastKey for this table, check if chunk is before it
   // Server must guarantee keys arrive in lexicographically sorted order,
-  // matching their logical ordering (composite keys are pre-encoded/sorted server-side)  
+  // matching their logical ordering (composite keys are pre-encoded/sorted server-side)
   if (progress.lastKey && progress.lastKey.table === message.tbl) {
     const lastChunkKey = message.objects[message.objects.length - 1]?.key;
     if (lastChunkKey && lastChunkKey <= progress.lastKey.key) {
@@ -328,7 +331,7 @@ export async function processStreamingSync(
     return footer;
   } finally {
     if (!finished) {
-      await reader.cancel().catch(()=>{});
+      await reader.cancel().catch(() => {});
     }
     reader.releaseLock();
   }

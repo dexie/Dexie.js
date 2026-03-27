@@ -1,2 +1,2 @@
-import "./tests-dummy";
-import "./tests-yjs";
+import './tests-dummy';
+import './tests-yjs';

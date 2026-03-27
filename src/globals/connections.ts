@@ -1,20 +1,22 @@
-import { type Dexie } from "../classes/dexie";
+import { type Dexie } from '../classes/dexie';
 
 export const connections = createConnectionsManager();
 
 function createConnectionsManager() {
-  if (typeof FinalizationRegistry !== 'undefined' && typeof WeakRef !== 'undefined') {
+  if (
+    typeof FinalizationRegistry !== 'undefined' &&
+    typeof WeakRef !== 'undefined'
+  ) {
     const _refs = new Set<WeakRef<Dexie>>();
     const _registry = new FinalizationRegistry((ref: WeakRef<Dexie>) => {
       _refs.delete(ref);
     });
 
-
     const toArray = (): ReadonlyArray<Dexie> => {
       return Array.from(_refs)
-        .map(ref => ref.deref())
+        .map((ref) => ref.deref())
         .filter((db): db is Dexie => db !== undefined);
-    }
+    };
 
     const add = (db: Dexie) => {
       const ref = new WeakRef(db._novip);
@@ -26,7 +28,7 @@ function createConnectionsManager() {
         _refs.delete(oldestRef);
         _registry.unregister(oldestRef);
       }
-    }
+    };
 
     const remove = (db: Dexie | undefined) => {
       if (!db) return;
@@ -42,7 +44,7 @@ function createConnectionsManager() {
         }
         result = iterator.next();
       }
-    }
+    };
     return { toArray, add, remove };
   } else {
     const connections: Dexie[] = [];
@@ -60,4 +62,3 @@ function createConnectionsManager() {
     return { toArray, add, remove };
   }
 }
-

@@ -42,11 +42,13 @@ export interface DBQueryCoreTable {
   count(req: DBCoreCountRequest): Promise<number>;
 }
 
-export type DBQueryCoreMutateRequest = DBCoreMutateRequest | DBQueryCoreUpdateRequest
+export type DBQueryCoreMutateRequest =
+  | DBCoreMutateRequest
+  | DBQueryCoreUpdateRequest;
 
 export interface DBQueryCoreUpdateRequest {
   type: 'update';
   trans: DBCoreTransaction;
   keys: readonly any[];
-  changeSpecs: {[keyPath: string]: any}[]; // changeSpec per key.
+  changeSpecs: { [keyPath: string]: any }[]; // changeSpec per key.
 }

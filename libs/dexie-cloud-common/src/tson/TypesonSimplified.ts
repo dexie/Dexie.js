@@ -1,5 +1,5 @@
-import { TypeDef } from "./TypeDef.js";
-import { TypeDefSet } from "./TypeDefSet.js";
+import { TypeDef } from './TypeDef.js';
+import { TypeDefSet } from './TypeDefSet.js';
 
 const { toString: toStr } = {};
 function getToStringTag(val: any) {
@@ -10,7 +10,7 @@ export function escapeDollarProps(value: any) {
   const keys = Object.keys(value);
   let dollarKeys: string[] | null = null;
   for (let i = 0, l = keys.length; i < l; ++i) {
-    if (keys[i][0] === "$") {
+    if (keys[i][0] === '$') {
       dollarKeys = dollarKeys || [];
       dollarKeys.push(keys[i]);
     }
@@ -21,7 +21,7 @@ export function escapeDollarProps(value: any) {
     delete clone[k];
   }
   for (const k of dollarKeys) {
-    clone["$" + k] = value[k];
+    clone['$' + k] = value[k];
   }
   return clone;
 }
@@ -83,7 +83,7 @@ export function TypesonSimplified(...typeDefsInputs: TypeDefSet[]) {
         //
         // Child part
         //
-        if (value === undefined || (key[0] === "$" && key !== "$t")) {
+        if (value === undefined || (key[0] === '$' && key !== '$t')) {
           top = stack[stack.length - 1];
           let deletes: string[];
           let mods: Record<string, any>;
@@ -93,7 +93,7 @@ export function TypesonSimplified(...typeDefsInputs: TypeDefSet[]) {
           } else {
             stack.push([this, (deletes = []), (mods = {})]);
           }
-          if (key[0] === "$" && key !== "$t") {
+          if (key[0] === '$' && key !== '$t') {
             // Unescape props (also preserves undefined if this is a combo)
             deletes.push(key);
             mods[key.substr(1)] = value;
@@ -111,8 +111,8 @@ export function TypesonSimplified(...typeDefsInputs: TypeDefSet[]) {
   function getTypeDef(realVal: any): TypeDef | null {
     const type = typeof realVal;
     switch (typeof realVal) {
-      case "object":
-      case "function": {
+      case 'object':
+      case 'function': {
         // "object", "function", null
         if (realVal === null) return null;
         const proto = Object.getPrototypeOf(realVal);
@@ -128,9 +128,9 @@ export function TypesonSimplified(...typeDefsInputs: TypeDefSet[]) {
         if (!typeDef) {
           typeDef = Array.isArray(realVal)
             ? null
-            : typeof realVal === "function"
-            ? typeDefs.function || null
-            : (ObjectDef as any);
+            : typeof realVal === 'function'
+              ? typeDefs.function || null
+              : (ObjectDef as any);
         }
         protoMap.set(proto, typeDef!);
         return typeDef!;

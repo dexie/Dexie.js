@@ -1,5 +1,5 @@
-import { DexieCloudDB } from "../db/DexieCloudDB";
-import { UserLogin } from "../db/entities/UserLogin";
+import { DexieCloudDB } from '../db/DexieCloudDB';
+import { UserLogin } from '../db/entities/UserLogin';
 
 export interface AuthPersistedContext extends UserLogin {
   save(): Promise<void>;
@@ -16,21 +16,25 @@ export class AuthPersistedContext {
 
   static load(db: DexieCloudDB, userId: string) {
     return db
-      .table("$logins")
+      .table('$logins')
       .get(userId)
       .then(
-        (userLogin) => new AuthPersistedContext(db, userLogin || {
-          userId,
-          claims: {
-            sub: userId
-          },
-          lastLogin: new Date(0)
-        })
+        (userLogin) =>
+          new AuthPersistedContext(
+            db,
+            userLogin || {
+              userId,
+              claims: {
+                sub: userId,
+              },
+              lastLogin: new Date(0),
+            }
+          )
       );
   }
 
   async save() {
     const db = wm.get(this)!;
-    db.table("$logins").put(this);
+    db.table('$logins').put(this);
   }
 }

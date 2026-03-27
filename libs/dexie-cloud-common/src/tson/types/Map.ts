@@ -1,7 +1,7 @@
 export const mapTypeDef = {
   Map: {
     replace: (map: Map<any, any>) => ({
-      $t: "Map",
+      $t: 'Map',
       v: Array.from(map.entries()),
     }),
     revive: ({ v }) => new Map(v),

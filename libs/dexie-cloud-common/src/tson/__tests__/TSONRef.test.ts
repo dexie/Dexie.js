@@ -1,4 +1,9 @@
-import { TSONRef, TSONRefData, collectTSONRefs, replaceTSONRefs } from '../TSONRef';
+import {
+  TSONRef,
+  TSONRefData,
+  collectTSONRefs,
+  replaceTSONRefs,
+} from '../TSONRef';
 
 describe('TSONRef', () => {
   describe('constructor and properties', () => {
@@ -95,7 +100,7 @@ describe('TSONRef', () => {
       const ref = new TSONRef('ArrayBuffer', 'ref', 4);
       const data = new ArrayBuffer(4);
       new Uint8Array(data).set([1, 2, 3, 4]);
-      
+
       const result = ref.reconstruct(data);
       expect(result).toBe(data); // Same reference
     });
@@ -104,7 +109,7 @@ describe('TSONRef', () => {
       const ref = new TSONRef('Uint8Array', 'ref', 4);
       const data = new ArrayBuffer(4);
       new Uint8Array(data).set([1, 2, 3, 4]);
-      
+
       const result = ref.reconstruct(data);
       expect(result).toBeInstanceOf(Uint8Array);
       expect(Array.from(result as Uint8Array)).toEqual([1, 2, 3, 4]);
@@ -113,7 +118,7 @@ describe('TSONRef', () => {
     test('reconstructs Blob with contentType', () => {
       const ref = new TSONRef('Blob', 'ref', 4, 'application/octet-stream');
       const data = new ArrayBuffer(4);
-      
+
       const result = ref.reconstruct(data);
       expect(result).toBeInstanceOf(Blob);
       expect((result as Blob).type).toBe('application/octet-stream');
@@ -123,7 +128,7 @@ describe('TSONRef', () => {
     test('reconstructs Int16Array with alignment validation', () => {
       const ref = new TSONRef('Int16Array', 'ref', 4);
       const data = new ArrayBuffer(4); // 4 bytes = 2 Int16 elements, aligned
-      
+
       const result = ref.reconstruct(data);
       expect(result).toBeInstanceOf(Int16Array);
     });
@@ -131,28 +136,28 @@ describe('TSONRef', () => {
     test('throws on misaligned Int16Array', () => {
       const ref = new TSONRef('Int16Array', 'ref', 3);
       const data = new ArrayBuffer(3); // 3 bytes is not aligned to 2
-      
+
       expect(() => ref.reconstruct(data)).toThrow(RangeError);
     });
 
     test('throws on misaligned Int32Array', () => {
       const ref = new TSONRef('Int32Array', 'ref', 5);
       const data = new ArrayBuffer(5); // 5 bytes is not aligned to 4
-      
+
       expect(() => ref.reconstruct(data)).toThrow(RangeError);
     });
 
     test('throws on misaligned Float64Array', () => {
       const ref = new TSONRef('Float64Array', 'ref', 7);
       const data = new ArrayBuffer(7); // 7 bytes is not aligned to 8
-      
+
       expect(() => ref.reconstruct(data)).toThrow(RangeError);
     });
 
     test('handles unknown type gracefully', () => {
       const ref = new TSONRef('UnknownType' as any, 'ref', 4);
       const data = new ArrayBuffer(4);
-      
+
       // Should return ArrayBuffer and log warning
       const consoleSpy = jest.spyOn(console, 'warn').mockImplementation();
       const result = ref.reconstruct(data);
@@ -174,7 +179,7 @@ describe('collectTSONRefs', () => {
   test('collects TSONRef from object', () => {
     const ref = new TSONRef('Uint8Array', 'ref-1', 100);
     const obj = { data: ref };
-    
+
     const refs = collectTSONRefs(obj);
     expect(refs).toHaveLength(1);
     expect(refs[0]).toBe(ref);
@@ -183,7 +188,7 @@ describe('collectTSONRefs', () => {
   test('collects TSONRefData from object', () => {
     const data: TSONRefData = { $t: 'Uint8Array', $ref: 'ref-2', $size: 200 };
     const obj = { data };
-    
+
     const refs = collectTSONRefs(obj);
     expect(refs).toHaveLength(1);
     expect(refs[0].ref).toBe('ref-2');
@@ -200,7 +205,7 @@ describe('collectTSONRefs', () => {
         },
       },
     };
-    
+
     const refs = collectTSONRefs(obj);
     expect(refs).toHaveLength(2);
   });
@@ -209,7 +214,7 @@ describe('collectTSONRefs', () => {
     const ref1 = new TSONRef('Uint8Array', 'ref-1', 100);
     const ref2 = new TSONRef('Uint8Array', 'ref-2', 100);
     const arr = [ref1, { nested: ref2 }];
-    
+
     const refs = collectTSONRefs(arr);
     expect(refs).toHaveLength(2);
   });
@@ -233,9 +238,9 @@ describe('replaceTSONRefs', () => {
   test('replaces TSONRef in object', async () => {
     const ref = new TSONRef('Uint8Array', 'ref-1', 4);
     const obj: any = { data: ref };
-    
+
     await replaceTSONRefs(obj, mockResolver);
-    
+
     expect(obj.data).toBeInstanceOf(Uint8Array);
     expect(mockResolver).toHaveBeenCalledTimes(1);
   });
@@ -244,25 +249,25 @@ describe('replaceTSONRefs', () => {
     const obj: any = {
       data: { $t: 'Uint8Array', $ref: 'ref-2', $size: 4 },
     };
-    
+
     await replaceTSONRefs(obj, mockResolver);
-    
+
     expect(obj.data).toBeInstanceOf(Uint8Array);
   });
 
   test('handles root-level TSONRef by returning value', async () => {
     const ref = new TSONRef('Uint8Array', 'ref-3', 4);
-    
+
     const result = await replaceTSONRefs(ref, mockResolver);
-    
+
     expect(result).toBeInstanceOf(Uint8Array);
   });
 
   test('handles object with no refs', async () => {
     const obj = { a: 1, b: 'test' };
-    
+
     const result = await replaceTSONRefs(obj, mockResolver);
-    
+
     expect(result).toBeUndefined();
     expect(mockResolver).not.toHaveBeenCalled();
   });
@@ -272,9 +277,9 @@ describe('replaceTSONRefs', () => {
       data1: new TSONRef('Uint8Array', 'same-ref', 4),
       data2: new TSONRef('Uint8Array', 'same-ref', 4),
     };
-    
+
     await replaceTSONRefs(obj, mockResolver);
-    
+
     // Should only fetch once despite two refs with same id
     expect(mockResolver).toHaveBeenCalledTimes(1);
   });
@@ -282,22 +287,23 @@ describe('replaceTSONRefs', () => {
   test('respects concurrency limit', async () => {
     let concurrent = 0;
     let maxConcurrent = 0;
-    
+
     const slowResolver = jest.fn(async (ref: TSONRef) => {
       concurrent++;
       maxConcurrent = Math.max(maxConcurrent, concurrent);
-      await new Promise(r => setTimeout(r, 10));
+      await new Promise((r) => setTimeout(r, 10));
       concurrent--;
       return new ArrayBuffer(ref.size);
     });
-    
-    const refs = Array.from({ length: 10 }, (_, i) => 
-      new TSONRef('Uint8Array', `ref-${i}`, 4)
+
+    const refs = Array.from(
+      { length: 10 },
+      (_, i) => new TSONRef('Uint8Array', `ref-${i}`, 4)
     );
     const obj: any = Object.fromEntries(refs.map((r, i) => [`data${i}`, r]));
-    
+
     await replaceTSONRefs(obj, slowResolver, 3);
-    
+
     expect(maxConcurrent).toBeLessThanOrEqual(3);
     expect(slowResolver).toHaveBeenCalledTimes(10);
   });

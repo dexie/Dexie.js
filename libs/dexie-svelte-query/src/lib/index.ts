@@ -1,1 +1,1 @@
-export * from "./stateQuery.svelte.js";
+export * from './stateQuery.svelte.js';

@@ -8,7 +8,7 @@ export default function initEnqueue(db) {
           return Dexie.vip(function () {
             return fn();
           });
-        }).finally(()=> {
+        }).finally(() => {
           delete context.ongoingOperation;
         });
       } else {

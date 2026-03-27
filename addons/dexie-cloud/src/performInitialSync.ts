@@ -9,11 +9,9 @@ export async function performInitialSync(
   cloudOptions: DexieCloudOptions,
   cloudSchema: DexieCloudSchema
 ) {
-  console.debug('Performing initial sync');  
-  await performGuardedJob(
-    db,
-    CURRENT_SYNC_WORKER,
-    () => sync(db, cloudOptions, cloudSchema, { isInitialSync: true })
+  console.debug('Performing initial sync');
+  await performGuardedJob(db, CURRENT_SYNC_WORKER, () =>
+    sync(db, cloudOptions, cloudSchema, { isInitialSync: true })
   );
   console.debug('Done initial sync');
 }

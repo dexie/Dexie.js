@@ -39,7 +39,10 @@ export async function loadAccessToken(
   } = currentUser;
   if (!accessToken) return null;
   const expTime = accessTokenExpiration?.getTime() ?? Infinity;
-  if (expTime > (Date.now() + 5 * MINUTES) && (currentUser.license?.status || 'ok') === 'ok') {
+  if (
+    expTime > Date.now() + 5 * MINUTES &&
+    (currentUser.license?.status || 'ok') === 'ok'
+  ) {
     return currentUser;
   }
   if (!refreshToken) {
@@ -136,7 +139,7 @@ export async function refreshAccessToken(
   login.license = {
     type: response.userType,
     status: response.claims.license || 'ok',
-  }
+  };
   if (response.evalDaysLeft != null) {
     login.license.evalDaysLeft = response.evalDaysLeft;
   }
@@ -157,7 +160,9 @@ async function userAuthenticate(
 ) {
   if (!crypto.subtle) {
     if (typeof location !== 'undefined' && location.protocol === 'http:') {
-      throw new Error(`Dexie Cloud Addon needs to use WebCrypto, but your browser has disabled it due to being served from an insecure location. Please serve it from https or http://localhost:<port> (See https://stackoverflow.com/questions/46670556/how-to-enable-crypto-subtle-for-unsecure-origins-in-chrome/46671627#46671627)`);
+      throw new Error(
+        `Dexie Cloud Addon needs to use WebCrypto, but your browser has disabled it due to being served from an insecure location. Please serve it from https or http://localhost:<port> (See https://stackoverflow.com/questions/46670556/how-to-enable-crypto-subtle-for-unsecure-origins-in-chrome/46671627#46671627)`
+      );
     } else {
       throw new Error(`This browser does not support WebCrypto.`);
     }
@@ -213,8 +218,8 @@ async function userAuthenticate(
     context.claims = response2.claims;
     context.license = {
       type: response2.userType,
-      status: response2.claims.license || 'ok',
-    }
+      status: response2.claims.license || 'ok',
+    };
     context.data = response2.data;
     if (response2.evalDaysLeft != null) {
       context.license.evalDaysLeft = response2.evalDaysLeft;
@@ -234,11 +239,17 @@ async function userAuthenticate(
     return context;
   } catch (error: any) {
     // OAuth redirect is not an error - page is navigating away
-    if (error instanceof OAuthRedirectError || error?.name === 'OAuthRedirectError') {
+    if (
+      error instanceof OAuthRedirectError ||
+      error?.name === 'OAuthRedirectError'
+    ) {
       throw error; // Re-throw without logging
     }
     // Policy rejections have already been shown to the user as a challenge
-    if (error instanceof PolicyRejectionError || error?.name === 'PolicyRejectionError') {
+    if (
+      error instanceof PolicyRejectionError ||
+      error?.name === 'PolicyRejectionError'
+    ) {
       throw error;
     }
     if (error instanceof TokenErrorResponseError) {
@@ -251,12 +262,17 @@ async function userAuthenticate(
       throw error;
     }
     let message = `We're having a problem authenticating right now.`;
-    console.error (`Error authenticating`, error);
+    console.error(`Error authenticating`, error);
     if (error instanceof TypeError) {
       const isOffline = typeof navigator !== 'undefined' && !navigator.onLine;
       if (isOffline) {
         message = `You seem to be offline. Please connect to the internet and try again.`;
-      } else if (typeof location !== 'undefined' && (Dexie.debug || location.hostname === 'localhost' || location.hostname === '127.0.0.1')) {
+      } else if (
+        typeof location !== 'undefined' &&
+        (Dexie.debug ||
+          location.hostname === 'localhost' ||
+          location.hostname === '127.0.0.1')
+      ) {
         // The audience is most likely the developer. Suggest to whitelist the localhost origin:
         const whitelistCommand = `npx dexie-cloud whitelist ${location.origin}`;
         message = `Could not connect to server. Please verify that your origin '${location.origin}' is whitelisted using \`npx dexie-cloud whitelist\``;
@@ -275,7 +291,7 @@ async function userAuthenticate(
           message,
           messageParams: {},
         }).catch(() => {});
-      }  
+      }
     }
 
     throw error;

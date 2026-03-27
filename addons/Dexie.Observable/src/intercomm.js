@@ -2,11 +2,17 @@ import Dexie from 'dexie';
 
 const Promise = Dexie.Promise;
 
-export default function initIntercomm(db, Observable, SyncNode, mySyncNode, localStorage) {
-//
-// Intercommunication between nodes
-//
-// Enable inter-process communication between browser windows using localStorage storage event (is registered in Dexie.Observable)
+export default function initIntercomm(
+  db,
+  Observable,
+  SyncNode,
+  mySyncNode,
+  localStorage
+) {
+  //
+  // Intercommunication between nodes
+  //
+  // Enable inter-process communication between browser windows using localStorage storage event (is registered in Dexie.Observable)
 
   var requestsWaitingForReply = {};
 
@@ -16,55 +22,78 @@ export default function initIntercomm(db, Observable, SyncNode, mySyncNode, loca
    * @param {number} destinationNode ID of destination node
    * @param {{wantReply: boolean, isFailure: boolean, requestId: number}} options If {wantReply: true}, the returned promise will complete with the reply from remote. Otherwise it will complete when message has been successfully sent.</param>
    */
-  db.observable.sendMessage = function (type, message, destinationNode, options) {
+  db.observable.sendMessage = function (
+    type,
+    message,
+    destinationNode,
+    options
+  ) {
     /// <param name="type" type="String">Type of message</param>
     /// <param name="message">Message to send</param>
     /// <param name="destinationNode" type="Number">ID of destination node</param>
     /// <param name="options" type="Object" optional="true">{wantReply: Boolean, isFailure: Boolean, requestId: Number}. If wantReply, the returned promise will complete with the reply from remote. Otherwise it will complete when message has been successfully sent.</param>
     options = options || {};
     if (!mySyncNode.node)
-      return options.wantReply ?
-          Promise.reject(new Dexie.DatabaseClosedError()) :
-          Promise.resolve(); // If caller doesn't want a reply, it won't catch errors either.
+      return options.wantReply
+        ? Promise.reject(new Dexie.DatabaseClosedError())
+        : Promise.resolve(); // If caller doesn't want a reply, it won't catch errors either.
 
-    var msg = {message: message, destinationNode: destinationNode, sender: mySyncNode.node.id, type: type};
+    var msg = {
+      message: message,
+      destinationNode: destinationNode,
+      sender: mySyncNode.node.id,
+      type: type,
+    };
     Dexie.extend(msg, options); // wantReply: wantReply, success: !isFailure, requestId: ...
-    return Dexie.ignoreTransaction(()=> {
-      var tables = ["_intercomm"];
-      if (options.wantReply) tables.push("_syncNodes"); // If caller wants a reply, include "_syncNodes" in transaction to check that there's a receiver there. Otherwise, new master will get it.
-      var promise = db.transaction('rw', tables, () => {
-        if (options.wantReply) {
-          // Check that there is a receiver there to take the request.
-          return db._syncNodes.where('id').equals(destinationNode).count(receiverAlive => {
-            if (receiverAlive)
-              return db._intercomm.add(msg);
-            else // If we couldn't find a node -> send to master
-              return db._syncNodes.where('isMaster').above(0).first(function (masterNode) {
-                msg.destinationNode = masterNode.id;
-                return db._intercomm.add(msg)
+    return Dexie.ignoreTransaction(() => {
+      var tables = ['_intercomm'];
+      if (options.wantReply) tables.push('_syncNodes'); // If caller wants a reply, include "_syncNodes" in transaction to check that there's a receiver there. Otherwise, new master will get it.
+      var promise = db
+        .transaction('rw', tables, () => {
+          if (options.wantReply) {
+            // Check that there is a receiver there to take the request.
+            return db._syncNodes
+              .where('id')
+              .equals(destinationNode)
+              .count((receiverAlive) => {
+                if (receiverAlive)
+                  return db._intercomm.add(msg); // If we couldn't find a node -> send to master
+                else
+                  return db._syncNodes
+                    .where('isMaster')
+                    .above(0)
+                    .first(function (masterNode) {
+                      msg.destinationNode = masterNode.id;
+                      return db._intercomm.add(msg);
+                    });
               });
-          });
-        } else {
-          // If caller doesn't need a response, we don't have to make sure that it gets one.
-          return db._intercomm.add(msg);
-        }
-      }).then(messageId => {
-        var rv = null;
-        if (options.wantReply) {
-          rv = new Promise(function (resolve, reject) {
-            requestsWaitingForReply[messageId.toString()] = {resolve: resolve, reject: reject};
-          });
-        }
-        if (localStorage) {
-          localStorage.setItem("Dexie.Observable/intercomm/" + db.name, messageId.toString());
-        }
-        Observable.on.intercomm.fire(db.name);
-        return rv;
-      });
+          } else {
+            // If caller doesn't need a response, we don't have to make sure that it gets one.
+            return db._intercomm.add(msg);
+          }
+        })
+        .then((messageId) => {
+          var rv = null;
+          if (options.wantReply) {
+            rv = new Promise(function (resolve, reject) {
+              requestsWaitingForReply[messageId.toString()] = {
+                resolve: resolve,
+                reject: reject,
+              };
+            });
+          }
+          if (localStorage) {
+            localStorage.setItem(
+              'Dexie.Observable/intercomm/' + db.name,
+              messageId.toString()
+            );
+          }
+          Observable.on.intercomm.fire(db.name);
+          return rv;
+        });
 
       if (!options.wantReply) {
-        promise.catch(()=> {
-        });
+        promise.catch(() => {});
         return;
       } else {
         // Forward rejection to caller if it waits for reply.
@@ -77,26 +106,39 @@ export default function initIntercomm(db, Observable, SyncNode, mySyncNode, loca
   db.observable.broadcastMessage = function (type, message, bIncludeSelf) {
     if (!mySyncNode.node) return;
     var mySyncNodeId = mySyncNode.node.id;
-    Dexie.ignoreTransaction(()=> {
-      db._syncNodes.toArray(nodes => {
-        return Promise.all(nodes
-            .filter(node => node.type === 'local' && (bIncludeSelf || node.id !== mySyncNodeId))
-            .map(node => db.observable.sendMessage(type, message, node.id)));
-      }).catch(()=> {
-      });
+    Dexie.ignoreTransaction(() => {
+      db._syncNodes
+        .toArray((nodes) => {
+          return Promise.all(
+            nodes
+              .filter(
+                (node) =>
+                  node.type === 'local' &&
+                  (bIncludeSelf || node.id !== mySyncNodeId)
+              )
+              .map((node) => db.observable.sendMessage(type, message, node.id))
+          );
+        })
+        .catch(() => {});
     });
   };
 
   function consumeIntercommMessages() {
     // Check if we got messages:
-    if (!mySyncNode.node) return Promise.reject(new Dexie.DatabaseClosedError());
+    if (!mySyncNode.node)
+      return Promise.reject(new Dexie.DatabaseClosedError());
 
-    return Dexie.ignoreTransaction(()=> {
-      return db.transaction('rw', '_intercomm', function() {
-        return db._intercomm.where({destinationNode: mySyncNode.node.id}).toArray(messages => {
-          messages.forEach(msg => consumeMessage(msg));
-          return db._intercomm.where('id').anyOf(messages.map(msg => msg.id)).delete();
-        });
+    return Dexie.ignoreTransaction(() => {
+      return db.transaction('rw', '_intercomm', function () {
+        return db._intercomm
+          .where({ destinationNode: mySyncNode.node.id })
+          .toArray((messages) => {
+            messages.forEach((msg) => consumeMessage(msg));
+            return db._intercomm
+              .where('id')
+              .anyOf(messages.map((msg) => msg.id))
+              .delete();
+          });
       });
     });
   }
@@ -116,10 +158,17 @@ export default function initIntercomm(db, Observable, SyncNode, mySyncNode, loca
     } else {
       // This is a message or request. Fire the event and add an API for the subscriber to use if reply is requested
       msg.resolve = function (result) {
-        db.observable.sendMessage('response', {result: result}, msg.sender, {requestId: msg.id});
+        db.observable.sendMessage('response', { result: result }, msg.sender, {
+          requestId: msg.id,
+        });
       };
       msg.reject = function (error) {
-        db.observable.sendMessage('response', {error: error.toString()}, msg.sender, {isFailure: true, requestId: msg.id});
+        db.observable.sendMessage(
+          'response',
+          { error: error.toString() },
+          msg.sender,
+          { isFailure: true, requestId: msg.id }
+        );
       };
       db.on.message.fire(msg);
     }
@@ -132,12 +181,12 @@ export default function initIntercomm(db, Observable, SyncNode, mySyncNode, loca
   function onIntercomm(dbname) {
     // When storage event trigger us to check
     if (dbname === db.name) {
-      consumeIntercommMessages().catch('DatabaseClosedError', ()=> {});
+      consumeIntercommMessages().catch('DatabaseClosedError', () => {});
     }
   }
 
   return {
     onIntercomm,
-    consumeIntercommMessages
+    consumeIntercommMessages,
   };
 }

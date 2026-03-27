@@ -1,6 +1,6 @@
-import { Table } from "./table";
-import { Dexie } from "./dexie";
-import { TransactionEvents } from "./transaction-events";
+import { Table } from './table';
+import { Dexie } from './dexie';
+import { TransactionEvents } from './transaction-events';
 
 export interface Transaction {
   db: Dexie;

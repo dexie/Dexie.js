@@ -3,12 +3,12 @@ import { makeClassConstructor } from '../../functions/make-class-constructor';
 import { Version } from './version';
 
 export interface VersionConstructor {
-  new(versionNumber: number): Version;
+  new (versionNumber: number): Version;
   prototype: Version;
 }
 
 /** Generates a Version constructor bound to given Dexie instance.
- * 
+ *
  * The purpose of having dynamically created constructors, is to allow
  * addons to extend classes for a certain Dexie instance without affecting
  * other db instances.
@@ -24,8 +24,8 @@ export function createVersionConstructor(db: Dexie) {
         storesSource: null,
         dbschema: {},
         tables: {},
-        contentUpgrade: null
+        contentUpgrade: null,
       };
-    });
-
+    }
+  );
 }

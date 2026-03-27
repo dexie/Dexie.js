@@ -18,13 +18,16 @@ export function createImplicitPropSetterMiddleware(
           return {
             ...table,
             mutate: (req) => {
-              const trans = req.trans as DBCoreTransaction & TXExpandos & IDBTransaction;
+              const trans = req.trans as DBCoreTransaction &
+                TXExpandos &
+                IDBTransaction;
 
               if (trans.disableChangeTracking) {
                 return table.mutate(req);
               }
 
-              const currentUserId = trans.currentUser?.userId ?? UNAUTHORIZED_USER.userId;
+              const currentUserId =
+                trans.currentUser?.userId ?? UNAUTHORIZED_USER.userId;
 
               if (db.cloud.schema?.[tableName]?.markedForSync) {
                 if (req.type === 'add' || req.type === 'put') {
@@ -68,7 +71,7 @@ export function createImplicitPropSetterMiddleware(
                       // same reason - object might be there on server. Must but put up instead.
 
                       // FUTURE: This clumpsy behavior of private IDs could be refined later.
-                      // Suggestion is to in future, treat private IDs as we treat all objects 
+                      // Suggestion is to in future, treat private IDs as we treat all objects
                       // and sync operations normally. Only that deletions should become soft deletes
                       // for them - so that server knows when a private ID has been deleted on server
                       // not accept insert/upserts on them.

@@ -113,11 +113,12 @@ export function applyOptimisticOps(
   const sorter: (a: any, b: any) => number = (a, b) =>
     cmp(extractLowLevelIndex(a), extractLowLevelIndex(b)) ||
     cmp(extractPrimKey(a), extractPrimKey(b));
-  
+
   // If direction is 'prev' or 'prevunique', sort in descending order
-  finalResult.sort(req.direction === 'prev' || req.direction === 'prevunique'
-    ? (a, b) => sorter(b, a)
-    : sorter
+  finalResult.sort(
+    req.direction === 'prev' || req.direction === 'prevunique'
+      ? (a, b) => sorter(b, a)
+      : sorter
   );
 
   // If we have a limit we need to respect it:
@@ -131,5 +132,5 @@ export function applyOptimisticOps(
       cacheEntry.dirty = true;
     }
   }
-  return immutable ? Object.freeze(finalResult) as any[] : finalResult;
+  return immutable ? (Object.freeze(finalResult) as any[]) : finalResult;
 }

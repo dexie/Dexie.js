@@ -1,4 +1,4 @@
-import { TypeDef } from "./TypeDef.js";
+import { TypeDef } from './TypeDef.js';
 
 export type TypeDefSet = {
   string?: TypeDef<string>;

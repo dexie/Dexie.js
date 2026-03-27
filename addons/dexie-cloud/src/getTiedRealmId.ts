@@ -1,4 +1,3 @@
-
 export function getTiedRealmId(objectId: string) {
   return 'rlm~' + objectId;
 }

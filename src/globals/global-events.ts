@@ -1,7 +1,8 @@
 import Events from '../helpers/Events';
 import { GlobalDexieEvents } from '../public/types/db-events';
 
-export const DEXIE_STORAGE_MUTATED_EVENT_NAME = 'storagemutated' as 'storagemutated';
+export const DEXIE_STORAGE_MUTATED_EVENT_NAME =
+  'storagemutated' as 'storagemutated';
 
 // Name of the global event fired using DOM dispatchEvent (if not in node).
 // Reason for propagating this as a DOM event is for getting reactivity across
@@ -16,4 +17,7 @@ export const DEXIE_STORAGE_MUTATED_EVENT_NAME = 'storagemutated' as 'storagemuta
 // is being used.
 export const STORAGE_MUTATED_DOM_EVENT_NAME = 'x-storagemutated-1';
 
-export const globalEvents = Events(null, DEXIE_STORAGE_MUTATED_EVENT_NAME) as GlobalDexieEvents;
+export const globalEvents = Events(
+  null,
+  DEXIE_STORAGE_MUTATED_EVENT_NAME
+) as GlobalDexieEvents;

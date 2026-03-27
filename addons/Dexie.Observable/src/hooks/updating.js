@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 
-import {UPDATE} from '../change_types';
+import { UPDATE } from '../change_types';
 
 export default function initUpdatingHook(db, tableName) {
   return function updatingHook(mods, primKey, oldObj, trans) {
@@ -22,7 +22,10 @@ export default function initUpdatingHook(db, tableName) {
         anythingChanged = true;
       } else {
         var currentValue = Dexie.getByKeyPath(oldObj, propPath);
-        if (mod !== currentValue && JSON.stringify(mod) !== JSON.stringify(currentValue)) {
+        if (
+          mod !== currentValue &&
+          JSON.stringify(mod) !== JSON.stringify(currentValue)
+        ) {
           Dexie.setByKeyPath(newObj, propPath, mod);
           modsWithoutUndefined[propPath] = mod;
           anythingChanged = true;
@@ -37,12 +40,15 @@ export default function initUpdatingHook(db, tableName) {
         type: UPDATE,
         mods: modsWithoutUndefined,
         oldObj: oldObj,
-        obj: newObj
+        obj: newObj,
       };
       var promise = db._changes.add(change); // Just so we get the correct revision order of the update...
       this.onsuccess = function () {
         promise._then(function (rev) {
-          trans._lastWrittenRevision = Math.max(trans._lastWrittenRevision, rev);
+          trans._lastWrittenRevision = Math.max(
+            trans._lastWrittenRevision,
+            rev
+          );
         });
       };
       this.onerror = function () {

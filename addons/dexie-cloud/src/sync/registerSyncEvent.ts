@@ -3,11 +3,15 @@ import { DexieCloudDB } from '../db/DexieCloudDB';
 //const hasSW = 'serviceWorker' in navigator;
 let hasComplainedAboutSyncEvent = false;
 
-export async function registerSyncEvent(db: DexieCloudDB, purpose: "push" | "pull") {
+export async function registerSyncEvent(
+  db: DexieCloudDB,
+  purpose: 'push' | 'pull'
+) {
   try {
     // Send sync event to SW:
-    const sw: ServiceWorkerRegistration & {sync?: any} = await navigator.serviceWorker.ready;
-    if (purpose === "push" && sw.sync) {
+    const sw: ServiceWorkerRegistration & { sync?: any } =
+      await navigator.serviceWorker.ready;
+    if (purpose === 'push' && sw.sync) {
       await sw.sync.register(`dexie-cloud:${db.name}`);
     }
     if (sw.active) {
@@ -16,10 +20,12 @@ export async function registerSyncEvent(db: DexieCloudDB, purpose: "push" | "pul
       sw.active.postMessage({
         type: 'dexie-cloud-sync',
         dbName: db.name,
-        purpose
+        purpose,
       });
     } else {
-      throw new Error(`Failed to trigger sync - there's no active service worker`);
+      throw new Error(
+        `Failed to trigger sync - there's no active service worker`
+      );
     }
     return;
   } catch (e) {
@@ -45,7 +51,10 @@ export async function registerPeriodicSyncEvent(db: DexieCloudDB) {
           `Dexie Cloud: Successfully registered periodicsync event for ${db.name}`
         );
       } catch (e) {
-        console.debug(`Dexie Cloud: Failed to register periodic sync. Your PWA must be installed to allow background sync.`, e);
+        console.debug(
+          `Dexie Cloud: Failed to register periodic sync. Your PWA must be installed to allow background sync.`,
+          e
+        );
       }
     } else {
       console.debug(`Dexie Cloud: periodicSync not supported.`);

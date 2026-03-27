@@ -35,16 +35,18 @@ export function computeSyncState(db: DexieCloudDB): Observable<SyncState> {
   );
   return combineLatest([
     lazyWebSocketStatus,
-    db.syncStateChangedEvent.pipe(startWith({ phase: 'initial' } as SyncStateChangedEventData)),
+    db.syncStateChangedEvent.pipe(
+      startWith({ phase: 'initial' } as SyncStateChangedEventData)
+    ),
     getCurrentUserEmitter(db.dx._novip),
-    userIsReallyActive
+    userIsReallyActive,
   ]).pipe(
     map(([status, syncState, user, userIsActive]) => {
       if (user.license?.status && user.license.status !== 'ok') {
         return {
           phase: 'offline',
           status: 'offline',
-          license: user.license.status
+          license: user.license.status,
         } satisfies SyncState;
       }
       let { phase, error, progress } = syncState;
@@ -61,17 +63,20 @@ export function computeSyncState(db: DexieCloudDB): Observable<SyncState> {
         if (phase === 'pushing' || phase === 'pulling') {
           adjustedStatus = 'connecting';
         }
-      }      
+      }
       const previousPhase = db.cloud.syncState.value.phase;
       //const previousStatus = db.cloud.syncState.value.status;
-      if (previousPhase === 'error' && (syncState.phase === 'pushing' || syncState.phase === 'pulling')) {
+      if (
+        previousPhase === 'error' &&
+        (syncState.phase === 'pushing' || syncState.phase === 'pulling')
+      ) {
         // We were in an errored state but is now doing sync. Show "connecting" icon.
         adjustedStatus = 'connecting';
       }
       /*if (syncState.phase === 'in-sync' && adjustedStatus === 'connecting') {
         adjustedStatus = 'connected';
       }*/
-        
+
       if (!userIsActive) {
         adjustedStatus = 'disconnected';
       }
@@ -81,7 +86,7 @@ export function computeSyncState(db: DexieCloudDB): Observable<SyncState> {
         error,
         progress,
         status: isOnline ? adjustedStatus : 'offline',
-        license: 'ok'
+        license: 'ok',
       };
 
       return retState;

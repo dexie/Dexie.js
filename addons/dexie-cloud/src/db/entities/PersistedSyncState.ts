@@ -2,7 +2,7 @@ export interface PersistedSyncState {
   serverRevision?: any;
   yServerRevision?: string;
   latestRevisions: {
-    [tableName: string]: number
+    [tableName: string]: number;
   };
   realms: string[];
   inviteRealms: string[];
@@ -13,10 +13,12 @@ export interface PersistedSyncState {
   timestamp?: Date;
   error?: string;
   yDownloadedRealms?: {
-    [realmId: string]: "*" | {
-      tbl: string;
-      prop: string;
-      key: any;
-    }
-  }
+    [realmId: string]:
+      | '*'
+      | {
+          tbl: string;
+          prop: string;
+          key: any;
+        };
+  };
 }

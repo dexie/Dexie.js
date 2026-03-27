@@ -66,7 +66,7 @@ export async function updateYSyncStates(
         await db.table<YDexieCloudSyncState>(yTable).add({
           i: DEXIE_CLOUD_SYNCER_ID,
           unsentFrom,
-          receivedUntil
+          receivedUntil,
         });
       } else {
         state.unsentFrom = Math.max(unsentFrom, state.unsentFrom || 1);

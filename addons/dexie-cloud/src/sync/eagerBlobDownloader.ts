@@ -1,9 +1,9 @@
 /**
  * Eager Blob Downloader
- * 
+ *
  * Downloads unresolved blobs in the background when blobMode='eager'.
  * Called after sync completes to prefetch blobs for offline access.
- * 
+ *
  * Progress is tracked automatically via liveQuery in blobProgress.ts —
  * no manual progress reporting needed here.
  */
@@ -27,10 +27,10 @@ import { getSyncableTables } from '../helpers/getSyncableTables';
 
 /**
  * Download all unresolved blobs in the background.
- * 
+ *
  * This is called when blobMode='eager' (default) after sync completes.
  * BlobRef URLs are signed (SAS tokens) so no auth header needed.
- * 
+ *
  * Each blob is saved atomically using Table.update() to avoid race conditions.
  */
 export async function downloadUnresolvedBlobs(
@@ -39,7 +39,7 @@ export async function downloadUnresolvedBlobs(
   signal?: AbortSignal
 ): Promise<void> {
   const debugLog = (msg: string) => console.debug(`[dexie-cloud] ${msg}`);
-  
+
   debugLog('Eager download: Starting...');
 
   // Scan for unresolved blobs
@@ -68,14 +68,18 @@ export async function downloadUnresolvedBlobs(
   setDownloadingState(downloading$, true);
 
   try {
-    debugLog(`Eager download: Found ${syncedTables.length} syncable tables: ${syncedTables.map(t => t.name).join(', ')}`);
-  
+    debugLog(
+      `Eager download: Found ${syncedTables.length} syncable tables: ${syncedTables.map((t) => t.name).join(', ')}`
+    );
+
     for (const table of syncedTables) {
       if (signal?.aborted) break;
 
       try {
         // Check if table has _hasBlobRefs index
-        const hasIndex = table.schema.indexes.some(idx => idx.name === '_hasBlobRefs');
+        const hasIndex = table.schema.indexes.some(
+          (idx) => idx.name === '_hasBlobRefs'
+        );
         if (!hasIndex) continue;
 
         // Query objects with _hasBlobRefs marker
@@ -84,17 +88,20 @@ export async function downloadUnresolvedBlobs(
           .equals(1)
           .toArray();
 
-        debugLog(`Eager download: Table ${table.name} has ${unresolvedObjects.length} unresolved objects`);
+        debugLog(
+          `Eager download: Table ${table.name} has ${unresolvedObjects.length} unresolved objects`
+        );
 
         const databaseUrl = db.cloud.options?.databaseUrl;
-        if (!databaseUrl) throw new Error('Database URL is required to download blobs');
+        if (!databaseUrl)
+          throw new Error('Database URL is required to download blobs');
 
         // Download up to MAX_CONCURRENT blobs in parallel
         const MAX_CONCURRENT = 6;
         const primaryKey = table.schema.primKey;
 
         // Filter to actionable objects first
-        const pending = unresolvedObjects.filter(obj => {
+        const pending = unresolvedObjects.filter((obj) => {
           if (!hasUnresolvedBlobRefs(obj)) return false;
           const key = primaryKey.keyPath
             ? Dexie.getByKeyPath(obj, primaryKey.keyPath as string)
@@ -114,7 +121,14 @@ export async function downloadUnresolvedBlobs(
               // Refresh token per object — cheap (returns cached) but ensures
               // we pick up renewed tokens during long download sessions.
               const resolvedBlobs: ResolvedBlob[] = [];
-              await resolveAllBlobRefs(obj, databaseUrl, resolvedBlobs, '', new WeakMap(), db.blobDownloadTracker);
+              await resolveAllBlobRefs(
+                obj,
+                databaseUrl,
+                resolvedBlobs,
+                '',
+                new WeakMap(),
+                db.blobDownloadTracker
+              );
 
               const updateSpec: UpdateSpec<any> = {
                 _hasBlobRefs: undefined,
@@ -123,11 +137,16 @@ export async function downloadUnresolvedBlobs(
                 updateSpec[blob.keyPath] = blob.data;
               }
 
-              debugLog(`Eager download: Updating ${table.name}:${key} with ${resolvedBlobs.length} blobs`);
+              debugLog(
+                `Eager download: Updating ${table.name}:${key} with ${resolvedBlobs.length} blobs`
+              );
               await table.update(key, updateSpec);
               // liveQuery in blobProgress.ts auto-detects this change
             } catch (err) {
-              console.error(`Failed to download blobs for ${table.name}:${key}:`, err);
+              console.error(
+                `Failed to download blobs for ${table.name}:${key}:`,
+                err
+              );
             }
           }
         };

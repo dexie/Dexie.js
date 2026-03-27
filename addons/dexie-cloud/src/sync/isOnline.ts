@@ -5,6 +5,6 @@
 export let isOnline = false;
 if (typeof self !== 'undefined' && typeof navigator !== 'undefined') {
   isOnline = navigator.onLine;
-  self.addEventListener('online', ()=>isOnline = true);
-  self.addEventListener('offline', ()=>isOnline = false);
+  self.addEventListener('online', () => (isOnline = true));
+  self.addEventListener('offline', () => (isOnline = false));
 }

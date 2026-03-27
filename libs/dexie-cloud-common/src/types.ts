@@ -121,7 +121,7 @@ export type TokenResponse =
   | TokenOtpDetailsResponse
   | TokenErrorResponse
   | TokenResponseInvalidTimestamp;
-  
+
 export interface CreateDbResponse {
   url: string;
   clientId: string;

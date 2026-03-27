@@ -8,10 +8,7 @@ import { otpFetchTokenCallback } from './otpFetchTokenCallback';
 import { setCurrentUser } from './setCurrentUser';
 import { UNAUTHORIZED_USER } from './UNAUTHORIZED_USER';
 
-export async function login(
-  db: DexieCloudDB,
-  hints?: LoginHints
-) {
+export async function login(db: DexieCloudDB, hints?: LoginHints) {
   const currentUser = await db.getCurrentUser();
   const origUserId = currentUser.userId;
   if (currentUser.isLoggedIn && (!hints || (!hints.email && !hints.userId))) {
