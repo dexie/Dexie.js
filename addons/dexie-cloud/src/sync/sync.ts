@@ -420,6 +420,7 @@ async function _sync(
     return await _sync(db, options, schema, {
       isInitialSync,
       cancelToken,
+      purpose,
       depth: depth + 1,
     });
   }
