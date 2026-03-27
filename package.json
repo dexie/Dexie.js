@@ -67,7 +67,9 @@
     "test:debug": "karma start test/karma.conf.js --log-level debug",
     "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test:unit; UNIT_STATUS=$?; kill $(cat tunnel.pid); exit $UNIT_STATUS",
     "test:ltTunnel": "node test/lt-local",
-    "prepack": "pnpm run build"
+    "prepack": "pnpm run build",
+    "format": "prettier --write \"src/**/*.{ts,tsx,js}\" \"libs/**/*.{ts,tsx,js}\" \"addons/**/*.{ts,tsx,js}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,js}\" \"libs/**/*.{ts,tsx,js}\" \"addons/**/*.{ts,tsx,js}\""
   },
   "just-build": {
     "default": [
@@ -143,7 +145,8 @@
     "tslib": "^2.1.0",
     "typescript": "^5.6.3",
     "uglify-js": "^3.9.2",
-    "yjs": "^13.6.27"
+    "yjs": "^13.6.27",
+    "prettier": "^3.8.1"
   },
   "pnpm": {
     "onlyBuiltDependencies": [
