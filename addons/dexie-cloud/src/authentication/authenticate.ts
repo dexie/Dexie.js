@@ -26,7 +26,10 @@ export type FetchTokenCallback = (tokenParams: {
   hints?: LoginHints;
 }) => Promise<TokenFinalResponse | TokenErrorResponse>;
 
-import { fetchWithStallTimeout, DEFAULT_FETCH_STALL_TIMEOUT } from '../helpers/fetchWithStallTimeout';
+import {
+  fetchWithStallTimeout,
+  DEFAULT_FETCH_STALL_TIMEOUT,
+} from '../helpers/fetchWithStallTimeout';
 
 export async function loadAccessToken(
   db: DexieCloudDB
@@ -124,12 +127,16 @@ export async function refreshAccessToken(
     signing_algorithm,
     time_stamp,
   };
-  const res = await fetchWithStallTimeout(`${url}/token`, {
-    body: JSON.stringify(tokenRequest),
-    method: 'post',
-    headers: { 'Content-Type': 'application/json' },
-    mode: 'cors',
-  }, fetchStallTimeout ?? DEFAULT_FETCH_STALL_TIMEOUT);
+  const res = await fetchWithStallTimeout(
+    `${url}/token`,
+    {
+      body: JSON.stringify(tokenRequest),
+      method: 'post',
+      headers: { 'Content-Type': 'application/json' },
+      mode: 'cors',
+    },
+    fetchStallTimeout ?? DEFAULT_FETCH_STALL_TIMEOUT
+  );
   if (res.status !== 200)
     throw new Error(`RefreshToken: Status ${res.status} from ${url}/token`);
   const response: TokenFinalResponse | TokenErrorResponse = await res.json();
