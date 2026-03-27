@@ -5,7 +5,10 @@ import type {
 } from 'dexie-cloud-common';
 import { OAuthError } from '../errors/OAuthError';
 import { TokenErrorResponseError } from './TokenErrorResponseError';
-import { PolicyRejectionError, isPolicyErrorBody } from '../errors/PolicyRejectionError';
+import {
+  PolicyRejectionError,
+  isPolicyErrorBody,
+} from '../errors/PolicyRejectionError';
 
 /** Options for exchanging an OAuth code */
 export interface ExchangeOAuthCodeOptions {
@@ -23,10 +26,10 @@ export interface ExchangeOAuthCodeOptions {
 
 /**
  * Exchanges a Dexie Cloud authorization code for access and refresh tokens.
- * 
+ *
  * This is called after the OAuth callback delivers the authorization code
  * via postMessage (popup flow) or redirect.
- * 
+ *
  * @param options - Exchange options
  * @returns Promise resolving to TokenFinalResponse
  * @throws OAuthError or TokenErrorResponseError on failure
@@ -34,7 +37,13 @@ export interface ExchangeOAuthCodeOptions {
 export async function exchangeOAuthCode(
   options: ExchangeOAuthCodeOptions
 ): Promise<TokenFinalResponse> {
-  const { databaseUrl, code, publicKey, scopes = ['ACCESS_DB'], intent } = options;
+  const {
+    databaseUrl,
+    code,
+    publicKey,
+    scopes = ['ACCESS_DB'],
+    intent,
+  } = options;
 
   const tokenRequest: AuthorizationCodeTokenRequest = {
     grant_type: 'authorization_code',
@@ -68,7 +77,7 @@ export async function exchangeOAuthCode(
           // Fall through to generic error
         }
       }
-      
+
       if (res.status === 400 || res.status === 401) {
         // Try to parse error response as JSON
         try {
@@ -77,7 +86,11 @@ export async function exchangeOAuthCode(
             // Check for specific error codes
             if (errorResponse.messageCode === 'INVALID_OTP') {
               // In the context of OAuth, this likely means expired code
-              throw new OAuthError('expired_code', undefined, errorResponse.message);
+              throw new OAuthError(
+                'expired_code',
+                undefined,
+                errorResponse.message
+              );
             }
             throw new TokenErrorResponseError(errorResponse);
           }
@@ -88,8 +101,12 @@ export async function exchangeOAuthCode(
           // Fall through to generic error
         }
       }
-      
-      throw new OAuthError('provider_error', undefined, `Token exchange failed: ${res.status} ${bodyText}`);
+
+      throw new OAuthError(
+        'provider_error',
+        undefined,
+        `Token exchange failed: ${res.status} ${bodyText}`
+      );
     }
 
     const response: TokenFinalResponse | TokenErrorResponse = await res.json();
@@ -99,20 +116,27 @@ export async function exchangeOAuthCode(
     }
 
     if (response.type !== 'tokens') {
-      throw new OAuthError('provider_error', undefined, `Unexpected response type: ${(response as any).type}`);
+      throw new OAuthError(
+        'provider_error',
+        undefined,
+        `Unexpected response type: ${(response as any).type}`
+      );
     }
 
     return response;
   } catch (error) {
-    if (error instanceof OAuthError || error instanceof TokenErrorResponseError) {
+    if (
+      error instanceof OAuthError ||
+      error instanceof TokenErrorResponseError
+    ) {
       throw error;
     }
-    
+
     if (error instanceof TypeError) {
       // Network error
       throw new OAuthError('network_error');
     }
-    
+
     throw error;
   }
 }

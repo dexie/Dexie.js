@@ -1,16 +1,27 @@
-import { WhereClause as IWhereClause } from "../../public/types/where-clause";
-import { Collection } from "../collection";
-import { Table } from "../table";
-import { IndexableType } from "../../public/types/indexable-type";
-import { emptyCollection, fail, addIgnoreCaseAlgorithm, createRange, rangeEqual } from './where-clause-helpers';
-import { INVALID_KEY_ARGUMENT, STRING_EXPECTED, maxString, minKey } from '../../globals/constants';
+import { WhereClause as IWhereClause } from '../../public/types/where-clause';
+import { Collection } from '../collection';
+import { Table } from '../table';
+import { IndexableType } from '../../public/types/indexable-type';
+import {
+  emptyCollection,
+  fail,
+  addIgnoreCaseAlgorithm,
+  createRange,
+  rangeEqual,
+} from './where-clause-helpers';
+import {
+  INVALID_KEY_ARGUMENT,
+  STRING_EXPECTED,
+  maxString,
+  minKey,
+} from '../../globals/constants';
 import { getArrayOf, NO_CHAR_ARRAY } from '../../functions/utils';
 import { exceptions } from '../../errors';
 import { Dexie } from '../dexie';
-import { Collection as ICollection} from "../../public/types/collection";
+import { Collection as ICollection } from '../../public/types/collection';
 
 /** class WhereClause
- * 
+ *
  * https://dexie.org/docs/WhereClause/WhereClause
  */
 export class WhereClause implements IWhereClause {
@@ -20,7 +31,7 @@ export class WhereClause implements IWhereClause {
     table: Table;
     index: string;
     or: Collection;
-  }
+  };
   _cmp: (a: IndexableType, b: IndexableType) => number;
   _ascending: (a: IndexableType, b: IndexableType) => number;
   _descending: (a: IndexableType, b: IndexableType) => number;
@@ -32,27 +43,38 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.between()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.between()
-   * 
+   *
    **/
-  between(lower: IndexableType, upper: IndexableType, includeLower?: boolean, includeUpper?: boolean) {
-    includeLower = includeLower !== false;   // Default to true
-    includeUpper = includeUpper === true;    // Default to false
+  between(
+    lower: IndexableType,
+    upper: IndexableType,
+    includeLower?: boolean,
+    includeUpper?: boolean
+  ) {
+    includeLower = includeLower !== false; // Default to true
+    includeUpper = includeUpper === true; // Default to false
     try {
-      if ((this._cmp(lower, upper) > 0) ||
-        (this._cmp(lower, upper) === 0 && (includeLower || includeUpper) && !(includeLower && includeUpper)))
+      if (
+        this._cmp(lower, upper) > 0 ||
+        (this._cmp(lower, upper) === 0 &&
+          (includeLower || includeUpper) &&
+          !(includeLower && includeUpper))
+      )
         return emptyCollection(this); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
-      return new this.Collection(this, ()=>createRange(lower, upper, !includeLower, !includeUpper));
+      return new this.Collection(this, () =>
+        createRange(lower, upper, !includeLower, !includeUpper)
+      );
     } catch (e) {
       return fail(this, INVALID_KEY_ARGUMENT);
     }
   }
 
   /** WhereClause.equals()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.equals()
-   * 
+   *
    **/
   equals(value: IndexableType) {
     if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
@@ -60,9 +82,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.above()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.above()
-   * 
+   *
    **/
   above(value: IndexableType) {
     if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
@@ -70,29 +92,33 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.aboveOrEqual()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.aboveOrEqual()
-   * 
+   *
    **/
   aboveOrEqual(value: IndexableType) {
     if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
-    return new this.Collection(this, () => createRange(value, undefined, false));
+    return new this.Collection(this, () =>
+      createRange(value, undefined, false)
+    );
   }
 
   /** WhereClause.below()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.below()
-   * 
+   *
    **/
   below(value: IndexableType) {
     if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
-    return new this.Collection(this, () => createRange(undefined, value, false, true));
+    return new this.Collection(this, () =>
+      createRange(undefined, value, false, true)
+    );
   }
 
   /** WhereClause.belowOrEqual()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.belowOrEqual()
-   * 
+   *
    **/
   belowOrEqual(value: IndexableType) {
     if (value == null) return fail(this, INVALID_KEY_ARGUMENT);
@@ -100,9 +126,9 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.startsWith()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.startsWith()
-   * 
+   *
    **/
   startsWith(str: string) {
     if (typeof str !== 'string') return fail(this, STRING_EXPECTED);
@@ -110,68 +136,82 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.startsWithIgnoreCase()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.startsWithIgnoreCase()
-   * 
+   *
    **/
   startsWithIgnoreCase(str: string) {
-    if (str === "") return this.startsWith(str);
-    return addIgnoreCaseAlgorithm(this, (x, a) => x.indexOf(a[0]) === 0, [str], maxString);
+    if (str === '') return this.startsWith(str);
+    return addIgnoreCaseAlgorithm(
+      this,
+      (x, a) => x.indexOf(a[0]) === 0,
+      [str],
+      maxString
+    );
   }
 
   /** WhereClause.equalsIgnoreCase()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.equalsIgnoreCase()
-   * 
+   *
    **/
   equalsIgnoreCase(str: string) {
-    return addIgnoreCaseAlgorithm(this, (x, a) => x === a[0], [str], "");
+    return addIgnoreCaseAlgorithm(this, (x, a) => x === a[0], [str], '');
   }
 
   /** WhereClause.anyOfIgnoreCase()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.anyOfIgnoreCase()
-   * 
+   *
    **/
   anyOfIgnoreCase(...values: string[]): Collection;
   anyOfIgnoreCase(values: string[]): Collection;
   anyOfIgnoreCase() {
     var set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
     if (set.length === 0) return emptyCollection(this);
-    return addIgnoreCaseAlgorithm(this, (x, a) => a.indexOf(x) !== -1, set, "");
+    return addIgnoreCaseAlgorithm(this, (x, a) => a.indexOf(x) !== -1, set, '');
   }
 
   /** WhereClause.startsWithAnyOfIgnoreCase()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.startsWithAnyOfIgnoreCase()
-   * 
+   *
    **/
   startsWithAnyOfIgnoreCase(...values: string[]): Collection;
   startsWithAnyOfIgnoreCase(values: string[]): Collection;
   startsWithAnyOfIgnoreCase() {
     var set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
     if (set.length === 0) return emptyCollection(this);
-    return addIgnoreCaseAlgorithm(this, (x, a) => a.some(n => x.indexOf(n) === 0), set, maxString);
+    return addIgnoreCaseAlgorithm(
+      this,
+      (x, a) => a.some((n) => x.indexOf(n) === 0),
+      set,
+      maxString
+    );
   }
 
   /** WhereClause.anyOf()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.anyOf()
-   * 
+   *
    **/
   anyOf(...values: string[]): Collection;
   anyOf(values: string[]): Collection;
   anyOf() {
     const set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
     let compare = this._cmp;
-    try { set.sort(compare); } catch (e) { return fail(this, INVALID_KEY_ARGUMENT); }
+    try {
+      set.sort(compare);
+    } catch (e) {
+      return fail(this, INVALID_KEY_ARGUMENT);
+    }
     if (set.length === 0) return emptyCollection(this);
-    const c = new this.Collection(this, () => createRange(set[0], set[set.length - 1]));
+    const c = new this.Collection(this, () =>
+      createRange(set[0], set[set.length - 1])
+    );
 
-    c._ondirectionchange = direction => {
-      compare = (direction === "next" ?
-        this._ascending :
-        this._descending);
+    c._ondirectionchange = (direction) => {
+      compare = direction === 'next' ? this._ascending : this._descending;
       set.sort(compare);
     };
 
@@ -192,7 +232,9 @@ export class WhereClause implements IWhereClause {
         return true;
       } else {
         // cursor.key not yet at set[i]. Forward cursor to the next key to hunt for.
-        advance(() => { cursor.continue(set[i]); });
+        advance(() => {
+          cursor.continue(set[i]);
+        });
         return false;
       }
     });
@@ -200,65 +242,84 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.notEqual()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.notEqual()
-   * 
+   *
    **/
   notEqual(value: IndexableType) {
-    return this.inAnyRange([[minKey, value], [value, this.db._maxKey]], { includeLowers: false, includeUppers: false });
+    return this.inAnyRange(
+      [
+        [minKey, value],
+        [value, this.db._maxKey],
+      ],
+      { includeLowers: false, includeUppers: false }
+    );
   }
 
   /** WhereClause.noneOf()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.noneOf()
-   * 
+   *
    **/
   noneOf(...values: string[]): Collection;
   noneOf(values: string[]): Collection;
   noneOf() {
     const set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
     if (set.length === 0) return new this.Collection(this); // Return entire collection.
-    try { set.sort(this._ascending); } catch (e) { return fail(this, INVALID_KEY_ARGUMENT); }
+    try {
+      set.sort(this._ascending);
+    } catch (e) {
+      return fail(this, INVALID_KEY_ARGUMENT);
+    }
     // Transform ["a","b","c"] to a set of ranges for between/above/below: [[minKey,"a"], ["a","b"], ["b","c"], ["c",maxKey]]
     const ranges = set.reduce(
-      (res, val) => res ?
-        res.concat([[res[res.length - 1][1], val]]) :
-        [[minKey, val]],
-      null);
+      (res, val) =>
+        res ? res.concat([[res[res.length - 1][1], val]]) : [[minKey, val]],
+      null
+    );
     ranges.push([set[set.length - 1], this.db._maxKey]);
-    return this.inAnyRange(ranges, { includeLowers: false, includeUppers: false });
+    return this.inAnyRange(ranges, {
+      includeLowers: false,
+      includeUppers: false,
+    });
   }
 
   /** WhereClause.inAnyRange()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.inAnyRange()
-   * 
+   *
    **/
   inAnyRange(
-    ranges: ReadonlyArray<{ 0: IndexableType, 1: IndexableType }>,
-    options?: { includeLowers?: boolean, includeUppers?: boolean })
-  {
+    ranges: ReadonlyArray<{ 0: IndexableType; 1: IndexableType }>,
+    options?: { includeLowers?: boolean; includeUppers?: boolean }
+  ) {
     const cmp = this._cmp,
-          ascending = this._ascending,
-          descending = this._descending,
-          min = this._min,
-          max = this._max;
+      ascending = this._ascending,
+      descending = this._descending,
+      min = this._min,
+      max = this._max;
 
     if (ranges.length === 0) return emptyCollection(this);
-    if (!ranges.every(range =>
-      range[0] !== undefined &&
-      range[1] !== undefined &&
-      ascending(range[0], range[1]) <= 0)) {
+    if (
+      !ranges.every(
+        (range) =>
+          range[0] !== undefined &&
+          range[1] !== undefined &&
+          ascending(range[0], range[1]) <= 0
+      )
+    ) {
       return fail(
         this,
-        "First argument to inAnyRange() must be an Array of two-value Arrays [lower,upper] where upper must not be lower than lower",
-        exceptions.InvalidArgument);
+        'First argument to inAnyRange() must be an Array of two-value Arrays [lower,upper] where upper must not be lower than lower',
+        exceptions.InvalidArgument
+      );
     }
-    const includeLowers = !options || options.includeLowers !== false;   // Default to true
-    const includeUppers = options && options.includeUppers === true;    // Default to false
+    const includeLowers = !options || options.includeLowers !== false; // Default to true
+    const includeUppers = options && options.includeUppers === true; // Default to false
 
     function addRange(ranges, newRange) {
-      let i = 0, l = ranges.length;
+      let i = 0,
+        l = ranges.length;
       for (; i < l; ++i) {
         const range = ranges[i];
         if (cmp(newRange[0], range[1]) < 0 && cmp(newRange[1], range[0]) > 0) {
@@ -267,13 +328,14 @@ export class WhereClause implements IWhereClause {
           break;
         }
       }
-      if (i === l)
-        ranges.push(newRange);
+      if (i === l) ranges.push(newRange);
       return ranges;
     }
 
     let sortDirection = ascending;
-    function rangeSorter(a, b) { return sortDirection(a[0], b[0]); }
+    function rangeSorter(a, b) {
+      return sortDirection(a[0], b[0]);
+    }
 
     // Join overlapping ranges
     let set;
@@ -285,13 +347,13 @@ export class WhereClause implements IWhereClause {
     }
 
     let rangePos = 0;
-    const keyIsBeyondCurrentEntry = includeUppers ?
-      key => ascending(key, set[rangePos][1]) > 0 :
-      key => ascending(key, set[rangePos][1]) >= 0;
+    const keyIsBeyondCurrentEntry = includeUppers
+      ? (key) => ascending(key, set[rangePos][1]) > 0
+      : (key) => ascending(key, set[rangePos][1]) >= 0;
 
-    const keyIsBeforeCurrentEntry = includeLowers ?
-      key => descending(key, set[rangePos][0]) > 0 :
-      key => descending(key, set[rangePos][0]) >= 0;
+    const keyIsBeforeCurrentEntry = includeLowers
+      ? (key) => descending(key, set[rangePos][0]) > 0
+      : (key) => descending(key, set[rangePos][0]) >= 0;
 
     function keyWithinCurrentRange(key) {
       return !keyIsBeyondCurrentEntry(key) && !keyIsBeforeCurrentEntry(key);
@@ -299,12 +361,17 @@ export class WhereClause implements IWhereClause {
 
     let checkKey = keyIsBeyondCurrentEntry;
 
-    const c = new this.Collection(
-      this,
-      () => createRange(set[0][0], set[set.length - 1][1], !includeLowers, !includeUppers));
+    const c = new this.Collection(this, () =>
+      createRange(
+        set[0][0],
+        set[set.length - 1][1],
+        !includeLowers,
+        !includeUppers
+      )
+    );
 
-    c._ondirectionchange = direction => {
-      if (direction === "next") {
+    c._ondirectionchange = (direction) => {
+      if (direction === 'next') {
         checkKey = keyIsBeyondCurrentEntry;
         sortDirection = ascending;
       } else {
@@ -328,7 +395,10 @@ export class WhereClause implements IWhereClause {
       if (keyWithinCurrentRange(key)) {
         // The current cursor value should be included and we should continue a single step in case next item has the same key or possibly our next key in set.
         return true;
-      } else if (this._cmp(key, set[rangePos][1]) === 0 || this._cmp(key, set[rangePos][0]) === 0) {
+      } else if (
+        this._cmp(key, set[rangePos][1]) === 0 ||
+        this._cmp(key, set[rangePos][0]) === 0
+      ) {
         // includeUpper or includeLower is false so keyWithinCurrentRange() returns false even though we are at range border.
         // Continue to next key but don't include this one.
         return false;
@@ -345,21 +415,20 @@ export class WhereClause implements IWhereClause {
   }
 
   /** WhereClause.startsWithAnyOf()
-   * 
+   *
    * https://dexie.org/docs/WhereClause/WhereClause.startsWithAnyOf()
-   * 
+   *
    **/
   startsWithAnyOf(...prefixes: string[]): Collection;
   startsWithAnyOf(prefixes: string[]): Collection;
   startsWithAnyOf() {
     const set = getArrayOf.apply(NO_CHAR_ARRAY, arguments);
 
-    if (!set.every(s => typeof s === 'string')) {
-        return fail(this, "startsWithAnyOf() only works with strings");
+    if (!set.every((s) => typeof s === 'string')) {
+      return fail(this, 'startsWithAnyOf() only works with strings');
     }
     if (set.length === 0) return emptyCollection(this);
 
     return this.inAnyRange(set.map((str: string) => [str, str + maxString]));
   }
-
 }

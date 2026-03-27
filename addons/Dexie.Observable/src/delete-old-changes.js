@@ -10,23 +10,27 @@ export default function deleteOldChanges(db) {
   // continuation every 500 ms.
   const CHUNK_SIZE = 100;
 
-  Dexie.ignoreTransaction(()=>{
-    return db._syncNodes.orderBy("myRevision").first(oldestNode => {
-      return db._changes
-          .where("rev").below(oldestNode.myRevision)
+  Dexie.ignoreTransaction(() => {
+    return db._syncNodes
+      .orderBy('myRevision')
+      .first((oldestNode) => {
+        return db._changes
+          .where('rev')
+          .below(oldestNode.myRevision)
           .limit(CHUNK_SIZE)
           .primaryKeys();
-    }).then(keysToDelete => {
-      if (keysToDelete.length === 0) return; // Done.
-      return db._changes.bulkDelete(keysToDelete).then(()=> {
-        // If not done garbage collecting, reschedule a continuation of it until done.
-        if (keysToDelete.length === CHUNK_SIZE) {
-          // Limit reached. Changes are there are more job to do. Schedule again:
-          setTimeout(() => db.isOpen() && deleteOldChanges(db), 500);
-        }
+      })
+      .then((keysToDelete) => {
+        if (keysToDelete.length === 0) return; // Done.
+        return db._changes.bulkDelete(keysToDelete).then(() => {
+          // If not done garbage collecting, reschedule a continuation of it until done.
+          if (keysToDelete.length === CHUNK_SIZE) {
+            // Limit reached. Changes are there are more job to do. Schedule again:
+            setTimeout(() => db.isOpen() && deleteOldChanges(db), 500);
+          }
+        });
       });
-    });
-  }).catch(()=>{
+  }).catch(() => {
     // The operation is not crucial. A failure could almost only be due to that database has been closed.
     // No need to log this.
   });

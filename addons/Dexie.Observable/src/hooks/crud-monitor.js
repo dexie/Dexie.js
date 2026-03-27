@@ -3,9 +3,9 @@ import initUpdatingHook from './updating';
 import initDeletingHook from './deleting';
 
 export default function initCrudMonitor(db) {
-//
-// The Creating/Updating/Deleting hook will make sure any change is stored to the changes table
-//
+  //
+  // The Creating/Updating/Deleting hook will make sure any change is stored to the changes table
+  //
   return function crudMonitor(table) {
     /// <param name="table" type="db.Table"></param>
     if (table.hook._observing) return;

@@ -1,4 +1,4 @@
-import Dexie from "dexie";
+import Dexie from 'dexie';
 
 export function throwVersionIncrementNeeded() {
   throw new Dexie.SchemaError(

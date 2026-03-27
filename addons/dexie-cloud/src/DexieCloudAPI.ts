@@ -1,12 +1,16 @@
 import { DexieCloudOptions } from './DexieCloudOptions';
-import { DBRealmRole, DexieCloudSchema, AuthProvidersResponse } from 'dexie-cloud-common';
+import {
+  DBRealmRole,
+  DexieCloudSchema,
+  AuthProvidersResponse,
+} from 'dexie-cloud-common';
 import { UserLogin } from './db/entities/UserLogin';
 import { PersistedSyncState } from './db/entities/PersistedSyncState';
 import { SyncState } from './types/SyncState';
 import { DXCUserInteraction } from './types/DXCUserInteraction';
 import { DXCWebSocketStatus } from './DXCWebSocketStatus';
 import { PermissionChecker } from './PermissionChecker';
-import { DexieCloudSyncOptions } from "./DexieCloudSyncOptions";
+import { DexieCloudSyncOptions } from './DexieCloudSyncOptions';
 import { Invite } from './Invite';
 import { BehaviorSubject, Observable } from 'rxjs';
 
@@ -14,10 +18,10 @@ import { BehaviorSubject, Observable } from 'rxjs';
 export interface BlobProgress {
   /** Whether blob downloads are currently in progress */
   isDownloading: boolean;
-  
+
   /** Number of blobs remaining to download */
   blobsRemaining: number;
-  
+
   /** Total bytes remaining to download (estimated from BlobRef.$size) */
   bytesRemaining: number;
 }
@@ -79,17 +83,17 @@ export interface DexieCloudAPI {
   persistedSyncState: BehaviorSubject<PersistedSyncState | undefined>;
 
   /** Observable of blob download progress.
-   * 
+   *
    * Shows the current state of background blob downloads (when blobMode='eager')
    * or provides insight into unresolved blobs (when blobMode='lazy').
-   * 
+   *
    * Use this to show progress indicators or "downloading for offline" status.
    */
   blobProgress: Observable<BlobProgress>;
 
   events: {
     syncComplete: Observable<void>;
-  }
+  };
 
   // Observable reflecting the GUI data that Dexie Cloud wants you to render if using
   // db.cloud.configure({customLoginGui: true}).
@@ -101,11 +105,11 @@ export interface DexieCloudAPI {
   invites: Observable<Invite[]>;
 
   // Observable of global application roles - a liveQuery() of the 'roles' table
-  roles: Observable<{[roleName: string]: DBRealmRole}>;
+  roles: Observable<{ [roleName: string]: DBRealmRole }>;
 
   // Boolean whether service worker is used or not
   usingServiceWorker?: boolean;
-  
+
   // Boolean whether this Dexie instance is a private Dexie instance owned by
   // the built-in Dexie Cloud service worker.
   isServiceWorkerDB?: boolean;
@@ -118,7 +122,7 @@ export interface DexieCloudAPI {
    */
   login(hint?: LoginHints): Promise<void>;
 
-  logout(options?: {force?: boolean}): Promise<void>;
+  logout(options?: { force?: boolean }): Promise<void>;
 
   /**
    * Connect to given URL
@@ -132,27 +136,34 @@ export interface DexieCloudAPI {
 
   /** Method that returns an observable of the available permissions of given
    * entity.
-   * 
+   *
    * @param entity Entity to check permission for
    */
-  permissions<T extends { owner: string; realmId: string; table: () => string; }>(entity: T): Observable<PermissionChecker<T>>;
+  permissions<
+    T extends { owner: string; realmId: string; table: () => string },
+  >(
+    entity: T
+  ): Observable<PermissionChecker<T>>;
 
   /** Method that returns an observable of the available permissions of given
    * object and table name.
-   * 
+   *
    * @param obj Object retrieved from a dexie query
    * @param table Table name that the object was retrieved from
    */
-   permissions<T>(obj: T, table: string): Observable<PermissionChecker<T, string>>;
+  permissions<T>(
+    obj: T,
+    table: string
+  ): Observable<PermissionChecker<T, string>>;
 
   /** Query available authentication providers from the server.
-   * 
+   *
    * Returns information about which OAuth providers are configured
    * and whether OTP (email) authentication is enabled.
-   * 
+   *
    * Useful for apps that want to build their own login UI and show
    * provider-specific buttons.
-   * 
+   *
    * @returns Promise resolving to available auth providers
    */
   getAuthProviders(): Promise<AuthProvidersResponse>;

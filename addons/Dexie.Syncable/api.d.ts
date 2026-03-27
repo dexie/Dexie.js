@@ -28,8 +28,8 @@
  *
  */
 
-import {IDatabaseChange} from 'dexie-observable/api';
-export {DatabaseChangeType} from 'dexie-observable/api';
+import { IDatabaseChange } from 'dexie-observable/api';
+export { DatabaseChangeType } from 'dexie-observable/api';
 
 /* ISyncProtocol
 
@@ -52,45 +52,46 @@ export {DatabaseChangeType} from 'dexie-observable/api';
  *
  */
 export interface ISyncProtocol {
-    partialsThreshold?: number;
-    sync (
-        context: IPersistedContext,
-        url: string,
-        options: any,
-        baseRevision: any,
-        syncedRevision: any,
-        changes: IDatabaseChange[],
-        partial: boolean,
-        applyRemoteChanges: ApplyRemoteChangesFunction,
-        onChangesAccepted: ()=>void,
-        onSuccess: (continuation: PollContinuation | ReactiveContinuation)=>void,
-        onError: (error: any, again?: number) => void) : void;
+  partialsThreshold?: number;
+  sync(
+    context: IPersistedContext,
+    url: string,
+    options: any,
+    baseRevision: any,
+    syncedRevision: any,
+    changes: IDatabaseChange[],
+    partial: boolean,
+    applyRemoteChanges: ApplyRemoteChangesFunction,
+    onChangesAccepted: () => void,
+    onSuccess: (continuation: PollContinuation | ReactiveContinuation) => void,
+    onError: (error: any, again?: number) => void
+  ): void;
 }
 
 /**
  * Documentation for this interface: https://github.com/dfahlander/Dexie.js/wiki/Dexie.Syncable.IPersistedContext
  */
 export interface IPersistedContext {
-    save() : Promise<void>;
-    [customProp: string] : any;
+  save(): Promise<void>;
+  [customProp: string]: any;
 }
 
 /**
  * Documentation for this function: https://github.com/dfahlander/Dexie.js/wiki/Dexie.Syncable.ISyncProtocol
  */
 export type ApplyRemoteChangesFunction = (
-    changes: IDatabaseChange[],
-    lastRevision: any,
-    partial?: boolean,
-    clear?: boolean)
-    => Promise<void>;
+  changes: IDatabaseChange[],
+  lastRevision: any,
+  partial?: boolean,
+  clear?: boolean
+) => Promise<void>;
 
 /**
  * Provide a poll continuation if your backend is a reqest/response service, such as a REST API.
  */
 export interface PollContinuation {
-    /** Implementation should return number of milliseconds until you want the framework to call sync() again. */
-    again: number
+  /** Implementation should return number of milliseconds until you want the framework to call sync() again. */
+  again: number;
 }
 
 /**
@@ -98,46 +99,47 @@ export interface PollContinuation {
  * and may push changes back to the client as they occur.
  */
 export interface ReactiveContinuation {
-    react (
-        /** List of local changes to send to server. */
-        changes: IDatabaseChange[],
+  react(
+    /** List of local changes to send to server. */
+    changes: IDatabaseChange[],
 
-        /** Server revision that server needs to know in order to apply the changes correcly.  */
-        baseRevision: any,
+    /** Server revision that server needs to know in order to apply the changes correcly.  */
+    baseRevision: any,
 
-        /** If true, it means that reach() will be called upon again with additional changes once you'version
-         * called onChangesAccepted(). An implementation may handle this transactionally, i.e. wait with applying
-         * these changes and instead buffer them in a temporary table and the apply everything once reac() is called
-         * with partial=false.
-         */
-        partial: boolean,
+    /** If true, it means that reach() will be called upon again with additional changes once you'version
+     * called onChangesAccepted(). An implementation may handle this transactionally, i.e. wait with applying
+     * these changes and instead buffer them in a temporary table and the apply everything once reac() is called
+     * with partial=false.
+     */
+    partial: boolean,
 
-        /** Callback to call when the given changes has been acknowledged and persisted at the server side.
-         * This will mark the change-set as delivered and the framework wont try resending these changes anymore.
-         */
-        onChangesAccepted: ()=>void): void;
+    /** Callback to call when the given changes has been acknowledged and persisted at the server side.
+     * This will mark the change-set as delivered and the framework wont try resending these changes anymore.
+     */
+    onChangesAccepted: () => void
+  ): void;
 
-    /** Implementation should disconned the underlying transport and stop calling applyRemoteChanges(). */
-    disconnect(): void;
+  /** Implementation should disconned the underlying transport and stop calling applyRemoteChanges(). */
+  disconnect(): void;
 }
 
 export enum SyncStatus {
-    /** An irrepairable error occurred and the sync provider is dead. */
-    ERROR = -1,
+  /** An irrepairable error occurred and the sync provider is dead. */
+  ERROR = -1,
 
-    /** The sync provider hasnt yet become online, or it has been disconnected. */
-    OFFLINE = 0,
+  /** The sync provider hasnt yet become online, or it has been disconnected. */
+  OFFLINE = 0,
 
-    /** Trying to connect to server */
-    CONNECTING = 1,
+  /** Trying to connect to server */
+  CONNECTING = 1,
 
-    /** Connected to server and currently in sync with server */
-    ONLINE = 2,
+  /** Connected to server and currently in sync with server */
+  ONLINE = 2,
 
-    /** Syncing with server. For poll pattern, this is every poll call.
-     * For react pattern, this is when local changes are being sent to server. */
-    SYNCING = 3,
+  /** Syncing with server. For poll pattern, this is every poll call.
+   * For react pattern, this is when local changes are being sent to server. */
+  SYNCING = 3,
 
-    /** An error occured such as net down but the sync provider will retry to connect. */
-    ERROR_WILL_RETRY = 4
+  /** An error occured such as net down but the sync provider will retry to connect. */
+  ERROR_WILL_RETRY = 4,
 }

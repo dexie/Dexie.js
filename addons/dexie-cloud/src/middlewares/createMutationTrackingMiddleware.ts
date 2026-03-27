@@ -152,7 +152,7 @@ export function createMutationTrackingMiddleware({
           if (!mutsTable) {
             // We cannot track mutations on this table because there is no mutations table for it.
             // This might happen in upgraders that executes before cloud schema is applied.
-            return table; 
+            return table;
           }
           return guardedTable({
             ...table,
@@ -259,7 +259,11 @@ export function createMutationTrackingMiddleware({
                   const validKeys = new RangeSet();
                   let anyChangeSpecBecameEmpty = false;
                   if (!upsert) {
-                    for (let i = 0, l = strippedChangeSpecs.length; i < l; ++i) {
+                    for (
+                      let i = 0, l = strippedChangeSpecs.length;
+                      i < l;
+                      ++i
+                    ) {
                       if (Object.keys(strippedChangeSpecs[i]).length > 0) {
                         newUpdates.keys.push(updates.keys[i]);
                         newUpdates.changeSpecs.push(strippedChangeSpecs[i]);
@@ -325,68 +329,71 @@ export function createMutationTrackingMiddleware({
                       userId,
                     }
                   : req.type === 'add'
-                  ? {
-                      type: 'insert',
-                      ts,
-                      opNo,
-                      keys,
-                      txid,
-                      userId,
-                      values,
-                    }
-                  : upsert && updates ? {
-                      type: 'upsert',
-                      ts,
-                      opNo,
-                      keys,
-                      values,
-                      changeSpecs: updates.changeSpecs.filter((_, idx) => !failures[idx]),
-                      txid,
-                      userId,
-                  }
-                  : criteria && changeSpec
-                  ? {
-                      // Common changeSpec for all keys
-                      type: 'modify',
-                      ts,
-                      opNo,
-                      keys,
-                      criteria,
-                      changeSpec,
-                      txid,
-                      userId,
-                    }
-                  : changeSpec
-                  ? {
-                      // In case criteria involved an unsynced property, we go for keys instead.
-                      type: 'update',
-                      ts,
-                      opNo,
-                      keys,
-                      changeSpecs: keys.map(() => changeSpec!),
-                      txid,
-                      userId,
-                    }
-                  : updates
-                  ? {
-                      // One changeSpec per key
-                      type: 'update',
-                      ts,
-                      opNo,
-                      keys: updates.keys,
-                      changeSpecs: updates.changeSpecs,
-                      txid,
-                      userId,
-                    }
-                  : {
-                      type: 'upsert',
-                      ts,
-                      opNo,
-                      keys,
-                      values,
-                      txid,
-                      userId,
-                    };
+                    ? {
+                        type: 'insert',
+                        ts,
+                        opNo,
+                        keys,
+                        txid,
+                        userId,
+                        values,
+                      }
+                    : upsert && updates
+                      ? {
+                          type: 'upsert',
+                          ts,
+                          opNo,
+                          keys,
+                          values,
+                          changeSpecs: updates.changeSpecs.filter(
+                            (_, idx) => !failures[idx]
+                          ),
+                          txid,
+                          userId,
+                        }
+                      : criteria && changeSpec
+                        ? {
+                            // Common changeSpec for all keys
+                            type: 'modify',
+                            ts,
+                            opNo,
+                            keys,
+                            criteria,
+                            changeSpec,
+                            txid,
+                            userId,
+                          }
+                        : changeSpec
+                          ? {
+                              // In case criteria involved an unsynced property, we go for keys instead.
+                              type: 'update',
+                              ts,
+                              opNo,
+                              keys,
+                              changeSpecs: keys.map(() => changeSpec!),
+                              txid,
+                              userId,
+                            }
+                          : updates
+                            ? {
+                                // One changeSpec per key
+                                type: 'update',
+                                ts,
+                                opNo,
+                                keys: updates.keys,
+                                changeSpecs: updates.changeSpecs,
+                                txid,
+                                userId,
+                              }
+                            : {
+                                type: 'upsert',
+                                ts,
+                                opNo,
+                                keys,
+                                values,
+                                txid,
+                                userId,
+                              };
 
               if ('isAdditionalChunk' in req && req.isAdditionalChunk) {
                 mut.isAdditionalChunk = true;

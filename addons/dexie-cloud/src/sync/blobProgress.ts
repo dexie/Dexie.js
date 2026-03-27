@@ -52,37 +52,39 @@ export function observeBlobProgress(
   db: DexieCloudDB,
   downloading$: BehaviorSubject<boolean>
 ): Observable<BlobProgress> {
-  const blobStats$ = from(liveQuery(async () => {
-    let blobsRemaining = 0;
-    let bytesRemaining = 0;
+  const blobStats$ = from(
+    liveQuery(async () => {
+      let blobsRemaining = 0;
+      let bytesRemaining = 0;
 
-    const syncedTables = getSyncableTables(db);
+      const syncedTables = getSyncableTables(db);
 
-    await db.dx.transaction('r', syncedTables, async (tx) => {
-      (tx.idbtrans as any).disableBlobResolve = true;
+      await db.dx.transaction('r', syncedTables, async (tx) => {
+        (tx.idbtrans as any).disableBlobResolve = true;
 
-      for (const table of syncedTables) {
-        const hasIndex = !!table.schema.idxByName['_hasBlobRefs'];
-        if (!hasIndex) continue;
+        for (const table of syncedTables) {
+          const hasIndex = !!table.schema.idxByName['_hasBlobRefs'];
+          if (!hasIndex) continue;
 
-        const unresolvedObjects = await table
-          .where('_hasBlobRefs')
-          .equals(1)
-          .toArray();
+          const unresolvedObjects = await table
+            .where('_hasBlobRefs')
+            .equals(1)
+            .toArray();
 
-        for (const obj of unresolvedObjects) {
-          const blobs = findBlobRefs(obj);
-          blobsRemaining += blobs.length;
-          bytesRemaining += blobs.reduce(
-            (sum, blob) => sum + (blob.size || 0),
-            0
-          );
+          for (const obj of unresolvedObjects) {
+            const blobs = findBlobRefs(obj);
+            blobsRemaining += blobs.length;
+            bytesRemaining += blobs.reduce(
+              (sum, blob) => sum + (blob.size || 0),
+              0
+            );
+          }
         }
-      }
-    });
+      });
 
-    return { blobsRemaining, bytesRemaining };
-  }));
+      return { blobsRemaining, bytesRemaining };
+    })
+  );
 
   return combineLatest([blobStats$, downloading$]).pipe(
     map(([stats, isDownloading]) => ({
@@ -90,7 +92,7 @@ export function observeBlobProgress(
       blobsRemaining: stats.blobsRemaining,
       bytesRemaining: stats.bytesRemaining,
     })),
-    share({ resetOnRefCountZero: () => timer(2000) }) // Keep alive for 2s after last unsubscription to avoid rapid re-subscriptions during UI updates  
+    share({ resetOnRefCountZero: () => timer(2000) }) // Keep alive for 2s after last unsubscription to avoid rapid re-subscriptions during UI updates
   );
 }
 

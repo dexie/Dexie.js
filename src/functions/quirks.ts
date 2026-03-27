@@ -5,7 +5,9 @@ export function safariMultiStoreFix(storeNames: string[]) {
 }
 
 export function getNativeGetDatabaseNamesFn(indexedDB) {
-  var fn = indexedDB && (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
+  var fn =
+    indexedDB &&
+    (indexedDB.getDatabaseNames || indexedDB.webkitGetDatabaseNames);
   return fn && fn.bind(indexedDB);
 }
 
@@ -18,4 +20,4 @@ export let getMaxKey = (IdbKeyRange: typeof IDBKeyRange) => {
     getMaxKey = () => maxString;
     return maxString;
   }
-}
+};

@@ -1,5 +1,5 @@
-import { TypedArray } from "../typings/TypedArray.js";
-import { b64decode, b64encode } from "./base64.js";
+import { TypedArray } from '../typings/TypedArray.js';
+import { b64decode, b64encode } from './base64.js';
 
 const HEX_PARSER_REGEXP = /[\da-f]{2}/gi;
 
@@ -21,12 +21,12 @@ export function buf2bigint(buf: TypedArray | ArrayBuffer): bigint {
 }
 
 export function bigint2Buf(bi: bigint): Uint8Array {
-  if (bi < 0) throw new TypeError("Cannot convert negative bigint to a buffer");
+  if (bi < 0) throw new TypeError('Cannot convert negative bigint to a buffer');
   const hex = bi.toString(16);
   return Uint8Array.from(
-    (
-      (hex.length % 2 ? "0" + hex : hex).match(HEX_PARSER_REGEXP) || []
-    ).map((h) => parseInt(h, 16))
+    ((hex.length % 2 ? '0' + hex : hex).match(HEX_PARSER_REGEXP) || []).map(
+      (h) => parseInt(h, 16)
+    )
   );
 }
 

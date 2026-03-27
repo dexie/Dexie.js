@@ -1,7 +1,7 @@
-import { b64LexEncode } from "./common/b64lex.js";
+import { b64LexEncode } from './common/b64lex.js';
 
 const getRandomValues: (buf: Uint8Array) => void =
-  typeof crypto !== "undefined"
+  typeof crypto !== 'undefined'
     ? crypto.getRandomValues.bind(crypto)
     : (buf: Uint8Array) => {
         for (let i = 0; i < buf.length; ++i) {

@@ -1,7 +1,10 @@
-import { DexieCloudSchema } from "dexie-cloud-common";
-import { DexieCloudOptions } from "./DexieCloudOptions";
+import { DexieCloudSchema } from 'dexie-cloud-common';
+import { DexieCloudOptions } from './DexieCloudOptions';
 
-export function updateSchemaFromOptions(schema?: DexieCloudSchema | null, options?: DexieCloudOptions | null) {
+export function updateSchemaFromOptions(
+  schema?: DexieCloudSchema | null,
+  options?: DexieCloudOptions | null
+) {
   if (schema && options) {
     if (options.unsyncedTables) {
       for (const tableName of options.unsyncedTables) {

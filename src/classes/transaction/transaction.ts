@@ -1,5 +1,5 @@
 import { Transaction as ITransaction } from '../../public/types/transaction';
-import { DexiePromise, wrap, rejection } from "../../helpers/promise";
+import { DexiePromise, wrap, rejection } from '../../helpers/promise';
 import { DbSchema } from '../../public/types/db-schema';
 import { assert, hasOwn } from '../../functions/utils';
 import { PSD, usePSD } from '../../helpers/promise';
@@ -13,9 +13,9 @@ import { Table } from '../table';
 import { globalEvents } from '../../globals/global-events';
 
 /** Transaction
- * 
+ *
  * https://dexie.org/docs/Transaction/Transaction
- * 
+ *
  **/
 export class Transaction implements ITransaction {
   db: Dexie;
@@ -28,10 +28,10 @@ export class Transaction implements ITransaction {
   on: any;
   parent?: Transaction;
   schema: DbSchema;
-  _memoizedTables: {[tableName: string]: Table};
+  _memoizedTables: { [tableName: string]: Table };
 
   _reculock: number;
-  _blockedFuncs: { 0: () => any, 1: any }[];
+  _blockedFuncs: { 0: () => any; 1: any }[];
   _resolve: () => void;
   _reject: (Error) => void;
   _waitingFor: DexiePromise; // for waitFor()
@@ -44,7 +44,7 @@ export class Transaction implements ITransaction {
   //
 
   /** Transaction._lock()
-   * 
+   *
    * Internal method.
    */
   _lock() {
@@ -56,7 +56,7 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction._unlock()
-   * 
+   *
    * Internal method.
    */
   _unlock() {
@@ -65,14 +65,16 @@ export class Transaction implements ITransaction {
       if (!PSD.global) PSD.lockOwnerFor = null;
       while (this._blockedFuncs.length > 0 && !this._locked()) {
         var fnAndPSD = this._blockedFuncs.shift();
-        try { usePSD(fnAndPSD[1], fnAndPSD[0]); } catch (e) { }
+        try {
+          usePSD(fnAndPSD[1], fnAndPSD[0]);
+        } catch (e) {}
       }
     }
     return this;
   }
 
   /** Transaction._lock()
-   * 
+   *
    * Internal method.
    */
   _locked() {
@@ -90,21 +92,21 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction.create()
-   * 
+   *
    * Internal method.
-   * 
+   *
    */
-  create(idbtrans?: IDBTransaction & {[prop: string]: any}) {
+  create(idbtrans?: IDBTransaction & { [prop: string]: any }) {
     if (!this.mode) return this;
     const idbdb = this.db.idbdb;
     const dbOpenError = this.db._state.dbOpenError;
     assert(!this.idbtrans);
     if (!idbtrans && !idbdb) {
       switch (dbOpenError && dbOpenError.name) {
-        case "DatabaseClosedError":
+        case 'DatabaseClosedError':
           // Errors where it is no difference whether it was caused by the user operation or an earlier call to db.open()
           throw new exceptions.DatabaseClosed(dbOpenError);
-        case "MissingAPIError":
+        case 'MissingAPIError':
           // Errors where it is no difference whether it was caused by the user operation or an earlier call to db.open()
           throw new exceptions.MissingAPI(dbOpenError.message, dbOpenError);
         default:
@@ -115,54 +117,61 @@ export class Transaction implements ITransaction {
     if (!this.active) throw new exceptions.TransactionInactive();
     assert(this._completion._state === null); // Completion Promise must still be pending.
 
-    idbtrans = this.idbtrans = idbtrans ||
-      (this.db.core 
-        ? this.db.core.transaction(this.storeNames, this.mode as 'readwrite' | 'readonly', { durability: this.chromeTransactionDurability })
-        : idbdb.transaction(this.storeNames, this.mode, { durability: this.chromeTransactionDurability })
-      ) as IDBTransaction;
+    idbtrans = this.idbtrans =
+      idbtrans ||
+      ((this.db.core
+        ? this.db.core.transaction(
+            this.storeNames,
+            this.mode as 'readwrite' | 'readonly',
+            { durability: this.chromeTransactionDurability }
+          )
+        : idbdb.transaction(this.storeNames, this.mode, {
+            durability: this.chromeTransactionDurability,
+          })) as IDBTransaction);
 
-    idbtrans.onerror = wrap(ev => {
-      preventDefault(ev);// Prohibit default bubbling to window.error
+    idbtrans.onerror = wrap((ev) => {
+      preventDefault(ev); // Prohibit default bubbling to window.error
       this._reject(idbtrans.error);
     });
-    idbtrans.onabort = wrap(ev => {
+    idbtrans.onabort = wrap((ev) => {
       preventDefault(ev);
       this.active && this._reject(new exceptions.Abort(idbtrans.error));
       this.active = false;
-      this.on("abort").fire(ev);
+      this.on('abort').fire(ev);
     });
     idbtrans.oncomplete = wrap(() => {
       this.active = false;
       this._resolve();
       if ('mutatedParts' in idbtrans) {
-        globalEvents.storagemutated.fire(idbtrans["mutatedParts"]);
+        globalEvents.storagemutated.fire(idbtrans['mutatedParts']);
       }
     });
     return this;
   }
 
   /** Transaction._promise()
-   * 
+   *
    * Internal method.
    */
   _promise(
     mode: IDBTransactionMode,
     fn: (resolve, reject, trans: Transaction) => PromiseLike<any> | void,
-    bWriteLock?: string | boolean): DexiePromise
-  {
+    bWriteLock?: string | boolean
+  ): DexiePromise {
     if (mode === 'readwrite' && this.mode !== 'readwrite')
-      return rejection(new exceptions.ReadOnly("Transaction is readonly"));
+      return rejection(new exceptions.ReadOnly('Transaction is readonly'));
 
-    if (!this.active)
-      return rejection(new exceptions.TransactionInactive());
+    if (!this.active) return rejection(new exceptions.TransactionInactive());
 
     if (this._locked()) {
       return new DexiePromise((resolve, reject) => {
-        this._blockedFuncs.push([() => {
-          this._promise(mode, fn, bWriteLock).then(resolve, reject);
-        }, PSD]);
+        this._blockedFuncs.push([
+          () => {
+            this._promise(mode, fn, bWriteLock).then(resolve, reject);
+          },
+          PSD,
+        ]);
       });
-
     } else if (bWriteLock) {
       return newScope(() => {
         var p = new DexiePromise((resolve, reject) => {
@@ -174,7 +183,6 @@ export class Transaction implements ITransaction {
         p._lib = true;
         return p;
       });
-
     } else {
       var p = new DexiePromise((resolve, reject) => {
         var rv = fn(resolve, reject, this);
@@ -186,7 +194,7 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction._root()
-   * 
+   *
    * Internal method. Retrieves the root transaction in the tree of sub transactions.
    */
   _root() {
@@ -194,10 +202,10 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction.waitFor()
-   * 
+   *
    * Internal method. Can be accessed from the public API through
    * Dexie.waitFor(): https://dexie.org/docs/Dexie/Dexie.waitFor()
-   * 
+   *
    **/
   waitFor(promiseLike: PromiseLike<any>) {
     // Always operate on the root transaction (in case this is a sub stransaction)
@@ -216,26 +224,28 @@ export class Transaction implements ITransaction {
       var store = root.idbtrans.objectStore(root.storeNames[0]);
       (function spin() {
         ++root._spinCount; // For debugging only
-        while (root._waitingQueue.length) (root._waitingQueue.shift())();
+        while (root._waitingQueue.length) root._waitingQueue.shift()();
         if (root._waitingFor) store.get(-Infinity).onsuccess = spin;
-      }());
+      })();
     }
     var currentWaitPromise = root._waitingFor;
     return new DexiePromise((resolve, reject) => {
-      promise.then(
-        res => root._waitingQueue.push(wrap(resolve.bind(null, res))),
-        err => root._waitingQueue.push(wrap(reject.bind(null, err)))
-      ).finally(() => {
-        if (root._waitingFor === currentWaitPromise) {
-          // No one added a wait after us. Safe to stop the spinning.
-          root._waitingFor = null;
-        }
-      });
+      promise
+        .then(
+          (res) => root._waitingQueue.push(wrap(resolve.bind(null, res))),
+          (err) => root._waitingQueue.push(wrap(reject.bind(null, err)))
+        )
+        .finally(() => {
+          if (root._waitingFor === currentWaitPromise) {
+            // No one added a wait after us. Safe to stop the spinning.
+            root._waitingFor = null;
+          }
+        });
     });
-  }  
+  }
 
   /** Transaction.abort()
-   * 
+   *
    * https://dexie.org/docs/Transaction/Transaction.abort()
    */
   abort() {
@@ -247,19 +257,24 @@ export class Transaction implements ITransaction {
   }
 
   /** Transaction.table()
-   * 
+   *
    * https://dexie.org/docs/Transaction/Transaction.table()
    */
   table(tableName: string) {
-    const memoizedTables = (this._memoizedTables || (this._memoizedTables = {}));
-    if (hasOwn(memoizedTables, tableName))
-      return memoizedTables[tableName];
+    const memoizedTables = this._memoizedTables || (this._memoizedTables = {});
+    if (hasOwn(memoizedTables, tableName)) return memoizedTables[tableName];
     const tableSchema = this.schema[tableName];
     if (!tableSchema) {
-      throw new exceptions.NotFound("Table " + tableName + " not part of transaction");        
+      throw new exceptions.NotFound(
+        'Table ' + tableName + ' not part of transaction'
+      );
     }
 
-    const transactionBoundTable = new this.db.Table(tableName, tableSchema, this);
+    const transactionBoundTable = new this.db.Table(
+      tableName,
+      tableSchema,
+      this
+    );
     transactionBoundTable.core = this.db.core.table(tableName);
     memoizedTables[tableName] = transactionBoundTable;
     return transactionBoundTable;

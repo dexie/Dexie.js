@@ -6,8 +6,8 @@ export class InvalidLicenseError extends Error {
       license === 'expired'
         ? `License expired`
         : license === 'deactivated'
-        ? `User deactivated`
-        : 'Invalid license'
+          ? `User deactivated`
+          : 'Invalid license'
     );
     if (license) {
       this.license = license;

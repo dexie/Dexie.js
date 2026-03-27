@@ -3,11 +3,11 @@ export const numberTypeDef = {
     replace: (num: number) => {
       switch (true) {
         case isNaN(num):
-          return { $t: "number", v: "NaN" };
+          return { $t: 'number', v: 'NaN' };
         case num === Infinity:
-          return { $t: "number", v: "Infinity" };
+          return { $t: 'number', v: 'Infinity' };
         case num === -Infinity:
-          return { $t: "number", v: "-Infinity" };
+          return { $t: 'number', v: '-Infinity' };
         default:
           return num;
       }

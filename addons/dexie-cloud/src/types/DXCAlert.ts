@@ -1,4 +1,3 @@
-
 export type DXCAlert = DXCErrorAlert | DXCWarningAlert | DXCInfoAlert;
 
 export interface DXCErrorAlert {
@@ -16,7 +15,7 @@ export interface DXCErrorAlert {
     | 'USER_DEACTIVATED'
     | 'WEBHOOK_ERROR';
   message: string;
-  messageParams: { [paramName: string]: string; };
+  messageParams: { [paramName: string]: string };
   /** Optional text that users can copy to clipboard (e.g. a CLI command) */
   copyText?: string;
 }
@@ -25,7 +24,7 @@ export interface DXCWarningAlert {
   type: 'warning';
   messageCode: 'GENERIC_WARNING' | 'LOGOUT_CONFIRMATION';
   message: string;
-  messageParams: { [paramName: string]: string; };
+  messageParams: { [paramName: string]: string };
   /** Optional text that users can copy to clipboard (e.g. a CLI command) */
   copyText?: string;
 }
@@ -34,7 +33,7 @@ export interface DXCInfoAlert {
   type: 'info';
   messageCode: 'GENERIC_INFO' | 'OTP_SENT';
   message: string;
-  messageParams: { [paramName: string]: string; };
+  messageParams: { [paramName: string]: string };
   /** Optional text that users can copy to clipboard (e.g. a CLI command) */
   copyText?: string;
 }

@@ -10,4 +10,3 @@ export function isCachableContext(ctx: LiveQueryContext, table: DBCoreTable) {
     !table.schema.primaryKey.outbound
   );
 }
-

@@ -10,7 +10,7 @@ export function mergePermissions(
     const ret = { ...result } as DBPermissionSet;
     for (const [verb, rights] of Object.entries(next) as [
       keyof DBPermissionSet,
-      DBPermissionSet[keyof DBPermissionSet]
+      DBPermissionSet[keyof DBPermissionSet],
     ][]) {
       if (verb in ret && ret[verb]) {
         if (ret[verb] === '*') continue;
@@ -32,7 +32,7 @@ export function mergePermissions(
           }; // because we've checked that typeof ret[verb] === 'object' and earlier that not ret[verb] === '*'.
           for (const [tableName, tableRights] of Object.entries(rights) as [
             string,
-            string[] | '*'
+            string[] | '*',
           ][]) {
             if (mergedRights[tableName] === '*') continue;
             if (tableRights === '*') {

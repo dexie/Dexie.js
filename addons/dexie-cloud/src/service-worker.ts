@@ -100,7 +100,7 @@ if (!DISABLE_SERVICEWORKER_STRATEGY) {
     console.debug('SW "sync" Event', event.tag);
     const dbName = getDbNameFromTag(event.tag);
     if (dbName) {
-      event.waitUntil(syncDB(dbName, "push")); // The purpose of sync events are "push"
+      event.waitUntil(syncDB(dbName, 'push')); // The purpose of sync events are "push"
     }
   });
 
@@ -108,7 +108,7 @@ if (!DISABLE_SERVICEWORKER_STRATEGY) {
     console.debug('SW "periodicsync" Event', event.tag);
     const dbName = getDbNameFromTag(event.tag);
     if (dbName) {
-      event.waitUntil(syncDB(dbName, "pull")); // The purpose of periodic sync events are "pull"
+      event.waitUntil(syncDB(dbName, 'pull')); // The purpose of periodic sync events are "pull"
     }
   });
 
@@ -119,16 +119,16 @@ if (!DISABLE_SERVICEWORKER_STRATEGY) {
       // Mimic background sync behavior - retry in X minutes on failure.
       // But lesser timeout and more number of times.
       const syncAndRetry = (num = 1) => {
-        return syncDB(dbName, event.data.purpose || "pull").catch(async (e) => {
+        return syncDB(dbName, event.data.purpose || 'pull').catch(async (e) => {
           if (num === 3) throw e;
           await sleep(60_000); // 1 minute
           syncAndRetry(num + 1);
         });
       };
       if ('waitUntil' in event) {
-        event.waitUntil(syncAndRetry().catch(error => console.error(error)));
+        event.waitUntil(syncAndRetry().catch((error) => console.error(error)));
       } else {
-        syncAndRetry().catch(error => console.error(error));
+        syncAndRetry().catch((error) => console.error(error));
       }
     }
   });

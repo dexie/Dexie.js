@@ -1,6 +1,9 @@
-import React, { Component } from "react";
+import React, { Component } from 'react';
 
-export class ErrorBoundary extends Component<React.PropsWithChildren<{}>, { error: any }> {
+export class ErrorBoundary extends Component<
+  React.PropsWithChildren<{}>,
+  { error: any }
+> {
   constructor(props: React.PropsWithChildren<{}>) {
     super(props);
     this.state = { error: null };
@@ -20,8 +23,10 @@ export class ErrorBoundary extends Component<React.PropsWithChildren<{}>, { erro
       return (
         <div id="errorBoundrary">
           <h1>Something went wrong.</h1>
-          <p>{"" + this.state.error}</p>
-          <button id="btnRetry" onClick={()=>this.setState({error: null})}>Retry</button>
+          <p>{'' + this.state.error}</p>
+          <button id="btnRetry" onClick={() => this.setState({ error: null })}>
+            Retry
+          </button>
         </div>
       );
     }

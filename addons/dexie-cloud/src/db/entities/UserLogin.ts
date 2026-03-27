@@ -1,4 +1,4 @@
-import { DXCUserInteraction } from "../../types/DXCUserInteraction";
+import { DXCUserInteraction } from '../../types/DXCUserInteraction';
 
 export interface UserLogin {
   userId?: string;
@@ -6,13 +6,13 @@ export interface UserLogin {
   email?: string;
   claims: {
     [claimName: string]: any;
-  }
+  };
   license?: {
     type: 'demo' | 'eval' | 'prod' | 'client';
     status: 'ok' | 'expired' | 'deactivated';
     validUntil?: Date;
     evalDaysLeft?: number;
-  }
+  };
   lastLogin: Date;
   accessToken?: string;
   accessTokenExpiration?: Date;

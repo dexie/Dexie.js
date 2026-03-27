@@ -1,15 +1,17 @@
 /** Used with pipeline to preserve yielded chunks before they are send to peer.
  * Peer can then decode these chunks using consumeChunkedBinaryStream.
- * 
+ *
  * Why do we need this? In order to guarantee to the consumer that every chunk is a complete
  * message of some kind, and never cut in the middle - no matter the transfer protocol, proxies
  * etc. In HTTP this can be important because a chunked message can be split into multiple chunks
  * by proxies. This function will make sure that the consumer will never see a chunk that is not
  * a complete message.
- * 
- * The source iterable 
+ *
+ * The source iterable
  */
-export async function* produceChunkedBinaryStream(source: AsyncIterable<Uint8Array>) {
+export async function* produceChunkedBinaryStream(
+  source: AsyncIterable<Uint8Array>
+) {
   const HIGH_WATER_MARK = 65535;
   let len = 0;
   let chunks: Uint8Array[] = [];

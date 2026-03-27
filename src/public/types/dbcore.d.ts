@@ -1,13 +1,13 @@
 // For public interface
 
-import { ObservabilitySet } from "./db-events";
-import {ChromeTransactionDurability} from "./dexie-constructor";
+import { ObservabilitySet } from './db-events';
+import { ChromeTransactionDurability } from './dexie-constructor';
 
 export const enum DBCoreRangeType {
   Equal = 1,
   Range = 2,
   Any = 3,
-  Never = 4
+  Never = 4,
 }
 
 export interface DBCoreKeyRange {
@@ -24,14 +24,18 @@ export interface DBCoreTransaction {
 }
 
 interface DbCoreTransactionOptions {
-  durability: ChromeTransactionDurability
+  durability: ChromeTransactionDurability;
 }
 
-export type DBCoreMutateRequest = DBCoreAddRequest | DBCorePutRequest | DBCoreDeleteRequest | DBCoreDeleteRangeRequest;
+export type DBCoreMutateRequest =
+  | DBCoreAddRequest
+  | DBCorePutRequest
+  | DBCoreDeleteRequest
+  | DBCoreDeleteRangeRequest;
 
 export interface DBCoreMutateResponse {
-  numFailures: number,
-  failures: {[operationNumber: number]: Error};
+  numFailures: number;
+  failures: { [operationNumber: number]: Error };
   lastResult: any;
   results?: any[]; // Always present on responses to AddRequest and PutRequest.
 }
@@ -41,7 +45,7 @@ export interface DBCoreAddRequest {
   trans: DBCoreTransaction;
   values: readonly any[];
   keys?: any[];
-  mutatedParts?: ObservabilitySet
+  mutatedParts?: ObservabilitySet;
   /** @deprecated Will always get results since 3.1.0-alpha.5 */
   wantResults?: boolean;
 }
@@ -51,18 +55,18 @@ export interface DBCorePutRequest {
   trans: DBCoreTransaction;
   values: readonly any[];
   keys?: any[];
-  mutatedParts?: ObservabilitySet
+  mutatedParts?: ObservabilitySet;
   upsert?: boolean; // If true, will insert the object if it does not exist. If false, will only update existing objects using the 'updates' property.
   criteria?: {
     index: string | null;
     range: DBCoreKeyRange;
   };
-  changeSpec?: {[keyPath: string]: any}; // Common changeSpec for each key
+  changeSpec?: { [keyPath: string]: any }; // Common changeSpec for each key
   isAdditionalChunk?: boolean;
   updates?: {
-    keys: any[],
-    changeSpecs: {[keyPath: string]: any}[]; // changeSpec per key.  
-  },
+    keys: any[];
+    changeSpecs: { [keyPath: string]: any }[]; // changeSpec per key.
+  };
   /** @deprecated Will always get results since 3.1.0-alpha.5 */
   wantResults?: boolean;
 }
@@ -71,7 +75,7 @@ export interface DBCoreDeleteRequest {
   type: 'delete';
   trans: DBCoreTransaction;
   keys: any[];
-  mutatedParts?: ObservabilitySet
+  mutatedParts?: ObservabilitySet;
   criteria?: {
     index: string | null;
     range: DBCoreKeyRange;
@@ -83,24 +87,24 @@ export interface DBCoreDeleteRangeRequest {
   type: 'deleteRange';
   trans: DBCoreTransaction;
   range: DBCoreKeyRange;
-  mutatedParts?: ObservabilitySet
+  mutatedParts?: ObservabilitySet;
 }
 
 export interface DBCoreGetManyRequest {
   trans: DBCoreTransaction;
   keys: any[];
-  cache?: "immutable" | "clone"
-  obsSet?: ObservabilitySet
+  cache?: 'immutable' | 'clone';
+  obsSet?: ObservabilitySet;
 }
 
 export interface DBCoreGetRequest {
   trans: DBCoreTransaction;
   key: any;
-  obsSet?: ObservabilitySet
+  obsSet?: ObservabilitySet;
 }
 
 export interface DBCoreQuery {
-  index: DBCoreIndex;//keyPath: null | string | string[]; // null represents primary key. string a property, string[] several properties.
+  index: DBCoreIndex; //keyPath: null | string | string[]; // null represents primary key. string a property, string[] several properties.
   range: DBCoreKeyRange;
 }
 
@@ -109,9 +113,8 @@ export interface DBCoreQueryRequest {
   values?: boolean;
   limit?: number;
   query: DBCoreQuery;
-  direction?: "next" | "nextunique" | "prev" | "prevunique";
-  obsSet?: ObservabilitySet
-
+  direction?: 'next' | 'nextunique' | 'prev' | 'prevunique';
+  obsSet?: ObservabilitySet;
 }
 
 export interface DBCoreQueryResponse {
@@ -124,13 +127,13 @@ export interface DBCoreOpenCursorRequest {
   unique?: boolean;
   reverse?: boolean;
   query: DBCoreQuery;
-  obsSet?: ObservabilitySet
+  obsSet?: ObservabilitySet;
 }
 
 export interface DBCoreCountRequest {
   trans: DBCoreTransaction;
   query: DBCoreQuery;
-  obsSet?: ObservabilitySet
+  obsSet?: ObservabilitySet;
 }
 
 export interface DBCoreCursor {
@@ -142,7 +145,7 @@ export interface DBCoreCursor {
   continue(key?: any): void;
   continuePrimaryKey(key: any, primaryKey: any): void;
   advance(count: number): void;
-  start(onNext: ()=>void): Promise<any>
+  start(onNext: () => void): Promise<any>;
   stop(value?: any | Promise<any>): void;
   next(): Promise<DBCoreCursor>;
   fail(error: Error): void;
@@ -156,7 +159,9 @@ export interface DBCoreTableSchema {
   readonly name: string;
   readonly primaryKey: DBCoreIndex;
   readonly indexes: DBCoreIndex[];
-  readonly getIndexByKeyPath: (keyPath: null | string | string[]) => DBCoreIndex | undefined;
+  readonly getIndexByKeyPath: (
+    keyPath: null | string | string[]
+  ) => DBCoreIndex | undefined;
 }
 
 export interface DBCoreIndex {
@@ -165,7 +170,7 @@ export interface DBCoreIndex {
   /** True if this index represents the primary key */
   readonly isPrimaryKey?: boolean;
   /** True if this index represents the primary key and is not inbound (https://dexie.org/docs/inbound) */
-  readonly outbound?: boolean; 
+  readonly outbound?: boolean;
   /** True if and only if keyPath is an array (https://dexie.org/docs/Compound-Index) */
   readonly compound?: boolean;
   /** keyPath, null for primary key, string for single-property indexes, Array<string> for compound indexes */
@@ -182,9 +187,13 @@ export interface DBCoreIndex {
   readonly lowLevelIndex?: DBCoreIndex;
 }
 export interface DBCore {
-  stack: "dbcore";
+  stack: 'dbcore';
   // Transaction and Object Store
-  transaction(stores: string[], mode: 'readonly' | 'readwrite', options?: DbCoreTransactionOptions): DBCoreTransaction;
+  transaction(
+    stores: string[],
+    mode: 'readonly' | 'readwrite',
+    options?: DbCoreTransactionOptions
+  ): DBCoreTransaction;
 
   // Utility methods
   readonly MIN_KEY: any;

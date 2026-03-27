@@ -8,12 +8,15 @@ import { mirror } from '../../functions/chaining-functions';
 
 /** Constructs a Collection instance. */
 export interface CollectionConstructor {
-  new(whereClause?: WhereClause | null, keyRangeGenerator?: () => DBCoreKeyRange): Collection;
+  new (
+    whereClause?: WhereClause | null,
+    keyRangeGenerator?: () => DBCoreKeyRange
+  ): Collection;
   prototype: Collection;
 }
 
 /** Generates a Collection constructor bound to given Dexie instance.
- * 
+ *
  * The purpose of having dynamically created constructors, is to allow
  * addons to extend classes for a certain Dexie instance without affecting
  * other db instances.
@@ -25,15 +28,17 @@ export function createCollectionConstructor(db: Dexie) {
     function Collection(
       this: Collection,
       whereClause?: WhereClause | null,
-      keyRangeGenerator?: () => DBCoreKeyRange)
-    {
+      keyRangeGenerator?: () => DBCoreKeyRange
+    ) {
       this.db = db;
-      let keyRange = AnyRange, error = null;
-      if (keyRangeGenerator) try {
-        keyRange = keyRangeGenerator();
-      } catch (ex) {
-        error = ex;
-      }
+      let keyRange = AnyRange,
+        error = null;
+      if (keyRangeGenerator)
+        try {
+          keyRange = keyRangeGenerator();
+        } catch (ex) {
+          error = ex;
+        }
 
       const whereCtx = whereClause._ctx;
       const table = whereCtx.table;
@@ -41,11 +46,14 @@ export function createCollectionConstructor(db: Dexie) {
       this._ctx = {
         table: table,
         index: whereCtx.index,
-        isPrimKey: (!whereCtx.index || (table.schema.primKey.keyPath && whereCtx.index === table.schema.primKey.name)),
+        isPrimKey:
+          !whereCtx.index ||
+          (table.schema.primKey.keyPath &&
+            whereCtx.index === table.schema.primKey.name),
         range: keyRange,
         keysOnly: false,
-        dir: "next",
-        unique: "",
+        dir: 'next',
+        unique: '',
         algorithm: null,
         filter: null,
         replayFilter: null,
@@ -55,7 +63,7 @@ export function createCollectionConstructor(db: Dexie) {
         limit: Infinity,
         error: error, // If set, any promise must be rejected with this error
         or: whereCtx.or,
-        valueMapper: readingHook !== mirror ? readingHook : null
+        valueMapper: readingHook !== mirror ? readingHook : null,
       };
     }
   );

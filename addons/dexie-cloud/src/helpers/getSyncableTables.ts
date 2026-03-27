@@ -1,10 +1,12 @@
-import { IndexableType, Table } from "dexie";
-import { DexieCloudDB } from "../db/DexieCloudDB";
-import { EntityCommon } from "../db/entities/EntityCommon";
+import { IndexableType, Table } from 'dexie';
+import { DexieCloudDB } from '../db/DexieCloudDB';
+import { EntityCommon } from '../db/entities/EntityCommon';
 
 export function getSyncableTables(db: DexieCloudDB): Table<EntityCommon>[] {
   return Object.entries(db.cloud.schema || {})
     .filter(([, { markedForSync }]) => markedForSync)
-    .map(([tbl]) => db.tables.find(({name}) => name === tbl))
-    .filter((syncableTable): syncableTable is Table<EntityCommon> => !!syncableTable);
+    .map(([tbl]) => db.tables.find(({ name }) => name === tbl))
+    .filter(
+      (syncableTable): syncableTable is Table<EntityCommon> => !!syncableTable
+    );
 }

@@ -1,7 +1,8 @@
 import {
   DBCoreAddRequest,
   DBCoreDeleteRequest,
-  DBCoreIndex, DBCorePutRequest
+  DBCoreIndex,
+  DBCorePutRequest,
 } from 'dexie';
 import { b64LexEncode } from 'dexie-cloud-common';
 
@@ -12,13 +13,13 @@ export function toStringTag(o: Object) {
 
 export function getEffectiveKeys(
   primaryKey: DBCoreIndex,
-  req: (Pick<DBCoreAddRequest | DBCorePutRequest, 'type' | 'values'> & {
-    keys?: any[];
-  }) |
-    Pick<DBCoreDeleteRequest, 'keys' | 'type'>
+  req:
+    | (Pick<DBCoreAddRequest | DBCorePutRequest, 'type' | 'values'> & {
+        keys?: any[];
+      })
+    | Pick<DBCoreDeleteRequest, 'keys' | 'type'>
 ) {
-  if (req.type === 'delete')
-    return req.keys;
+  if (req.type === 'delete') return req.keys;
   return req.keys?.slice() || req.values.map(primaryKey.extractKey!);
 }
 function applyToUpperBitFix(orig: string, bits: number) {
@@ -45,10 +46,8 @@ export function generateTablePrefix(
   while (allPrefixes.has(rv)) {
     if (/\d/g.test(rv)) {
       rv = rv.substr(0, rv.length - 1) + (rv[rv.length - 1] + 1);
-      if (rv.length > 3)
-        rv = rv.substr(0, 3);
-      else
-        continue;
+      if (rv.length > 3) rv = rv.substr(0, 3);
+      else continue;
     } else if (rv.length < 3) {
       rv = rv + '2';
       continue;
@@ -59,8 +58,7 @@ export function generateTablePrefix(
       upperFixed = applyToUpperBitFix(rv, bitFix);
       ++bitFix;
     }
-    if (bitFix < 8)
-      rv = upperFixed;
+    if (bitFix < 8) rv = upperFixed;
     else {
       let nextChar = (rv.charCodeAt(2) + 1) & 127;
       rv = rv.substr(0, 2) + String.fromCharCode(nextChar);

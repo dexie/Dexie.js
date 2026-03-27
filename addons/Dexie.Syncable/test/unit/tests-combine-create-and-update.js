@@ -1,11 +1,9 @@
-import {module, test, deepEqual, ok} from 'QUnit';
+import { module, test, deepEqual, ok } from 'QUnit';
 import combineCreateAndUpdate from '../../src/combine-create-and-update';
 
 module('combineCreateAndUpdate', {
-  setup: () => {
-  },
-  teardown: () => {
-  }
+  setup: () => {},
+  teardown: () => {},
 });
 
 test('should get a create change and update change and return a combined object', () => {

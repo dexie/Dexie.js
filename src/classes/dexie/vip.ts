@@ -1,7 +1,7 @@
 import { newScope } from '../../helpers/promise';
 import { PSD } from '../../helpers/promise';
 
-export function vip (fn) {
+export function vip(fn) {
   // To be used by subscribers to the on('ready') event.
   // This will let caller through to access DB even when it is blocked while the db.ready() subscribers are firing.
   // This would have worked automatically if we were certain that the Provider was using Dexie.Promise for all asyncronic operations. The promise PSD
@@ -15,4 +15,3 @@ export function vip (fn) {
     return fn();
   });
 }
-

@@ -75,9 +75,10 @@ export function useObservable<T, TDefault>(
       }
     }
 
-    if (!monitor.current.hasResult &&
-        typeof window !== 'undefined' // Don't do this in SSR
-       ) {
+    if (
+      !monitor.current.hasResult &&
+      typeof window !== 'undefined' // Don't do this in SSR
+    ) {
       // Optimize for BehaviorSubject and other observables implementing getValue():
       if (typeof observable.hasValue !== 'function' || observable.hasValue()) {
         if (typeof observable.getValue === 'function') {

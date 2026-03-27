@@ -1,10 +1,9 @@
-import { Dexie } from "./classes/dexie";
-import { connections } from "./globals/connections";
-import { debug } from "./helpers/debug";
-import { RangeSet } from "./helpers/rangeset";
-import { bc, createBC } from "./live-query/enable-broadcast";
-import { propagateLocally } from "./live-query/propagate-locally";
-
+import { Dexie } from './classes/dexie';
+import { connections } from './globals/connections';
+import { debug } from './helpers/debug';
+import { RangeSet } from './helpers/rangeset';
+import { bc, createBC } from './live-query/enable-broadcast';
+import { propagateLocally } from './live-query/propagate-locally';
 
 if (typeof addEventListener !== 'undefined') {
   addEventListener('pagehide', (event) => {
@@ -12,7 +11,7 @@ if (typeof addEventListener !== 'undefined') {
       if (debug) console.debug('Dexie: handling persisted pagehide');
       bc?.close();
       for (const db of connections.toArray()) {
-        db.close({disableAutoOpen: false});
+        db.close({ disableAutoOpen: false });
       }
     }
   });
@@ -20,7 +19,7 @@ if (typeof addEventListener !== 'undefined') {
     if (!Dexie.disableBfCache && event.persisted) {
       if (debug) console.debug('Dexie: handling persisted pageshow');
       createBC();
-      propagateLocally({all: new RangeSet(-Infinity, [[]])}); // Trigger all queries to requery
+      propagateLocally({ all: new RangeSet(-Infinity, [[]]) }); // Trigger all queries to requery
     }
   });
 }

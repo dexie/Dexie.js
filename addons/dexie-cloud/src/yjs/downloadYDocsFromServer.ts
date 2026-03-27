@@ -83,17 +83,20 @@ export async function downloadYDocsFromServer(
         currentRealmId &&
         ((currentTable && currentProp && lastDoc) || completedRealm)
       ) {
-        await db.$syncState.update('syncState', (syncState: PersistedSyncState) => {
-          const yDownloadedRealms = syncState.yDownloadedRealms || {};
-          yDownloadedRealms[currentRealmId!] = completedRealm
-            ? '*'
-            : {
-                tbl: currentTable!,
-                prop: currentProp!,
-                key: lastDoc.k!,
-              };
-          syncState.yDownloadedRealms = yDownloadedRealms;
-        });
+        await db.$syncState.update(
+          'syncState',
+          (syncState: PersistedSyncState) => {
+            const yDownloadedRealms = syncState.yDownloadedRealms || {};
+            yDownloadedRealms[currentRealmId!] = completedRealm
+              ? '*'
+              : {
+                  tbl: currentTable!,
+                  prop: currentProp!,
+                  key: lastDoc.k!,
+                };
+            syncState.yDownloadedRealms = yDownloadedRealms;
+          }
+        );
       }
     }
 

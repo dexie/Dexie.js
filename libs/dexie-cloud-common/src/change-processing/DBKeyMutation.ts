@@ -1,18 +1,15 @@
-export type DBKeyMutation =
-  | DBKeyUpsert
-  | DBKeyUpdate
-  | DBKeyDelete;
+export type DBKeyMutation = DBKeyUpsert | DBKeyUpdate | DBKeyDelete;
 
 export interface DBKeyUpsert {
-  type: "ups";
+  type: 'ups';
   val: any;
 }
 
 export interface DBKeyUpdate {
-  type: "upd";
+  type: 'upd';
   mod: { [keyPath: string]: any };
 }
 
 export interface DBKeyDelete {
-  type: "del";
+  type: 'del';
 }

@@ -13,7 +13,7 @@ module.exports = {
     ],
   },
   resolve: {
-    extensions: [ '.tsx', '.ts', '.js' ],
+    extensions: ['.tsx', '.ts', '.js'],
   },
   optimization: {
     //minimize: false // to see a not-minimized output.
@@ -29,19 +29,19 @@ module.exports = {
       commonjs: 'react',
       commonjs2: 'react',
       amd: 'react',
-      root: 'React'
+      root: 'React',
     },
-    "react-dom": {
+    'react-dom': {
       commonjs: 'react-dom',
       commonjs2: 'react-dom',
       amd: 'react-dom',
-      root: 'ReactDOM'
+      root: 'ReactDOM',
     },
     dexie: {
       commonjs: 'dexie',
       commonjs2: 'dexie',
       amd: 'dexie',
-      root: 'Dexie'
-    }
-  }
+      root: 'Dexie',
+    },
+  },
 };

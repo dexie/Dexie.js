@@ -1,20 +1,20 @@
-import { PSD, rejection, newScope } from "../helpers/promise";
-import { DexieOptions } from "../public/types/dexie-constructor";
-import { errnames, exceptions } from "../errors";
-import { nop } from "./chaining-functions";
-import { Transaction } from "../classes/transaction";
+import { PSD, rejection, newScope } from '../helpers/promise';
+import { DexieOptions } from '../public/types/dexie-constructor';
+import { errnames, exceptions } from '../errors';
+import { nop } from './chaining-functions';
+import { Transaction } from '../classes/transaction';
 import { Dexie } from '../classes/dexie';
 
 /* Generate a temporary transaction when db operations are done outside a transaction scope.
-*/
-export function tempTransaction (
+ */
+export function tempTransaction(
   db: Dexie,
   mode: IDBTransactionMode,
   storeNames: string[],
-  fn: (resolve, reject, trans: Transaction) => any)
+  fn: (resolve, reject, trans: Transaction) => any
+) {
   // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
-{
-  if (!db.idbdb || (!db._state.openComplete && (!PSD.letThrough && !db._vip))) {
+  if (!db.idbdb || (!db._state.openComplete && !PSD.letThrough && !db._vip)) {
     if (db._state.openComplete) {
       // db.idbdb is falsy but openComplete is true. Must have been an exception durin open.
       // Don't wait for openComplete as it would lead to infinite loop.
@@ -25,39 +25,53 @@ export function tempTransaction (
         return rejection(new exceptions.DatabaseClosed());
       db.open().catch(nop); // Open in background. If if fails, it will be catched by the final promise anyway.
     }
-    return db._state.dbReadyPromise.then(() => tempTransaction(db, mode, storeNames, fn));
+    return db._state.dbReadyPromise.then(() =>
+      tempTransaction(db, mode, storeNames, fn)
+    );
   } else {
     var trans = db._createTransaction(mode, storeNames, db._dbSchema);
     try {
       trans.create();
       db._state.PR1398_maxLoop = 3;
     } catch (ex) {
-      if (ex.name === errnames.InvalidState && db.isOpen() && --db._state.PR1398_maxLoop > 0) {
+      if (
+        ex.name === errnames.InvalidState &&
+        db.isOpen() &&
+        --db._state.PR1398_maxLoop > 0
+      ) {
         console.warn('Dexie: Need to reopen db');
-        db.close({disableAutoOpen: false});
-        return db.open().then(()=>tempTransaction(db, mode, storeNames, fn));
+        db.close({ disableAutoOpen: false });
+        return db.open().then(() => tempTransaction(db, mode, storeNames, fn));
       }
       return rejection(ex);
     }
-    return trans._promise(mode, (resolve, reject) => {
-      return newScope(() => { // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
-        PSD.trans = trans;
-        return fn(resolve, reject, trans);
-      });
-    }).then(result => {
-      // Instead of resolving value directly, wait with resolving it until transaction has completed.
-      // Otherwise the data would not be in the DB if requesting it in the then() operation.
-      // Specifically, to ensure that the following expression will work:
-      //
-      //   db.friends.put({name: "Arne"}).then(function () {
-      //       db.friends.where("name").equals("Arne").count(function(count) {
-      //           assert (count === 1);
-      //       });
-      //   });
-      //
-      if (mode === 'readwrite') try {trans.idbtrans.commit();} catch {}
-      return mode === 'readonly' ? result : trans._completion.then(() => result);
-    });/*.catch(err => { // Don't do this as of now. If would affect bulk- and modify methods in a way that could be more intuitive. But wait! Maybe change in next major.
+    return trans
+      ._promise(mode, (resolve, reject) => {
+        return newScope(() => {
+          // OPTIMIZATION POSSIBLE? newScope() not needed because it's already done in _promise.
+          PSD.trans = trans;
+          return fn(resolve, reject, trans);
+        });
+      })
+      .then((result) => {
+        // Instead of resolving value directly, wait with resolving it until transaction has completed.
+        // Otherwise the data would not be in the DB if requesting it in the then() operation.
+        // Specifically, to ensure that the following expression will work:
+        //
+        //   db.friends.put({name: "Arne"}).then(function () {
+        //       db.friends.where("name").equals("Arne").count(function(count) {
+        //           assert (count === 1);
+        //       });
+        //   });
+        //
+        if (mode === 'readwrite')
+          try {
+            trans.idbtrans.commit();
+          } catch {}
+        return mode === 'readonly'
+          ? result
+          : trans._completion.then(() => result);
+      }); /*.catch(err => { // Don't do this as of now. If would affect bulk- and modify methods in a way that could be more intuitive. But wait! Maybe change in next major.
           trans._reject(err);
           return rejection(err);
       });*/

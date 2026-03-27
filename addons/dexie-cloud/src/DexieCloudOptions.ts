@@ -11,7 +11,7 @@ export interface DexieCloudOptions {
   databaseUrl: string;
 
   // Whether to require authentication or opt-in to it using db.cloud.login()
-  requireAuth?: boolean | LoginHints
+  requireAuth?: boolean | LoginHints;
 
   // Whether to use service worker. Combine with registering your own service
   // worker and import "dexie-cloud-addon/dist/modern/service-worker.min.js" from it.
@@ -31,7 +31,7 @@ export interface DexieCloudOptions {
 
   unsyncedProperties?: {
     [tableName: string]: string[];
-  }
+  };
 
   // By default Dexie Cloud will suffix the cloud DB ID to your IndexedDB database name
   // in order to ensure that the local database is uniquely tied to the remote one and
@@ -39,7 +39,7 @@ export interface DexieCloudOptions {
   // is not being used anymore.
   //
   // By setting this value to `false`, no suffix will be added to the database name and
-  // instead, it will use the exact name that is specified in the Dexie constructor, 
+  // instead, it will use the exact name that is specified in the Dexie constructor,
   // without a suffix.
   nameSuffix?: boolean;
 
@@ -62,7 +62,7 @@ export interface DexieCloudOptions {
   /** Enable social/OAuth authentication.
    * - true (default): Fetch providers from server, show if available
    * - false: Disable OAuth, always use OTP flow
-   * 
+   *
    * Use `false` for backward compatibility if your custom login UI
    * doesn't handle the `DXCSelect` interaction type yet.
    */
@@ -70,7 +70,7 @@ export interface DexieCloudOptions {
 
   /** Redirect URI for OAuth callback.
    * Defaults to window.location.href for web SPAs.
-   * 
+   *
    * For Capacitor/native apps, set this to a custom URL scheme:
    * ```
    * oauthRedirectUri: 'myapp://'
@@ -79,24 +79,24 @@ export interface DexieCloudOptions {
   oauthRedirectUri?: string;
 
   /** How to handle blob downloads from cloud storage.
-   * 
+   *
    * - 'eager' (default): Download blobs in background immediately after sync.
    *   Best for offline-first apps that need all data available offline ASAP.
-   * 
+   *
    * - 'lazy': Download blobs on-demand when accessed.
    *   Best for apps with large media that may not all be needed offline.
    */
   blobMode?: 'eager' | 'lazy';
 
   /** Maximum string length (in characters) before offloading to blob storage during sync.
-   * 
+   *
    * Strings longer than this threshold are uploaded as blobs during sync,
    * reducing sync payload size. The original string is kept intact in IndexedDB.
-   * 
+   *
    * Set to `Infinity` to disable string offloading.
    * Minimum value is 100 to prevent accidental offloading of primary keys.
    * Maximum value is 32768 (server limit).
-   * 
+   *
    * @default 32768
    */
   maxStringLength?: number;

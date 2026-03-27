@@ -7,7 +7,10 @@ import { cache } from './cache';
 let unsignaledParts: ObservabilitySet = {};
 let isTaskEnqueued = false;
 
-export function signalSubscribersLazily(part: ObservabilitySet, optimistic = false) {
+export function signalSubscribersLazily(
+  part: ObservabilitySet,
+  optimistic = false
+) {
   extendObservabilitySet(unsignaledParts, part);
   if (!isTaskEnqueued) {
     isTaskEnqueued = true;

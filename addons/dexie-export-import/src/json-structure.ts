@@ -12,7 +12,7 @@ export interface DexieExportJsonMeta {
       schema: string;
       rowCount: number;
     }>;
-  }
+  };
 }
 
 export interface DexieExportJsonStructure extends DexieExportJsonMeta {
@@ -31,8 +31,8 @@ export interface DexieExportJsonStructure extends DexieExportJsonMeta {
       inbound: boolean;
       rows: any[];
     }>;
-  }
+  };
 }
 
-export type DexieExportedDatabase = DexieExportJsonStructure["data"];
-export type DexieExportedTable = DexieExportedDatabase["data"][number];
+export type DexieExportedDatabase = DexieExportJsonStructure['data'];
+export type DexieExportedTable = DexieExportedDatabase['data'][number];

@@ -1,6 +1,6 @@
 import Dexie from 'dexie';
 
-import {CREATE} from '../change_types';
+import { CREATE } from '../change_types';
 
 export default function initCreatingHook(db, table) {
   return function creatingHook(primKey, obj, trans) {
@@ -18,7 +18,7 @@ export default function initCreatingHook(db, table) {
       table: table.name,
       key: primKey === undefined ? null : primKey,
       type: CREATE,
-      obj: obj
+      obj: obj,
     };
 
     var promise = db._changes.add(change).then(function (rev) {

@@ -36,7 +36,8 @@ export async function* consumeChunkedBinaryStream(
             sizeBufPos === 4
               ? new DataView(sizeBuf.buffer, 0, 4).getUint32(0, false)
               : dw.getUint32(pos, false);
-          if (sizeBufPos) sizeBufPos = 0; // in this case pos is already forwarded
+          if (sizeBufPos)
+            sizeBufPos = 0; // in this case pos is already forwarded
           else pos += 4; // else pos is not yet forwarded - that's why we do it now
         // Intentional fall-through...
         case 2:
@@ -47,12 +48,14 @@ export async function* consumeChunkedBinaryStream(
           }
           if (pos + len > chunk.byteLength) {
             bufs.push(chunk.slice(pos));
-            len -= (chunk.byteLength - pos);
+            len -= chunk.byteLength - pos;
             state = 2;
             pos = chunk.byteLength; // will break while loop.
           } else {
             if (bufs.length > 0) {
-              const concats = new Uint8Array(bufs.reduce((p,c) => p + c.byteLength, len));
+              const concats = new Uint8Array(
+                bufs.reduce((p, c) => p + c.byteLength, len)
+              );
               let p = 0;
               for (const buf of bufs) {
                 concats.set(buf, p);

@@ -29,19 +29,21 @@ describe('TypesonSimplified', () => {
       expect(TSON.stringify(null)).toBe('null');
       expect(TSON.parse('null')).toBeNull();
       const objWithNullValue = { foo: null };
-      expect(TSON.stringify(objWithNullValue)).toBe(JSON.stringify(objWithNullValue));
+      expect(TSON.stringify(objWithNullValue)).toBe(
+        JSON.stringify(objWithNullValue)
+      );
       expect(TSON.parse(TSON.stringify(null))).toBe(null);
     });
 
     test('stringifies plain objects same as JSON', () => {
-      const plainObject = { foo: "bar" };
+      const plainObject = { foo: 'bar' };
       const tson = TSON.stringify(plainObject);
       expect(tson).toBe(JSON.stringify(plainObject));
       expect(TSON.parse(tson)).toStrictEqual(plainObject);
     });
 
     test('stringifies plain arrays same as JSON', () => {
-      const plainArray = [{ foo: "bar" }, 5, "dfd"];
+      const plainArray = [{ foo: 'bar' }, 5, 'dfd'];
       const tson = TSON.stringify(plainArray);
       expect(tson).toBe(JSON.stringify(plainArray));
       expect(TSON.parse(tson)).toStrictEqual(plainArray);
@@ -57,23 +59,23 @@ describe('TypesonSimplified', () => {
     test('should not stringify undefined in objects (default behavior)', () => {
       // Without undefined type def, undefined properties are omitted (like JSON)
       expect(TSON.stringify({ foo: null, bar: undefined })).toBe(
-        JSON.stringify({ foo: null }),
+        JSON.stringify({ foo: null })
       );
     });
   });
 
   describe('$ escaping', () => {
     test('escapes props named $t', () => {
-      const input = { $t: "fakeType" };
+      const input = { $t: 'fakeType' };
       const tson = TSON.stringify(input);
-      expect(tson).toBe(JSON.stringify({ $$t: "fakeType" }));
+      expect(tson).toBe(JSON.stringify({ $$t: 'fakeType' }));
       expect(TSON.parse(tson)).toStrictEqual(input);
     });
 
     test('escapes props starting with $', () => {
-      const tson = TSON.stringify({ $hello: "world" });
-      expect(tson).toBe(JSON.stringify({ $$hello: "world" }));
-      expect(TSON.parse(tson)).toStrictEqual({ $hello: "world" });
+      const tson = TSON.stringify({ $hello: 'world' });
+      expect(tson).toBe(JSON.stringify({ $$hello: 'world' }));
+      expect(TSON.parse(tson)).toStrictEqual({ $hello: 'world' });
     });
 
     test('escapes props named $', () => {
@@ -102,14 +104,16 @@ describe('TypesonSimplified', () => {
     test('handles epoch date', () => {
       const date = new Date(0);
       const tson = TSON.stringify(date);
-      expect(tson).toBe(JSON.stringify({ $t: "Date", v: "1970-01-01T00:00:00.000Z" }));
+      expect(tson).toBe(
+        JSON.stringify({ $t: 'Date', v: '1970-01-01T00:00:00.000Z' })
+      );
       expect(TSON.parse(tson)).toStrictEqual(date);
     });
 
     test('handles invalid Date', () => {
       const invalidDate = new Date(NaN);
       const tson = TSON.stringify(invalidDate);
-      expect(tson).toBe(JSON.stringify({ $t: "Date", v: "NaN" }));
+      expect(tson).toBe(JSON.stringify({ $t: 'Date', v: 'NaN' }));
       expect(TSON.parse(tson).getTime()).toBeNaN();
     });
 
@@ -176,7 +180,7 @@ describe('TypesonSimplified', () => {
           { $t: 'bigint', v: '-1' },
           { $t: 'bigint', v: '16' },
           { $t: 'bigint', v: '53169852434298556854127064950' },
-        ]),
+        ])
       );
     });
   });
@@ -244,13 +248,13 @@ describe('TypesonSimplified', () => {
 
     test('handles Map with nested special types', () => {
       const m = new Map<string, { foo: Array<number> }>();
-      m.set("foo", { foo: [1, 2, 3, Infinity] });
+      m.set('foo', { foo: [1, 2, 3, Infinity] });
       const tson = TSON.stringify(m);
       expect(tson).toBe(
         JSON.stringify({
-          $t: "Map",
-          v: [["foo", { foo: [1, 2, 3, { $t: "number", v: "Infinity" }] }]],
-        }),
+          $t: 'Map',
+          v: [['foo', { foo: [1, 2, 3, { $t: 'number', v: 'Infinity' }] }]],
+        })
       );
       expect(TSON.parse(tson)).toStrictEqual(m);
     });
@@ -327,7 +331,11 @@ describe('TypesonSimplified', () => {
     });
 
     test('round-trips BigInt64Array', () => {
-      const arr = new BigInt64Array([BigInt('-9223372036854775808'), BigInt(0), BigInt('9223372036854775807')]);
+      const arr = new BigInt64Array([
+        BigInt('-9223372036854775808'),
+        BigInt(0),
+        BigInt('9223372036854775807'),
+      ]);
       const result = TSON.parse(TSON.stringify(arr));
       expect(result).toBeInstanceOf(BigInt64Array);
       expect(result[0]).toBe(BigInt('-9223372036854775808'));
@@ -335,7 +343,10 @@ describe('TypesonSimplified', () => {
     });
 
     test('round-trips BigUint64Array', () => {
-      const arr = new BigUint64Array([BigInt(0), BigInt('18446744073709551615')]);
+      const arr = new BigUint64Array([
+        BigInt(0),
+        BigInt('18446744073709551615'),
+      ]);
       const result = TSON.parse(TSON.stringify(arr));
       expect(result).toBeInstanceOf(BigUint64Array);
       expect(result[0]).toBe(BigInt(0));
@@ -450,7 +461,12 @@ describe('TypesonSimplified', () => {
     });
 
     test('POJO with $t: "Blob" (BlobRef format) is NOT revived as Blob', () => {
-      const input = { $t: 'Blob', ref: '1:abc123', size: 8192, ct: 'image/png' };
+      const input = {
+        $t: 'Blob',
+        ref: '1:abc123',
+        size: 8192,
+        ct: 'image/png',
+      };
       const result = TSON.parse(TSON.stringify(input));
       expect(result).toStrictEqual(input);
     });
@@ -472,7 +488,7 @@ describe('TypesonSimplified', () => {
       // A real Uint8Array serialized by TSON, then passed through TSON again as a POJO
       const arr = new Uint8Array([1, 2, 3]);
       const tson1 = TSON.stringify(arr); // produces {"$t":"Uint8Array","$v":"AQID"}
-      const pojo = JSON.parse(tson1);     // plain POJO: {$t: "Uint8Array", $v: "AQID"}
+      const pojo = JSON.parse(tson1); // plain POJO: {$t: "Uint8Array", $v: "AQID"}
       // Now this POJO goes through TSON (simulating server→client scenario)
       const tson2 = TSON.stringify(pojo);
       const result = TSON.parse(tson2);

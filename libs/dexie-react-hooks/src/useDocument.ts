@@ -10,13 +10,15 @@ type DexieYProvider = import('y-dexie').DexieYProvider;
 type DexieYProviderConstructor = typeof import('y-dexie').DexieYProvider;
 type YDoc = import('yjs').Doc;
 
-const gracePeriod = 100 // 100 ms = grace period to optimize for unload/reload scenarios
+const gracePeriod = 100; // 100 ms = grace period to optimize for unload/reload scenarios
 
-const fr = typeof FinalizationRegistry !== 'undefined' && new FinalizationRegistry((doc: YDoc) => {
-  // If coming here, react effect never ran. This is a fallback cleanup mechanism.
-  const DexieYProvider = Dexie['DexieYProvider'] as DexieYProviderConstructor;
-  if (DexieYProvider) DexieYProvider.release(doc);
-});
+const fr =
+  typeof FinalizationRegistry !== 'undefined' &&
+  new FinalizationRegistry((doc: YDoc) => {
+    // If coming here, react effect never ran. This is a fallback cleanup mechanism.
+    const DexieYProvider = Dexie['DexieYProvider'] as DexieYProviderConstructor;
+    if (DexieYProvider) DexieYProvider.release(doc);
+  });
 
 export function useDocument(
   doc: YDoc | null | undefined
@@ -25,7 +27,9 @@ export function useDocument(
   const providerRef = React.useRef<DexieYProvider | null>(null);
   const DexieYProvider = Dexie['DexieYProvider'] as DexieYProviderConstructor;
   if (!DexieYProvider) {
-    throw new Error('DexieYProvider is not available. Make sure `y-dexie` is installed and imported.');
+    throw new Error(
+      'DexieYProvider is not available. Make sure `y-dexie` is installed and imported.'
+    );
   }
   let unregisterToken: object | undefined = undefined;
   if (doc) {
@@ -52,12 +56,14 @@ export function useDocument(
       if (provider) {
         return () => {
           DexieYProvider.release(doc);
-        }
+        };
       } else {
         // Maybe the doc was destroyed in the meantime.
         // Can not happen if React and FinalizationRegistry works as we expect them to.
         // Except if a user had called DexieYProvider.release() on the doc
-        throw new Error(`FATAL. DexieYProvider.release() has been called somewhere in application code, making us lose the document.`);
+        throw new Error(
+          `FATAL. DexieYProvider.release() has been called somewhere in application code, making us lose the document.`
+        );
       }
     }
   }, [doc, unregisterToken]);

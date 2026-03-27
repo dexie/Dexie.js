@@ -9,7 +9,7 @@ export interface JsonStream<T> {
   result: Partial<T>;
 }
 
-export function JsonStream<T>(blob: Blob):  JsonStream<T> {
+export function JsonStream<T>(blob: Blob): JsonStream<T> {
   let pos = 0;
   const parser = JsonParser(true);
   // Use TextDecoder in streaming mode so that multi-byte UTF-8 sequences
@@ -43,14 +43,13 @@ export function JsonStream<T>(blob: Blob):  JsonStream<T> {
     eof() {
       return pos >= blob.size;
     },
-    result: {}
-  }
+    result: {},
+  };
 
   return rv;
 }
 
-
-export function JsonParser (allowPartial: boolean) {
+export function JsonParser(allowPartial: boolean) {
   const parser = (clarinet as any).parser();
   let level = 0;
   let result: any;
@@ -60,12 +59,12 @@ export function JsonParser (allowPartial: boolean) {
   let done = false;
   let array = false;
 
-  parser.onopenobject = newKey => {
+  parser.onopenobject = (newKey) => {
     const newObj = {};
     (newObj as any).incomplete = true;
     if (!result) result = newObj;
     if (obj) {
-      stack.push([key,obj,array])
+      stack.push([key, obj, array]);
       if (allowPartial) {
         if (array) {
           obj.push(newObj);
@@ -78,10 +77,10 @@ export function JsonParser (allowPartial: boolean) {
     key = newKey;
     array = false;
     ++level;
-  }
-  parser.onkey = newKey => key = newKey;
-  parser.onvalue = value => array ? obj.push(value) : obj[key!] = value;
-  parser.oncloseobject = ()=>{
+  };
+  parser.onkey = (newKey) => (key = newKey);
+  parser.onvalue = (value) => (array ? obj.push(value) : (obj[key!] = value));
+  parser.oncloseobject = () => {
     delete obj.incomplete;
     key = null;
     if (--level === 0) {
@@ -97,13 +96,13 @@ export function JsonParser (allowPartial: boolean) {
         }
       }
     }
-  }
+  };
   parser.onopenarray = () => {
     const newObj = [];
     (newObj as any).incomplete = true;
     if (!result) result = newObj;
     if (obj) {
-      stack.push([key,obj,array])
+      stack.push([key, obj, array]);
       if (allowPartial) {
         if (array) {
           obj.push(newObj);
@@ -116,7 +115,7 @@ export function JsonParser (allowPartial: boolean) {
     array = true;
     key = null;
     ++level;
-  }
+  };
   parser.onclosearray = () => {
     delete obj.incomplete;
     key = null;
@@ -133,7 +132,7 @@ export function JsonParser (allowPartial: boolean) {
         }
       }
     }
-  }
+  };
 
   return {
     write(jsonPart: string) {
@@ -142,6 +141,6 @@ export function JsonParser (allowPartial: boolean) {
     },
     done() {
       return done;
-    }
-  }
+    },
+  };
 }

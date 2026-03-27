@@ -7,10 +7,13 @@ import { DexieCloudDB } from '../db/DexieCloudDB';
 let syncRatelimitDelays = new WeakMap<DexieCloudDB, Date>();
 
 export async function checkSyncRateLimitDelay(db: DexieCloudDB) {
-  const delatMilliseconds = (syncRatelimitDelays.get(db)?.getTime() ?? 0) - Date.now();
+  const delatMilliseconds =
+    (syncRatelimitDelays.get(db)?.getTime() ?? 0) - Date.now();
   if (delatMilliseconds > 0) {
-    console.debug(`Stalling sync request ${delatMilliseconds} ms to spare ratelimits`);
-    await new Promise(resolve => setTimeout(resolve, delatMilliseconds));
+    console.debug(
+      `Stalling sync request ${delatMilliseconds} ms to spare ratelimits`
+    );
+    await new Promise((resolve) => setTimeout(resolve, delatMilliseconds));
   }
 }
 

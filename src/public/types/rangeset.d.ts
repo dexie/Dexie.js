@@ -1,4 +1,4 @@
-import { IndexableType } from "./indexable-type";
+import { IndexableType } from './indexable-type';
 
 export type IntervalTree = IntervalTreeNode | EmptyRange;
 export interface IntervalTreeNode {
@@ -9,15 +9,21 @@ export interface IntervalTreeNode {
   d: number; // depth
 }
 export interface EmptyRange {
-  d: 0
+  d: 0;
 }
 
 export interface RangeSetPrototype {
-  add(rangeSet: IntervalTree | {from: IndexableType, to: IndexableType}): RangeSet;
+  add(
+    rangeSet: IntervalTree | { from: IndexableType; to: IndexableType }
+  ): RangeSet;
   addKey(key: IndexableType): RangeSet;
   addKeys(keys: IndexableType[]): RangeSet;
   hasKey(key: IndexableType): boolean;
-  [Symbol.iterator](): Iterator<IntervalTreeNode, undefined, IndexableType | undefined>;
+  [Symbol.iterator](): Iterator<
+    IntervalTreeNode,
+    undefined,
+    IndexableType | undefined
+  >;
 }
 
 export type RangeSet = RangeSetPrototype & IntervalTree;

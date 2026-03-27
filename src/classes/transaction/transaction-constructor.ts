@@ -5,18 +5,19 @@ import { DbSchema } from '../../public/types/db-schema';
 import Events from '../../helpers/Events';
 import Promise, { rejection } from '../../helpers/promise';
 
-export interface TransactionConstructor<T extends Transaction=Transaction> {
+export interface TransactionConstructor<T extends Transaction = Transaction> {
   new (
     mode: IDBTransactionMode,
     storeNames: string[],
     dbschema: DbSchema,
     chromeTransactionDurability: IDBTransactionDurability,
-    parent?: Transaction) : T;
+    parent?: Transaction
+  ): T;
   prototype: T;
 }
 
 /** Generates a Transaction constructor bound to given Dexie instance.
- * 
+ *
  * The purpose of having dynamically created constructors, is to allow
  * addons to extend classes for a certain Dexie instance without affecting
  * other db instances.
@@ -24,19 +25,21 @@ export interface TransactionConstructor<T extends Transaction=Transaction> {
 export function createTransactionConstructor(db: Dexie) {
   return makeClassConstructor<TransactionConstructor<Transaction>>(
     Transaction.prototype,
-    function Transaction (
+    function Transaction(
       this: Transaction,
       mode: IDBTransactionMode,
       storeNames: string[],
       dbschema: DbSchema,
       chromeTransactionDurability: IDBTransactionDurability,
-      parent?: Transaction)
-    {
-      if (mode !== 'readonly') storeNames.forEach(storeName => {
-        // Uncollapse storeName to include Y update tables in case deletion of a record - then we must also delete its Y updates.
-        const yProps = dbschema[storeName]?.yProps;
-        if (yProps) storeNames = storeNames.concat(yProps.map(p => p.updatesTable));
-      });
+      parent?: Transaction
+    ) {
+      if (mode !== 'readonly')
+        storeNames.forEach((storeName) => {
+          // Uncollapse storeName to include Y update tables in case deletion of a record - then we must also delete its Y updates.
+          const yProps = dbschema[storeName]?.yProps;
+          if (yProps)
+            storeNames = storeNames.concat(yProps.map((p) => p.updatesTable));
+        });
 
       this.db = db;
       this.mode = mode;
@@ -44,7 +47,7 @@ export function createTransactionConstructor(db: Dexie) {
       this.schema = dbschema;
       this.chromeTransactionDurability = chromeTransactionDurability;
       this.idbtrans = null;
-      this.on = Events(this, "complete", "error", "abort");
+      this.on = Events(this, 'complete', 'error', 'abort');
       this.parent = parent || null;
       this.active = true;
       this._reculock = 0;
@@ -54,25 +57,26 @@ export function createTransactionConstructor(db: Dexie) {
       this._waitingFor = null;
       this._waitingQueue = null;
       this._spinCount = 0; // Just for debugging waitFor()
-      this._completion = new Promise ((resolve, reject) => {
-          this._resolve = resolve;
-          this._reject = reject;
+      this._completion = new Promise((resolve, reject) => {
+        this._resolve = resolve;
+        this._reject = reject;
       });
-      
+
       this._completion.then(
-          ()=> {
-              this.active = false;
-              this.on.complete.fire();
-          },
-          e => {
-              var wasActive = this.active;
-              this.active = false;
-              this.on.error.fire(e);
-              this.parent ?
-                  this.parent._reject(e) :
-                  wasActive && this.idbtrans && this.idbtrans.abort();
-              return rejection(e); // Indicate we actually DO NOT catch this error.
-          });
-    
-    });
+        () => {
+          this.active = false;
+          this.on.complete.fire();
+        },
+        (e) => {
+          var wasActive = this.active;
+          this.active = false;
+          this.on.error.fire(e);
+          this.parent
+            ? this.parent._reject(e)
+            : wasActive && this.idbtrans && this.idbtrans.abort();
+          return rejection(e); // Indicate we actually DO NOT catch this error.
+        }
+      );
+    }
+  );
 }

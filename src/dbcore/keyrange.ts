@@ -5,13 +5,13 @@ export const AnyRange: DBCoreKeyRange = {
   lower: -Infinity,
   lowerOpen: false,
   upper: [[]],
-  upperOpen: false
-}
+  upperOpen: false,
+};
 
 export const NeverRange: DBCoreKeyRange = {
   type: DBCoreRangeType.Never,
   lower: -Infinity,
   lowerOpen: true,
   upper: -Infinity,
-  upperOpen: true
-}
+  upperOpen: true,
+};

@@ -13,13 +13,21 @@ import { DBCore } from './dbcore';
 import { Middleware, DexieStacks } from './middleware';
 
 export type TableProp<DX> = {
-  [K in keyof DX]: DX[K] extends {schema: any, get: any, put: any, add: any, where: any} ? K : never;
-}[keyof DX] & string;
+  [K in keyof DX]: DX[K] extends {
+    schema: any;
+    get: any;
+    put: any;
+    add: any;
+    where: any;
+  }
+    ? K
+    : never;
+}[keyof DX] &
+  string;
 
 type TXWithTables<DX extends Dexie> = Dexie extends DX
-? Transaction // If not subclassed, just expect a Transaction without table props
-: Transaction & { [P in TableProp<DX>]: DX[P] };
-
+  ? Transaction // If not subclassed, just expect a Transaction without table props
+  : Transaction & { [P in TableProp<DX>]: DX[P] };
 
 export interface Dexie {
   readonly name: string;
@@ -52,14 +60,14 @@ export interface Dexie {
 
   open(): PromiseExtended<Dexie>;
 
-  table<T = any, TKey = IndexableType, TInsertType=T>(tableName: string): Table<T, TKey, TInsertType>;
+  table<T = any, TKey = IndexableType, TInsertType = T>(
+    tableName: string
+  ): Table<T, TKey, TInsertType>;
 
   transaction<U>(
     mode: TransactionMode,
     tables: readonly (string | Table)[],
-    scope: (
-      trans: TXWithTables<this>
-    ) => PromiseLike<U> | U
+    scope: (trans: TXWithTables<this>) => PromiseLike<U> | U
   ): PromiseExtended<U>;
 
   transaction<U>(
@@ -96,10 +104,10 @@ export interface Dexie {
     table5: string | Table,
     scope: (trans: TXWithTables<this>) => PromiseLike<U> | U
   ): PromiseExtended<U>;
-  
-  close(closeOptions?: {disableAutoOpen: boolean}): void;
 
-  delete(closeOptions?: {disableAutoOpen: boolean}): PromiseExtended<void>;
+  close(closeOptions?: { disableAutoOpen: boolean }): void;
+
+  delete(closeOptions?: { disableAutoOpen: boolean }): PromiseExtended<void>;
 
   isOpen(): boolean;
 

@@ -1,16 +1,19 @@
-
 import Dexie from 'dexie';
 import { getSchemaString, extractDbSchema } from './helpers';
 import { DexieExportedTable, DexieExportJsonStructure } from './json-structure';
 import { TSON } from './tson';
 
 export interface ExportOptions {
-  skipTables?: string[],
+  skipTables?: string[];
   noTransaction?: boolean;
   numRowsPerChunk?: number;
   prettyJson?: boolean;
   filter?: (table: string, value: any, key?: any) => boolean;
-  transform?: (table: string, value: any, key?: any) => ({value: any, key?: any});
+  transform?: (
+    table: string,
+    value: any,
+    key?: any
+  ) => { value: any; key?: any };
   progressCallback?: (progress: ExportProgress) => boolean;
 }
 
@@ -24,35 +27,38 @@ export interface ExportProgress {
 
 const DEFAULT_ROWS_PER_CHUNK = 2000;
 
-export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob> {
+export async function exportDB(
+  db: Dexie,
+  options?: ExportOptions
+): Promise<Blob> {
   options = options || {};
-  const skipTables = options.skipTables? options.skipTables: []
-  const targetTables = db.tables.filter((x)=> !skipTables.includes(x.name))
+  const skipTables = options.skipTables ? options.skipTables : [];
+  const targetTables = db.tables.filter((x) => !skipTables.includes(x.name));
   const slices: (string | Blob)[] = [];
-  const tables = targetTables.map(table => ({
+  const tables = targetTables.map((table) => ({
     name: table.name,
     schema: getSchemaString(table),
-    rowCount: 0
+    rowCount: 0,
   }));
-  const {prettyJson} = options!;
+  const { prettyJson } = options!;
   const emptyExport: DexieExportJsonStructure = {
-    formatName: "dexie",
+    formatName: 'dexie',
     formatVersion: 1,
     data: {
       databaseName: db.name,
       databaseVersion: db.verno,
       tables: tables,
-      data: []
-    }
+      data: [],
+    },
   };
-  
-  const {progressCallback} = options!;
+
+  const { progressCallback } = options!;
   const progress: ExportProgress = {
     done: false,
     completedRows: 0,
     completedTables: 0,
     totalRows: NaN,
-    totalTables: tables.length
+    totalTables: tables.length,
   };
 
   try {
@@ -65,16 +71,22 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
     TSON.finalize(); // Free up mem if error has occurred
   }
 
-  return new Blob(slices,{type: "text/json"});
+  return new Blob(slices, { type: 'text/json' });
 
   async function exportAll() {
     // Count rows:
-    const tablesRowCounts = await Promise.all(targetTables.map(table => table.count()));
-    tablesRowCounts.forEach((rowCount, i) => tables[i].rowCount = rowCount);
-    progress.totalRows = tablesRowCounts.reduce((p,c)=>p+c);
+    const tablesRowCounts = await Promise.all(
+      targetTables.map((table) => table.count())
+    );
+    tablesRowCounts.forEach((rowCount, i) => (tables[i].rowCount = rowCount));
+    progress.totalRows = tablesRowCounts.reduce((p, c) => p + c);
 
     // Write first JSON slice
-    const emptyExportJson = JSON.stringify(emptyExport, undefined, prettyJson ? 2 : undefined);
+    const emptyExportJson = JSON.stringify(
+      emptyExport,
+      undefined,
+      prettyJson ? 2 : undefined
+    );
     const posEndDataArray = emptyExportJson.lastIndexOf(']');
     const firstJsonSlice = emptyExportJson.substring(0, posEndDataArray);
     slices.push(firstJsonSlice);
@@ -82,21 +94,27 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
     const filter = options!.filter;
     const transform = options!.transform;
 
-    for (const {name: tableName} of tables) {
+    for (const { name: tableName } of tables) {
       const table = db.table(tableName);
-      const {primKey} = table.schema;
+      const { primKey } = table.schema;
       const inbound = !!primKey.keyPath;
       const LIMIT = options!.numRowsPerChunk || DEFAULT_ROWS_PER_CHUNK;
-      const emptyTableExport: DexieExportedTable = inbound ? {
-        tableName: table.name,
-        inbound: true,
-        rows: []
-      } : {
-        tableName: table.name,
-        inbound: false,
-        rows: []
-      };
-      let emptyTableExportJson = JSON.stringify(emptyTableExport, undefined, prettyJson ? 2 : undefined);
+      const emptyTableExport: DexieExportedTable = inbound
+        ? {
+            tableName: table.name,
+            inbound: true,
+            rows: [],
+          }
+        : {
+            tableName: table.name,
+            inbound: false,
+            rows: [],
+          };
+      let emptyTableExportJson = JSON.stringify(
+        emptyTableExport,
+        undefined,
+        prettyJson ? 2 : undefined
+      );
       if (prettyJson) {
         // Increase indentation according to this:
         // {
@@ -105,7 +123,7 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
         //     ...
         //     data: [
         // 123456<---- here
-        //     ] 
+        //     ]
         //   ]
         // }
         emptyTableExportJson = emptyTableExportJson.split('\n').join('\n    ');
@@ -118,11 +136,12 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
       while (mayHaveMoreRows) {
         if (progressCallback) {
           // Keep ongoing transaction private
-          Dexie.ignoreTransaction(()=>progressCallback(progress));
+          Dexie.ignoreTransaction(() => progressCallback(progress));
         }
-        const chunkedCollection = lastKey == null ?
-          table.limit(LIMIT) :
-          table.where(':id').above(lastKey).limit(LIMIT);
+        const chunkedCollection =
+          lastKey == null
+            ? table.limit(LIMIT)
+            : table.where(':id').above(lastKey).limit(LIMIT);
 
         const values = await chunkedCollection.toArray();
 
@@ -130,76 +149,92 @@ export async function exportDB(db: Dexie, options?: ExportOptions): Promise<Blob
 
         if (lastKey != null && lastNumRows > 0) {
           // Not initial chunk. Must add a comma:
-          slices.push(",");
+          slices.push(',');
           if (prettyJson) {
-            slices.push("\n      ");
+            slices.push('\n      ');
           }
         }
 
         mayHaveMoreRows = values.length === LIMIT;
-        
+
         if (inbound) {
-          const filteredValues = filter ?
-            values.filter(value => filter(tableName, value)) :
-            values;
+          const filteredValues = filter
+            ? values.filter((value) => filter(tableName, value))
+            : values;
 
-          const transformedValues = transform ?
-            filteredValues.map(value => transform(tableName, value).value) :
-            filteredValues;
+          const transformedValues = transform
+            ? filteredValues.map((value) => transform(tableName, value).value)
+            : filteredValues;
 
-          const tsonValues = transformedValues.map(value => TSON.encapsulate(value));
+          const tsonValues = transformedValues.map((value) =>
+            TSON.encapsulate(value)
+          );
           if (TSON.mustFinalize()) {
             await Dexie.waitFor(TSON.finalize(tsonValues));
           }
 
-          let json = JSON.stringify(tsonValues, undefined, prettyJson ? 2 : undefined);
+          let json = JSON.stringify(
+            tsonValues,
+            undefined,
+            prettyJson ? 2 : undefined
+          );
           if (prettyJson) json = json.split('\n').join('\n      ');
 
           // By generating a blob here, we give web platform the opportunity to store the contents
           // on disk and release RAM.
           slices.push(new Blob([json.substring(1, json.length - 1)]));
           lastNumRows = transformedValues.length;
-          lastKey = values.length > 0 ?
-            Dexie.getByKeyPath(values[values.length -1], primKey.keyPath as string) :
-            null;
+          lastKey =
+            values.length > 0
+              ? Dexie.getByKeyPath(
+                  values[values.length - 1],
+                  primKey.keyPath as string
+                )
+              : null;
         } else {
           const keys = await chunkedCollection.primaryKeys();
           let keyvals = keys.map((key, i) => [key, values[i]]);
-          if (filter) keyvals = keyvals.filter(([key, value]) => filter(tableName, value, key));
-          if (transform) keyvals = keyvals.map(([key, value]) => {
-            const transformResult = transform(tableName, value, key);
-            return [transformResult.key, transformResult.value];
-          });
+          if (filter)
+            keyvals = keyvals.filter(([key, value]) =>
+              filter(tableName, value, key)
+            );
+          if (transform)
+            keyvals = keyvals.map(([key, value]) => {
+              const transformResult = transform(tableName, value, key);
+              return [transformResult.key, transformResult.value];
+            });
 
-          const tsonTuples = keyvals.map(tuple => TSON.encapsulate(tuple));
+          const tsonTuples = keyvals.map((tuple) => TSON.encapsulate(tuple));
           if (TSON.mustFinalize()) {
             await Dexie.waitFor(TSON.finalize(tsonTuples));
           }
 
-          let json = JSON.stringify(tsonTuples, undefined, prettyJson ? 2 : undefined);
+          let json = JSON.stringify(
+            tsonTuples,
+            undefined,
+            prettyJson ? 2 : undefined
+          );
           if (prettyJson) json = json.split('\n').join('\n      ');
 
           // By generating a blob here, we give web platform the opportunity to store the contents
           // on disk and release RAM.
           slices.push(new Blob([json.substring(1, json.length - 1)]));
           lastNumRows = keyvals.length;
-          lastKey = keys.length > 0 ?
-            keys[keys.length - 1] :
-            null;
+          lastKey = keys.length > 0 ? keys[keys.length - 1] : null;
         }
         progress.completedRows += values.length;
       }
       slices.push(emptyTableExportJson.substr(posEndRowsArray)); // "]}"
       progress.completedTables += 1;
       if (progress.completedTables < progress.totalTables) {
-        slices.push(",");
+        slices.push(',');
       }
     }
     slices.push(emptyExportJson.substr(posEndDataArray));
     progress.done = true;
     if (progressCallback) {
       // Keep ongoing transaction private
-      Dexie.ignoreTransaction(()=>progressCallback(progress));
+      Dexie.ignoreTransaction(() => progressCallback(progress));
     }
   }
 }

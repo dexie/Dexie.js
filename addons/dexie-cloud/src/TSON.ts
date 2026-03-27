@@ -1,5 +1,5 @@
-import { 
-  TypesonSimplified, 
+import {
+  TypesonSimplified,
   undefinedTypeDef,
   blobTypeDef,
   typedArrayTypeDefs,

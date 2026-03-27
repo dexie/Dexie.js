@@ -7,13 +7,13 @@ describe('undefined type support', () => {
 
   test('should stringify undefined', () => {
     expect(TSON.stringify({ foo: null, bar: undefined })).toBe(
-      JSON.stringify({ foo: null, bar: { $t: "undefined" } }),
+      JSON.stringify({ foo: null, bar: { $t: 'undefined' } })
     );
   });
 
   test('should revive undefined', () => {
     const revived = TSON.parse(TSON.stringify({ foo: null, bar: undefined }));
-    expect(Object.keys(revived)).toStrictEqual(["foo", "bar"]);
+    expect(Object.keys(revived)).toStrictEqual(['foo', 'bar']);
     expect(Object.values(revived)).toStrictEqual([null, undefined]);
   });
 
@@ -23,11 +23,11 @@ describe('undefined type support', () => {
       undef1: undefined,
       $undef1: undefined,
       bar: {
-        baz: "x",
+        baz: 'x',
         undef: undefined,
         $undef: undefined,
         $$undef: undefined,
-        $Gunnar: "2",
+        $Gunnar: '2',
         $t: undefined,
       },
       undef2: undefined,

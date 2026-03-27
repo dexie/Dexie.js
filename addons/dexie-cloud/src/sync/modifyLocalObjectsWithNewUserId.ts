@@ -1,30 +1,38 @@
-import { Table } from "dexie";
-import { EntityCommon } from "../db/entities/EntityCommon";
-import { UserLogin } from "../db/entities/UserLogin";
-import { Member } from "../db/entities/Member";
-import { UNAUTHORIZED_USER } from "../authentication/UNAUTHORIZED_USER";
-import { Realm } from "../db/entities/Realm";
+import { Table } from 'dexie';
+import { EntityCommon } from '../db/entities/EntityCommon';
+import { UserLogin } from '../db/entities/UserLogin';
+import { Member } from '../db/entities/Member';
+import { UNAUTHORIZED_USER } from '../authentication/UNAUTHORIZED_USER';
+import { Realm } from '../db/entities/Realm';
 
 export async function modifyLocalObjectsWithNewUserId(
   syncifiedTables: Table<EntityCommon>[],
   currentUser: UserLogin,
-  alreadySyncedRealms?: string[]) {
+  alreadySyncedRealms?: string[]
+) {
   const ignoredRealms = new Set(alreadySyncedRealms || []);
   for (const table of syncifiedTables) {
-    if (table.name === "members") {
+    if (table.name === 'members') {
       // members
       await table.toCollection().modify((member: Member) => {
-        if (!ignoredRealms.has(member.realmId) && (!member.userId || member.userId === UNAUTHORIZED_USER.userId)) {
+        if (
+          !ignoredRealms.has(member.realmId) &&
+          (!member.userId || member.userId === UNAUTHORIZED_USER.userId)
+        ) {
           member.userId = currentUser.userId;
         }
       });
-    } else if (table.name === "roles") {
+    } else if (table.name === 'roles') {
       // roles
       // No changes needed.
-    } else if (table.name === "realms") {
+    } else if (table.name === 'realms') {
       // realms
       await table.toCollection().modify((realm: Realm) => {
-        if (!ignoredRealms.has(realm.realmId) && (realm.owner === undefined || realm.owner === UNAUTHORIZED_USER.userId)) {
+        if (
+          !ignoredRealms.has(realm.realmId) &&
+          (realm.owner === undefined ||
+            realm.owner === UNAUTHORIZED_USER.userId)
+        ) {
           realm.owner = currentUser.userId;
         }
       });

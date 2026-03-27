@@ -10,7 +10,7 @@
 export const undefinedTypeDef = {
   undefined: {
     replace: () => ({
-      $t: "undefined",
+      $t: 'undefined',
     }),
     revive: () => undefined,
   },

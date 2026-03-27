@@ -1,3 +1,3 @@
-import { TableSchema } from "./table-schema";
+import { TableSchema } from './table-schema';
 
-export type DbSchema = {[tableName: string]: TableSchema};
+export type DbSchema = { [tableName: string]: TableSchema };

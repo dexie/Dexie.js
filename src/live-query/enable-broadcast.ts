@@ -7,13 +7,13 @@ import { propagateLocally, propagatingLocally } from './propagate-locally';
 
 export let bc: BroadcastChannel;
 
-export let createBC = ()=>{};
+export let createBC = () => {};
 
 if (typeof BroadcastChannel !== 'undefined') {
   createBC = () => {
     bc = new BroadcastChannel(STORAGE_MUTATED_DOM_EVENT_NAME);
-    bc.onmessage = ev => ev.data && propagateLocally(ev.data);
-  }
+    bc.onmessage = (ev) => ev.data && propagateLocally(ev.data);
+  };
   createBC();
 
   /**
@@ -27,7 +27,7 @@ if (typeof BroadcastChannel !== 'undefined') {
   if (typeof (bc as any).unref === 'function') {
     (bc as any).unref();
   }
-  
+
   //
   // Propagate local changes to remote tabs, windows and workers via BroadcastChannel
   //

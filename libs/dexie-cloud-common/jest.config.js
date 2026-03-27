@@ -1,11 +1,11 @@
 /** @type {import('ts-jest').JestConfigWithTsJest} **/
 export default {
-  testEnvironment: "node",
+  testEnvironment: 'node',
   transform: {
-    "^.+.tsx?$": ["ts-jest",{}],
+    '^.+.tsx?$': ['ts-jest', {}],
   },
-  testPathIgnorePatterns: ["/dist/"],
+  testPathIgnorePatterns: ['/dist/'],
   moduleNameMapper: {
-    "^(\\.{1,2}/.*)\\.js$": "$1"
-  }
+    '^(\\.{1,2}/.*)\\.js$': '$1',
+  },
 };

@@ -1,7 +1,7 @@
-import React from "react";
-import { useLiveQuery } from "../../src";
-import { Item } from "../models/Item";
-import { ItemComponent } from "./ItemComponent";
+import React from 'react';
+import { useLiveQuery } from '../../src';
+import { Item } from '../models/Item';
+import { ItemComponent } from './ItemComponent';
 
 interface Props {
   loadItems: () => Promise<Item[]>;

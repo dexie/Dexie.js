@@ -67,7 +67,7 @@ export async function syncWithServer(
     baseRevs,
     changes: encodeIdsForServer(db.dx.core.schema, currentUser, changes),
     y,
-    dxcv: db.cloud.version
+    dxcv: db.cloud.version,
   };
   console.debug('Sync request', syncRequest);
   db.syncStateChangedEvent.next({
@@ -95,7 +95,9 @@ export async function syncWithServer(
     case 'application/x-bison':
     case 'application/x-bison-stream':
       // BISON format deprecated - throw error if server sends it
-      throw new Error('BISON format no longer supported. Server should send application/json.');
+      throw new Error(
+        'BISON format no longer supported. Server should send application/json.'
+      );
     default:
     case 'application/json': {
       const text = await res.text();

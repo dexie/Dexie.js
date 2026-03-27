@@ -1,4 +1,4 @@
-import { DexieCloudDB } from "../db/DexieCloudDB";
+import { DexieCloudDB } from '../db/DexieCloudDB';
 
 export function performGuardedJob<T>(
   db: DexieCloudDB,

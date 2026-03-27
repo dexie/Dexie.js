@@ -4,14 +4,16 @@ import { YDocCache } from './types/YDocCache';
 import { DexieYDocMeta } from './types/DexieYDocMeta';
 
 // The finalization registry
-const docRegistry = new FinalizationRegistry<{cache: any, key: string}>(({cache, key}) => {
-  delete cache[key];
-});
+const docRegistry = new FinalizationRegistry<{ cache: any; key: string }>(
+  ({ cache, key }) => {
+    delete cache[key];
+  }
+);
 
 // The Y.Doc cache containing all active documents
 export function getDocCache(db: Dexie): YDocCache {
-  return db._novip['_docCache'] ??= {
-    cache: {} as { [key: string]: WeakRef<Y.Doc>; },
+  return (db._novip['_docCache'] ??= {
+    cache: {} as { [key: string]: WeakRef<Y.Doc> },
     get size() {
       return Object.keys(this.cache).length;
     },
@@ -34,13 +36,17 @@ export function getDocCache(db: Dexie): YDocCache {
     },
     delete(doc: Y.Doc): void {
       docRegistry.unregister(doc); // Don't run garbage collection on this doc as it is being deleted here and now.
-      const cacheKey = getYDocCacheKey(doc.meta.parentTable, doc.meta.parentId, doc.meta.parentProp);
+      const cacheKey = getYDocCacheKey(
+        doc.meta.parentTable,
+        doc.meta.parentId,
+        doc.meta.parentProp
+      );
       const cacheEntry = this.cache[cacheKey];
       if (cacheEntry?.deref() === doc) {
         delete this.cache[cacheKey]; // Remove the entry from the cache only if it is the same doc.
       }
     },
-  };
+  });
 }
 
 // Emulate a private boolean property "destroyed" on Y.Doc instances that we manage
@@ -52,6 +58,10 @@ export function throwIfDestroyed(doc: any) {
     throw new Error(`Y.Doc ${doc.meta.parentId} has been destroyed`);
 }
 
-export function getYDocCacheKey(table: string, primaryKey: any, ydocProp: string): string {
+export function getYDocCacheKey(
+  table: string,
+  primaryKey: any,
+  ydocProp: string
+): string {
   return `${table}[${primaryKey}].${ydocProp}`;
 }

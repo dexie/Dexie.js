@@ -1,8 +1,8 @@
-import { DBKeyMutation } from "./DBKeyMutation.js";
-import { DBKeyMutationSet } from "./DBKeyMutationSet.js";
-import { DBOperationsSet } from "../DBOperationsSet.js";
-import { DBOperation } from "../DBOperation.js";
-import { setByKeyPath } from "../utils.js";
+import { DBKeyMutation } from './DBKeyMutation.js';
+import { DBKeyMutationSet } from './DBKeyMutationSet.js';
+import { DBOperationsSet } from '../DBOperationsSet.js';
+import { DBOperation } from '../DBOperation.js';
+import { setByKeyPath } from '../utils.js';
 
 export function applyOperation(
   target: DBKeyMutationSet,
@@ -10,43 +10,44 @@ export function applyOperation(
   op: DBOperation
 ) {
   const tbl = target[table] || (target[table] = {});
-  const keys = op.keys.map(key => typeof key === 'string' ? key : JSON.stringify(key));
+  const keys = op.keys.map((key) =>
+    typeof key === 'string' ? key : JSON.stringify(key)
+  );
 
   switch (op.type) {
-    case "insert":
-      // TODO: Don't treat insert and upsert the same?
-    case "upsert":
+    case 'insert':
+    // TODO: Don't treat insert and upsert the same?
+    case 'upsert':
       keys.forEach((key, idx) => {
         tbl[key] = {
-          type: "ups",
+          type: 'ups',
           val: op.values[idx],
         };
       });
       break;
-    case "update":
-    case "modify": {
+    case 'update':
+    case 'modify': {
       keys.forEach((key, idx) => {
-        const changeSpec = op.type === "update"
-          ? op.changeSpecs[idx]
-          : op.changeSpec;
+        const changeSpec =
+          op.type === 'update' ? op.changeSpecs[idx] : op.changeSpec;
         const entry = tbl[key];
         if (!entry) {
           tbl[key] = {
-            type: "upd",
+            type: 'upd',
             mod: changeSpec,
           };
         } else {
           switch (entry.type) {
-            case "ups":
+            case 'ups':
               // Adjust the existing upsert with additional updates
               for (const [propPath, value] of Object.entries(changeSpec)) {
                 setByKeyPath(entry.val, propPath, value);
               }
               break;
-            case "del":
+            case 'del':
               // No action.
               break;
-            case "upd":
+            case 'upd':
               // Adjust existing update with additional updates
               Object.assign(entry.mod, changeSpec); // May work for deep props as well - new keys is added later, right? Does the prop order persist along TSON and all? But it will not be 100% when combined with some server code (seach for "address.city": "Stockholm" comment)
               break;
@@ -55,10 +56,10 @@ export function applyOperation(
       });
       break;
     }
-    case "delete":
+    case 'delete':
       keys.forEach((key) => {
         tbl[key] = {
-          type: "del",
+          type: 'del',
         };
       });
       break;

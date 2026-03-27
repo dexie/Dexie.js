@@ -41,7 +41,7 @@ export function encodeYMessage(msg: YMessage): Uint8Array {
           break;
         case 'u-c':
           writeVarUint8Array(encoder, msg.u);
-          writeBigUint64(encoder, BigInt(msg.i));            
+          writeBigUint64(encoder, BigInt(msg.i));
           break;
         case 'u-s':
           writeVarUint8Array(encoder, msg.u);

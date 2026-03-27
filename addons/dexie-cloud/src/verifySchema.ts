@@ -1,5 +1,5 @@
-import Dexie from "dexie";
-import { DexieCloudDB } from "./db/DexieCloudDB";
+import Dexie from 'dexie';
+import { DexieCloudDB } from './db/DexieCloudDB';
 
 export function verifySchema(db: DexieCloudDB) {
   for (const table of db.tables) {

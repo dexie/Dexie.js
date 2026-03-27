@@ -1,7 +1,7 @@
-import { deepClone } from "../functions/utils";
-import { DBCore } from "../public/types/dbcore";
-import { Middleware } from "../public/types/middleware";
-import Promise from "../helpers/promise";
+import { deepClone } from '../functions/utils';
+import { DBCore } from '../public/types/dbcore';
+import { Middleware } from '../public/types/middleware';
+import Promise from '../helpers/promise';
 import { cmp } from '../functions/cmp';
 
 export function getFromTransactionCache(
@@ -29,7 +29,7 @@ export function getFromTransactionCache(
 }
 
 export const cacheExistingValuesMiddleware: Middleware<DBCore> = {
-  stack: "dbcore",
+  stack: 'dbcore',
   level: -1,
   create: (core) => {
     return {
@@ -43,23 +43,23 @@ export const cacheExistingValuesMiddleware: Middleware<DBCore> = {
             }
             const cachedResult = getFromTransactionCache(
               req.keys,
-              req.trans["_cache"],
-              req.cache === "clone"
+              req.trans['_cache'],
+              req.cache === 'clone'
             );
             if (cachedResult) {
               return Promise.resolve(cachedResult);
             }
             return table.getMany(req).then((res) => {
-              req.trans["_cache"] = {
+              req.trans['_cache'] = {
                 keys: req.keys,
-                values: req.cache === "clone" ? deepClone(res) : res,
+                values: req.cache === 'clone' ? deepClone(res) : res,
               };
               return res;
             });
           },
           mutate: (req) => {
             // Invalidate cache on any mutate except "add" which can't change existing values:
-            if (req.type !== "add") req.trans["_cache"] = null;
+            if (req.type !== 'add') req.trans['_cache'] = null;
             return table.mutate(req);
           },
         };

@@ -1,8 +1,8 @@
-import { DbSchema } from "./db-schema";
-import { Dexie } from "./dexie";
-import { IndexSpec } from "./index-spec";
-import { TableSchema } from "./table-schema";
-import { Transaction } from "./transaction";
+import { DbSchema } from './db-schema';
+import { Dexie } from './dexie';
+import { IndexSpec } from './index-spec';
+import { TableSchema } from './table-schema';
+import { Transaction } from './transaction';
 
 export interface Version {
   stores(schema: { [tableName: string]: string | null }): Version;
@@ -18,7 +18,7 @@ export interface ExtendableVersion extends Version {
   _createTableSchema(
     tableName: string,
     primKey: IndexSpec,
-    indexes: IndexSpec[],
+    indexes: IndexSpec[]
   ): TableSchema;
   _parseIndexSyntax(primKeyAndIndexes: string): IndexSpec[];
 }

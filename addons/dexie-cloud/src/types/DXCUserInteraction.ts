@@ -9,12 +9,12 @@ export type DXCUserInteraction =
   | DXCLogoutConfirmation;
 
 /** A selectable option that can appear in any user interaction.
- * 
+ *
  * Similar to an HTML `<option>` element:
  * - `name` identifies the field name in the result (like input name attribute)
  * - `value` is the value to return when selected (like option value attribute)
  * - `displayName` is the human-readable label
- * 
+ *
  * When an option is selected, call `onSubmit({ [option.name]: option.value })`.
  */
 export interface DXCOption {
@@ -30,7 +30,10 @@ export interface DXCOption {
   styleHint?: string;
 }
 
-export interface DXCGenericUserInteraction<Type extends string="generic", TFields extends {[name: string]: DXCInputField} = any> {
+export interface DXCGenericUserInteraction<
+  Type extends string = 'generic',
+  TFields extends { [name: string]: DXCInputField } = any,
+> {
   type: Type;
   title: string;
   alerts: DXCAlert[];
@@ -41,12 +44,12 @@ export interface DXCGenericUserInteraction<Type extends string="generic", TField
   options?: DXCOption[];
   submitLabel: string;
   cancelLabel: string | null;
-  onSubmit: (params: { [P in keyof TFields]: string} ) => void;
+  onSubmit: (params: { [P in keyof TFields]: string }) => void;
   onCancel: () => void;
 }
 
 /** When the system needs to prompt for an email address for login.
- * 
+ *
  * May include `options` when social login providers are available.
  * Options should be rendered as clickable buttons above the email field.
  */
@@ -64,13 +67,15 @@ export interface DXCEmailPrompt {
   options?: DXCOption[];
   submitLabel: string;
   cancelLabel: string;
-  onSubmit: (params: { email: string } | { [paramName: string]: string }) => void;
+  onSubmit: (
+    params: { email: string } | { [paramName: string]: string }
+  ) => void;
   onCancel: () => void;
 }
 
 /** When the system needs to prompt for an OTP code.
- * 
-*/
+ *
+ */
 export interface DXCOTPPrompt {
   type: 'otp';
   title: string;
@@ -79,7 +84,7 @@ export interface DXCOTPPrompt {
     otp: {
       type: 'text';
       label: string;
-    }
+    };
   };
   submitLabel: string;
   cancelLabel: string;

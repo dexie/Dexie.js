@@ -11,15 +11,19 @@ import { Disposable } from './helpers/Disposable';
 const wm = new WeakMap<any, DexieYProvider>();
 
 function createEvents() {
-  return (Dexie.Events as any)(null, 'load', 'sync', 'error') as DexieYProvider['on'];
+  return (Dexie.Events as any)(
+    null,
+    'load',
+    'sync',
+    'error'
+  ) as DexieYProvider['on'];
 }
 
 interface ReleaseOptions {
   gracePeriod?: number; // Grace period to optimize for unload/reload scenarios
 }
 
-class DexieYProvider
-{
+class DexieYProvider {
   refCount = 1;
   private stopObserving: () => void;
   private cleanupHandlers: (() => void)[] = [];
@@ -40,10 +44,11 @@ class DexieYProvider
   static on = (Dexie.Events as any)(null, {
     new: [nonStoppableEventChain],
     beforeunload: [promisableChain],
-  }) as DexieEventSet & ((name: string, f: (...args: any[]) => any) => void) & {
-    new: DexieEvent;
-    beforeunload: DexieEvent;
-  };
+  }) as DexieEventSet &
+    ((name: string, f: (...args: any[]) => any) => void) & {
+      new: DexieEvent;
+      beforeunload: DexieEvent;
+    };
 
   static getOrCreateDocument(db: Dexie, table: string, prop: string, id: any) {
     const docCache = getDocCache(db);
@@ -57,10 +62,7 @@ class DexieYProvider
     return getOrCreateDocument(db, docCache, table, prop, updatesTable, id);
   }
 
-  static load(
-    doc: Y.Doc,
-    options?: ReleaseOptions
-  ): DexieYProvider {
+  static load(doc: Y.Doc, options?: ReleaseOptions): DexieYProvider {
     let p = wm.get(doc);
     if (p) {
       ++p.refCount;
@@ -224,7 +226,7 @@ class DexieYProvider
       updatesTable,
       parentId
     );
-    DexieYProvider.on("new").fire(this); // Allow for addons to invoke their sync- and awareness providers here.
+    DexieYProvider.on('new').fire(this); // Allow for addons to invoke their sync- and awareness providers here.
   }
 
   destroy() {
@@ -255,15 +257,15 @@ class DexieYProvider
 interface DexieYProvider extends Disposable {}
 
 //
-// Eliminate dual package hazard 
+// Eliminate dual package hazard
 //
 // Since we're holding static state, make sure to singletonize DexieYProvider
 //
-if (Dexie["DexieYProvider"]) {
+if (Dexie['DexieYProvider']) {
   // @ts-ignore
-  DexieYProvider = Dexie["DexieYProvider"] || DexieYProvider;
+  DexieYProvider = Dexie['DexieYProvider'] || DexieYProvider;
 } else {
-  Dexie["DexieYProvider"] = DexieYProvider;
+  Dexie['DexieYProvider'] = DexieYProvider;
 }
 
 export { DexieYProvider };

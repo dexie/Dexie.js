@@ -1,26 +1,26 @@
-import { Dexie } from "../classes/dexie/dexie";
-import { Table } from "../public/types/table";
-import { DBNAMES_DB } from "../globals/constants";
-import { DexieDOMDependencies } from "../public/types/dexie-dom-dependencies";
-import { nop } from "../functions/chaining-functions";
+import { Dexie } from '../classes/dexie/dexie';
+import { Table } from '../public/types/table';
+import { DBNAMES_DB } from '../globals/constants';
+import { DexieDOMDependencies } from '../public/types/dexie-dom-dependencies';
+import { nop } from '../functions/chaining-functions';
 
 type IDBKeyNamesVar = typeof IDBKeyRange;
 
 function getDbNamesTable(indexedDB: IDBFactory, IDBKeyRange: IDBKeyNamesVar) {
-  let dbNamesDB = indexedDB["_dbNamesDB"];
+  let dbNamesDB = indexedDB['_dbNamesDB'];
   if (!dbNamesDB) {
-    dbNamesDB = indexedDB["_dbNamesDB"] = new Dexie(DBNAMES_DB, {
+    dbNamesDB = indexedDB['_dbNamesDB'] = new Dexie(DBNAMES_DB, {
       addons: [],
       indexedDB,
       IDBKeyRange,
     });
-    dbNamesDB.version(1).stores({ dbnames: "name" });
+    dbNamesDB.version(1).stores({ dbnames: 'name' });
   }
-  return dbNamesDB.table("dbnames") as Table<{ name: string }, string>;
+  return dbNamesDB.table('dbnames') as Table<{ name: string }, string>;
 }
 
 function hasDatabasesNative(indexedDB: IDBFactory) {
-  return indexedDB && typeof indexedDB.databases === "function";
+  return indexedDB && typeof indexedDB.databases === 'function';
 }
 
 export function getDatabaseNames({
@@ -44,7 +44,7 @@ export function _onDatabaseCreated(
 ) {
   !hasDatabasesNative(indexedDB) &&
     name !== DBNAMES_DB &&
-    getDbNamesTable(indexedDB, IDBKeyRange).put({name}).catch(nop);
+    getDbNamesTable(indexedDB, IDBKeyRange).put({ name }).catch(nop);
 }
 
 export function _onDatabaseDeleted(

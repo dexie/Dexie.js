@@ -1,13 +1,11 @@
-import {module, test, deepEqual} from 'QUnit';
+import { module, test, deepEqual } from 'QUnit';
 import mergeChange from '../../src/merge-change';
-import {CREATE, UPDATE, DELETE} from '../../src/change_types';
+import { CREATE, UPDATE, DELETE } from '../../src/change_types';
 
 // Tests for if a key exists multiple times in a table
 module('mergeChange: prev change was CREATE', {
-  setup: () => {
-  },
-  teardown: () => {
-  }
+  setup: () => {},
+  teardown: () => {},
 });
 
 test('should just return the nextChange if it is CREATE', () => {
@@ -20,7 +18,7 @@ test('should just return the nextChange if it is CREATE', () => {
   const nextChange = {
     key: 1,
     table: 'foo',
-    obj: {foo: 'bar'},
+    obj: { foo: 'bar' },
     type: CREATE,
   };
   const res = mergeChange(prevChange, nextChange);
@@ -68,31 +66,29 @@ test('should combine the CREATE and UPDATE change if nextChange is UPATE', () =>
     table: 'foo',
     obj: {
       title: 'bar',
-      foo: 'baz'
+      foo: 'baz',
     },
-    type: CREATE
+    type: CREATE,
   };
   deepEqual(res, expectedResult);
 });
 
 module('mergeChange: prev change was UPDATE', {
-  setup: () => {
-  },
-  teardown: () => {
-  }
+  setup: () => {},
+  teardown: () => {},
 });
 
 test('should return the nextChange if it is CREATE', () => {
   const prevChange = {
     key: 1,
     table: 'foo',
-    mods: {foo: 'bar'},
+    mods: { foo: 'bar' },
     type: UPDATE,
   };
   const nextChange = {
     key: 1,
     table: 'foo',
-    obj: {foo: 'bar baz'},
+    obj: { foo: 'bar baz' },
     type: CREATE,
   };
   const res = mergeChange(prevChange, nextChange);
@@ -103,7 +99,7 @@ test('should return the nextChange if it is DELETE', () => {
   const prevChange = {
     key: 1,
     table: 'foo',
-    mods: {foo: 'bar'},
+    mods: { foo: 'bar' },
     type: UPDATE,
   };
   const nextChange = {
@@ -139,18 +135,16 @@ test('should the changes if the nextChange is UPDATE', () => {
     table: 'foo',
     mods: {
       title: 'bar',
-      foo: 'baz'
+      foo: 'baz',
     },
-    type: UPDATE
+    type: UPDATE,
   };
   deepEqual(res, expectedResult);
 });
 
 module('mergeChange: prev change was DELETE', {
-  setup: () => {
-  },
-  teardown: () => {
-  }
+  setup: () => {},
+  teardown: () => {},
 });
 
 test('should return nextChange if it is CREATE', () => {
@@ -162,7 +156,7 @@ test('should return nextChange if it is CREATE', () => {
   const nextChange = {
     key: 1,
     table: 'foo',
-    obj: {foo: 'bar'},
+    obj: { foo: 'bar' },
     type: CREATE,
   };
   const res = mergeChange(prevChange, nextChange);
@@ -195,7 +189,7 @@ test('should return prevChange if nextChange is UPDATE', () => {
     rev: 1,
     key: 1,
     table: 'foo',
-    mods: {foo: 'bar'},
+    mods: { foo: 'bar' },
     type: UPDATE,
   };
   const res = mergeChange(prevChange, nextChange);

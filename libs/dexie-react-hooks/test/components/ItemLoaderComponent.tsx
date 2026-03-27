@@ -1,7 +1,7 @@
-import React from "react";
-import { useSuspendingLiveQuery } from "../../src";
-import { Item } from "../models/Item";
-import { ItemComponent } from "./ItemComponent";
+import React from 'react';
+import { useSuspendingLiveQuery } from '../../src';
+import { Item } from '../models/Item';
+import { ItemComponent } from './ItemComponent';
 
 export interface Props {
   id: number;
@@ -9,7 +9,7 @@ export interface Props {
 }
 
 export function ItemLoaderComponent({ id, loadItem }: Props) {
-  const item = useSuspendingLiveQuery(() => loadItem(id), ["item", id]);
+  const item = useSuspendingLiveQuery(() => loadItem(id), ['item', id]);
   if (!item)
     return (
       <p className="not-found-item">

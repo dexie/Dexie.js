@@ -17,13 +17,19 @@ export function createIndexSpec(
     multi,
     auto,
     compound,
-    src: (unique && !isPrimKey ? '&' : '') + (multi ? '*' : '') + (auto ? "++" : "") + nameFromKeyPath(keyPath),
-    type
-  }
+    src:
+      (unique && !isPrimKey ? '&' : '') +
+      (multi ? '*' : '') +
+      (auto ? '++' : '') +
+      nameFromKeyPath(keyPath),
+    type,
+  };
 }
 
-export function nameFromKeyPath (keyPath?: string | string[]): string {
-  return typeof keyPath === 'string' ?
-    keyPath :
-    keyPath ? ('[' + [].join.call(keyPath, '+') + ']') : "";
+export function nameFromKeyPath(keyPath?: string | string[]): string {
+  return typeof keyPath === 'string'
+    ? keyPath
+    : keyPath
+      ? '[' + [].join.call(keyPath, '+') + ']'
+      : '';
 }

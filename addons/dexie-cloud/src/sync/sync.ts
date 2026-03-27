@@ -28,7 +28,10 @@ import { applyServerChanges } from './applyServerChanges';
 import { checkSyncRateLimitDelay } from './ratelimit';
 import { listYClientMessagesAndStateVector } from '../yjs/listYClientMessagesAndStateVector';
 import { applyYServerMessages } from '../yjs/applyYMessages';
-import { hasLargeBlobsInOperations, offloadBlobsInOperations } from './blobOffloading';
+import {
+  hasLargeBlobsInOperations,
+  offloadBlobsInOperations,
+} from './blobOffloading';
 import { updateYSyncStates } from '../yjs/updateYSyncStates';
 import { downloadYDocsFromServer } from '../yjs/downloadYDocsFromServer';
 import { UpdateSpec } from 'dexie';
@@ -52,7 +55,8 @@ export function sync(
 ): Promise<boolean> {
   return _sync(db, options, schema, syncOptions)
     .then((result) => {
-      if (!syncOptions?.justCheckIfNeeded) { // && syncOptions?.purpose !== 'push') {
+      if (!syncOptions?.justCheckIfNeeded) {
+        // && syncOptions?.purpose !== 'push') {
         db.syncStateChangedEvent.next({
           phase: 'in-sync',
         });
@@ -153,18 +157,21 @@ async function _sync(
   //
   // List changes to sync
   //
-  const [clientChangeSet, syncState, baseRevs, {yMessages, lastUpdateIds}] = await db.transaction(
-    'r',
-    db.tables,
-    async () => {
+  const [clientChangeSet, syncState, baseRevs, { yMessages, lastUpdateIds }] =
+    await db.transaction('r', db.tables, async () => {
       const syncState = await db.getPersistedSyncState();
       let baseRevs = await db.$baseRevs.toArray();
-      
+
       // Resolve #2168
-      baseRevs = baseRevs.filter(br => tablesToSync.some(tbl => tbl.name === br.tableName));
+      baseRevs = baseRevs.filter((br) =>
+        tablesToSync.some((tbl) => tbl.name === br.tableName)
+      );
 
       let clientChanges = await listClientChanges(mutationTables, db);
-      const yResults = await listYClientMessagesAndStateVector(db, tablesToSync);
+      const yResults = await listYClientMessagesAndStateVector(
+        db,
+        tablesToSync
+      );
       throwIfCancelled(cancelToken);
       if (doSyncify) {
         const alreadySyncedRealms = [
@@ -182,12 +189,12 @@ async function _sync(
         return [clientChanges, syncState, baseRevs, yResults];
       }
       return [clientChanges, syncState, baseRevs, yResults];
-    }
-  );
+    });
 
-  const pushSyncIsNeeded = clientChangeSet.some((set) =>
-    set.muts.some((mut) => mut.keys.length > 0)
-  ) || yMessages.some(m => m.type === 'u-c');
+  const pushSyncIsNeeded =
+    clientChangeSet.some((set) =>
+      set.muts.some((mut) => mut.keys.length > 0)
+    ) || yMessages.some((m) => m.type === 'u-c');
   if (justCheckIfNeeded) {
     console.debug('Sync is needed:', pushSyncIsNeeded);
     return pushSyncIsNeeded;
@@ -209,7 +216,10 @@ async function _sync(
   //
   let processedChangeSet = clientChangeSet;
   const maxStringLength = db.cloud.options?.maxStringLength ?? 32768;
-  const hasLargeBlobs = hasLargeBlobsInOperations(clientChangeSet, maxStringLength);
+  const hasLargeBlobs = hasLargeBlobsInOperations(
+    clientChangeSet,
+    maxStringLength
+  );
   if (hasLargeBlobs) {
     processedChangeSet = await offloadBlobsInOperations(
       clientChangeSet,
@@ -239,158 +249,163 @@ async function _sync(
   //
   // Apply changes locally and clear old change entries:
   //
-  const {done, newSyncState} = await db.transaction('rw', db.tables, async (tx) => {
-    // @ts-ignore
-    tx.idbtrans.disableChangeTracking = true;
-    // @ts-ignore
-    tx.idbtrans.disableAccessControl = true; // TODO: Take care of this flag in access control middleware!
+  const { done, newSyncState } = await db.transaction(
+    'rw',
+    db.tables,
+    async (tx) => {
+      // @ts-ignore
+      tx.idbtrans.disableChangeTracking = true;
+      // @ts-ignore
+      tx.idbtrans.disableAccessControl = true; // TODO: Take care of this flag in access control middleware!
 
-    // Update db.cloud.schema from server response.
-    // Local schema MAY include a subset of tables, so do not force all tables into local schema.
-    for (const tableName of Object.keys(schema)) {
-      if (res.schema[tableName]) {
-        // Write directly into configured schema. This code can only be executed alone.
-        schema[tableName] = res.schema[tableName];
+      // Update db.cloud.schema from server response.
+      // Local schema MAY include a subset of tables, so do not force all tables into local schema.
+      for (const tableName of Object.keys(schema)) {
+        if (res.schema[tableName]) {
+          // Write directly into configured schema. This code can only be executed alone.
+          schema[tableName] = res.schema[tableName];
+        }
       }
-    }
-    await db.$syncState.put(schema, 'schema');
+      await db.$syncState.put(schema, 'schema');
 
-    // List mutations that happened during our exchange with the server:
-    const addedClientChanges = await listClientChanges(mutationTables, db, {
-      since: latestRevisions,
-    });
-
-    //
-    // Delete changes now as server has return success
-    // (but keep changes that haven't reached server yet)
-    //
-    for (const mutTable of mutationTables) {
-      const tableName = getTableFromMutationTable(mutTable.name);
-      if (
-        !addedClientChanges.some(
-          (ch) => ch.table === tableName && ch.muts.length > 0
-        )
-      ) {
-        // No added mutations for this table during the time we sent changes
-        // to the server.
-        // It is therefore safe to clear all changes (which is faster than
-        // deleting a range)
-        await Promise.all([
-          mutTable.clear(),
-          db.$baseRevs.where({ tableName }).delete(),
-        ]);
-      } else if (latestRevisions[tableName]) {
-        const latestRev = latestRevisions[tableName] || 0;
-        await Promise.all([
-          mutTable.where('rev').belowOrEqual(latestRev).delete(),
-          db.$baseRevs
-            .where(':id')
-            .between(
-              [tableName, -Infinity],
-              [tableName, latestRev + 1],
-              true,
-              true
-            )
-            .reverse()
-            .offset(1) // Keep one entry (the one mapping muts that came during fetch --> previous server revision)
-            .delete(),
-        ]);
-      } else {
-        // In this case, the mutation table only contains added items after sending empty changeset to server.
-        // We should not clear out anything now.
-      }
-    }
-
-    // Update latestRevisions object according to additional changes:
-    getLatestRevisionsPerTable(addedClientChanges, latestRevisions);
-
-    // Update/add new entries into baseRevs map.
-    // * On tables without mutations since last serverRevision,
-    //   this will update existing entry.
-    // * On tables where mutations have been recorded since last
-    //   serverRevision, this will create a new entry.
-    // The purpose of this operation is to mark a start revision (per table)
-    // so that all client-mutations that come after this, will be mapped to current
-    // server revision.
-    await updateBaseRevs(db, schema, latestRevisions, res.serverRevision);
-
-    const syncState = await db.getPersistedSyncState();
-
-    //
-    // Delete objects from removed realms
-    //
-    await deleteObjectsFromRemovedRealms(db, res, syncState);
-
-    //
-    // Update syncState
-    //
-    const newSyncState: PersistedSyncState = syncState || {
-      syncedTables: [],
-      latestRevisions: {},
-      realms: [],
-      inviteRealms: [],
-      clientIdentity,
-    };
-    if (readyForSyncification) {
-      newSyncState.syncedTables = tablesToSync
-        .map((tbl) => tbl.name)
-        .concat(tablesToSyncify.map((tbl) => tbl.name));
-    }
-    newSyncState.latestRevisions = latestRevisions;
-    newSyncState.remoteDbId = res.dbId;
-    newSyncState.initiallySynced = true;
-    newSyncState.realms = res.realms;
-    newSyncState.inviteRealms = res.inviteRealms;
-    newSyncState.serverRevision = res.serverRevision;
-    newSyncState.yServerRevision = res.serverRevision;
-    newSyncState.timestamp = new Date();
-    delete newSyncState.error;
-
-    const filteredChanges = filterServerChangesThroughAddedClientChanges(
-      res.changes,
-      addedClientChanges
-    );
-
-    //
-    // apply server changes
-    //
-    await applyServerChanges(filteredChanges, db);
-
-    if (res.yMessages) {
-      //
-      // apply yMessages
-      //
-      const {receivedUntils, resyncNeeded, yServerRevision} = await applyYServerMessages(res.yMessages, db);
-      if (yServerRevision) {
-        newSyncState.yServerRevision = yServerRevision;
-      }
+      // List mutations that happened during our exchange with the server:
+      const addedClientChanges = await listClientChanges(mutationTables, db, {
+        since: latestRevisions,
+      });
 
       //
-      // update Y SyncStates
+      // Delete changes now as server has return success
+      // (but keep changes that haven't reached server yet)
       //
-      await updateYSyncStates(lastUpdateIds, receivedUntils, db);
-
-      if (resyncNeeded) {
-        newSyncState.yDownloadedRealms = {}; // Will trigger a full download of Y-documents below...
+      for (const mutTable of mutationTables) {
+        const tableName = getTableFromMutationTable(mutTable.name);
+        if (
+          !addedClientChanges.some(
+            (ch) => ch.table === tableName && ch.muts.length > 0
+          )
+        ) {
+          // No added mutations for this table during the time we sent changes
+          // to the server.
+          // It is therefore safe to clear all changes (which is faster than
+          // deleting a range)
+          await Promise.all([
+            mutTable.clear(),
+            db.$baseRevs.where({ tableName }).delete(),
+          ]);
+        } else if (latestRevisions[tableName]) {
+          const latestRev = latestRevisions[tableName] || 0;
+          await Promise.all([
+            mutTable.where('rev').belowOrEqual(latestRev).delete(),
+            db.$baseRevs
+              .where(':id')
+              .between(
+                [tableName, -Infinity],
+                [tableName, latestRev + 1],
+                true,
+                true
+              )
+              .reverse()
+              .offset(1) // Keep one entry (the one mapping muts that came during fetch --> previous server revision)
+              .delete(),
+          ]);
+        } else {
+          // In this case, the mutation table only contains added items after sending empty changeset to server.
+          // We should not clear out anything now.
+        }
       }
+
+      // Update latestRevisions object according to additional changes:
+      getLatestRevisionsPerTable(addedClientChanges, latestRevisions);
+
+      // Update/add new entries into baseRevs map.
+      // * On tables without mutations since last serverRevision,
+      //   this will update existing entry.
+      // * On tables where mutations have been recorded since last
+      //   serverRevision, this will create a new entry.
+      // The purpose of this operation is to mark a start revision (per table)
+      // so that all client-mutations that come after this, will be mapped to current
+      // server revision.
+      await updateBaseRevs(db, schema, latestRevisions, res.serverRevision);
+
+      const syncState = await db.getPersistedSyncState();
+
+      //
+      // Delete objects from removed realms
+      //
+      await deleteObjectsFromRemovedRealms(db, res, syncState);
+
+      //
+      // Update syncState
+      //
+      const newSyncState: PersistedSyncState = syncState || {
+        syncedTables: [],
+        latestRevisions: {},
+        realms: [],
+        inviteRealms: [],
+        clientIdentity,
+      };
+      if (readyForSyncification) {
+        newSyncState.syncedTables = tablesToSync
+          .map((tbl) => tbl.name)
+          .concat(tablesToSyncify.map((tbl) => tbl.name));
+      }
+      newSyncState.latestRevisions = latestRevisions;
+      newSyncState.remoteDbId = res.dbId;
+      newSyncState.initiallySynced = true;
+      newSyncState.realms = res.realms;
+      newSyncState.inviteRealms = res.inviteRealms;
+      newSyncState.serverRevision = res.serverRevision;
+      newSyncState.yServerRevision = res.serverRevision;
+      newSyncState.timestamp = new Date();
+      delete newSyncState.error;
+
+      const filteredChanges = filterServerChangesThroughAddedClientChanges(
+        res.changes,
+        addedClientChanges
+      );
+
+      //
+      // apply server changes
+      //
+      await applyServerChanges(filteredChanges, db);
+
+      if (res.yMessages) {
+        //
+        // apply yMessages
+        //
+        const { receivedUntils, resyncNeeded, yServerRevision } =
+          await applyYServerMessages(res.yMessages, db);
+        if (yServerRevision) {
+          newSyncState.yServerRevision = yServerRevision;
+        }
+
+        //
+        // update Y SyncStates
+        //
+        await updateYSyncStates(lastUpdateIds, receivedUntils, db);
+
+        if (resyncNeeded) {
+          newSyncState.yDownloadedRealms = {}; // Will trigger a full download of Y-documents below...
+        }
+      }
+
+      //
+      // Update regular syncState
+      //
+      db.$syncState.put(newSyncState, 'syncState');
+
+      return {
+        done: addedClientChanges.length === 0,
+        newSyncState,
+      };
     }
-
-    //
-    // Update regular syncState
-    //
-    db.$syncState.put(newSyncState, 'syncState');
-
-    return {
-      done: addedClientChanges.length === 0,
-      newSyncState
-    };
-  });
+  );
   if (!done) {
     console.debug('MORE SYNC NEEDED. Go for it again!');
     await checkSyncRateLimitDelay(db);
     return await _sync(db, options, schema, { isInitialSync, cancelToken });
   }
-  const usingYProps = Object.values(schema).some(tbl => tbl.yProps?.length);
+  const usingYProps = Object.values(schema).some((tbl) => tbl.yProps?.length);
   const serverSupportsYprops = !!res.yMessages;
   if (usingYProps && serverSupportsYprops) {
     try {
@@ -466,7 +481,7 @@ async function deleteObjectsFromRemovedRealms(
     const updateSpec: UpdateSpec<PersistedSyncState> = {};
     for (const realmId of rejectedRealms) {
       delete syncState.yDownloadedRealms[realmId];
-    } 
+    }
   }
 }
 

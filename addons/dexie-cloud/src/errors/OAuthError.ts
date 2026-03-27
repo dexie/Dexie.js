@@ -10,11 +10,14 @@ export type OAuthErrorCode =
 /** User-friendly messages for OAuth error codes */
 const ERROR_MESSAGES: Record<OAuthErrorCode, string> = {
   access_denied: 'Access was denied by the authentication provider.',
-  invalid_state: 'The authentication response could not be verified. Please try again.',
-  email_not_verified: 'Your email address must be verified before you can log in.',
+  invalid_state:
+    'The authentication response could not be verified. Please try again.',
+  email_not_verified:
+    'Your email address must be verified before you can log in.',
   expired_code: 'The authentication code has expired. Please try again.',
   provider_error: 'An error occurred with the authentication provider.',
-  network_error: 'A network error occurred during authentication. Please check your connection and try again.',
+  network_error:
+    'A network error occurred during authentication. Please check your connection and try again.',
 };
 
 /** Error class for OAuth-specific errors */

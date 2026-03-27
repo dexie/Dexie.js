@@ -72,7 +72,9 @@ export function createIdGenerationMiddleware(
           return {
             ...table,
             mutate: (req) => {
-              const idbtrans = req.trans as DBCoreTransaction & IDBTransaction & TXExpandos;
+              const idbtrans = req.trans as DBCoreTransaction &
+                IDBTransaction &
+                TXExpandos;
               if (idbtrans.mode === 'versionchange') {
                 // Tell all the other middlewares to skip bothering. We're in versionchange mode.
                 // dexie-cloud is not initialized yet.

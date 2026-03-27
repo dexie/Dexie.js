@@ -1,4 +1,10 @@
-import { DbSchema, Dexie, ExtendableVersion, IndexSpec, TableSchema } from 'dexie';
+import {
+  DbSchema,
+  Dexie,
+  ExtendableVersion,
+  IndexSpec,
+  TableSchema,
+} from 'dexie';
 import { createYjsMiddleware } from './createYjsMiddleware';
 import { createYDocProperty } from './createYDocProperty';
 import { periodicGC } from './periodicGC';
@@ -30,12 +36,16 @@ export default function yDexie(dbOrOptions: Dexie | YDexieOptions) {
 }
 
 function configurableYDexie(db: Dexie, options: YDexieOptions) {
-  db.Table = class Table extends (db.Table as (new() => Dexie.Table<any>)) {
+  db.Table = class Table extends (db.Table as new () => Dexie.Table<any>) {
     mapToClass(constructor: Function) {
       if (this.schema.yProps) {
         constructor = class extends (constructor as any) {};
-        this.schema.yProps.forEach(({prop, updatesTable}) => {
-          Object.defineProperty(constructor.prototype, prop, createYDocProperty(db, this, prop, updatesTable));
+        this.schema.yProps.forEach(({ prop, updatesTable }) => {
+          Object.defineProperty(
+            constructor.prototype,
+            prop,
+            createYDocProperty(db, this, prop, updatesTable)
+          );
         });
       }
       const result = super.mapToClass(constructor);
@@ -44,7 +54,9 @@ function configurableYDexie(db: Dexie, options: YDexieOptions) {
     }
   };
 
-  db.Version = class Version extends (db.Version as (new() => ExtendableVersion)) {
+  db.Version = class Version extends (
+    (db.Version as new () => ExtendableVersion)
+  ) {
     _createTableSchema(
       name: string,
       primKey: IndexSpec,
