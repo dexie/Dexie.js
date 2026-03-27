@@ -62,7 +62,9 @@ export class Table implements ITable<any, IndexableType> {
     const task =
       debug &&
       typeof console !== 'undefined' &&
+      // @ts-ignore
       console.createTask &&
+      // @ts-ignore
       console.createTask(
         `Dexie: ${mode === 'readonly' ? 'read' : 'write'} ${this.name}`
       );
