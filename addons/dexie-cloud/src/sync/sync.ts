@@ -56,7 +56,6 @@ export function sync(
   return _sync(db, options, schema, syncOptions)
     .then((result) => {
       if (!syncOptions?.justCheckIfNeeded) {
-        // && syncOptions?.purpose !== 'push') {
         db.syncStateChangedEvent.next({
           phase: 'in-sync',
         });

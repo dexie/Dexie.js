@@ -8,20 +8,27 @@ export function fetchWithStallTimeout(
   stallMs: number
 ): Promise<Response> {
   const controller = new AbortController();
+  let onAbort: (() => void) | undefined;
+
   // If the caller already set a signal, chain abort from it
   if (init.signal) {
     const outerSignal = init.signal;
     if (outerSignal.aborted) {
       controller.abort(outerSignal.reason);
     } else {
-      outerSignal.addEventListener(
-        'abort',
-        () => controller.abort(outerSignal.reason),
-        { once: true }
-      );
+      onAbort = () => controller.abort(outerSignal.reason);
+      outerSignal.addEventListener('abort', onAbort, { once: true });
     }
   }
   let timer = setTimeout(() => controller.abort(), stallMs);
+
+  const cleanup = () => {
+    clearTimeout(timer);
+    if (onAbort && init.signal) {
+      init.signal.removeEventListener('abort', onAbort);
+      onAbort = undefined;
+    }
+  };
 
   const bump = () => {
     clearTimeout(timer);
@@ -39,19 +46,20 @@ export function fetchWithStallTimeout(
             try {
               const { done, value } = await reader.read();
               if (done) {
-                clearTimeout(timer);
+                cleanup();
                 ctrl.close();
               } else {
                 bump();
                 ctrl.enqueue(value);
               }
             } catch (e) {
-              clearTimeout(timer);
+              cleanup();
               ctrl.error(e);
             }
           },
           cancel() {
-            clearTimeout(timer);
+            cleanup();
+            reader.cancel();
             controller.abort();
           },
         });
@@ -61,11 +69,11 @@ export function fetchWithStallTimeout(
           headers: res.headers,
         });
       }
-      clearTimeout(timer);
+      cleanup();
       return res;
     })
     .catch((e) => {
-      clearTimeout(timer);
+      cleanup();
       throw e;
     });
 }
