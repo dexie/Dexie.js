@@ -88,6 +88,24 @@ export interface DexieCloudOptions {
    */
   blobMode?: 'eager' | 'lazy';
 
+  /** Timeout (ms) for HTTP requests to Dexie Cloud server.
+   * Uses stall detection: aborts if no data is received for this duration.
+   * This means large downloads/uploads won't time out as long as data is flowing.
+   * Default: 30_000 (30 seconds).
+   */
+  fetchStallTimeout?: number;
+
+  /** Timeout (ms) for sync({ wait: true }) to wait for sync completion.
+   * Default: 120_000 (2 minutes).
+   */
+  syncWaitTimeout?: number;
+
+  /** Maximum recursive depth for _sync() retries.
+   * Prevents infinite recursion if mutations keep occurring during sync.
+   * Default: 10.
+   */
+  maxSyncDepth?: number;
+
   /** Maximum string length (in characters) before offloading to blob storage during sync.
    *
    * Strings longer than this threshold are uploaded as blobs during sync,

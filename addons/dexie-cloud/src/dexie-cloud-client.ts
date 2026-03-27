@@ -11,13 +11,22 @@ import {
   from,
   fromEvent,
   Subject,
+  throwError,
 } from 'rxjs';
 import {
   createDownloadingState,
   observeBlobProgress,
 } from './sync/blobProgress';
 import { downloadUnresolvedBlobs } from './sync/eagerBlobDownloader';
-import { filter, map, skip, startWith, switchMap, take } from 'rxjs/operators';
+import {
+  filter,
+  map,
+  skip,
+  startWith,
+  switchMap,
+  take,
+  timeout,
+} from 'rxjs/operators';
 import { login } from './authentication/login';
 import { UNAUTHORIZED_USER } from './authentication/UNAUTHORIZED_USER';
 import { DexieCloudDB } from './db/DexieCloudDB';
@@ -247,7 +256,11 @@ export function dexieCloud(dexie: Dexie) {
         );
       }
       const socialAuthEnabled = options.socialAuth !== false;
-      return fetchAuthProviders(options.databaseUrl, socialAuthEnabled);
+      return fetchAuthProviders(
+        options.databaseUrl,
+        socialAuthEnabled,
+        options.fetchStallTimeout
+      );
     },
     async sync(
       { wait, purpose }: DexieCloudSyncOptions = { wait: true, purpose: 'push' }
@@ -261,6 +274,7 @@ export function dexieCloud(dexie: Dexie) {
       }
       if (purpose === 'pull') {
         const syncState = db.cloud.persistedSyncState.value;
+        const syncWaitTimeout = db.cloud.options?.syncWaitTimeout ?? 120_000;
         triggerSync(db, purpose);
         if (wait) {
           const newSyncState = await firstValueFrom(
@@ -269,7 +283,17 @@ export function dexieCloud(dexie: Dexie) {
                 (newSyncState) =>
                   newSyncState?.timestamp != null &&
                   (!syncState || newSyncState.timestamp > syncState.timestamp!)
-              )
+              ),
+              timeout({
+                each: syncWaitTimeout,
+                with: () =>
+                  throwError(
+                    () =>
+                      new Error(
+                        `dexie-cloud: sync({ wait: true, purpose: 'pull' }) timed out after ${syncWaitTimeout}ms`
+                      )
+                  ),
+              })
             )
           );
           if (newSyncState?.error) {
@@ -278,6 +302,7 @@ export function dexieCloud(dexie: Dexie) {
         }
       } else if (await isSyncNeeded(db)) {
         const syncState = db.cloud.persistedSyncState.value;
+        const syncWaitTimeout = db.cloud.options?.syncWaitTimeout ?? 120_000;
         triggerSync(db, purpose);
         if (wait) {
           console.debug('db.cloud.login() is waiting for sync completion...');
@@ -293,7 +318,19 @@ export function dexieCloud(dexie: Dexie) {
                   throw new Error(`Sync error: ` + newSyncState.error);
                 return syncNeeded;
               })
-            ).pipe(filter((isNeeded) => !isNeeded))
+            ).pipe(
+              filter((isNeeded) => !isNeeded),
+              timeout({
+                each: syncWaitTimeout,
+                with: () =>
+                  throwError(
+                    () =>
+                      new Error(
+                        `dexie-cloud: sync({ wait: true, purpose: 'push' }) timed out after ${syncWaitTimeout}ms`
+                      )
+                  ),
+              })
+            )
           );
           console.debug(
             'Done waiting for sync completion because we have nothing to push anymore'
