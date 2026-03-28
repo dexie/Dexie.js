@@ -312,7 +312,13 @@ pnpm run watch
 
 <br/>
 
-[![Browser testing via TestMu AI (Formerly LambdaTest)](testmuai-logo.svg)](https://www.testmuai.com/?utm_medium=sponsor&utm_source=dexiejs)
+Browser testing via<br/>
+<a href="https://www.testmuai.com/?utm_medium=sponsor&utm_source=dexiejs">
+  <picture>
+    <source media="(prefers-color-scheme: dark)" srcset="testmuai-logo-white.svg">
+    <img src="testmuai-logo.svg" alt="TestMu AI (Formerly LambdaTest)" width="147" height="26">
+  </picture>
+</a>
 
 [npm-image]: https://img.shields.io/npm/v/dexie.svg?style=flat
 [npm-url]: https://npmjs.org/package/dexie
