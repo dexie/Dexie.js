@@ -28,11 +28,43 @@ jobs:
       - name: Upgrade npm
         run: npm install -g npm@latest
 
-      # Build everything from root — this builds dexie + all addons/libs
       - name: Install dependencies
         run: pnpm install
 
-      - name: Build all packages
+      # Build in dependency order
+      - name: Build dexie
+        run: pnpm run build
+
+      - name: Build y-dexie
+        working-directory: addons/y-dexie
+        run: pnpm run build
+
+      - name: Build dexie-react-hooks
+        working-directory: libs/dexie-react-hooks
+        run: pnpm run build
+
+      - name: Build dexie-cloud-common
+        working-directory: libs/dexie-cloud-common
+        run: pnpm run build
+
+      - name: Build dexie-cloud-addon
+        working-directory: addons/dexie-cloud
+        run: pnpm run build
+
+      - name: Build dexie-export-import
+        working-directory: addons/dexie-export-import
+        run: pnpm run build
+
+      - name: Build dexie-svelte-query
+        working-directory: libs/dexie-svelte-query
+        run: pnpm run build
+
+      - name: Build dexie-observable
+        working-directory: addons/Dexie.Observable
+        run: pnpm run build
+
+      - name: Build dexie-syncable
+        working-directory: addons/Dexie.Syncable
         run: pnpm run build
 
       # Publish each package if its version is not already on npm
