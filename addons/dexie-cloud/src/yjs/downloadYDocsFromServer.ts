@@ -8,6 +8,10 @@ import { PersistedSyncState } from '../db/entities/PersistedSyncState';
 import { TSON } from '../TSON';
 import { loadAccessToken } from '../authentication/authenticate';
 import {
+  fetchWithStallTimeout,
+  DEFAULT_FETCH_STALL_TIMEOUT,
+} from '../helpers/fetchWithStallTimeout';
+import {
   Decoder,
   readUint8,
   readVarString,
@@ -44,12 +48,16 @@ export async function downloadYDocsFromServer(
   if (user) {
     headers.Authorization = `Bearer ${user.accessToken}`;
   }
-  const res = await fetch(`${databaseUrl}/y/download`, {
-    body: TSON.stringify({ downloadedRealms: yDownloadedRealms || {} }),
-    method: 'POST',
-    headers,
-    credentials: 'include',
-  });
+  const res = await fetchWithStallTimeout(
+    `${databaseUrl}/y/download`,
+    {
+      body: TSON.stringify({ downloadedRealms: yDownloadedRealms || {} }),
+      method: 'POST',
+      headers,
+      credentials: 'include',
+    },
+    db.cloud.options?.fetchStallTimeout ?? DEFAULT_FETCH_STALL_TIMEOUT
+  );
   if (!res.ok) {
     throw new Error(
       `Failed to download Yjs documents from server. Status: ${res.status}`

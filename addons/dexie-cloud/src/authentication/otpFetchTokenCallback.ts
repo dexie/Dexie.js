@@ -26,6 +26,10 @@ import {
 import { startOAuthRedirect } from './oauthLogin';
 import { OAuthRedirectError } from '../errors/OAuthRedirectError';
 import { DXCAlert } from '../types/DXCAlert';
+import {
+  fetchWithStallTimeout,
+  DEFAULT_FETCH_STALL_TIMEOUT,
+} from '../helpers/fetchWithStallTimeout';
 
 export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
   const { userInteraction } = db.cloud;
@@ -67,6 +71,7 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
           publicKey: public_key,
           scopes: ['ACCESS_DB'],
           intent,
+          fetchStallTimeout: db.cloud.options?.fetchStallTimeout,
         });
       } catch (err) {
         if (err instanceof PolicyRejectionError) {
@@ -171,7 +176,11 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
     } else {
       // Default path: check for OAuth providers, then fall back to OTP.
       const socialAuthEnabled = db.cloud.options?.socialAuth !== false;
-      const authProviders = await fetchAuthProviders(url, socialAuthEnabled);
+      const authProviders = await fetchAuthProviders(
+        url,
+        socialAuthEnabled,
+        db.cloud.options?.fetchStallTimeout
+      );
 
       if (authProviders.providers.length > 0) {
         const providerAlerts = policyAlert ? [policyAlert] : [];
@@ -217,12 +226,18 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
     }
 
     // ── POST /token (step 1) ───────────────────────────────────────────────
-    const res1 = await fetch(`${url}/token`, {
-      body: JSON.stringify(tokenRequest),
-      method: 'post',
-      headers: { 'Content-Type': 'application/json' },
-      mode: 'cors',
-    });
+    const stallTimeout =
+      db.cloud.options?.fetchStallTimeout ?? DEFAULT_FETCH_STALL_TIMEOUT;
+    const res1 = await fetchWithStallTimeout(
+      `${url}/token`,
+      {
+        body: JSON.stringify(tokenRequest),
+        method: 'post',
+        headers: { 'Content-Type': 'application/json' },
+        mode: 'cors',
+      },
+      stallTimeout
+    );
 
     if (res1.status !== 200) {
       const alert = await tryParsePolicyAlert(res1);
@@ -256,12 +271,16 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
       } satisfies OTPTokenRequest2;
 
       // ── POST /token (step 2: OTP verification) ─────────────────────────
-      let res2 = await fetch(`${url}/token`, {
-        body: JSON.stringify(tokenRequest2),
-        method: 'post',
-        headers: { 'Content-Type': 'application/json' },
-        mode: 'cors',
-      });
+      let res2 = await fetchWithStallTimeout(
+        `${url}/token`,
+        {
+          body: JSON.stringify(tokenRequest2),
+          method: 'post',
+          headers: { 'Content-Type': 'application/json' },
+          mode: 'cors',
+        },
+        stallTimeout
+      );
       while (res2.status === 401) {
         const errorText = await res2.text();
         tokenRequest2.otp = await promptForOTP(
@@ -274,12 +293,16 @@ export function otpFetchTokenCallback(db: DexieCloudDB): FetchTokenCallback {
             messageParams: {},
           }
         );
-        res2 = await fetch(`${url}/token`, {
-          body: JSON.stringify(tokenRequest2),
-          method: 'post',
-          headers: { 'Content-Type': 'application/json' },
-          mode: 'cors',
-        });
+        res2 = await fetchWithStallTimeout(
+          `${url}/token`,
+          {
+            body: JSON.stringify(tokenRequest2),
+            method: 'post',
+            headers: { 'Content-Type': 'application/json' },
+            mode: 'cors',
+          },
+          stallTimeout
+        );
       }
 
       if (res2.status !== 200) {

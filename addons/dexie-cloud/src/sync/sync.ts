@@ -56,7 +56,6 @@ export function sync(
   return _sync(db, options, schema, syncOptions)
     .then((result) => {
       if (!syncOptions?.justCheckIfNeeded) {
-        // && syncOptions?.purpose !== 'push') {
         db.syncStateChangedEvent.next({
           phase: 'in-sync',
         });
@@ -105,7 +104,13 @@ async function _sync(
   db: DexieCloudDB,
   options: DexieCloudOptions,
   schema: DexieCloudSchema,
-  { isInitialSync, cancelToken, justCheckIfNeeded, purpose }: SyncOptions = {
+  {
+    isInitialSync,
+    cancelToken,
+    justCheckIfNeeded,
+    purpose,
+    depth = 0,
+  }: SyncOptions & { depth?: number } = {
     isInitialSync: false,
   }
 ): Promise<boolean> {
@@ -225,7 +230,8 @@ async function _sync(
       clientChangeSet,
       databaseUrl,
       () => loadCachedAccessToken(db),
-      maxStringLength
+      maxStringLength,
+      options?.fetchStallTimeout
     );
   }
 
@@ -242,7 +248,8 @@ async function _sync(
     databaseUrl,
     schema,
     clientIdentity,
-    currentUser
+    currentUser,
+    options?.fetchStallTimeout
   );
   console.debug('Sync response', res);
 
@@ -402,8 +409,19 @@ async function _sync(
   );
   if (!done) {
     console.debug('MORE SYNC NEEDED. Go for it again!');
+    if (depth >= (options?.maxSyncDepth ?? 10)) {
+      console.warn(
+        'dexie-cloud: sync recursion limit reached. Some local changes may not have been pushed.'
+      );
+      return false;
+    }
     await checkSyncRateLimitDelay(db);
-    return await _sync(db, options, schema, { isInitialSync, cancelToken });
+    return await _sync(db, options, schema, {
+      isInitialSync,
+      cancelToken,
+      purpose,
+      depth: depth + 1,
+    });
   }
   const usingYProps = Object.values(schema).some((tbl) => tbl.yProps?.length);
   const serverSupportsYprops = !!res.yMessages;
