@@ -312,7 +312,7 @@ pnpm run watch
 
 <br/>
 
-[![Browser testing via LAMBDATEST](https://www.lambdatest.com/support/img/logo.svg)](https://www.lambdatest.com/)
+[![Browser testing via TestMu AI (Formerly LambdaTest)](https://assets.testmuai.com/resources/images/logos/logo.svg)](https://www.testmuai.com/)
 
 [npm-image]: https://img.shields.io/npm/v/dexie.svg?style=flat
 [npm-url]: https://npmjs.org/package/dexie
