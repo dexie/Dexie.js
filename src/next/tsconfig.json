@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "module": "es2015",
+    "declaration": true,
+    "sourceMap": true,
+    "outDir": "../../tools/tmp/src/next",
+    "moduleResolution": "node",
+    "lib": ["es2022", "dom"],
+    "importHelpers": true,
+    "strictNullChecks": false,
+    "noImplicitAny": false,
+    "noImplicitReturns": false,
+    "forceConsistentCasingInFileNames": true
+  },
+  "include": [
+    "./*.mts"
+  ]
+}
