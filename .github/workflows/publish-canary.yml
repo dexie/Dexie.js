@@ -1,0 +1,144 @@
+name: Publish Canary
+
+on:
+  push:
+    branches: [master]
+
+jobs:
+  publish:
+    name: Publish canary to npm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # required for OIDC Trusted Publisher
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      # npm must be upgraded for OIDC Trusted Publisher to work
+      - name: Upgrade npm
+        run: npm install -g npm@latest
+
+      # Build everything from root — this builds dexie + all addons/libs
+      - name: Install dependencies
+        run: pnpm install
+
+      - name: Build all packages
+        run: pnpm run build
+
+      # Publish each package if its version is not already on npm
+      - name: Publish dexie
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm show dexie@$VERSION version 2>/dev/null || echo "")
+          if [ -z "$PUBLISHED" ]; then
+            echo "Publishing dexie@$VERSION as canary..."
+            pnpm publish --tag canary --provenance --no-git-checks
+          else
+            echo "dexie@$VERSION already published, skipping."
+          fi
+
+      - name: Publish dexie-cloud-common
+        working-directory: libs/dexie-cloud-common
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm show dexie-cloud-common@$VERSION version 2>/dev/null || echo "")
+          if [ -z "$PUBLISHED" ]; then
+            echo "Publishing dexie-cloud-common@$VERSION as canary..."
+            pnpm publish --tag canary --provenance --no-git-checks
+          else
+            echo "dexie-cloud-common@$VERSION already published, skipping."
+          fi
+
+      - name: Publish dexie-react-hooks
+        working-directory: libs/dexie-react-hooks
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm show dexie-react-hooks@$VERSION version 2>/dev/null || echo "")
+          if [ -z "$PUBLISHED" ]; then
+            echo "Publishing dexie-react-hooks@$VERSION as canary..."
+            pnpm publish --tag canary --provenance --no-git-checks
+          else
+            echo "dexie-react-hooks@$VERSION already published, skipping."
+          fi
+
+      - name: Publish dexie-svelte-query
+        working-directory: libs/dexie-svelte-query
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm show dexie-svelte-query@$VERSION version 2>/dev/null || echo "")
+          if [ -z "$PUBLISHED" ]; then
+            echo "Publishing dexie-svelte-query@$VERSION as canary..."
+            pnpm publish --tag canary --provenance --no-git-checks
+          else
+            echo "dexie-svelte-query@$VERSION already published, skipping."
+          fi
+
+      - name: Publish dexie-export-import
+        working-directory: addons/dexie-export-import
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm show dexie-export-import@$VERSION version 2>/dev/null || echo "")
+          if [ -z "$PUBLISHED" ]; then
+            echo "Publishing dexie-export-import@$VERSION as canary..."
+            pnpm publish --tag canary --provenance --no-git-checks
+          else
+            echo "dexie-export-import@$VERSION already published, skipping."
+          fi
+
+      - name: Publish dexie-observable
+        working-directory: addons/Dexie.Observable
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm show dexie-observable@$VERSION version 2>/dev/null || echo "")
+          if [ -z "$PUBLISHED" ]; then
+            echo "Publishing dexie-observable@$VERSION as canary..."
+            pnpm publish --tag canary --provenance --no-git-checks
+          else
+            echo "dexie-observable@$VERSION already published, skipping."
+          fi
+
+      - name: Publish dexie-syncable
+        working-directory: addons/Dexie.Syncable
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm show dexie-syncable@$VERSION version 2>/dev/null || echo "")
+          if [ -z "$PUBLISHED" ]; then
+            echo "Publishing dexie-syncable@$VERSION as canary..."
+            pnpm publish --tag canary --provenance --no-git-checks
+          else
+            echo "dexie-syncable@$VERSION already published, skipping."
+          fi
+
+      - name: Publish y-dexie
+        working-directory: addons/y-dexie
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm show y-dexie@$VERSION version 2>/dev/null || echo "")
+          if [ -z "$PUBLISHED" ]; then
+            echo "Publishing y-dexie@$VERSION as canary..."
+            pnpm publish --tag canary --provenance --no-git-checks
+          else
+            echo "y-dexie@$VERSION already published, skipping."
+          fi
+
+      - name: Publish dexie-cloud-addon
+        working-directory: addons/dexie-cloud
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          PUBLISHED=$(npm show dexie-cloud-addon@$VERSION version 2>/dev/null || echo "")
+          if [ -z "$PUBLISHED" ]; then
+            echo "Publishing dexie-cloud-addon@$VERSION as canary..."
+            pnpm publish --tag canary --provenance --no-git-checks
+          else
+            echo "dexie-cloud-addon@$VERSION already published, skipping."
+          fi
