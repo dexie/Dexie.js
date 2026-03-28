@@ -1,42 +1,54 @@
-name: Publish PR Prerelease
+name: Publish
 
-# Manually triggered by Liz (via GitHub API) when a trusted team member
-# requests a prerelease of a specific PR branch for testing.
+# Handles two scenarios:
+# 1. Canary publish: auto-triggered on push to master
+# 2. PR prerelease: manually triggered by Liz for trusted testers
 #
-# Usage (Liz triggers via gh CLI):
-#   gh workflow run publish-pr.yml \
+# Manual trigger (Liz uses this via gh CLI):
+#   gh workflow run publish.yml \
 #     --repo dexie/Dexie.js \
 #     --ref <branch-name> \
+#     -f mode=pr \
 #     -f pr_number=2253 \
 #     -f packages=dexie-cloud-addon \
 #     -f requester_discord_id=321912613246337024 \
 #     -f build_number=1
 
 on:
+  push:
+    branches: [master]
   workflow_dispatch:
     inputs:
-      pr_number:
-        description: 'PR number (e.g. 2253)'
+      mode:
+        description: 'Publish mode'
         required: true
+        default: 'pr'
+        type: choice
+        options:
+          - pr
+          - canary
+      pr_number:
+        description: 'PR number (required for mode=pr, e.g. 2253)'
+        required: false
         type: string
       packages:
         description: 'Packages to publish (comma-separated or "all")'
-        required: true
+        required: false
         default: 'all'
         type: string
       build_number:
-        description: 'Build number suffix (increment if re-running same PR)'
+        description: 'Build number suffix for PR mode (increment if re-running)'
         required: false
         default: '1'
         type: string
       requester_discord_id:
-        description: 'Discord user ID of the person who requested this prerelease'
+        description: 'Discord user ID of the person who requested the prerelease'
         required: false
         type: string
 
 jobs:
-  publish-pr:
-    name: Publish PR prerelease
+  publish:
+    name: Publish to npm
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -54,6 +66,7 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      # npm must be upgraded for OIDC Trusted Publisher to work
       - name: Upgrade npm
         run: npm install -g npm@latest
 
@@ -96,19 +109,29 @@ jobs:
         working-directory: addons/Dexie.Syncable
         run: pnpm run build
 
-      - name: Publish PR prereleases
+      - name: Publish packages
         id: publish
         run: |
+          # Determine mode: push to master = canary, workflow_dispatch = use input
+          if [ "${{ github.event_name }}" = "push" ]; then
+            MODE="canary"
+          else
+            MODE="${{ inputs.mode }}"
+          fi
+
           PR="${{ inputs.pr_number }}"
           BUILD="${{ inputs.build_number }}"
           PACKAGES="${{ inputs.packages }}"
+          [ -z "$PACKAGES" ] && PACKAGES="all"
+
           PUBLISHED_VERSIONS=""
 
           publish_pkg() {
             local PKG_NAME="$1"
             local PKG_DIR="$2"
-            local SHOULD_PUBLISH=false
 
+            # Check if this package should be published
+            local SHOULD_PUBLISH=false
             if [ "$PACKAGES" = "all" ]; then
               SHOULD_PUBLISH=true
             else
@@ -126,31 +149,45 @@ jobs:
               return
             fi
 
-            local BASE_VERSION=$(node -p "require('${PKG_DIR}/package.json').version")
-            local PR_VERSION="${BASE_VERSION}-pr${PR}.${BUILD}"
-            local TAG="pr${PR}"
+            local BASE_VERSION=$(node -p "require('./${PKG_DIR}/package.json').version")
 
-            echo "Publishing ${PKG_NAME}@${PR_VERSION} with tag ${TAG}..."
+            if [ "$MODE" = "canary" ]; then
+              # Canary: publish as-is if not already published
+              local PUBLISHED=$(npm show ${PKG_NAME}@${BASE_VERSION} version 2>/dev/null || echo "")
+              if [ -n "$PUBLISHED" ]; then
+                echo "${PKG_NAME}@${BASE_VERSION} already published, skipping."
+                return
+              fi
+              local PUBLISH_VERSION="$BASE_VERSION"
+              local TAG="canary"
+            else
+              # PR prerelease: append -prNNN.K suffix
+              local PUBLISH_VERSION="${BASE_VERSION}-pr${PR}.${BUILD}"
+              local TAG="pr${PR}"
 
-            # Temporarily patch version for publish
-            node -e "
-              const fs = require('fs');
-              const pkg = JSON.parse(fs.readFileSync('${PKG_DIR}/package.json', 'utf8'));
-              pkg.version = '${PR_VERSION}';
-              fs.writeFileSync('${PKG_DIR}/package.json', JSON.stringify(pkg, null, 2) + '\n');
-            "
+              # Temporarily patch version
+              node -e "
+                const fs = require('fs');
+                const pkg = JSON.parse(fs.readFileSync('./${PKG_DIR}/package.json', 'utf8'));
+                pkg.version = '${PUBLISH_VERSION}';
+                fs.writeFileSync('./${PKG_DIR}/package.json', JSON.stringify(pkg, null, 2) + '\n');
+              "
+            fi
 
+            echo "Publishing ${PKG_NAME}@${PUBLISH_VERSION} with tag ${TAG}..."
             (cd "${PKG_DIR}" && pnpm publish --tag "${TAG}" --provenance --no-git-checks)
 
-            # Restore original version
-            node -e "
-              const fs = require('fs');
-              const pkg = JSON.parse(fs.readFileSync('${PKG_DIR}/package.json', 'utf8'));
-              pkg.version = '${BASE_VERSION}';
-              fs.writeFileSync('${PKG_DIR}/package.json', JSON.stringify(pkg, null, 2) + '\n');
-            "
+            # Restore original version after PR publish
+            if [ "$MODE" = "pr" ]; then
+              node -e "
+                const fs = require('fs');
+                const pkg = JSON.parse(fs.readFileSync('./${PKG_DIR}/package.json', 'utf8'));
+                pkg.version = '${BASE_VERSION}';
+                fs.writeFileSync('./${PKG_DIR}/package.json', JSON.stringify(pkg, null, 2) + '\n');
+              "
+            fi
 
-            PUBLISHED_VERSIONS="${PUBLISHED_VERSIONS}\n- \`npm install ${PKG_NAME}@${PR_VERSION}\`"
+            PUBLISHED_VERSIONS="${PUBLISHED_VERSIONS}\n- \`npm install ${PKG_NAME}@${PUBLISH_VERSION}\`"
           }
 
           publish_pkg "dexie" "."
@@ -163,12 +200,13 @@ jobs:
           publish_pkg "y-dexie" "addons/y-dexie"
           publish_pkg "dexie-cloud-addon" "addons/dexie-cloud"
 
+          echo "mode=$MODE" >> $GITHUB_OUTPUT
           echo "published_versions<<EOF" >> $GITHUB_OUTPUT
           echo -e "$PUBLISHED_VERSIONS" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
-      - name: Notify via Discord
-        if: always()
+      - name: Notify via Discord (PR mode only)
+        if: inputs.mode == 'pr' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'pr')
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_LIZ_LEAD_DEV }}
         run: |
