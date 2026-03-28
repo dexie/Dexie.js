@@ -1,0 +1,194 @@
+name: Publish PR Prerelease
+
+# Manually triggered by Liz (via GitHub API) when a trusted team member
+# requests a prerelease of a specific PR branch for testing.
+#
+# Usage (Liz triggers via gh CLI):
+#   gh workflow run publish-pr.yml \
+#     --repo dexie/Dexie.js \
+#     --ref <branch-name> \
+#     -f pr_number=2253 \
+#     -f packages=dexie-cloud-addon \
+#     -f requester_discord_id=321912613246337024 \
+#     -f build_number=1
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: 'PR number (e.g. 2253)'
+        required: true
+        type: string
+      packages:
+        description: 'Packages to publish (comma-separated or "all")'
+        required: true
+        default: 'all'
+        type: string
+      build_number:
+        description: 'Build number suffix (increment if re-running same PR)'
+        required: false
+        default: '1'
+        type: string
+      requester_discord_id:
+        description: 'Discord user ID of the person who requested this prerelease'
+        required: false
+        type: string
+
+jobs:
+  publish-pr:
+    name: Publish PR prerelease
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write  # required for OIDC Trusted Publisher
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: latest
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          registry-url: https://registry.npmjs.org
+
+      - name: Upgrade npm
+        run: npm install -g npm@latest
+
+      - name: Install dependencies
+        run: pnpm install
+
+      # Build in dependency order
+      - name: Build dexie
+        run: pnpm run build
+
+      - name: Build y-dexie
+        working-directory: addons/y-dexie
+        run: pnpm run build
+
+      - name: Build dexie-react-hooks
+        working-directory: libs/dexie-react-hooks
+        run: pnpm run build
+
+      - name: Build dexie-cloud-common
+        working-directory: libs/dexie-cloud-common
+        run: pnpm run build
+
+      - name: Build dexie-cloud-addon
+        working-directory: addons/dexie-cloud
+        run: pnpm run build
+
+      - name: Build dexie-export-import
+        working-directory: addons/dexie-export-import
+        run: pnpm run build
+
+      - name: Build dexie-svelte-query
+        working-directory: libs/dexie-svelte-query
+        run: pnpm run build
+
+      - name: Build dexie-observable
+        working-directory: addons/Dexie.Observable
+        run: pnpm run build
+
+      - name: Build dexie-syncable
+        working-directory: addons/Dexie.Syncable
+        run: pnpm run build
+
+      - name: Publish PR prereleases
+        id: publish
+        run: |
+          PR="${{ inputs.pr_number }}"
+          BUILD="${{ inputs.build_number }}"
+          PACKAGES="${{ inputs.packages }}"
+          PUBLISHED_VERSIONS=""
+
+          publish_pkg() {
+            local PKG_NAME="$1"
+            local PKG_DIR="$2"
+            local SHOULD_PUBLISH=false
+
+            if [ "$PACKAGES" = "all" ]; then
+              SHOULD_PUBLISH=true
+            else
+              IFS=',' read -ra PKG_LIST <<< "$PACKAGES"
+              for p in "${PKG_LIST[@]}"; do
+                if [ "$(echo $p | tr -d ' ')" = "$PKG_NAME" ]; then
+                  SHOULD_PUBLISH=true
+                  break
+                fi
+              done
+            fi
+
+            if [ "$SHOULD_PUBLISH" = "false" ]; then
+              echo "Skipping $PKG_NAME (not in requested packages)"
+              return
+            fi
+
+            local BASE_VERSION=$(node -p "require('${PKG_DIR}/package.json').version")
+            local PR_VERSION="${BASE_VERSION}-pr${PR}.${BUILD}"
+            local TAG="pr${PR}"
+
+            echo "Publishing ${PKG_NAME}@${PR_VERSION} with tag ${TAG}..."
+
+            # Temporarily patch version for publish
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('${PKG_DIR}/package.json', 'utf8'));
+              pkg.version = '${PR_VERSION}';
+              fs.writeFileSync('${PKG_DIR}/package.json', JSON.stringify(pkg, null, 2) + '\n');
+            "
+
+            (cd "${PKG_DIR}" && pnpm publish --tag "${TAG}" --provenance --no-git-checks)
+
+            # Restore original version
+            node -e "
+              const fs = require('fs');
+              const pkg = JSON.parse(fs.readFileSync('${PKG_DIR}/package.json', 'utf8'));
+              pkg.version = '${BASE_VERSION}';
+              fs.writeFileSync('${PKG_DIR}/package.json', JSON.stringify(pkg, null, 2) + '\n');
+            "
+
+            PUBLISHED_VERSIONS="${PUBLISHED_VERSIONS}\n- \`npm install ${PKG_NAME}@${PR_VERSION}\`"
+          }
+
+          publish_pkg "dexie" "."
+          publish_pkg "dexie-cloud-common" "libs/dexie-cloud-common"
+          publish_pkg "dexie-react-hooks" "libs/dexie-react-hooks"
+          publish_pkg "dexie-svelte-query" "libs/dexie-svelte-query"
+          publish_pkg "dexie-export-import" "addons/dexie-export-import"
+          publish_pkg "dexie-observable" "addons/Dexie.Observable"
+          publish_pkg "dexie-syncable" "addons/Dexie.Syncable"
+          publish_pkg "y-dexie" "addons/y-dexie"
+          publish_pkg "dexie-cloud-addon" "addons/dexie-cloud"
+
+          echo "published_versions<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$PUBLISHED_VERSIONS" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Notify via Discord
+        if: always()
+        env:
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_LIZ_LEAD_DEV }}
+        run: |
+          PR="${{ inputs.pr_number }}"
+          REQUESTER="${{ inputs.requester_discord_id }}"
+          STATUS="${{ job.status }}"
+          BRANCH="${GITHUB_REF_NAME}"
+          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+
+          if [ "$STATUS" = "success" ]; then
+            MENTION=""
+            if [ -n "$REQUESTER" ]; then
+              MENTION=" (requested by <@${REQUESTER}>)"
+            fi
+            VERSIONS="${{ steps.publish.outputs.published_versions }}"
+            MESSAGE="✅ **PR #${PR} prerelease published**${MENTION}\n\nBranch: \`${BRANCH}\`\n\n${VERSIONS}\n\n[View run](${RUN_URL})"
+          else
+            MESSAGE="❌ **PR #${PR} prerelease FAILED** — [View run](${RUN_URL})"
+          fi
+
+          curl -s -X POST "$DISCORD_WEBHOOK" \
+            -H "Content-Type: application/json" \
+            -d "{\"content\": \"$MESSAGE\"}"
