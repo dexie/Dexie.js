@@ -215,7 +215,10 @@ async function _sync(
   // Offload large blobs to blob storage before sync
   //
   let processedChangeSet = clientChangeSet;
-  const maxStringLength = db.cloud.options?.maxStringLength ?? 32768;
+  const maxStringLength =
+    db.cloud.options?.largeStringThreshold ??
+    db.cloud.options?.maxStringLength ??
+    32768;
   const hasLargeBlobs = hasLargeBlobsInOperations(
     clientChangeSet,
     maxStringLength

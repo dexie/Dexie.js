@@ -180,21 +180,35 @@ export function dexieCloud(dexie: Dexie) {
     invites: getInvitesObservable(dexie),
     roles: getGlobalRolesObservable(dexie),
     configure(options: DexieCloudOptions) {
-      // Validate maxStringLength — Infinity disables offloading, otherwise must be
-      // a finite number between 100 and the server limit (32768).
+      // Validate largeStringThreshold (preferred) or maxStringLength (deprecated) —
+      // Infinity disables offloading, otherwise must be a finite number between 100
+      // and the server limit (32768).
       // Minimum 100 prevents accidental offloading of primary keys and short strings
       // that would break sync.
       const MIN_STRING_LENGTH = 100;
       const MAX_SERVER_STRING_LENGTH = 32768;
+      if (options.maxStringLength !== undefined) {
+        console.warn(
+          'maxStringLength is deprecated, use largeStringThreshold instead'
+        );
+        // If largeStringThreshold is not explicitly set, migrate to new name
+        if (options.largeStringThreshold === undefined) {
+          options = {
+            ...options,
+            largeStringThreshold: options.maxStringLength,
+          };
+        }
+      }
+      const thresholdValue = options.largeStringThreshold;
       if (
-        options.maxStringLength !== undefined &&
-        options.maxStringLength !== Infinity &&
-        (!Number.isFinite(options.maxStringLength) ||
-          options.maxStringLength < MIN_STRING_LENGTH ||
-          options.maxStringLength > MAX_SERVER_STRING_LENGTH)
+        thresholdValue !== undefined &&
+        thresholdValue !== Infinity &&
+        (!Number.isFinite(thresholdValue) ||
+          thresholdValue < MIN_STRING_LENGTH ||
+          thresholdValue > MAX_SERVER_STRING_LENGTH)
       ) {
         throw new Error(
-          `maxStringLength must be Infinity or a finite number in [${MIN_STRING_LENGTH}, ${MAX_SERVER_STRING_LENGTH}]. Got: ${options.maxStringLength}`
+          `largeStringThreshold must be Infinity or a finite number in [${MIN_STRING_LENGTH}, ${MAX_SERVER_STRING_LENGTH}]. Got: ${thresholdValue}`
         );
       }
       options = dexie.cloud.options = { ...dexie.cloud.options, ...options };
