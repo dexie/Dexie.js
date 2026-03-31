@@ -1,7 +1,7 @@
 name: Publish
 
 # Handles two scenarios:
-# 1. Dev publish: auto-triggered on push to master
+# 1. Dev publish: auto-triggered after "Build and Test" succeeds on master
 # 2. PR prerelease: manually triggered by Liz for trusted testers
 #
 # Manual trigger (Liz uses this via gh CLI):
@@ -15,7 +15,9 @@ name: Publish
 #     -f build_number=1
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Build and Test"]
+    types: [completed]
     branches: [master]
   workflow_dispatch:
     inputs:
@@ -50,6 +52,9 @@ jobs:
   publish:
     name: Publish to npm
     runs-on: ubuntu-latest
+    # For workflow_run trigger: only run if tests passed
+    # For workflow_dispatch (manual PR prereleases): always run
+    if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: read
       id-token: write  # required for OIDC Trusted Publisher
