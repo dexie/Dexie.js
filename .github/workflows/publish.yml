@@ -1,7 +1,7 @@
 name: Publish
 
 # Handles two scenarios:
-# 1. Canary publish: auto-triggered on push to master
+# 1. Dev publish: auto-triggered on push to master
 # 2. PR prerelease: manually triggered by Liz for trusted testers
 #
 # Manual trigger (Liz uses this via gh CLI):
@@ -26,7 +26,7 @@ on:
         type: choice
         options:
           - pr
-          - canary
+          - dev
       pr_number:
         description: 'PR number (required for mode=pr, e.g. 2253)'
         required: false
@@ -112,9 +112,9 @@ jobs:
       - name: Publish packages
         id: publish
         run: |
-          # Determine mode: push to master = canary, workflow_dispatch = use input
+          # Determine mode: push to master = dev, workflow_dispatch = use input
           if [ "${{ github.event_name }}" = "push" ]; then
-            MODE="canary"
+            MODE="dev"
           else
             MODE="${{ inputs.mode }}"
           fi
@@ -158,15 +158,15 @@ jobs:
 
             local BASE_VERSION=$(node -p "require('./${PKG_DIR}/package.json').version")
 
-            if [ "$MODE" = "canary" ]; then
-              # Canary: publish as-is if not already published
+            if [ "$MODE" = "dev" ]; then
+              # Dev: publish as-is if not already published
               # Use exit code to distinguish "not found" from real errors
               if npm show "${PKG_NAME}@${BASE_VERSION}" version >/dev/null 2>&1; then
                 echo "${PKG_NAME}@${BASE_VERSION} already published, skipping."
                 return
               fi
               local PUBLISH_VERSION="$BASE_VERSION"
-              local TAG="canary"
+              local TAG="dev"
             else
               # PR prerelease: append -prNNN.K suffix
               local PUBLISH_VERSION="${BASE_VERSION}-pr${PR}.${BUILD}"
