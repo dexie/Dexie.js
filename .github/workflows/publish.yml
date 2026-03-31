@@ -220,7 +220,7 @@ jobs:
       - name: Notify via Discord (PR mode only)
         if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'pr'
         env:
-          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_LIZ_LEAD_DEV }}
+          DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_NPM_RELEASES }}
         run: |
           PR="${{ inputs.pr_number }}"
           REQUESTER="${{ inputs.requester_discord_id }}"
