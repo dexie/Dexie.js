@@ -16,7 +16,7 @@ import { getObjectDiff } from '../../functions/get-object-diff';
 import { fullNameExceptions } from '../../errors';
 import { DexieConstructor } from '../../public/types/dexie-constructor';
 import { getDatabaseNames } from '../../helpers/database-enumerator';
-import { PSD } from '../../helpers/promise';
+import { PSD, globalPSD } from '../../helpers/promise';
 import { usePSD } from '../../helpers/promise';
 import { newScope } from '../../helpers/promise';
 import { rejection } from '../../helpers/promise';
@@ -124,8 +124,8 @@ props(Dexie, {
     //  2) setTimeout() would wait unnescessary until firing. This is however not the case with setImmediate().
     //  3) setImmediate() is not supported in the ES standard.
     //  4) You might want to keep other PSD state that was set in a parent PSD, such as PSD.letThrough.
-    return PSD.trans && PSD.transless
-      ? usePSD(PSD.transless, scopeFunc) // Use the closest parent that was non-transactional.
+    return PSD.trans
+      ? usePSD(PSD.transless || globalPSD, scopeFunc) // Use the closest parent that was non-transactional.
       : scopeFunc(); // No need to change scope because there is no ongoing transaction.
   },
 
