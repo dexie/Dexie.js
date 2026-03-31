@@ -124,7 +124,7 @@ props(Dexie, {
     //  2) setTimeout() would wait unnescessary until firing. This is however not the case with setImmediate().
     //  3) setImmediate() is not supported in the ES standard.
     //  4) You might want to keep other PSD state that was set in a parent PSD, such as PSD.letThrough.
-    return PSD.trans
+    return PSD.trans && PSD.transless
       ? usePSD(PSD.transless, scopeFunc) // Use the closest parent that was non-transactional.
       : scopeFunc(); // No need to change scope because there is no ongoing transaction.
   },
