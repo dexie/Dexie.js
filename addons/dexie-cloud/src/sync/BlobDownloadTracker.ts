@@ -31,8 +31,9 @@ export class BlobDownloadTracker {
     if (!promise) {
       promise = loadCachedAccessToken(this.db)
         .then((accessToken) => {
-          if (!accessToken)
-            throw new Error('No access token available for blob download');
+          // accessToken may be null for anonymous/unauthenticated users.
+          // Public realm blobs (rlm-public) are accessible without auth.
+          // downloadBlob will omit the Authorization header when token is null.
           return downloadBlob(blobRef, dbUrl, accessToken);
         })
         .finally(() => this.inFlight.delete(blobRef.ref));
@@ -45,23 +46,26 @@ export class BlobDownloadTracker {
 /**
  * Download blob data from server via proxy endpoint.
  * Uses auth header for authentication (same as sync).
+ * When accessToken is null, the request is made without Authorization header —
+ * this allows downloading blobs from public realms (rlm-public) for
+ * unauthenticated users.
  *
  * @param blobRef - The BlobRef to download
  * @param dbUrl - Base URL for the database (e.g., 'https://mydb.dexie.cloud')
- * @param accessToken - Access token for authentication
+ * @param accessToken - Access token for authentication, or null for anonymous access
  */
 
 export async function downloadBlob(
   blobRef: BlobRef,
   dbUrl: string,
-  accessToken: string
+  accessToken: string | null
 ): Promise<Uint8Array> {
   const downloadUrl = `${dbUrl}/blob/${blobRef.ref}`;
-  const response = await fetch(downloadUrl, {
-    headers: {
-      Authorization: `Bearer ${accessToken}`,
-    },
-  });
+  const headers: HeadersInit = {};
+  if (accessToken) {
+    headers['Authorization'] = `Bearer ${accessToken}`;
+  }
+  const response = await fetch(downloadUrl, { headers });
 
   if (!response.ok) {
     throw new Error(
