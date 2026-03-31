@@ -27,6 +27,14 @@ export function loadCachedAccessToken(
     });
     return Promise.resolve(currentUser.accessToken);
   }
+  // If the current user is not logged in (no isLoggedIn flag), there's no
+  // token to load from the database — skip the Dexie.ignoreTransaction() call.
+  // This avoids a crash in service worker context where Dexie's Promise zone
+  // (PSD.transless.env) may be undefined when called from within an active
+  // rw transaction (e.g. during applyServerChanges).
+  if (!currentUser?.isLoggedIn) {
+    return Promise.resolve(null);
+  }
   return Dexie.ignoreTransaction(() =>
     loadAccessToken(db).then((user) => {
       if (user?.accessToken) {
