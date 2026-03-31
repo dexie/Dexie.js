@@ -59,54 +59,54 @@ jobs:
 
       - uses: pnpm/action-setup@v4
         with:
-          version: latest
+          version: 10
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.14.0
           registry-url: https://registry.npmjs.org
 
-      # npm must be upgraded for OIDC Trusted Publisher to work
+      # npm 11.5.1+ required for OIDC Trusted Publisher
       - name: Upgrade npm
-        run: npm install -g npm@latest
+        run: npm install -g npm@11.5.1
 
       - name: Install dependencies
         run: pnpm install
 
-      # Build in dependency order
+      # Build in dependency order:
+      # 1. dexie (no workspace deps)
+      # 2. dexie-cloud-common, dexie-svelte-query (no workspace deps)
+      # 3. y-dexie (→ dexie)
+      # 4. dexie-export-import (→ dexie)
+      # 5. dexie-react-hooks (→ dexie, y-dexie)
+      # 6. dexie-cloud-addon (→ dexie, dexie-cloud-common, y-dexie)
+      # Note: dexie-observable and dexie-syncable are excluded (planned deprecation)
+
       - name: Build dexie
-        run: pnpm run build
-
-      - name: Build y-dexie
-        working-directory: addons/y-dexie
-        run: pnpm run build
-
-      - name: Build dexie-react-hooks
-        working-directory: libs/dexie-react-hooks
         run: pnpm run build
 
       - name: Build dexie-cloud-common
         working-directory: libs/dexie-cloud-common
         run: pnpm run build
 
-      - name: Build dexie-cloud-addon
-        working-directory: addons/dexie-cloud
+      - name: Build dexie-svelte-query
+        working-directory: libs/dexie-svelte-query
+        run: pnpm run build
+
+      - name: Build y-dexie
+        working-directory: addons/y-dexie
         run: pnpm run build
 
       - name: Build dexie-export-import
         working-directory: addons/dexie-export-import
         run: pnpm run build
 
-      - name: Build dexie-svelte-query
-        working-directory: libs/dexie-svelte-query
+      - name: Build dexie-react-hooks
+        working-directory: libs/dexie-react-hooks
         run: pnpm run build
 
-      - name: Build dexie-observable
-        working-directory: addons/Dexie.Observable
-        run: pnpm run build
-
-      - name: Build dexie-syncable
-        working-directory: addons/Dexie.Syncable
+      - name: Build dexie-cloud-addon
+        working-directory: addons/dexie-cloud
         run: pnpm run build
 
       - name: Publish packages
@@ -119,12 +119,19 @@ jobs:
             MODE="${{ inputs.mode }}"
           fi
 
+          # Validate pr_number is provided when mode=pr
+          if [ "$MODE" = "pr" ] && [ -z "${{ inputs.pr_number }}" ]; then
+            echo "Error: pr_number is required when mode=pr"
+            exit 1
+          fi
+
           PR="${{ inputs.pr_number }}"
           BUILD="${{ inputs.build_number }}"
           PACKAGES="${{ inputs.packages }}"
           [ -z "$PACKAGES" ] && PACKAGES="all"
 
           PUBLISHED_VERSIONS=""
+          PUBLISHED_COUNT=0
 
           publish_pkg() {
             local PKG_NAME="$1"
@@ -153,8 +160,8 @@ jobs:
 
             if [ "$MODE" = "canary" ]; then
               # Canary: publish as-is if not already published
-              local PUBLISHED=$(npm show ${PKG_NAME}@${BASE_VERSION} version 2>/dev/null || echo "")
-              if [ -n "$PUBLISHED" ]; then
+              # Use exit code to distinguish "not found" from real errors
+              if npm show "${PKG_NAME}@${BASE_VERSION}" version >/dev/null 2>&1; then
                 echo "${PKG_NAME}@${BASE_VERSION} already published, skipping."
                 return
               fi
@@ -188,6 +195,7 @@ jobs:
             fi
 
             PUBLISHED_VERSIONS="${PUBLISHED_VERSIONS}\n- \`npm install ${PKG_NAME}@${PUBLISH_VERSION}\`"
+            PUBLISHED_COUNT=$((PUBLISHED_COUNT + 1))
           }
 
           publish_pkg "dexie" "."
@@ -195,10 +203,14 @@ jobs:
           publish_pkg "dexie-react-hooks" "libs/dexie-react-hooks"
           publish_pkg "dexie-svelte-query" "libs/dexie-svelte-query"
           publish_pkg "dexie-export-import" "addons/dexie-export-import"
-          publish_pkg "dexie-observable" "addons/Dexie.Observable"
-          publish_pkg "dexie-syncable" "addons/Dexie.Syncable"
           publish_pkg "y-dexie" "addons/y-dexie"
           publish_pkg "dexie-cloud-addon" "addons/dexie-cloud"
+
+          # Fail fast if no packages were published (likely a typo in inputs.packages)
+          if [ "$PUBLISHED_COUNT" -eq 0 ] && [ "$PACKAGES" != "all" ]; then
+            echo "::error::No packages matched inputs.packages='${PACKAGES}'. Valid names: dexie, dexie-cloud-common, dexie-react-hooks, dexie-svelte-query, dexie-export-import, y-dexie, dexie-cloud-addon"
+            exit 1
+          fi
 
           echo "mode=$MODE" >> $GITHUB_OUTPUT
           echo "published_versions<<EOF" >> $GITHUB_OUTPUT
@@ -206,27 +218,37 @@ jobs:
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Notify via Discord (PR mode only)
-        if: inputs.mode == 'pr' || (github.event_name == 'workflow_dispatch' && inputs.mode == 'pr')
+        if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'pr'
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_LIZ_LEAD_DEV }}
         run: |
           PR="${{ inputs.pr_number }}"
           REQUESTER="${{ inputs.requester_discord_id }}"
-          STATUS="${{ job.status }}"
+          OUTCOME="${{ steps.publish.outcome }}"
           BRANCH="${GITHUB_REF_NAME}"
           RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
 
-          if [ "$STATUS" = "success" ]; then
+          if [ "$OUTCOME" = "success" ]; then
             MENTION=""
             if [ -n "$REQUESTER" ]; then
               MENTION=" (requested by <@${REQUESTER}>)"
             fi
             VERSIONS="${{ steps.publish.outputs.published_versions }}"
-            MESSAGE="✅ **PR #${PR} prerelease published**${MENTION}\n\nBranch: \`${BRANCH}\`\n\n${VERSIONS}\n\n[View run](${RUN_URL})"
+            TITLE="✅ PR #${PR} prerelease published${MENTION}"
+            BODY="Branch: \`${BRANCH}\`\n\n${VERSIONS}\n\n[View run](${RUN_URL})"
           else
-            MESSAGE="❌ **PR #${PR} prerelease FAILED** — [View run](${RUN_URL})"
+            TITLE="❌ PR #${PR} prerelease FAILED"
+            BODY="[View run](${RUN_URL})"
           fi
 
+          # Build JSON payload with python to safely handle special characters
+          python3 -c "
+          import json, os, sys
+          title = os.environ.get('MSG_TITLE', '')
+          body = os.environ.get('MSG_BODY', '')
+          content = title + '\n\n' + body
+          print(json.dumps({'content': content}))
+          " MSG_TITLE="$TITLE" MSG_BODY="$BODY" | \
           curl -s -X POST "$DISCORD_WEBHOOK" \
             -H "Content-Type: application/json" \
-            -d "{\"content\": \"$MESSAGE\"}"
+            -d @-
