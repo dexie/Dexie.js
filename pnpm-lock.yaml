@@ -450,14 +450,14 @@ importers:
   samples/dexie-cloud-todo-app:
     dependencies:
       dexie:
-        specifier: ^4.4.1
-        version: 4.4.1
+        specifier: ^4.4.2
+        version: 4.4.2
       dexie-cloud-addon:
-        specifier: ^4.4.5
-        version: 4.4.5(dexie@4.4.1)
+        specifier: ^4.4.8
+        version: 4.4.8(dexie@4.4.2)
       dexie-react-hooks:
         specifier: ^4.4.0
-        version: 4.4.0(dexie@4.4.1)(react@18.3.1)
+        version: 4.4.0(dexie@4.4.2)(react@18.3.1)
       lucide-react:
         specifier: ^0.554.0
         version: 0.554.0(react@18.3.1)
@@ -2817,11 +2817,11 @@ packages:
   devalue@5.6.1:
     resolution: {integrity: sha512-jDwizj+IlEZBunHcOuuFVBnIMPAEHvTsJj0BcIp94xYguLRVBcXO853px/MyIJvbVzWdsGvrRweIUWJw8hBP7A==}
 
-  dexie-cloud-addon@4.4.5:
-    resolution: {integrity: sha512-taEWh3Bgg1DxUZbvEtI/BrXP6Qf7iBZUrf+GvpwogRTw7aQrwRUN1uT4pkskQ9WBH0F/AhWFx5HvXaGyFt58yQ==}
+  dexie-cloud-addon@4.4.8:
+    resolution: {integrity: sha512-ugGMNxKsQuDe3dzL6e5IEdtJSGXgt/5FAaobGU+XP8tV9K78Ni34AqFADHw14Ez0UJ371KZnspO5L5BDm48BCw==}
     engines: {node: '>=14'}
     peerDependencies:
-      dexie: ^4.4.1
+      dexie: ^4.4.2
 
   dexie-cloud-common@1.0.59:
     resolution: {integrity: sha512-XX59WK7nLU1oCvQNLK4XO4BkITo7KL2a1HHWsxr0wvDqW3ONgyUnzR+06z/RozuTMNtiDiVtAGeTNk4i9KjwZw==}
@@ -2835,8 +2835,8 @@ packages:
   dexie@4.2.1:
     resolution: {integrity: sha512-Ckej0NS6jxQ4Po3OrSQBFddayRhTCic2DoCAG5zacOfOVB9P2Q5Xc5uL/nVa7ZVs+HdMnvUPzLFCB/JwpB6Csg==}
 
-  dexie@4.4.1:
-    resolution: {integrity: sha512-4Xec5+yrS+TgyFAnMrneFOt/QG8sD3FxlkUVpfypui3SriRN80UN0SZBWmkNAY7ulfKgk0ilvv7M6pBURprdgA==}
+  dexie@4.4.2:
+    resolution: {integrity: sha512-zMtV8q79EFE5U8FKZvt0Y/77PCU/Hr/RDxv1EDeo228L+m/HTbeN2AjoQm674rhQCX8n3ljK87lajt7UQuZfvw==}
 
   di@0.0.1:
     resolution: {integrity: sha512-uJaamHkagcZtHPqCIHZxnFrXlunQXgBOsZSUOWwFw31QJCAbyTBoHMW75YOTur5ZNx8pIeAKgf6GWIgaqqiLhA==}
@@ -8429,12 +8429,12 @@ snapshots:
 
   devalue@5.6.1: {}
 
-  dexie-cloud-addon@4.4.5(dexie@4.4.1):
+  dexie-cloud-addon@4.4.8(dexie@4.4.2):
     dependencies:
-      dexie: 4.4.1
+      dexie: 4.4.2
       dexie-cloud-common: 1.0.59
       rxjs: 7.8.2
-      y-dexie: 4.4.0(dexie@4.4.1)(yjs@13.6.27)
+      y-dexie: 4.4.0(dexie@4.4.2)(yjs@13.6.27)
       y-protocols: 1.0.6(yjs@13.6.27)
       yjs: 13.6.27
 
@@ -8442,14 +8442,14 @@ snapshots:
     dependencies:
       lib0: 0.2.114
 
-  dexie-react-hooks@4.4.0(dexie@4.4.1)(react@18.3.1):
+  dexie-react-hooks@4.4.0(dexie@4.4.2)(react@18.3.1):
     dependencies:
-      dexie: 4.4.1
+      dexie: 4.4.2
       react: 18.3.1
 
   dexie@4.2.1: {}
 
-  dexie@4.4.1: {}
+  dexie@4.4.2: {}
 
   di@0.0.1: {}
 
@@ -11923,9 +11923,9 @@ snapshots:
 
   xmlchars@2.2.0: {}
 
-  y-dexie@4.4.0(dexie@4.4.1)(yjs@13.6.27):
+  y-dexie@4.4.0(dexie@4.4.2)(yjs@13.6.27):
     dependencies:
-      dexie: 4.4.1
+      dexie: 4.4.2
       yjs: 13.6.27
 
   y-protocols@1.0.6(yjs@13.6.27):
