@@ -118,7 +118,7 @@ jobs:
         id: publish
         run: |
           # Determine mode: push to master = dev, workflow_dispatch = use input
-          if [ "${{ github.event_name }}" = "push" ]; then
+          if [ "${{ github.event_name }}" = "workflow_run" ]; then
             MODE="dev"
           else
             MODE="${{ inputs.mode }}"
