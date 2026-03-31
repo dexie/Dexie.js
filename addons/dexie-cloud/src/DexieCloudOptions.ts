@@ -88,7 +88,7 @@ export interface DexieCloudOptions {
    */
   blobMode?: 'eager' | 'lazy';
 
-  /** Maximum string length (in characters) before offloading to blob storage during sync.
+  /** String length threshold (in characters) for offloading to blob storage during sync.
    *
    * Strings longer than this threshold are uploaded as blobs during sync,
    * reducing sync payload size. The original string is kept intact in IndexedDB.
@@ -98,6 +98,11 @@ export interface DexieCloudOptions {
    * Maximum value is 32768 (server limit).
    *
    * @default 32768
+   */
+  largeStringThreshold?: number;
+
+  /**
+   * @deprecated Use `largeStringThreshold` instead.
    */
   maxStringLength?: number;
 }
