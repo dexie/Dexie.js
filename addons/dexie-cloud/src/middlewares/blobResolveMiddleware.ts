@@ -201,6 +201,29 @@ function createBlobResolvingCursor(
 ): DBCoreCursor {
   // Create wrapped cursor using Object.create() - inherits everything
   const wrappedCursor = Object.create(cursor, {
+    // key and primaryKey must be overridden with explicit getters that delegate to the
+    // original cursor via the closed-over reference.
+    //
+    // Without this, accessing .key or .primaryKey on the wrappedCursor would fall through
+    // the prototype chain and invoke the native IDBCursorWithValue getter with `this` set
+    // to wrappedCursor (a plain object), causing "TypeError: Illegal invocation".
+    //
+    // This matters specifically when:
+    //   1. The query uses the primary key index (observability middleware does NOT wrap the
+    //      cursor for primary key queries, so no safe intermediate getter exists), OR
+    //   2. Virtual index wrapping is not active (also skips cursor wrapping).
+    key: {
+      get() {
+        return cursor.key;
+      },
+      enumerable: true,
+    },
+    primaryKey: {
+      get() {
+        return cursor.primaryKey;
+      },
+      enumerable: true,
+    },
     value: {
       value: cursor.value,
       enumerable: true,
