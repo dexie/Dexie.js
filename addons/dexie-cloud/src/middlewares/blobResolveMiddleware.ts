@@ -199,8 +199,20 @@ function createBlobResolvingCursor(
   blobSavingQueue: BlobSavingQueue,
   db: DexieCloudDB
 ): DBCoreCursor {
-  // Create wrapped cursor using Object.create() - inherits everything
+  // Create wrapped cursor using Object.create() - inherits everything.
+  // Important: .key and .primaryKey must be explicitly overridden with
+  // closure-based getters to prevent native IDBCursorWithValue getters from
+  // being reached through the prototype chain with a wrong `this`, which
+  // throws "Illegal invocation" in Chrome 146+.
   const wrappedCursor = Object.create(cursor, {
+    key: {
+      get() { return cursor.key; },
+      configurable: true,
+    },
+    primaryKey: {
+      get() { return cursor.primaryKey; },
+      configurable: true,
+    },
     value: {
       value: cursor.value,
       enumerable: true,
