@@ -195,7 +195,7 @@ export class Collection implements ICollection {
       return cmp(aVal, bVal) * order;
     }
     return this.toArray(function (a) {
-      return a.sort(sorter);
+      return a.slice().sort(sorter);
     }).then(cb);
   }
 
