@@ -12,6 +12,21 @@ import Promise, {
   incrementExpectedAwaits,
 } from '../../helpers/promise';
 
+/** Detect the WebKit "Cannot inject key into script value" UnknownError.
+ * Same helper used in temp-transaction.ts for tempTransaction retries.
+ * https://github.com/dexie/Dexie.js/issues/2296
+ */
+function isWebKitInjectKeyError(ex: any): boolean {
+  return (
+    ex?.name === 'UnknownError' &&
+    typeof ex?.message === 'string' &&
+    ex.message.includes('inject key')
+  );
+}
+
+const WEBKIT_INJECT_KEY_MAX_RETRIES = 7;
+const WEBKIT_INJECT_KEY_BASE_DELAY_MS = 100;
+
 export function extractTransactionArgs(
   mode: TransactionMode,
   _tableArgs_,
@@ -35,7 +50,8 @@ export function enterTransactionScope(
   mode: IDBTransactionMode,
   storeNames: string[],
   parentTransaction: Transaction | undefined,
-  scopeFunc: () => PromiseLike<any> | any
+  scopeFunc: () => PromiseLike<any> | any,
+  _webkitRetry = 0
 ) {
   return Promise.resolve().then(() => {
     // Keep a pointer to last non-transactional PSD to use if someone calls Dexie.ignoreTransaction().
@@ -130,6 +146,34 @@ export function enterTransactionScope(
       })
       .catch((e) => {
         trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
+        // Workaround for WebKit "Cannot inject key into script value" UnknownError.
+        // Only retry root transactions (not sub-transactions) since sub-transactions share parent's IDBTransaction.
+        // https://github.com/dexie/Dexie.js/issues/2296
+        if (
+          !parentTransaction &&
+          isWebKitInjectKeyError(e) &&
+          _webkitRetry < WEBKIT_INJECT_KEY_MAX_RETRIES
+        ) {
+          const delay =
+            WEBKIT_INJECT_KEY_BASE_DELAY_MS * Math.pow(1.5, _webkitRetry);
+          if (_webkitRetry === 0) {
+            console.warn(
+              'Dexie: WebKit "Cannot inject key" workaround — retrying transaction'
+            );
+          }
+          return new Promise<void>((resolve) =>
+            setTimeout(resolve, delay)
+          ).then(() =>
+            enterTransactionScope(
+              db,
+              mode,
+              storeNames,
+              parentTransaction,
+              scopeFunc,
+              _webkitRetry + 1
+            )
+          );
+        }
         return rejection(e);
       });
   });
