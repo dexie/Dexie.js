@@ -145,9 +145,9 @@ export function enterTransactionScope(
         return trans._completion.then(() => x);
       })
       .catch((e) => {
-        trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
         // Workaround for WebKit "Cannot inject key into script value" UnknownError.
         // Only retry root transactions (not sub-transactions) since sub-transactions share parent's IDBTransaction.
+        // Don't reject the transaction if we're going to retry — let the retry handle it.
         // https://github.com/dexie/Dexie.js/issues/2296
         if (
           !parentTransaction &&
@@ -174,6 +174,7 @@ export function enterTransactionScope(
             )
           );
         }
+        trans._reject(e); // Yes, above then-handler were maybe not called because of an unhandled rejection in scopeFunc!
         return rejection(e);
       });
   });
