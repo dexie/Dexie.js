@@ -21,7 +21,7 @@ function isWebKitInjectKeyError(ex: any): boolean {
   );
 }
 
-const WEBKIT_INJECT_KEY_MAX_RETRIES = 20;
+const WEBKIT_INJECT_KEY_MAX_RETRIES = 7;
 const WEBKIT_INJECT_KEY_BASE_DELAY_MS = 100;
 
 /* Generate a temporary transaction when db operations are done outside a transaction scope.
