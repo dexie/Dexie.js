@@ -5,13 +5,33 @@ import { nop } from './chaining-functions';
 import { Transaction } from '../classes/transaction';
 import { Dexie } from '../classes/dexie';
 
+/** Detect the WebKit "Cannot inject key into script value" UnknownError.
+ *
+ * This is a transient WebKit/Safari bug triggered on cold start or after
+ * wake-from-background. The transaction itself is valid — retrying after
+ * a short delay resolves it in practice.
+ *
+ * https://github.com/dexie/Dexie.js/issues/2296
+ */
+function isWebKitInjectKeyError(ex: any): boolean {
+  return (
+    ex?.name === 'UnknownError' &&
+    typeof ex?.message === 'string' &&
+    ex.message.includes('inject key')
+  );
+}
+
+const WEBKIT_INJECT_KEY_MAX_RETRIES = 20;
+const WEBKIT_INJECT_KEY_BASE_DELAY_MS = 100;
+
 /* Generate a temporary transaction when db operations are done outside a transaction scope.
  */
 export function tempTransaction(
   db: Dexie,
   mode: IDBTransactionMode,
   storeNames: string[],
-  fn: (resolve, reject, trans: Transaction) => any
+  fn: (resolve, reject, trans: Transaction) => any,
+  _webkitRetry = 0
 ) {
   // Last argument is "writeLocked". But this doesnt apply to oneshot direct db operations, so we ignore it.
   if (!db.idbdb || (!db._state.openComplete && !PSD.letThrough && !db._vip)) {
@@ -71,6 +91,29 @@ export function tempTransaction(
         return mode === 'readonly'
           ? result
           : trans._completion.then(() => result);
+      })
+      .catch((ex) => {
+        // Workaround for WebKit "Cannot inject key into script value" UnknownError.
+        // This is a transient Safari/WebKit bug that occurs on cold start or after
+        // wake-from-background. Retrying the transaction with exponential backoff resolves it.
+        // https://github.com/dexie/Dexie.js/issues/2296
+        if (
+          isWebKitInjectKeyError(ex) &&
+          _webkitRetry < WEBKIT_INJECT_KEY_MAX_RETRIES
+        ) {
+          const delay =
+            WEBKIT_INJECT_KEY_BASE_DELAY_MS * Math.pow(1.5, _webkitRetry);
+          if (_webkitRetry === 0) {
+            console.warn(
+              'Dexie: WebKit "Cannot inject key" workaround — retrying transaction'
+            );
+          }
+          return new Promise<void>((resolve) => setTimeout(resolve, delay)).then(
+            () =>
+              tempTransaction(db, mode, storeNames, fn, _webkitRetry + 1)
+          );
+        }
+        return rejection(ex);
       }); /*.catch(err => { // Don't do this as of now. If would affect bulk- and modify methods in a way that could be more intuitive. But wait! Maybe change in next major.
           trans._reject(err);
           return rejection(err);
