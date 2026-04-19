@@ -61,13 +61,12 @@ export function connectWebSocket(db: DexieCloudDB) {
 
   const readyForChangesMessage = db.messageConsumer.readyToServe.pipe(
     filter((isReady) => isReady), // When consumer is ready for new messages, produce such a message to inform server about it
-    switchMap(() =>
-      db.cloud.persistedSyncState.pipe(
-        filter((syncState) => !!(syncState && syncState.serverRevision)),
-        take(1)
-      )
-    ), // Wait reactively for syncState with serverRevision (avoids race with logout/re-sync)
-    switchMap<PersistedSyncState, Promise<ReadyForChangesMessage>>(
+    switchMap(() => db.getPersistedSyncState()),
+    filter(
+      (syncState): syncState is PersistedSyncState =>
+        !!(syncState && syncState.serverRevision)
+    ),
+    switchMap(
       async (syncState) =>
         ({
           // Produce the message to trigger server to send us new messages to consume:
