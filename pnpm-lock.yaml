@@ -453,8 +453,8 @@ importers:
         specifier: ^4.4.2
         version: 4.4.2
       dexie-cloud-addon:
-        specifier: ^4.4.10
-        version: 4.4.10(dexie@4.4.2)
+        specifier: ^4.4.11
+        version: 4.4.11(dexie@4.4.2)
       dexie-react-hooks:
         specifier: ^4.4.0
         version: 4.4.0(dexie@4.4.2)(react@18.3.1)
@@ -2950,8 +2950,8 @@ packages:
   devalue@5.6.1:
     resolution: {integrity: sha512-jDwizj+IlEZBunHcOuuFVBnIMPAEHvTsJj0BcIp94xYguLRVBcXO853px/MyIJvbVzWdsGvrRweIUWJw8hBP7A==}
 
-  dexie-cloud-addon@4.4.10:
-    resolution: {integrity: sha512-3zrTRixHvIsIeSjhb40ybxM3OlBz25ejnuUaLG/PPBjgDanpeJt26OrMkBkJxulXZAr68EuiL3uQyYl1PttE9w==}
+  dexie-cloud-addon@4.4.11:
+    resolution: {integrity: sha512-0oi0PMgXWujZW82e5sRX9/OMiBCnmhycg8DQRD9VYXMF1HuY2PO4Q/khrx0mX23d+Fn/+maPaWj4pB5fDM7HgQ==}
     engines: {node: '>=14'}
     peerDependencies:
       dexie: ^4.4.2
@@ -8655,7 +8655,7 @@ snapshots:
 
   devalue@5.6.1: {}
 
-  dexie-cloud-addon@4.4.10(dexie@4.4.2):
+  dexie-cloud-addon@4.4.11(dexie@4.4.2):
     dependencies:
       dexie: 4.4.2
       dexie-cloud-common: 1.0.59
