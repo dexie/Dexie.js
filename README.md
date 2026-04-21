@@ -247,6 +247,14 @@ Source: [Dexie Cloud To-do app](https://github.com/dexie/Dexie.js/tree/master/sa
 
 Live demo: https://dexie.github.io/Dexie.js/dexie-cloud-todo-app/
 
+## Legacy Addons (dexie-observable, dexie-syncable)
+
+> **⚠️ These packages are legacy and no longer maintained.**
+
+If you find references to `dexie-observable` or `dexie-syncable` in tutorials, blog posts, or old code, be aware that these are **deprecated** sync solutions. They are not compatible with Dexie Cloud and should not be used in new projects.
+
+**For local-first sync, use [`dexie-cloud-addon`](https://dexie.org/cloud/) instead.** It is the modern, actively maintained solution for offline-first apps with real-time sync.
+
 ## Samples
 
 https://dexie.org/docs/Samples
