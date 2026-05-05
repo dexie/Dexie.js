@@ -17,6 +17,7 @@ import { SyncState, SyncStatePhase } from '../types/SyncState';
 import { MessagesFromServerConsumer } from '../sync/messagesFromServerQueue';
 import { YClientMessage } from 'dexie-cloud-common';
 import { BlobDownloadTracker } from '../sync/BlobDownloadTracker';
+import { RealmDownload } from './entities/RealmDownload';
 
 /*export interface DexieCloudDB extends Dexie {
   table(name: string): Table<any, any>;
@@ -46,6 +47,7 @@ export interface DexieCloudDBBase {
   readonly cloud: Dexie['cloud'];
   readonly $jobs: Table<GuardedJob, string>;
   readonly $logins: Table<UserLogin, string>;
+  readonly $realmDownloads: Table<RealmDownload, string>;
   readonly $syncState: SyncStateTable;
   readonly $baseRevs: Table<BaseRevisionMapEntry, [string, number]>;
 
@@ -82,6 +84,7 @@ export const DEXIE_CLOUD_SCHEMA = {
   $syncState: '',
   $baseRevs: '[tableName+clientRev]',
   $logins: 'claims.sub, lastLogin',
+  $realmDownloads: 'realmId',
 };
 
 let static_counter = 0;

@@ -15,6 +15,7 @@ import {
 import { encodeIdsForServer } from './encodeIdsForServer';
 import { UserLogin } from '../db/entities/UserLogin';
 import { updateSyncRateLimitDelays } from './ratelimit';
+import { processStreamingResponse } from './processStreamingResponse';
 //import {BisonWebStreamReader} from "dreambase-library/dist/typeson-simplified/BisonWebStreamReader";
 
 export async function syncWithServer(
@@ -51,8 +52,11 @@ export async function syncWithServer(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
+  // Fetch any pending realm downloads for resume info
+  const pendingDownloads = await db.$realmDownloads.toArray();
+
   const syncRequest: SyncRequest = {
-    v: 3, // v3 = supports BlobRef
+    v: 4, // v4 = streaming NDJSON support
     dbID: syncState?.remoteDbId,
     clientIdentity,
     schema: schema || {},
@@ -68,6 +72,11 @@ export async function syncWithServer(
     changes: encodeIdsForServer(db.dx.core.schema, currentUser, changes),
     y,
     dxcv: db.cloud.version,
+    syncedRealmDownloads: pendingDownloads.map((d) => ({
+      realmId: d.realmId,
+      serverRevision: d.serverRevision,
+      resumeCursor: d.resumeCursor ?? undefined,
+    })),
   };
   console.debug('Sync request', syncRequest);
   db.syncStateChangedEvent.next({
@@ -91,7 +100,26 @@ export async function syncWithServer(
     throw new HttpError(res);
   }
 
-  switch (res.headers.get('content-type')) {
+  const contentType = res.headers.get('content-type') ?? '';
+
+  if (
+    contentType.includes('application/x-ndjson') ||
+    contentType.includes('x-ndjson')
+  ) {
+    // New streaming path (v4+)
+    const streamResult = await processStreamingResponse(
+      db,
+      res,
+      pendingDownloads
+    );
+    // Build a minimal SyncResponse from stream result data
+    return {
+      changes: [],
+      ...streamResult,
+    } as SyncResponse;
+  }
+
+  switch (contentType) {
     case 'application/x-bison':
     case 'application/x-bison-stream':
       // BISON format deprecated - throw error if server sends it

@@ -368,8 +368,13 @@ async function _sync(
       );
 
       //
-      // apply server changes
+      // apply server changes (filter out changes for realms already streamed)
       //
+      // After streaming, $realmDownloads entries are deleted (realm-complete).
+      // Track streamed realms from the sync response itself using the fact that
+      // streaming responses return empty changes array for streamed realms.
+      // We rely on processStreamingResponse having already written objects directly.
+      // If res.changes is empty (streaming path), applyServerChanges is a no-op.
       await applyServerChanges(filteredChanges, db);
 
       if (res.yMessages) {

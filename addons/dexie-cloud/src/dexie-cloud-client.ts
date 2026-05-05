@@ -56,6 +56,7 @@ import { getCurrentUserEmitter } from './currentUserEmitter';
 import { NewIdOptions } from './types/NewIdOptions';
 import { getInvitesObservable } from './getInvitesObservable';
 import { getGlobalRolesObservable } from './getGlobalRolesObservable';
+import { resumeRealmDownloads } from './sync/resumeRealmDownloads';
 import { UserLogin } from './db/entities/UserLogin';
 import { InvalidLicenseError } from './InvalidLicenseError';
 import { logout, _logout } from './authentication/logout';
@@ -493,6 +494,16 @@ export function dexieCloud(dexie: Dexie) {
 
     if (initiallySynced) {
       db.setInitiallySynced(true);
+    }
+
+    // Check for any interrupted realm downloads and resume them
+    const databaseUrl = db.cloud.options?.databaseUrl;
+    if (databaseUrl) {
+      const pendingDownloads = await db.$realmDownloads.toArray();
+      if (pendingDownloads.length > 0) {
+        // Block db.open() (this is in db.on('ready') handler) until download is complete
+        await resumeRealmDownloads(db, databaseUrl, pendingDownloads);
+      }
     }
 
     verifySchema(db);
