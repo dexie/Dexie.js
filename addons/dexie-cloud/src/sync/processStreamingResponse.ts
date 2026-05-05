@@ -260,6 +260,12 @@ export async function processStreamingResponse(
         if (currentRealmId && currentTbl) {
           chunkBuffer.push({ tbl: currentTbl, id, obj });
         }
+      } else if (buffer[0] === '{') {
+        // Truncated control row — log for debugging
+        console.warn(
+          'processStreamingResponse: truncated control row in trailing buffer:',
+          buffer.substring(0, 200)
+        );
       }
     } catch {
       // Ignore parse error on incomplete last line

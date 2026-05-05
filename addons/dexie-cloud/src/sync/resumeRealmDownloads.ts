@@ -55,8 +55,6 @@ export async function resumeRealmDownloads(
     await processStreamingResponse(db, res, pendingDownloads);
   } else {
     // Old server — fall back to existing flow
-    // Clear $realmDownloads (old server can't resume)
-    await db.$realmDownloads.clear();
     const text = await res.text();
     const syncRes = TSON.parse(text);
     if (
@@ -64,7 +62,10 @@ export async function resumeRealmDownloads(
       typeof syncRes === 'object' &&
       Array.isArray(syncRes.changes)
     ) {
+      // Apply changes first; only clear $realmDownloads on success
       await applyServerChanges(syncRes.changes, db);
     }
+    // Clear $realmDownloads after successful apply (old server can't resume)
+    await db.$realmDownloads.clear();
   }
 }
