@@ -33,7 +33,12 @@ export async function processStreamingResponse(
   res: Response,
   _knownPendingDownloads: RealmDownload[]
 ): Promise<Partial<PersistedSyncState>> {
-  const reader = res.body!.getReader();
+  if (!res.body) {
+    throw new Error(
+      'processStreamingResponse: Response body is null (non-stream response)'
+    );
+  }
+  const reader = res.body.getReader();
   const decoder = new TextDecoder();
   let buffer = '';
 
@@ -128,7 +133,13 @@ export async function processStreamingResponse(
       // O(1) classification: '[' = object row (array form), '{' = control row
       if (line[0] === '[') {
         const [id, obj] = JSON.parse(line) as StreamObjectRow;
-        if (!currentRealmId || !currentTbl) continue;
+        if (!currentRealmId || !currentTbl) {
+          console.warn(
+            `processStreamingResponse: Object row received without active realm/table context`,
+            { currentRealmId, currentTbl, id }
+          );
+          continue;
+        }
         chunkBuffer.push({ tbl: currentTbl, id, obj });
         if (chunkBuffer.length >= CHUNK_SIZE) {
           await flushChunk(currentRealmId, [...chunkBuffer]);

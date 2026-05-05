@@ -59,7 +59,11 @@ export async function resumeRealmDownloads(
     await db.$realmDownloads.clear();
     const text = await res.text();
     const syncRes = TSON.parse(text);
-    if (syncRes.changes) {
+    if (
+      syncRes &&
+      typeof syncRes === 'object' &&
+      Array.isArray(syncRes.changes)
+    ) {
       await applyServerChanges(syncRes.changes, db);
     }
   }

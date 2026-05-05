@@ -132,6 +132,9 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
       get $logins() {
         return dx.table('$logins') as Table<UserLogin, string>;
       },
+      get $realmDownloads() {
+        return dx.table('$realmDownloads') as Table<RealmDownload, string>;
+      },
 
       get realms() {
         return dx.realms;
