@@ -245,12 +245,18 @@ export async function processStreamingResponse(
             chunkBuffer.length = 0;
           }
 
-          // Correct total estimate using actual counts
+          // Correct total estimate using actual counts.
+          // Note: protocol's StreamRealmComplete.actual only reports
+          // objs+ydocs; blobs are corrected during the blob phase.
           if (progressCounters && row.actual) {
             const est = realmEstimates.get(row.realmId);
             if (est) {
-              progressCounters.objs.total += row.actual.objs - est.objs;
-              progressCounters.ydocs.total += row.actual.ydocs - est.ydocs;
+              if (typeof row.actual.objs === 'number') {
+                progressCounters.objs.total += row.actual.objs - est.objs;
+              }
+              if (typeof row.actual.ydocs === 'number') {
+                progressCounters.ydocs.total += row.actual.ydocs - est.ydocs;
+              }
             }
           }
 

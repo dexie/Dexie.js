@@ -500,8 +500,17 @@ export function dexieCloud(dexie: Dexie) {
       );
       if (pendingDownloads.length > 0) {
         // Block db.open() (this is in db.on('ready') handler) until
-        // the resumed download(s) finish.
-        await resumeRealmDownloads(db, databaseUrl, pendingDownloads);
+        // the resumed download(s) finish. Don't block startup if
+        // resume fails — log and continue so the rest of init runs
+        // and a later sync can retry.
+        try {
+          await resumeRealmDownloads(db, databaseUrl, pendingDownloads);
+        } catch (error) {
+          console.warn(
+            'dexie-cloud: failed to resume interrupted realm downloads; continuing startup. A later sync will retry.',
+            error
+          );
+        }
       }
     }
 
