@@ -17,7 +17,8 @@ export type StreamingSyncRow =
   | StreamObjectRow
   | StreamTableEnd
   | StreamRealmComplete
-  | StreamEnd;
+  | StreamEnd
+  | StreamError;
 
 /** First control row — standard SyncResponse data (without realm objects) */
 export interface StreamSyncResponse {
@@ -97,4 +98,18 @@ export interface StreamRealmComplete {
 /** Last row in the stream */
 export interface StreamEnd {
   type: 'stream-end';
+}
+
+/**
+ * Error row — emitted by the server if a streaming sync fails after
+ * response headers have already been committed (so a 5xx HTTP status
+ * is no longer possible). The client should surface this as a sync
+ * failure rather than treating the silently-truncated stream as
+ * complete.
+ */
+export interface StreamError {
+  type: 'stream-error';
+  message: string;
+  /** Server-defined error code (e.g. "STREAM_FAIL"). Optional. */
+  code?: string;
 }

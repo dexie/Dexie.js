@@ -14,6 +14,7 @@ import {
   StreamTableEnd,
   StreamRealmComplete,
   StreamEnd,
+  StreamError,
 } from 'dexie-cloud-common';
 import { SyncProgress } from '../types/SyncState';
 
@@ -166,7 +167,8 @@ export async function processStreamingResponse(
         | StreamTableStart
         | StreamTableEnd
         | StreamRealmComplete
-        | StreamEnd;
+        | StreamEnd
+        | StreamError;
 
       switch (row.type) {
         case 'sync-response': {
@@ -294,6 +296,16 @@ export async function processStreamingResponse(
             });
           }
           break;
+        }
+
+        case 'stream-error': {
+          // Server failed mid-stream after headers were committed. Surface
+          // as a sync failure so the caller can retry; pending realms in
+          // \$syncState.realmDownloads remain so resume can continue them.
+          throw new Error(
+            `Streaming sync failed on server: ${row.message}` +
+              (row.code ? ` (${row.code})` : '')
+          );
         }
       }
     }
