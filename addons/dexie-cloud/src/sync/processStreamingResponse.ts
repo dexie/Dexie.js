@@ -1,8 +1,10 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { RealmDownload } from '../db/entities/RealmDownload';
 import { applyServerChanges } from './applyServerChanges';
 import { getSyncableTables } from '../helpers/getSyncableTables';
-import { PersistedSyncState } from '../db/entities/PersistedSyncState';
+import {
+  PersistedSyncState,
+  RealmDownloadState,
+} from '../db/entities/PersistedSyncState';
 import {
   StreamSyncResponse,
   StreamSyncStart,
@@ -13,12 +15,7 @@ import {
   StreamRealmComplete,
   StreamEnd,
 } from 'dexie-cloud-common';
-
-interface ProgressCounters {
-  objs: { downloaded: number; total: number };
-  ydocs: { downloaded: number; total: number };
-  blobs: { downloaded: number; total: number };
-}
+import { SyncProgress } from '../types/SyncState';
 
 interface ChunkItem {
   tbl: string;
@@ -28,10 +25,19 @@ interface ChunkItem {
 
 const CHUNK_SIZE = 500;
 
+/**
+ * Pending download info passed in for resume.
+ * Used to seed `progressCounters.objs.downloaded` so UI continues
+ * from where the previous session left off, instead of from 0.
+ */
+export interface PendingRealmDownload extends RealmDownloadState {
+  realmId: string;
+}
+
 export async function processStreamingResponse(
   db: DexieCloudDB,
   res: Response,
-  _knownPendingDownloads: RealmDownload[]
+  knownPendingDownloads: PendingRealmDownload[]
 ): Promise<Partial<PersistedSyncState>> {
   if (!res.body) {
     throw new Error(
@@ -45,11 +51,18 @@ export async function processStreamingResponse(
   let currentRealmId: string | null = null;
   let currentTbl: string | null = null;
   const chunkBuffer: ChunkItem[] = [];
-  let progressCounters: ProgressCounters | null = null;
+  let progressCounters: SyncProgress | null = null;
   const realmEstimates = new Map<
     string,
     { objs: number; ydocs: number; blobs: number }
   >();
+
+  // Sum of `downloadedCount` from previous (interrupted) sessions, so
+  // resume continues from where we left off rather than from 0.
+  const resumeAlreadyDownloaded = knownPendingDownloads.reduce(
+    (sum, d) => sum + (d.downloadedCount || 0),
+    0
+  );
 
   let syncResponseData: Partial<PersistedSyncState> = {};
 
@@ -88,33 +101,31 @@ export async function processStreamingResponse(
           }
           const table = db.dx.table(tbl);
           for (const row of rows) {
+            // put(obj, id) — overload-safe form for out-of-line keys.
+            // For inline-keyed schemas obj.id should already match row.id;
+            // for out-of-line schemas the explicit key is required.
             await table.put(row.obj, row.id);
           }
         }
       }
     );
 
-    // Update cursor and downloadedCount (persistent, for resume)
+    // Update cursor and downloadedCount inline in $syncState (atomic mutator)
     const lastObj = chunk[chunk.length - 1];
-    await db.$realmDownloads
-      .where('realmId')
-      .equals(realmId)
-      .modify((d: RealmDownload) => {
-        d.resumeCursor = `${lastObj.tbl}:${lastObj.id}`;
-        d.downloadedCount += chunk.length;
-      });
+    await db.$syncState.update('syncState', (state: PersistedSyncState) => {
+      const entry = state.realmDownloads?.[realmId];
+      if (entry) {
+        entry.resumeCursor = `${lastObj.tbl}:${lastObj.id}`;
+        entry.downloadedCount += chunk.length;
+      }
+    });
 
-    // Bump global obj counter and emit progress
+    // Bump global obj counter and emit progress (object form, not number)
     if (progressCounters) {
       progressCounters.objs.downloaded += chunk.length;
-      const { objs } = progressCounters;
-      const pct =
-        objs.total > 0
-          ? Math.min(99, Math.round((objs.downloaded / objs.total) * 100))
-          : 0;
       db.syncStateChangedEvent.next({
         phase: 'pulling',
-        progress: pct,
+        progress: progressCounters,
       });
     }
   }
@@ -173,7 +184,10 @@ export async function processStreamingResponse(
 
         case 'sync-start': {
           progressCounters = {
-            objs: { downloaded: 0, total: row.estimate.objs },
+            objs: {
+              downloaded: resumeAlreadyDownloaded,
+              total: row.estimate.objs,
+            },
             ydocs: { downloaded: 0, total: row.estimate.ydocs },
             blobs: { downloaded: 0, total: row.estimate.blobs },
           };
@@ -186,7 +200,7 @@ export async function processStreamingResponse(
           }
           db.syncStateChangedEvent.next({
             phase: 'pulling',
-            progress: 0,
+            progress: progressCounters,
           });
           break;
         }
@@ -194,14 +208,23 @@ export async function processStreamingResponse(
         case 'realm-start': {
           currentRealmId = row.realmId;
           const estimate = realmEstimates.get(row.realmId);
-          await db.$realmDownloads.put({
-            realmId: row.realmId,
-            serverRevision: row.serverRevision,
-            resumeCursor: null,
-            totalCount: estimate?.objs ?? 0,
-            downloadedCount: 0,
-            startedAt: new Date(),
-          });
+          // Persist realm-download state inline in $syncState (atomic update)
+          // Preserve any existing `downloadedCount` so resume keeps its progress
+          // toward the cursor; reset it to 0 only for fresh entries.
+          await db.$syncState.update(
+            'syncState',
+            (state: PersistedSyncState) => {
+              state.realmDownloads = state.realmDownloads ?? {};
+              const existing = state.realmDownloads[row.realmId];
+              state.realmDownloads[row.realmId] = {
+                serverRevision: row.serverRevision,
+                resumeCursor: existing?.resumeCursor ?? null,
+                totalCount: estimate?.objs ?? existing?.totalCount ?? 0,
+                downloadedCount: existing?.downloadedCount ?? 0,
+                startedAt: existing?.startedAt ?? new Date().toISOString(),
+              };
+            }
+          );
           break;
         }
 
@@ -231,18 +254,37 @@ export async function processStreamingResponse(
             }
           }
 
-          // Remove from pending downloads
-          await db.$realmDownloads.delete(row.realmId);
+          // Remove the entry from realmDownloads (keep rest of $syncState).
+          // Drop the whole map when empty so we don't leave a stray empty obj.
+          await db.$syncState.update(
+            'syncState',
+            (state: PersistedSyncState) => {
+              if (state.realmDownloads) {
+                delete state.realmDownloads[row.realmId];
+                if (Object.keys(state.realmDownloads).length === 0) {
+                  delete state.realmDownloads;
+                }
+              }
+            }
+          );
+
+          // Emit a fresh progress tick so consumers see the corrected total
+          if (progressCounters) {
+            db.syncStateChangedEvent.next({
+              phase: 'pulling',
+              progress: progressCounters,
+            });
+          }
           currentRealmId = null;
           break;
         }
 
         case 'stream-end': {
-          // All done
+          // Final progress emit — UI consumers may snap to 100% on this.
           if (progressCounters) {
             db.syncStateChangedEvent.next({
               phase: 'pulling',
-              progress: 100,
+              progress: progressCounters,
             });
           }
           break;

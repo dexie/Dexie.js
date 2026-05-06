@@ -399,10 +399,8 @@ export function dexieCloud(dexie: Dexie) {
         ? await navigator.serviceWorker.getRegistrations()
         : [];
 
-    const [initiallySynced, lastSyncedRealms] = await db.transaction(
-      'rw',
-      db.$syncState,
-      async () => {
+    const [initiallySynced, lastSyncedRealms, persistedRealmDownloads] =
+      await db.transaction('rw', db.$syncState, async () => {
         const { options, schema } = db.cloud;
         const [persistedOptions, persistedSchema, persistedSyncState] =
           await Promise.all([
@@ -488,22 +486,27 @@ export function dexieCloud(dexie: Dexie) {
         return [
           persistedSyncState?.initiallySynced,
           persistedSyncState?.realms,
+          persistedSyncState?.realmDownloads,
         ];
+      });
+
+    // Resume any interrupted realm downloads BEFORE marking initiallySynced.
+    // This handles case 1 (db.on('ready') — db not yet open). Case 2 (db
+    // already open) is handled by a separate locking mechanism.
+    const databaseUrl = db.cloud.options?.databaseUrl;
+    if (databaseUrl && persistedRealmDownloads) {
+      const pendingDownloads = Object.entries(persistedRealmDownloads).map(
+        ([realmId, d]) => ({ realmId, ...d })
+      );
+      if (pendingDownloads.length > 0) {
+        // Block db.open() (this is in db.on('ready') handler) until
+        // the resumed download(s) finish.
+        await resumeRealmDownloads(db, databaseUrl, pendingDownloads);
       }
-    );
+    }
 
     if (initiallySynced) {
       db.setInitiallySynced(true);
-    }
-
-    // Check for any interrupted realm downloads and resume them
-    const databaseUrl = db.cloud.options?.databaseUrl;
-    if (databaseUrl) {
-      const pendingDownloads = await db.$realmDownloads.toArray();
-      if (pendingDownloads.length > 0) {
-        // Block db.open() (this is in db.on('ready') handler) until download is complete
-        await resumeRealmDownloads(db, databaseUrl, pendingDownloads);
-      }
     }
 
     verifySchema(db);

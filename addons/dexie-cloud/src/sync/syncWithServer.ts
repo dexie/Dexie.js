@@ -52,8 +52,13 @@ export async function syncWithServer(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
-  // Fetch any pending realm downloads for resume info
-  const pendingDownloads = await db.$realmDownloads.toArray();
+  // Pending realm downloads for resume info — embedded in $syncState (already loaded as `syncState` argument)
+  const pendingDownloads = syncState?.realmDownloads
+    ? Object.entries(syncState.realmDownloads).map(([realmId, d]) => ({
+        realmId,
+        ...d,
+      }))
+    : [];
 
   const syncRequest: SyncRequest = {
     v: 4, // v4 = streaming NDJSON support
@@ -112,11 +117,14 @@ export async function syncWithServer(
       res,
       pendingDownloads
     );
-    // Build a minimal SyncResponse from stream result data
+    // Build a minimal SyncResponse from stream result data.
+    // Stream-path returns no `changes` (objects were written directly),
+    // and several SyncResponse fields are not relevant in this path — cast
+    // via `unknown` to avoid the structural-overlap warning.
     return {
       changes: [],
       ...streamResult,
-    } as SyncResponse;
+    } as unknown as SyncResponse;
   }
 
   switch (contentType) {

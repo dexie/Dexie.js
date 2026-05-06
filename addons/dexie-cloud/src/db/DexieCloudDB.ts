@@ -13,11 +13,10 @@ import {
   DexieCloudSchema,
 } from 'dexie-cloud-common';
 import { BroadcastedAndLocalEvent } from '../helpers/BroadcastedAndLocalEvent';
-import { SyncState, SyncStatePhase } from '../types/SyncState';
+import { SyncProgress, SyncState, SyncStatePhase } from '../types/SyncState';
 import { MessagesFromServerConsumer } from '../sync/messagesFromServerQueue';
 import { YClientMessage } from 'dexie-cloud-common';
 import { BlobDownloadTracker } from '../sync/BlobDownloadTracker';
-import { RealmDownload } from './entities/RealmDownload';
 
 /*export interface DexieCloudDB extends Dexie {
   table(name: string): Table<any, any>;
@@ -31,7 +30,7 @@ import { RealmDownload } from './entities/RealmDownload';
 export interface SyncStateChangedEventData {
   phase: SyncStatePhase;
   error?: Error;
-  progress?: number;
+  progress?: SyncProgress;
 }
 
 type SyncStateTable = Table<
@@ -47,7 +46,6 @@ export interface DexieCloudDBBase {
   readonly cloud: Dexie['cloud'];
   readonly $jobs: Table<GuardedJob, string>;
   readonly $logins: Table<UserLogin, string>;
-  readonly $realmDownloads: Table<RealmDownload, string>;
   readonly $syncState: SyncStateTable;
   readonly $baseRevs: Table<BaseRevisionMapEntry, [string, number]>;
 
@@ -84,7 +82,6 @@ export const DEXIE_CLOUD_SCHEMA = {
   $syncState: '',
   $baseRevs: '[tableName+clientRev]',
   $logins: 'claims.sub, lastLogin',
-  $realmDownloads: 'realmId',
 };
 
 let static_counter = 0;
@@ -131,9 +128,6 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
       },
       get $logins() {
         return dx.table('$logins') as Table<UserLogin, string>;
-      },
-      get $realmDownloads() {
-        return dx.table('$realmDownloads') as Table<RealmDownload, string>;
       },
 
       get realms() {

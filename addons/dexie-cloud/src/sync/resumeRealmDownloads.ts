@@ -1,16 +1,22 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { RealmDownload } from '../db/entities/RealmDownload';
+import {
+  PersistedSyncState,
+  RealmDownloadState,
+} from '../db/entities/PersistedSyncState';
 import { loadAccessToken } from '../authentication/authenticate';
 import { TSON } from '../TSON';
 import { HttpError } from '../errors/HttpError';
 import { SyncRequest } from 'dexie-cloud-common';
 import { applyServerChanges } from './applyServerChanges';
-import { processStreamingResponse } from './processStreamingResponse';
+import {
+  PendingRealmDownload,
+  processStreamingResponse,
+} from './processStreamingResponse';
 
 export async function resumeRealmDownloads(
   db: DexieCloudDB,
   databaseUrl: string,
-  pendingDownloads: RealmDownload[]
+  pendingDownloads: PendingRealmDownload[]
 ): Promise<void> {
   db.syncStateChangedEvent.next({ phase: 'pulling' });
 
@@ -54,7 +60,7 @@ export async function resumeRealmDownloads(
   if (contentType.includes('ndjson') || contentType.includes('x-ndjson')) {
     await processStreamingResponse(db, res, pendingDownloads);
   } else {
-    // Old server — fall back to existing flow
+    // Old server — fall back to existing flow.
     const text = await res.text();
     const syncRes = TSON.parse(text);
     if (
@@ -62,10 +68,13 @@ export async function resumeRealmDownloads(
       typeof syncRes === 'object' &&
       Array.isArray(syncRes.changes)
     ) {
-      // Apply changes first; only clear $realmDownloads on success
+      // Apply changes first; only clear realmDownloads on success.
       await applyServerChanges(syncRes.changes, db);
     }
-    // Clear $realmDownloads after successful apply (old server can't resume)
-    await db.$realmDownloads.clear();
+    // Clear realmDownloads field in $syncState (old server can't resume).
+    // Use the mutator form so we don't trample concurrent fields in the record.
+    await db.$syncState.update('syncState', (state: PersistedSyncState) => {
+      delete state.realmDownloads;
+    });
   }
 }
