@@ -112,19 +112,18 @@ export async function syncWithServer(
     contentType.includes('x-ndjson')
   ) {
     // New streaming path (v4+)
-    const streamResult = await processStreamingResponse(
+    const { syncResponse } = await processStreamingResponse(
       db,
       res,
       pendingDownloads
     );
-    // Build a minimal SyncResponse from stream result data.
-    // Stream-path returns no `changes` (objects were written directly),
-    // and several SyncResponse fields are not relevant in this path — cast
-    // via `unknown` to avoid the structural-overlap warning.
-    return {
-      changes: [],
-      ...streamResult,
-    } as unknown as SyncResponse;
+    // The streaming path's `sync-response` row carries the full
+    // SyncResponse shape (serverRevision, dbId, realms, inviteRealms,
+    // schema, changes, rejections, yMessages) so it's a drop-in
+    // replacement for the JSON path. Realm objects were written
+    // directly by processStreamingResponse — they are NOT in
+    // syncResponse.changes (server contract).
+    return syncResponse;
   }
 
   switch (contentType) {

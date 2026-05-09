@@ -1,5 +1,4 @@
 import { DexieCloudDB } from '../db/DexieCloudDB';
-import { applyServerChanges } from './applyServerChanges';
 import { getSyncableTables } from '../helpers/getSyncableTables';
 import {
   PersistedSyncState,
@@ -15,6 +14,7 @@ import {
   StreamRealmComplete,
   StreamEnd,
   StreamError,
+  SyncResponse,
 } from 'dexie-cloud-common';
 import { SyncProgress } from '../types/SyncState';
 
@@ -35,11 +35,21 @@ export interface PendingRealmDownload extends RealmDownloadState {
   realmId: string;
 }
 
+/**
+ * Result of processing a v4 NDJSON streaming response.
+ * Contains the full SyncResponse data extracted from the `sync-response`
+ * control row, so callers can treat the streaming and JSON paths uniformly.
+ */
+export interface StreamingResponseResult {
+  /** Standard SyncResponse fields captured from the first control row. */
+  syncResponse: SyncResponse;
+}
+
 export async function processStreamingResponse(
   db: DexieCloudDB,
   res: Response,
   knownPendingDownloads: PendingRealmDownload[]
-): Promise<Partial<PersistedSyncState>> {
+): Promise<StreamingResponseResult> {
   if (!res.body) {
     throw new Error(
       'processStreamingResponse: Response body is null (non-stream response)'
@@ -65,7 +75,20 @@ export async function processStreamingResponse(
     0
   );
 
-  let syncResponseData: Partial<PersistedSyncState> = {};
+  // Captured `sync-response` row data — populated when the first control
+  // row arrives. Defaults provided for safety so the cast below is sound
+  // even on a malformed stream (caller still surfaces empty changes).
+  let syncResponse: SyncResponse = {
+    serverRevision: '',
+    dbId: '',
+    realms: [],
+    inviteRealms: [],
+    schema: {},
+    changes: [],
+    rejections: [],
+    yMessages: [],
+  };
+  let gotSyncResponseRow = false;
 
   async function flushChunk(realmId: string, chunk: ChunkItem[]) {
     if (chunk.length === 0) return;
@@ -172,15 +195,21 @@ export async function processStreamingResponse(
 
       switch (row.type) {
         case 'sync-response': {
-          // Apply delta changes (non-realm-objects)
-          await applyServerChanges(row.changes, db);
-          // Capture sync state data to return
-          syncResponseData = {
+          // Capture full SyncResponse data so the streaming path is a
+          // drop-in replacement for the legacy JSON path. Do NOT apply
+          // changes here — that's the caller's job (sync.ts), which
+          // wraps it in the same rw transaction as the syncState write.
+          syncResponse = {
             serverRevision: row.serverRevision,
-            remoteDbId: row.dbId,
+            dbId: row.dbId,
             realms: row.realms,
             inviteRealms: row.inviteRealms,
+            schema: row.schema,
+            changes: row.changes,
+            rejections: row.rejections,
+            yMessages: row.yMessages,
           };
+          gotSyncResponseRow = true;
           break;
         }
 
@@ -338,5 +367,11 @@ export async function processStreamingResponse(
     chunkBuffer.length = 0;
   }
 
-  return syncResponseData;
+  if (!gotSyncResponseRow) {
+    throw new Error(
+      'processStreamingResponse: stream ended without a sync-response control row'
+    );
+  }
+
+  return { syncResponse };
 }
