@@ -107,10 +107,7 @@ export async function syncWithServer(
 
   const contentType = res.headers.get('content-type') ?? '';
 
-  if (
-    contentType.includes('application/x-ndjson') ||
-    contentType.includes('x-ndjson')
-  ) {
+  if (contentType.includes('ndjson')) {
     // New streaming path (v4+)
     const { syncResponse } = await processStreamingResponse(
       db,
