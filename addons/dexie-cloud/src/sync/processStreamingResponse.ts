@@ -17,6 +17,7 @@ import {
   SyncResponse,
 } from 'dexie-cloud-common';
 import { SyncProgress } from '../types/SyncState';
+import { TSON } from '../TSON';
 
 interface ChunkItem {
   tbl: string;
@@ -167,7 +168,7 @@ export async function processStreamingResponse(
 
       // O(1) classification: '[' = object row (array form), '{' = control row
       if (line[0] === '[') {
-        const [id, obj] = JSON.parse(line) as StreamObjectRow;
+        const [id, obj] = TSON.parse(line) as StreamObjectRow;
         if (!currentRealmId || !currentTbl) {
           console.warn(
             `processStreamingResponse: Object row received without active realm/table context`,
@@ -183,7 +184,7 @@ export async function processStreamingResponse(
         continue;
       }
 
-      const row = JSON.parse(line) as
+      const row = TSON.parse(line) as
         | StreamSyncResponse
         | StreamSyncStart
         | StreamRealmStart
@@ -345,7 +346,7 @@ export async function processStreamingResponse(
     // best-effort: try parsing the last line
     try {
       if (buffer[0] === '[') {
-        const [id, obj] = JSON.parse(buffer) as StreamObjectRow;
+        const [id, obj] = TSON.parse(buffer) as StreamObjectRow;
         if (currentRealmId && currentTbl) {
           chunkBuffer.push({ tbl: currentTbl, id, obj });
         }
