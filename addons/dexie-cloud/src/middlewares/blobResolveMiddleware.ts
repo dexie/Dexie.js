@@ -328,23 +328,18 @@ function resolveAndSave(
               : undefined;
 
         if (key !== undefined) {
-          // Queue each resolved blob individually for atomic update
-          // This uses setTimeout(fn, 0) to completely isolate from
-          // Dexie's transaction context (avoids inheriting PSD)
-          if (isReadonly) {
-            blobSavingQueue.saveBlobs(table.name, key, resolvedBlobs);
-          } else {
-            // For rw transactions, we can save directly without queueing
-            // since we're still in the same transaction context
-            table
-              .mutate({ type: 'put', keys: [key], values: [resolved], trans })
-              .catch((err) => {
-                console.error(
-                  `Failed to save resolved blob on ${table.name}:${key}:`,
-                  err
-                );
-              });
-          }
+          // Always use the BlobSavingQueue, even for rw transactions.
+          // Reason: blob download is an async native fetch that breaks out of
+          // Dexie's PSD zone. By the time the download finishes, PSD.trans is
+          // no longer the original transaction (it may be undefined or a
+          // different transaction). Calling table.mutate() at that point causes
+          // HooksMiddleware to read PSD.trans, crash, and surface the error as
+          // "[dexie-cloud:blobResolve] Failed to resolve BlobRefs on <table>".
+          //
+          // BlobSavingQueue uses setTimeout(fn, 0) to run in a fresh JS task
+          // completely outside any PSD context, then opens a proper Dexie rw
+          // transaction — which is always safe regardless of the calling context.
+          blobSavingQueue.saveBlobs(table.name, key, resolvedBlobs);
         }
 
         return resolved;
