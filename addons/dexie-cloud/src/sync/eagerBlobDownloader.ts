@@ -75,72 +75,66 @@ export async function downloadUnresolvedBlobs(
     t.schema.indexes.some((idx) => idx.name === '_hasBlobRefs')
   );
 
-  // Snapshot the primary keys of all unresolved rows up-front, per table.
-  // Empty arrays are kept so logging is consistent; the loop below skips
-  // tables with no work to do.
-  const workByTable = new Map<string, any[]>();
-  let totalWork = 0;
-  for (const table of syncedTables) {
-    try {
-      const keys = await table.where('_hasBlobRefs').equals(1).primaryKeys();
-      workByTable.set(table.name, keys);
-      totalWork += keys.length;
-    } catch (err) {
-      console.error(
-        `Eager download: failed to list unresolved rows for ${table.name}:`,
-        err
-      );
-      workByTable.set(table.name, []);
-    }
-  }
-
-  if (totalWork === 0) {
-    debugLog('Eager download: No blobs remaining, exiting');
-    return;
-  }
-
-  setDownloadingState(downloading$, true);
+  let started = false;
+  let totalProcessed = 0;
 
   try {
-    debugLog(
-      `Eager download: ${totalWork} unresolved row(s) across ${syncedTables.length} table(s)`
-    );
-
     for (const table of syncedTables) {
       if (signal?.aborted) break;
-      const keys = workByTable.get(table.name);
-      if (!keys || keys.length === 0) continue;
 
+      let keys: any[];
       try {
-        for (let i = 0; i < keys.length; i += CHUNK_SIZE) {
-          if (signal?.aborted) break;
-          const slice = keys.slice(i, i + CHUNK_SIZE);
+        keys = await table.where('_hasBlobRefs').equals(1).primaryKeys();
+      } catch (err) {
+        console.error(
+          `Eager download: failed to list unresolved rows for ${table.name}:`,
+          err
+        );
+        continue;
+      }
+      if (keys.length === 0) continue;
+
+      if (!started) {
+        setDownloadingState(downloading$, true);
+        started = true;
+      }
+
+      debugLog(`Eager download: ${table.name} has ${keys.length} row(s)`);
+
+      for (let i = 0; i < keys.length; i += CHUNK_SIZE) {
+        if (signal?.aborted) break;
+        const slice = keys.slice(i, i + CHUNK_SIZE);
+        try {
           // bulkGet triggers the blob-resolve middleware for each row that
           // still has `_hasBlobRefs=1`. Rows already resolved by parallel
           // reads come back without the marker and the middleware no-ops.
           // Rows that have been deleted return `undefined` and are
           // likewise skipped.
           await table.bulkGet(slice);
-          debugLog(
-            `Eager download: ${table.name} ${Math.min(
-              i + CHUNK_SIZE,
-              keys.length
-            )}/${keys.length}`
-          );
+        } catch (err) {
+          console.error(`Eager download: ${table.name} chunk failed:`, err);
+          continue;
         }
-      } catch (err) {
-        console.error(
-          `Eager download: error processing table ${table.name}:`,
-          err
+        totalProcessed += slice.length;
+        debugLog(
+          `Eager download: ${table.name} ${Math.min(
+            i + CHUNK_SIZE,
+            keys.length
+          )}/${keys.length}`
         );
       }
     }
 
-    // Make sure all middleware-enqueued saves have landed before we flip
-    // `downloading$` to false — otherwise observers might see a "done"
-    // signal while writes are still in flight.
-    await db.blobDownloadTracker.drainPendingSaves();
+    if (started) {
+      // Make sure all middleware-enqueued saves have landed before we flip
+      // `downloading$` to false — otherwise observers might see a "done"
+      // signal while writes are still in flight.
+      await db.blobDownloadTracker.drainPendingSaves();
+      debugLog(`Eager download: done (${totalProcessed} row(s) processed)`);
+    } else {
+      debugLog('Eager download: No blobs remaining, exiting');
+    }
   } finally {
-    setDownloadingState(downloading$, false);
+    if (started) setDownloadingState(downloading$, false);
   }
 }
