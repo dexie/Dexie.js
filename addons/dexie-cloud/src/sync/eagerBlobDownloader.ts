@@ -4,12 +4,14 @@
  * Downloads unresolved blobs in the background when blobMode='eager'.
  * Called after sync completes to prefetch blobs for offline access.
  *
- * Strategy: simply read rows with `_hasBlobRefs=1` in chunks via the
- * normal middleware stack. The blob-resolve middleware does all the
- * actual work — downloading blobs (throttled and deduplicated by the
- * shared BlobDownloadTracker) and enqueueing them for persistence via
- * the internal save queue. Between chunks we drain the save queue so
- * the next chunk's query no longer sees the just-persisted rows.
+ * Strategy:
+ *   1. Snapshot the primary keys of all rows currently flagged
+ *      `_hasBlobRefs=1` for each syncable table.
+ *   2. Walk that key list in chunks via `bulkGet`. Each `bulkGet`
+ *      triggers the blob-resolve middleware, which does all the actual
+ *      work — downloading blobs (throttled and deduplicated by the
+ *      shared BlobDownloadTracker) and enqueueing them for persistence
+ *      via the internal save queue.
  *
  * This keeps a single, symmetric code path with normal application
  * reads, which is important when other middlewares are present
@@ -17,12 +19,33 @@
  * queue and reads from this loop both pass through the full middleware
  * stack, so on-disk representation stays consistent.
  *
+ * Why a snapshot of primary keys (rather than re-querying the index)?
+ *   - Rows that get resolved by parallel application reads simply
+ *     disappear from the table contents we're about to re-fetch; the
+ *     middleware skips them since `_hasBlobRefs` is already cleared.
+ *   - Stuck rows (e.g., blob 404s) are naturally bypassed: we just
+ *     advance to the next chunk in the snapshot. No `seenKeys`
+ *     bookkeeping required.
+ *   - The snapshot is `string[]`-shaped for typical Dexie Cloud rows
+ *     (~36 bytes/UUID), so ~28K keys per MB. Acceptable for any
+ *     realistic dataset.
+ *
  * Progress is tracked automatically via liveQuery in blobProgress.ts —
  * no manual progress reporting needed here.
+ *
+ * --- Throughput note ---
+ * The chunk loop is sequential: bulkGet → wait for all downloads to
+ * settle → next bulkGet. The save queue drains in the background and
+ * does not block iteration (saves no longer need to be persisted before
+ * the next iteration, since we don't re-query the index). For typical
+ * blob sizes (10 KB – 10 MB) the network dominates total time. If
+ * real-world profiling later shows the per-chunk fixed cost matters,
+ * the next bulkGet could be kicked off in parallel with the current
+ * one's middleware work — but we keep it simple until measurements
+ * justify otherwise.
  */
 
 import { BehaviorSubject } from 'rxjs';
-import Dexie from 'dexie';
 import { setDownloadingState } from './blobProgress';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { getSyncableTables } from '../helpers/getSyncableTables';
@@ -31,8 +54,8 @@ import { MAX_CONCURRENT } from './BlobDownloadTracker';
 // One chunk = one full saturation of the tracker's concurrency semaphore.
 // Larger chunks would only buffer more downloaded Uint8Arrays in memory
 // while waiting for the save queue to persist them, without any throughput
-// benefit (the semaphore is the gate, not the query).
-const CHUNK_SIZE = MAX_CONCURRENT;
+// benefit (the semaphore is the gate, not the bulkGet).
+const CHUNK_SIZE = MAX_CONCURRENT - 1; // Leave one slot for parallel app reads that might also trigger downloads
 
 /**
  * Download all unresolved blobs in the background.
@@ -52,21 +75,26 @@ export async function downloadUnresolvedBlobs(
     t.schema.indexes.some((idx) => idx.name === '_hasBlobRefs')
   );
 
-  // Quick check: any work at all?
-  let hasWork = false;
+  // Snapshot the primary keys of all unresolved rows up-front, per table.
+  // Empty arrays are kept so logging is consistent; the loop below skips
+  // tables with no work to do.
+  const workByTable = new Map<string, any[]>();
+  let totalWork = 0;
   for (const table of syncedTables) {
     try {
-      const count = await table.where('_hasBlobRefs').equals(1).count();
-      if (count > 0) {
-        hasWork = true;
-        break;
-      }
-    } catch {
-      // skip
+      const keys = await table.where('_hasBlobRefs').equals(1).primaryKeys();
+      workByTable.set(table.name, keys);
+      totalWork += keys.length;
+    } catch (err) {
+      console.error(
+        `Eager download: failed to list unresolved rows for ${table.name}:`,
+        err
+      );
+      workByTable.set(table.name, []);
     }
   }
 
-  if (!hasWork) {
+  if (totalWork === 0) {
     debugLog('Eager download: No blobs remaining, exiting');
     return;
   }
@@ -75,82 +103,30 @@ export async function downloadUnresolvedBlobs(
 
   try {
     debugLog(
-      `Eager download: Found ${syncedTables.length} eligible tables: ${syncedTables
-        .map((t) => t.name)
-        .join(', ')}`
+      `Eager download: ${totalWork} unresolved row(s) across ${syncedTables.length} table(s)`
     );
 
     for (const table of syncedTables) {
       if (signal?.aborted) break;
-
-      // Guard against an infinite loop when some rows cannot be cleared
-      // (e.g., blob 404s persistently on the server). We track keys we've
-      // already attempted, and expand the query limit by that count so the
-      // chunk window slides past stuck rows and keeps making progress on
-      // healthy ones. We bail only when even the expanded query produces
-      // no fresh rows, or when too many stuck rows have accumulated.
-      //
-      // MAX_SEEN caps how many stuck rows we tolerate before giving up on
-      // this table. Each stuck row costs one extra download attempt per
-      // iteration, so we keep the cap modest.
-      const MAX_SEEN = 256;
-      const seenKeys = new Set<string>();
-      const primKey = table.schema.primKey;
-      const keyOf = (obj: any): string => {
-        const k = primKey.keyPath
-          ? Dexie.getByKeyPath(obj, primKey.keyPath as string)
-          : undefined;
-        // Stringify so that compound keys (arrays) hash to a stable form.
-        return k === undefined ? '' : JSON.stringify(k);
-      };
+      const keys = workByTable.get(table.name);
+      if (!keys || keys.length === 0) continue;
 
       try {
-        // Loop chunks until the table has no more unresolved rows.
-        // Each toArray() call triggers the blob-resolve middleware, which
-        // downloads (throttled by the tracker) and enqueues saves. We
-        // drain the save queue between chunks so the next query no longer
-        // returns the rows we just processed.
-        while (!signal?.aborted) {
-          // Expand the query window past any stuck rows from earlier
-          // iterations so we still discover fresh rows beyond them.
-          const limit = CHUNK_SIZE + seenKeys.size;
-          const chunk = await table
-            .where('_hasBlobRefs')
-            .equals(1)
-            .limit(limit)
-            .toArray();
-
-          if (chunk.length === 0) break;
-
-          // Identify rows we have NOT attempted before. If there are none,
-          // the entire remaining table is stuck — give up on this table.
-          let freshCount = 0;
-          for (const obj of chunk) {
-            if (!seenKeys.has(keyOf(obj))) freshCount++;
-          }
-          if (freshCount === 0) {
-            console.warn(
-              `Eager download: ${table.name} stopped — ${chunk.length} rows could not be cleared (likely persistent blob fetch errors)`
-            );
-            break;
-          }
-
-          for (const obj of chunk) seenKeys.add(keyOf(obj));
-
-          if (seenKeys.size >= MAX_SEEN) {
-            console.warn(
-              `Eager download: ${table.name} stopped — accumulated ${seenKeys.size} stuck rows (cap ${MAX_SEEN})`
-            );
-            break;
-          }
-
+        for (let i = 0; i < keys.length; i += CHUNK_SIZE) {
+          if (signal?.aborted) break;
+          const slice = keys.slice(i, i + CHUNK_SIZE);
+          // bulkGet triggers the blob-resolve middleware for each row that
+          // still has `_hasBlobRefs=1`. Rows already resolved by parallel
+          // reads come back without the marker and the middleware no-ops.
+          // Rows that have been deleted return `undefined` and are
+          // likewise skipped.
+          await table.bulkGet(slice);
           debugLog(
-            `Eager download: ${table.name} processed chunk of ${chunk.length} (${freshCount} fresh, ${seenKeys.size} total seen)`
+            `Eager download: ${table.name} ${Math.min(
+              i + CHUNK_SIZE,
+              keys.length
+            )}/${keys.length}`
           );
-
-          // Wait for the middleware-driven saves to land in IndexedDB
-          // before re-querying the index.
-          await db.blobDownloadTracker.drainPendingSaves();
         }
       } catch (err) {
         console.error(
@@ -159,6 +135,11 @@ export async function downloadUnresolvedBlobs(
         );
       }
     }
+
+    // Make sure all middleware-enqueued saves have landed before we flip
+    // `downloading$` to false — otherwise observers might see a "done"
+    // signal while writes are still in flight.
+    await db.blobDownloadTracker.drainPendingSaves();
   } finally {
     setDownloadingState(downloading$, false);
   }
