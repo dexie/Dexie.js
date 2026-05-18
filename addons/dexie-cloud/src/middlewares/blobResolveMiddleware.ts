@@ -8,10 +8,11 @@
  * Uses Dexie.waitFor() only for explicit rw transactions to keep them alive.
  * For readonly or implicit transactions, resolves directly (no waitFor needed).
  *
- * Resolved blobs are queued for saving via BlobSavingQueue, which uses
- * setTimeout(fn, 0) to completely isolate from Dexie's transaction context.
- * Each blob is saved atomically using Table.update() with its keyPath to
- * avoid race conditions with other property changes.
+ * Resolved blobs are persisted via db.blobDownloadTracker.enqueueSave(),
+ * which internally uses a queue that runs in a fresh JS task to completely
+ * isolate from Dexie's transaction context. Each blob is saved atomically
+ * using Table.update() with its keyPath to avoid race conditions with other
+ * property changes.
  *
  * Blob downloads use Authorization header (same as sync) via the server
  * proxy endpoint: GET /blob/{ref}
@@ -34,7 +35,6 @@ import {
   resolveAllBlobRefs,
   ResolvedBlob,
 } from '../sync/blobResolve';
-import { BlobSavingQueue } from '../sync/BlobSavingQueue';
 import { TXExpandos } from '../types/TXExpandos';
 import { UserLogin } from '../dexie-cloud-client';
 
@@ -46,9 +46,6 @@ export function createBlobResolveMiddleware(
     name: 'blobResolve',
     level: 2, // Run above cache (0) and other middlewares (1) to resolve BlobRefs from cached data
     create(downlevelDatabase: DBCore): DBCore {
-      // Create a single queue instance for this database
-      const blobSavingQueue = new BlobSavingQueue(db);
-
       return {
         ...downlevelDatabase,
         table(tableName: string): DBCoreTable {
@@ -82,7 +79,6 @@ export function createBlobResolveMiddleware(
                     req.trans,
                     req.key,
                     result,
-                    blobSavingQueue,
                     db
                   );
                 }
@@ -112,7 +108,6 @@ export function createBlobResolveMiddleware(
                         req.trans,
                         req.keys[index],
                         result,
-                        blobSavingQueue,
                         db
                       );
                     }
@@ -147,7 +142,6 @@ export function createBlobResolveMiddleware(
                         req.trans,
                         undefined,
                         item,
-                        blobSavingQueue,
                         db
                       );
                     }
@@ -168,12 +162,7 @@ export function createBlobResolveMiddleware(
                 if (!cursor) return cursor; // No results, so no resolution needed
                 if (!req.values) return cursor; // No values requested, so no resolution needed
                 if (!dbUrl) return cursor; // No database URL configured, can't resolve blobs
-                return createBlobResolvingCursor(
-                  cursor,
-                  downlevelTable,
-                  blobSavingQueue,
-                  db
-                );
+                return createBlobResolvingCursor(cursor, downlevelTable, db);
               });
             },
           };
@@ -196,7 +185,6 @@ export function createBlobResolveMiddleware(
 function createBlobResolvingCursor(
   cursor: DBCoreCursor,
   table: DBCoreTable,
-  blobSavingQueue: BlobSavingQueue,
   db: DexieCloudDB
 ): DBCoreCursor {
   // Create wrapped cursor using Object.create() - inherits everything.
@@ -237,7 +225,6 @@ function createBlobResolvingCursor(
             cursor.trans,
             cursor.primaryKey,
             rawValue,
-            blobSavingQueue,
             db,
             true
           ).then(
@@ -280,7 +267,6 @@ function resolveAndSave(
   trans: DBCoreTransaction,
   pKey: any | undefined, // optional. If missing, tries to extract from object using primary key path
   obj: any,
-  blobSavingQueue: BlobSavingQueue,
   db: DexieCloudDB,
   isCursorValue: boolean = false // Flag to indicate if we're resolving a cursor value (which may not have a primary key)
 ): Promise<any> {
@@ -332,18 +318,18 @@ function resolveAndSave(
               : undefined;
 
         if (key !== undefined) {
-          // Always use the BlobSavingQueue, even for rw transactions.
-          // Reason: blob download is an async native fetch that breaks out of
-          // Dexie's PSD zone. By the time the download finishes, PSD.trans is
-          // no longer the original transaction (it may be undefined or a
-          // different transaction). Calling table.mutate() at that point causes
-          // HooksMiddleware to read PSD.trans, crash, and surface the error as
-          // "[dexie-cloud:blobResolve] Failed to resolve BlobRefs on <table>".
-          //
-          // BlobSavingQueue uses setTimeout(fn, 0) to run in a fresh JS task
-          // completely outside any PSD context, then opens a proper Dexie rw
-          // transaction — which is always safe regardless of the calling context.
-          blobSavingQueue.saveBlobs(table.name, key, resolvedBlobs);
+          // Hand off persistence to the tracker. The tracker owns an
+          // internal save-queue that runs in a fresh JS task (setTimeout 0)
+          // — completely outside any PSD context, so opening a Dexie rw
+          // transaction there is always safe regardless of the calling
+          // context. The tracker also keeps the in-flight download cache
+          // alive until the save completes, so concurrent readers piggyback
+          // on the already-downloaded data instead of refetching.
+          db.blobDownloadTracker.enqueueSave(table.name, key, resolvedBlobs);
+        } else if (resolvedBlobs.length > 0) {
+          // No primary key — we can't persist. Release the in-flight cache
+          // entries explicitly so they don't leak.
+          db.blobDownloadTracker.releaseRefs(resolvedBlobs.map((b) => b.ref));
         }
 
         return resolved;

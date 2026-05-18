@@ -1,27 +1,64 @@
 import type { DexieCloudDB } from '../db/DexieCloudDB';
-import { BlobRef } from './blobResolve';
+import { BlobRef, ResolvedBlob } from './blobResolve';
+import { BlobSavingQueue } from './BlobSavingQueue';
 import { loadCachedAccessToken } from './loadCachedAccessToken';
 
 /**
- * Deduplicates in-flight blob downloads.
+ * Owns the full lifecycle of downloaded blobs:
+ *   1. Deduplicates concurrent downloads for the same ref.
+ *   2. Bounds the number of concurrent network fetches (MAX_CONCURRENT)
+ *      so that ad-hoc reads can't starve the HTTP connection pool. Calls
+ *      beyond the cap queue in FIFO order as slots free. The slot is held
+ *      only for the duration of the fetch — NOT until persistence — to
+ *      avoid deadlocks when a single object contains more blob refs than
+ *      MAX_CONCURRENT (a sequential resolver would otherwise hold every
+ *      slot itself while waiting for the next).
+ *   3. Keeps the in-flight promise alive after the network fetch completes,
+ *      until the blob has been persisted back to IndexedDB. This way,
+ *      readers that ask for the same ref while it is queued for saving
+ *      can piggyback on the existing promise instead of refetching.
+ *      In-flight membership and slot ownership are independent: a piggyback
+ *      reader consumes neither a slot nor extra memory beyond the existing
+ *      cached Uint8Array.
+ *   4. Persists resolved blobs via an internal BlobSavingQueue, and
+ *      releases the in-flight entry when persistence completes.
  *
- * Both the blob-resolve middleware and the eager blob downloader may
- * try to fetch the same blob concurrently. This tracker ensures each
- * unique blob ref is only downloaded once — subsequent requests for
- * the same ref piggyback on the existing promise.
- *
- * Instantiate once per DexieCloudDB.
+ * Both the blob-resolve middleware and the eager blob downloader use this
+ * tracker. Instantiate once per DexieCloudDB.
  */
+
+const MAX_CONCURRENT = 6;
+
 export class BlobDownloadTracker {
   private inFlight = new Map<string, Promise<Uint8Array>>();
   private db: DexieCloudDB;
+  private savingQueue: BlobSavingQueue;
+  private activeFetches = 0;
+  private waiting: Array<() => void> = [];
 
   constructor(db: DexieCloudDB) {
     this.db = db;
+    this.savingQueue = new BlobSavingQueue(db, (refs) => {
+      // Called by the queue when a save transaction has completed
+      // (regardless of success). Drop the in-flight cache entries now —
+      // any future reader will go through IndexedDB instead.
+      for (const ref of refs) {
+        this.inFlight.delete(ref);
+      }
+    });
   }
 
   /**
-   * Download a blob, deduplicating concurrent requests for the same ref.
+   * Download a blob, deduplicating concurrent requests for the same ref
+   * and respecting the global fetch concurrency cap.
+   *
+   * Lifecycle:
+   *   - Slot is acquired before the fetch and released as soon as the
+   *     fetch settles (success or failure).
+   *   - The in-flight entry survives a successful fetch and lives on
+   *     until persistence completes (via enqueueSave) or releaseRefs
+   *     is called. On fetch failure, the entry is removed immediately
+   *     so a future call can retry.
    *
    * @param blobRef - The BlobRef to download
    * @param dbUrl - Base URL for the database (e.g., 'https://mydb.dexie.cloud')
@@ -29,13 +66,63 @@ export class BlobDownloadTracker {
   download(blobRef: BlobRef, dbUrl: string): Promise<Uint8Array> {
     let promise = this.inFlight.get(blobRef.ref);
     if (!promise) {
-      promise = this.downloadBlob(blobRef, dbUrl).finally(() =>
-        this.inFlight.delete(blobRef.ref)
-      );
-      // When the promise settles (either fulfilled or rejected), remove it from the in-flight map
+      promise = this.acquireSlot()
+        .then(() =>
+          this.downloadBlob(blobRef, dbUrl).finally(() => this.releaseSlot())
+        )
+        .catch((err) => {
+          // On error, remove immediately so a future call can retry.
+          // (Slot already released by the .finally above.)
+          this.inFlight.delete(blobRef.ref);
+          throw err;
+        });
       this.inFlight.set(blobRef.ref, promise);
     }
     return promise;
+  }
+
+  /**
+   * Queue resolved blobs for persisting back to IndexedDB.
+   * When the save transaction completes, the corresponding in-flight
+   * entries are released.
+   */
+  enqueueSave(
+    tableName: string,
+    primaryKey: any,
+    resolvedBlobs: ResolvedBlob[]
+  ): void {
+    this.savingQueue.saveBlobs(tableName, primaryKey, resolvedBlobs);
+  }
+
+  /**
+   * Release in-flight entries without going through the internal saving
+   * queue. Used when the caller persists the blobs itself (e.g., the
+   * eager downloader does its own table.update()), or when no primary
+   * key was available and the data won't be persisted at all.
+   */
+  releaseRefs(refs: string[]): void {
+    for (const ref of refs) {
+      this.inFlight.delete(ref);
+    }
+  }
+
+  private acquireSlot(): Promise<void> {
+    if (this.activeFetches < MAX_CONCURRENT) {
+      this.activeFetches++;
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      this.waiting.push(() => {
+        this.activeFetches++;
+        resolve();
+      });
+    });
+  }
+
+  private releaseSlot(): void {
+    this.activeFetches--;
+    const next = this.waiting.shift();
+    if (next) next();
   }
 
   /**

@@ -121,27 +121,40 @@ export async function downloadUnresolvedBlobs(
               // Refresh token per object — cheap (returns cached) but ensures
               // we pick up renewed tokens during long download sessions.
               const resolvedBlobs: ResolvedBlob[] = [];
-              await resolveAllBlobRefs(
-                obj,
-                databaseUrl,
-                resolvedBlobs,
-                '',
-                new WeakMap(),
-                db.blobDownloadTracker
-              );
+              try {
+                await resolveAllBlobRefs(
+                  obj,
+                  databaseUrl,
+                  resolvedBlobs,
+                  '',
+                  new WeakMap(),
+                  db.blobDownloadTracker
+                );
 
-              const updateSpec: UpdateSpec<any> = {
-                _hasBlobRefs: undefined,
-              };
-              for (const blob of resolvedBlobs) {
-                updateSpec[blob.keyPath] = blob.data;
+                const updateSpec: UpdateSpec<any> = {
+                  _hasBlobRefs: undefined,
+                };
+                for (const blob of resolvedBlobs) {
+                  updateSpec[blob.keyPath] = blob.data;
+                }
+
+                debugLog(
+                  `Eager download: Updating ${table.name}:${key} with ${resolvedBlobs.length} blobs`
+                );
+                await table.update(key, updateSpec);
+                // liveQuery in blobProgress.ts auto-detects this change
+              } finally {
+                // Release the in-flight download cache entries owned by
+                // BlobDownloadTracker. We persist directly via table.update()
+                // here rather than going through the tracker's saving queue,
+                // so we must explicitly release the refs ourselves —
+                // otherwise they would leak in the tracker's inFlight map.
+                if (resolvedBlobs.length > 0) {
+                  db.blobDownloadTracker.releaseRefs(
+                    resolvedBlobs.map((b) => b.ref)
+                  );
+                }
               }
-
-              debugLog(
-                `Eager download: Updating ${table.name}:${key} with ${resolvedBlobs.length} blobs`
-              );
-              await table.update(key, updateSpec);
-              // liveQuery in blobProgress.ts auto-detects this change
             } catch (err) {
               console.error(
                 `Failed to download blobs for ${table.name}:${key}:`,

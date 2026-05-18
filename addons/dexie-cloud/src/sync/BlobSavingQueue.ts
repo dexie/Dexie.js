@@ -1,5 +1,9 @@
 /**
- * BlobSavingQueue - Queues resolved blobs for saving back to IndexedDB
+ * BlobSavingQueue - Queues resolved blobs for saving back to IndexedDB.
+ *
+ * This is an internal collaborator of BlobDownloadTracker and is not
+ * intended to be used directly by middleware or other code. See
+ * BlobDownloadTracker.enqueueSave().
  *
  * Uses setTimeout(fn, 0) instead of queueMicrotask to completely isolate
  * from Dexie's Promise.PSD context. This prevents the save operation
@@ -24,9 +28,11 @@ export class BlobSavingQueue {
   private queue: QueuedBlob[] = [];
   private isProcessing = false;
   private db: DexieCloudDB;
+  private onPersisted: (refs: string[]) => void;
 
-  constructor(db: DexieCloudDB) {
+  constructor(db: DexieCloudDB, onPersisted: (refs: string[]) => void) {
     this.db = db;
+    this.onPersisted = onPersisted;
   }
 
   /**
@@ -38,7 +44,11 @@ export class BlobSavingQueue {
     primaryKey: any,
     resolvedBlobs: ResolvedBlob[]
   ): void {
-    this.queue.push({ tableName, primaryKey, resolvedBlobs });
+    this.queue.push({
+      tableName,
+      primaryKey,
+      resolvedBlobs,
+    });
     this.startConsumer();
   }
 
@@ -120,6 +130,13 @@ export class BlobSavingQueue {
         );
       })
       .finally(() => {
+        // At this point, the transaction has completed (either successfully or with error),
+        // and the blobs have been saved (or failed to save).
+        // Notify the owner (BlobDownloadTracker) so it can release the
+        // in-flight download cache entries for these refs. The cache was
+        // kept alive until now to maximize reuse while the blob was still
+        // in-flight (downloading or queued for save).
+        this.onPersisted(item.resolvedBlobs.map((b) => b.ref));
         // Process next item in the queue
         return this.processQueue();
       });
