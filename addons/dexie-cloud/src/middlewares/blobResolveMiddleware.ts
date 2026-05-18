@@ -206,11 +206,15 @@ function createBlobResolvingCursor(
   // throws "Illegal invocation" in Chrome 146+.
   const wrappedCursor = Object.create(cursor, {
     key: {
-      get() { return cursor.key; },
+      get() {
+        return cursor.key;
+      },
       configurable: true,
     },
     primaryKey: {
-      get() { return cursor.primaryKey; },
+      get() {
+        return cursor.primaryKey;
+      },
       configurable: true,
     },
     value: {
