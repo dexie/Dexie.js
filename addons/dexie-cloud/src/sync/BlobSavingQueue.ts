@@ -29,6 +29,7 @@ export class BlobSavingQueue {
   private isProcessing = false;
   private db: DexieCloudDB;
   private onPersisted: (refs: string[]) => void;
+  private drainResolvers: Array<() => void> = [];
 
   constructor(db: DexieCloudDB, onPersisted: (refs: string[]) => void) {
     this.db = db;
@@ -50,6 +51,26 @@ export class BlobSavingQueue {
       resolvedBlobs,
     });
     this.startConsumer();
+  }
+
+  /**
+   * Returns a promise that resolves when the queue is empty AND no item
+   * is currently being processed. Used by callers that need to know when
+   * all previously enqueued saves have been persisted to IndexedDB before
+   * making decisions based on the on-disk state (e.g., the eager blob
+   * downloader looping over `_hasBlobRefs=1` rows in chunks).
+   *
+   * Note: New work enqueued AFTER drain() is called does NOT extend the
+   * wait. Callers that race against concurrent producers should treat the
+   * returned promise as "queue was empty at some point after this call".
+   */
+  drain(): Promise<void> {
+    if (!this.isProcessing && this.queue.length === 0) {
+      return Promise.resolve();
+    }
+    return new Promise<void>((resolve) => {
+      this.drainResolvers.push(resolve);
+    });
   }
 
   /**
@@ -78,6 +99,14 @@ export class BlobSavingQueue {
     const item = this.queue.shift();
     if (!item) {
       this.isProcessing = false;
+      // Fire any pending drain() waiters. New saveBlobs() calls that
+      // arrive after this point will start a fresh processing cycle
+      // and have their own drain() semantics.
+      const resolvers = this.drainResolvers;
+      if (resolvers.length > 0) {
+        this.drainResolvers = [];
+        for (const resolve of resolvers) resolve();
+      }
       return;
     }
 
@@ -92,36 +121,32 @@ export class BlobSavingQueue {
         for (const blob of item.resolvedBlobs) {
           updateSpec[blob.keyPath] = blob.data;
         }
-        tx.table(item.tableName)
-          .update(item.primaryKey, (obj) => {
-            // Check that object still has the same unresolved blob refs before applying update (i.e. it hasn't been modified since we read it)
-            for (const blob of item.resolvedBlobs) {
-              // Verify atomicity - none of the blob properties has been modified since we read it. If any of them was modified, skip updating this item to avoid overwriting user changes.
-              const currentValue = Dexie.getByKeyPath(obj, blob.keyPath);
-              if (currentValue === undefined) {
-                // Blob property was removed - skip updating this blob
-                continue;
-              }
-              if (!isBlobRef(currentValue)) {
-                // Blob property was modified to a non-blob-ref value - skip updating this blob
-                continue;
-              }
-              if (currentValue.ref !== blob.ref) {
-                // Blob property was modified - skip updating this blob
-                return; // Stop. Another items has been queued to fully fix the object.
-              }
-              Dexie.setByKeyPath(obj, blob.keyPath, blob.data);
+        tx.table(item.tableName).update(item.primaryKey, (obj) => {
+          // Check that object still has the same unresolved blob refs before applying update (i.e. it hasn't been modified since we read it)
+          for (const blob of item.resolvedBlobs) {
+            // Verify atomicity - none of the blob properties has been modified since we read it. If any of them was modified, skip updating this item to avoid overwriting user changes.
+            const currentValue = Dexie.getByKeyPath(obj, blob.keyPath);
+            if (currentValue === undefined) {
+              // Blob property was removed - skip updating this blob
+              continue;
             }
-            delete obj._hasBlobRefs; // Clear the _hasBlobRefs marker if all refs was resolved.
-          })
-          .then(() => {
-            // Disable waking up live queries since this is an internal update that shouldn't trigger UI updates.
-            // What we want is to clear out mutatedParts just before the transaction completes,
-            // but there is no hook for "just before transaction completes". So we do it in a then() after the update,
-            // which is guaranteed to run before the transaction completes and wakes up live queries.
-            // (doing it after transaction promise completes would be too late since live queries would have been woken up already)
-            trans.mutatedParts = undefined;
-          });
+            if (!isBlobRef(currentValue)) {
+              // Blob property was modified to a non-blob-ref value - skip updating this blob
+              continue;
+            }
+            if (currentValue.ref !== blob.ref) {
+              // Blob property was modified - skip updating this blob
+              return; // Stop. Another items has been queued to fully fix the object.
+            }
+            Dexie.setByKeyPath(obj, blob.keyPath, blob.data);
+          }
+          delete obj._hasBlobRefs; // Clear the _hasBlobRefs marker if all refs was resolved.
+        });
+        // Note: we intentionally do NOT clear trans.mutatedParts here.
+        // Letting the normal mutation signal through means the
+        // blobProgress liveQuery (and any user-defined liveQuery that
+        // depends on the resolved fields) wakes up and reflects progress
+        // as blobs land in IndexedDB.
       })
       .catch((error) => {
         console.error(

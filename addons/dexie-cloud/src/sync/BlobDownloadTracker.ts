@@ -27,7 +27,17 @@ import { loadCachedAccessToken } from './loadCachedAccessToken';
  * tracker. Instantiate once per DexieCloudDB.
  */
 
-const MAX_CONCURRENT = 6;
+/**
+ * Maximum number of concurrent blob fetches.
+ *
+ * Historically 6 to match the HTTP/1.1 same-origin connection cap that
+ * browsers enforce. With HTTP/2 (the typical transport for Dexie Cloud
+ * today) many streams multiplex over a single TCP connection, so the
+ * old cap is overly conservative. 10 is a modest bump that still keeps
+ * memory pressure (in-flight Uint8Arrays) and server load bounded.
+ * Can be made configurable via DexieCloudOptions if a real need arises.
+ */
+export const MAX_CONCURRENT = 10;
 
 export class BlobDownloadTracker {
   private inFlight = new Map<string, Promise<Uint8Array>>();
@@ -95,10 +105,23 @@ export class BlobDownloadTracker {
   }
 
   /**
+   * Wait until all previously enqueued saves have been persisted to
+   * IndexedDB. Used by callers that need to make decisions based on
+   * on-disk state — e.g., the eager downloader looping over rows with
+   * `_hasBlobRefs=1` in chunks, where each iteration must see the
+   * previous chunk's writes before re-querying.
+   *
+   * New saves enqueued AFTER drainPendingSaves() is called do NOT extend
+   * the wait.
+   */
+  drainPendingSaves(): Promise<void> {
+    return this.savingQueue.drain();
+  }
+
+  /**
    * Release in-flight entries without going through the internal saving
-   * queue. Used when the caller persists the blobs itself (e.g., the
-   * eager downloader does its own table.update()), or when no primary
-   * key was available and the data won't be persisted at all.
+   * queue. Used when the caller persists the blobs itself, or when no
+   * primary key was available and the data won't be persisted at all.
    */
   releaseRefs(refs: string[]): void {
     for (const ref of refs) {
