@@ -131,7 +131,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       // currentObs — it will return false, just accumulating mutations until the
       // query completes and populates currentObs.
       if (!startedListening) {
-        globalEvents(DEXIE_STORAGE_MUTATED_EVENT_NAME, mutationListener);
+        globalEvents.storagemutated.subscribe(mutationListener);
         startedListening = true;
       }
 
