@@ -4,34 +4,63 @@
  * Downloads unresolved blobs in the background when blobMode='eager'.
  * Called after sync completes to prefetch blobs for offline access.
  *
+ * Strategy:
+ *   1. Snapshot the primary keys of all rows currently flagged
+ *      `_hasBlobRefs=1` for each syncable table.
+ *   2. Walk that key list in chunks via `bulkGet`. Each `bulkGet`
+ *      triggers the blob-resolve middleware, which does all the actual
+ *      work — downloading blobs (throttled and deduplicated by the
+ *      shared BlobDownloadTracker) and enqueueing them for persistence
+ *      via the internal save queue.
+ *
+ * This keeps a single, symmetric code path with normal application
+ * reads, which is important when other middlewares are present
+ * (e.g., a hypothetical encryption middleware): writes from the save
+ * queue and reads from this loop both pass through the full middleware
+ * stack, so on-disk representation stays consistent.
+ *
+ * Why a snapshot of primary keys (rather than re-querying the index)?
+ *   - Rows that get resolved by parallel application reads simply
+ *     disappear from the table contents we're about to re-fetch; the
+ *     middleware skips them since `_hasBlobRefs` is already cleared.
+ *   - Stuck rows (e.g., blob 404s) are naturally bypassed: we just
+ *     advance to the next chunk in the snapshot. No `seenKeys`
+ *     bookkeeping required.
+ *   - The snapshot is `string[]`-shaped for typical Dexie Cloud rows
+ *     (~36 bytes/UUID), so ~28K keys per MB. Acceptable for any
+ *     realistic dataset.
+ *
  * Progress is tracked automatically via liveQuery in blobProgress.ts —
  * no manual progress reporting needed here.
+ *
+ * --- Throughput note ---
+ * The chunk loop is sequential: bulkGet → wait for all downloads to
+ * settle → next bulkGet. The save queue drains in the background and
+ * does not block iteration (saves no longer need to be persisted before
+ * the next iteration, since we don't re-query the index). For typical
+ * blob sizes (10 KB – 10 MB) the network dominates total time. If
+ * real-world profiling later shows the per-chunk fixed cost matters,
+ * the next bulkGet could be kicked off in parallel with the current
+ * one's middleware work — but we keep it simple until measurements
+ * justify otherwise.
  */
 
-import Dexie, { UpdateSpec } from 'dexie';
 import { BehaviorSubject } from 'rxjs';
-import { TSONRef, hasTSONRefs } from 'dexie-cloud-common';
-import {
-  BlobRef,
-  isBlobRef,
-  hasBlobRefs,
-  hasUnresolvedBlobRefs,
-  isSerializedTSONRef,
-  resolveAllBlobRefs,
-  ResolvedBlob,
-} from './blobResolve';
-import { loadCachedAccessToken } from './loadCachedAccessToken';
 import { setDownloadingState } from './blobProgress';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import { getSyncableTables } from '../helpers/getSyncableTables';
+import { MAX_CONCURRENT } from './BlobDownloadTracker';
+
+// One chunk = one full saturation of the tracker's concurrency semaphore.
+// Larger chunks would only buffer more downloaded Uint8Arrays in memory
+// while waiting for the save queue to persist them, without any throughput
+// benefit (the semaphore is the gate, not the bulkGet).
+const CHUNK_SIZE = MAX_CONCURRENT - 1; // Leave one slot for parallel app reads that might also trigger downloads
 
 /**
  * Download all unresolved blobs in the background.
  *
  * This is called when blobMode='eager' (default) after sync completes.
- * BlobRef URLs are signed (SAS tokens) so no auth header needed.
- *
- * Each blob is saved atomically using Table.update() to avoid race conditions.
  */
 export async function downloadUnresolvedBlobs(
   db: DexieCloudDB,
@@ -42,126 +71,70 @@ export async function downloadUnresolvedBlobs(
 
   debugLog('Eager download: Starting...');
 
-  // Scan for unresolved blobs
-  const syncedTables = getSyncableTables(db);
-  let hasWork = false;
+  const syncedTables = getSyncableTables(db).filter((t) =>
+    t.schema.indexes.some((idx) => idx.name === '_hasBlobRefs')
+  );
 
-  for (const table of syncedTables) {
-    try {
-      const hasIndex = !!table.schema.idxByName['_hasBlobRefs'];
-      if (!hasIndex) continue;
-      const count = await table.where('_hasBlobRefs').equals(1).count();
-      if (count > 0) {
-        hasWork = true;
-        break;
-      }
-    } catch {
-      // skip
-    }
-  }
-
-  if (!hasWork) {
-    debugLog('Eager download: No blobs remaining, exiting');
-    return;
-  }
-
-  setDownloadingState(downloading$, true);
+  let started = false;
+  let totalProcessed = 0;
 
   try {
-    debugLog(
-      `Eager download: Found ${syncedTables.length} syncable tables: ${syncedTables.map((t) => t.name).join(', ')}`
-    );
-
     for (const table of syncedTables) {
       if (signal?.aborted) break;
 
+      let keys: any[];
       try {
-        // Check if table has _hasBlobRefs index
-        const hasIndex = table.schema.indexes.some(
-          (idx) => idx.name === '_hasBlobRefs'
-        );
-        if (!hasIndex) continue;
-
-        // Query objects with _hasBlobRefs marker
-        const unresolvedObjects = await table
-          .where('_hasBlobRefs')
-          .equals(1)
-          .toArray();
-
-        debugLog(
-          `Eager download: Table ${table.name} has ${unresolvedObjects.length} unresolved objects`
-        );
-
-        const databaseUrl = db.cloud.options?.databaseUrl;
-        if (!databaseUrl)
-          throw new Error('Database URL is required to download blobs');
-
-        // Download up to MAX_CONCURRENT blobs in parallel
-        const MAX_CONCURRENT = 6;
-        const primaryKey = table.schema.primKey;
-
-        // Filter to actionable objects first
-        const pending = unresolvedObjects.filter((obj) => {
-          if (!hasUnresolvedBlobRefs(obj)) return false;
-          const key = primaryKey.keyPath
-            ? Dexie.getByKeyPath(obj, primaryKey.keyPath as string)
-            : undefined;
-          return key !== undefined;
-        });
-
-        // Process in parallel with concurrency limit
-        let i = 0;
-        const runNext = async (): Promise<void> => {
-          while (i < pending.length) {
-            if (signal?.aborted) return;
-            const obj = pending[i++];
-            const key = Dexie.getByKeyPath(obj, primaryKey.keyPath as string);
-
-            try {
-              // Refresh token per object — cheap (returns cached) but ensures
-              // we pick up renewed tokens during long download sessions.
-              const resolvedBlobs: ResolvedBlob[] = [];
-              await resolveAllBlobRefs(
-                obj,
-                databaseUrl,
-                resolvedBlobs,
-                '',
-                new WeakMap(),
-                db.blobDownloadTracker
-              );
-
-              const updateSpec: UpdateSpec<any> = {
-                _hasBlobRefs: undefined,
-              };
-              for (const blob of resolvedBlobs) {
-                updateSpec[blob.keyPath] = blob.data;
-              }
-
-              debugLog(
-                `Eager download: Updating ${table.name}:${key} with ${resolvedBlobs.length} blobs`
-              );
-              await table.update(key, updateSpec);
-              // liveQuery in blobProgress.ts auto-detects this change
-            } catch (err) {
-              console.error(
-                `Failed to download blobs for ${table.name}:${key}:`,
-                err
-              );
-            }
-          }
-        };
-
-        // Launch up to MAX_CONCURRENT workers
-        const workers: Promise<void>[] = [];
-        for (let w = 0; w < Math.min(MAX_CONCURRENT, pending.length); w++) {
-          workers.push(runNext());
-        }
-        await Promise.all(workers);
+        keys = await table.where('_hasBlobRefs').equals(1).primaryKeys();
       } catch (err) {
-        // Table might not have _hasBlobRefs index or other issues - skip silently
+        console.error(
+          `Eager download: failed to list unresolved rows for ${table.name}:`,
+          err
+        );
+        continue;
+      }
+      if (keys.length === 0) continue;
+
+      if (!started) {
+        setDownloadingState(downloading$, true);
+        started = true;
+      }
+
+      debugLog(`Eager download: ${table.name} has ${keys.length} row(s)`);
+
+      for (let i = 0; i < keys.length; i += CHUNK_SIZE) {
+        if (signal?.aborted) break;
+        const slice = keys.slice(i, i + CHUNK_SIZE);
+        try {
+          // bulkGet triggers the blob-resolve middleware for each row that
+          // still has `_hasBlobRefs=1`. Rows already resolved by parallel
+          // reads come back without the marker and the middleware no-ops.
+          // Rows that have been deleted return `undefined` and are
+          // likewise skipped.
+          await table.bulkGet(slice);
+        } catch (err) {
+          console.error(`Eager download: ${table.name} chunk failed:`, err);
+          continue;
+        }
+        totalProcessed += slice.length;
+        debugLog(
+          `Eager download: ${table.name} ${Math.min(
+            i + CHUNK_SIZE,
+            keys.length
+          )}/${keys.length}`
+        );
       }
     }
+
+    if (started) {
+      // Make sure all middleware-enqueued saves have landed before we flip
+      // `downloading$` to false — otherwise observers might see a "done"
+      // signal while writes are still in flight.
+      await db.blobDownloadTracker.drainPendingSaves();
+      debugLog(`Eager download: done (${totalProcessed} row(s) processed)`);
+    } else {
+      debugLog('Eager download: No blobs remaining, exiting');
+    }
   } finally {
-    setDownloadingState(downloading$, false);
+    if (started) setDownloadingState(downloading$, false);
   }
 }
