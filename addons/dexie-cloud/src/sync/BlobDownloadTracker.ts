@@ -172,7 +172,14 @@ export class BlobDownloadTracker {
       // downloadBlob will omit the Authorization header when token is null.
       headers['Authorization'] = `Bearer ${accessToken}`;
     }
-    const response = await fetch(downloadUrl, { headers });
+    // cache: 'no-store' prevents the browser from storing this response in its
+    // HTTP cache. The server sets a long Expires/Cache-Control header on blob
+    // responses (blobs are immutable and content-addressed), which would
+    // otherwise cause the browser to keep a copy in its disk cache in addition
+    // to the copy we persist to IndexedDB — doubling storage for every blob.
+    // Since we always persist to IndexedDB and subsequent reads go through
+    // IndexedDB (never re-fetch), the browser cache copy is pure overhead.
+    const response = await fetch(downloadUrl, { headers, cache: 'no-store' });
 
     if (!response.ok) {
       throw new Error(
