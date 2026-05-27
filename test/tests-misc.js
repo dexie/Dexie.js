@@ -294,6 +294,44 @@ spawnedTest ("delByKeyPath not working correctly for arrays", function* () {
     equal(jsonResult, jsonResult2, `Should be equal ${jsonResult} ${jsonResult2}`);
 });
 
+spawnedTest ("delByKeyPath should not create intermediate empty objects on missing path", function* () {
+    // Regression test: delByKeyPath() / setByKeyPath(obj, path, undefined) used to
+    // create empty intermediate objects along the path even though the goal was
+    // to delete a (non-existing) property. Make sure that no longer happens.
+
+    // Case 1: Completely empty object - foo property should NOT be added.
+    const obj1 = {};
+    Dexie.delByKeyPath(obj1, "foo.bar");
+    equal(JSON.stringify(obj1), "{}", "Empty object should remain empty after delByKeyPath on missing path");
+    ok(!("foo" in obj1), "Property 'foo' should not have been created");
+
+    // Case 2: Deeper missing path - nothing should be added.
+    const obj2 = {};
+    Dexie.delByKeyPath(obj2, "a.b.c.d");
+    equal(JSON.stringify(obj2), "{}", "Empty object should remain empty after deep delByKeyPath");
+
+    // Case 3: Existing sibling should remain untouched and no new key created.
+    const obj3 = {existing: 1};
+    Dexie.delByKeyPath(obj3, "foo.bar");
+    deepEqual(obj3, {existing: 1}, "Sibling property should be untouched and no new prop created");
+
+    // Case 4: When the intermediate object DOES exist, deletion still works for
+    // the leaf without creating new ones.
+    const obj4 = {foo: {bar: 1, baz: 2}};
+    Dexie.delByKeyPath(obj4, "foo.bar");
+    deepEqual(obj4, {foo: {baz: 2}}, "Should delete leaf without affecting siblings");
+
+    // Case 5: Existing intermediate but missing leaf should remain intact.
+    const obj5 = {foo: {}};
+    Dexie.delByKeyPath(obj5, "foo.bar");
+    deepEqual(obj5, {foo: {}}, "Existing intermediate object should not be removed");
+
+    // Case 6: Array form of keyPath should also not create empty intermediates.
+    const obj6 = {};
+    Dexie.delByKeyPath(obj6, ["foo.bar", "baz.qux"]);
+    equal(JSON.stringify(obj6), "{}", "Array keyPath form should not create empty intermediates");
+});
+
 asyncTest ("#1079 mapToClass", function(){
     class Foo {
     }

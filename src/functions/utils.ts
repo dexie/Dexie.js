@@ -176,8 +176,13 @@ export function setByKeyPath(obj, keyPath, value) {
         } else obj[currentKeyPath] = value;
       else {
         var innerObj = obj[currentKeyPath];
-        if (!innerObj || !hasOwn(obj, currentKeyPath))
+        if (!innerObj || !hasOwn(obj, currentKeyPath)) {
+          // Don't create intermediate objects when we're just deleting a
+          // non-existing path. Otherwise delByKeyPath() would have the
+          // side-effect of adding empty objects along the path.
+          if (value === undefined) return;
           innerObj = obj[currentKeyPath] = {};
+        }
         setByKeyPath(innerObj, remainingKeyPath, value);
       }
     } else {
