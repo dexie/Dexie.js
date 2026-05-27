@@ -92,17 +92,18 @@ export async function applyServerChanges(
           }
           break;
         case 'update':
-          if (!primaryKey.outbound && primaryKey.keyPath) {
+          if (
+            !primaryKey.outbound &&
+            primaryKey.keyPath &&
+            typeof primaryKey.keyPath === 'string'
+          ) {
             // The primary key should never be part of an updateSpec — it cannot change
             // and is already communicated via the operation's keys array.
             // For private singleton IDs (e.g. "#key:userId" on server, "#key" on client),
             // the encoded server-side key may leak into the changeSpec via getObjectDiff().
             // Strip it here unconditionally as a defensive measure.
             for (const changeSpec of mut.changeSpecs) {
-              Dexie.delByKeyPath(
-                changeSpec as object,
-                primaryKey.keyPath as string
-              );
+              delete changeSpec[primaryKey.keyPath];
             }
           }
           await bulkUpdate(table, keys, mut.changeSpecs);
