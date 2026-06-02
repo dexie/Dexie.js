@@ -366,6 +366,32 @@ asyncTest("equalsIgnoreCase() 3 (first key shorter than needle)", function () {
     }).finally(start);
 });
 
+asyncTest("equalsIgnoreCase() with length-changing case fold (ß / ligatures / İ)", function () {
+    // toUpperCase()/toLowerCase() are not always length-preserving: German 'ß' -> 'SS',
+    // ligature 'ﬁ' -> 'FI', Turkish 'İ'. The case-insensitive index walk must not skip
+    // and silently drop such rows. All variants below fold to 'straße'.
+    var folder = new Folder();
+    folder.path = "/casefold";
+    db.folders.add(folder).then(function (folderId) {
+        var filenames = ["straße", "STRAßE", "Straße", "STRASSE", "strasse"];
+        return db.transaction("rw", db.files, function () {
+            filenames.forEach(function (filename) {
+                var file = new File();
+                file.filename = filename;
+                file.folderId = folderId;
+                db.files.add(file);
+            });
+            db.files.where("filename").equalsIgnoreCase("straße").toArray(function (a) {
+                var got = a.map(function (f) { return f.filename; }).sort().join(",");
+                equal(a.length, 3, "Should match all 3 case variants folding to 'straße' (none silently dropped)");
+                equal(got, "STRAßE,Straße,straße", "Returned variants: " + got);
+            });
+        });
+    }).catch(function (e) {
+        ok(false, "Error: " + (e.stack || e));
+    }).finally(start);
+});
+
 asyncTest("startsWithIgnoreCase()", function () {
     db.transaction("r", db.folders, function () {
 
