@@ -366,10 +366,10 @@ asyncTest("equalsIgnoreCase() 3 (first key shorter than needle)", function () {
     }).finally(start);
 });
 
-asyncTest("equalsIgnoreCase() with length-changing case fold (ß / ligatures / İ)", function () {
-    // toUpperCase()/toLowerCase() are not always length-preserving: German 'ß' -> 'SS',
-    // ligature 'ﬁ' -> 'FI', Turkish 'İ'. The case-insensitive index walk must not skip
-    // and silently drop such rows. All variants below fold to 'straße'.
+asyncTest("equalsIgnoreCase() with length-changing case fold (ß)", function () {
+    // toUpperCase()/toLowerCase() are not always length-preserving. German 'ß' -> 'SS'
+    // is enough to make the case-insensitive index walk skip and silently drop rows.
+    // All variants below fold to 'straße'.
     var folder = new Folder();
     folder.path = "/casefold";
     db.folders.add(folder).then(function (folderId) {
