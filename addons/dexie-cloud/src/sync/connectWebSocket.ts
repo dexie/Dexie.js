@@ -89,9 +89,9 @@ export function connectWebSocket(db: DexieCloudDB) {
         )
       ),
       switchMap(([userLogin, syncState]) => {
-        /*if (userLogin.license?.status && userLogin.license.status !== 'ok') {
-          throw new InvalidLicenseError();
-        }*/
+        if (userLogin?.license?.status && userLogin.license.status !== 'ok') {
+          return of([null, syncState] as const);
+        }
         return userIsReallyActive.pipe(
           map((isActive) => [isActive ? userLogin : null, syncState] as const)
         );
