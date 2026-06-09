@@ -42,8 +42,8 @@ class Signal {
   promise = new Promise((resolve) => (this.resolve = resolve));
 }
 
-function liveQueryUnitTester(lq, { graceTime } = { graceTime: 0 }) {
-  const lq = liveQuery(lq);
+function liveQueryUnitTester(queryFn, { graceTime } = { graceTime: 0 }) {
+  const lq = liveQuery(queryFn);
   return {
     waitTilDeepEqual(expected, description, timeout = 500) {
       return new Promise((resolve, reject) => {
@@ -792,7 +792,7 @@ const mutsAndExpects = () => [
 promisedTest('Full use case matrix', async () => {
   const queries = {
     itemsToArray: () => db.items.toArray(),
-    itemsGet1And2: () => Promise.all(db.items.get(1), db.items.get(-1)),
+    itemsGet1And2: () => Promise.all([db.items.get(1), db.items.get(-1)]),
     itemsBulkGet123: () => db.items.bulkGet([1, 2, 3]),
     itemsStartsWithA: () => db.items.where('name').startsWith('A').toArray(),
     itemsStartsWithAPrimKeys: () =>
@@ -1210,36 +1210,44 @@ promisedTest('Issue 2058: Cache error after bulkPut failures', async () => {
 promisedTest(
   'Issue 2309: useLiveQuery stops updating when mutating returned object in-place and putting it',
   async () => {
-    const dbCloned = new Dexie('TestLiveQueryIssue2309', { cache: 'cloned' });
-    dbCloned.version(1).stores({
-      items: 'id, name',
-    });
-    await dbCloned.items.add({ id: 1, name: 'Initial' });
+    // We run the test for both 'cloned' (Dexie 4.4 cache mode) and 'disabled' (representing Dexie 4.3 behavior)
+    for (const cacheMode of ['cloned', 'disabled']) {
+      const dbCloned = new Dexie('TestLiveQueryIssue2309_' + cacheMode, {
+        cache: cacheMode,
+      });
+      dbCloned.version(1).stores({
+        items: 'id, name',
+      });
+      await dbCloned.items.add({ id: 1, name: 'Initial' });
 
-    let log = [];
-    let signal = new Signal();
-    let subscription = liveQuery(() => dbCloned.items.get(1)).subscribe(
-      (result) => {
-        log.push(result);
-        signal.resolve(result);
-      }
-    );
+      let log = [];
+      let signal = new Signal();
+      let subscription = liveQuery(() => dbCloned.items.get(1)).subscribe(
+        (result) => {
+          log.push(result);
+          signal.resolve(result);
+        }
+      );
 
-    let val1 = await signal.promise;
-    equal(val1.name, 'Initial', 'Initial value is correct');
+      let val1 = await signal.promise;
+      equal(val1.name, 'Initial', `[${cacheMode}] Initial value is correct`);
 
-    // Mutate in place
-    val1.name = 'Mutated';
+      // Mutate in place
+      val1.name = 'Mutated';
 
-    signal = new Signal();
-    await dbCloned.items.put(val1);
-    let val2 = await signal.promise;
+      signal = new Signal();
+      await dbCloned.items.put(val1);
+      let val2 = await signal.promise;
 
-    equal(val2.name, 'Mutated', 'Mutated value is received');
-    ok(val1 !== val2, 'Returned value must be a new reference (cloned)');
-    equal(log.length, 2, 'Should have emitted twice');
+      equal(val2.name, 'Mutated', `[${cacheMode}] Mutated value is received`);
+      ok(
+        val1 !== val2,
+        `[${cacheMode}] Returned value must be a new reference (cloned)`
+      );
+      equal(log.length, 2, `[${cacheMode}] Should have emitted twice`);
 
-    subscription.unsubscribe();
-    await dbCloned.delete();
+      subscription.unsubscribe();
+      await dbCloned.delete();
+    }
   }
 );
