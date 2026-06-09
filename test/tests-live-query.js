@@ -859,7 +859,7 @@ promisedTest('Full use case matrix', async () => {
   let flyingNow = 0;
   //let signal = new Signal();
   let eventTarget = new EventTarget();
-  const actualResults = objectify(
+  let actualResults = objectify(
     new Map(Object.keys(queries).map((name) => [name, undefined]))
   );
   const observables = new Map(
