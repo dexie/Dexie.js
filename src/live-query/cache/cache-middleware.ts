@@ -336,15 +336,16 @@ export const cacheMiddleware: Middleware<DBCore> = {
             }
             subscribeToCacheEntry(cacheEntry, container!, requery, signal);
             return cacheEntry.promise.then((res: DBCoreQueryResponse) => {
+              const result = applyOptimisticOps(
+                res.result,
+                req,
+                tblCache?.optimisticOps,
+                downTable,
+                cacheEntry!,
+                freezeResults
+              ) as any[]; // readonly any[]
               return {
-                result: applyOptimisticOps(
-                  res.result,
-                  req,
-                  tblCache?.optimisticOps,
-                  downTable,
-                  cacheEntry!,
-                  freezeResults
-                ) as any[], // readonly any[]
+                result: freezeResults ? result : deepClone(result),
               };
             });
           },
