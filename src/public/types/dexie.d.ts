@@ -101,6 +101,7 @@ export interface Dexie {
     table: string | Table,
     table2: string | Table,
     table3: string | Table,
+    table4: string | Table,
     table5: string | Table,
     scope: (trans: TXWithTables<this>) => PromiseLike<U> | U
   ): PromiseExtended<U>;
