@@ -28,6 +28,25 @@ export function createImplicitPropSetterMiddleware(
 
               if (db.cloud.schema?.[tableName]?.markedForSync) {
                 if (req.type === 'add' || req.type === 'put') {
+                  if (tableName === 'members' || tableName === 'roles') {
+                    for (const obj of req.values) {
+                      if (obj && 'permissions' in obj) {
+                        validatePermissions(obj.permissions, tableName);
+                      }
+                    }
+                    if (req.type === 'put') {
+                      const changeSpec = 'changeSpec' in req ? (req as any).changeSpec : undefined;
+                      if (changeSpec) {
+                        validateChangeSpec(changeSpec, tableName);
+                      }
+                      const updates = 'updates' in req ? (req as any).updates : undefined;
+                      if (updates && updates.changeSpecs) {
+                        for (const spec of updates.changeSpecs) {
+                          validateChangeSpec(spec, tableName);
+                        }
+                      }
+                    }
+                  }
                   if (tableName === 'members') {
                     for (const member of req.values) {
                       if (typeof member.email === 'string') {
@@ -89,4 +108,64 @@ export function createImplicitPropSetterMiddleware(
       };
     },
   };
+}
+
+function validatePermissions(permissions: any, tableName: string) {
+  if (permissions === undefined) return;
+  if (permissions === null || typeof permissions !== 'object' || Array.isArray(permissions)) {
+    throw new TypeError(`Invalid permissions format in ${tableName}: permissions must be an object.`);
+  }
+
+  const { add, update, manage } = permissions;
+
+  if (add !== undefined) {
+    if (add !== '*' && (!Array.isArray(add) || add.some(x => typeof x !== 'string'))) {
+      throw new TypeError(`Invalid 'add' permission format in ${tableName}: must be '*' or an array of strings.`);
+    }
+  }
+
+  if (manage !== undefined) {
+    if (manage !== '*' && (!Array.isArray(manage) || manage.some(x => typeof x !== 'string'))) {
+      throw new TypeError(`Invalid 'manage' permission format in ${tableName}: must be '*' or an array of strings.`);
+    }
+  }
+
+  if (update !== undefined) {
+    if (update === null || typeof update !== 'object' || Array.isArray(update)) {
+      throw new TypeError(`Invalid 'update' permission format in ${tableName}: must be an object.`);
+    }
+    for (const [tbl, props] of Object.entries(update)) {
+      if (props !== '*' && (!Array.isArray(props) || props.some(x => typeof x !== 'string'))) {
+        throw new TypeError(`Invalid update permission properties format for table '${tbl}' in ${tableName}: must be '*' or an array of strings.`);
+      }
+    }
+  }
+}
+
+function validateChangeSpec(changeSpec: { [keyPath: string]: any }, tableName: string) {
+  if (!changeSpec) return;
+  for (const [keyPath, value] of Object.entries(changeSpec)) {
+    if (keyPath === 'permissions') {
+      validatePermissions(value, tableName);
+    } else if (keyPath === 'permissions.add' || keyPath === 'permissions.manage') {
+      if (value !== undefined && value !== '*' && (!Array.isArray(value) || value.some(x => typeof x !== 'string'))) {
+        throw new TypeError(`Invalid '${keyPath}' format in ${tableName}: must be '*' or an array of strings.`);
+      }
+    } else if (keyPath === 'permissions.update') {
+      if (value !== undefined) {
+        if (value === null || typeof value !== 'object' || Array.isArray(value)) {
+          throw new TypeError(`Invalid 'permissions.update' format in ${tableName}: must be an object.`);
+        }
+        for (const [tbl, props] of Object.entries(value)) {
+          if (props !== '*' && (!Array.isArray(props) || props.some(x => typeof x !== 'string'))) {
+            throw new TypeError(`Invalid update permission properties format for table '${tbl}' in ${tableName}: must be '*' or an array of strings.`);
+          }
+        }
+      }
+    } else if (keyPath.startsWith('permissions.update.')) {
+      if (value !== undefined && value !== '*' && (!Array.isArray(value) || value.some(x => typeof x !== 'string'))) {
+        throw new TypeError(`Invalid update properties format for '${keyPath}' in ${tableName}: must be '*' or an array of strings.`);
+      }
+    }
+  }
 }

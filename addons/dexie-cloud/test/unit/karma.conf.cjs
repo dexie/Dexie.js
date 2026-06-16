@@ -34,5 +34,13 @@ module.exports = function (config) {
   cfg.hostname = 'localhost';
   cfg.port = 9876;
 
+  cfg.customLaunchers = {
+    ChromeHeadlessNoSandbox: {
+      base: 'ChromeHeadless',
+      flags: ['--no-sandbox', '--disable-setuid-sandbox']
+    }
+  };
+  cfg.browsers = ['ChromeHeadlessNoSandbox'];
+
   config.set(cfg);
 }
