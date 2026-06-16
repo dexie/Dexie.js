@@ -292,12 +292,12 @@ export const cacheMiddleware: Middleware<DBCore> = {
                       Object.freeze(result[i]);
                     }
                     Object.freeze(result);
-                  } else {
-                    // If not frozen, we need to clone the result to avoid user mutating the cache
-                    // When we do this, user's must feel conformable with the fact that the result
-                    // can be mutated deeply - user is not expected to have any respect for immutability.
-                    res.result = deepClone(result);
                   }
+                  // If not frozen (cache: 'cloned'), we do NOT clone here.
+                  // Since every cache read (including the initial one) will go through
+                  // the downstream .then() handler and perform a deepClone on read,
+                  // the original query results in the cache remain perfectly isolated
+                  // and we avoid a redundant double deepClone on the first query.
                   return res;
                 })
                 .catch((error) => {
