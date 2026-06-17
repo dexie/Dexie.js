@@ -191,6 +191,65 @@ promisedTest('add-realm', async () => {
   console.log('After syncing the realm removal');
 });
 
+import { applyServerChanges } from '../../src/sync/applyServerChanges';
+
+promisedTest('applyServerChanges with frozen objects', async () => {
+  const testDb = new Dexie('frozen-test-db', { addons: [dexieCloud] }) as any;
+  testDb.version(1).stores({
+    items: '@id, name',
+  });
+  await Dexie.delete(testDb.name);
+  await testDb.open();
+
+  // Create a frozen object for insertion
+  const frozenVal = Object.freeze({ name: 'Frozen Item' });
+
+  // Define server changes containing the frozen object
+  const changes: any = [
+    {
+      table: 'items',
+      muts: [
+        {
+          type: 'insert',
+          keys: ['item-1'],
+          values: [frozenVal],
+        },
+      ],
+    },
+  ];
+
+  // Apply server changes
+  await applyServerChanges(changes, testDb);
+
+  // Retrieve the item and verify it was inserted successfully
+  const item = await testDb.table('items').get('item-1');
+  ok(item, 'Item was inserted');
+  equal(item.name, 'Frozen Item', 'Item name is correct');
+  equal(item.id, 'item-1', 'Primary key was successfully set on the object');
+
+  // Also verify with upsert & frozen changeSpecs
+  const frozenUpsertVal = Object.freeze({ name: 'Frozen Upsert' });
+  const upsertChanges: any = [
+    {
+      table: 'items',
+      muts: [
+        {
+          type: 'upsert',
+          keys: ['item-2'],
+          values: [frozenUpsertVal],
+        },
+      ],
+    },
+  ];
+  await applyServerChanges(upsertChanges, testDb);
+  const item2 = await testDb.table('items').get('item-2');
+  ok(item2, 'Upsert item was inserted');
+  equal(item2.name, 'Frozen Upsert', 'Upsert item name is correct');
+  equal(item2.id, 'item-2', 'Primary key was successfully set on the upsert object');
+
+  await testDb.close();
+});
+
 /*promisedTest('require-auth', async () => {
   await Dexie.delete(db.name);
   db.cloud.configure({
