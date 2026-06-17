@@ -56,6 +56,7 @@ import { getCurrentUserEmitter } from './currentUserEmitter';
 import { NewIdOptions } from './types/NewIdOptions';
 import { getInvitesObservable } from './getInvitesObservable';
 import { getGlobalRolesObservable } from './getGlobalRolesObservable';
+import { resumeRealmDownloads } from './sync/resumeRealmDownloads';
 import { UserLogin } from './db/entities/UserLogin';
 import { InvalidLicenseError } from './InvalidLicenseError';
 import { logout, _logout } from './authentication/logout';
@@ -398,10 +399,8 @@ export function dexieCloud(dexie: Dexie) {
         ? await navigator.serviceWorker.getRegistrations()
         : [];
 
-    const [initiallySynced, lastSyncedRealms] = await db.transaction(
-      'rw',
-      db.$syncState,
-      async () => {
+    const [initiallySynced, lastSyncedRealms, persistedRealmDownloads] =
+      await db.transaction('rw', db.$syncState, async () => {
         const { options, schema } = db.cloud;
         const [persistedOptions, persistedSchema, persistedSyncState] =
           await Promise.all([
@@ -487,9 +486,33 @@ export function dexieCloud(dexie: Dexie) {
         return [
           persistedSyncState?.initiallySynced,
           persistedSyncState?.realms,
+          persistedSyncState?.realmDownloads,
         ];
+      });
+
+    // Resume any interrupted realm downloads BEFORE marking initiallySynced.
+    // This handles case 1 (db.on('ready') — db not yet open). Case 2 (db
+    // already open) is handled by a separate locking mechanism.
+    const databaseUrl = db.cloud.options?.databaseUrl;
+    if (databaseUrl && persistedRealmDownloads) {
+      const pendingDownloads = Object.entries(persistedRealmDownloads).map(
+        ([realmId, d]) => ({ realmId, ...d })
+      );
+      if (pendingDownloads.length > 0) {
+        // Block db.open() (this is in db.on('ready') handler) until
+        // the resumed download(s) finish. Don't block startup if
+        // resume fails — log and continue so the rest of init runs
+        // and a later sync can retry.
+        try {
+          await resumeRealmDownloads(db, databaseUrl, pendingDownloads);
+        } catch (error) {
+          console.warn(
+            'dexie-cloud: failed to resume interrupted realm downloads; continuing startup. A later sync will retry.',
+            error
+          );
+        }
       }
-    );
+    }
 
     if (initiallySynced) {
       db.setInitiallySynced(true);
