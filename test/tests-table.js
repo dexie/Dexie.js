@@ -558,6 +558,7 @@ promisedTest("bulkUpdate must not change an inbound primary key (compound & nest
         } catch (e) { err2 = e; }
         equal(err2 && err2.name, "ConstraintError", "Replacing a nested-key parent object in bulkUpdate() should throw ConstraintError");
         equal(await db.nested.count(), 1, "No duplicate record should have been created for the nested key");
+        deepEqual(await db.nested.toArray(), [{foo: {bar: 1}, v: "x"}], "The original nested-key record is left unchanged");
 
         // Updating a non-key field on a compound-key table must still succeed.
         await db.compound.bulkUpdate([{key: [1, 2], changes: {v: "y"}}]);
