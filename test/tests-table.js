@@ -529,6 +529,44 @@ promisedTest("bulkUpdate without actual changes (check it doesn't bail out)", as
 });
 
 
+promisedTest("bulkUpdate must not change an inbound primary key (compound & nested) [issue #2218]", async ()=>{
+    const db = new Dexie("BulkUpdatePrimKeyTest");
+    db.version(1).stores({
+        compound: "[a+b]",
+        nested: "foo.bar"
+    });
+    try {
+        await db.open();
+
+        // Compound primary key: changing a key component must be rejected, not
+        // silently create a new record at a different key.
+        await db.compound.bulkAdd([{a: 1, b: 2, v: "x"}]);
+        let err = null;
+        try {
+            await db.compound.bulkUpdate([{key: [1, 2], changes: {a: 9}}]);
+        } catch (e) { err = e; }
+        equal(err && err.name, "ConstraintError", "Changing a compound key component in bulkUpdate() should throw ConstraintError");
+        equal(await db.compound.count(), 1, "No duplicate record should have been created for the compound key");
+        deepEqual(await db.compound.toArray(), [{a: 1, b: 2, v: "x"}], "The original compound-key record is left unchanged");
+
+        // Nested primary key: replacing the parent object that holds the key
+        // must be rejected too (this path was previously uncaught).
+        await db.nested.bulkAdd([{foo: {bar: 1}, v: "x"}]);
+        let err2 = null;
+        try {
+            await db.nested.bulkUpdate([{key: 1, changes: {foo: {bar: 9}}}]);
+        } catch (e) { err2 = e; }
+        equal(err2 && err2.name, "ConstraintError", "Replacing a nested-key parent object in bulkUpdate() should throw ConstraintError");
+        equal(await db.nested.count(), 1, "No duplicate record should have been created for the nested key");
+
+        // Updating a non-key field on a compound-key table must still succeed.
+        await db.compound.bulkUpdate([{key: [1, 2], changes: {v: "y"}}]);
+        deepEqual(await db.compound.toArray(), [{a: 1, b: 2, v: "y"}], "A non-key update on a compound-key table still applies");
+    } finally {
+        await db.delete();
+    }
+});
+
 promisedTest("bulkUpdate with failure", async ()=>{
     if (isSafari) {
         // Avoid bug https://bugs.webkit.org/show_bug.cgi?id=247053
