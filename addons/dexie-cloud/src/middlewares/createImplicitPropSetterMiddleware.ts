@@ -31,69 +31,84 @@ export function createImplicitPropSetterMiddleware(
 
               if (db.cloud.schema?.[tableName]?.markedForSync) {
                 if (req.type === 'add' || req.type === 'put') {
-                  const values = req.values as any[];
-                  for (let i = 0; i < values.length; i++) {
-                    const obj = values[i];
-                    if (
-                      obj &&
-                      typeof obj === 'object' &&
-                      (Object.isFrozen(obj) ||
-                        Object.isSealed(obj) ||
-                        !Object.isExtensible(obj))
-                    ) {
-                      values[i] = { ...obj };
-                    }
-                  }
+                  let values: any[] | null = null;
 
-                  if (tableName === 'members') {
-                    for (const member of req.values) {
-                      if (typeof member.email === 'string') {
-                        // Resolve https://github.com/dexie/dexie-cloud/issues/4
-                        // If adding a member, make sure email is lowercase and trimmed.
-                        // This is to avoid issues where the APP does not check this
-                        // and just allows the user to enter an email address that might
-                        // have been pasted by the user from a source that had a trailing
-                        // space or was in uppercase. We want to avoid that the user
-                        // creates a new member with a different email address than
-                        // the one he/she intended to create.
-                        member.email = member.email.trim().toLowerCase();
+                  for (let i = 0; i < req.values.length; i++) {
+                    const obj = req.values[i];
+                    if (obj && typeof obj === 'object') {
+                      let needsClone = false;
+                      let email = obj.email;
+                      if (tableName === 'members' && typeof email === 'string') {
+                        const trimmedLower = email.trim().toLowerCase();
+                        if (trimmedLower !== email) {
+                          needsClone = true;
+                          email = trimmedLower;
+                        }
+                      }
+
+                      const owner = obj.owner || currentUserId;
+                      const realmId = obj.realmId || currentUserId;
+                      if (owner !== obj.owner || realmId !== obj.realmId) {
+                        needsClone = true;
+                      }
+
+                      let ts = obj.$ts;
+                      let isPrivatePut = false;
+                      if (req.type === 'put') {
+                        const key = table.schema.primaryKey.extractKey?.(obj);
+                        if (typeof key === 'string' && key[0] === '#') {
+                          isPrivatePut = true;
+                          ts = Date.now();
+                          if (ts !== obj.$ts) {
+                            needsClone = true;
+                          }
+                        }
+                      }
+
+                      if (
+                        !needsClone &&
+                        (Object.isFrozen(obj) ||
+                          Object.isSealed(obj) ||
+                          !Object.isExtensible(obj))
+                      ) {
+                        needsClone = true;
+                      }
+
+                      if (needsClone) {
+                        if (!values) {
+                          values = [...req.values];
+                        }
+                        const cloned = { ...obj };
+                        if (tableName === 'members' && typeof email === 'string') {
+                          cloned.email = email;
+                        }
+                        cloned.owner = owner;
+                        cloned.realmId = realmId;
+                        if (isPrivatePut) {
+                          cloned.$ts = ts;
+                        }
+                        values[i] = cloned;
                       }
                     }
                   }
-                  // No matter if user is logged in or not, make sure "owner" and "realmId" props are set properly.
-                  // If not logged in, this will be changed upon syncification of the tables (next sync after login),
-                  // however, application code will work better if we can always rely on that the properties realmId
-                  // and owner are set. Application code may index them and query them based on db.cloud.currentUserId,
-                  // and expect them to be returned. That scenario must work also when db.cloud.currentUserId === 'unauthorized'.
+
+                  if (values) {
+                    req = { ...req, values };
+                  }
+
+                  // Handle degrading the request for private IDs if needed:
+                  let mutatedReq = false;
                   for (const obj of req.values) {
-                    if (!obj.owner) {
-                      obj.owner = currentUserId;
-                    }
-                    if (!obj.realmId) {
-                      obj.realmId = currentUserId;
-                    }
                     const key = table.schema.primaryKey.extractKey?.(obj);
                     if (typeof key === 'string' && key[0] === '#') {
-                      // Add $ts prop for put operations and
-                      // disable update operations as well as consistent
-                      // modify operations. Reason: Server may not have
-                      // the object. Object should be created on server only
-                      // if is being updated. An update operation won't create it
-                      // so we must delete req.changeSpec to degrade operation to
-                      // an upsert operation with timestamp so that it will be created.
-                      // We must also degrade from consistent modify operations for the
-                      // same reason - object might be there on server. Must but put up instead.
-
-                      // FUTURE: This clumpsy behavior of private IDs could be refined later.
-                      // Suggestion is to in future, treat private IDs as we treat all objects
-                      // and sync operations normally. Only that deletions should become soft deletes
-                      // for them - so that server knows when a private ID has been deleted on server
-                      // not accept insert/upserts on them.
                       if (req.type === 'put') {
+                        if (!mutatedReq) {
+                          req = { ...req };
+                          mutatedReq = true;
+                        }
                         delete req.criteria;
                         delete req.changeSpec;
                         if (!req.upsert) delete req.updates;
-                        obj.$ts = Date.now();
                       }
                     }
                   }
