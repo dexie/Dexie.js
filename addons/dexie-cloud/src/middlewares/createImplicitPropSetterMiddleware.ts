@@ -36,21 +36,18 @@ export function createImplicitPropSetterMiddleware(
                   for (let i = 0; i < req.values.length; i++) {
                     const obj = req.values[i];
                     if (obj && typeof obj === 'object') {
-                      let needsClone = false;
                       let email = obj.email;
+                      let hasEmailChange = false;
                       if (tableName === 'members' && typeof email === 'string') {
                         const trimmedLower = email.trim().toLowerCase();
                         if (trimmedLower !== email) {
-                          needsClone = true;
+                          hasEmailChange = true;
                           email = trimmedLower;
                         }
                       }
 
                       const owner = obj.owner || currentUserId;
                       const realmId = obj.realmId || currentUserId;
-                      if (owner !== obj.owner || realmId !== obj.realmId) {
-                        needsClone = true;
-                      }
 
                       let ts = obj.$ts;
                       let isPrivatePut = false;
@@ -59,35 +56,48 @@ export function createImplicitPropSetterMiddleware(
                         if (typeof key === 'string' && key[0] === '#') {
                           isPrivatePut = true;
                           ts = Date.now();
-                          if (ts !== obj.$ts) {
-                            needsClone = true;
-                          }
                         }
                       }
 
-                      if (
-                        !needsClone &&
-                        (Object.isFrozen(obj) ||
-                          Object.isSealed(obj) ||
-                          !Object.isExtensible(obj))
-                      ) {
-                        needsClone = true;
-                      }
+                      const isFrozen =
+                        Object.isFrozen(obj) ||
+                        Object.isSealed(obj) ||
+                        !Object.isExtensible(obj);
 
-                      if (needsClone) {
+                      if (isFrozen) {
+                        // For frozen objects, we MUST clone to prevent error on writing properties,
+                        // and we also build a cloned values array.
                         if (!values) {
                           values = [...req.values];
                         }
-                        const cloned = { ...obj };
+                        const clonedObj = { ...obj };
                         if (tableName === 'members' && typeof email === 'string') {
-                          cloned.email = email;
+                          clonedObj.email = email;
                         }
-                        cloned.owner = owner;
-                        cloned.realmId = realmId;
+                        clonedObj.owner = owner;
+                        clonedObj.realmId = realmId;
                         if (isPrivatePut) {
-                          cloned.$ts = ts;
+                          clonedObj.$ts = ts;
                         }
-                        values[i] = cloned;
+                        values[i] = clonedObj;
+                      } else {
+                        // For normal extensible objects, we mutate in-place to preserve
+                        // backward compatibility (so caller references get owner/realmId/etc.)
+                        if (hasEmailChange) {
+                          obj.email = email;
+                        }
+                        if (!obj.owner) {
+                          obj.owner = owner;
+                        }
+                        if (!obj.realmId) {
+                          obj.realmId = realmId;
+                        }
+                        if (isPrivatePut) {
+                          obj.$ts = ts;
+                        }
+                        if (values) {
+                          values[i] = obj;
+                        }
                       }
                     }
                   }
