@@ -31,6 +31,20 @@ export function createImplicitPropSetterMiddleware(
 
               if (db.cloud.schema?.[tableName]?.markedForSync) {
                 if (req.type === 'add' || req.type === 'put') {
+                  const values = req.values as any[];
+                  for (let i = 0; i < values.length; i++) {
+                    const obj = values[i];
+                    if (
+                      obj &&
+                      typeof obj === 'object' &&
+                      (Object.isFrozen(obj) ||
+                        Object.isSealed(obj) ||
+                        !Object.isExtensible(obj))
+                    ) {
+                      values[i] = { ...obj };
+                    }
+                  }
+
                   if (tableName === 'members') {
                     for (const member of req.values) {
                       if (typeof member.email === 'string') {

@@ -250,6 +250,33 @@ promisedTest('applyServerChanges with frozen objects', async () => {
   await testDb.close();
 });
 
+promisedTest('implicitPropSetterMiddleware with frozen objects', async () => {
+  const testDb = new Dexie('frozen-propsetter-db', { addons: [dexieCloud] }) as any;
+  testDb.version(1).stores({
+    items: '@id, name',
+  });
+  testDb.cloud.configure({
+    databaseUrl: 'http://localhost:3000/ziud0envo',
+    requireAuth: false,
+  });
+  testDb.cloud.schema = {
+    items: { markedForSync: true },
+  };
+  await Dexie.delete(testDb.name);
+  await testDb.open();
+
+  const frozenVal = Object.freeze({ id: 'f-1', name: 'Frozen Item' });
+  await testDb.table('items').add(frozenVal);
+
+  const item = await testDb.table('items').get('f-1');
+  ok(item, 'Frozen item was written successfully through propSetter');
+  equal(item.name, 'Frozen Item', 'Item name is correct');
+  equal(item.owner, 'unauthorized', 'Implicit owner property was set');
+  equal(item.realmId, 'unauthorized', 'Implicit realmId property was set');
+
+  await testDb.close();
+});
+
 /*promisedTest('require-auth', async () => {
   await Dexie.delete(db.name);
   db.cloud.configure({
