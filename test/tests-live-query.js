@@ -920,3 +920,29 @@ promisedTest("Issue 2309: useLiveQuery stops updating when mutating returned obj
   }
 });
 
+promisedTest("Issue 2021: liveQuery must react on mutations of falsy but valid primary keys", async () => {
+  // Number 0 and empty string are falsy in javascript but perfectly valid IndexedDB keys.
+  for (const id of [0, ""]) {
+    const idStr = JSON.stringify(id);
+    await db.items.put({id, name: "before"});
+    const log = [];
+    let signal = new Signal();
+    const subscription = liveQuery(
+      () => db.items.where('id').equals(id).toArray()
+    ).subscribe(result => {
+      log.push(result);
+      signal.resolve(result);
+    });
+    await signal.promise;
+    deepEqual(log[0], [{id, name: "before"}], `Initial emit for primary key ${idStr}`);
+
+    signal = new Signal();
+    await db.items.update(id, {name: "after"});
+    await Promise.race([signal.promise, new Promise(resolve => setTimeout(resolve, 300))]);
+    equal(log.length, 2, `liveQuery re-emitted after updating the item with primary key ${idStr}`);
+    deepEqual(log[log.length - 1], [{id, name: "after"}], `Latest emit holds the updated value for primary key ${idStr}`);
+
+    subscription.unsubscribe();
+  }
+});
+
