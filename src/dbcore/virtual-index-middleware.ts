@@ -46,7 +46,8 @@ export function createVirtualIndexMiddleware(down: DBCore): DBCore {
     table(tableName: string) {
       const table = down.table(tableName);
       const { schema } = table;
-      const indexLookup: { [indexAlias: string]: VirtualIndex[] } = {};
+      const indexLookup: { [indexAlias: string]: VirtualIndex[] } =
+        Object.create(null);
       const allVirtualIndexes: VirtualIndex[] = [];
 
       function addVirtualIndexes(
