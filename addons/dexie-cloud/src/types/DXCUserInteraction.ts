@@ -26,7 +26,7 @@ export interface DXCOption {
   displayName: string;
   /** URL to an icon image (can be a regular URL or a data: URL for inline images) */
   iconUrl?: string;
-  /** Optional style hint for the UI (e.g., 'google', 'github', 'microsoft', 'apple', 'otp') */
+  /** Optional style hint (normally the OAuth provider type or 'otp') */
   styleHint?: string;
 }
 
