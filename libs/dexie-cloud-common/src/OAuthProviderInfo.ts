@@ -6,6 +6,7 @@ export interface OAuthProviderInfo {
     | 'github'
     | 'microsoft'
     | 'apple'
+    | 'facebook'
     | 'linkedin'
     | 'discord'
     | 'custom-oauth2';
