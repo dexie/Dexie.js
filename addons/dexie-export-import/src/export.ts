@@ -131,7 +131,7 @@ export async function exportDB(
       const posEndRowsArray = emptyTableExportJson.lastIndexOf(']');
       slices.push(emptyTableExportJson.substring(0, posEndRowsArray));
       let lastKey: any = null;
-      let lastNumRows = 0;
+      let wroteAnyRow = false;
       let mayHaveMoreRows = true;
       while (mayHaveMoreRows) {
         if (progressCallback) {
@@ -146,14 +146,6 @@ export async function exportDB(
         const values = await chunkedCollection.toArray();
 
         if (values.length === 0) break;
-
-        if (lastKey != null && lastNumRows > 0) {
-          // Not initial chunk. Must add a comma:
-          slices.push(',');
-          if (prettyJson) {
-            slices.push('\n      ');
-          }
-        }
 
         mayHaveMoreRows = values.length === LIMIT;
 
@@ -173,17 +165,32 @@ export async function exportDB(
             await Dexie.waitFor(TSON.finalize(tsonValues));
           }
 
-          let json = JSON.stringify(
-            tsonValues,
-            undefined,
-            prettyJson ? 2 : undefined
-          );
-          if (prettyJson) json = json.split('\n').join('\n      ');
+          if (transformedValues.length > 0) {
+            // Only add a separating comma (and write a slice) when this chunk
+            // actually contributes rows. A chunk can be entirely filtered out
+            // (e.g. an active `filter` option matching zero rows in this
+            // chunk), and previously that still queued up a comma with
+            // nothing after it — producing invalid JSON with a trailing
+            // comma before the closing `]` once no further rows followed.
+            if (wroteAnyRow) {
+              slices.push(',');
+              if (prettyJson) {
+                slices.push('\n      ');
+              }
+            }
 
-          // By generating a blob here, we give web platform the opportunity to store the contents
-          // on disk and release RAM.
-          slices.push(new Blob([json.substring(1, json.length - 1)]));
-          lastNumRows = transformedValues.length;
+            let json = JSON.stringify(
+              tsonValues,
+              undefined,
+              prettyJson ? 2 : undefined
+            );
+            if (prettyJson) json = json.split('\n').join('\n      ');
+
+            // By generating a blob here, we give web platform the opportunity to store the contents
+            // on disk and release RAM.
+            slices.push(new Blob([json.substring(1, json.length - 1)]));
+            wroteAnyRow = true;
+          }
           lastKey =
             values.length > 0
               ? Dexie.getByKeyPath(
@@ -209,17 +216,28 @@ export async function exportDB(
             await Dexie.waitFor(TSON.finalize(tsonTuples));
           }
 
-          let json = JSON.stringify(
-            tsonTuples,
-            undefined,
-            prettyJson ? 2 : undefined
-          );
-          if (prettyJson) json = json.split('\n').join('\n      ');
+          if (keyvals.length > 0) {
+            // See the comment in the `inbound` branch above: only add a
+            // separating comma when this chunk actually has rows to write.
+            if (wroteAnyRow) {
+              slices.push(',');
+              if (prettyJson) {
+                slices.push('\n      ');
+              }
+            }
 
-          // By generating a blob here, we give web platform the opportunity to store the contents
-          // on disk and release RAM.
-          slices.push(new Blob([json.substring(1, json.length - 1)]));
-          lastNumRows = keyvals.length;
+            let json = JSON.stringify(
+              tsonTuples,
+              undefined,
+              prettyJson ? 2 : undefined
+            );
+            if (prettyJson) json = json.split('\n').join('\n      ');
+
+            // By generating a blob here, we give web platform the opportunity to store the contents
+            // on disk and release RAM.
+            slices.push(new Blob([json.substring(1, json.length - 1)]));
+            wroteAnyRow = true;
+          }
           lastKey = keys.length > 0 ? keys[keys.length - 1] : null;
         }
         progress.completedRows += values.length;
