@@ -87,36 +87,38 @@ promisedTest(
     // JSON (JSON.parse below throws on that).
     await Dexie.delete(DATABASE_NAME);
     const db = new Dexie(DATABASE_NAME);
-    db.version(1).stores({ friends: '++id,name,age' });
-    await db.table('friends').bulkAdd(
-      Array.from({ length: 10 }, (_, i) => ({
-        name: `Friend ${i + 1}`,
-        age: 20 + i,
-      }))
-    );
+    try {
+      db.version(1).stores({ friends: '++id,name,age' });
+      await db.table('friends').bulkAdd(
+        Array.from({ length: 10 }, (_, i) => ({
+          name: `Friend ${i + 1}`,
+          age: 20 + i,
+        }))
+      );
 
-    // A chunk size smaller than the table, with a filter matching only the
-    // first row, guarantees at least one later chunk is filtered out
-    // entirely - the scenario that triggered the bug.
-    const exportBlob = await db.export({
-      numRowsPerChunk: 3,
-      filter: (_table, value) => value.id === 1,
-    });
-    const json = await readBlob(exportBlob);
+      // A chunk size smaller than the table, with a filter matching only the
+      // first row, guarantees at least one later chunk is filtered out
+      // entirely - the scenario that triggered the bug.
+      const exportBlob = await db.export({
+        numRowsPerChunk: 3,
+        filter: (_table, value) => value.id === 1,
+      });
+      const json = await readBlob(exportBlob);
 
-    const parsed = JSON.parse(json);
-    const friendsRows = parsed.data.data.find(
-      (t: any) => t.tableName === 'friends'
-    ).rows;
-    equal(friendsRows.length, 1, 'Only the filtered-in row should be exported');
-    equal(
-      friendsRows[0].name,
-      'Friend 1',
-      'The matching row is the one that was exported'
-    );
-
-    db.close();
-    await Dexie.delete(DATABASE_NAME);
+      const parsed = JSON.parse(json);
+      const friendsRows = parsed.data.data.find(
+        (t: any) => t.tableName === 'friends'
+      ).rows;
+      equal(friendsRows.length, 1, 'Only the filtered-in row should be exported');
+      equal(
+        friendsRows[0].name,
+        'Friend 1',
+        'The matching row is the one that was exported'
+      );
+    } finally {
+      db.close();
+      await Dexie.delete(DATABASE_NAME);
+    }
   }
 );
 
