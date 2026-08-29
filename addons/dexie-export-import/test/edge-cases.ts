@@ -4,6 +4,7 @@ import { module, asyncTest, start, stop, strictEqual, ok, equal } from 'qunit';
 import { promisedTest, readBlob, readBlobBinary, deepEqual } from './tools';
 import { getSimpleImportData } from './test-data';
 import { importInto } from '../src';
+import { DexieExportJsonStructure } from '../src/json-structure';
 
 module('edge-cases');
 
@@ -114,6 +115,72 @@ promisedTest(
         friendsRows[0].name,
         'Friend 1',
         'The matching row is the one that was exported'
+      );
+    } finally {
+      db.close();
+      await Dexie.delete(DATABASE_NAME);
+    }
+  }
+);
+
+promisedTest(
+  'importInto tolerates legacy schema:"null" for a hidden-primary-key table (issue #1050)',
+  async () => {
+    // Regression test for #1050: databases exported by Dexie v2.x with an
+    // older dexie-export-import wrote the schema of a table with a hidden
+    // (non-inbound, implicit) primary key as the literal string "null"
+    // instead of an empty string. A live Dexie v3+ table represents a
+    // hidden primary key as table.schema.primKey.src === ''. Importing a
+    // legacy export like this used to throw "Primary key differs" even
+    // though the primary key hadn't actually changed.
+    await Dexie.delete(DATABASE_NAME);
+    const db = new Dexie(DATABASE_NAME);
+    try {
+      db.version(1).stores({ user: '' }); // hidden primary key
+
+      const legacyExport: DexieExportJsonStructure = {
+        formatName: 'dexie',
+        formatVersion: 1,
+        data: {
+          databaseName: DATABASE_NAME,
+          databaseVersion: 1,
+          tables: [
+            {
+              name: 'user',
+              // Legacy (Dexie 2.x-era) representation of a hidden primary key.
+              // Dexie 3+'s own exporter correctly writes '' for this case.
+              schema: 'null',
+              rowCount: 2,
+            },
+          ],
+          data: [
+            {
+              tableName: 'user',
+              inbound: false,
+              rows: [
+                [1, { name: 'Alice' }],
+                [2, { name: 'Bob' }],
+              ],
+            },
+          ],
+        },
+      };
+      const blob = new Blob([JSON.stringify(legacyExport)]);
+
+      // Should not throw "Primary key differs for table user."
+      await importInto(db, blob, { clearTablesBeforeImport: true });
+
+      const rows = await db.table('user').toArray();
+      equal(rows.length, 2, 'Both rows were imported');
+      deepEqual(
+        await db.table('user').get(1),
+        { name: 'Alice' },
+        'Row keyed 1 imported correctly'
+      );
+      deepEqual(
+        await db.table('user').get(2),
+        { name: 'Bob' },
+        'Row keyed 2 imported correctly'
       );
     } finally {
       db.close();
