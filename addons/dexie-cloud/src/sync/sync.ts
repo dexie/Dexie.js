@@ -370,6 +370,13 @@ async function _sync(
       //
       // apply server changes
       //
+      // Note (paginated sync v4): For v4+ streaming responses, the server
+      // returns an empty `changes` array for realms that were streamed.
+      // processStreamingResponse has already written those objects directly
+      // to their target tables, so applyServerChanges is effectively a no-op
+      // for streamed realms. DBOperationsSet is keyed by table (not realm),
+      // so we cannot do a per-realm defensive filter here — we rely on the
+      // server contract that streamed realms produce no `changes` entries.
       await applyServerChanges(filteredChanges, db);
 
       if (res.yMessages) {
