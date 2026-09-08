@@ -64,14 +64,15 @@ export function overrideParseStoresSpec(origFunc: Function, dexie: Dexie) {
     const cloudSchema = dexie.cloud.schema || (dexie.cloud.schema = {});
     const allPrefixes = new Set<string>();
     Object.keys(storesClone).forEach((tableName) => {
-    const schemaSrc = storesClone[tableName]?.trim();
+      const schemaSrc = storesClone[tableName]?.trim();
       const isNewCloudTable = !cloudSchema[tableName];
       const cloudTableSchema =
         cloudSchema[tableName] || (cloudSchema[tableName] = {});
-      if (isNewCloudTable) {
+      if (isNewCloudTable || cloudTableSchema.deleted) {
         // Tell the server that this table has not been downloaded by this
         // client yet. The server uses this to perform a full table load when
-        // an upgraded client adds a table that older clients may have missed.
+        // an upgraded client adds a table that older clients may have missed,
+        // or when a previously deleted table is added again.
         // Older clients do not send this field and remain protocol-compatible.
         cloudTableSchema.initiallySynced = false;
       }
