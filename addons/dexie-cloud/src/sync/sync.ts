@@ -34,6 +34,7 @@ import {
 } from './blobOffloading';
 import { updateYSyncStates } from '../yjs/updateYSyncStates';
 import { downloadYDocsFromServer } from '../yjs/downloadYDocsFromServer';
+import { applyServerSchema } from '../mergePersistedSchema';
 import { UpdateSpec } from 'dexie';
 import { loadCachedAccessToken } from './loadCachedAccessToken';
 
@@ -263,12 +264,7 @@ async function _sync(
 
       // Update db.cloud.schema from server response.
       // Local schema MAY include a subset of tables, so do not force all tables into local schema.
-      for (const tableName of Object.keys(schema)) {
-        if (res.schema[tableName]) {
-          // Write directly into configured schema. This code can only be executed alone.
-          schema[tableName] = res.schema[tableName];
-        }
-      }
+      applyServerSchema(schema, res.schema);
       await db.$syncState.put(schema, 'schema');
 
       // List mutations that happened during our exchange with the server:

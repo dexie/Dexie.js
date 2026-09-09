@@ -1,66 +1,95 @@
-import { module, test, strictEqual } from 'qunit';
-import Dexie from 'dexie';
-import { overrideParseStoresSpec } from '../../src/overrideParseStoresSpec';
+import { deepEqual, module, strictEqual, test } from 'qunit';
+import {
+  applyServerSchema,
+  mergePersistedSchema,
+} from '../../src/mergePersistedSchema';
 
 module('schema');
 
-function createParser(db: Dexie & { cloud: any }) {
-  return overrideParseStoresSpec(
-    (stores: Record<string, string | null>, dbSchema: Record<string, any>) => {
-      for (const [tableName, schema] of Object.entries(stores)) {
-        if (schema == null) {
-          delete dbSchema[tableName];
-        } else {
-          dbSchema[tableName] = schema;
-        }
-      }
-      return stores;
+test('tables absent from persisted schema are marked for initial sync', () => {
+  const declaredSchema = {
+    friends: { markedForSync: true, generatedGlobalId: true },
+    pets: { markedForSync: true, generatedGlobalId: true },
+  };
+  const persistedSchema = {
+    friends: {
+      markedForSync: true,
+      generatedGlobalId: true,
+      initiallySynced: true,
+      idPrefix: 'fr',
     },
-    db
-  ) as (
-    stores: Record<string, string | null>,
-    dbSchema: Record<string, any>
-  ) => any;
-}
+  };
 
-test('new cloud tables are marked as not initially synced', () => {
-  const db = new Dexie('issue2331-schema-test') as any;
-  db.cloud = {};
-
-  const parseStoresSpec = createParser(db);
-  const dbSchema: Record<string, any> = {};
-
-  parseStoresSpec({ pets: '@id' }, dbSchema);
+  const mergedSchema = mergePersistedSchema(declaredSchema, persistedSchema);
 
   strictEqual(
-    db.cloud.schema?.pets.initiallySynced,
+    mergedSchema.friends.initiallySynced,
+    true,
+    'an existing table keeps its completed initial-sync state'
+  );
+  strictEqual(
+    mergedSchema.pets.initiallySynced,
     false,
-    'new table starts unsynced'
+    'a table absent from persisted schema requires a full load'
+  );
+  strictEqual(
+    mergedSchema.friends.idPrefix,
+    'fr',
+    'persisted table metadata is preserved'
   );
 });
 
-test('re-added cloud tables are marked as not initially synced', () => {
-  const db = new Dexie('issue2331-schema-readd-test') as any;
-  db.cloud = {};
-  const parseStoresSpec = createParser(db);
-  const dbSchema: Record<string, any> = {};
+test('dynamic clients can continue using the persisted schema unchanged', () => {
+  const persistedSchema = {
+    friends: {
+      markedForSync: true,
+      initiallySynced: true,
+      idPrefix: 'fr',
+    },
+  };
 
-  parseStoresSpec({ pets: '@id' }, dbSchema);
-  db.cloud.schema.pets.initiallySynced = true;
+  deepEqual(
+    mergePersistedSchema({}, persistedSchema),
+    persistedSchema,
+    'no declared tables means no new initial-sync markers'
+  );
+});
 
-  // Dexie represents a table removed by a later version as a null store spec.
-  parseStoresSpec({ pets: null }, dbSchema);
-  strictEqual(db.cloud.schema.pets.deleted, true, 'table is marked deleted');
+test('an old server cannot clear a pending table initial sync', () => {
+  const schema = {
+    friends: { markedForSync: true, initiallySynced: true },
+    pets: { markedForSync: true, initiallySynced: false },
+  };
 
-  parseStoresSpec({ pets: '@id' }, dbSchema);
+  applyServerSchema(schema, {
+    friends: { markedForSync: true },
+    pets: { markedForSync: true },
+  });
+
   strictEqual(
-    db.cloud.schema.pets.deleted,
-    false,
-    'table is marked active again'
+    schema.friends.initiallySynced,
+    true,
+    'an already synced table remains synced'
   );
   strictEqual(
-    db.cloud.schema.pets.initiallySynced,
+    schema.pets.initiallySynced,
     false,
-    're-added table starts a new initial sync'
+    'false remains until the server explicitly acknowledges the full load'
+  );
+});
+
+test('a new server can acknowledge a completed table initial sync', () => {
+  const schema = {
+    pets: { markedForSync: true, initiallySynced: false },
+  };
+
+  applyServerSchema(schema, {
+    pets: { markedForSync: true, initiallySynced: true },
+  });
+
+  strictEqual(
+    schema.pets.initiallySynced,
+    true,
+    'an explicit acknowledgement clears the pending marker'
   );
 });
