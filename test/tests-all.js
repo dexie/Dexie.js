@@ -1,4 +1,4 @@
-﻿import Dexie from 'dexie';
+import Dexie from 'dexie';
 Dexie.test = true; // Improve code coverage
 import "./tests-cmp.js";
 import "./tests-table.js";
@@ -21,4 +21,5 @@ import "./tests-live-query";
 import "./tests-rangeset";
 import "./tests-idb30";
 import "./tests-max-connections.js";
+import "./tests-2330.js";
 //import "./tests-performance.js"; Not required. Should make other performance tests separately instead.
