@@ -52,7 +52,7 @@
     "@types/react": "^18.3.27",
     "@types/react-dom": "^18.3.7",
     "@vitejs/plugin-react": "^5.2.0",
-    "@vitest/ui": "^4.1.9",
+    "@vitest/ui": "^4.1.11",
     "autoprefixer": "^10.4.22",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
@@ -64,10 +64,11 @@
     "tailwindcss-animate": "^1.0.7",
     "vite": "^8.0.4",
     "vite-plugin-pwa": "^1.3.0",
-    "vitest": "^4.1.9",
+    "vitest": "^4.1.11",
     "workbox-build": "^7.4.0"
   },
   "overrides": {
+    "glob": "^13.0.6",
     "magic-string": "^0.30.21",
     "sourcemap-codec": "npm:@jridgewell/sourcemap-codec@^1.5.0",
     "source-map": "^0.7.4",
