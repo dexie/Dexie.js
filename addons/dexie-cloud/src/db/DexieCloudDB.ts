@@ -13,7 +13,7 @@ import {
   DexieCloudSchema,
 } from 'dexie-cloud-common';
 import { BroadcastedAndLocalEvent } from '../helpers/BroadcastedAndLocalEvent';
-import { SyncState, SyncStatePhase } from '../types/SyncState';
+import { SyncProgress, SyncState, SyncStatePhase } from '../types/SyncState';
 import { MessagesFromServerConsumer } from '../sync/messagesFromServerQueue';
 import { YClientMessage } from 'dexie-cloud-common';
 import { BlobDownloadTracker } from '../sync/BlobDownloadTracker';
@@ -30,7 +30,7 @@ import { BlobDownloadTracker } from '../sync/BlobDownloadTracker';
 export interface SyncStateChangedEventData {
   phase: SyncStatePhase;
   error?: Error;
-  progress?: number;
+  progress?: SyncProgress;
 }
 
 type SyncStateTable = Table<
