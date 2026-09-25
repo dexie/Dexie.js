@@ -23,7 +23,17 @@ export function fail(
 }
 
 export function emptyCollection(whereClause: WhereClause) {
-  return new whereClause.Collection(whereClause, () => rangeEqual('')).limit(0);
+  // Use a filtering algorithm rather than .limit(0). A .limit() registers a
+  // replayFilter on the resulting collection, and when an empty collection is
+  // the outermost clause of an or()-chain, that replayFilter is applied to the
+  // entire union (see iter() in collection-helpers) and silently empties the
+  // whole result. An algorithm only filters this collection's own cursor and
+  // therefore leaves the other or()-branches untouched. See issue #1607.
+  const collection = new whereClause.Collection(whereClause, () =>
+    rangeEqual('')
+  );
+  collection._addAlgorithm(() => false);
+  return collection;
 }
 
 export function upperFactory(dir: 'next' | 'prev') {
