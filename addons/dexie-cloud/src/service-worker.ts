@@ -86,8 +86,12 @@ function syncDB(dbName: string, purpose: 'push' | 'pull') {
       // Error occured. Stop managing this DB until we wake up again by a sync event,
       // which will open a new Dexie and start trying to sync it.
       stopManagingDB();
-      if (e.name !== Dexie.errnames.NoSuchDatabase) {
-        // Unless the error was that DB doesn't exist, rethrow to trigger sync retry.
+      if (
+        e.name !== Dexie.errnames.NoSuchDatabase &&
+        e.name !== 'InvalidLicenseError' &&
+        !(e.name === 'HttpError' && e.httpStatus === 403)
+      ) {
+        // Unless the error was that DB doesn't exist or is a license/forbidden error, rethrow to trigger sync retry.
         throw e; // Throw e to make syncEvent.waitUntil() receive a rejected promis, so it will retry.
       }
     }
@@ -120,6 +124,12 @@ if (!DISABLE_SERVICEWORKER_STRATEGY) {
       // But lesser timeout and more number of times.
       const syncAndRetry = (num = 1) => {
         return syncDB(dbName, event.data.purpose || 'pull').catch(async (e) => {
+          if (
+            e.name === 'InvalidLicenseError' ||
+            (e.name === 'HttpError' && e.httpStatus === 403)
+          ) {
+            return; // Stop retrying on license errors!
+          }
           if (num === 3) throw e;
           await sleep(60_000); // 1 minute
           syncAndRetry(num + 1);
