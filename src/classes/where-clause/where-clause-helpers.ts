@@ -81,6 +81,14 @@ export function addIgnoreCaseAlgorithm(
   if (!needles.every((s) => typeof s === 'string')) {
     return fail(whereClause, STRING_EXPECTED);
   }
+  // toUpperCase()/toLowerCase() are not always length- or position-preserving
+  // (e.g. German 'ß' -> 'SS', ligature 'ﬁ' -> 'FI', Turkish 'İ'). The nextCasing()
+  // index-skip optimization below assumes they are; when they aren't, it can skip
+  // past valid records and silently drop matching rows. Detect that case and fall
+  // back to a correct linear scan over the range.
+  const caseFoldUnstable = needles.some(
+    (n) => n.toLowerCase().length !== n.length || n.toUpperCase().length !== n.length
+  );
   function initDirection(dir) {
     upper = upperFactory(dir);
     lower = lowerFactory(dir);
@@ -124,6 +132,14 @@ export function addIgnoreCaseAlgorithm(
     if (match(lowerKey, lowerNeedles, firstPossibleNeedle)) {
       return true;
     } else {
+      if (caseFoldUnstable) {
+        // Length-changing case fold detected: the casing-skip below is unsafe and
+        // would drop rows. Advance one record at a time (correct linear scan).
+        advance(function () {
+          cursor.continue();
+        });
+        return false;
+      }
       var lowestPossibleCasing = null;
       for (var i = firstPossibleNeedle; i < needlesLen; ++i) {
         var casing = nextCasing(
