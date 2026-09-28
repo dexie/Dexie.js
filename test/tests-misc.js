@@ -557,3 +557,34 @@ promisedTest("Issue #1920 - table with an index or primary key named 'constructo
         await Dexie.delete(dbName);
     }
 });
+
+promisedTest("Issue #2087 - bulkUpdate before database is open", async () => {
+    const dbName = "TestIssue2087";
+    await Dexie.delete(dbName);
+
+    const setupDb = new Dexie(dbName);
+    setupDb.version(1).stores({ items: "id" });
+    await setupDb.items.bulkAdd([
+        { id: "qr-0001", time: "2024-01-01" },
+        { id: "qr-0002", time: "2024-01-01" }
+    ]);
+    setupDb.close();
+
+    const testdb = new Dexie(dbName);
+    testdb.version(1).stores({ items: "id" });
+    try {
+        await testdb.items.bulkUpdate([
+            { key: "qr-0001", changes: { time: "2024-10-23" } },
+            { key: "qr-0002", changes: { time: "2024-10-23" } },
+            { key: "qr-0003", changes: { time: "2024-10-23" } }
+        ]);
+        const items = await testdb.items.toArray();
+        deepEqual(items, [
+            { id: "qr-0001", time: "2024-10-23" },
+            { id: "qr-0002", time: "2024-10-23" }
+        ], "bulkUpdate auto-opened the db and applied changes to existing keys");
+    } finally {
+        testdb.close();
+        await Dexie.delete(dbName);
+    }
+});

@@ -691,11 +691,11 @@ export class Table implements ITable<any, IndexableType> {
   bulkUpdate(
     keysAndChanges: readonly { key: any; changes: UpdateSpec<any> }[]
   ): PromiseExtended<number> {
-    const coreTable = this.core;
     const keys = keysAndChanges.map((entry) => entry.key);
     const changeSpecs = keysAndChanges.map((entry) => entry.changes);
     const offsetMap: number[] = [];
     return this._trans('readwrite', (trans) => {
+      const coreTable = this.core;
       return coreTable.getMany({ trans, keys, cache: 'clone' }).then((objs) => {
         const resultKeys: any[] = [];
         const resultObjs: any[] = [];
