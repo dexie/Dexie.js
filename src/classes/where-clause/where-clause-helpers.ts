@@ -103,8 +103,25 @@ export function addIgnoreCaseAlgorithm(
   }
   initDirection('next');
 
+  // IDBKeyRange.bound and RangeSet.add require lower <= upper. Uppercase usually
+  // sorts first ('A' < 'a'), but some Unicode letters invert that: MICRO SIGN 'µ'
+  // (U+00B5) uppercases to GREEK CAPITAL MU 'Μ' (U+039C). Use min/max of both
+  // casings so the cursor range stays valid (issue #1686).
+  var rangeLower = upperNeedles[0];
+  var rangeUpper = lowerNeedles[needlesLen - 1];
+  for (var i = 0; i < needlesLen; ++i) {
+    rangeLower = whereClause._min(
+      rangeLower,
+      whereClause._min(upperNeedles[i], lowerNeedles[i])
+    );
+    rangeUpper = whereClause._max(
+      rangeUpper,
+      whereClause._max(upperNeedles[i], lowerNeedles[i])
+    );
+  }
+
   var c = new whereClause.Collection(whereClause, () =>
-    createRange(upperNeedles[0], lowerNeedles[needlesLen - 1] + suffix)
+    createRange(rangeLower, rangeUpper + suffix)
   );
 
   c._ondirectionchange = function (direction) {

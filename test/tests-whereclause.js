@@ -1,4 +1,4 @@
-﻿import Dexie from 'dexie';
+﻿import Dexie, { liveQuery } from 'dexie';
 import {module, stop, start, test, asyncTest, equal, ok} from 'QUnit';
 import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
@@ -391,6 +391,52 @@ asyncTest("startsWithIgnoreCase()", function () {
     }).finally(function () {
         start();
     });
+});
+
+promisedTest("Issue #1686 - IgnoreCase with inverted Unicode case", async () => {
+    // MICRO SIGN µ (U+00B5) uppercases to GREEK CAPITAL MU Μ (U+039C), which
+    // sorts AFTER µ. LATIN SMALL LETTER Y WITH DIAERESIS ÿ (U+00FF) uppercases
+    // to Ÿ (U+0178) with the same inversion. The ignore-case IDB range used to
+    // assume uppercase < lowercase and threw DataError / RangeError.
+    await db.friends.bulkAdd([
+        {name: "µ", age: 1},
+        {name: "µmeter", age: 2},
+        {name: "ÿellow", age: 3},
+        {name: "Hello", age: 4},
+        {name: "alpha", age: 5}
+    ]);
+
+    const micro = await db.friends.where("name").startsWithIgnoreCase("µ").toArray();
+    equal(micro.map(f => f.name).join(","), "µ,µmeter", "startsWithIgnoreCase('µ') should find µ-prefixed names and not ÿellow (which sits between µ and Μ)");
+
+    const microRev = await db.friends.where("name").startsWithIgnoreCase("µ").reverse().toArray();
+    equal(microRev.map(f => f.name).join(","), "µmeter,µ", "startsWithIgnoreCase('µ').reverse() should also work");
+
+    const microEq = await db.friends.where("name").equalsIgnoreCase("µ").toArray();
+    equal(microEq.length, 1, "equalsIgnoreCase('µ') should find the exact row");
+    equal(microEq[0].name, "µ");
+
+    const y = await db.friends.where("name").startsWithIgnoreCase("ÿ").toArray();
+    equal(y.map(f => f.name).join(","), "ÿellow", "startsWithIgnoreCase('ÿ') should find ÿellow");
+
+    const anyPrefix = await db.friends.where("name").startsWithAnyOfIgnoreCase("µ", "hel").toArray();
+    equal(anyPrefix.map(f => f.name).sort().join(","), "Hello,µ,µmeter", "startsWithAnyOfIgnoreCase should mix inverted and ASCII needles");
+
+    const anyExact = await db.friends.where("name").anyOfIgnoreCase("µ", "hello").toArray();
+    equal(anyExact.map(f => f.name).sort().join(","), "Hello,µ", "anyOfIgnoreCase should mix inverted and ASCII needles");
+
+    const liveRows = await new Promise((resolve, reject) => {
+        const sub = liveQuery(() =>
+            db.friends.where("name").startsWithIgnoreCase("µ").toArray()
+        ).subscribe({
+            next(rows) {
+                sub.unsubscribe();
+                resolve(rows);
+            },
+            error: reject
+        });
+    });
+    equal(liveRows.map(f => f.name).join(","), "µ,µmeter", "liveQuery should not throw RangeError on an inverted ignore-case range");
 });
 
 asyncTest("queryingNonExistingObj", function () {
