@@ -697,22 +697,25 @@ export class Table implements ITable<any, IndexableType> {
     const offsetMap: number[] = [];
     return this._trans('readwrite', (trans) => {
       return coreTable.getMany({ trans, keys, cache: 'clone' }).then((objs) => {
+        const { outbound, extractKey } = coreTable.schema.primaryKey;
         const resultKeys: any[] = [];
         const resultObjs: any[] = [];
         keysAndChanges.forEach(({ key, changes }, idx) => {
           const obj = objs[idx];
           if (obj) {
             for (const keyPath of Object.keys(changes)) {
-              const value = changes[keyPath];
-              if (keyPath === this.schema.primKey.keyPath) {
-                if (cmp(value, key) !== 0) {
-                  throw new exceptions.Constraint(
-                    `Cannot update primary key in bulkUpdate()`
-                  );
-                }
-              } else {
-                setByKeyPath(obj, keyPath, value);
-              }
+              setByKeyPath(obj, keyPath, changes[keyPath]);
+            }
+            // Applying the changes must not move the record to a different
+            // primary key. Comparing the change keyPath against primKey.keyPath
+            // (the previous approach) silently missed compound keys, whose
+            // keyPath is an array, and nested keys changed via a parent object.
+            // Extract the resulting key the same way Collection.modify() does
+            // and reject any change to an inbound primary key.
+            if (!outbound && cmp(extractKey(obj), key) !== 0) {
+              throw new exceptions.Constraint(
+                `Cannot update primary key in bulkUpdate()`
+              );
             }
             offsetMap.push(idx);
             resultKeys.push(key);
