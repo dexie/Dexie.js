@@ -165,9 +165,19 @@ export async function importInto(
             );
           else continue;
         }
+        // A hidden (non-inbound, implicit) primary key is represented as an
+        // empty string in Dexie's own schema (table.schema.primKey.src).
+        // Exports produced by Dexie 2.x + older dexie-export-import versions
+        // instead wrote the literal string "null" for that same case, so
+        // comparing them verbatim against a live v3+ table incorrectly
+        // reports "Primary key differs" even though nothing changed. See
+        // https://github.com/dexie/Dexie.js/issues/1050
+        const exportedPrimKeySrc = tableSchemaStr.split(',')[0];
+        const normalizedExportedPrimKeySrc =
+          exportedPrimKeySrc === 'null' ? '' : exportedPrimKeySrc;
         if (
           !options!.acceptChangedPrimaryKey &&
-          tableSchemaStr.split(',')[0] != table.schema.primKey.src
+          normalizedExportedPrimKeySrc != table.schema.primKey.src
         ) {
           throw new Error(
             `Primary key differs for table ${tableExport.tableName}. `
