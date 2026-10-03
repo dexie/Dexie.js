@@ -1,4 +1,4 @@
-import { PropModification, Table, UpdateSpec } from 'dexie';
+import Dexie, { PropModification, Table, UpdateSpec } from 'dexie';
 import { getTableFromMutationTable } from '../helpers/getTableFromMutationTable';
 import { DexieCloudDB } from '../db/DexieCloudDB';
 import {
@@ -70,7 +70,7 @@ export async function listClientChanges(
   }
 
   // Filter out those tables that doesn't have any mutations:
-  return result;
+  return Dexie.deepClone(result);
 }
 
 function removeRedundantUpdateOps(muts: DBOperation[]) {
