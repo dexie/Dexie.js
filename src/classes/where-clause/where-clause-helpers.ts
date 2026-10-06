@@ -26,16 +26,49 @@ export function emptyCollection(whereClause: WhereClause) {
   return new whereClause.Collection(whereClause, () => rangeEqual('')).limit(0);
 }
 
+// Not every character's upper case sorts first (Georgian, "ÿ") or has the
+// same length ("ß" is "SS"). For those strings, pick the casing per character
+// and leave characters that change length as they are. Issue #2339.
+function upperSortsFirst(s: string, upper: string, lower: string) {
+  if (upper.length !== s.length || lower.length !== s.length) return false;
+  for (var i = 0; i < s.length; ++i) {
+    if (upper.charCodeAt(i) > lower.charCodeAt(i)) return false;
+  }
+  return true;
+}
+
+function casingOfEachChar(s: string, sortsLast: boolean) {
+  var result = '';
+  for (var i = 0; i < s.length; ++i) {
+    var code = s.charCodeAt(i);
+    var c = code >= 0xd800 && code <= 0xdbff ? s.substr(i++, 2) : s[i];
+    var upper = c.toUpperCase();
+    var lower = c.toLowerCase();
+    if (upper.length !== c.length || lower.length !== c.length) result += c;
+    else if (upper < lower) result += sortsLast ? lower : upper;
+    else result += sortsLast ? upper : lower;
+  }
+  return result;
+}
+
+function firstCasing(s: string) {
+  var upper = s.toUpperCase();
+  var lower = s.toLowerCase();
+  return upperSortsFirst(s, upper, lower) ? upper : casingOfEachChar(s, false);
+}
+
+function lastCasing(s: string) {
+  var upper = s.toUpperCase();
+  var lower = s.toLowerCase();
+  return upperSortsFirst(s, upper, lower) ? lower : casingOfEachChar(s, true);
+}
+
 export function upperFactory(dir: 'next' | 'prev') {
-  return dir === 'next'
-    ? (s: string) => s.toUpperCase()
-    : (s: string) => s.toLowerCase();
+  return dir === 'next' ? firstCasing : lastCasing;
 }
 
 export function lowerFactory(dir: 'next' | 'prev') {
-  return dir === 'next'
-    ? (s: string) => s.toLowerCase()
-    : (s: string) => s.toUpperCase();
+  return dir === 'next' ? lastCasing : firstCasing;
 }
 
 export function nextCasing(key, lowerKey, upperNeedle, lowerNeedle, cmp, dir) {

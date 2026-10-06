@@ -1,5 +1,5 @@
 ﻿import Dexie from 'dexie';
-import {module, stop, start, test, asyncTest, equal, ok} from 'QUnit';
+import {module, stop, start, test, asyncTest, equal, deepEqual, ok} from 'QUnit';
 import {resetDatabase, supports, spawnedTest, promisedTest} from './dexie-unittest-utils';
 
 const async = Dexie.async;
@@ -336,6 +336,55 @@ asyncTest("equalsIgnoreCase() 2 descending", function () {
             start();
         }).finally(start);
     });
+});
+
+const filenames = async (collection) => (await collection.toArray()).map(f => f.filename).sort();
+
+promisedTest("Issue #2339 - ignore-case queries with characters whose case changes length", async () => {
+    // "İ" and "ß" change length when their case changes.
+    await db.files.bulkAdd([
+        "İki Şair", "İKI ŞAIR", "iki şair", "Iki Şair",
+        "Straße", "STRAßE", "STRASSE", "strasse",
+    ].map(filename => ({ filename })));
+    const ikiSair = ["İKI ŞAIR", "İki Şair"].sort();
+    deepEqual(await filenames(db.files.where("filename").equalsIgnoreCase("İki Şair")), ikiSair,
+        "equalsIgnoreCase() with İ");
+    deepEqual(await filenames(db.files.where("filename").equalsIgnoreCase("İki Şair").reverse()), ikiSair,
+        "equalsIgnoreCase() with İ, reversed");
+    deepEqual(await filenames(db.files.where("filename").startsWithIgnoreCase("İki")), ikiSair,
+        "startsWithIgnoreCase() with İ");
+    deepEqual(await filenames(db.files.where("filename").anyOfIgnoreCase(["İki Şair", "hello"])),
+        ["Hello", "hello", ...ikiSair].sort(),
+        "anyOfIgnoreCase() mixing İ with plain letters");
+    const strasse = ["STRAßE", "Straße"].sort();
+    deepEqual(await filenames(db.files.where("filename").equalsIgnoreCase("straße")), strasse,
+        "equalsIgnoreCase() with ß");
+    deepEqual(await filenames(db.files.where("filename").equalsIgnoreCase("straße").reverse()), strasse,
+        "equalsIgnoreCase() with ß, reversed");
+});
+
+promisedTest("Issue #2339 - ignore-case queries with characters whose upper case sorts after lower case", async () => {
+    // Upper case Georgian and "Ÿ" sort after their lower case.
+    await db.files.bulkAdd([
+        "გამარჯობა", "ᲒᲐᲛᲐᲠᲯᲝᲑᲐ", "Გამარჯობა", "გამარჯობა!",
+        "kÿ", "KŸ", "Kÿ", "ky",
+    ].map(filename => ({ filename })));
+    const gamarjoba = ["გამარჯობა", "ᲒᲐᲛᲐᲠᲯᲝᲑᲐ", "Გამარჯობა"].sort();
+    deepEqual(await filenames(db.files.where("filename").equalsIgnoreCase("გამარჯობა")), gamarjoba,
+        "equalsIgnoreCase() with Georgian");
+    deepEqual(await filenames(db.files.where("filename").equalsIgnoreCase("ᲒᲐᲛᲐᲠᲯᲝᲑᲐ").reverse()), gamarjoba,
+        "equalsIgnoreCase() with Georgian, reversed");
+    deepEqual(await filenames(db.files.where("filename").startsWithIgnoreCase("გამარ")),
+        [...gamarjoba, "გამარჯობა!"].sort(),
+        "startsWithIgnoreCase() with Georgian");
+    const ky = ["KŸ", "Kÿ", "kÿ"].sort();
+    deepEqual(await filenames(db.files.where("filename").equalsIgnoreCase("kÿ")), ky,
+        "equalsIgnoreCase() with ÿ after the first character");
+    deepEqual(await filenames(db.files.where("filename").equalsIgnoreCase("kÿ").reverse()), ky,
+        "equalsIgnoreCase() with ÿ after the first character, reversed");
+    deepEqual(await filenames(db.files.where("filename").anyOfIgnoreCase(["KŸ", "hello"])),
+        ["Hello", "hello", ...ky].sort(),
+        "anyOfIgnoreCase() mixing ÿ with plain letters");
 });
 
 asyncTest("equalsIgnoreCase() 3 (first key shorter than needle)", function () {
