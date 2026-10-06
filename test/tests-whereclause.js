@@ -361,6 +361,9 @@ promisedTest("Issue #2339 - ignore-case queries with characters whose case chang
         "equalsIgnoreCase() with ß");
     deepEqual(await filenames(db.files.where("filename").equalsIgnoreCase("straße").reverse()), strasse,
         "equalsIgnoreCase() with ß, reversed");
+    await db.files.bulkAdd(["ßΟΣ", "ßος", "ßοσ"].map(filename => ({ filename })));
+    deepEqual(await filenames(db.files.where("filename").equalsIgnoreCase("ßΟΣ")), ["ßΟΣ", "ßος"].sort(),
+        "equalsIgnoreCase() with ß keeps the final ς");
 });
 
 promisedTest("Issue #2339 - ignore-case queries with characters whose upper case sorts after lower case", async () => {

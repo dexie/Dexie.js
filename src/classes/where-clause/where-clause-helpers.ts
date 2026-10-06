@@ -38,12 +38,16 @@ function upperSortsFirst(s: string, upper: string, lower: string) {
 }
 
 function casingOfEachChar(s: string, sortsLast: boolean) {
+  // Take lower case from the whole string, which keeps context like the
+  // final "ς" in "ΟΣ".
+  var wholeLower = s.toLowerCase();
   var result = '';
-  for (var i = 0; i < s.length; ++i) {
+  for (var i = 0, j = 0; i < s.length; i += c.length) {
     var code = s.charCodeAt(i);
-    var c = code >= 0xd800 && code <= 0xdbff ? s.substr(i++, 2) : s[i];
+    var c = s.substring(i, code >= 0xd800 && code <= 0xdbff ? i + 2 : i + 1);
     var upper = c.toUpperCase();
-    var lower = c.toLowerCase();
+    var lower = wholeLower.substring(j, j + c.toLowerCase().length);
+    j += lower.length;
     if (upper.length !== c.length || lower.length !== c.length) result += c;
     else if (upper < lower) result += sortsLast ? lower : upper;
     else result += sortsLast ? upper : lower;
