@@ -29,6 +29,7 @@ import {
   globalEvents,
 } from '../../globals/global-events';
 import { signalSubscribersNow } from '../../live-query/cache/signalSubscribers';
+import { _global } from '../../globals/global';
 
 export function dexieOpen(db: Dexie) {
   const state = db._state;
@@ -175,12 +176,16 @@ export function dexieOpen(db: Dexie) {
     });
 
   // safari14Workaround = Workaround by jakearchibald for new nasty bug in safari 14.
+  // It reads the global indexedDB, so skip it when opening an injected one or the global is missing.
+  const useSafari14Workaround =
+    typeof navigator !== 'undefined' &&
+    !!indexedDB &&
+    indexedDB === _global.indexedDB;
   return Promise.race([
     openCanceller,
-    (typeof navigator === 'undefined'
-      ? Promise.resolve()
-      : safari14Workaround()
-    ).then(tryOpenDB),
+    (useSafari14Workaround ? safari14Workaround() : Promise.resolve()).then(
+      tryOpenDB
+    ),
   ])
     .then(() => {
       // Before finally resolving the dbReadyPromise and this promise,
