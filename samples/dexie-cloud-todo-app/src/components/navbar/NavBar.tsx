@@ -36,7 +36,7 @@ export function NavBar() {
             <SyncStatusIcon className="h-5 w-5" />
             {currentUser?.isLoggedIn ? (
               <DropdownMenu>
-                <DropdownMenuTrigger>
+                <DropdownMenuTrigger asChild>
                   <Button variant="ghost" className="flex items-center gap-2">
                     <User className="h-4 w-4" />
                     {currentUser.name}
@@ -52,7 +52,7 @@ export function NavBar() {
               </DropdownMenu>
             ) : (
               <DropdownMenu>
-                <DropdownMenuTrigger>
+                <DropdownMenuTrigger asChild>
                   <Button variant="outline" className="flex items-center gap-2">
                     Sign in or create account
                     <ChevronDown className="h-4 w-4" />

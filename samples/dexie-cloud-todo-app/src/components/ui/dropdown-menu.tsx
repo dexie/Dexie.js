@@ -27,21 +27,41 @@ const DropdownMenu = ({ children, ...props }: React.ComponentProps<"div">) => {
   )
 }
 
+type DropdownMenuTriggerProps = React.ComponentProps<"button"> & {
+  asChild?: boolean
+}
+
 const DropdownMenuTrigger = React.forwardRef<
   HTMLButtonElement,
-  React.ComponentProps<"button">
->(({ className, children, ...props }, ref) => (
-  <button
-    ref={ref}
-    className={cn(
-      "inline-flex w-full justify-center gap-x-1.5 rounded-md bg-background px-3 py-2 text-sm font-semibold text-foreground shadow-sm ring-1 ring-inset ring-border hover:bg-accent",
-      className
-    )}
-    {...props}
-  >
-    {children}
-  </button>
-))
+  DropdownMenuTriggerProps
+>(({ className, children, asChild = false, ...props }, ref) => {
+  if (asChild) {
+    const child = React.Children.only(children) as React.ReactElement<any>
+    const childProps = child.props as React.ComponentProps<"button">
+    return React.cloneElement(child, {
+      ...props,
+      ref,
+      className: cn(className, childProps.className),
+      onClick: (event: React.MouseEvent<HTMLButtonElement>) => {
+        props.onClick?.(event)
+        childProps.onClick?.(event)
+      },
+    })
+  }
+
+  return (
+    <button
+      ref={ref}
+      className={cn(
+        "inline-flex w-full justify-center gap-x-1.5 rounded-md bg-background px-3 py-2 text-sm font-semibold text-foreground shadow-sm ring-1 ring-inset ring-border hover:bg-accent",
+        className
+      )}
+      {...props}
+    >
+      {children}
+    </button>
+  )
+})
 DropdownMenuTrigger.displayName = "DropdownMenuTrigger"
 
 const DropdownMenuContent = React.forwardRef<
