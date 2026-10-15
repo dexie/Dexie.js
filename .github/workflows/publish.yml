@@ -60,13 +60,13 @@ jobs:
       id-token: write  # required for OIDC Trusted Publisher
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@fc06bc1257f339d1d5d8b3a19a8cae5388b55320 # v4.4.0
         with:
           version: 10
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22.14.0
           registry-url: https://registry.npmjs.org
@@ -116,23 +116,27 @@ jobs:
 
       - name: Publish packages
         id: publish
+        env:
+          MODE: ${{ github.event_name == 'workflow_run' && 'dev' || inputs.mode }}
+          PR: ${{ inputs.pr_number }}
+          BUILD: ${{ inputs.build_number }}
+          PACKAGES: ${{ inputs.packages }}
         run: |
-          # Determine mode: push to master = dev, workflow_dispatch = use input
-          if [ "${{ github.event_name }}" = "workflow_run" ]; then
-            MODE="dev"
-          else
-            MODE="${{ inputs.mode }}"
-          fi
-
-          # Validate pr_number is provided when mode=pr
-          if [ "$MODE" = "pr" ] && [ -z "${{ inputs.pr_number }}" ]; then
-            echo "Error: pr_number is required when mode=pr"
+          if [[ "$MODE" != "dev" && "$MODE" != "pr" ]]; then
+            echo "::error::mode must be dev or pr"
             exit 1
           fi
 
-          PR="${{ inputs.pr_number }}"
-          BUILD="${{ inputs.build_number }}"
-          PACKAGES="${{ inputs.packages }}"
+          if [[ "$MODE" = "pr" && ! "$PR" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::pr_number must be a positive integer when mode=pr"
+            exit 1
+          fi
+
+          if [[ "$MODE" = "pr" && ! "$BUILD" =~ ^[1-9][0-9]*$ ]]; then
+            echo "::error::build_number must be a positive integer when mode=pr"
+            exit 1
+          fi
+
           [ -z "$PACKAGES" ] && PACKAGES="all"
 
           PUBLISHED_VERSIONS=""
@@ -149,7 +153,7 @@ jobs:
             else
               IFS=',' read -ra PKG_LIST <<< "$PACKAGES"
               for p in "${PKG_LIST[@]}"; do
-                if [ "$(echo $p | tr -d ' ')" = "$PKG_NAME" ]; then
+                if [ "$(printf '%s' "$p" | tr -d ' ')" = "$PKG_NAME" ]; then
                   SHOULD_PUBLISH=true
                   break
                 fi
@@ -178,12 +182,13 @@ jobs:
               local TAG="pr${PR}"
 
               # Temporarily patch version
-              node -e "
-                const fs = require('fs');
-                const pkg = JSON.parse(fs.readFileSync('./${PKG_DIR}/package.json', 'utf8'));
-                pkg.version = '${PUBLISH_VERSION}';
-                fs.writeFileSync('./${PKG_DIR}/package.json', JSON.stringify(pkg, null, 2) + '\n');
-              "
+              node -e '
+                const fs = require("fs");
+                const [file, version] = process.argv.slice(1);
+                const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+                pkg.version = version;
+                fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
+              ' "./${PKG_DIR}/package.json" "$PUBLISH_VERSION"
             fi
 
             echo "Publishing ${PKG_NAME}@${PUBLISH_VERSION} with tag ${TAG}..."
@@ -191,12 +196,13 @@ jobs:
 
             # Restore original version after PR publish
             if [ "$MODE" = "pr" ]; then
-              node -e "
-                const fs = require('fs');
-                const pkg = JSON.parse(fs.readFileSync('./${PKG_DIR}/package.json', 'utf8'));
-                pkg.version = '${BASE_VERSION}';
-                fs.writeFileSync('./${PKG_DIR}/package.json', JSON.stringify(pkg, null, 2) + '\n');
-              "
+              node -e '
+                const fs = require("fs");
+                const [file, version] = process.argv.slice(1);
+                const pkg = JSON.parse(fs.readFileSync(file, "utf8"));
+                pkg.version = version;
+                fs.writeFileSync(file, JSON.stringify(pkg, null, 2) + "\n");
+              ' "./${PKG_DIR}/package.json" "$BASE_VERSION"
             fi
 
             PUBLISHED_VERSIONS="${PUBLISHED_VERSIONS}\n- \`npm install ${PKG_NAME}@${PUBLISH_VERSION}\`"
@@ -226,19 +232,19 @@ jobs:
         if: always() && github.event_name == 'workflow_dispatch' && inputs.mode == 'pr'
         env:
           DISCORD_WEBHOOK: ${{ secrets.DISCORD_WEBHOOK_NPM_RELEASES }}
+          PR: ${{ inputs.pr_number }}
+          REQUESTER: ${{ inputs.requester_discord_id }}
+          OUTCOME: ${{ steps.publish.outcome }}
+          VERSIONS: ${{ steps.publish.outputs.published_versions }}
         run: |
-          PR="${{ inputs.pr_number }}"
-          REQUESTER="${{ inputs.requester_discord_id }}"
-          OUTCOME="${{ steps.publish.outcome }}"
           BRANCH="${GITHUB_REF_NAME}"
-          RUN_URL="https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+          RUN_URL="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
 
           if [ "$OUTCOME" = "success" ]; then
             MENTION=""
-            if [ -n "$REQUESTER" ]; then
+            if [[ "$REQUESTER" =~ ^[0-9]+$ ]]; then
               MENTION=" (requested by <@${REQUESTER}>)"
             fi
-            VERSIONS="${{ steps.publish.outputs.published_versions }}"
             TITLE="✅ PR #${PR} prerelease published${MENTION}"
             BODY="Branch: \`${BRANCH}\`\n\n${VERSIONS}\n\n[View run](${RUN_URL})"
           else
@@ -246,14 +252,11 @@ jobs:
             BODY="[View run](${RUN_URL})"
           fi
 
-          # Build JSON payload with python to safely handle special characters
-          python3 -c "
-          import json, os, sys
-          title = os.environ.get('MSG_TITLE', '')
-          body = os.environ.get('MSG_BODY', '')
-          content = title + '\n\n' + body
-          print(json.dumps({'content': content}))
-          " MSG_TITLE="$TITLE" MSG_BODY="$BODY" | \
+          MSG_TITLE="$TITLE" MSG_BODY="$BODY" node -e '
+            const { MSG_TITLE, MSG_BODY } = process.env;
+            const content = MSG_TITLE + "\n\n" + MSG_BODY.replace(/\\n/g, "\n");
+            console.log(JSON.stringify({ content }));
+          ' | \
           curl -s -X POST "$DISCORD_WEBHOOK" \
             -H "Content-Type: application/json" \
             -d @-

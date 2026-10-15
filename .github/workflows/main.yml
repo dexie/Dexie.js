@@ -29,16 +29,19 @@ jobs:
       max-parallel: 6 # At least for browserstack, this seems to be needed to avoid timeouts
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@a37ce9120846195fa4ece8f58b268e6043cb2f26 # v3.7.0
       - name: Set up pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@eae0cfeb286e66ffb5155f1a79b90583a127a68b # v2.4.1
         with:
           version: 9
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
         with:
           node-version: 18
           cache: "pnpm"
+      - name: Test publishing workflow
+        if: matrix.TF == 'test'
+        run: node --test .github/tests/publish-workflow.test.cjs
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
       - name: Build
@@ -46,7 +49,7 @@ jobs:
       - name: Set LT_TUNNEL_NAME
         run: echo "LT_TUNNEL_NAME=${{ matrix.TF }}-${{ github.run_id }}-${{ github.run_attempt }}" >> $GITHUB_ENV
       - name: Run headless test
-        uses: coactions/setup-xvfb@v1
+        uses: coactions/setup-xvfb@b6b4fcfb9f5a895edadc3bc76318fae0ac17c8b3 # v1.0.1
         with:
           run: bash -e ./gh-actions.sh
           working-directory: ${{ matrix.TF }}
