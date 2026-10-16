@@ -6,10 +6,10 @@ on:
     branches:
       - master # Add also master-4 when dexie@4 is stable and master will represent dexie@5. dexie@3 has its own workflow.
   pull_request:
-      types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened]
 env:
-  LAMBDATEST: "true"
-  GH_ACTIONS: "true"
+  LAMBDATEST: 'true'
+  GH_ACTIONS: 'true'
   LT_USERNAME: ${{ secrets.LT_USERNAME }}
   LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
 
@@ -38,7 +38,7 @@ jobs:
         uses: actions/setup-node@3235b876344d2a9aa001b8d1453c930bba69e610 # v3.9.1
         with:
           node-version: 18
-          cache: "pnpm"
+          cache: 'pnpm'
       - name: Test publishing workflow
         if: matrix.TF == 'test'
         run: node --test .github/tests/publish-workflow.test.cjs

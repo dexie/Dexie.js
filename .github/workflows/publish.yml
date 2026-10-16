@@ -16,7 +16,7 @@ name: Publish
 
 on:
   workflow_run:
-    workflows: ["Build and Test"]
+    workflows: ['Build and Test']
     types: [completed]
     branches: [master]
   workflow_dispatch:
@@ -57,7 +57,7 @@ jobs:
     if: github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success'
     permissions:
       contents: read
-      id-token: write  # required for OIDC Trusted Publisher
+      id-token: write # required for OIDC Trusted Publisher
 
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
