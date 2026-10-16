@@ -5,6 +5,7 @@ import { TSON } from '../TSON';
 import { getSyncableTables } from '../helpers/getSyncableTables';
 import { BaseRevisionMapEntry } from '../db/entities/BaseRevisionMapEntry';
 import { HttpError } from '../errors/HttpError';
+import { InvalidLicenseError } from '../InvalidLicenseError';
 import {
   DBOperationsSet,
   DexieCloudSchema,
@@ -36,16 +37,20 @@ export async function syncWithServer(
     'Content-Type': 'application/tson',
   };
   const updatedUser = await loadAccessToken(db);
-  /*
-  if (updatedUser?.license && changes.length > 0) {
+
+  const hasLocalChanges =
+    changes.some((set) => set.muts.some((mut) => mut.keys.length > 0)) ||
+    y.some((m) => m.type === 'u-c');
+
+  if (updatedUser?.license && hasLocalChanges) {
     if (updatedUser.license.status === 'expired') {
-      throw new Error(`License has expired`);
+      throw new InvalidLicenseError('expired');
     }
     if (updatedUser.license.status === 'deactivated') {
-      throw new Error(`License deactivated`);
+      throw new InvalidLicenseError('deactivated');
     }
   }
-  */
+
   const accessToken = updatedUser?.accessToken;
   if (accessToken) {
     headers.Authorization = `Bearer ${accessToken}`;

@@ -49,6 +49,16 @@ export function LocalSyncWorker(
             ongoingSync = false;
             nextRetryTime = 0;
             syncStartTime = 0;
+          } else if (
+            error &&
+            ((error as any).name === 'InvalidLicenseError' ||
+              ((error as any).name === 'HttpError' &&
+                (error as any).httpStatus === 403))
+          ) {
+            // Do not retry on license errors or 403 Forbidden!
+            ongoingSync = false;
+            nextRetryTime = 0;
+            syncStartTime = 0;
           } else if (retryNum < 5) {
             // Mimic service worker sync event but a bit more eager: retry 4 times
             // * first retry after 20 seconds
