@@ -16,6 +16,8 @@ import dexieCloud, {
   DexieCloudTable,
   getTiedRealmId,
 } from '../../src/dexie-cloud-client';
+import { listClientChanges } from '../../src/sync/listClientChanges';
+import { getMutationTable } from '../../src/helpers/getMutationTable';
 
 const DBURL = 'https://zv8n7bwcs.dexie.cloud'; // Shall exist in cloud.
 
@@ -183,3 +185,34 @@ function strip(...props: string[]) {
     return newObj;
   };
 }
+
+promisedTest('https://github.com/dexie/Dexie.js/pull/2317 - frozen objects in listClientChanges', async () => {
+  const testDb = new Dexie('frozen-mutations-db', { addons: [dexieCloud] }) as any;
+  testDb.version(1).stores({
+    items: '@id, name',
+  });
+  testDb.cloud.configure({
+    databaseUrl: DBURL,
+    requireAuth: { email: 'issue2317@demo.local', grant_type: 'demo' },
+  });
+  await Dexie.delete(testDb.name);
+  await testDb.open();
+
+  // Add a frozen object
+  const frozenVal = Object.freeze({ name: 'Frozen Local Item' });
+  await testDb.table('items').add(frozenVal);
+
+  // List client changes
+  const mutationTables = [testDb.table(getMutationTable('items'))];
+  const clientChanges = await listClientChanges(mutationTables, testDb);
+
+  // Verify that the listed mutations and their values are NOT frozen
+  ok(clientChanges.length > 0, 'Client changes were listed');
+  const mut = clientChanges[0].muts[0] as any;
+  ok(!Object.isFrozen(mut), 'Mutation object is not frozen');
+  ok(!Object.isFrozen(mut.values[0]), 'Value inside mutation is not frozen');
+  equal(mut.values[0].name, 'Frozen Local Item', 'Item name is correct');
+
+  await testDb.close();
+  await Dexie.delete(testDb.name);
+});
