@@ -449,6 +449,26 @@ asyncTest("db.close", ()=> {
     });
 });
 
+promisedTest("db.hasBeenClosed()", async ()=>{
+    let db = new Dexie("TestDB");
+    db.version(1).stores({foo: "id"});
+    ok(!db.hasBeenClosed(), "Should be false before db has been opened");
+    await db.open();
+    ok(!db.hasBeenClosed(), "Should be false when db is open");
+    db.close();
+    ok(db.hasBeenClosed(), "Should be true after db.close()");
+    await db.open();
+    ok(!db.hasBeenClosed(), "Should be false after db has been reopened");
+    db.close({disableAutoOpen: false});
+    ok(!db.hasBeenClosed(), "Should be false after db.close({disableAutoOpen: false}) since db will auto-open again");
+
+    let failingDb = new Dexie("TestDB", {indexedDB: undefined, IDBKeyRange: undefined});
+    failingDb.version(1).stores({foo: "id"});
+    await failingDb.open().catch(()=>{});
+    ok(failingDb.hasFailed(), "hasFailed() should be true when db failed to open");
+    ok(!failingDb.hasBeenClosed(), "Should be false when db failed to open for other reasons than being closed");
+});
+
 spawnedTest("db.open several times", 2, function*(){
     let db = new Dexie("TestDB");
     db.version(1).stores({foo: "id"});

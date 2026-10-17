@@ -478,7 +478,7 @@ export class Dexie implements IDexie {
 
   hasBeenClosed() {
     const dbOpenError = this._state.dbOpenError;
-    return dbOpenError && dbOpenError.name === 'DatabaseClosed';
+    return dbOpenError && dbOpenError.name === 'DatabaseClosedError';
   }
 
   hasFailed() {
