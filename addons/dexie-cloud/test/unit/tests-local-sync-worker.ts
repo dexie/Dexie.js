@@ -1,5 +1,6 @@
 import { module, ok, equal } from 'qunit';
 import { Subject } from 'rxjs';
+import Dexie from 'dexie';
 import { promisedTest } from '../promisedTest';
 import { LocalSyncWorker } from '../../src/sync/LocalSyncWorker';
 import { sync } from '../../src/sync/sync';
@@ -186,6 +187,46 @@ promisedTest('issue #2350: cancelled sync does not persist stale error', async (
     await sync(db, {} as any, {} as any, { cancelToken: { cancelled: true } });
   } catch (_error) { /* Expected invalid configuration or cancellation. */ }
   ok(!persisted && !emitted, 'stopped worker cannot overwrite status');
+});
+
+promisedTest('issue #2350: cancellation rolls back a pending IndexedDB error write', async () => {
+  const db = new Dexie('issue2350-cancelled-error-write');
+  db.version(1).stores({ $syncState: '' });
+  await db.open();
+  const state = db.table('$syncState');
+  await state.put({ error: 'before' }, 'syncState');
+  const cancelToken = { cancelled: false };
+  const originalUpdate = state.update.bind(state);
+  let writeStarted: () => void = () => {};
+  const started = new Promise<void>((resolve) => { writeStarted = resolve; });
+  let releaseWrite: () => void = () => {};
+  const hold = new Promise<void>((resolve) => { releaseWrite = resolve; });
+  let emitted = false;
+  (state as any).update = async (key: string, changes: object) => {
+    const result = await originalUpdate(key, changes);
+    writeStarted();
+    await Dexie.waitFor(hold); // Keep the transaction open until close cancels it.
+    return result;
+  };
+  try {
+    const cloudDb = {
+      transaction: db.transaction.bind(db),
+      $syncState: state,
+      syncStateChangedEvent: { next: () => { emitted = true; } },
+    } as any;
+    const attempt = sync(cloudDb, {} as any, {} as any, { cancelToken }).catch(() => {});
+    await started;
+    cancelToken.cancelled = true;
+    releaseWrite();
+    await attempt;
+    equal((await state.get('syncState')).error, 'before', 'cancelled write rolled back');
+    ok(!emitted, 'old worker did not publish stale status');
+  } finally {
+    (state as any).update = originalUpdate;
+    releaseWrite();
+    db.close();
+    await db.delete();
+  }
 });
 
 promisedTest('issue #2350: close during error write aborts stale status', async () => {
