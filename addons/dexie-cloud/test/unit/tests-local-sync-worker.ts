@@ -98,6 +98,33 @@ promisedTest('issue #2350: failed immediate retry backs off again without overla
   }
 });
 
+promisedTest('issue #2350: online during a failed attempt retries once', async () => {
+  const clock = captureRetryTimers();
+  let attempts = 0;
+  let failAttempt: (error: Error) => void = () => {};
+  const { worker, localSyncEvent } = makeWorker(() => {
+    ++attempts;
+    return new Promise<void>((_resolve, reject) => { failAttempt = reject; });
+  });
+  try {
+    localSyncEvent.next({ purpose: 'push' });
+    await flush();
+    localSyncEvent.next({ purpose: 'push', immediate: true });
+    localSyncEvent.next({ purpose: 'push', immediate: true });
+    equal(attempts, 1, 'no overlapping request while old attempt is in flight');
+    failAttempt(new Error('network changed'));
+    await flush();
+    equal(attempts, 2, 'one prompt attempt after the failed in-flight request');
+    failAttempt(new Error('still offline'));
+    await flush();
+    equal(attempts, 2, 'wake was consumed: no endless immediate retries');
+    equal([...clock.timers.values()][0].delay, 20000, 'failure resumes backoff');
+  } finally {
+    worker.stop();
+    clock.restore();
+  }
+});
+
 promisedTest('issue #2350: stopped worker cannot retry after reopening', async () => {
   const clock = captureRetryTimers();
   let attempts = 0;
@@ -128,6 +155,26 @@ promisedTest('issue #2350: stopped worker cannot retry after reopening', async (
   }
 });
 
+promisedTest('issue #2350: stop after timer fires blocks zero-delay launch', async () => {
+  const clock = captureRetryTimers();
+  let attempts = 0;
+  const { worker, localSyncEvent } = makeWorker(() => {
+    ++attempts;
+    return Promise.reject(new Error('offline'));
+  });
+  try {
+    localSyncEvent.next({ purpose: 'push' });
+    await flush();
+    clock.advance(); // Retry callback has fired, but the zero-delay launch has not.
+    worker.stop();
+    await flush();
+    equal(attempts, 1, 'stopped worker did not launch another request');
+  } finally {
+    worker.stop();
+    clock.restore();
+  }
+});
+
 promisedTest('issue #2350: cancelled sync does not persist stale error', async () => {
   let persisted = false;
   let emitted = false;
@@ -139,4 +186,32 @@ promisedTest('issue #2350: cancelled sync does not persist stale error', async (
     await sync(db, {} as any, {} as any, { cancelToken: { cancelled: true } });
   } catch (_error) { /* Expected invalid configuration or cancellation. */ }
   ok(!persisted && !emitted, 'stopped worker cannot overwrite status');
+});
+
+promisedTest('issue #2350: close during error write aborts stale status', async () => {
+  const cancelToken = { cancelled: false };
+  let releaseWrite: () => void = () => {};
+  let writeStarted = false;
+  let emitted = false;
+  let aborted = false;
+  const db = {
+    $syncState: {
+      update: () => {
+        writeStarted = true;
+        return new Promise<void>((resolve) => { releaseWrite = resolve; });
+      },
+    },
+    transaction: async (_mode: string, _table: unknown, work: () => Promise<void>) => {
+      try { await work(); } catch (error) { aborted = true; throw error; }
+    },
+    syncStateChangedEvent: { next: () => { emitted = true; } },
+  } as any;
+  const attempt = sync(db, {} as any, {} as any, { cancelToken }).catch(() => {});
+  await flush();
+  ok(writeStarted, 'old worker reached the persisted error write');
+  cancelToken.cancelled = true;
+  releaseWrite();
+  await attempt;
+  ok(aborted, 'cancelled error write aborts its transaction');
+  ok(!emitted, 'old worker cannot publish error after reopen');
 });

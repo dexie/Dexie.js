@@ -17,6 +17,7 @@ export function LocalSyncWorker(
   let retryTimer: ReturnType<typeof setTimeout> | undefined;
   let startTimer: ReturnType<typeof setTimeout> | undefined;
   let syncStartTime = 0;
+  let wakeAfterCurrentAttempt = false;
 
   function syncAndRetry(retryNum = 1) {
     // Use setTimeout() to get onto a clean stack and
@@ -34,6 +35,7 @@ export function LocalSyncWorker(
         purpose,
       })
         .then(() => {
+          wakeAfterCurrentAttempt = false;
           if (cancelToken.cancelled) {
             stop();
           } else {
@@ -54,6 +56,12 @@ export function LocalSyncWorker(
             ongoingSync = false;
             nextRetryTime = 0;
             syncStartTime = 0;
+          } else if (wakeAfterCurrentAttempt) {
+            // Connectivity returned during the failed attempt. Try once now;
+            // another failure gets the normal backoff (not another free retry).
+            wakeAfterCurrentAttempt = false;
+            syncStartTime = 0;
+            syncAndRetry();
           } else if (retryNum < 5) {
             // Mimic service worker sync event but a bit more eager: retry 4 times
             // * first retry after 20 seconds
@@ -93,6 +101,8 @@ export function LocalSyncWorker(
         retryTimer = undefined;
         nextRetryTime = 0;
         syncAndRetry(); // Wake the paused worker without starting a concurrent sync.
+      } else if (immediate && syncStartTime) {
+        wakeAfterCurrentAttempt = true;
       } else if (nextRetryTime) {
         console.debug(
           `Sync is paused until ${new Date(nextRetryTime).toISOString()} due to error in last sync attempt`
@@ -125,6 +135,7 @@ export function LocalSyncWorker(
     cancelToken.cancelled = true;
     if (startTimer) clearTimeout(startTimer);
     if (retryTimer) clearTimeout(retryTimer);
+    wakeAfterCurrentAttempt = false;
     startTimer = undefined;
     retryTimer = undefined;
     if (localSyncEventSubscription) localSyncEventSubscription.unsubscribe();

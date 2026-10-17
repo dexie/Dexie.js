@@ -93,10 +93,16 @@ export function sync(
       }
       // Make sure that no matter whether sync() explodes or not,
       // always update the timestamp. Also store the error.
-      await db.$syncState.update('syncState', {
-        timestamp: new Date(),
-        error: '' + error,
+      await db.transaction('rw', db.$syncState, async () => {
+        throwIfCancelled(syncOptions?.cancelToken);
+        await db.$syncState.update('syncState', {
+          timestamp: new Date(),
+          error: '' + error,
+        });
+        // Abort the transaction if the worker was stopped during the write.
+        throwIfCancelled(syncOptions?.cancelToken);
       });
+      throwIfCancelled(syncOptions?.cancelToken);
       db.syncStateChangedEvent.next({
         phase: isOnline ? 'error' : 'offline',
         error: new Error('' + error?.message || error),
