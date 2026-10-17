@@ -37,7 +37,7 @@ function captureRetryTimers() {
   };
 }
 
-function makeWorker(attempt: () => Promise<void>) {
+function makeWorker(attempt: (...args: any[]) => Promise<void>) {
   const localSyncEvent = new Subject<{ purpose: 'push' | 'pull'; immediate?: boolean }>();
   const db = { localSyncEvent } as any;
   const worker = LocalSyncWorker(db, {} as any, {} as any, attempt as any);
@@ -68,6 +68,25 @@ promisedTest('issue #2350: online wakes paused retry; normal mutations retain ba
     await flush();
     equal(attempts, 2, 'online signal causes an immediate new attempt');
     equal(clock.timers.size, 0, 'old retry timer was removed');
+  } finally {
+    worker.stop();
+    clock.restore();
+  }
+});
+
+promisedTest('issue #2350: failed pull is not silently downgraded to push on reconnect', async () => {
+  const clock = captureRetryTimers();
+  const purposes: string[] = [];
+  const { worker, localSyncEvent } = makeWorker((_db, _options, _schema, options) => {
+    purposes.push(options.purpose);
+    return purposes.length === 1 ? Promise.reject(new Error('offline')) : Promise.resolve();
+  });
+  try {
+    localSyncEvent.next({ purpose: 'pull' });
+    await flush();
+    localSyncEvent.next({ purpose: 'push', immediate: true });
+    await flush();
+    equal(purposes.join(','), 'pull,pull', 'recovery preserves original pull intent');
   } finally {
     worker.stop();
     clock.restore();

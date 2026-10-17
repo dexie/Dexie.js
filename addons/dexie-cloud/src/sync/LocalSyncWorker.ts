@@ -51,6 +51,9 @@ export function LocalSyncWorker(
         })
         .catch((error: unknown) => {
           console.error('error in syncIfPossible()', error);
+          // A failed pull still needs a pull after connectivity returns, even
+          // when there are no local changes for a push-only attempt.
+          if (!cancelToken.cancelled && purpose === 'pull') pullSignalled = true;
           if (cancelToken.cancelled) {
             stop();
             ongoingSync = false;
