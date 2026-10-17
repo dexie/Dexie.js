@@ -53,7 +53,7 @@ export interface DexieCloudDBBase {
   readonly members: Table<DBRealmMember, string>;
   readonly roles: Table<DBRealmRole, [string, string]>;
 
-  readonly localSyncEvent: Subject<{ purpose?: 'pull' | 'push' }>;
+  readonly localSyncEvent: Subject<{ purpose?: 'pull' | 'push'; immediate?: boolean }>;
   readonly syncStateChangedEvent: BroadcastedAndLocalEvent<SyncStateChangedEventData>;
   readonly syncCompleteEvent: BroadcastedAndLocalEvent<void>;
   readonly dx: Dexie;
@@ -89,7 +89,7 @@ export function DexieCloudDB(dx: Dexie): DexieCloudDB {
   if ('vip' in dx) dx = dx['vip']; // Avoid race condition. Always map to a vipped dexie that don't block during db.on.ready().
   let db = wm.get(dx);
   if (!db) {
-    const localSyncEvent = new Subject<{ purpose: 'push' | 'pull' }>();
+    const localSyncEvent = new Subject<{ purpose: 'push' | 'pull'; immediate?: boolean }>();
     let syncStateChangedEvent =
       new BroadcastedAndLocalEvent<SyncStateChangedEventData>(
         `syncstatechanged-${dx.name}`
