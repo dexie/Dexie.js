@@ -61,6 +61,7 @@ import { InvalidLicenseError } from './InvalidLicenseError';
 import { logout, _logout } from './authentication/logout';
 import { loadAccessToken } from './authentication/authenticate';
 import { isEagerSyncDisabled } from './isEagerSyncDisabled';
+import { documentBecomesVisible } from './userIsActive';
 import { createYHandler } from './yjs/createYHandler';
 import { DexieYProvider } from 'y-dexie';
 import {
@@ -135,7 +136,7 @@ export function dexieCloud(dexie: Dexie) {
     if (closed) throw new Dexie.DatabaseClosedError();
   }
 
-  dexie.once('close', () => {
+  dexie.on('close', () => {
     subscriptions.forEach((subscription) => subscription.unsubscribe());
     subscriptions.splice(0, subscriptions.length);
     closed = true;
@@ -668,7 +669,12 @@ export function dexieCloud(dexie: Dexie) {
             phase: 'not-in-sync',
           });
           if (!isEagerSyncDisabled(db)) {
-            triggerSync(db, 'push');
+            triggerSync(db, 'push', true);
+          }
+        }),
+        documentBecomesVisible.subscribe(() => {
+          if (!db.cloud.usingServiceWorker && !isEagerSyncDisabled(db)) {
+            triggerSync(db, 'push', true);
           }
         }),
         fromEvent(self, 'offline').subscribe(() => {

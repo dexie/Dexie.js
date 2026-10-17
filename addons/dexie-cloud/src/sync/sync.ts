@@ -56,6 +56,7 @@ export function sync(
 ): Promise<boolean> {
   return _sync(db, options, schema, syncOptions)
     .then((result) => {
+      throwIfCancelled(syncOptions?.cancelToken);
       if (!syncOptions?.justCheckIfNeeded) {
         // && syncOptions?.purpose !== 'push') {
         db.syncStateChangedEvent.next({
@@ -65,7 +66,9 @@ export function sync(
       return result;
     })
     .catch(async (error: any) => {
-      if (syncOptions?.justCheckIfNeeded) return Promise.reject(error); // Just rethrow.
+      if (syncOptions?.justCheckIfNeeded || syncOptions?.cancelToken?.cancelled) {
+        return Promise.reject(error); // Stopped workers must not overwrite a newer sync status.
+      }
       console.debug('Error from _sync', {
         isOnline,
         syncOptions,
