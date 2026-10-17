@@ -79,7 +79,12 @@ export const observabilityMiddleware: Middleware<DBCore> = {
                   ? [req.keys] // keys known already here. newObjs will be undefined.
                   : req.values.length < 50
                     ? [
-                        getEffectiveKeys(primaryKey, req).filter((id) => id),
+                        // Filter out null/undefined keys only - they are the
+                        // autoIncremented ones. Falsy keys such as 0 and '' are
+                        // valid IndexedDB keys and must be kept (issue #2021).
+                        getEffectiveKeys(primaryKey, req).filter(
+                          (id) => id != null
+                        ),
                         req.values,
                       ] // keys except autoIncremented - they will be added later on.
                     : []; // keys and newObjs will both be undefined - changeSpec will become true (changed for entire table)
