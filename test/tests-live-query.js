@@ -920,3 +920,40 @@ promisedTest("Issue 2309: useLiveQuery stops updating when mutating returned obj
   }
 });
 
+promisedTest("Issue 2352: an aborted run that rejects late should not reach observer.error", async () => {
+  const db2352 = new Dexie('TestLiveQueryIssue2352');
+  db2352.version(1).stores({ items: '++id' });
+  await db2352.open();
+  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+  let hold = null;
+  let failHeldRun;
+  const values = [];
+  const errors = [];
+  const subscription = liveQuery(async () => {
+    const gate = hold;
+    hold = null;
+    const count = await db2352.items.count();
+    if (gate) await gate;
+    return count;
+  }).subscribe({
+    next: (value) => values.push(value),
+    error: (err) => errors.push(err),
+  });
+
+  await sleep(50);
+  hold = new Promise((_, reject) => { failHeldRun = reject; });
+  hold.catch(() => {});
+  await db2352.items.add({});
+  await sleep(50);
+  await db2352.items.add({});
+  await sleep(50);
+  failHeldRun(new Error('late failure of aborted run'));
+  await sleep(50);
+
+  deepEqual(values, [0, 2], 'Got values from the initial and the latest run');
+  equal(errors.length, 0, 'The aborted run did not report an error');
+
+  subscription.unsubscribe();
+  await db2352.delete();
+});

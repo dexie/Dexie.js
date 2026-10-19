@@ -168,6 +168,10 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
           }
         },
         (err) => {
+          if (closed || ctx.signal.aborted) {
+            // An aborted run has been replaced by a newer one, so its error is stale.
+            return;
+          }
           hasValue = false;
           if (!['DatabaseClosedError', 'AbortError'].includes(err?.name)) {
             if (!closed)
