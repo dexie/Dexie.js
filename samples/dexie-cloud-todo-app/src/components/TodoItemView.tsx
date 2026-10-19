@@ -47,7 +47,7 @@ export function TodoItemView({ item }: Props) {
 
   useEffect(() => {
     // On hover, show trash icon only if user can delete. After 2 seconds of hover, start fading out.
-    let timer: NodeJS.Timeout;
+    let timer: ReturnType<typeof setTimeout> | undefined;
     
     if (isHovering && can.delete()) {
       setShowTrash(true);
@@ -60,7 +60,7 @@ export function TodoItemView({ item }: Props) {
     }
     
     return () => {
-      if (timer) clearTimeout(timer);
+      if (timer !== undefined) clearTimeout(timer);
     };
   }, [isHovering, can]);
 
