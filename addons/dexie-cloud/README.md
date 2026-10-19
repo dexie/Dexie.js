@@ -9,17 +9,70 @@ npm install dexie-cloud-addon@latest
 
 ```ts
 import { Dexie } from 'dexie';
-import dexieCloud from 'dexie-cloud-addon';
+import dexieCloud, { type DexieCloudTable } from 'dexie-cloud-addon';
+import { v7 as uuidv7 } from 'uuid'; // for creating performant, unique uuids
 
-const db = new Dexie('dbname', { addons: [dexieCloud]});
+// YJS documents (optional)
+import yDexie from 'y-dexie';
+import type * as Y from 'yjs';
+
+const db = new Dexie('dbname', { addons: [dexieCloud] }) as Dexie & {
+  yourTable: DexieCloudTable<YourItem, 'id'>
+}
+
+interface YourItem {
+  id: string
+  foo: number
+  bar: boolean
+  myBlob: Blob
+  myYDoc: Y.Doc
+  ...
+}
 
 db.version(1).stores({
-    yourTable: '@primKeyProp, indexedProp1, indexedProp2, ...'
+  yourTable: `
+    id,
+    foo,
+    myYDoc:Y.Doc
+  `,
 });
 
 db.cloud.configure({
-  databaseUrl: 'https://<yourdb>.dexie.cloud'
-})
+  databaseUrl: 'https://<yourdb>.dexie.cloud',
+});
+
+// Add new rows:
+await db.yourTable.add({
+  id: uuidv7(),
+  foo: 1,
+  bar: true,
+  myBlob: new Blob(["hello world"]),
+  myYDoc: new Y.Doc()
+});
+
+// Query: See https://dexie.org/docs/API-Reference#query-items
+
+// Update individual fields:
+await db.yourTable.update(existingId, { foo: 2 });
+
+// Update or add new if missing:
+await db.yourTable.upsert(existingId, { foo: 2, bar: true, myBlob: new Blob()})
+
+// Sync-consistent where...delete():
+await db.yourTable.where({foo: 2}).delete();
+
+// Sync-consistent where...modify():
+await db.yourTable.where({foo: 3}).modify({bar: false});
+
+// Sync-consistent addition and subtraction:
+import { add, remove } from 'dexie';
+// increment foo in sync-consistent manner
+await db.yourTable.update(existingId, { foo: add(1) })
+// dedrement foo in sync-consistent manner
+await db.yourTable.update(existingId, { foo: remove(1) })
+
+// See also: https://dexie.org/docs/cloud/consistency
+
 ```
 
 ## See also
@@ -36,7 +89,7 @@ npx dexie-cloud create
 
 See also https://dexie.org/cloud/#getting-started
 
-*Having problems getting started, please [file an issue](https://github.com/dexie/Dexie.js/issues/new)*
+_Having problems getting started, please [file an issue](https://github.com/dexie/Dexie.js/issues/new)_
 
 # The Cloud Service
 

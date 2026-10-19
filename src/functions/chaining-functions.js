@@ -61,8 +61,9 @@ export function hookDeletingChain(f1, f2) {
 
 export function hookUpdatingChain(f1, f2) {
   if (f1 === nop) return f2;
-  return function (modifications) {
+  return function () {
     var res = f1.apply(this, arguments);
+    var modifications = arguments[0];
     extend(modifications, res); // If f1 returns new modifications, extend caller's modifications with the result before calling next in chain.
     var onsuccess = this.onsuccess, // In case event listener has set this.onsuccess
       onerror = this.onerror; // In case event listener has set this.onerror

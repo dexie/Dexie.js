@@ -1,5 +1,8 @@
 /// <reference lib="webworker" />
 
+// Vite replaces process.env.BUILD_DATE using the define option in vite.config.ts.
+declare const process: { env: { BUILD_DATE: string } };
+
 /* Minimal Service Worker for caching and background sync with Dexie Cloud
  * 
  * This service worker does two main things:

@@ -61,6 +61,7 @@ import { InvalidLicenseError } from './InvalidLicenseError';
 import { logout, _logout } from './authentication/logout';
 import { loadAccessToken } from './authentication/authenticate';
 import { isEagerSyncDisabled } from './isEagerSyncDisabled';
+import { documentBecomesVisible } from './userIsActive';
 import { createYHandler } from './yjs/createYHandler';
 import { DexieYProvider } from 'y-dexie';
 import {
@@ -70,6 +71,7 @@ import {
 import { OAuthError } from './errors/OAuthError';
 import { alertUser } from './authentication/interactWithUser';
 import { fetchAuthProviders } from './authentication/fetchAuthProviders';
+import { mergePersistedSchema } from './mergePersistedSchema';
 export { DexieCloudTable } from './DexieCloudTable';
 export * from './getTiedRealmId';
 export {
@@ -134,7 +136,7 @@ export function dexieCloud(dexie: Dexie) {
     if (closed) throw new Dexie.DatabaseClosedError();
   }
 
-  dexie.once('close', () => {
+  dexie.on('close', () => {
     subscriptions.forEach((subscription) => subscription.unsubscribe());
     subscriptions.splice(0, subscriptions.length);
     closed = true;
@@ -467,17 +469,10 @@ export function dexieCloud(dexie: Dexie) {
           JSON.stringify(persistedSchema) !== JSON.stringify(schema)
         ) {
           // Update persisted schema (but don't overwrite table prefixes)
-          const newPersistedSchema = persistedSchema || {};
-          for (const [table, tblSchema] of Object.entries(schema)) {
-            const newTblSchema = newPersistedSchema[table];
-            if (!newTblSchema) {
-              newPersistedSchema[table] = { ...tblSchema };
-            } else {
-              newTblSchema.markedForSync = tblSchema.markedForSync;
-              tblSchema.deleted = newTblSchema.deleted;
-              newTblSchema.generatedGlobalId = tblSchema.generatedGlobalId;
-            }
-          }
+          const newPersistedSchema = mergePersistedSchema(
+            schema,
+            persistedSchema
+          );
           await db.$syncState.put(newPersistedSchema, 'schema');
 
           // Make sure persisted table prefixes are being used instead of computed ones:
@@ -674,7 +669,12 @@ export function dexieCloud(dexie: Dexie) {
             phase: 'not-in-sync',
           });
           if (!isEagerSyncDisabled(db)) {
-            triggerSync(db, 'push');
+            triggerSync(db, 'push', true);
+          }
+        }),
+        documentBecomesVisible.subscribe(() => {
+          if (!db.cloud.usingServiceWorker && !isEagerSyncDisabled(db)) {
+            triggerSync(db, 'push', true);
           }
         }),
         fromEvent(self, 'offline').subscribe(() => {

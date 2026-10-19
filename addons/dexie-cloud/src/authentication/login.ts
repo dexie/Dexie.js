@@ -27,11 +27,27 @@ export async function login(db: DexieCloudDB, hints?: LoginHints) {
       (!currentUser.refreshTokenExpiration ||
         currentUser.refreshTokenExpiration.getTime() > Date.now())
     ) {
-      // Refresh the token
-      await loadAccessToken(db);
-      return false;
+      // Refresh the token. This can fail not just from network errors but
+      // also because the server has permanently invalidated the refresh
+      // token itself (e.g. the issuing API client was revoked or rotated --
+      // see client_id claim checked on the 'refresh_token' grant). A locally
+      // unexpired refreshTokenExpiration does NOT guarantee the server still
+      // honors the token. In that case, don't throw: fall through to the
+      // same re-authentication path used below for "no refresh token",
+      // which re-runs fetchTokens exactly as on first login. Callers with
+      // their own fetchTokens (e.g. impersonation-based custom auth) can
+      // either silently re-mint tokens under the hood if their own session
+      // is still valid, or trigger their own challenge/login flow if not --
+      // same as a first-time login would.
+      try {
+        await loadAccessToken(db);
+        return false;
+      } catch (err) {
+        if (err?.name === 'OAuthRedirectError') throw err; // Page is navigating away
+        // Fall through to re-authenticate below.
+      }
     }
-    // No refresh token - must re-authenticate:
+    // No refresh token (or refresh failed) - must re-authenticate:
   }
   const context = new AuthPersistedContext(db, {
     claims: {},

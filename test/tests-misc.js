@@ -535,3 +535,56 @@ promisedTest("Issue #1890 - BigInt64Array getting corrupted after an update", as
     val = await db.foo.get(1);
     ok(val.cols[0].values instanceof BigInt64Array, "cols[0].values is still a BigInt64Array after update");
 });
+
+promisedTest("Issue #1920 - table with an index or primary key named 'constructor' should not crash db.open()", async () => {
+    const dbName = "TestIssue1920";
+    await Dexie.delete(dbName);
+    const idb = new Dexie(dbName);
+    idb.version(1).stores({
+        items: "id, constructor"
+    });
+    try {
+        await idb.open();
+        ok(true, "db.open() succeeded with a 'constructor'-named index");
+
+        await idb.items.add({ id: 1, constructor: "foo" });
+        const result = await idb.items.where("constructor").equals("foo").first();
+        ok(result && result.id === 1, "Could add and query a row using the 'constructor' index");
+    } catch (error) {
+        ok(false, "db.open() (or subsequent use of the 'constructor' index) should not throw, but threw: " + error);
+    } finally {
+        idb.close();
+        await Dexie.delete(dbName);
+    }
+});
+
+promisedTest("Issue #2087 - bulkUpdate before database is open", async () => {
+    const dbName = "TestIssue2087";
+    await Dexie.delete(dbName);
+
+    const setupDb = new Dexie(dbName);
+    setupDb.version(1).stores({ items: "id" });
+    await setupDb.items.bulkAdd([
+        { id: "qr-0001", time: "2024-01-01" },
+        { id: "qr-0002", time: "2024-01-01" }
+    ]);
+    setupDb.close();
+
+    const testdb = new Dexie(dbName);
+    testdb.version(1).stores({ items: "id" });
+    try {
+        await testdb.items.bulkUpdate([
+            { key: "qr-0001", changes: { time: "2024-10-23" } },
+            { key: "qr-0002", changes: { time: "2024-10-23" } },
+            { key: "qr-0003", changes: { time: "2024-10-23" } }
+        ]);
+        const items = await testdb.items.toArray();
+        deepEqual(items, [
+            { id: "qr-0001", time: "2024-10-23" },
+            { id: "qr-0002", time: "2024-10-23" }
+        ], "bulkUpdate auto-opened the db and applied changes to existing keys");
+    } finally {
+        testdb.close();
+        await Dexie.delete(dbName);
+    }
+});

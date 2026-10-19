@@ -34,6 +34,7 @@ import {
 } from './blobOffloading';
 import { updateYSyncStates } from '../yjs/updateYSyncStates';
 import { downloadYDocsFromServer } from '../yjs/downloadYDocsFromServer';
+import { applyServerSchema } from '../mergePersistedSchema';
 import { UpdateSpec } from 'dexie';
 import { loadCachedAccessToken } from './loadCachedAccessToken';
 
@@ -55,6 +56,7 @@ export function sync(
 ): Promise<boolean> {
   return _sync(db, options, schema, syncOptions)
     .then((result) => {
+      throwIfCancelled(syncOptions?.cancelToken);
       if (!syncOptions?.justCheckIfNeeded) {
         // && syncOptions?.purpose !== 'push') {
         db.syncStateChangedEvent.next({
@@ -64,7 +66,9 @@ export function sync(
       return result;
     })
     .catch(async (error: any) => {
-      if (syncOptions?.justCheckIfNeeded) return Promise.reject(error); // Just rethrow.
+      if (syncOptions?.justCheckIfNeeded || syncOptions?.cancelToken?.cancelled) {
+        return Promise.reject(error); // Stopped workers must not overwrite a newer sync status.
+      }
       console.debug('Error from _sync', {
         isOnline,
         syncOptions,
@@ -89,10 +93,16 @@ export function sync(
       }
       // Make sure that no matter whether sync() explodes or not,
       // always update the timestamp. Also store the error.
-      await db.$syncState.update('syncState', {
-        timestamp: new Date(),
-        error: '' + error,
+      await db.transaction('rw', db.$syncState, async () => {
+        throwIfCancelled(syncOptions?.cancelToken);
+        await db.$syncState.update('syncState', {
+          timestamp: new Date(),
+          error: '' + error,
+        });
+        // Abort the transaction if the worker was stopped during the write.
+        throwIfCancelled(syncOptions?.cancelToken);
       });
+      throwIfCancelled(syncOptions?.cancelToken);
       db.syncStateChangedEvent.next({
         phase: isOnline ? 'error' : 'offline',
         error: new Error('' + error?.message || error),
@@ -263,12 +273,7 @@ async function _sync(
 
       // Update db.cloud.schema from server response.
       // Local schema MAY include a subset of tables, so do not force all tables into local schema.
-      for (const tableName of Object.keys(schema)) {
-        if (res.schema[tableName]) {
-          // Write directly into configured schema. This code can only be executed alone.
-          schema[tableName] = res.schema[tableName];
-        }
-      }
+      applyServerSchema(schema, res.schema);
       await db.$syncState.put(schema, 'schema');
 
       // List mutations that happened during our exchange with the server:

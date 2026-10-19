@@ -6,10 +6,10 @@ on:
     branches:
       - master # Add also master-4 when dexie@4 is stable and master will represent dexie@5. dexie@3 has its own workflow.
   pull_request:
-      types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened]
 env:
-  LAMBDATEST: "true"
-  GH_ACTIONS: "true"
+  LAMBDATEST: 'true'
+  GH_ACTIONS: 'true'
   LT_USERNAME: ${{ secrets.LT_USERNAME }}
   LT_ACCESS_KEY: ${{ secrets.LT_ACCESS_KEY }}
 
@@ -29,16 +29,19 @@ jobs:
       max-parallel: 6 # At least for browserstack, this seems to be needed to avoid timeouts
     steps:
       - name: Checkout code
-        uses: actions/checkout@v3
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Set up pnpm
-        uses: pnpm/action-setup@v2
+        uses: pnpm/action-setup@0977fd99725f1db4007ccb2928dbb4e90d06cc86 # v6.0.10
         with:
           version: 9
       - name: Set up Node.js
-        uses: actions/setup-node@v3
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with:
           node-version: 18
-          cache: "pnpm"
+          cache: 'pnpm'
+      - name: Test publishing workflow
+        if: matrix.TF == 'test'
+        run: node --test .github/tests/publish-workflow.test.cjs
       - name: Install dependencies
         run: pnpm install --no-frozen-lockfile
       - name: Build
@@ -46,7 +49,7 @@ jobs:
       - name: Set LT_TUNNEL_NAME
         run: echo "LT_TUNNEL_NAME=${{ matrix.TF }}-${{ github.run_id }}-${{ github.run_attempt }}" >> $GITHUB_ENV
       - name: Run headless test
-        uses: coactions/setup-xvfb@v1
+        uses: coactions/setup-xvfb@b6b4fcfb9f5a895edadc3bc76318fae0ac17c8b3 # v1.0.1
         with:
           run: bash -e ./gh-actions.sh
           working-directory: ${{ matrix.TF }}
