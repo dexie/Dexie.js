@@ -248,6 +248,36 @@ asyncTest("anyOf(emptyArray)", function () {
     }).finally(start);
 });
 
+asyncTest("Issue#1607 anyOf(emptyArray) combined with or()", function () {
+    // An empty anyOf() as the last clause of an or()-chain must not empty the
+    // whole union - it should just contribute nothing of its own.
+    db.transaction("r", db.files, function () {
+        db.files
+            .where('filename').anyOf(['hello', 'world'])
+            .or('extension').anyOf([])
+            .toArray(function (a) {
+                equal(a.length, 2, "or()-branch results are kept when the other branch is anyOf([])");
+                var names = a.map(function (f) { return f.filename; }).sort();
+                equal(names.join(','), 'hello,world', "Got the two matching files");
+            });
+
+        // count() must reflect the same union, not 0.
+        db.files
+            .where('filename').anyOf(['hello', 'world'])
+            .or('extension').anyOf([])
+            .count(function (n) {
+                equal(n, 2, "count() of the union is unaffected by the empty branch");
+            });
+
+        // A standalone empty anyOf() must still resolve to nothing.
+        db.files.where('extension').anyOf([]).count(function (n) {
+            equal(n, 0, "Standalone anyOf([]) is still empty");
+        });
+    }).catch(function (e) {
+        ok(false, "Error: " + (e.stack || e));
+    }).finally(start);
+});
+
 asyncTest("equalsIgnoreCase()", function () {
 
     db.files.where("filename").equalsIgnoreCase("hello").toArray(function (a) {
