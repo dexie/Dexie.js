@@ -1,6 +1,10 @@
 {
   "name": "dexie-cloud-common",
   "version": "1.0.60",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/dexie/Dexie.js.git"
+  },
   "description": "Library for shared code between dexie-cloud-addon, dexie-cloud (CLI) and dexie-cloud-server",
   "type": "module",
   "module": "dist/index.js",
