@@ -555,3 +555,50 @@ promisedTest("#1842 - Should set the unique flag for primKey to true", async () 
     const databases = await Dexie.getDatabaseNames();
     ok(!databases.includes("PrimKey1842"), "'PrimKey1842' should NOT be in the list of database names");
 })
+
+async function withSafariLikeBrowserWithoutGlobalIndexedDB(fn) {
+    const overrides = [
+        [navigator, 'userAgent', 'Mozilla/5.0 (iPhone; CPU iPhone OS 18_7 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) CriOS/141.0.0.0 Mobile/15E148 Safari/604.1'],
+        [navigator, 'userAgentData', undefined],
+        [globalThis, 'indexedDB', undefined],
+    ];
+    const restores = overrides.map(([target, prop, value]) => {
+        const ownDescriptor = Object.getOwnPropertyDescriptor(target, prop);
+        Object.defineProperty(target, prop, { value, configurable: true, writable: true });
+        return () => ownDescriptor ? Object.defineProperty(target, prop, ownDescriptor) : delete target[prop];
+    });
+    try {
+        await fn();
+    } finally {
+        restores.reverse().forEach(restore => restore());
+    }
+}
+
+promisedTest("#1798 - Should reject with MissingAPIError when a Safari-like browser has no global indexedDB", async () => {
+    const db = new Dexie("TestDB", { indexedDB: undefined, IDBKeyRange: undefined });
+    db.version(1).stores({ foo: "++id" });
+    await withSafariLikeBrowserWithoutGlobalIndexedDB(async () => {
+        try {
+            await db.open();
+            ok(false, "Should not open without an indexedDB API");
+        } catch (e) {
+            ok(e instanceof Dexie.MissingAPIError, "Should get MissingAPIError. Got: " + e);
+        }
+    });
+});
+
+promisedTest("Should open the indexedDB option when a Safari-like browser has no global indexedDB", async () => {
+    const { indexedDB, IDBKeyRange } = Dexie.dependencies;
+    const db = new Dexie("TestDB", { indexedDB, IDBKeyRange });
+    db.version(1).stores({ foo: "++id" });
+    await withSafariLikeBrowserWithoutGlobalIndexedDB(async () => {
+        try {
+            await db.open();
+            ok(true, "Could open db");
+        } catch (e) {
+            ok(false, "Could not open db: " + e);
+        } finally {
+            db.close();
+        }
+    });
+});
