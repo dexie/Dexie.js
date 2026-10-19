@@ -924,34 +924,42 @@ promisedTest("Issue 2352: an aborted run that rejects late should not reach obse
   const db2352 = new Dexie('TestLiveQueryIssue2352');
   db2352.version(1).stores({ items: '++id' });
   await db2352.open();
-  const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
   let hold = null;
   let failHeldRun;
+  let gateReached = new Signal();
+  let valueSignal = new Signal();
   const values = [];
   const errors = [];
   const subscription = liveQuery(async () => {
     const gate = hold;
     hold = null;
     const count = await db2352.items.count();
-    if (gate) await gate;
+    if (gate) {
+      gateReached.resolve();
+      await gate;
+    }
     return count;
   }).subscribe({
-    next: (value) => values.push(value),
+    next: (value) => {
+      values.push(value);
+      valueSignal.resolve(value);
+    },
     error: (err) => errors.push(err),
   });
 
-  await sleep(50);
+  equal(await valueSignal.promise, 0, 'Initial run emitted 0');
+  valueSignal = new Signal();
   hold = new Promise((_, reject) => { failHeldRun = reject; });
   hold.catch(() => {});
   await db2352.items.add({});
-  await sleep(50);
+  await gateReached.promise;
   await db2352.items.add({});
-  await sleep(50);
+  equal(await valueSignal.promise, 2, 'Replacing run emitted 2');
   failHeldRun(new Error('late failure of aborted run'));
-  await sleep(50);
+  await new Promise((resolve) => setTimeout(resolve, 50));
 
-  deepEqual(values, [0, 2], 'Got values from the initial and the latest run');
+  deepEqual(values, [0, 2], 'Got values from the initial and the replacing run');
   equal(errors.length, 0, 'The aborted run did not report an error');
 
   subscription.unsubscribe();
