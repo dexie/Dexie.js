@@ -8,7 +8,7 @@ import { checkSyncRateLimitDelay } from './ratelimit';
 
 const ongoingSyncs = new WeakMap<
   DexieCloudDB,
-  { promise: Promise<void>; pull: boolean }
+  { promise: Promise<void>; pull: boolean; cancelToken?: SyncOptions['cancelToken'] }
 >();
 
 export function syncIfPossible(
@@ -19,6 +19,13 @@ export function syncIfPossible(
 ) {
   const ongoing = ongoingSyncs.get(db);
   if (ongoing) {
+    if (ongoing.cancelToken?.cancelled && !options?.cancelToken?.cancelled) {
+      // Reopening may race with a stopped worker's in-flight sync. Wait for
+      // its guarded job to settle, then retry instead of adopting its error.
+      return ongoing.promise.catch(() => {}).then(() =>
+        syncIfPossible(db, cloudOptions, cloudSchema, options)
+      );
+    }
     if (ongoing.pull || options?.purpose === 'push') {
       console.debug('syncIfPossible(): returning the ongoing sync promise.');
       return ongoing.promise;
@@ -64,7 +71,11 @@ export function syncIfPossible(
   }
 
   const promise = _syncIfPossible();
-  ongoingSyncs.set(db, { promise, pull: options?.purpose !== 'push' });
+  ongoingSyncs.set(db, {
+    promise,
+    pull: options?.purpose !== 'push',
+    cancelToken: options?.cancelToken,
+  });
   return promise;
 
   async function _syncIfPossible() {

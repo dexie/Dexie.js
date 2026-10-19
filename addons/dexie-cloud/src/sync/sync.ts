@@ -56,6 +56,7 @@ export function sync(
 ): Promise<boolean> {
   return _sync(db, options, schema, syncOptions)
     .then((result) => {
+      throwIfCancelled(syncOptions?.cancelToken);
       if (!syncOptions?.justCheckIfNeeded) {
         // && syncOptions?.purpose !== 'push') {
         db.syncStateChangedEvent.next({
@@ -65,7 +66,9 @@ export function sync(
       return result;
     })
     .catch(async (error: any) => {
-      if (syncOptions?.justCheckIfNeeded) return Promise.reject(error); // Just rethrow.
+      if (syncOptions?.justCheckIfNeeded || syncOptions?.cancelToken?.cancelled) {
+        return Promise.reject(error); // Stopped workers must not overwrite a newer sync status.
+      }
       console.debug('Error from _sync', {
         isOnline,
         syncOptions,
@@ -90,10 +93,16 @@ export function sync(
       }
       // Make sure that no matter whether sync() explodes or not,
       // always update the timestamp. Also store the error.
-      await db.$syncState.update('syncState', {
-        timestamp: new Date(),
-        error: '' + error,
+      await db.transaction('rw', db.$syncState, async () => {
+        throwIfCancelled(syncOptions?.cancelToken);
+        await db.$syncState.update('syncState', {
+          timestamp: new Date(),
+          error: '' + error,
+        });
+        // Abort the transaction if the worker was stopped during the write.
+        throwIfCancelled(syncOptions?.cancelToken);
       });
+      throwIfCancelled(syncOptions?.cancelToken);
       db.syncStateChangedEvent.next({
         phase: isOnline ? 'error' : 'offline',
         error: new Error('' + error?.message || error),
