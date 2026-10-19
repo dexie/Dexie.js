@@ -4,8 +4,8 @@
   "type": "module",
   "private": true,
   "dependencies": {
-    "dexie": "^4.4.4",
-    "dexie-cloud-addon": "^4.4.13",
+    "dexie": "^4.4.7",
+    "dexie-cloud-addon": "^4.4.16",
     "dexie-react-hooks": "^4.4.0",
     "lucide-react": "^0.554.0",
     "react": "^18.3.1",
