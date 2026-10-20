@@ -452,7 +452,10 @@ const mutsAndExpects = () => [
       outboundIdBtwnMinus1And2: [{num:1,name:"A"},{num:2,name:"B"}],
       outboundAnyOf_BCD_keys: ["B", "C"]
     },[
-      "itemsStartsWithACount"
+      "itemsStartsWithACount",
+      // Like count(), a query with offset() depends on deletes of rows in front of
+      // its window, which are not known when the deleted row was not read.
+      "itemsStartsWithAOffset3"
     ]
   ],
   [
@@ -1205,5 +1208,156 @@ promisedTest("liveQuery results equal fresh query results for compound, nested a
         return { when: target.when };
       }
     }
+  }
+});
+
+function countReadsMiddleware(counter) {
+  return {
+    stack: 'dbcore',
+    name: 'countReads',
+    create: (down) => ({
+      ...down,
+      table: (tableName) => {
+        const table = down.table(tableName);
+        return {
+          ...table,
+          // Count reads of queries, not the reads of writes like update().
+          openCursor: (req) => {
+            if (req.trans.mode === 'readonly') counter.reads++;
+            return table.openCursor(req);
+          },
+          query: (req) => {
+            if (req.trans.mode === 'readonly') counter.reads++;
+            return table.query(req);
+          },
+        };
+      },
+    }),
+  };
+}
+
+promisedTest("liveQuery applies writes to filter() results without reading them again", async () => {
+  const counter = { reads: 0 };
+  const db2 = new Dexie('TestLiveQueryReducedReads');
+  db2.use(countReadsMiddleware(counter));
+  db2.version(1).stores({ friends: 'id, age' });
+  await db2.friends.bulkAdd([
+    { id: 1, age: 20, active: true },
+    { id: 2, age: 30, active: false },
+    { id: 3, age: 40, active: true },
+  ]);
+  let latest;
+  const subscription = liveQuery(() =>
+    db2.friends.where('age').above(18).filter((f) => f.active).limit(2).toArray()
+  ).subscribe((value) => (latest = value));
+  const ids = () => latest && latest.map((f) => f.id);
+  await waitForLiveValue(ids, [1, 3], 'initial result');
+
+  let reads = counter.reads;
+  await db2.friends.put({ id: 4, age: 19, active: true }); // sorts in front of the window
+  await waitForLiveValue(ids, [4, 1], 'row 4 is inserted first, row 3 drops out');
+  equal(counter.reads - reads, 0, 'Inserting in front of the window did not read from the database');
+
+  reads = counter.reads;
+  await db2.friends.update(1, { name: 'One' }); // changes a field that is neither sorted nor filtered
+  await waitForLiveValue(() => latest && latest.map((f) => f.name), [undefined, 'One'], 'row 1 is replaced');
+  equal(counter.reads - reads, 0, 'Updating a row of the result did not read from the database');
+
+  reads = counter.reads;
+  await db2.friends.update(1, { active: false }); // leaves the full window, which must be refilled
+  await waitForLiveValue(ids, [4, 3], 'row 1 left, row 3 is read again');
+  equal(counter.reads - reads, 1, 'Refilling the limit window read from the database once');
+
+  subscription.unsubscribe();
+  await db2.delete();
+});
+
+promisedTest("liveQuery results equal fresh query results for filter(), offset() and sortBy()", async () => {
+  let seed = 11;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+  const randomInt = (max) => Math.floor(random() * max);
+  const randomFriend = (id) => ({
+    id,
+    age: randomInt(60),
+    score: randomInt(1000) / 10,
+    team: ['a', 'b', 'c'][randomInt(3)],
+    active: random() < 0.5,
+  });
+  for (const cacheMode of ['immutable', 'cloned']) {
+    const name = 'TestLiveQueryReducedQueries_' + cacheMode;
+    const db2 = new Dexie(name, { cache: cacheMode });
+    db2.version(1).stores({ friends: 'id, age, team', virtual: 'id, [team+score]' });
+    const otherInstance = new Dexie(name, { cache: cacheMode });
+    otherInstance.version(1).stores({ friends: 'id, age, team', virtual: 'id, [team+score]' });
+    const initial = [];
+    for (let id = 0; id < 40; id++) initial.push(randomFriend(id));
+    await db2.friends.bulkAdd(initial);
+    await db2.virtual.bulkAdd(initial);
+
+    const queries = {
+      filterLimit: () => db2.friends.where('age').between(20, 50).filter((f) => f.active).limit(5).toArray(),
+      filterAll: () => db2.friends.where('age').above(10).and((f) => f.team !== 'b').toArray(),
+      twoFilters: () => db2.friends.where('age').below(40).filter((f) => f.active).filter((f) => f.score > 30).reverse().toArray(),
+      offsetLimit: () => db2.friends.where('age').above(5).offset(3).limit(4).toArray(),
+      offsetOnly: () => db2.friends.orderBy('age').offset(30).toArray(),
+      sortBy: () => db2.friends.where('age').above(18).sortBy('score'),
+      reverseSortBy: () => db2.friends.where('team').equals('b').filter((f) => f.active).reverse().sortBy('score'),
+      first: () => db2.friends.where('age').above(25).filter((f) => f.active).first(),
+      tableFilter: () => db2.friends.filter((f) => f.active).toArray(),
+      tableSortBy: () => db2.friends.toCollection().sortBy('age'),
+      virtualIndex: () => db2.virtual.where('team').equals('a').filter((f) => f.age > 10).toArray(),
+      // Not reduced, must stay correct:
+      limitBeforeOffset: () => db2.friends.where('age').above(5).limit(6).offset(2).toArray(),
+      until: () => db2.friends.orderBy('age').until((f) => f.age > 30).toArray(),
+    };
+    const latest = {};
+    const subscriptions = Object.keys(queries).map((queryName) =>
+      liveQuery(queries[queryName]).subscribe((value) => (latest[queryName] = value))
+    );
+    let nextId = 40;
+    let failed = false;
+    for (let i = 0; i < 60 && !failed; i++) {
+      const r = random();
+      const table = random() < 0.8 ? db2.friends : db2.virtual;
+      const writer = random() < 0.2 ? otherInstance : db2;
+      const writerTable = writer.table(table.name);
+      const existingId = randomInt(nextId);
+      const kind = (writer === db2 ? '' : 'other instance ') + table.name + ' ' +
+        (r < 0.2 ? 'add' : r < 0.4 ? 'modify sort fields' : r < 0.55 ? 'update filtered fields' : r < 0.7 ? 'put' : r < 0.8 ? 'bulkPut' : r < 0.97 ? 'delete' : 'clear');
+      if (r < 0.2) {
+        await writerTable.add(randomFriend(nextId++));
+      } else if (r < 0.4) {
+        // change the sort fields only
+        await writerTable.where('id').equals(existingId).modify((f) => {
+          f.age = randomInt(60);
+          f.score = randomInt(1000) / 10;
+        });
+      } else if (r < 0.55) {
+        // change the filtered fields only
+        await writerTable.update(existingId, { active: random() < 0.5, team: ['a', 'b', 'c'][randomInt(3)] });
+      } else if (r < 0.7) {
+        await writerTable.put(randomFriend(existingId));
+      } else if (r < 0.8) {
+        await writerTable.bulkPut([randomFriend(existingId), randomFriend(nextId++)]);
+      } else if (r < 0.97) {
+        await writerTable.delete(existingId);
+      } else {
+        await writerTable.clear();
+        await writerTable.bulkAdd([randomFriend(nextId++), randomFriend(nextId++), randomFriend(nextId++)]);
+      }
+      for (const queryName of Object.keys(queries)) {
+        const expected = await db2.transaction('r', db2.friends, db2.virtual, queries[queryName]);
+        if (!(await waitForLiveValue(() => latest[queryName], expected, `[${cacheMode}] ${queryName} after write #${i} (${kind})`))) {
+          failed = true;
+          break;
+        }
+      }
+    }
+    subscriptions.forEach((s) => s.unsubscribe());
+    otherInstance.close();
+    await db2.delete();
   }
 });

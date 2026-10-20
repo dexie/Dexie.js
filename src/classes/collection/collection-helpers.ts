@@ -26,6 +26,7 @@ export function isPlainKeyRange(
 
 export function addFilter(ctx: CollectionContext, fn: Function) {
   ctx.filter = combine(ctx.filter, fn);
+  ctx.filterCount = (ctx.filterCount || 0) + 1;
 }
 
 export function addReplayFilter(
