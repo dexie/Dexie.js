@@ -1125,3 +1125,85 @@ promisedTest("liveQuery results equal fresh query results after random writes", 
     await db2.delete();
   }
 });
+
+promisedTest("liveQuery results equal fresh query results for compound, nested and Date keys and multiEntry indexes", async () => {
+  let seed = 7;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+  const randomInt = (max) => Math.floor(random() * max);
+  const tags = ['x', 'y', 'z'];
+  const tables = {
+    compound: {
+      schema: '[team+num], age, *tags',
+      row: (n) => ({ team: ['a', 'b'][n % 2], num: n, age: randomInt(50), tags: [tags[randomInt(3)]] }),
+      key: (row) => [row.team, row.num],
+    },
+    nested: {
+      schema: 'meta.id, age, *tags',
+      row: (n) => ({ meta: { id: 'k' + n }, age: randomInt(50), tags: [tags[randomInt(3)]] }),
+      key: (row) => row.meta.id,
+    },
+    dates: {
+      schema: 'when, age, *tags',
+      row: (n) => ({ when: new Date(1700000000000 + n * 1000), age: randomInt(50), tags: [tags[randomInt(3)], tags[randomInt(3)]] }),
+      key: (row) => row.when,
+    },
+  };
+  for (const cacheMode of ['immutable', 'cloned']) {
+    for (const tableName of Object.keys(tables)) {
+      const { schema, row, key } = tables[tableName];
+      const db2 = new Dexie(`TestLiveQueryKeyTypes_${tableName}_${cacheMode}`, { cache: cacheMode });
+      db2.version(1).stores({ items: schema });
+      const initial = [];
+      for (let n = 0; n < 30; n++) initial.push(row(n));
+      await db2.items.bulkAdd(initial);
+      const queries = {
+        orderByLimit: () => db2.items.orderBy('age').limit(4).toArray(),
+        reverseLimit: () => db2.items.orderBy('age').reverse().limit(4).toArray(),
+        rangeLimit: () => db2.items.where('age').between(10, 30).limit(3).toArray(),
+        all: () => db2.items.orderBy('age').toArray(),
+        multiEntry: () => db2.items.where('tags').equals('x').toArray(),
+        multiEntryLimit: () => db2.items.where('tags').equals('y').limit(3).toArray(),
+      };
+      const latest = {};
+      const subscriptions = Object.keys(queries).map((name) =>
+        liveQuery(queries[name]).subscribe((value) => (latest[name] = value))
+      );
+      let nextNum = 30;
+      let failed = false;
+      for (let i = 0; i < 40 && !failed; i++) {
+        const r = random();
+        const existing = await db2.items.toArray();
+        const target = existing[randomInt(existing.length)];
+        if (r < 0.25 || !target) {
+          await db2.items.add(row(nextNum++));
+        } else if (r < 0.65) {
+          // same key, new sort field and tags
+          await db2.items.put({ ...row(0), ...pickKey(target), age: randomInt(50), tags: [tags[randomInt(3)]] });
+        } else if (r < 0.9) {
+          await db2.items.delete(key(target));
+        } else {
+          await db2.items.clear();
+          await db2.items.bulkAdd([row(nextNum++), row(nextNum++), row(nextNum++)]);
+        }
+        for (const name of Object.keys(queries)) {
+          const expected = await db2.transaction('r', db2.items, queries[name]);
+          if (!(await waitForLiveValue(() => latest[name], expected, `[${cacheMode}] ${tableName} ${name} after write #${i}`))) {
+            failed = true;
+            break;
+          }
+        }
+      }
+      subscriptions.forEach((s) => s.unsubscribe());
+      await db2.delete();
+
+      function pickKey(target) {
+        if (tableName === 'compound') return { team: target.team, num: target.num };
+        if (tableName === 'nested') return { meta: target.meta };
+        return { when: target.when };
+      }
+    }
+  }
+});
