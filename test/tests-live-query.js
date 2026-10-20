@@ -991,3 +991,137 @@ promisedTest("Issue 2352: an aborted run that rejects late should not reach obse
   subscription.unsubscribe();
   await db2352.delete();
 });
+
+function waitForLiveValue(getLatest, expected, description, timeout = 1000) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    (function check() {
+      if (isDeepEqual(getLatest(), expected) || Date.now() - started > timeout) {
+        deepEqual(getLatest(), expected, description);
+        resolve(isDeepEqual(getLatest(), expected));
+      } else {
+        setTimeout(check, 5);
+      }
+    })();
+  });
+}
+
+promisedTest("liveQuery with limit must refill the window when a row moves out of it", async () => {
+  for (const cacheMode of ['immutable', 'cloned']) {
+    const db2 = new Dexie('TestLiveQueryLimitWindow_' + cacheMode, { cache: cacheMode });
+    db2.version(1).stores({ friends: 'id, age, [name+age]' });
+    await db2.friends.bulkAdd([
+      { id: 1, name: 'x', age: 1 },
+      { id: 2, name: 'x', age: 2 },
+      { id: 3, name: 'x', age: 3 },
+    ]);
+    const queries = {
+      orderByLimit: () => db2.friends.orderBy('age').limit(2).toArray(),
+      reverseLimit: () => db2.friends.orderBy('age').reverse().limit(2).toArray(),
+      compoundLimit: () =>
+        db2.friends
+          .where('[name+age]')
+          .between(['x', Dexie.minKey], ['x', Dexie.maxKey])
+          .limit(2)
+          .toArray(),
+    };
+    const latest = {};
+    const subscriptions = Object.keys(queries).map((name) =>
+      liveQuery(queries[name]).subscribe((value) => (latest[name] = value))
+    );
+    const ids = (rows) => rows && rows.map((row) => row.id);
+    await waitForLiveValue(() => ids(latest.orderByLimit), [1, 2], `[${cacheMode}] initial orderBy().limit()`);
+    await waitForLiveValue(() => ids(latest.reverseLimit), [3, 2], `[${cacheMode}] initial reverse().limit()`);
+    await waitForLiveValue(() => ids(latest.compoundLimit), [1, 2], `[${cacheMode}] initial compound limit`);
+
+    // Row 1 moves behind row 3, which is not part of the limited results.
+    await db2.friends.put({ id: 1, name: 'x', age: 10 });
+    await waitForLiveValue(() => ids(latest.orderByLimit), [2, 3], `[${cacheMode}] orderBy().limit() is refilled with row 3`);
+    await waitForLiveValue(() => ids(latest.compoundLimit), [2, 3], `[${cacheMode}] compound limit is refilled with row 3`);
+    await waitForLiveValue(() => ids(latest.reverseLimit), [1, 3], `[${cacheMode}] reverse().limit() puts row 1 first`);
+
+    // Row 1 moves in front of row 2, which is the last row of the reverse window.
+    await db2.friends.put({ id: 1, name: 'x', age: 0 });
+    await waitForLiveValue(() => ids(latest.reverseLimit), [3, 2], `[${cacheMode}] reverse().limit() is refilled with row 2`);
+    await waitForLiveValue(() => ids(latest.orderByLimit), [1, 2], `[${cacheMode}] orderBy().limit() puts row 1 first`);
+
+    subscriptions.forEach((s) => s.unsubscribe());
+    await db2.delete();
+  }
+});
+
+promisedTest("liveQuery results equal fresh query results after random writes", async () => {
+  let seed = 42;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+  for (const cacheMode of ['immutable', 'cloned']) {
+    const db2 = new Dexie('TestLiveQueryRandomWrites_' + cacheMode, { cache: cacheMode });
+    db2.version(1).stores({ friends: 'id, age, name, [name+age]' });
+    const names = ['a', 'b', 'c'];
+    const randomFriend = (id) => ({
+      id,
+      name: names[Math.floor(random() * names.length)],
+      age: Math.floor(random() * 50),
+      note: 'n' + Math.floor(random() * 1000),
+    });
+    const initial = [];
+    for (let id = 0; id < 40; id++) initial.push(randomFriend(id));
+    await db2.friends.bulkAdd(initial);
+
+    const queries = {
+      orderByLimit: () => db2.friends.orderBy('age').limit(5).toArray(),
+      reverseLimit: () => db2.friends.orderBy('age').reverse().limit(5).toArray(),
+      rangeLimit: () => db2.friends.where('age').between(10, 30).limit(7).toArray(),
+      range: () => db2.friends.where('age').between(10, 30).toArray(),
+      all: () => db2.friends.orderBy('age').toArray(),
+      equalsLimit: () => db2.friends.where('name').equals('b').limit(3).toArray(),
+      compoundLimit: () =>
+        db2.friends
+          .where('[name+age]')
+          .between(['a', Dexie.minKey], ['a', Dexie.maxKey])
+          .limit(4)
+          .toArray(),
+      primaryKeyLimit: () => db2.friends.where('id').above(10).limit(5).toArray(),
+    };
+    const latest = {};
+    const subscriptions = Object.keys(queries).map((name) =>
+      liveQuery(queries[name]).subscribe((value) => (latest[name] = value))
+    );
+
+    let nextId = 40;
+    let failed = false;
+    for (let i = 0; i < 60 && !failed; i++) {
+      const r = random();
+      const existingId = Math.floor(random() * nextId);
+      if (r < 0.2) {
+        await db2.friends.add(randomFriend(nextId++));
+      } else if (r < 0.45) {
+        // change the sort field only
+        await db2.friends.where('id').equals(existingId).modify((f) => {
+          f.age = Math.floor(random() * 50);
+        });
+      } else if (r < 0.6) {
+        // change a field that is not indexed
+        await db2.friends.update(existingId, { note: 'u' + i });
+      } else if (r < 0.75) {
+        // change several fields
+        await db2.friends.put(randomFriend(existingId));
+      } else if (r < 0.85) {
+        await db2.friends.bulkPut([randomFriend(existingId), randomFriend(nextId++)]);
+      } else {
+        await db2.friends.delete(existingId);
+      }
+      for (const name of Object.keys(queries)) {
+        const expected = await db2.transaction('r', db2.friends, queries[name]);
+        if (!(await waitForLiveValue(() => latest[name], expected, `[${cacheMode}] ${name} after write #${i}`))) {
+          failed = true; // stop at the first wrong result instead of piling up timeouts
+          break;
+        }
+      }
+    }
+    subscriptions.forEach((s) => s.unsubscribe());
+    await db2.delete();
+  }
+});

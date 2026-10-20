@@ -8,6 +8,7 @@ import {
   DBCoreTable,
 } from '../../public/types/dbcore';
 import { isWithinRange } from './is-within-range';
+import { applyOpsWithEventReduce } from './apply-ops-with-event-reduce';
 
 export function applyOptimisticOps(
   result: any[],
@@ -18,6 +19,16 @@ export function applyOptimisticOps(
   immutable: boolean
 ): any[] {
   if (!ops || ops.length === 0) return result;
+  const reduced = applyOpsWithEventReduce(result, req, ops, table, cacheEntry);
+  if (reduced) {
+    return reduced === result || !immutable
+      ? reduced
+      : (Object.freeze(reduced) as any[]);
+  }
+  // Not supported by EventReduce, or the cache entry was marked dirty because
+  // the new result could not be derived in memory. Compute the best possible
+  // result with the generic algorithm below. A dirty entry is queried again
+  // once the transaction has committed.
   const index = req.query.index;
   const { multiEntry } = index;
   const queryRange = req.query.range;
