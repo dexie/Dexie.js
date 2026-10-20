@@ -1,4 +1,8 @@
-import { calculateActionName, runAction } from 'event-reduce-js';
+import {
+  calculateActionFunction,
+  doNothing,
+  runFullQueryAgain,
+} from 'event-reduce-js';
 import type { ChangeEvent, QueryParams } from 'event-reduce-js';
 import { cmp } from '../../functions/cmp';
 import { isArray } from '../../functions/utils';
@@ -127,25 +131,21 @@ export function applyOpsWithEventReduce(
       }
     }
     for (const changeEvent of changeEvents) {
-      const action = calculateActionName({
+      const input = {
         queryParams,
         changeEvent,
         previousResults: results,
         keyDocumentMap: keyDocumentMap as Map<string, any>,
-      });
-      if (action === 'runFullQueryAgain') {
+      };
+      // calculateActionFunction() keeps the action names out of the bundle.
+      const action = calculateActionFunction(input);
+      if (action === runFullQueryAgain) {
         cacheEntry.dirty = true;
         return undefined;
       }
-      if (action !== 'doNothing') {
+      if (action !== doNothing) {
         changed = true;
-        results = runAction(
-          action,
-          queryParams,
-          changeEvent,
-          results,
-          keyDocumentMap as Map<string, any>
-        );
+        action(input); // mutates results and keyDocumentMap
       }
     }
   }
