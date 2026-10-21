@@ -1211,10 +1211,11 @@ promisedTest("liveQuery results equal fresh query results for compound, nested a
   }
 });
 
-function countReadsMiddleware(counter) {
+function countReadsMiddleware(counter, level) {
   return {
     stack: 'dbcore',
     name: 'countReads',
+    level, // A level below the cache middleware (0) only counts reads that reach IndexedDB.
     create: (down) => ({
       ...down,
       table: (tableName) => {
@@ -1360,4 +1361,26 @@ promisedTest("liveQuery results equal fresh query results for filter(), offset()
     otherInstance.close();
     await db2.delete();
   }
+});
+
+promisedTest("liveQuery with an open-ended range is served from the cache", async () => {
+  const counter = { reads: 0 };
+  const db2 = new Dexie('TestLiveQueryOpenEndedRange');
+  db2.use(countReadsMiddleware(counter, -10));
+  db2.version(1).stores({ friends: 'id, age' });
+  const rows = [];
+  for (let id = 0; id < 30; id++) rows.push({ id, age: id, name: 'n' + id });
+  await db2.friends.bulkAdd(rows);
+  let latest;
+  // above() and below() create ranges with an undefined upper / lower bound.
+  const subscription = liveQuery(() => db2.friends.where('age').above(18).limit(5).toArray()).subscribe(
+    (value) => (latest = value)
+  );
+  await waitForLiveValue(() => latest && latest.map((f) => f.id), [19, 20, 21, 22, 23], 'initial result');
+  const reads = counter.reads;
+  await db2.friends.put({ id: 20, age: 20, name: 'renamed' });
+  await waitForLiveValue(() => latest && latest[1].name, 'renamed', 'the renamed row is emitted');
+  equal(counter.reads - reads, 0, 'The live query did not read from IndexedDB again');
+  subscription.unsubscribe();
+  await db2.delete();
 });
