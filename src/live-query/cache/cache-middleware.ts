@@ -259,6 +259,30 @@ export const cacheMiddleware: Middleware<DBCore> = {
             const { requery, signal } = PSD as LiveQueryContext;
             let [cacheEntry, exactMatch, tblCache, container] =
               findCompatibleQuery(dbName, tableName, 'query', req);
+            if (
+              cacheEntry &&
+              exactMatch &&
+              cacheEntry.res &&
+              tblCache.optimisticOps.length > 0
+            ) {
+              // A write is in progress. If its changes cannot be applied to the
+              // cached result, the entry gets dirty. Instead of returning the old
+              // result and querying again after the commit, query now: the read
+              // transaction is queued behind the write and returns its result
+              // right after the commit.
+              applyOptimisticOps(
+                cacheEntry.res as any[],
+                req,
+                tblCache.optimisticOps,
+                downTable,
+                cacheEntry,
+                freezeResults
+              );
+              if (cacheEntry.dirty) {
+                cacheEntry = undefined;
+                exactMatch = false;
+              }
+            }
             if (cacheEntry && exactMatch) {
               cacheEntry.obsSet = req.obsSet!; // So that optimistic result is monitored.
               // How? - because observability-middleware will track result where optimistic
