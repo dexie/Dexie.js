@@ -91,7 +91,7 @@ const DropdownMenuContent = React.forwardRef<
     <div
       ref={ref}
       className={cn(
-        "absolute z-10 mt-2 w-56 origin-top-right rounded-md bg-popover shadow-lg ring-1 ring-border ring-opacity-5 focus:outline-none",
+        "absolute z-10 mt-2 w-56 origin-top-right overflow-hidden rounded-md bg-popover shadow-lg ring-1 ring-border ring-opacity-5 focus:outline-none",
         align === "end" ? "right-0" : "left-0",
         className
       )}
