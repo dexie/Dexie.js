@@ -1384,3 +1384,37 @@ promisedTest("liveQuery with an open-ended range is served from the cache", asyn
   subscription.unsubscribe();
   await db2.delete();
 });
+
+promisedTest("liveQuery with limit refills the window from the rows after it", async () => {
+  const counter = { reads: 0 };
+  const db2 = new Dexie('TestLiveQueryWindowBuffer');
+  db2.use(countReadsMiddleware(counter, -10));
+  db2.version(1).stores({ friends: 'id, age' });
+  const rows = [];
+  for (let id = 0; id < 30; id++) rows.push({ id, age: id, name: 'n' + id });
+  await db2.friends.bulkAdd(rows);
+  let latest;
+  // Limit 5 keeps 2 rows after the window (getRecommendedResultWindowBufferSize(5) of EventReduce).
+  const subscription = liveQuery(() => db2.friends.where('age').above(18).limit(5).toArray()).subscribe(
+    (value) => (latest = value)
+  );
+  await waitForLiveValue(() => latest && latest.map((f) => f.id), [19, 20, 21, 22, 23], 'initial result');
+  const reads = counter.reads;
+  await db2.friends.put({ id: 19, age: 100, name: 'n19' });
+  await waitForLiveValue(() => latest.map((f) => f.id), [20, 21, 22, 23, 24], 'row 24 came from the buffer');
+  await db2.friends.delete(20);
+  await waitForLiveValue(() => latest.map((f) => f.id), [21, 22, 23, 24, 25], 'row 25 came from the buffer');
+  equal(counter.reads - reads, 0, 'The live query did not read from IndexedDB again');
+  // An insert into the window moves its last row into the buffer.
+  await db2.friends.put({ id: 30, age: 24.5, name: 'n30' });
+  await waitForLiveValue(() => latest.map((f) => f.id), [21, 22, 23, 24, 30], 'row 30 was inserted');
+  await db2.friends.put({ id: 21, age: 200, name: 'n21' });
+  await waitForLiveValue(() => latest.map((f) => f.id), [22, 23, 24, 30, 25], 'row 25 came from the buffer');
+  equal(counter.reads - reads, 0, 'The live query still did not read from IndexedDB again');
+  // The buffer is used up now.
+  await db2.friends.put({ id: 22, age: 300, name: 'n22' });
+  await waitForLiveValue(() => latest.map((f) => f.id), [23, 24, 30, 25, 26], 'row 26 was read');
+  equal(counter.reads - reads, 1, 'The live query read from IndexedDB once');
+  subscription.unsubscribe();
+  await db2.delete();
+});

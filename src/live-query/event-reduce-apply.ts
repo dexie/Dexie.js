@@ -47,55 +47,17 @@ export function applyWithEventReduce(
   query: ReducibleQuery,
   keyDocumentMap: Map<string, any>
 ): any[] | null {
-  const { extractPrimKey, compare, skip } = query;
-  const getDocumentId = (doc: any) => keyToId(extractPrimKey(doc));
-  const queryParams: QueryParams<any> = {
-    primaryKey: '', // not used, ids come from getDocumentId
-    getDocumentId,
-    sortFields: query.sortFields,
-    limit: query.limit && query.limit < Infinity ? query.limit : undefined,
-    skip: skip || undefined,
-    queryMatcher: query.matches,
-    // EventReduce needs a comparator that never returns 0.
-    sortComparator: (a, b) => (compare(a, b) < 0 ? -1 : 1),
-  };
-
+  const queryParams = toQueryParams(query);
   const results = result.slice();
   let changed = false;
   for (const mutation of mutations) {
-    const changeEvents: ChangeEvent<any>[] = [];
-    if (mutation.type === 'add' || mutation.type === 'put') {
-      for (const value of mutation.values) {
-        const id = getDocumentId(value);
-        if (id === undefined) return null;
-        const previous = keyDocumentMap.get(id);
-        if (previous) {
-          if (mutation.type === 'add') continue; // add() of an existing key fails
-          changeEvents.push({ operation: 'UPDATE', id, doc: value, previous });
-        } else {
-          if (skip) return null; // might have been in front of the window
-          changeEvents.push({
-            operation: 'INSERT',
-            id,
-            doc: value,
-            previous: null,
-          });
-        }
-      }
-    } else if (mutation.type === 'delete') {
-      for (const key of mutation.keys) {
-        const id = keyToId(key);
-        if (id === undefined) continue; // not a valid key: nothing is deleted
-        const previous = keyDocumentMap.get(id);
-        if (previous) {
-          changeEvents.push({ operation: 'DELETE', id, doc: null, previous });
-        } else if (skip) {
-          return null; // might have been in front of the window
-        }
-      }
-    } else {
-      return null; // deleteRange
-    }
+    const changeEvents = toChangeEvents(
+      mutation,
+      queryParams,
+      keyDocumentMap,
+      !!query.skip
+    );
+    if (!changeEvents) return null;
     for (const changeEvent of changeEvents) {
       const input = {
         queryParams,
@@ -113,6 +75,68 @@ export function applyWithEventReduce(
     }
   }
   return changed ? results : result;
+}
+
+export function toQueryParams(query: ReducibleQuery): QueryParams<any> {
+  const { extractPrimKey, compare } = query;
+  return {
+    primaryKey: '', // not used, ids come from getDocumentId
+    getDocumentId: (doc: any) => keyToId(extractPrimKey(doc)),
+    sortFields: query.sortFields,
+    limit: query.limit && query.limit < Infinity ? query.limit : undefined,
+    skip: query.skip || undefined,
+    queryMatcher: query.matches,
+    // EventReduce needs a comparator that never returns 0.
+    sortComparator: (a, b) => (compare(a, b) < 0 ? -1 : 1),
+  };
+}
+
+/** Turns a mutation into EventReduce change events. Rows that are not in
+ * keyDocumentMap are inserted. Returns null if that is not correct, which is
+ * the case for deleteRange, keys that are not valid and, with skip, rows that
+ * might have been in front of the window.
+ */
+export function toChangeEvents(
+  mutation: ReducibleMutation,
+  queryParams: QueryParams<any>,
+  keyDocumentMap: Map<string, any>,
+  skip: boolean
+): ChangeEvent<any>[] | null {
+  const getDocumentId = queryParams.getDocumentId!;
+  const changeEvents: ChangeEvent<any>[] = [];
+  if (mutation.type === 'add' || mutation.type === 'put') {
+    for (const value of mutation.values) {
+      const id = getDocumentId(value);
+      if (id === undefined) return null;
+      const previous = keyDocumentMap.get(id);
+      if (previous) {
+        if (mutation.type === 'add') continue; // add() of an existing key fails
+        changeEvents.push({ operation: 'UPDATE', id, doc: value, previous });
+      } else {
+        if (skip) return null; // might have been in front of the window
+        changeEvents.push({
+          operation: 'INSERT',
+          id,
+          doc: value,
+          previous: null,
+        });
+      }
+    }
+  } else if (mutation.type === 'delete') {
+    for (const key of mutation.keys) {
+      const id = keyToId(key);
+      if (id === undefined) continue; // not a valid key: nothing is deleted
+      const previous = keyDocumentMap.get(id);
+      if (previous) {
+        changeEvents.push({ operation: 'DELETE', id, doc: null, previous });
+      } else if (skip) {
+        return null; // might have been in front of the window
+      }
+    }
+  } else {
+    return null; // deleteRange
+  }
+  return changeEvents;
 }
 
 /** Builds the keyDocumentMap for applyWithEventReduce().
