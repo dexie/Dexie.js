@@ -1246,8 +1246,11 @@ promisedTest("liveQuery applies writes to filter() results without reading them 
     { id: 1, age: 20, active: true },
     { id: 2, age: 30, active: false },
     { id: 3, age: 40, active: true },
+    { id: 5, age: 50, active: true },
+    { id: 6, age: 60, active: true },
   ]);
   let latest;
+  // Limit 2 keeps 1 row after the window (getRecommendedResultWindowBufferSize(2) of EventReduce).
   const subscription = liveQuery(() =>
     db2.friends.where('age').above(18).filter((f) => f.active).limit(2).toArray()
   ).subscribe((value) => (latest = value));
@@ -1265,8 +1268,13 @@ promisedTest("liveQuery applies writes to filter() results without reading them 
   equal(counter.reads - reads, 0, 'Updating a row of the result did not read from the database');
 
   reads = counter.reads;
-  await db2.friends.update(1, { active: false }); // leaves the full window, which must be refilled
-  await waitForLiveValue(ids, [4, 3], 'row 1 left, row 3 is read again');
+  await db2.friends.update(1, { active: false }); // leaves the full window, which is refilled
+  await waitForLiveValue(ids, [4, 3], 'row 1 left, row 3 came from the buffer');
+  equal(counter.reads - reads, 0, 'Refilling the limit window from the buffer did not read from the database');
+
+  reads = counter.reads;
+  await db2.friends.update(4, { active: false }); // the buffer is used up
+  await waitForLiveValue(ids, [3, 5], 'row 4 left, row 5 is read');
   equal(counter.reads - reads, 1, 'Refilling the limit window read from the database once');
 
   subscription.unsubscribe();

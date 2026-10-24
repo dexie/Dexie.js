@@ -9,13 +9,9 @@ import type { ResultWindowBuffer } from 'event-reduce-js';
 import { RangeSet } from '../../helpers/rangeset';
 import { CacheEntry } from '../../public/types/cache';
 import { IntervalTree } from '../../public/types/rangeset';
-import {
-  DBCoreMutateRequest,
-  DBCoreQueryRequest,
-  DBCoreTable,
-} from '../../public/types/dbcore';
+import { DBCoreQueryRequest } from '../../public/types/dbcore';
 import { toChangeEvents, toQueryParams } from '../event-reduce-apply';
-import type { ReducibleQuery } from '../event-reduce-apply';
+import type { ReducibleMutation, ReducibleQuery } from '../event-reduce-apply';
 
 /** Rows after the result window of cached queries with a limit, so that a
  * row leaving a full window can be replaced from memory instead of reading
@@ -63,7 +59,8 @@ export function resetWindowBuffer(entry: CacheEntry, rows: any[]): any[] {
  */
 export function applyToWindowBuffer(
   buffer: ResultWindowBuffer<any>,
-  ops: DBCoreMutateRequest[]
+  ops: readonly ReducibleMutation[],
+  skip = false
 ): {
   buffer: ResultWindowBuffer<any>;
   changed: boolean;
@@ -81,7 +78,7 @@ export function applyToWindowBuffer(
       op,
       newBuffer.queryParams,
       newBuffer.keyDocumentMap,
-      false
+      skip
     );
     if (!changeEvents) return null;
     const res = applyChangeEventsToResultWindowBuffer(newBuffer, changeEvents);

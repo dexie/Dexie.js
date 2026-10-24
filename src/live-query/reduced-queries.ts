@@ -22,7 +22,17 @@ import {
   ReducibleQuery,
   toKeyDocumentMap,
   toPaths,
+  toQueryParams,
 } from './event-reduce-apply';
+import { applyToWindowBuffer } from './cache/window-buffer';
+import {
+  createResultWindowBuffer,
+  getRecommendedResultWindowBufferSize,
+  getResultWindowBufferQuery,
+  getResultWindowBufferResults,
+  resetResultWindowBuffer,
+} from 'event-reduce-js';
+import type { ResultWindowBuffer } from 'event-reduce-js';
 import type { LiveQueryContext } from './live-query';
 
 /*
@@ -39,6 +49,10 @@ import type { LiveQueryContext } from './live-query';
  * table was changed by another tab or another Dexie instance, the collection is
  * read from IndexedDB again.
  *
+ * Collections with a limit keep some rows before and after the result window
+ * (EventReduce's result window buffer). A row leaving the window is then
+ * replaced from memory until the buffer is used up.
+ *
  * Slots are matched between runs of the same subscription by the shape of the
  * collection: table, index, range, direction, offset, limit, sortBy() key path
  * and the source code of the filter() functions. Filter functions are expected
@@ -54,6 +68,9 @@ interface ReducedQuerySlot {
   /** null until the collection has been read from IndexedDB. */
   results: any[] | null;
   keyDocumentMap: Map<string, any> | null;
+  /** Rows around the result window of collections with a limit, so that rows
+   * moving into the window can be taken from memory. */
+  buffer: ResultWindowBuffer<any> | null;
   /** Committed writes on the table since results was last updated. */
   pending: ReducibleMutation[];
   pendingValues: number;
@@ -264,7 +281,8 @@ export function readReducedCollection(
   ctx: CollectionContext,
   trans: Transaction,
   sortByKeyPath: string | null,
-  readFromDb: () => PromiseLike<any[]>
+  /** Reads the collection, or its rows with another offset and limit. */
+  readFromDb: (offset?: number, limit?: number) => PromiseLike<any[]>
 ): PromiseLike<any[]> | undefined {
   const run = (PSD as LiveQueryContext).reducedQueries;
   const subscr = (PSD as LiveQueryContext).subscr;
@@ -302,6 +320,7 @@ export function readReducedCollection(
       tableKey,
       results: null,
       keyDocumentMap: null,
+      buffer: null,
       pending: [],
       pendingValues: 0,
       invalid: false,
@@ -334,16 +353,45 @@ export function readReducedCollection(
     );
     return deepClone(results);
   };
+  const query = toReducibleQuery(
+    ctx,
+    index,
+    primaryKey,
+    jsFilters,
+    sortByKeyPath
+  );
   const readAgain = () => {
     const current = slot!;
     current.pending = [];
     current.pendingValues = 0;
     current.invalid = false;
-    return readFromDb().then((results) => {
-      const map = toKeyDocumentMap(results, extractPrimKey);
-      current.results = map ? results : null;
-      current.keyDocumentMap = map || null;
-      return done(results);
+    const bufferSize =
+      ctx.limit < Infinity
+        ? getRecommendedResultWindowBufferSize(ctx.limit)
+        : 0;
+    const buffer = (current.buffer = bufferSize
+      ? createResultWindowBuffer(toQueryParams(query), {
+          limitBufferSize: bufferSize,
+          skipBufferSize: bufferSize,
+        })
+      : null);
+    const bufferQuery =
+      buffer &&
+      getResultWindowBufferQuery(buffer, {
+        skip: ctx.offset,
+        limit: ctx.limit,
+      });
+    return readFromDb(bufferQuery?.skip, bufferQuery?.limit).then((rows) => {
+      const map = toKeyDocumentMap(rows, extractPrimKey);
+      if (map && buffer) {
+        resetResultWindowBuffer(buffer, rows);
+        current.results = getResultWindowBufferResults(buffer);
+        current.keyDocumentMap = buffer.keyDocumentMap;
+      } else {
+        current.results = map ? rows : null;
+        current.keyDocumentMap = map || null;
+      }
+      return done(current.results || rows);
     });
   };
 
@@ -351,12 +399,25 @@ export function readReducedCollection(
   if (slot.pending.length === 0)
     return DexiePromise.resolve(done(slot.results));
 
-  const reduced = applyWithEventReduce(
-    slot.results,
-    slot.pending,
-    toReducibleQuery(ctx, index, primaryKey, jsFilters, sortByKeyPath),
-    slot.keyDocumentMap
-  );
+  let reduced: any[] | null;
+  if (slot.buffer) {
+    const applied = applyToWindowBuffer(
+      slot.buffer,
+      slot.pending,
+      ctx.offset > 0
+    );
+    if (!applied) return readAgain();
+    slot.buffer = applied.buffer;
+    slot.keyDocumentMap = applied.buffer.keyDocumentMap;
+    reduced = applied.results;
+  } else {
+    reduced = applyWithEventReduce(
+      slot.results,
+      slot.pending,
+      query,
+      slot.keyDocumentMap
+    );
+  }
   if (!reduced) return readAgain();
   slot.results = reduced;
   slot.pending = [];

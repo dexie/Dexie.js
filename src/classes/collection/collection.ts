@@ -219,13 +219,17 @@ export class Collection implements ICollection {
   toArray(cb?): PromiseExtended<any[]> {
     return this._read((trans, dxTrans) => {
       const ctx = this._ctx;
-      const readFromDb = () => readArray(ctx, trans);
       if (isPlainKeyRange(ctx, true) && ctx.limit > 0) {
         // Read with getAll(), which the liveQuery cache keeps up to date.
-        return readFromDb();
+        return readArray(ctx, trans);
       }
       return (
-        readReducedCollection(ctx, dxTrans, null, readFromDb) || readFromDb()
+        readReducedCollection(ctx, dxTrans, null, (offset, limit) =>
+          readArray(
+            offset === undefined ? ctx : withWindow(ctx, offset, limit),
+            trans
+          )
+        ) || readArray(ctx, trans)
       );
     }, cb);
   }
@@ -754,6 +758,29 @@ export class Collection implements ICollection {
 }
 
 const deleteCallback = (value, ctx) => (ctx.value = null);
+
+/** A copy of ctx with another offset and limit, for the result window buffer
+ * of reduced queries. ctx must not have other replay filters than offset() and
+ * limit(), and limit() must not be before offset().
+ */
+function withWindow(
+  ctx: Collection['_ctx'],
+  offset: number,
+  limit: number | undefined
+): Collection['_ctx'] {
+  const windowCtx: Collection['_ctx'] = {
+    ...ctx,
+    replayFilter: null,
+    justLimit: true,
+    offset: 0,
+    limit: Infinity,
+  };
+  const collection = { _ctx: windowCtx } as Collection;
+  Collection.prototype.offset.call(collection, offset);
+  if (limit !== undefined) Collection.prototype.limit.call(collection, limit);
+  windowCtx.justLimit = false; // Read with a cursor, not through the liveQuery cache.
+  return windowCtx;
+}
 
 function readArray(ctx: Collection['_ctx'], trans): PromiseLike<any[]> {
   if (isPlainKeyRange(ctx, true) && ctx.limit > 0) {
