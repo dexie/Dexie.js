@@ -1393,6 +1393,30 @@ promisedTest("liveQuery with an open-ended range is served from the cache", asyn
   await db2.delete();
 });
 
+promisedTest("liveQuery with limit() before offset() updates when a skipped row is deleted", async () => {
+  const db2 = new Dexie('TestLiveQueryLimitBeforeOffset');
+  db2.version(1).stores({ friends: 'id, age' });
+  const rows = [];
+  for (let id = 0; id < 20; id++) rows.push({ id, age: id });
+  await db2.friends.bulkAdd(rows);
+  let latest, latestKeys;
+  // limit() before offset() is read with a cursor that skips rows without reading them.
+  const subscription = liveQuery(() => db2.friends.where('age').above(5).limit(6).offset(2).toArray()).subscribe(
+    (value) => (latest = value)
+  );
+  const keysSubscription = liveQuery(() => db2.friends.where('age').above(5).offset(2).primaryKeys()).subscribe(
+    (value) => (latestKeys = value)
+  );
+  await waitForLiveValue(() => latest && latest.map((f) => f.id), [8, 9, 10, 11], 'initial result');
+  await waitForLiveValue(() => latestKeys && latestKeys.slice(0, 2), [8, 9], 'initial keys');
+  await db2.friends.delete(6); // a skipped row
+  await waitForLiveValue(() => latest.map((f) => f.id), [9, 10, 11, 12], 'the window moved');
+  await waitForLiveValue(() => latestKeys.slice(0, 2), [9, 10], 'the keys moved');
+  subscription.unsubscribe();
+  keysSubscription.unsubscribe();
+  await db2.delete();
+});
+
 promisedTest("liveQuery with limit refills the window from the rows after it", async () => {
   const counter = { reads: 0 };
   const db2 = new Dexie('TestLiveQueryWindowBuffer');
