@@ -403,8 +403,7 @@ export class Collection implements ICollection {
    *
    **/
   eachUniqueKey(cb?) {
-    this._ctx.unique = 'unique';
-    return this.eachKey(cb);
+    return this.clone({ unique: 'unique' }).eachKey(cb);
   }
 
   /** Collection.eachPrimaryKey()
@@ -481,8 +480,7 @@ export class Collection implements ICollection {
    *
    **/
   uniqueKeys(cb?) {
-    this._ctx.unique = 'unique';
-    return this.keys(cb);
+    return this.clone({ unique: 'unique' }).keys(cb);
   }
 
   /** Collection.firstKey()
