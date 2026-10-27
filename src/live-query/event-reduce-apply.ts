@@ -28,9 +28,8 @@ export interface ReducibleQuery {
   skip?: number;
 }
 
-/** Creates EventReduce's result window buffer for a query. Besides the result,
- * it keeps the recommended number of rows after a limit window and, with skip,
- * before it. Without a limit, it holds the whole result.
+/** Creates EventReduce's result window buffer for a query, with the
+ * recommended buffer size. See the EventReduce docs.
  */
 export function createWindowBuffer(
   query: ReducibleQuery
@@ -45,22 +44,10 @@ export function createWindowBuffer(
   });
 }
 
-/** Applies mutations to a result window buffer with the EventReduce algorithm
- * (https://github.com/pubkey/event-reduce).
- *
- * Each written value is applied as a change event: moved, inserted and removed
- * rows are put at their sort position without running the query again. A row
- * leaving a full limit window is replaced by the next row of the buffer.
- *
- * The previous version of a row is only known when it is in the buffer.
- * Without skip that is enough: a row outside the buffer either did not match
- * or was sorted after it, so an update of it behaves like an insert and a
- * delete of it changes nothing. With skip, such a row might have been in front
- * of the buffer, so the new result cannot be derived.
- *
- * Returns the updated buffer, or null when the result window cannot be
- * derived and the query must run again. The buffer is updated in place,
- * unless copy is set.
+/** Applies mutations to a result window buffer with EventReduce
+ * (https://github.com/pubkey/event-reduce). Returns the updated buffer, or
+ * null when the query must run again. Updates the buffer in place unless
+ * copy is set.
  */
 export function applyToWindowBuffer(
   buffer: ResultWindowBuffer<any>,
@@ -108,10 +95,10 @@ export function toQueryParams(query: ReducibleQuery): QueryParams<any> {
   };
 }
 
-/** Turns a mutation into EventReduce change events. Rows that are not in
- * keyDocumentMap are inserted. Returns null if that is not correct, which is
- * the case for deleteRange, keys that are not valid and, with skip, rows that
- * might have been in front of the window.
+/** Turns a mutation into EventReduce change events. Dexie does not know the
+ * previous value of rows outside the buffer, so they are inserted. That is
+ * correct unless skip is used: such a row might have been in front of the
+ * window. Returns null then, and for deleteRange and invalid keys.
  */
 export function toChangeEvents(
   mutation: ReducibleMutation,

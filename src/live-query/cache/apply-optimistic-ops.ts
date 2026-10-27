@@ -13,18 +13,11 @@ import type { ReducibleQuery } from '../event-reduce-apply';
 import { isWithinRange } from './is-within-range';
 import { getEntryBuffer } from './window-buffer';
 
-/** Applies mutations to a cached query result with EventReduce, see
- * applyToWindowBuffer(). The commit applies them to the entry's buffer; the
- * optimistic results of reads apply them to a copy.
- *
- * When the new result cannot be derived from the buffer (for example when a
- * row leaves a full limit window and the buffer is used up), the cache entry
- * is marked dirty so that it is queried again, and the result is returned
- * unchanged.
- *
- * Queries that EventReduce does not handle (multiEntry indexes, outbound
- * primary keys, keys only) and deleteRange mutations mark the cache entry
- * dirty when they might affect the result.
+/** Applies mutations to a cached query result with EventReduce: to the
+ * entry's buffer on commit, to a copy of it for optimistic reads. Marks the
+ * entry dirty when the result cannot be derived, or for queries and mutations
+ * EventReduce does not handle (multiEntry, outbound keys, keys only,
+ * deleteRange) when they might affect the result.
  */
 export function applyOptimisticOps(
   result: any[],
