@@ -6,6 +6,7 @@ import {
   DBCoreQueryRequest,
   DBCoreTable,
 } from '../../public/types/dbcore';
+import { getResultWindowBufferResults } from 'event-reduce-js';
 import type { ResultWindowBuffer } from 'event-reduce-js';
 import { applyToWindowBuffer, keyToId, toPaths } from '../event-reduce-apply';
 import type { ReducibleQuery } from '../event-reduce-apply';
@@ -44,11 +45,14 @@ export function applyOptimisticOps(
     cacheEntry.dirty = true;
     return result;
   }
-  return !applied.changed
-    ? result
-    : immutable
-      ? (Object.freeze(applied.results) as any[])
-      : applied.results;
+  const results = getResultWindowBufferResults(applied);
+  if (
+    results.length === result.length &&
+    results.every((row, i) => row === result[i])
+  ) {
+    return result;
+  }
+  return immutable ? (Object.freeze(results) as any[]) : results;
 }
 
 /** The query of a request for EventReduce, or null if EventReduce can't

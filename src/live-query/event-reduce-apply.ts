@@ -1,8 +1,7 @@
 import {
-  applyChangeEventsToResultWindowBuffer,
+  applyChangeEventToResultWindowBuffer,
   createResultWindowBuffer,
   getRecommendedResultWindowBufferSize,
-  getResultWindowBufferResults,
 } from 'event-reduce-js';
 import type {
   ChangeEvent,
@@ -59,18 +58,15 @@ export function createWindowBuffer(
  * delete of it changes nothing. With skip, such a row might have been in front
  * of the buffer, so the new result cannot be derived.
  *
- * Returns the new result window, or null when it cannot be derived and the
- * query must run again. The buffer is updated in place, unless copy is set.
+ * Returns the updated buffer, or null when the result window cannot be
+ * derived and the query must run again. The buffer is updated in place,
+ * unless copy is set.
  */
 export function applyToWindowBuffer(
   buffer: ResultWindowBuffer<any>,
   mutations: readonly ReducibleMutation[],
   copy: boolean
-): {
-  buffer: ResultWindowBuffer<any>;
-  changed: boolean;
-  results: any[];
-} | null {
+): ResultWindowBuffer<any> | null {
   if (copy) {
     buffer = {
       ...buffer,
@@ -79,8 +75,6 @@ export function applyToWindowBuffer(
     };
   }
   const skip = !!buffer.queryParams.skip;
-  let changed = false;
-  let results: any[] | null = null;
   for (const mutation of mutations) {
     const changeEvents = toChangeEvents(
       mutation,
@@ -89,16 +83,15 @@ export function applyToWindowBuffer(
       skip
     );
     if (!changeEvents) return null;
-    const res = applyChangeEventsToResultWindowBuffer(buffer, changeEvents);
-    if (res.runFullQueryAgain === true) return null;
-    if (res.changed) changed = true;
-    results = res.results;
+    for (const changeEvent of changeEvents) {
+      if (
+        applyChangeEventToResultWindowBuffer(buffer, changeEvent) ===
+        'runFullQueryAgain'
+      )
+        return null;
+    }
   }
-  return {
-    buffer,
-    changed,
-    results: results || getResultWindowBufferResults(buffer),
-  };
+  return buffer;
 }
 
 export function toQueryParams(query: ReducibleQuery): QueryParams<any> {
