@@ -1,7 +1,6 @@
 import sourcemaps from 'rollup-plugin-sourcemaps';
 import nodeResolve from '@rollup/plugin-node-resolve';
 import cleanup from 'rollup-plugin-cleanup';
-import { downlevelDependencies } from './downlevel-dependencies.mjs';
 
 import {readFileSync} from 'fs';
 import path from 'path';
@@ -29,7 +28,6 @@ export default {
   plugins: [
     sourcemaps(),
     nodeResolve({browser: true, ignoreGlobal: false}),
-    downlevelDependencies(),
     cleanup()
   ],
   onwarn ({loc, frame, code, message}) {
