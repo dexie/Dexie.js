@@ -1443,15 +1443,22 @@ promisedTest("liveQuery reads cloned collections and limit(0) like fresh queries
     limit0: () => db2.friends.where('age').above(5).filter((f) => f.active).limit(0).toArray(),
   };
   const latest = {};
+  const emissions = {};
   const subscriptions = Object.keys(queries).map((name) =>
-    liveQuery(queries[name]).subscribe((value) => (latest[name] = value))
+    liveQuery(queries[name]).subscribe((value) => {
+      latest[name] = value;
+      emissions[name] = (emissions[name] || 0) + 1;
+    })
   );
   const ids = (name) => () => latest[name] && latest[name].map((f) => f.id);
   await waitForLiveValue(ids('cloned'), [8, 10, 12], 'cloned: initial result');
   await waitForLiveValue(ids('limit0'), [], 'limit0: initial result');
+  const limit0Emissions = emissions.limit0;
   await db2.friends.put({ id: 20, age: 7, active: true });
   await waitForLiveValue(ids('cloned'), [20, 8, 10], 'cloned: a row was inserted into the window');
-  await waitForLiveValue(ids('limit0'), [], 'limit0: still empty after an insert');
+  // limit0 is [] already, so wait for the result of its run after the write.
+  await waitForLiveValue(() => emissions.limit0 > limit0Emissions, true, 'limit0: ran again after the insert');
+  deepEqual(ids('limit0')(), [], 'limit0: still empty after an insert');
   subscriptions.forEach((s) => s.unsubscribe());
   await db2.delete();
 });
