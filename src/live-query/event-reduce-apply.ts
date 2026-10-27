@@ -87,7 +87,7 @@ export function toQueryParams(query: ReducibleQuery): QueryParams<any> {
     primaryKey: '', // not used, ids come from getDocumentId
     getDocumentId: (doc: any) => keyToId(extractPrimKey(doc)),
     sortFields: query.sortFields,
-    limit: query.limit && query.limit < Infinity ? query.limit : undefined,
+    limit: query.limit! < Infinity ? query.limit : undefined, // keeps limit(0)
     skip: query.skip || undefined,
     queryMatcher: query.matches,
     // EventReduce needs a comparator that never returns 0.

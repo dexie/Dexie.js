@@ -999,9 +999,16 @@ function waitForLiveValue(getLatest, expected, description, timeout = 1000) {
   return new Promise((resolve) => {
     const started = Date.now();
     (function check() {
-      if (isDeepEqual(getLatest(), expected) || Date.now() - started > timeout) {
-        deepEqual(getLatest(), expected, description);
-        resolve(isDeepEqual(getLatest(), expected));
+      const actual = getLatest();
+      const matches = isDeepEqual(actual, expected);
+      if (matches || Date.now() - started > timeout) {
+        if (actual === undefined || expected === undefined) {
+          // deepEqual() cannot compare undefined (it uses JSON.parse()).
+          ok(matches, `${description}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+        } else {
+          deepEqual(actual, expected, description);
+        }
+        resolve(matches);
       } else {
         setTimeout(check, 5);
       }
@@ -1421,6 +1428,31 @@ promisedTest("liveQuery with an open-ended range is served from the cache", asyn
   await waitForLiveValue(() => latest && latest[1].name, 'renamed', 'the renamed row is emitted');
   equal(counter.reads - reads, 0, 'The live query did not read from IndexedDB again' + readsSince(counter, reads));
   subscription.unsubscribe();
+  await db2.delete();
+});
+
+promisedTest("liveQuery reads cloned collections and limit(0) like fresh queries", async () => {
+  const db2 = new Dexie('TestLiveQueryCloneAndLimit0');
+  db2.version(1).stores({ friends: 'id, age' });
+  const rows = [];
+  for (let id = 0; id < 20; id++) rows.push({ id, age: id, active: id % 2 === 0 });
+  await db2.friends.bulkAdd(rows);
+  const queries = {
+    // clone() inherits the collection's context through its prototype.
+    cloned: () => db2.friends.where('age').above(5).clone().filter((f) => f.active).offset(1).limit(3).toArray(),
+    limit0: () => db2.friends.where('age').above(5).filter((f) => f.active).limit(0).toArray(),
+  };
+  const latest = {};
+  const subscriptions = Object.keys(queries).map((name) =>
+    liveQuery(queries[name]).subscribe((value) => (latest[name] = value))
+  );
+  const ids = (name) => () => latest[name] && latest[name].map((f) => f.id);
+  await waitForLiveValue(ids('cloned'), [8, 10, 12], 'cloned: initial result');
+  await waitForLiveValue(ids('limit0'), [], 'limit0: initial result');
+  await db2.friends.put({ id: 20, age: 7, active: true });
+  await waitForLiveValue(ids('cloned'), [20, 8, 10], 'cloned: a row was inserted into the window');
+  await waitForLiveValue(ids('limit0'), [], 'limit0: still empty after an insert');
+  subscriptions.forEach((s) => s.unsubscribe());
   await db2.delete();
 });
 

@@ -768,13 +768,12 @@ function withWindow(
   offset: number,
   limit: number | undefined
 ): Collection['_ctx'] {
-  const windowCtx: Collection['_ctx'] = {
-    ...ctx,
-    replayFilter: null,
-    justLimit: true,
-    offset: 0,
-    limit: Infinity,
-  };
+  // Object.create(), like clone(): a cloned ctx inherits most of its fields.
+  const windowCtx: Collection['_ctx'] = Object.create(ctx);
+  windowCtx.replayFilter = null;
+  windowCtx.justLimit = true;
+  windowCtx.offset = 0;
+  windowCtx.limit = Infinity;
   const collection = { _ctx: windowCtx } as Collection;
   Collection.prototype.offset.call(collection, offset);
   if (limit !== undefined) Collection.prototype.limit.call(collection, limit);
