@@ -1,9 +1,14 @@
 import {
-  calculateActionFunction,
-  doNothing,
-  runFullQueryAgain,
+  applyChangeEventsToResultWindowBuffer,
+  createResultWindowBuffer,
+  getRecommendedResultWindowBufferSize,
+  getResultWindowBufferResults,
 } from 'event-reduce-js';
-import type { ChangeEvent, QueryParams } from 'event-reduce-js';
+import type {
+  ChangeEvent,
+  QueryParams,
+  ResultWindowBuffer,
+} from 'event-reduce-js';
 import { getUint8Array, type } from '../functions/cmp';
 import { isArray } from '../functions/utils';
 
@@ -24,57 +29,76 @@ export interface ReducibleQuery {
   skip?: number;
 }
 
-/** Applies mutations to the previous result of a query with the EventReduce
- * algorithm (https://github.com/pubkey/event-reduce).
+/** Creates EventReduce's result window buffer for a query. Besides the result,
+ * it keeps the recommended number of rows after a limit window and, with skip,
+ * before it. Without a limit, it holds the whole result.
+ */
+export function createWindowBuffer(
+  query: ReducibleQuery
+): ResultWindowBuffer<any> {
+  const size =
+    query.limit! < Infinity
+      ? getRecommendedResultWindowBufferSize(query.limit)
+      : 0;
+  return createResultWindowBuffer(toQueryParams(query), {
+    limitBufferSize: size,
+    skipBufferSize: size,
+  });
+}
+
+/** Applies mutations to a result window buffer with the EventReduce algorithm
+ * (https://github.com/pubkey/event-reduce).
  *
  * Each written value is applied as a change event: moved, inserted and removed
- * rows are put at their sort position without running the query again.
+ * rows are put at their sort position without running the query again. A row
+ * leaving a full limit window is replaced by the next row of the buffer.
  *
- * The previous version of a row is only known when it is part of the result.
- * Without skip that is enough: a row outside the result either did not match
- * or was sorted after a full limit window, so an update of it behaves like an
- * insert and a delete of it changes nothing. With skip, such a row might have
- * been in front of the window, so the new result cannot be derived.
+ * The previous version of a row is only known when it is in the buffer.
+ * Without skip that is enough: a row outside the buffer either did not match
+ * or was sorted after it, so an update of it behaves like an insert and a
+ * delete of it changes nothing. With skip, such a row might have been in front
+ * of the buffer, so the new result cannot be derived.
  *
- * Returns the new result (the given array when nothing changed), or null when
- * the new result cannot be derived and the query must run again.
- * keyDocumentMap must contain the rows of result by keyToId() of their primary
- * key. It is updated to the new result, but is undefined after null is returned.
+ * Returns the new result window, or null when it cannot be derived and the
+ * query must run again. The buffer is updated in place, unless copy is set.
  */
-export function applyWithEventReduce(
-  result: any[],
+export function applyToWindowBuffer(
+  buffer: ResultWindowBuffer<any>,
   mutations: readonly ReducibleMutation[],
-  query: ReducibleQuery,
-  keyDocumentMap: Map<string, any>
-): any[] | null {
-  const queryParams = toQueryParams(query);
-  const results = result.slice();
+  copy: boolean
+): {
+  buffer: ResultWindowBuffer<any>;
+  changed: boolean;
+  results: any[];
+} | null {
+  if (copy) {
+    buffer = {
+      ...buffer,
+      buffer: buffer.buffer.slice(),
+      keyDocumentMap: new Map(buffer.keyDocumentMap),
+    };
+  }
+  const skip = !!buffer.queryParams.skip;
   let changed = false;
+  let results: any[] | null = null;
   for (const mutation of mutations) {
     const changeEvents = toChangeEvents(
       mutation,
-      queryParams,
-      keyDocumentMap,
-      !!query.skip
+      buffer.queryParams,
+      buffer.keyDocumentMap,
+      skip
     );
     if (!changeEvents) return null;
-    for (const changeEvent of changeEvents) {
-      const input = {
-        queryParams,
-        changeEvent,
-        previousResults: results,
-        keyDocumentMap,
-      };
-      // calculateActionFunction() keeps the action names out of the bundle.
-      const action = calculateActionFunction(input);
-      if (action === runFullQueryAgain) return null;
-      if (action !== doNothing) {
-        changed = true;
-        action(input); // mutates results and keyDocumentMap
-      }
-    }
+    const res = applyChangeEventsToResultWindowBuffer(buffer, changeEvents);
+    if (res.runFullQueryAgain === true) return null;
+    if (res.changed) changed = true;
+    results = res.results;
   }
-  return changed ? results : result;
+  return {
+    buffer,
+    changed,
+    results: results || getResultWindowBufferResults(buffer),
+  };
 }
 
 export function toQueryParams(query: ReducibleQuery): QueryParams<any> {
@@ -137,22 +161,6 @@ export function toChangeEvents(
     return null; // deleteRange
   }
   return changeEvents;
-}
-
-/** Builds the keyDocumentMap for applyWithEventReduce().
- * Returns undefined if a primary key is not a valid key.
- */
-export function toKeyDocumentMap(
-  result: readonly any[],
-  extractPrimKey: (value: any) => any
-): Map<string, any> | undefined {
-  const map = new Map<string, any>();
-  for (let i = 0, l = result.length; i < l; ++i) {
-    const id = keyToId(extractPrimKey(result[i]));
-    if (id === undefined) return undefined;
-    map.set(id, result[i]);
-  }
-  return map;
 }
 
 export function toPaths(keyPath: null | string | string[]): string[] {

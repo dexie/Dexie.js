@@ -16,18 +16,14 @@ import type { Collection } from '../classes/collection';
 import type { Transaction } from '../classes/transaction';
 import { isWithinRange } from './cache/is-within-range';
 import {
-  applyWithEventReduce,
+  applyToWindowBuffer,
+  createWindowBuffer,
   keyToId,
   ReducibleMutation,
   ReducibleQuery,
-  toKeyDocumentMap,
   toPaths,
-  toQueryParams,
 } from './event-reduce-apply';
-import { applyToWindowBuffer } from './cache/window-buffer';
 import {
-  createResultWindowBuffer,
-  getRecommendedResultWindowBufferSize,
   getResultWindowBufferQuery,
   getResultWindowBufferResults,
   resetResultWindowBuffer,
@@ -65,13 +61,10 @@ type CollectionContext = Collection['_ctx'];
 
 interface ReducedQuerySlot {
   tableKey: string;
-  /** null until the collection has been read from IndexedDB. */
-  results: any[] | null;
-  keyDocumentMap: Map<string, any> | null;
-  /** Rows around the result window of collections with a limit, so that rows
-   * moving into the window can be taken from memory. */
+  /** The result and, with a limit, the rows around it (see
+   * createWindowBuffer()). null until the collection has been read. */
   buffer: ResultWindowBuffer<any> | null;
-  /** Committed writes on the table since results was last updated. */
+  /** Committed writes on the table since the buffer was last updated. */
   pending: ReducibleMutation[];
   pendingValues: number;
   /** Set when the table was changed in a way that is not in pending. */
@@ -318,8 +311,6 @@ export function readReducedCollection(
   if (!slot) {
     slot = {
       tableKey,
-      results: null,
-      keyDocumentMap: null,
       buffer: null,
       pending: [],
       pendingValues: 0,
@@ -334,95 +325,41 @@ export function readReducedCollection(
   }
   slot.runId = run.runId;
 
-  const extractPrimKey = primaryKey.extractKey!;
-  const fullRange = new RangeSet(db.core.MIN_KEY, db.core.MAX_KEY);
   const done = (results: any[]) => {
-    observe(
-      subscr,
-      db.name,
-      table.name,
-      index,
-      range,
-      fullRange,
-      ctx.offset > 0,
-      jsFilters.length > 0,
-      results,
-      extractPrimKey,
-      db.core.MIN_KEY,
-      db.core.MAX_KEY
-    );
+    observe(subscr, ctx, index, primaryKey, jsFilters.length > 0, results);
     return deepClone(results);
   };
-  const query = toReducibleQuery(
-    ctx,
-    index,
-    primaryKey,
-    jsFilters,
-    sortByKeyPath
-  );
   const readAgain = () => {
     const current = slot!;
     current.pending = [];
     current.pendingValues = 0;
     current.invalid = false;
-    const bufferSize =
-      ctx.limit < Infinity
-        ? getRecommendedResultWindowBufferSize(ctx.limit)
-        : 0;
-    const buffer = (current.buffer = bufferSize
-      ? createResultWindowBuffer(toQueryParams(query), {
-          limitBufferSize: bufferSize,
-          skipBufferSize: bufferSize,
-        })
-      : null);
-    const bufferQuery =
-      buffer &&
-      getResultWindowBufferQuery(buffer, {
-        skip: ctx.offset,
-        limit: ctx.limit,
-      });
-    return readFromDb(bufferQuery?.skip, bufferQuery?.limit).then((rows) => {
-      const map = toKeyDocumentMap(rows, extractPrimKey);
-      if (map && buffer) {
-        resetResultWindowBuffer(buffer, rows);
-        current.results = getResultWindowBufferResults(buffer);
-        current.keyDocumentMap = buffer.keyDocumentMap;
-      } else {
-        current.results = map ? rows : null;
-        current.keyDocumentMap = map || null;
-      }
-      return done(current.results || rows);
+    const buffer = createWindowBuffer(
+      toReducibleQuery(ctx, index, primaryKey, jsFilters, sortByKeyPath)
+    );
+    const bufferQuery = getResultWindowBufferQuery(buffer, {
+      skip: ctx.offset,
+      limit: ctx.limit,
+    });
+    const read =
+      buffer.limitBufferSize || buffer.skipBufferSize
+        ? readFromDb(bufferQuery.skip, bufferQuery.limit)
+        : readFromDb();
+    return read.then((rows) => {
+      resetResultWindowBuffer(buffer, rows);
+      current.buffer = buffer;
+      return done(getResultWindowBufferResults(buffer));
     });
   };
 
-  if (!slot.results || !slot.keyDocumentMap || slot.invalid) return readAgain();
-  if (slot.pending.length === 0)
-    return DexiePromise.resolve(done(slot.results));
-
-  let reduced: any[] | null;
-  if (slot.buffer) {
-    const applied = applyToWindowBuffer(
-      slot.buffer,
-      slot.pending,
-      ctx.offset > 0
-    );
+  if (!slot.buffer || slot.invalid) return readAgain();
+  if (slot.pending.length > 0) {
+    const applied = applyToWindowBuffer(slot.buffer, slot.pending, false);
+    slot.pending = [];
+    slot.pendingValues = 0;
     if (!applied) return readAgain();
-    slot.buffer = applied.buffer;
-    slot.keyDocumentMap = applied.buffer.keyDocumentMap;
-    reduced = applied.results;
-  } else {
-    reduced = applyWithEventReduce(
-      slot.results,
-      slot.pending,
-      query,
-      slot.keyDocumentMap
-    );
   }
-  if (!reduced) return readAgain();
-  slot.results = reduced;
-  slot.pending = [];
-  slot.pendingValues = 0;
-  return DexiePromise.resolve(done(reduced));
+  return DexiePromise.resolve(done(getResultWindowBufferResults(slot.buffer)));
 }
 
 function isReducible(
@@ -500,42 +437,41 @@ function toReducibleQuery(
  */
 function observe(
   subscr: ObservabilitySet,
-  dbName: string,
-  tableName: string,
+  ctx: CollectionContext,
   index: DBCoreIndex,
-  range: DBCoreKeyRange,
-  fullRange: RangeSet,
-  hasOffset: boolean,
+  primaryKey: DBCoreIndex,
   hasFilter: boolean,
-  results: any[],
-  extractPrimKey: (value: any) => any,
-  minKey: any,
-  maxKey: any
+  results: any[]
 ) {
+  const { db, name } = ctx.table;
+  const { MIN_KEY, MAX_KEY } = db.core;
+  const range = ctx.range;
   const getRangeSet = (indexName: string) => {
-    const part = `idb://${dbName}/${tableName}/${indexName}`;
+    const part = `idb://${db.name}/${name}/${indexName}`;
     return (subscr[part] || (subscr[part] = new RangeSet())) as RangeSet;
   };
   if (index.lowLevelIndex) {
     // A virtual index (the prefix of a compound index) is read and written
     // as the compound index, whose keys are not comparable with the range.
-    getRangeSet(index.lowLevelIndex.name || '').add(fullRange);
+    getRangeSet(index.lowLevelIndex.name || '').add(
+      new RangeSet(MIN_KEY, MAX_KEY)
+    );
   } else {
     getRangeSet(index.name || '').add(
-      new RangeSet(range.lower ?? minKey, range.upper ?? maxKey)
+      new RangeSet(range.lower ?? MIN_KEY, range.upper ?? MAX_KEY)
     );
   }
   if (hasFilter) {
     // filter() reads every row of the range. A change of any of them can
     // make it match, also when its indexed value did not change.
-    getRangeSet('').add(new RangeSet(minKey, maxKey));
+    getRangeSet('').add(new RangeSet(MIN_KEY, MAX_KEY));
   } else if (!index.isPrimaryKey) {
-    getRangeSet('').addKeys(results.map(extractPrimKey));
+    getRangeSet('').addKeys(results.map(primaryKey.extractKey!));
   }
-  if (hasOffset) {
+  if (ctx.offset > 0) {
     // A delete or move of any row in front of the window shifts the window,
     // also when the writer did not know the previous index value of the row.
-    getRangeSet(':dels').add(fullRange);
+    getRangeSet(':dels').add(new RangeSet(MIN_KEY, MAX_KEY));
   }
 }
 

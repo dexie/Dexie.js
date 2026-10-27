@@ -1211,11 +1211,11 @@ promisedTest("liveQuery results equal fresh query results for compound, nested a
   }
 });
 
-function countReadsMiddleware(counter, level) {
+function countReadsMiddleware(counter) {
   return {
     stack: 'dbcore',
     name: 'countReads',
-    level, // A level below the cache middleware (0) only counts reads that reach IndexedDB.
+    level: -10, // Below the cache middleware (0): only counts reads that reach IndexedDB.
     create: (down) => ({
       ...down,
       table: (tableName) => {
@@ -1374,7 +1374,7 @@ promisedTest("liveQuery results equal fresh query results for filter(), offset()
 promisedTest("liveQuery with an open-ended range is served from the cache", async () => {
   const counter = { reads: 0 };
   const db2 = new Dexie('TestLiveQueryOpenEndedRange');
-  db2.use(countReadsMiddleware(counter, -10));
+  db2.use(countReadsMiddleware(counter));
   db2.version(1).stores({ friends: 'id, age' });
   const rows = [];
   for (let id = 0; id < 30; id++) rows.push({ id, age: id, name: 'n' + id });
@@ -1420,7 +1420,7 @@ promisedTest("liveQuery with limit() before offset() updates when a skipped row 
 promisedTest("liveQuery with limit refills the window from the rows after it", async () => {
   const counter = { reads: 0 };
   const db2 = new Dexie('TestLiveQueryWindowBuffer');
-  db2.use(countReadsMiddleware(counter, -10));
+  db2.use(countReadsMiddleware(counter));
   db2.version(1).stores({ friends: 'id, age' });
   const rows = [];
   for (let id = 0; id < 30; id++) rows.push({ id, age: id, name: 'n' + id });

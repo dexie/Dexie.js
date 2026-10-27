@@ -6,35 +6,24 @@ import {
   DBCoreQueryRequest,
   DBCoreTable,
 } from '../../public/types/dbcore';
-import {
-  applyWithEventReduce,
-  keyToId,
-  toKeyDocumentMap,
-  toPaths,
-} from '../event-reduce-apply';
+import type { ResultWindowBuffer } from 'event-reduce-js';
+import { applyToWindowBuffer, keyToId, toPaths } from '../event-reduce-apply';
 import type { ReducibleQuery } from '../event-reduce-apply';
 import { isWithinRange } from './is-within-range';
-import {
-  applyToWindowBuffer,
-  getWindowBuffer,
-  setWindowBuffer,
-} from './window-buffer';
+import { getEntryBuffer } from './window-buffer';
 
-/** Applies mutations to a cached query result with the EventReduce algorithm
- * (see applyWithEventReduce()).
+/** Applies mutations to a cached query result with EventReduce, see
+ * applyToWindowBuffer(). The commit applies them to the entry's buffer; the
+ * optimistic results of reads apply them to a copy.
  *
- * When the new result cannot be derived from the old one (for example when a
- * row leaves a full limit window and the next row is unknown), the cache entry
- * is marked dirty so that it is queried again once the transaction has
- * committed, and the result is returned unchanged.
+ * When the new result cannot be derived from the buffer (for example when a
+ * row leaves a full limit window and the buffer is used up), the cache entry
+ * is marked dirty so that it is queried again, and the result is returned
+ * unchanged.
  *
- * Queries with a limit keep rows after the result window in a buffer (see
- * createWindowBuffer()), so a row leaving a full window can be replaced from
- * memory until the buffer is used up.
- *
- * Queries on multiEntry indexes (where a row can be in the result more than
- * once) and deleteRange mutations are not handled by EventReduce. They mark
- * the cache entry dirty when they might affect the result.
+ * Queries that EventReduce does not handle (multiEntry indexes, outbound
+ * primary keys, keys only) and deleteRange mutations mark the cache entry
+ * dirty when they might affect the result.
  */
 export function applyOptimisticOps(
   result: any[],
@@ -46,52 +35,20 @@ export function applyOptimisticOps(
   commit?: boolean
 ): any[] {
   if (!ops || ops.length === 0) return result;
-  const windowBuffer = getWindowBuffer(cacheEntry);
-  if (windowBuffer) {
-    // Rows after the result window are kept, see createWindowBuffer().
-    if (ops.some((op) => op.type === 'deleteRange')) {
-      return requery(
-        result,
-        ops,
-        req,
-        table,
-        cacheEntry,
-        windowBuffer.keyDocumentMap
-      );
-    }
-    const applied = applyToWindowBuffer(windowBuffer, ops);
-    if (!applied) {
-      cacheEntry.dirty = true;
-      return result;
-    }
-    if (commit) setWindowBuffer(cacheEntry, applied.buffer);
-    return !applied.changed
-      ? result
-      : immutable
-        ? (Object.freeze(applied.results) as any[])
-        : applied.results;
+  const buffer = getEntryBuffer(cacheEntry);
+  if (!buffer || ops.some((op) => op.type === 'deleteRange')) {
+    return requery(result, ops, req, table, cacheEntry, buffer);
   }
-  const primaryKey = table.schema.primaryKey;
-  if (!req.values || primaryKey.outbound) {
-    return requery(result, ops, req, table, cacheEntry);
-  }
-  const keyDocumentMap = toKeyDocumentMap(result, primaryKey.extractKey!);
-  const query = toReducibleQuery(req, table);
-  if (
-    !keyDocumentMap ||
-    !query ||
-    ops.some((op) => op.type === 'deleteRange')
-  ) {
-    return requery(result, ops, req, table, cacheEntry, keyDocumentMap);
-  }
-  const reduced = applyWithEventReduce(result, ops, query, keyDocumentMap);
-  if (!reduced) {
+  const applied = applyToWindowBuffer(buffer, ops, !commit);
+  if (!applied) {
     cacheEntry.dirty = true;
     return result;
   }
-  return reduced === result || !immutable
-    ? reduced
-    : (Object.freeze(reduced) as any[]);
+  return !applied.changed
+    ? result
+    : immutable
+      ? (Object.freeze(applied.results) as any[])
+      : applied.results;
 }
 
 /** The query of a request for EventReduce, or null if EventReduce can't
@@ -136,13 +93,19 @@ function requery(
   req: DBCoreQueryRequest,
   table: DBCoreTable,
   cacheEntry: CacheEntry,
-  keyDocumentMap?: Map<string, any>
+  buffer: ResultWindowBuffer<any> | undefined
 ): any[] {
   const extractPrimKey = table.schema.primaryKey.extractKey;
   const extractIndex = req.query.index.extractKey;
+  // The ids of the rows that are known, if they can be known.
+  const ids =
+    buffer?.keyDocumentMap ||
+    (req.values && !table.schema.primaryKey.outbound
+      ? new Set(result.map((value) => keyToId(extractPrimKey(value))))
+      : null);
   const isInResult = (key: any) => {
     const id = keyToId(key);
-    return !keyDocumentMap || id === undefined || keyDocumentMap.has(id);
+    return !ids || id === undefined || ids.has(id);
   };
   const affected = ops.some((op) => {
     switch (op.type) {

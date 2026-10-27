@@ -24,9 +24,9 @@ import { isCachableRequest } from './is-cachable-request';
 import { signalSubscribersLazily } from './signalSubscribers';
 import { subscribeToCacheEntry } from './subscribe-cachentry';
 import {
-  createWindowBuffer,
-  observeWindowBuffer,
-  resetWindowBuffer,
+  createEntryBuffer,
+  observeEntryBuffer,
+  resetEntryBuffer,
 } from './window-buffer';
 
 const primKeyOf = (table: DBCoreTable) => table.schema.primaryKey.extractKey!;
@@ -122,7 +122,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                               );
                             } else {
                               // Observe rows that came into the buffer.
-                              observeWindowBuffer(
+                              observeEntryBuffer(
                                 entry,
                                 entry.obsSet[`idb://${dbName}/${storeName}/`],
                                 primKeyOf(table)
@@ -328,7 +328,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
               };
               const reducibleQuery = toReducibleQuery(req, downTable);
               newEntry.promise = downTable
-                .query(createWindowBuffer(newEntry, req, reducibleQuery))
+                .query(createEntryBuffer(newEntry, req, reducibleQuery))
                 .then((res) => {
                   // Freeze or clone results
                   if (freezeResults) {
@@ -342,7 +342,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                     }
                   }
                   // Rows after the result window stay in the buffer.
-                  const result = resetWindowBuffer(newEntry, res.result);
+                  const result = resetEntryBuffer(newEntry, res.result);
                   res = { ...res, result };
                   newEntry.res = result;
                   if (freezeResults) Object.freeze(result);
@@ -389,7 +389,7 @@ export const cacheMiddleware: Middleware<DBCore> = {
                 cacheEntry!,
                 freezeResults
               ) as any[]; // readonly any[]
-              observeWindowBuffer(
+              observeEntryBuffer(
                 cacheEntry!,
                 req.obsSet?.[`idb://${dbName}/${tableName}/`],
                 primKeyOf(downTable)
