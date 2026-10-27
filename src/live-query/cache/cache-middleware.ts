@@ -227,7 +227,9 @@ export const cacheMiddleware: Middleware<DBCore> = {
                   reqWithResolvedKeys,
                   res
                 );
-                tblCache.optimisticOps.push(adjustedReq);
+                if (adjustedReq) {
+                  tblCache.optimisticOps.push(adjustedReq);
+                }
                 // Signal subscribers after the observability middleware has complemented req.mutatedParts with the new keys.
                 // We must queue the task so that we get the req.mutatedParts updated by observability middleware first.
                 // If we refactor the dependency between observability middleware and this middleware we might not need to queue the task.

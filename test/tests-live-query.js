@@ -1450,3 +1450,123 @@ promisedTest("liveQuery with limit refills the window from the rows after it", a
   subscription.unsubscribe();
   await db2.delete();
 });
+
+// Issue #2085: when every value of a write fails, the liveQuery cache must not keep a null
+// optimistic operation. Writes with auto-incremented keys or with 50 or more values are added
+// to the cache after they complete, so a write whose values all failed must add nothing.
+// Intermediate optimistic emissions may still show the failing values (see #2058). One summary
+// assertion covers the initial emission and the last emission after a short grace period, so
+// that no failure hides another.
+async function issue2085WaitFor(predicate, timeout = 500) {
+  const deadline = Date.now() + timeout;
+  while (!predicate()) {
+    if (Date.now() > deadline) return false;
+    await new Promise((resolve) => setTimeout(resolve, 10));
+  }
+  return true;
+}
+
+const issue2085Shapes = {
+  // The shape reported in #2085: auto-incremented primary key and a unique index.
+  add: {
+    schema: '++id, &name',
+    seed: { name: 'a' },
+    failingWrite: (table) => table.add({ name: 'a' }),
+    expectedFailure: 'ConstraintError',
+    nextWrite: (table) => table.add({ name: 'b' }),
+  },
+  // 50 or more values, all violating the primary key.
+  bulkAdd: {
+    schema: 'id, name',
+    seed: { id: 1, name: 'x' },
+    failingWrite: (table) =>
+      table.bulkAdd(Array.from({ length: 50 }, () => ({ id: 1, name: 'dup' }))),
+    expectedFailure: '50 failures',
+    nextWrite: (table) => table.add({ id: 2, name: 'y' }),
+  },
+};
+
+function issue2085Test(shapeName, cacheMode) {
+  return async () => {
+    const shape = issue2085Shapes[shapeName];
+    const dbName = `TestLiveQueryIssue2085_${shapeName}_${cacheMode}`;
+    await Dexie.delete(dbName);
+    const db2085 = new Dexie(dbName, { cache: cacheMode });
+    db2085.version(1).stores({ items: shape.schema });
+    await db2085.items.add(shape.seed);
+
+    // Errors thrown in IndexedDB event listeners are uncaught. Record them here and assert below.
+    const uncaught = [];
+    const previousOnError = window.onerror;
+    window.onerror = (message, source, line, column, error) => {
+      uncaught.push(String(error || message));
+      return true;
+    };
+    const onUnhandledRejection = (event) => {
+      uncaught.push(String(event.reason));
+      event.preventDefault();
+    };
+    window.addEventListener('unhandledrejection', onUnhandledRejection);
+
+    const emissions = [];
+    const observerErrors = [];
+    const subscription = liveQuery(() => db2085.items.toArray()).subscribe({
+      next: (result) => emissions.push(result),
+      error: (error) => observerErrors.push(String(error)),
+    });
+    let failure = null;
+    let initialEmissionSeen = false;
+    let lastEmissionMatchesTable = false;
+    try {
+      initialEmissionSeen = await issue2085WaitFor(() => emissions.length > 0);
+      await shape.failingWrite(db2085.items).catch((error) => {
+        failure = error.failuresByPos
+          ? `${Object.keys(error.failuresByPos).length} failures`
+          : error.name;
+      });
+      await shape.nextWrite(db2085.items);
+      const table = await db2085.transaction('r', db2085.items, () =>
+        db2085.items.toArray()
+      );
+      // Wait for the table state to be emitted, then let late transaction listeners and
+      // emissions run before the last emission is compared with the table.
+      await issue2085WaitFor(
+        () =>
+          emissions.length > 0 &&
+          isDeepEqual(emissions[emissions.length - 1], table)
+      );
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      lastEmissionMatchesTable =
+        emissions.length > 0 &&
+        isDeepEqual(emissions[emissions.length - 1], table);
+    } finally {
+      subscription.unsubscribe();
+      window.onerror = previousOnError;
+      window.removeEventListener('unhandledrejection', onUnhandledRejection);
+      db2085.close();
+      await Dexie.delete(dbName);
+    }
+    equal(
+      JSON.stringify({
+        failure,
+        initialEmissionSeen,
+        uncaught,
+        observerErrors,
+        lastEmissionMatchesTable,
+      }),
+      JSON.stringify({
+        failure: shape.expectedFailure,
+        initialEmissionSeen: true,
+        uncaught: [],
+        observerErrors: [],
+        lastEmissionMatchesTable: true,
+      }),
+      `${shapeName} with cache: '${cacheMode}'`
+    );
+  };
+}
+
+promisedTest("Issue 2085: a failing add with an auto-incremented key must not break liveQuery (cache: 'cloned')", issue2085Test('add', 'cloned'));
+promisedTest("Issue 2085: a failing add with an auto-incremented key must not break liveQuery (cache: 'immutable')", issue2085Test('add', 'immutable'));
+promisedTest("Issue 2085: a bulkAdd where all 50 values fail must not break liveQuery (cache: 'cloned')", issue2085Test('bulkAdd', 'cloned'));
+promisedTest("Issue 2085: a bulkAdd where all 50 values fail must not break liveQuery (cache: 'immutable')", issue2085Test('bulkAdd', 'immutable'));
