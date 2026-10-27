@@ -1212,6 +1212,14 @@ promisedTest("liveQuery results equal fresh query results for compound, nested a
 });
 
 function countReadsMiddleware(counter) {
+  counter.log = [];
+  const count = (method, tableName, req) => {
+    if (req.trans.mode !== 'readonly') return;
+    counter.reads++;
+    // Describe the read for failure messages: what was read, and from where.
+    const caller = (new Error().stack || '').split('\n').slice(2, 8).join(' <- ');
+    counter.log.push(`${method} ${tableName}.${req.query.index.name || ':id'} limit=${req.limit} at ${caller}`);
+  };
   return {
     stack: 'dbcore',
     name: 'countReads',
@@ -1224,17 +1232,40 @@ function countReadsMiddleware(counter) {
           ...table,
           // Count reads of queries, not the reads of writes like update().
           openCursor: (req) => {
-            if (req.trans.mode === 'readonly') counter.reads++;
+            count('openCursor', tableName, req);
             return table.openCursor(req);
           },
           query: (req) => {
-            if (req.trans.mode === 'readonly') counter.reads++;
+            count('query', tableName, req);
             return table.query(req);
           },
         };
       },
     }),
   };
+}
+
+/** Waits until no read has happened for a while, so that reads that are still
+ * caused by the setup of a test are not counted for the writes after it.
+ * Returns the number of reads so far. */
+async function settleReads(counter, quietTime = 200, timeout = 3000) {
+  const started = Date.now();
+  let reads = counter.reads;
+  let quietSince = Date.now();
+  while (Date.now() - quietSince < quietTime && Date.now() - started < timeout) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    if (counter.reads !== reads) {
+      reads = counter.reads;
+      quietSince = Date.now();
+    }
+  }
+  return counter.reads;
+}
+
+/** The reads since the given count, for failure messages. */
+function readsSince(counter, reads) {
+  const log = counter.log.slice(reads);
+  return log.length ? ` (reads: ${log.join(' | ')})` : '';
 }
 
 promisedTest("liveQuery applies writes to filter() results without reading them again", async () => {
@@ -1257,25 +1288,25 @@ promisedTest("liveQuery applies writes to filter() results without reading them 
   const ids = () => latest && latest.map((f) => f.id);
   await waitForLiveValue(ids, [1, 3], 'initial result');
 
-  let reads = counter.reads;
+  let reads = await settleReads(counter);
   await db2.friends.put({ id: 4, age: 19, active: true }); // sorts in front of the window
   await waitForLiveValue(ids, [4, 1], 'row 4 is inserted first, row 3 drops out');
-  equal(counter.reads - reads, 0, 'Inserting in front of the window did not read from the database');
+  equal(counter.reads - reads, 0, 'Inserting in front of the window did not read from the database' + readsSince(counter, reads));
 
-  reads = counter.reads;
+  reads = await settleReads(counter);
   await db2.friends.update(1, { name: 'One' }); // changes a field that is neither sorted nor filtered
   await waitForLiveValue(() => latest && latest.map((f) => f.name), [undefined, 'One'], 'row 1 is replaced');
-  equal(counter.reads - reads, 0, 'Updating a row of the result did not read from the database');
+  equal(counter.reads - reads, 0, 'Updating a row of the result did not read from the database' + readsSince(counter, reads));
 
-  reads = counter.reads;
+  reads = await settleReads(counter);
   await db2.friends.update(1, { active: false }); // leaves the full window, which is refilled
   await waitForLiveValue(ids, [4, 3], 'row 1 left, row 3 came from the buffer');
-  equal(counter.reads - reads, 0, 'Refilling the limit window from the buffer did not read from the database');
+  equal(counter.reads - reads, 0, 'Refilling the limit window from the buffer did not read from the database' + readsSince(counter, reads));
 
-  reads = counter.reads;
+  reads = await settleReads(counter);
   await db2.friends.update(4, { active: false }); // the buffer is used up
   await waitForLiveValue(ids, [3, 5], 'row 4 left, row 5 is read');
-  equal(counter.reads - reads, 1, 'Refilling the limit window read from the database once');
+  equal(counter.reads - reads, 1, 'Refilling the limit window read from the database once' + readsSince(counter, reads));
 
   subscription.unsubscribe();
   await db2.delete();
@@ -1385,10 +1416,10 @@ promisedTest("liveQuery with an open-ended range is served from the cache", asyn
     (value) => (latest = value)
   );
   await waitForLiveValue(() => latest && latest.map((f) => f.id), [19, 20, 21, 22, 23], 'initial result');
-  const reads = counter.reads;
+  const reads = await settleReads(counter);
   await db2.friends.put({ id: 20, age: 20, name: 'renamed' });
   await waitForLiveValue(() => latest && latest[1].name, 'renamed', 'the renamed row is emitted');
-  equal(counter.reads - reads, 0, 'The live query did not read from IndexedDB again');
+  equal(counter.reads - reads, 0, 'The live query did not read from IndexedDB again' + readsSince(counter, reads));
   subscription.unsubscribe();
   await db2.delete();
 });
@@ -1431,22 +1462,22 @@ promisedTest("liveQuery with limit refills the window from the rows after it", a
     (value) => (latest = value)
   );
   await waitForLiveValue(() => latest && latest.map((f) => f.id), [19, 20, 21, 22, 23], 'initial result');
-  const reads = counter.reads;
+  const reads = await settleReads(counter);
   await db2.friends.put({ id: 19, age: 100, name: 'n19' });
   await waitForLiveValue(() => latest.map((f) => f.id), [20, 21, 22, 23, 24], 'row 24 came from the buffer');
   await db2.friends.delete(20);
   await waitForLiveValue(() => latest.map((f) => f.id), [21, 22, 23, 24, 25], 'row 25 came from the buffer');
-  equal(counter.reads - reads, 0, 'The live query did not read from IndexedDB again');
+  equal(counter.reads - reads, 0, 'The live query did not read from IndexedDB again' + readsSince(counter, reads));
   // An insert into the window moves its last row into the buffer.
   await db2.friends.put({ id: 30, age: 24.5, name: 'n30' });
   await waitForLiveValue(() => latest.map((f) => f.id), [21, 22, 23, 24, 30], 'row 30 was inserted');
   await db2.friends.put({ id: 21, age: 200, name: 'n21' });
   await waitForLiveValue(() => latest.map((f) => f.id), [22, 23, 24, 30, 25], 'row 25 came from the buffer');
-  equal(counter.reads - reads, 0, 'The live query still did not read from IndexedDB again');
+  equal(counter.reads - reads, 0, 'The live query still did not read from IndexedDB again' + readsSince(counter, reads));
   // The buffer is used up now.
   await db2.friends.put({ id: 22, age: 300, name: 'n22' });
   await waitForLiveValue(() => latest.map((f) => f.id), [23, 24, 30, 25, 26], 'row 26 was read');
-  equal(counter.reads - reads, 1, 'The live query read from IndexedDB once');
+  equal(counter.reads - reads, 1, 'The live query read from IndexedDB once' + readsSince(counter, reads));
   subscription.unsubscribe();
   await db2.delete();
 });
