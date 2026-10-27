@@ -40,6 +40,7 @@ export function findCompatibleQuery(
       const reqDirection = req.direction ?? 'next';
       const equalEntry = entries.find(
         (entry) =>
+          !entry.dirty && // Dirty entries wait for being removed after the commit.
           (entry.req as DBCoreQueryRequest).limit === req.limit &&
           (entry.req as DBCoreQueryRequest).values === req.values &&
           ((entry.req as DBCoreQueryRequest).direction ?? 'next') ===

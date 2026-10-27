@@ -35,6 +35,7 @@ import {
   DBCoreKeyRange,
 } from '../../public/types/dbcore';
 import { cmp } from '../../functions/cmp';
+import { readReducedCollection } from '../../live-query/reduced-queries';
 import { PropModification } from '../../helpers/prop-modification';
 import { UpdateSpec } from '../../public/types/update-spec';
 import { builtInDeletionTrigger } from '../table/table-helpers';
@@ -64,6 +65,12 @@ export class Collection implements ICollection {
     error: any; // If set, any promise must be rejected with this error
     or: Collection;
     valueMapper: (any) => any;
+    /** The functions given to filter() and and(), for reduced live queries. */
+    jsFilters?: Function[];
+    /** Number of cursor filters, including filter(), until() and distinct(). */
+    filterCount?: number;
+    /** True when limit() was called before offset(). */
+    limitBeforeOffset?: boolean;
   };
 
   _ondirectionchange?: Function;
@@ -194,8 +201,13 @@ export class Collection implements ICollection {
         bVal = getval(b, lastIndex);
       return cmp(aVal, bVal) * order;
     }
-    return this.toArray(function (a) {
-      return a.slice().sort(sorter);
+    return this._read((trans, dxTrans) => {
+      const ctx = this._ctx;
+      const readFromDb = () =>
+        readArray(ctx, trans).then((a) => a.slice().sort(sorter));
+      return (
+        readReducedCollection(ctx, dxTrans, keyPath, readFromDb) || readFromDb()
+      );
     }).then(cb);
   }
 
@@ -205,34 +217,20 @@ export class Collection implements ICollection {
    *
    **/
   toArray(cb?): PromiseExtended<any[]> {
-    return this._read((trans) => {
-      var ctx = this._ctx;
+    return this._read((trans, dxTrans) => {
+      const ctx = this._ctx;
       if (isPlainKeyRange(ctx, true) && ctx.limit > 0) {
-        // Special optimization using IDBObjectStore.getAll() or IDBKeyRange.getAll().
-        // For reverse queries on IDB 3.0+ browsers, uses getAll(options) with direction.
-        const { valueMapper } = ctx;
-        const index = getIndexOrStore(ctx, ctx.table.core.schema);
-        return ctx.table.core
-          .query({
-            trans,
-            limit: ctx.limit,
-            values: true,
-            direction: ctx.dir === 'prev' ? 'prev' : undefined,
-            query: {
-              index,
-              range: ctx.range,
-            },
-          })
-          .then(({ result }) =>
-            valueMapper ? result.map(valueMapper) : result
-          );
-      } else {
-        // Getting array through a cursor.
-        const a = [];
-        return iter(ctx, (item) => a.push(item), trans, ctx.table.core).then(
-          () => a
-        );
+        // Read with getAll(), which the liveQuery cache keeps up to date.
+        return readArray(ctx, trans);
       }
+      return (
+        readReducedCollection(ctx, dxTrans, null, (offset, limit) =>
+          readArray(
+            offset === undefined ? ctx : withWindow(ctx, offset, limit),
+            trans
+          )
+        ) || readArray(ctx, trans)
+      );
     }, cb);
   }
 
@@ -244,6 +242,7 @@ export class Collection implements ICollection {
   offset(offset: number): Collection {
     var ctx = this._ctx;
     if (offset <= 0) return this;
+    if (ctx.limit !== Infinity) ctx.limitBeforeOffset = true;
     ctx.offset += offset; // For count()
     if (isPlainKeyRange(ctx)) {
       addReplayFilter(ctx, () => {
@@ -340,6 +339,8 @@ export class Collection implements ICollection {
     addFilter(this._ctx, function (cursor) {
       return filterFunction(cursor.value);
     });
+    // Assign a new array so that clones made with Object.create() keep theirs.
+    this._ctx.jsFilters = (this._ctx.jsFilters || []).concat([filterFunction]);
     // match filters not used in Dexie.js but can be used by 3rd part libraries to test a
     // collection for a match without querying DB. Used by Dexie.Observable.
     addMatchFilter(this._ctx, filterFunction);
@@ -757,3 +758,53 @@ export class Collection implements ICollection {
 }
 
 const deleteCallback = (value, ctx) => (ctx.value = null);
+
+/** A copy of ctx with another offset and limit, for the result window buffer
+ * of reduced queries. ctx must not have other replay filters than offset() and
+ * limit(), and limit() must not be before offset().
+ */
+function withWindow(
+  ctx: Collection['_ctx'],
+  offset: number,
+  limit: number | undefined
+): Collection['_ctx'] {
+  const windowCtx: Collection['_ctx'] = {
+    ...ctx,
+    replayFilter: null,
+    justLimit: true,
+    offset: 0,
+    limit: Infinity,
+  };
+  const collection = { _ctx: windowCtx } as Collection;
+  Collection.prototype.offset.call(collection, offset);
+  if (limit !== undefined) Collection.prototype.limit.call(collection, limit);
+  windowCtx.justLimit = false; // Read with a cursor, not through the liveQuery cache.
+  return windowCtx;
+}
+
+function readArray(ctx: Collection['_ctx'], trans): PromiseLike<any[]> {
+  if (isPlainKeyRange(ctx, true) && ctx.limit > 0) {
+    // Special optimization using IDBObjectStore.getAll() or IDBKeyRange.getAll().
+    // For reverse queries on IDB 3.0+ browsers, uses getAll(options) with direction.
+    const { valueMapper } = ctx;
+    const index = getIndexOrStore(ctx, ctx.table.core.schema);
+    return ctx.table.core
+      .query({
+        trans,
+        limit: ctx.limit,
+        values: true,
+        direction: ctx.dir === 'prev' ? 'prev' : undefined,
+        query: {
+          index,
+          range: ctx.range,
+        },
+      })
+      .then(({ result }) => (valueMapper ? result.map(valueMapper) : result));
+  } else {
+    // Getting array through a cursor.
+    const a = [];
+    return iter(ctx, (item) => a.push(item), trans, ctx.table.core).then(
+      () => a
+    );
+  }
+}
