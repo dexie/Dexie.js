@@ -34,27 +34,16 @@ import type { LiveQueryContext } from './live-query';
 /*
  * Reduced queries
  * ===============
- * A liveQuery runs its querier again whenever a write overlaps with what the
- * querier has read. Collections that are read with a cursor (because they use
- * filter(), offset() or sortBy()) are then read again from IndexedDB.
+ * Collections that are read with a cursor (filter(), offset(), sortBy()) are
+ * not cached. Instead, each liveQuery subscription keeps their previous result
+ * in a "slot" and applies the writes committed since the last run to it with
+ * EventReduce (https://github.com/pubkey/event-reduce). They are read from
+ * IndexedDB again when EventReduce cannot derive the new result, or when the
+ * table was changed by another tab or Dexie instance.
  *
- * Instead, each liveQuery subscription keeps the previous result of such a
- * collection in a "slot". The writes committed since the last run are applied
- * to it with EventReduce. Only when the new result cannot be derived from the
- * old one (for example when a row leaves a full limit window), or when the
- * table was changed by another tab or another Dexie instance, the collection is
- * read from IndexedDB again.
- *
- * Collections with a limit keep some rows before and after the result window
- * (EventReduce's result window buffer). A row leaving the window is then
- * replaced from memory until the buffer is used up.
- *
- * Slots are matched between runs of the same subscription by the shape of the
- * collection: table, index, range, direction, offset, limit, sortBy() key path
- * and the source code of the filter() functions. Filter functions are expected
- * to be pure: they are only run again on changed rows. A filter that depends on
- * outer variables which change without a new subscription is only re-evaluated
- * for the changed rows, not for all of them.
+ * Slots are matched between runs by table, index, range, direction, offset,
+ * limit, sortBy() key path and the source code of the filter() functions.
+ * Filter functions must be pure: they only run again for changed rows.
  */
 
 type CollectionContext = Collection['_ctx'];
