@@ -61,6 +61,18 @@ export async function applyServerChanges(
       const keys = mut.keys.map(keyDecoder);
       switch (mut.type) {
         case 'insert':
+          mut.values = mut.values.map((val) => {
+            if (
+              val &&
+              typeof val === 'object' &&
+              (Object.isFrozen(val) ||
+                Object.isSealed(val) ||
+                !Object.isExtensible(val))
+            ) {
+              return { ...val };
+            }
+            return val;
+          });
           mut.values.forEach(markIfHasBlobRefs);
           if (primaryKey.outbound) {
             await table.bulkAdd(mut.values, keys);
@@ -73,6 +85,18 @@ export async function applyServerChanges(
           }
           break;
         case 'upsert':
+          mut.values = mut.values.map((val) => {
+            if (
+              val &&
+              typeof val === 'object' &&
+              (Object.isFrozen(val) ||
+                Object.isSealed(val) ||
+                !Object.isExtensible(val))
+            ) {
+              return { ...val };
+            }
+            return val;
+          });
           mut.values.forEach(markIfHasBlobRefs);
           if (primaryKey.outbound) {
             await table.bulkPut(mut.values, keys);
@@ -102,7 +126,18 @@ export async function applyServerChanges(
             // For private singleton IDs (e.g. "#key:userId" on server, "#key" on client),
             // the encoded server-side key may leak into the changeSpec via getObjectDiff().
             // Strip it here unconditionally as a defensive measure.
-            for (const changeSpec of mut.changeSpecs) {
+            for (let i = 0; i < mut.changeSpecs.length; i++) {
+              let changeSpec = mut.changeSpecs[i];
+              if (
+                changeSpec &&
+                typeof changeSpec === 'object' &&
+                (Object.isFrozen(changeSpec) ||
+                  Object.isSealed(changeSpec) ||
+                  !Object.isExtensible(changeSpec))
+              ) {
+                changeSpec = { ...changeSpec };
+                mut.changeSpecs[i] = changeSpec;
+              }
               delete changeSpec[primaryKey.keyPath];
             }
           }
