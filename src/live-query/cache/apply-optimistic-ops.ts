@@ -1,136 +1,129 @@
 import { cmp } from '../../functions/cmp';
 import { isArray } from '../../functions/utils';
-import { RangeSet } from '../../helpers/rangeset';
 import { CacheEntry } from '../../public/types/cache';
 import {
   DBCoreMutateRequest,
   DBCoreQueryRequest,
   DBCoreTable,
 } from '../../public/types/dbcore';
+import { getResultWindowBufferResults } from 'event-reduce-js';
+import type { ResultWindowBuffer } from 'event-reduce-js';
+import { applyToWindowBuffer, keyToId, toPaths } from '../event-reduce-apply';
+import type { ReducibleQuery } from '../event-reduce-apply';
 import { isWithinRange } from './is-within-range';
+import { getEntryBuffer } from './window-buffer';
 
+/** Applies mutations to a cached query result with EventReduce: to the
+ * entry's buffer on commit, to a copy of it for optimistic reads. Marks the
+ * entry dirty when the result cannot be derived, or for queries and mutations
+ * EventReduce does not handle (multiEntry, outbound keys, keys only,
+ * deleteRange) when they might affect the result.
+ */
 export function applyOptimisticOps(
   result: any[],
   req: DBCoreQueryRequest,
   ops: DBCoreMutateRequest[] | undefined,
   table: DBCoreTable,
   cacheEntry: CacheEntry,
-  immutable: boolean
+  immutable: boolean,
+  commit?: boolean
 ): any[] {
   if (!ops || ops.length === 0) return result;
+  const buffer = getEntryBuffer(cacheEntry);
+  if (!buffer || ops.some((op) => op.type === 'deleteRange')) {
+    return requery(result, ops, req, table, cacheEntry, buffer);
+  }
+  const applied = applyToWindowBuffer(buffer, ops, !commit);
+  if (!applied) {
+    cacheEntry.dirty = true;
+    return result;
+  }
+  const results = getResultWindowBufferResults(applied);
+  if (
+    results.length === result.length &&
+    results.every((row, i) => row === result[i])
+  ) {
+    return result;
+  }
+  return immutable ? (Object.freeze(results) as any[]) : results;
+}
+
+/** The query of a request for EventReduce, or null if EventReduce can't
+ * handle it.
+ */
+export function toReducibleQuery(
+  req: DBCoreQueryRequest,
+  table: DBCoreTable
+): ReducibleQuery | null {
   const index = req.query.index;
-  const { multiEntry } = index;
-  const queryRange = req.query.range;
   const primaryKey = table.schema.primaryKey;
+  if (!req.values || primaryKey.outbound || index.multiEntry) return null;
   const extractPrimKey = primaryKey.extractKey!;
   const extractIndex = index.extractKey!;
-  const extractLowLevelIndex = (index.lowLevelIndex || index).extractKey!;
+  const lowLevelIndex = index.lowLevelIndex || index;
+  const extractLowLevelIndex = lowLevelIndex.extractKey!;
+  const queryRange = req.query.range;
+  const reverse = req.direction === 'prev' || req.direction === 'prevunique';
+  return {
+    extractPrimKey,
+    sortFields: toPaths(lowLevelIndex.keyPath).concat(
+      toPaths(primaryKey.keyPath)
+    ),
+    limit: req.limit,
+    matches: (value) => isWithinRange(extractIndex(value), queryRange),
+    // Same order as the index: index key, then primary key.
+    compare: (a, b) => {
+      const order =
+        cmp(extractLowLevelIndex(a), extractLowLevelIndex(b)) ||
+        cmp(extractPrimKey(a), extractPrimKey(b));
+      return reverse ? -order : order;
+    },
+  };
+}
 
-  let finalResult = ops.reduce((result, op) => {
-    let modifedResult = result;
-    const includedValues: any[] = [];
-    if (op.type === 'add' || op.type === 'put') {
-      const includedPKs = new RangeSet(); // For ignoring duplicates
-      for (let i = op.values.length - 1; i >= 0; --i) {
-        // backwards to prioritize last value of same PK
-        const value = op.values[i];
-        const pk = extractPrimKey(value);
-        if (includedPKs.hasKey(pk)) continue;
-        const key = extractIndex(value);
-        if (
-          multiEntry && isArray(key)
-            ? key.some((k) => isWithinRange(k, queryRange))
-            : isWithinRange(key, queryRange)
-        ) {
-          includedPKs.addKey(pk);
-          includedValues.push(value);
-        }
-      }
-    }
+/** Marks the cache entry dirty, so that it is queried again once the
+ * transaction has committed, when one of the mutations might change the result.
+ */
+function requery(
+  result: any[],
+  ops: DBCoreMutateRequest[],
+  req: DBCoreQueryRequest,
+  table: DBCoreTable,
+  cacheEntry: CacheEntry,
+  buffer: ResultWindowBuffer<any> | undefined
+): any[] {
+  const extractPrimKey = table.schema.primaryKey.extractKey;
+  const extractIndex = req.query.index.extractKey;
+  // The ids of the rows that are known, if they can be known.
+  const ids =
+    buffer?.keyDocumentMap ||
+    (req.values && !table.schema.primaryKey.outbound
+      ? new Set(result.map((value) => keyToId(extractPrimKey(value))))
+      : null);
+  const isInResult = (key: any) => {
+    const id = keyToId(key);
+    return !ids || id === undefined || ids.has(id);
+  };
+  const affected = ops.some((op) => {
     switch (op.type) {
-      case 'add': {
-        const existingKeys = new RangeSet().addKeys(
-          req.values ? result.map((v) => extractPrimKey(v)) : result
-        );
-
-        modifedResult = result.concat(
-          req.values
-            ? includedValues.filter((v) => {
-                const key = extractPrimKey(v);
-                if (existingKeys.hasKey(key)) return false;
-                existingKeys.addKey(key);
-                return true;
-              })
-            : includedValues
-                .map((v) => extractPrimKey(v))
-                .filter((k) => {
-                  if (existingKeys.hasKey(k)) return false;
-                  existingKeys.addKey(k);
-                  return true;
-                })
-        );
-        break;
-      }
-      case 'put': {
-        const keySet = new RangeSet().addKeys(
-          op.values.map((v) => extractPrimKey(v))
-        );
-        modifedResult = result
-          .filter(
-            // Remove all items that are being replaced
-            (item) => !keySet.hasKey(req.values ? extractPrimKey(item) : item)
-          )
-          .concat(
-            // Add all items that are being put (sorting will be done later)
-            req.values
-              ? includedValues
-              : includedValues.map((v) => extractPrimKey(v))
+      case 'add':
+      case 'put':
+        return op.values.some((value) => {
+          if (!extractPrimKey || !extractIndex) return true;
+          const key = extractIndex(value);
+          return (
+            isInResult(extractPrimKey(value)) ||
+            (isArray(key)
+              ? key.some((k) => isWithinRange(k, req.query.range))
+              : isWithinRange(key, req.query.range))
           );
-        break;
-      }
+        });
       case 'delete':
-        const keysToDelete = new RangeSet().addKeys(op.keys);
-        modifedResult = result.filter(
-          (item) =>
-            !keysToDelete.hasKey(req.values ? extractPrimKey(item) : item)
-        );
-
-        break;
-      case 'deleteRange':
-        const range = op.range;
-        modifedResult = result.filter(
-          (item) => !isWithinRange(extractPrimKey(item), range)
-        );
-        break;
+        return op.keys.some(isInResult);
+      default:
+        return true; // deleteRange
     }
-    return modifedResult;
-  }, result);
-
-  // If no changes were made, we can return the original result.
-  if (finalResult === result) return result;
-
-  // Sort the result on sortIndex:
-  const sorter: (a: any, b: any) => number = (a, b) =>
-    cmp(extractLowLevelIndex(a), extractLowLevelIndex(b)) ||
-    cmp(extractPrimKey(a), extractPrimKey(b));
-
-  // If direction is 'prev' or 'prevunique', sort in descending order
-  finalResult.sort(
-    req.direction === 'prev' || req.direction === 'prevunique'
-      ? (a, b) => sorter(b, a)
-      : sorter
-  );
-
-  // If we have a limit we need to respect it:
-  if (req.limit && req.limit < Infinity) {
-    if (finalResult.length > req.limit) {
-      finalResult.length = req.limit; // Cut of any extras after sorting correctly.
-    } else if (result.length === req.limit && finalResult.length < req.limit) {
-      // We're missing some items because of the limit. We need to add them back.
-      // The easiest way is to mark the cache entry as dirty, which will cause
-      // it to be requeried after the write-transaction successfully completes.
-      cacheEntry.dirty = true;
-    }
-  }
-  return immutable ? (Object.freeze(finalResult) as any[]) : finalResult;
+  });
+  if (affected) cacheEntry.dirty = true;
+  return result;
 }

@@ -452,7 +452,10 @@ const mutsAndExpects = () => [
       outboundIdBtwnMinus1And2: [{num:1,name:"A"},{num:2,name:"B"}],
       outboundAnyOf_BCD_keys: ["B", "C"]
     },[
-      "itemsStartsWithACount"
+      "itemsStartsWithACount",
+      // Like count(), a query with offset() depends on deletes of rows in front of
+      // its window, which are not known when the deleted row was not read.
+      "itemsStartsWithAOffset3"
     ]
   ],
   [
@@ -990,6 +993,532 @@ promisedTest("Issue 2352: an aborted run that rejects late should not reach obse
 
   subscription.unsubscribe();
   await db2352.delete();
+});
+
+function waitForLiveValue(getLatest, expected, description, timeout = 1000) {
+  return new Promise((resolve) => {
+    const started = Date.now();
+    (function check() {
+      const actual = getLatest();
+      const matches = isDeepEqual(actual, expected);
+      if (matches || Date.now() - started > timeout) {
+        if (actual === undefined || expected === undefined) {
+          // deepEqual() cannot compare undefined (it uses JSON.parse()).
+          ok(matches, `${description}: expected ${JSON.stringify(expected)}, got ${JSON.stringify(actual)}`);
+        } else {
+          deepEqual(actual, expected, description);
+        }
+        resolve(matches);
+      } else {
+        setTimeout(check, 5);
+      }
+    })();
+  });
+}
+
+promisedTest("liveQuery with limit must refill the window when a row moves out of it", async () => {
+  for (const cacheMode of ['immutable', 'cloned']) {
+    const db2 = new Dexie('TestLiveQueryLimitWindow_' + cacheMode, { cache: cacheMode });
+    db2.version(1).stores({ friends: 'id, age, [name+age]' });
+    await db2.friends.bulkAdd([
+      { id: 1, name: 'x', age: 1 },
+      { id: 2, name: 'x', age: 2 },
+      { id: 3, name: 'x', age: 3 },
+    ]);
+    const queries = {
+      orderByLimit: () => db2.friends.orderBy('age').limit(2).toArray(),
+      reverseLimit: () => db2.friends.orderBy('age').reverse().limit(2).toArray(),
+      compoundLimit: () =>
+        db2.friends
+          .where('[name+age]')
+          .between(['x', Dexie.minKey], ['x', Dexie.maxKey])
+          .limit(2)
+          .toArray(),
+    };
+    const latest = {};
+    const subscriptions = Object.keys(queries).map((name) =>
+      liveQuery(queries[name]).subscribe((value) => (latest[name] = value))
+    );
+    const ids = (rows) => rows && rows.map((row) => row.id);
+    await waitForLiveValue(() => ids(latest.orderByLimit), [1, 2], `[${cacheMode}] initial orderBy().limit()`);
+    await waitForLiveValue(() => ids(latest.reverseLimit), [3, 2], `[${cacheMode}] initial reverse().limit()`);
+    await waitForLiveValue(() => ids(latest.compoundLimit), [1, 2], `[${cacheMode}] initial compound limit`);
+
+    // Row 1 moves behind row 3, which is not part of the limited results.
+    await db2.friends.put({ id: 1, name: 'x', age: 10 });
+    await waitForLiveValue(() => ids(latest.orderByLimit), [2, 3], `[${cacheMode}] orderBy().limit() is refilled with row 3`);
+    await waitForLiveValue(() => ids(latest.compoundLimit), [2, 3], `[${cacheMode}] compound limit is refilled with row 3`);
+    await waitForLiveValue(() => ids(latest.reverseLimit), [1, 3], `[${cacheMode}] reverse().limit() puts row 1 first`);
+
+    // Row 1 moves in front of row 2, which is the last row of the reverse window.
+    await db2.friends.put({ id: 1, name: 'x', age: 0 });
+    await waitForLiveValue(() => ids(latest.reverseLimit), [3, 2], `[${cacheMode}] reverse().limit() is refilled with row 2`);
+    await waitForLiveValue(() => ids(latest.orderByLimit), [1, 2], `[${cacheMode}] orderBy().limit() puts row 1 first`);
+
+    subscriptions.forEach((s) => s.unsubscribe());
+    await db2.delete();
+  }
+});
+
+promisedTest("liveQuery results equal fresh query results after random writes", async () => {
+  let seed = 42;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+  for (const cacheMode of ['immutable', 'cloned']) {
+    const db2 = new Dexie('TestLiveQueryRandomWrites_' + cacheMode, { cache: cacheMode });
+    db2.version(1).stores({ friends: 'id, age, name, [name+age]' });
+    const names = ['a', 'b', 'c'];
+    const randomFriend = (id) => ({
+      id,
+      name: names[Math.floor(random() * names.length)],
+      age: Math.floor(random() * 50),
+      note: 'n' + Math.floor(random() * 1000),
+    });
+    const initial = [];
+    for (let id = 0; id < 40; id++) initial.push(randomFriend(id));
+    await db2.friends.bulkAdd(initial);
+
+    const queries = {
+      orderByLimit: () => db2.friends.orderBy('age').limit(5).toArray(),
+      reverseLimit: () => db2.friends.orderBy('age').reverse().limit(5).toArray(),
+      rangeLimit: () => db2.friends.where('age').between(10, 30).limit(7).toArray(),
+      range: () => db2.friends.where('age').between(10, 30).toArray(),
+      all: () => db2.friends.orderBy('age').toArray(),
+      equalsLimit: () => db2.friends.where('name').equals('b').limit(3).toArray(),
+      compoundLimit: () =>
+        db2.friends
+          .where('[name+age]')
+          .between(['a', Dexie.minKey], ['a', Dexie.maxKey])
+          .limit(4)
+          .toArray(),
+      primaryKeyLimit: () => db2.friends.where('id').above(10).limit(5).toArray(),
+    };
+    const latest = {};
+    const subscriptions = Object.keys(queries).map((name) =>
+      liveQuery(queries[name]).subscribe((value) => (latest[name] = value))
+    );
+
+    let nextId = 40;
+    let failed = false;
+    for (let i = 0; i < 60 && !failed; i++) {
+      const r = random();
+      const existingId = Math.floor(random() * nextId);
+      if (r < 0.2) {
+        await db2.friends.add(randomFriend(nextId++));
+      } else if (r < 0.45) {
+        // change the sort field only
+        await db2.friends.where('id').equals(existingId).modify((f) => {
+          f.age = Math.floor(random() * 50);
+        });
+      } else if (r < 0.6) {
+        // change a field that is not indexed
+        await db2.friends.update(existingId, { note: 'u' + i });
+      } else if (r < 0.75) {
+        // change several fields
+        await db2.friends.put(randomFriend(existingId));
+      } else if (r < 0.85) {
+        await db2.friends.bulkPut([randomFriend(existingId), randomFriend(nextId++)]);
+      } else {
+        await db2.friends.delete(existingId);
+      }
+      for (const name of Object.keys(queries)) {
+        const expected = await db2.transaction('r', db2.friends, queries[name]);
+        if (!(await waitForLiveValue(() => latest[name], expected, `[${cacheMode}] ${name} after write #${i}`))) {
+          failed = true; // stop at the first wrong result instead of piling up timeouts
+          break;
+        }
+      }
+    }
+    subscriptions.forEach((s) => s.unsubscribe());
+    await db2.delete();
+  }
+});
+
+promisedTest("liveQuery results equal fresh query results for compound, nested and Date keys and multiEntry indexes", async () => {
+  let seed = 7;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+  const randomInt = (max) => Math.floor(random() * max);
+  const tags = ['x', 'y', 'z'];
+  const tables = {
+    compound: {
+      schema: '[team+num], age, *tags',
+      row: (n) => ({ team: ['a', 'b'][n % 2], num: n, age: randomInt(50), tags: [tags[randomInt(3)]] }),
+      key: (row) => [row.team, row.num],
+    },
+    nested: {
+      schema: 'meta.id, age, *tags',
+      row: (n) => ({ meta: { id: 'k' + n }, age: randomInt(50), tags: [tags[randomInt(3)]] }),
+      key: (row) => row.meta.id,
+    },
+    dates: {
+      schema: 'when, age, *tags',
+      row: (n) => ({ when: new Date(1700000000000 + n * 1000), age: randomInt(50), tags: [tags[randomInt(3)], tags[randomInt(3)]] }),
+      key: (row) => row.when,
+    },
+  };
+  for (const cacheMode of ['immutable', 'cloned']) {
+    for (const tableName of Object.keys(tables)) {
+      const { schema, row, key } = tables[tableName];
+      const db2 = new Dexie(`TestLiveQueryKeyTypes_${tableName}_${cacheMode}`, { cache: cacheMode });
+      db2.version(1).stores({ items: schema });
+      const initial = [];
+      for (let n = 0; n < 30; n++) initial.push(row(n));
+      await db2.items.bulkAdd(initial);
+      const queries = {
+        orderByLimit: () => db2.items.orderBy('age').limit(4).toArray(),
+        reverseLimit: () => db2.items.orderBy('age').reverse().limit(4).toArray(),
+        rangeLimit: () => db2.items.where('age').between(10, 30).limit(3).toArray(),
+        all: () => db2.items.orderBy('age').toArray(),
+        multiEntry: () => db2.items.where('tags').equals('x').toArray(),
+        multiEntryLimit: () => db2.items.where('tags').equals('y').limit(3).toArray(),
+      };
+      const latest = {};
+      const subscriptions = Object.keys(queries).map((name) =>
+        liveQuery(queries[name]).subscribe((value) => (latest[name] = value))
+      );
+      let nextNum = 30;
+      let failed = false;
+      for (let i = 0; i < 40 && !failed; i++) {
+        const r = random();
+        const existing = await db2.items.toArray();
+        const target = existing[randomInt(existing.length)];
+        if (r < 0.25 || !target) {
+          await db2.items.add(row(nextNum++));
+        } else if (r < 0.65) {
+          // same key, new sort field and tags
+          await db2.items.put({ ...row(0), ...pickKey(target), age: randomInt(50), tags: [tags[randomInt(3)]] });
+        } else if (r < 0.9) {
+          await db2.items.delete(key(target));
+        } else {
+          await db2.items.clear();
+          await db2.items.bulkAdd([row(nextNum++), row(nextNum++), row(nextNum++)]);
+        }
+        for (const name of Object.keys(queries)) {
+          const expected = await db2.transaction('r', db2.items, queries[name]);
+          if (!(await waitForLiveValue(() => latest[name], expected, `[${cacheMode}] ${tableName} ${name} after write #${i}`))) {
+            failed = true;
+            break;
+          }
+        }
+      }
+      subscriptions.forEach((s) => s.unsubscribe());
+      await db2.delete();
+
+      function pickKey(target) {
+        if (tableName === 'compound') return { team: target.team, num: target.num };
+        if (tableName === 'nested') return { meta: target.meta };
+        return { when: target.when };
+      }
+    }
+  }
+});
+
+function countReadsMiddleware(counter) {
+  counter.log = [];
+  const count = (method, tableName, req) => {
+    if (req.trans.mode !== 'readonly') return;
+    counter.reads++;
+    // Describe the read for failure messages: what was read, and from where.
+    const caller = (new Error().stack || '').split('\n').slice(2, 8).join(' <- ');
+    counter.log.push(`${method} ${tableName}.${req.query.index.name || ':id'} limit=${req.limit} at ${caller}`);
+  };
+  return {
+    stack: 'dbcore',
+    name: 'countReads',
+    level: -10, // Below the cache middleware (0): only counts reads that reach IndexedDB.
+    create: (down) => ({
+      ...down,
+      table: (tableName) => {
+        const table = down.table(tableName);
+        return {
+          ...table,
+          // Count reads of queries, not the reads of writes like update().
+          openCursor: (req) => {
+            count('openCursor', tableName, req);
+            return table.openCursor(req);
+          },
+          query: (req) => {
+            count('query', tableName, req);
+            return table.query(req);
+          },
+        };
+      },
+    }),
+  };
+}
+
+/** Waits until no read has happened for a while, so that reads that are still
+ * caused by the setup of a test are not counted for the writes after it.
+ * Returns the number of reads so far. */
+async function settleReads(counter, quietTime = 200, timeout = 3000) {
+  const started = Date.now();
+  let reads = counter.reads;
+  let quietSince = Date.now();
+  while (Date.now() - quietSince < quietTime && Date.now() - started < timeout) {
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    if (counter.reads !== reads) {
+      reads = counter.reads;
+      quietSince = Date.now();
+    }
+  }
+  return counter.reads;
+}
+
+/** The reads since the given count, for failure messages. */
+function readsSince(counter, reads) {
+  const log = counter.log.slice(reads);
+  return log.length ? ` (reads: ${log.join(' | ')})` : '';
+}
+
+promisedTest("liveQuery applies writes to filter() results without reading them again", async () => {
+  const counter = { reads: 0 };
+  const db2 = new Dexie('TestLiveQueryReducedReads');
+  db2.use(countReadsMiddleware(counter));
+  db2.version(1).stores({ friends: 'id, age' });
+  await db2.friends.bulkAdd([
+    { id: 1, age: 20, active: true },
+    { id: 2, age: 30, active: false },
+    { id: 3, age: 40, active: true },
+    { id: 5, age: 50, active: true },
+    { id: 6, age: 60, active: true },
+  ]);
+  let latest;
+  // Limit 2 keeps 1 row after the window (getRecommendedResultWindowBufferSize(2) of EventReduce).
+  const subscription = liveQuery(() =>
+    db2.friends.where('age').above(18).filter((f) => f.active).limit(2).toArray()
+  ).subscribe((value) => (latest = value));
+  const ids = () => latest && latest.map((f) => f.id);
+  await waitForLiveValue(ids, [1, 3], 'initial result');
+
+  let reads = await settleReads(counter);
+  await db2.friends.put({ id: 4, age: 19, active: true }); // sorts in front of the window
+  await waitForLiveValue(ids, [4, 1], 'row 4 is inserted first, row 3 drops out');
+  equal(counter.reads - reads, 0, 'Inserting in front of the window did not read from the database' + readsSince(counter, reads));
+
+  reads = await settleReads(counter);
+  await db2.friends.update(1, { name: 'One' }); // changes a field that is neither sorted nor filtered
+  await waitForLiveValue(() => latest && latest.map((f) => f.name), [undefined, 'One'], 'row 1 is replaced');
+  equal(counter.reads - reads, 0, 'Updating a row of the result did not read from the database' + readsSince(counter, reads));
+
+  reads = await settleReads(counter);
+  await db2.friends.update(1, { active: false }); // leaves the full window, which is refilled
+  await waitForLiveValue(ids, [4, 3], 'row 1 left, row 3 came from the buffer');
+  equal(counter.reads - reads, 0, 'Refilling the limit window from the buffer did not read from the database' + readsSince(counter, reads));
+
+  reads = await settleReads(counter);
+  await db2.friends.update(4, { active: false }); // the buffer is used up
+  await waitForLiveValue(ids, [3, 5], 'row 4 left, row 5 is read');
+  equal(counter.reads - reads, 1, 'Refilling the limit window read from the database once' + readsSince(counter, reads));
+
+  subscription.unsubscribe();
+  await db2.delete();
+});
+
+promisedTest("liveQuery results equal fresh query results for filter(), offset() and sortBy()", async () => {
+  let seed = 11;
+  const random = () => {
+    seed = (seed * 1664525 + 1013904223) % 4294967296;
+    return seed / 4294967296;
+  };
+  const randomInt = (max) => Math.floor(random() * max);
+  const randomFriend = (id) => ({
+    id,
+    age: randomInt(60),
+    score: randomInt(1000) / 10,
+    team: ['a', 'b', 'c'][randomInt(3)],
+    active: random() < 0.5,
+  });
+  for (const cacheMode of ['immutable', 'cloned']) {
+    const name = 'TestLiveQueryReducedQueries_' + cacheMode;
+    const db2 = new Dexie(name, { cache: cacheMode });
+    db2.version(1).stores({ friends: 'id, age, team', virtual: 'id, [team+score]' });
+    const otherInstance = new Dexie(name, { cache: cacheMode });
+    otherInstance.version(1).stores({ friends: 'id, age, team', virtual: 'id, [team+score]' });
+    const initial = [];
+    for (let id = 0; id < 40; id++) initial.push(randomFriend(id));
+    await db2.friends.bulkAdd(initial);
+    await db2.virtual.bulkAdd(initial);
+
+    const queries = {
+      filterLimit: () => db2.friends.where('age').between(20, 50).filter((f) => f.active).limit(5).toArray(),
+      filterAll: () => db2.friends.where('age').above(10).and((f) => f.team !== 'b').toArray(),
+      twoFilters: () => db2.friends.where('age').below(40).filter((f) => f.active).filter((f) => f.score > 30).reverse().toArray(),
+      offsetLimit: () => db2.friends.where('age').above(5).offset(3).limit(4).toArray(),
+      offsetOnly: () => db2.friends.orderBy('age').offset(30).toArray(),
+      sortBy: () => db2.friends.where('age').above(18).sortBy('score'),
+      reverseSortBy: () => db2.friends.where('team').equals('b').filter((f) => f.active).reverse().sortBy('score'),
+      first: () => db2.friends.where('age').above(25).filter((f) => f.active).first(),
+      tableFilter: () => db2.friends.filter((f) => f.active).toArray(),
+      tableSortBy: () => db2.friends.toCollection().sortBy('age'),
+      virtualIndex: () => db2.virtual.where('team').equals('a').filter((f) => f.age > 10).toArray(),
+      // Not reduced, must stay correct:
+      limitBeforeOffset: () => db2.friends.where('age').above(5).limit(6).offset(2).toArray(),
+      until: () => db2.friends.orderBy('age').until((f) => f.age > 30).toArray(),
+    };
+    const latest = {};
+    const subscriptions = Object.keys(queries).map((queryName) =>
+      liveQuery(queries[queryName]).subscribe((value) => (latest[queryName] = value))
+    );
+    let nextId = 40;
+    let failed = false;
+    for (let i = 0; i < 60 && !failed; i++) {
+      const r = random();
+      const table = random() < 0.8 ? db2.friends : db2.virtual;
+      const writer = random() < 0.2 ? otherInstance : db2;
+      const writerTable = writer.table(table.name);
+      const existingId = randomInt(nextId);
+      const kind = (writer === db2 ? '' : 'other instance ') + table.name + ' ' +
+        (r < 0.2 ? 'add' : r < 0.4 ? 'modify sort fields' : r < 0.55 ? 'update filtered fields' : r < 0.7 ? 'put' : r < 0.8 ? 'bulkPut' : r < 0.97 ? 'delete' : 'clear');
+      if (r < 0.2) {
+        await writerTable.add(randomFriend(nextId++));
+      } else if (r < 0.4) {
+        // change the sort fields only
+        await writerTable.where('id').equals(existingId).modify((f) => {
+          f.age = randomInt(60);
+          f.score = randomInt(1000) / 10;
+        });
+      } else if (r < 0.55) {
+        // change the filtered fields only
+        await writerTable.update(existingId, { active: random() < 0.5, team: ['a', 'b', 'c'][randomInt(3)] });
+      } else if (r < 0.7) {
+        await writerTable.put(randomFriend(existingId));
+      } else if (r < 0.8) {
+        await writerTable.bulkPut([randomFriend(existingId), randomFriend(nextId++)]);
+      } else if (r < 0.97) {
+        await writerTable.delete(existingId);
+      } else {
+        await writerTable.clear();
+        await writerTable.bulkAdd([randomFriend(nextId++), randomFriend(nextId++), randomFriend(nextId++)]);
+      }
+      for (const queryName of Object.keys(queries)) {
+        const expected = await db2.transaction('r', db2.friends, db2.virtual, queries[queryName]);
+        if (!(await waitForLiveValue(() => latest[queryName], expected, `[${cacheMode}] ${queryName} after write #${i} (${kind})`))) {
+          failed = true;
+          break;
+        }
+      }
+    }
+    subscriptions.forEach((s) => s.unsubscribe());
+    otherInstance.close();
+    await db2.delete();
+  }
+});
+
+promisedTest("liveQuery with an open-ended range is served from the cache", async () => {
+  const counter = { reads: 0 };
+  const db2 = new Dexie('TestLiveQueryOpenEndedRange');
+  db2.use(countReadsMiddleware(counter));
+  db2.version(1).stores({ friends: 'id, age' });
+  const rows = [];
+  for (let id = 0; id < 30; id++) rows.push({ id, age: id, name: 'n' + id });
+  await db2.friends.bulkAdd(rows);
+  let latest;
+  // above() and below() create ranges with an undefined upper / lower bound.
+  const subscription = liveQuery(() => db2.friends.where('age').above(18).limit(5).toArray()).subscribe(
+    (value) => (latest = value)
+  );
+  await waitForLiveValue(() => latest && latest.map((f) => f.id), [19, 20, 21, 22, 23], 'initial result');
+  const reads = await settleReads(counter);
+  await db2.friends.put({ id: 20, age: 20, name: 'renamed' });
+  await waitForLiveValue(() => latest && latest[1].name, 'renamed', 'the renamed row is emitted');
+  equal(counter.reads - reads, 0, 'The live query did not read from IndexedDB again' + readsSince(counter, reads));
+  subscription.unsubscribe();
+  await db2.delete();
+});
+
+promisedTest("liveQuery reads cloned collections and limit(0) like fresh queries", async () => {
+  const db2 = new Dexie('TestLiveQueryCloneAndLimit0');
+  db2.version(1).stores({ friends: 'id, age' });
+  const rows = [];
+  for (let id = 0; id < 20; id++) rows.push({ id, age: id, active: id % 2 === 0 });
+  await db2.friends.bulkAdd(rows);
+  const queries = {
+    // clone() inherits the collection's context through its prototype.
+    cloned: () => db2.friends.where('age').above(5).clone().filter((f) => f.active).offset(1).limit(3).toArray(),
+    limit0: () => db2.friends.where('age').above(5).filter((f) => f.active).limit(0).toArray(),
+  };
+  const latest = {};
+  const emissions = {};
+  const subscriptions = Object.keys(queries).map((name) =>
+    liveQuery(queries[name]).subscribe((value) => {
+      latest[name] = value;
+      emissions[name] = (emissions[name] || 0) + 1;
+    })
+  );
+  const ids = (name) => () => latest[name] && latest[name].map((f) => f.id);
+  await waitForLiveValue(ids('cloned'), [8, 10, 12], 'cloned: initial result');
+  await waitForLiveValue(ids('limit0'), [], 'limit0: initial result');
+  const limit0Emissions = emissions.limit0;
+  await db2.friends.put({ id: 20, age: 7, active: true });
+  await waitForLiveValue(ids('cloned'), [20, 8, 10], 'cloned: a row was inserted into the window');
+  // limit0 is [] already, so wait for the result of its run after the write.
+  await waitForLiveValue(() => emissions.limit0 > limit0Emissions, true, 'limit0: ran again after the insert');
+  deepEqual(ids('limit0')(), [], 'limit0: still empty after an insert');
+  subscriptions.forEach((s) => s.unsubscribe());
+  await db2.delete();
+});
+
+promisedTest("liveQuery with limit() before offset() updates when a skipped row is deleted", async () => {
+  const db2 = new Dexie('TestLiveQueryLimitBeforeOffset');
+  db2.version(1).stores({ friends: 'id, age' });
+  const rows = [];
+  for (let id = 0; id < 20; id++) rows.push({ id, age: id });
+  await db2.friends.bulkAdd(rows);
+  let latest, latestKeys;
+  // limit() before offset() is read with a cursor that skips rows without reading them.
+  const subscription = liveQuery(() => db2.friends.where('age').above(5).limit(6).offset(2).toArray()).subscribe(
+    (value) => (latest = value)
+  );
+  const keysSubscription = liveQuery(() => db2.friends.where('age').above(5).offset(2).primaryKeys()).subscribe(
+    (value) => (latestKeys = value)
+  );
+  await waitForLiveValue(() => latest && latest.map((f) => f.id), [8, 9, 10, 11], 'initial result');
+  await waitForLiveValue(() => latestKeys && latestKeys.slice(0, 2), [8, 9], 'initial keys');
+  await db2.friends.delete(6); // a skipped row
+  await waitForLiveValue(() => latest.map((f) => f.id), [9, 10, 11, 12], 'the window moved');
+  await waitForLiveValue(() => latestKeys.slice(0, 2), [9, 10], 'the keys moved');
+  subscription.unsubscribe();
+  keysSubscription.unsubscribe();
+  await db2.delete();
+});
+
+promisedTest("liveQuery with limit refills the window from the rows after it", async () => {
+  const counter = { reads: 0 };
+  const db2 = new Dexie('TestLiveQueryWindowBuffer');
+  db2.use(countReadsMiddleware(counter));
+  db2.version(1).stores({ friends: 'id, age' });
+  const rows = [];
+  for (let id = 0; id < 30; id++) rows.push({ id, age: id, name: 'n' + id });
+  await db2.friends.bulkAdd(rows);
+  let latest;
+  // Limit 5 keeps 2 rows after the window (getRecommendedResultWindowBufferSize(5) of EventReduce).
+  const subscription = liveQuery(() => db2.friends.where('age').above(18).limit(5).toArray()).subscribe(
+    (value) => (latest = value)
+  );
+  await waitForLiveValue(() => latest && latest.map((f) => f.id), [19, 20, 21, 22, 23], 'initial result');
+  const reads = await settleReads(counter);
+  await db2.friends.put({ id: 19, age: 100, name: 'n19' });
+  await waitForLiveValue(() => latest.map((f) => f.id), [20, 21, 22, 23, 24], 'row 24 came from the buffer');
+  await db2.friends.delete(20);
+  await waitForLiveValue(() => latest.map((f) => f.id), [21, 22, 23, 24, 25], 'row 25 came from the buffer');
+  equal(counter.reads - reads, 0, 'The live query did not read from IndexedDB again' + readsSince(counter, reads));
+  // An insert into the window moves its last row into the buffer.
+  await db2.friends.put({ id: 30, age: 24.5, name: 'n30' });
+  await waitForLiveValue(() => latest.map((f) => f.id), [21, 22, 23, 24, 30], 'row 30 was inserted');
+  await db2.friends.put({ id: 21, age: 200, name: 'n21' });
+  await waitForLiveValue(() => latest.map((f) => f.id), [22, 23, 24, 30, 25], 'row 25 came from the buffer');
+  equal(counter.reads - reads, 0, 'The live query still did not read from IndexedDB again' + readsSince(counter, reads));
+  // The buffer is used up now.
+  await db2.friends.put({ id: 22, age: 300, name: 'n22' });
+  await waitForLiveValue(() => latest.map((f) => f.id), [23, 24, 30, 25, 26], 'row 26 was read');
+  equal(counter.reads - reads, 1, 'The live query read from IndexedDB once' + readsSince(counter, reads));
+  subscription.unsubscribe();
+  await db2.delete();
 });
 
 // Issue #2085: when every value of a write fails, the liveQuery cache must not keep a null

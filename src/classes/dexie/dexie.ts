@@ -69,6 +69,7 @@ import { IndexableType } from '../../public';
 import { observabilityMiddleware } from '../../live-query/observability-middleware';
 import { cacheExistingValuesMiddleware } from '../../dbcore/cache-existing-values-middleware';
 import { cacheMiddleware } from '../../live-query/cache/cache-middleware';
+import { reducedQueriesMiddleware } from '../../live-query/reduced-queries';
 import { vipify } from '../../helpers/vipify';
 import { connections } from '../../globals/connections';
 
@@ -278,6 +279,7 @@ export class Dexie implements IDexie {
     // Default middlewares:
     this.use(cacheExistingValuesMiddleware);
     this.use(cacheMiddleware);
+    this.use(reducedQueriesMiddleware);
     this.use(observabilityMiddleware);
     this.use(virtualIndexMiddleware);
     this.use(hooksMiddleware);

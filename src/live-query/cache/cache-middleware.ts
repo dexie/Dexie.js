@@ -10,17 +10,26 @@ import {
   DBCoreMutateResponse,
   DBCoreQueryRequest,
   DBCoreQueryResponse,
+  DBCoreTable,
 } from '../../public/types/dbcore';
+import { CacheEntry } from '../../public/types/cache';
 import { Middleware } from '../../public/types/middleware';
 import { obsSetsOverlap } from '../obs-sets-overlap';
 import { adjustOptimisticFromFailures } from './adjust-optimistic-request-from-failures';
-import { applyOptimisticOps } from './apply-optimistic-ops';
+import { applyOptimisticOps, toReducibleQuery } from './apply-optimistic-ops';
 import { cache } from './cache';
 import { findCompatibleQuery } from './find-compatible-query';
 import { isCachableContext } from './is-cachable-context';
 import { isCachableRequest } from './is-cachable-request';
 import { signalSubscribersLazily } from './signalSubscribers';
 import { subscribeToCacheEntry } from './subscribe-cachentry';
+import {
+  createEntryBuffer,
+  observeEntryBuffer,
+  resetEntryBuffer,
+} from './window-buffer';
+
+const primKeyOf = (table: DBCoreTable) => table.schema.primaryKey.extractKey!;
 
 export const cacheMiddleware: Middleware<DBCore> = {
   stack: 'dbcore',
@@ -102,7 +111,8 @@ export const cacheMiddleware: Middleware<DBCore> = {
                               ops,
                               table,
                               entry,
-                              freezeResults
+                              freezeResults,
+                              true
                             );
                             if (entry.dirty) {
                               // Found out at this point that the entry is dirty - not to rely on!
@@ -110,18 +120,26 @@ export const cacheMiddleware: Middleware<DBCore> = {
                               entry.subscribers.forEach((requery) =>
                                 affectedSubscribers.add(requery)
                               );
-                            } else if (modRes !== entry.res) {
-                              entry.res = modRes;
-                              // Update promise
-                              entry.promise = DexiePromise.resolve({
-                                result: modRes,
-                              } satisfies DBCoreQueryResponse);
+                            } else {
+                              // Observe rows that came into the buffer.
+                              observeEntryBuffer(
+                                entry,
+                                entry.obsSet[`idb://${dbName}/${storeName}/`],
+                                primKeyOf(table)
+                              );
+                              if (modRes !== entry.res) {
+                                entry.res = modRes;
+                                // Update promise
+                                entry.promise = DexiePromise.resolve({
+                                  result: modRes,
+                                } satisfies DBCoreQueryResponse);
 
-                              // No need to notify subscribers. They already have this value.
-                              // We have just updated the value of the cache without having to
-                              // requery the database - because we know the result for this
-                              // query based on computing the operations and applying them
-                              // to the previous result.
+                                // No need to notify subscribers. They already have this value.
+                                // We have just updated the value of the cache without having to
+                                // requery the database - because we know the result for this
+                                // query based on computing the operations and applying them
+                                // to the previous result.
+                              }
                             }
                           } else {
                             if (entry.dirty) {
@@ -261,6 +279,30 @@ export const cacheMiddleware: Middleware<DBCore> = {
             const { requery, signal } = PSD as LiveQueryContext;
             let [cacheEntry, exactMatch, tblCache, container] =
               findCompatibleQuery(dbName, tableName, 'query', req);
+            if (
+              cacheEntry &&
+              exactMatch &&
+              cacheEntry.res &&
+              tblCache.optimisticOps.length > 0
+            ) {
+              // A write is in progress. If its changes cannot be applied to the
+              // cached result, the entry gets dirty. Instead of returning the old
+              // result and querying again after the commit, query now: the read
+              // transaction is queued behind the write and returns its result
+              // right after the commit.
+              applyOptimisticOps(
+                cacheEntry.res as any[],
+                req,
+                tblCache.optimisticOps,
+                downTable,
+                cacheEntry,
+                freezeResults
+              );
+              if (cacheEntry.dirty) {
+                cacheEntry = undefined;
+                exactMatch = false;
+              }
+            }
             if (cacheEntry && exactMatch) {
               cacheEntry.obsSet = req.obsSet!; // So that optimistic result is monitored.
               // How? - because observability-middleware will track result where optimistic
@@ -278,23 +320,34 @@ export const cacheMiddleware: Middleware<DBCore> = {
               // the data from.
 
               // No cached result found. We need to query the database and cache the result.
-              const promise = downTable
-                .query(req)
+              const newEntry: CacheEntry = {
+                obsSet: req.obsSet!,
+                promise: null!,
+                subscribers: new Set(),
+                type: 'query',
+                req,
+                dirty: false,
+              };
+              const reducibleQuery = toReducibleQuery(req, downTable);
+              newEntry.promise = downTable
+                .query(createEntryBuffer(newEntry, req, reducibleQuery))
                 .then((res) => {
                   // Freeze or clone results
-                  const result = res.result;
-                  if (cacheEntry) cacheEntry.res = result;
                   if (freezeResults) {
                     // For performance reasons don't deep freeze.
                     // Only freeze the top-level array and its items.
                     // This is good enough to teach users that the result must be treated as immutable
                     // without enforcing it recursively on the entire result (which is not even possible
                     // for things like Date objects and typed arrays)
-                    for (let i = 0, l = result.length; i < l; ++i) {
-                      Object.freeze(result[i]);
+                    for (let i = 0, l = res.result.length; i < l; ++i) {
+                      Object.freeze(res.result[i]);
                     }
-                    Object.freeze(result);
                   }
+                  // Rows after the result window stay in the buffer.
+                  const result = resetEntryBuffer(newEntry, res.result);
+                  res = { ...res, result };
+                  newEntry.res = result;
+                  if (freezeResults) Object.freeze(result);
                   // If not frozen (cache: 'cloned'), we do NOT clone here.
                   // Since every cache read (including the initial one) will go through
                   // the downstream .then() handler and perform a deepClone on read,
@@ -306,18 +359,10 @@ export const cacheMiddleware: Middleware<DBCore> = {
                   // In case the query operation failed, we need to remove it from the cache
                   // so that subsequent calls does not get the same error but re-evaluate
                   // the query.
-                  if (container && cacheEntry)
-                    delArrayItem(container, cacheEntry);
+                  if (container) delArrayItem(container, newEntry);
                   return Promise.reject(error);
                 });
-              cacheEntry = {
-                obsSet: req.obsSet!,
-                promise,
-                subscribers: new Set(),
-                type: 'query',
-                req,
-                dirty: false,
-              };
+              cacheEntry = newEntry;
               if (container) {
                 container.push(cacheEntry);
               } else {
@@ -346,6 +391,11 @@ export const cacheMiddleware: Middleware<DBCore> = {
                 cacheEntry!,
                 freezeResults
               ) as any[]; // readonly any[]
+              observeEntryBuffer(
+                cacheEntry!,
+                req.obsSet?.[`idb://${dbName}/${tableName}/`],
+                primKeyOf(downTable)
+              );
               return {
                 result: freezeResults ? result : deepClone(result),
               };
