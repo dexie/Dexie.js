@@ -115,20 +115,25 @@ export function applyOptimisticOps(
     cmp(extractPrimKey(a), extractPrimKey(b));
 
   // If direction is 'prev' or 'prevunique', sort in descending order
-  finalResult.sort(
+  const compare =
     req.direction === 'prev' || req.direction === 'prevunique'
       ? (a, b) => sorter(b, a)
-      : sorter
-  );
+      : sorter;
+  finalResult.sort(compare);
 
   // If we have a limit we need to respect it:
   if (req.limit && req.limit < Infinity) {
     if (finalResult.length > req.limit) {
       finalResult.length = req.limit; // Cut of any extras after sorting correctly.
-    } else if (result.length === req.limit && finalResult.length < req.limit) {
-      // We're missing some items because of the limit. We need to add them back.
-      // The easiest way is to mark the cache entry as dirty, which will cause
-      // it to be requeried after the write-transaction successfully completes.
+    }
+    if (
+      result.length === req.limit &&
+      (finalResult.length < req.limit ||
+        compare(finalResult[req.limit - 1], result[req.limit - 1]) > 0)
+    ) {
+      // A full window only tells us about rows up to its old last position.
+      // Even with the same row count, moving that boundary outwards may have
+      // skipped an uncached row. Refill after commit, then cache the new window.
       cacheEntry.dirty = true;
     }
   }
