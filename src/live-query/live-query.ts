@@ -30,6 +30,13 @@ import { rangesOverlap } from '../helpers/rangeset';
 import { domDeps } from '../classes/dexie/dexie-dom-dependencies';
 import { Transaction } from '../classes/transaction';
 import { obsSetsOverlap } from './obs-sets-overlap';
+import {
+  beginReducedQueryRun,
+  createReducedQueryState,
+  disposeReducedQueryState,
+  endReducedQueryRun,
+  ReducedQueryRun,
+} from './reduced-queries';
 
 export interface LiveQueryContext {
   subscr: ObservabilitySet;
@@ -37,6 +44,8 @@ export interface LiveQueryContext {
   requery: () => void;
   trans: null | Transaction;
   querier: Function; // For debugging purposes and Error messages
+  /** Previous results of collections, see reduced-queries.ts */
+  reducedQueries?: ReducedQueryRun;
 }
 
 export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
@@ -67,6 +76,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
 
     let accumMuts: ObservabilitySet = {};
     let currentObs: ObservabilitySet = {};
+    const reducedQueries = createReducedQueryState();
 
     const subscription: Subscription = {
       get closed() {
@@ -78,6 +88,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
         if (abortController) abortController.abort();
         if (startedListening)
           globalEvents.storagemutated.unsubscribe(mutationListener);
+        disposeReducedQueryState(reducedQueries);
       },
     };
 
@@ -116,12 +127,14 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
       if (abortController) abortController.abort(); // Cancel previous query. Last query will be cancelled on unsubscribe().
       abortController = new AbortController();
 
+      const reducedQueryRun = beginReducedQueryRun(reducedQueries);
       const ctx: LiveQueryContext = {
         subscr,
         signal: abortController.signal,
         requery: doQuery,
         querier,
         trans: null, // Make the scope transactionless (don't reuse transaction from outer scope of the caller of subscribe())
+        reducedQueries: reducedQueryRun,
       };
       const ret = execute(ctx);
 
@@ -137,6 +150,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
 
       Promise.resolve(ret).then(
         (result) => {
+          endReducedQueryRun(reducedQueryRun);
           hasValue = true;
           currentValue = result;
           if (closed || ctx.signal.aborted) {
@@ -168,6 +182,7 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
           }
         },
         (err) => {
+          endReducedQueryRun(reducedQueryRun);
           if (closed || ctx.signal.aborted) {
             // An aborted run has been replaced by a newer one, so its error is stale.
             return;

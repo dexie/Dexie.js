@@ -55,7 +55,7 @@ export function compareUint8Arrays(a: Uint8Array, b: Uint8Array) {
 }
 
 // Implementation of https://www.w3.org/TR/IndexedDB-3/#key-type
-function type(x: any) {
+export function type(x: any) {
   const t = typeof x;
   if (t !== 'object') return t;
   if (ArrayBuffer.isView(x)) return 'binary';
@@ -79,7 +79,7 @@ type BinaryType =
   | BigInt64Array
   | BigUint64Array;
 
-function getUint8Array(a: BinaryType): Uint8Array {
+export function getUint8Array(a: BinaryType): Uint8Array {
   if (a instanceof Uint8Array) return a;
   if (ArrayBuffer.isView(a))
     // TypedArray or DataView

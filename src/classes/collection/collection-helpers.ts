@@ -1,7 +1,9 @@
 import { combine } from '../../functions/combine';
 import { exceptions } from '../../errors';
 import { hasOwn } from '../../functions/utils';
-import { wrap } from '../../helpers/promise';
+import { PSD, wrap } from '../../helpers/promise';
+import { RangeSet } from '../../helpers/rangeset';
+import type { LiveQueryContext } from '../../live-query/live-query';
 import { Collection } from './';
 import {
   DBCoreCursor,
@@ -26,6 +28,7 @@ export function isPlainKeyRange(
 
 export function addFilter(ctx: CollectionContext, fn: Function) {
   ctx.filter = combine(ctx.filter, fn);
+  ctx.filterCount = (ctx.filterCount || 0) + 1;
 }
 
 export function addReplayFilter(
@@ -79,6 +82,20 @@ export function openCursor(
   });
 }
 
+/** Rows skipped by offset() are not read, so a liveQuery does not observe
+ * their keys. A delete of one of them shifts the window, also when the writer
+ * did not know its index values. Observe all deletes of the table, like count().
+ */
+function observeDeletes(ctx: CollectionContext) {
+  const subscr = (PSD as LiveQueryContext).subscr;
+  if (!subscr) return;
+  const { db, name } = ctx.table;
+  const part = `idb://${db.name}/${name}/:dels`;
+  ((subscr[part] || (subscr[part] = new RangeSet())) as RangeSet).add(
+    new RangeSet(db.core.MIN_KEY, db.core.MAX_KEY)
+  );
+}
+
 export function iter(
   ctx: CollectionContext,
   fn: (item, cursor: DBCoreCursor, advance: Function) => void,
@@ -88,6 +105,7 @@ export function iter(
   const filter = ctx.replayFilter
     ? combine(ctx.filter, ctx.replayFilter())
     : ctx.filter;
+  if (ctx.offset > 0) observeDeletes(ctx);
   if (!ctx.or) {
     return iterate(
       openCursor(ctx, coreTable, coreTrans),
