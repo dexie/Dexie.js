@@ -400,13 +400,9 @@ const mutsAndExpects = () => [
       itemsStartsWithA: [{id: 4, name: "Abbot"}, {id: 6, name: "Ambros"}, {id: 5, name: "Assot"}],
       itemsStartsWithAPrimKeys: [4, 6, 5],
       itemsStartsWithAKeys: ["Abbot", "Ambros", "Assot"],
-      itemsStartsWithACount: 3
-    },
-    // Allowed extras:
-    // If hooks is listened to we'll get an even more correct update of the itemsStartsWithAOffset3 query
-    // since oldVal will be available and offset-queries will be correcly triggered for deleted index keys before the offset.
-    {
-      itemsStartsWithAOffset3: [] 
+      itemsStartsWithACount: 3,
+      // Deleting a skipped row must trigger the offset query even without hooks.
+      itemsStartsWithAOffset3: []
     }
   ],
   // Special case for more fine grained keys observation of put (not knowing oldObjs
@@ -452,7 +448,8 @@ const mutsAndExpects = () => [
       outboundIdBtwnMinus1And2: [{num:1,name:"A"},{num:2,name:"B"}],
       outboundAnyOf_BCD_keys: ["B", "C"]
     },[
-      "itemsStartsWithACount"
+      "itemsStartsWithACount",
+      "itemsStartsWithAOffset3" // Unknown old index values conservatively invalidate offset queries too.
     ]
   ],
   [
@@ -1111,3 +1108,114 @@ promisedTest("Issue 2085: a failing add with an auto-incremented key must not br
 promisedTest("Issue 2085: a failing add with an auto-incremented key must not break liveQuery (cache: 'immutable')", issue2085Test('add', 'immutable'));
 promisedTest("Issue 2085: a bulkAdd where all 50 values fail must not break liveQuery (cache: 'cloned')", issue2085Test('bulkAdd', 'cloned'));
 promisedTest("Issue 2085: a bulkAdd where all 50 values fail must not break liveQuery (cache: 'immutable')", issue2085Test('bulkAdd', 'immutable'));
+
+
+// PR 2361: keep these regressions independent of EventReduce.
+function pr2361WaitFor(predicate, timeout = 500) {
+  const started = Date.now();
+  return new Promise(resolve => {
+    (function check() {
+      if (predicate() || Date.now() - started >= timeout) resolve();
+      else setTimeout(check, 5);
+    })();
+  });
+}
+
+async function pr2361Fixture(cacheMode, run) {
+  const db2 = new Dexie('TestPR2361_' + cacheMode, { cache: cacheMode });
+  db2.version(1).stores({ items: 'id, score, [team+score]' });
+  let reads = 0;
+  db2.use({
+    stack: 'dbcore',
+    name: 'PR2361ReadCounter',
+    level: -1,
+    create: core => ({
+      ...core,
+      table: name => {
+        const table = core.table(name);
+        return {
+          ...table,
+          query: req => { ++reads; return table.query(req); },
+          openCursor: req => { ++reads; return table.openCursor(req); }
+        };
+      }
+    })
+  });
+  const subscriptions = [];
+  const errors = [];
+  const observe = query => {
+    const state = { value: undefined, emissions: 0 };
+    subscriptions.push(liveQuery(query).subscribe({
+      next: value => { state.value = value; ++state.emissions; },
+      error: error => errors.push(String(error))
+    }));
+    return state;
+  };
+  const expectValue = async (state, expected, message) => {
+    await pr2361WaitFor(() => isDeepEqual(state.value, expected));
+    equal(JSON.stringify(state.value), JSON.stringify(expected), message);
+  };
+  try {
+    await db2.items.bulkAdd(Array.from({ length: 20 }, (_, id) => ({
+      id, score: id, team: 'x', note: 'original'
+    })));
+    await run({ db2, observe, expectValue, reads: () => reads });
+    equal(errors.length, 0, 'No liveQuery errors');
+  } finally {
+    subscriptions.forEach(subscription => subscription.unsubscribe());
+    await db2.delete();
+  }
+}
+
+for (const cacheMode of ['immutable', 'cloned']) {
+  for (const shape of ['forward', 'reverse', 'compound', 'tie']) {
+    promisedTest('PR2361 limit window refill: ' + shape + ' (' + cacheMode + ')', () =>
+      pr2361Fixture(cacheMode, async ({ db2, observe, expectValue, reads }) => {
+        if (shape === 'tie') await db2.items.bulkPut([
+          { id: 0, score: 0, team: 'x' },
+          { id: 1, score: 1, team: 'x' },
+          { id: 2, score: 1, team: 'x' }
+        ]);
+        const query = () => (shape === 'compound'
+          ? db2.items.where('[team+score]').between(['x', -1], ['x', 1000])
+          : shape === 'tie' ? db2.items.where('score').between(-1, 1000)
+          : db2.items.orderBy('score'));
+        const collection = () => (shape === 'reverse' ? query().reverse() : query()).limit(2);
+        const state = observe(() => collection().toArray());
+        await pr2361WaitFor(() => state.value !== undefined);
+        deepEqual(state.value.map(row => row.id), shape === 'reverse' ? [19, 18] : [0, 1], 'Initial limited window');
+        const before = reads();
+        // A non-sort update must retain the existing cached window.
+        await db2.items.put({ id: shape === 'reverse' ? 19 : 0, score: shape === 'reverse' ? 19 : 0, team: 'x', note: 'changed' });
+        await pr2361WaitFor(() => state.value.some(row => row.note === 'changed'));
+        ok(state.value.some(row => row.note === 'changed'), 'Cached row updated');
+        equal(reads(), before, 'No IndexedDB query for a cache-safe update');
+        await db2.items.put({ id: shape === 'reverse' ? 19 : 0, team: 'x', score: shape === 'reverse' ? -10 : 100 });
+        const expected = await db2.transaction('r', db2.items, () => collection().toArray());
+        await expectValue(state, expected, 'Moving past the window refills from IndexedDB');
+        const afterRefill = reads();
+        await db2.items.put({ id: shape === 'reverse' ? 18 : 1, score: shape === 'reverse' ? 18 : 1, team: 'x', note: 'cached-again' });
+        await pr2361WaitFor(() => state.value.some(row => row.note === 'cached-again'));
+        ok(state.value.some(row => row.note === 'cached-again'), 'Refilled window remains live');
+        equal(reads(), afterRefill, 'Refilled result is cached again');
+      })
+    );
+  }
+  for (const shape of ['limit-offset', 'offset-limit', 'offset-one', 'reverse', 'primaryKeys']) {
+    promisedTest('PR2361 offset deletion: ' + shape + ' (' + cacheMode + ')', () =>
+      pr2361Fixture(cacheMode, async ({ db2, observe, expectValue }) => {
+        const query = () => {
+          let c = db2.items.where('score').above(5);
+          if (shape === 'reverse') c = c.reverse();
+          c = shape === 'limit-offset' ? c.limit(6).offset(2)
+            : c.offset(shape === 'offset-one' ? 1 : 2).limit(4);
+          return shape === 'primaryKeys' ? c.primaryKeys() : c.toArray();
+        };
+        const state = observe(query);
+        await expectValue(state, await db2.transaction('r', db2.items, query), 'Initial offset result');
+        await db2.items.delete(shape === 'reverse' ? 19 : 6);
+        await expectValue(state, await db2.transaction('r', db2.items, query), 'Deleting a skipped row shifts the window');
+      })
+    );
+  }
+}

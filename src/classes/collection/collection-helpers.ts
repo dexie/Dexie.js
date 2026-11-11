@@ -1,7 +1,9 @@
 import { combine } from '../../functions/combine';
 import { exceptions } from '../../errors';
 import { hasOwn } from '../../functions/utils';
-import { wrap } from '../../helpers/promise';
+import { PSD, wrap } from '../../helpers/promise';
+import { RangeSet } from '../../helpers/rangeset';
+import type { LiveQueryContext } from '../../live-query/live-query';
 import { Collection } from './';
 import {
   DBCoreCursor,
@@ -67,6 +69,16 @@ export function openCursor(
   trans: DBCoreTransaction
 ) {
   const index = getIndexOrStore(ctx, coreTable.schema);
+  const subscr = (PSD as LiveQueryContext).subscr;
+  if (ctx.offset > 0 && subscr && !index.isPrimaryKey) {
+    // Skipped rows may never expose their primary keys (cursor.advance()).
+    // Unknown old index values on delete/put can still shift the offset window.
+    const { db, name } = ctx.table;
+    const part = `idb://${db.name}/${name}/:dels`;
+    ((subscr[part] || (subscr[part] = new RangeSet())) as RangeSet).add(
+      new RangeSet(db.core.MIN_KEY, db.core.MAX_KEY)
+    );
+  }
   return coreTable.openCursor({
     trans,
     values: !ctx.keysOnly,
