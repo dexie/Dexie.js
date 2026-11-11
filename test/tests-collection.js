@@ -446,6 +446,21 @@ asyncTest("eachKey and eachUniqueKey", function () {
     }).finally(start);
 });
 
+promisedTest("Issue 1957: uniqueKeys() and eachUniqueKey() should not affect later queries on the same collection", async () => {
+    await db.users.add({ id: 3, first: "Ylva", last: "Fahlander", username: "yfahlander" });
+
+    const byLastName = db.users.orderBy("last");
+    deepEqual(await byLastName.uniqueKeys(), ["Cedersköld", "Fahlander"], "uniqueKeys() gives each last name once");
+    deepEqual(await byLastName.keys(), ["Cedersköld", "Fahlander", "Fahlander"], "keys() still gives all last names");
+
+    const users = db.users.orderBy("last");
+    const lastNames = [];
+    await users.eachUniqueKey(lastName => lastNames.push(lastName));
+    deepEqual(lastNames, ["Cedersköld", "Fahlander"], "eachUniqueKey() gives each last name once");
+    const fahlanders = await users.filter(user => user.last === "Fahlander").toArray();
+    deepEqual(fahlanders.map(user => user.first), ["David", "Ylva"], "filter().toArray() still finds both Fahlanders");
+});
+
 asyncTest("or", 14, function () {
     db.transaction("rw", db.users, function () {
         db.users.add({ id: 3, first: "Apan", last: "Japan", username: "apanjapan" });
