@@ -36,3 +36,4 @@ export * from './yjs/decoding.js';
 export * from './async-generators/asyncIterablePipeline.js';
 export * from './async-generators/consumeChunkedBinaryStream.js';
 export * from './async-generators/getFetchResponseBodyGenerator.js';
+export * from './StreamingSync.js';

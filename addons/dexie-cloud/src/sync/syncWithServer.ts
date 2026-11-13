@@ -15,6 +15,7 @@ import {
 import { encodeIdsForServer } from './encodeIdsForServer';
 import { UserLogin } from '../db/entities/UserLogin';
 import { updateSyncRateLimitDelays } from './ratelimit';
+import { processStreamingResponse } from './processStreamingResponse';
 //import {BisonWebStreamReader} from "dreambase-library/dist/typeson-simplified/BisonWebStreamReader";
 
 export async function syncWithServer(
@@ -51,8 +52,16 @@ export async function syncWithServer(
     headers.Authorization = `Bearer ${accessToken}`;
   }
 
+  // Pending realm downloads for resume info — embedded in $syncState (already loaded as `syncState` argument)
+  const pendingDownloads = syncState?.realmDownloads
+    ? Object.entries(syncState.realmDownloads).map(([realmId, d]) => ({
+        realmId,
+        ...d,
+      }))
+    : [];
+
   const syncRequest: SyncRequest = {
-    v: 3, // v3 = supports BlobRef
+    v: 4, // v4 = streaming NDJSON support
     dbID: syncState?.remoteDbId,
     clientIdentity,
     schema: schema || {},
@@ -68,6 +77,11 @@ export async function syncWithServer(
     changes: encodeIdsForServer(db.dx.core.schema, currentUser, changes),
     y,
     dxcv: db.cloud.version,
+    syncedRealmDownloads: pendingDownloads.map((d) => ({
+      realmId: d.realmId,
+      serverRevision: d.serverRevision,
+      resumeCursor: d.resumeCursor ?? undefined,
+    })),
   };
   console.debug('Sync request', syncRequest);
   db.syncStateChangedEvent.next({
@@ -91,7 +105,25 @@ export async function syncWithServer(
     throw new HttpError(res);
   }
 
-  switch (res.headers.get('content-type')) {
+  const contentType = res.headers.get('content-type') ?? '';
+
+  if (contentType.includes('ndjson')) {
+    // New streaming path (v4+)
+    const { syncResponse } = await processStreamingResponse(
+      db,
+      res,
+      pendingDownloads
+    );
+    // The streaming path's `sync-response` row carries the full
+    // SyncResponse shape (serverRevision, dbId, realms, inviteRealms,
+    // schema, changes, rejections, yMessages) so it's a drop-in
+    // replacement for the JSON path. Realm objects were written
+    // directly by processStreamingResponse — they are NOT in
+    // syncResponse.changes (server contract).
+    return syncResponse;
+  }
+
+  switch (contentType) {
     case 'application/x-bison':
     case 'application/x-bison-stream':
       // BISON format deprecated - throw error if server sends it
