@@ -1,8 +1,8 @@
 import { DBCore, DBCoreTable, DBCoreMutateResponse } from 'dexie';
 import * as Y from 'yjs';
 import { DbSchema } from 'dexie';
-import { YUpdateRow } from './types/YUpdateRow';
-import { hasOwn } from './helpers/hasOwn';
+import { YUpdateRow } from './types/YUpdateRow.js';
+import { hasOwn } from './helpers/hasOwn.js';
 
 const EMPTY_ARRAY = [] as const; // Optimization of returning empty array frequently in flatMap operaion.
 

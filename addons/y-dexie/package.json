@@ -20,7 +20,8 @@
     "url": "https://github.com/dexie/Dexie.js.git"
   },
   "scripts": {
-    "test": "just-build test && pnpm run test-unit",
+    "test": "pnpm run build && pnpm run test:typings && just-build test && pnpm run test-unit",
+    "test:typings": "node test/typings/run.mjs",
     "test-unit": "karma start test/unit/karma.conf.cjs --single-run",
     "test:ltcloud": "cross-env LAMBDATEST=true pnpm run test:ltTunnel & sleep 10 && pnpm run test; UNIT_STATUS=$?; kill $(cat tunnel.pid); exit $UNIT_STATUS",
     "test:ltTunnel": "node ../../test/lt-local",

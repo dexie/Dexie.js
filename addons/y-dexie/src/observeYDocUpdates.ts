@@ -1,12 +1,12 @@
 import type { Dexie } from 'dexie';
 import * as Y from 'yjs';
-import { YUpdateRow } from './types/YUpdateRow';
+import { YUpdateRow } from './types/YUpdateRow.js';
 import type { EntityTable } from 'dexie';
-import { throwIfDestroyed } from './docCache';
+import { throwIfDestroyed } from './docCache.js';
 import { liveQuery } from 'dexie';
 import { cmp } from 'dexie';
-import { setCurrentUpdateRow } from './currentUpdateRow';
-import type { DexieYProvider } from './DexieYProvider';
+import { setCurrentUpdateRow } from './currentUpdateRow.js';
+import type { DexieYProvider } from './DexieYProvider.js';
 
 export function observeYDocUpdates(
   provider: DexieYProvider,
