@@ -1,4 +1,4 @@
-import { nop } from './nop';
+import { nop } from './nop.js';
 
 export function nonStoppableEventChain(f1: Function, f2: Function) {
   if (f1 === nop) return f2;

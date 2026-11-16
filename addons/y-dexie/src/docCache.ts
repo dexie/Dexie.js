@@ -1,7 +1,7 @@
 import { Dexie } from 'dexie';
 import * as Y from 'yjs';
-import { YDocCache } from './types/YDocCache';
-import { DexieYDocMeta } from './types/DexieYDocMeta';
+import { YDocCache } from './types/YDocCache.js';
+import { DexieYDocMeta } from './types/DexieYDocMeta.js';
 
 // The finalization registry
 const docRegistry = new FinalizationRegistry<{ cache: any; key: string }>(

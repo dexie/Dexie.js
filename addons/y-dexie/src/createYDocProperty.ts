@@ -1,6 +1,6 @@
 import { Dexie, Table } from 'dexie';
-import { getDocCache } from './docCache';
-import { getOrCreateDocument } from './getOrCreateDocument';
+import { getDocCache } from './docCache.js';
+import { getOrCreateDocument } from './getOrCreateDocument.js';
 
 const { getByKeyPath } = Dexie;
 

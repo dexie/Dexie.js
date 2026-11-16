@@ -1,5 +1,5 @@
 import { Dexie } from 'dexie';
-import { compressYDocs } from './compressYDocs';
+import { compressYDocs } from './compressYDocs.js';
 
 const GC_DELAY = 10_000; // Delay before starting GC when DB is started
 const GC_INTERVAL = 300_000; // Every 5 minutes

@@ -1,7 +1,7 @@
 import { Dexie, cmp } from 'dexie';
-import { YLastCompressed } from './types/YLastCompressed';
-import { YSyncState } from './types/YSyncState';
-import { YUpdateRow } from './types/YUpdateRow';
+import { YLastCompressed } from './types/YLastCompressed.js';
+import { YSyncState } from './types/YSyncState.js';
+import { YUpdateRow } from './types/YUpdateRow.js';
 import * as Y from 'yjs';
 
 /** Go through all Y.Doc tables in the entire local db and compress updates
