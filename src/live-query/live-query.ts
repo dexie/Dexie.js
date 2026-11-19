@@ -137,8 +137,6 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
 
       Promise.resolve(ret).then(
         (result) => {
-          hasValue = true;
-          currentValue = result;
           if (closed || ctx.signal.aborted) {
             // closed - no subscriber anymore.
             // signal.aborted - new query was made before this one completed and
@@ -148,6 +146,8 @@ export function liveQuery<T>(querier: () => T | Promise<T>): IObservable<T> {
             // and we must not base currentObs on the half-baked subscr.
             return;
           }
+          hasValue = true;
+          currentValue = result;
           // Check if mutations arrived during the query that overlap with the
           // OLD observation set. If so, re-query immediately.
           if (shouldNotify()) {
