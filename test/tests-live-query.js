@@ -1111,3 +1111,67 @@ promisedTest("Issue 2085: a failing add with an auto-incremented key must not br
 promisedTest("Issue 2085: a failing add with an auto-incremented key must not break liveQuery (cache: 'immutable')", issue2085Test('add', 'immutable'));
 promisedTest("Issue 2085: a bulkAdd where all 50 values fail must not break liveQuery (cache: 'cloned')", issue2085Test('bulkAdd', 'cloned'));
 promisedTest("Issue 2085: a bulkAdd where all 50 values fail must not break liveQuery (cache: 'immutable')", issue2085Test('bulkAdd', 'immutable'));
+
+promisedTest('A replaced live query run must not overwrite the cached snapshot when it resolves late', async () => {
+  const database = new Dexie('LateSuccessSnapshot');
+  database.version(1).stores({ items: '++id' });
+  await database.open();
+  let heldGate;
+  let finishHeldRun;
+  const entered = new Signal();
+  let emitted = new Signal();
+  const values = [];
+  const query = liveQuery(async () => {
+    const gate = heldGate;
+    heldGate = null;
+    const count = await database.items.count();
+    if (gate) {
+      entered.resolve();
+      await gate;
+    }
+    return count;
+  });
+  const subscription = query.subscribe(value => {
+    values.push(value);
+    emitted.resolve(value);
+  });
+  try {
+    equal(await emitted.promise, 0, 'The initial result is available');
+    emitted = new Signal();
+    heldGate = new Promise(resolve => { finishHeldRun = resolve; });
+    await database.items.add({});
+    await entered.promise;
+    await database.items.add({});
+    equal(await emitted.promise, 2, 'The replacement result is emitted');
+    equal(query.getValue(), 2, 'The cache contains the replacement result');
+    finishHeldRun();
+    await new Promise(resolve => setTimeout(resolve, 50));
+    deepEqual(values, [0, 2], 'The superseded result is not emitted');
+    ok(query.hasValue(), 'The current result stays available');
+    equal(query.getValue(), 2, 'A new consumer sees the current result, not the superseded result');
+  } finally {
+    finishHeldRun && finishHeldRun();
+    subscription.unsubscribe();
+    await database.delete();
+  }
+});
+
+promisedTest('An unsubscribed live query run must not create a cached value when it resolves', async () => {
+  let finish;
+  const started = new Signal();
+  const gate = new Promise(resolve => { finish = resolve; });
+  const query = liveQuery(async () => {
+    started.resolve();
+    await gate;
+    return 'closed result';
+  });
+  const values = [];
+  const subscription = query.subscribe(value => values.push(value));
+  await started.promise;
+  subscription.unsubscribe();
+  finish();
+  await new Promise(resolve => setTimeout(resolve, 50));
+  deepEqual(values, [], 'No result was emitted after unsubscribe');
+  ok(!query.hasValue(), 'A closed run does not mark a value as available');
+  equal(query.getValue(), undefined, 'A closed run does not store a result');
+});
