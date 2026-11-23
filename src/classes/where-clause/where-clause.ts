@@ -58,9 +58,7 @@ export class WhereClause implements IWhereClause {
     try {
       if (
         this._cmp(lower, upper) > 0 ||
-        (this._cmp(lower, upper) === 0 &&
-          (includeLower || includeUpper) &&
-          !(includeLower && includeUpper))
+        (this._cmp(lower, upper) === 0 && !(includeLower && includeUpper))
       )
         return emptyCollection(this); // Workaround for idiotic W3C Specification that DataError must be thrown if lower > upper. The natural result would be to return an empty collection.
       return new this.Collection(this, () =>
@@ -340,11 +338,18 @@ export class WhereClause implements IWhereClause {
     // Join overlapping ranges
     let set;
     try {
-      set = ranges.reduce(addRange, []);
+      set = ranges
+        // A range with equal bounds is empty unless both bounds are included
+        .filter(
+          (range) =>
+            (includeLowers && includeUppers) || cmp(range[0], range[1]) !== 0
+        )
+        .reduce(addRange, []);
       set.sort(rangeSorter);
     } catch (ex) {
       return fail(this, INVALID_KEY_ARGUMENT);
     }
+    if (set.length === 0) return emptyCollection(this);
 
     let rangePos = 0;
     const keyIsBeyondCurrentEntry = includeUppers
