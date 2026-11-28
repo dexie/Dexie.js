@@ -1,0 +1,11 @@
+{
+  "compilerOptions": {
+    "strict": true,
+    "noEmit": true,
+    "target": "ES2021",
+    // The public provider already references Symbol.dispose.
+    "lib": ["ES2021", "DOM", "ESNext.Disposable"],
+    "types": []
+  },
+  "files": ["exports.mts"]
+}

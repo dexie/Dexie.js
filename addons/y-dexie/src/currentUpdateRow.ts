@@ -1,4 +1,4 @@
-import type { YUpdateRow } from './types/YUpdateRow';
+import type { YUpdateRow } from './types/YUpdateRow.js';
 
 export let currentUpdateRow: YUpdateRow | null = null;
 

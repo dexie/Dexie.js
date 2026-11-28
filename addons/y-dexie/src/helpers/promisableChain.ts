@@ -1,4 +1,4 @@
-import { nop } from './nop';
+import { nop } from './nop.js';
 
 export function promisableChain(f1, f2) {
   if (f1 === nop) return f2;

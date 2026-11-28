@@ -1,8 +1,8 @@
 import type { Dexie } from 'dexie';
-import { destroyedDocs } from './docCache';
-import { YDocCache } from './types/YDocCache';
+import { destroyedDocs } from './docCache.js';
+import { YDocCache } from './types/YDocCache.js';
 import * as Y from 'yjs';
-import { DexieYDocMeta } from './types/DexieYDocMeta';
+import { DexieYDocMeta } from './types/DexieYDocMeta.js';
 
 export function getOrCreateDocument(
   db: Dexie,

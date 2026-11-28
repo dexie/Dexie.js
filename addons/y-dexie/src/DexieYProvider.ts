@@ -1,12 +1,13 @@
 import { Dexie, DexieEvent, DexieEventSet, Unsubscribable } from 'dexie';
 import * as Y from 'yjs';
-import { throwIfDestroyed, getDocCache, destroyedDocs } from './docCache';
-import { getOrCreateDocument } from './getOrCreateDocument';
-import { observeYDocUpdates } from './observeYDocUpdates';
-import { promisableChain } from './helpers/promisableChain';
-import { nonStoppableEventChain } from './helpers/nonStoppableEventChain';
-import { currentUpdateRow } from './currentUpdateRow';
-import { Disposable } from './helpers/Disposable';
+import { throwIfDestroyed, getDocCache, destroyedDocs } from './docCache.js';
+import { getOrCreateDocument } from './getOrCreateDocument.js';
+import { observeYDocUpdates } from './observeYDocUpdates.js';
+import { promisableChain } from './helpers/promisableChain.js';
+import { nonStoppableEventChain } from './helpers/nonStoppableEventChain.js';
+import { currentUpdateRow } from './currentUpdateRow.js';
+import { Disposable } from './helpers/Disposable.js';
+import type { YUpdateRow } from './types/YUpdateRow.js';
 
 const wm = new WeakMap<any, DexieYProvider>();
 
@@ -136,7 +137,7 @@ class DexieYProvider {
     return wm.get(doc);
   }
   static getDocCache = getDocCache;
-  static get currentUpdateRow() {
+  static get currentUpdateRow(): YUpdateRow | null {
     return currentUpdateRow;
   }
 

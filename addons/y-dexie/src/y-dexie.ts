@@ -5,9 +5,9 @@ import {
   IndexSpec,
   TableSchema,
 } from 'dexie';
-import { createYjsMiddleware } from './createYjsMiddleware';
-import { createYDocProperty } from './createYDocProperty';
-import { periodicGC } from './periodicGC';
+import { createYjsMiddleware } from './createYjsMiddleware.js';
+import { createYDocProperty } from './createYDocProperty.js';
+import { periodicGC } from './periodicGC.js';
 
 const YJS_MIDDLEWARE_NAME = 'yjsMiddleware';
 
@@ -15,9 +15,9 @@ export interface YDexieOptions {
   gc?: boolean; // Enable or disable garbage collection for Y.js documents.
 }
 
-export { compressYDocs } from './compressYDocs';
-export { DexieYProvider } from './DexieYProvider';
-export * from './types';
+export { compressYDocs } from './compressYDocs.js';
+export { DexieYProvider } from './DexieYProvider.js';
+export * from './types/index.js';
 
 export default function yDexie(dbOrOptions: Dexie | YDexieOptions) {
   // This function is a placeholder for the y-dexie addon.
