@@ -26,7 +26,7 @@ export type KeyPaths<T, MAXDEPTH = 'II', CURRDEPTH extends string = ''> = {
         ? K extends any[] // Array of arrays (issue #2026)
           ? P | `${P}.${number}` | `${P}.${number}.${number}`
           : K extends object // only drill into the array element if it's an object
-            ? P | `${P}.${number}` | `${P}.${number}.${KeyPaths<Required<K>>}`
+            ? P | `${P}.${number}` | `${P}.${number}.${KeyPaths<Required<K>, MAXDEPTH, `${CURRDEPTH}I`>}`
             : P | `${P}.${number}`
         : T[P] extends (...args: any[]) => any // Method
           ? never
