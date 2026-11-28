@@ -41,3 +41,31 @@ const specB2: UpdateSpec<WithNestedArray> = {
 const specB3: UpdateSpec<WithNestedArray> = {
   addresses: [{ city: 'Stockholm' }],
 };
+
+// Issue 2373: KeyPaths must carry the depth counter into the array-element
+// branch, so row types that refer back to themselves through an array element
+// resolve instead of failing with TS2615.
+interface TreeNode {
+  id: string;
+  name: string;
+  children: TreeNode[];
+}
+const specTreeNode: UpdateSpec<TreeNode> = {
+  name: 'new name',
+};
+const specTreeNodeChild: UpdateSpec<TreeNode> = {
+  'children.0.name': 'new child name',
+};
+interface Author {
+  id: string;
+  name: string;
+  posts: Post[];
+}
+interface Post {
+  id: string;
+  title: string;
+  author: Author;
+}
+const specAuthorPost: UpdateSpec<Author> = {
+  'posts.0.title': 'new title',
+};
