@@ -3,6 +3,7 @@ import { ObservabilitySet } from '../../public/types/db-events';
 import { extendObservabilitySet } from '../extend-observability-set';
 import { obsSetsOverlap } from '../obs-sets-overlap';
 import { cache } from './cache';
+import { invalidateReducedQueries } from '../reduced-queries';
 
 let unsignaledParts: ObservabilitySet = {};
 let isTaskEnqueued = false;
@@ -28,6 +29,11 @@ export function signalSubscribersNow(
   deleteAffectedCacheEntries = false
 ) {
   const queriesToSignal = new Set<() => void>();
+  if (deleteAffectedCacheEntries) {
+    // The changes come from another tab, worker or Dexie instance (or the
+    // database was created), so they are not known to the reduced queries.
+    invalidateReducedQueries(updatedParts);
+  }
   if (updatedParts.all) {
     // Signal all subscribers to requery.
     for (const tblCache of Object.values(cache)) {
