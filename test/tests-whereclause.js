@@ -509,7 +509,7 @@ if (!supports("compound")) {
     });
 }
 
-asyncTest("above, aboveOrEqual, below, belowOrEqual, between", 32, function () {
+asyncTest("above, aboveOrEqual, below, belowOrEqual, between", 34, function () {
     db.folders.where('id').above(firstFolderId + 4).toArray(function (a) {
         equal(a.length, 4, "Four folders have id above 5");
         equal(a[0].path, "/usr/local/var");
@@ -566,6 +566,14 @@ asyncTest("above, aboveOrEqual, below, belowOrEqual, between", 32, function () {
             equal(a.length, 2, "Two folder between 1 and 2 (including both lower and upper)");
             equal(a[0].id, firstFolderId, "Number 1 among found items");
             equal(a[1].id, firstFolderId + 1, "Number 2 among found items");
+        });
+    }).then(function () {
+        return db.folders.where('id').between(firstFolderId, firstFolderId, false, false).toArray(function (a) {
+            equal(a.length, 0, "Zarro folders between 1 and 1 (neither including lower nor upper)");
+        });
+    }).then(function () {
+        return db.folders.where('id').between(firstFolderId, firstFolderId, true, true).toArray(function (a) {
+            equal(a.length, 1, "One folder between 1 and 1 (including both lower and upper)");
         });
     }).catch(function (err) {
         ok(false, err.stack || err);
@@ -659,6 +667,17 @@ asyncTest("inAnyOfRanges", function () {
             equal(result.length, 2, "Should give us two persons");
             equal(result[0].name, "Ylva", "First is Ylva");
             equal(result[1].name, "David", "Second is David");
+            return db.friends.where("age").inAnyRange([[40, 40]]).toArray();
+        }).then(function (result) {
+            equal(result.length, 0, "[40, 40] without includeUppers is empty");
+            return db.friends.where("age").inAnyRange([[40, 40], [42, 42]], { includeLowers: false }).toArray();
+        }).then(function (result) {
+            equal(result.length, 0, "[40, 40] and [42, 42] without includeLowers are empty");
+            return db.friends.where("age").inAnyRange([[40, 40], [72, 72]], { includeUppers: true }).toArray();
+        }).then(function (result) {
+            equal(result.length, 2, "Should give us two persons");
+            equal(result[0].name, "Ylva", "First is Ylva");
+            equal(result[1].name, "Ann-Sofie", "Second is Ann-Sofie");
         });
     }).catch(function (err) {
         ok(false, err.stack || err);
